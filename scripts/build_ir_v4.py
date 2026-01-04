@@ -140,7 +140,7 @@ def build_graph_ir_v4(config: Dict, model_name: str, alignment_bytes: int = 64) 
     dtype = config["dtype"]
     elem_bytes = v3.DTYPE_BYTES.get(dtype, 4)
     weight_dtype = str(config.get("weight_dtype", "")).lower()
-    use_k_align = weight_dtype.startswith(("q4_k", "q6_k", "q8_k"))
+    use_k_align = weight_dtype in ("q4_k", "q6_k", "q8_k")
     qk_align_bytes = QK_K * elem_bytes
 
     E = config["embed_dim"]
@@ -2275,9 +2275,7 @@ def parse_args(argv: List[str]) -> Dict:
         elif arg.startswith("--weight-dtype="):
             w_dtype = arg.split("=", 1)[1].lower()
             # Normalize aliases
-            if w_dtype == "q4_k_m":
-                w_dtype = "q4_k"
-            if w_dtype not in ("q4_0", "q4_k", "q6_k", "q8_0", "q8_k", "f32", "bf16"):
+            if w_dtype not in ("q4_0", "q4_k", "q4_k_m", "q6_k", "q8_0", "q8_k", "f32", "bf16"):
                 raise ValueError(f"--weight-dtype must be q4_0/q4_k/q4_k_m/q6_k/q8_0/q8_k/f32/bf16, got: {w_dtype}")
             args["weight_dtype"] = w_dtype
         elif arg.startswith("--modes="):
@@ -2388,12 +2386,14 @@ def print_usage():
     print()
     print("Quantization Options (llama.cpp compatible):")
     print("  --weight-dtype=q4_k     Q4_K: 4-bit K-quant (4.5 bits/weight)")
+    print("  --weight-dtype=q4_k_m   Mixed GGUF; uses per-weight manifest dtypes")
     print("  --weight-dtype=q6_k     Q6_K: 6-bit K-quant (6.5 bits/weight)")
     print("  --weight-dtype=q4_0     Q4_0: Simple 4-bit (4.5 bits/weight)")
     print("  --weight-dtype=q8_0     Q8_0: Simple 8-bit (8.5 bits/weight)")
     print()
     print("Notes:")
     print("  Quantized inference uses --weight-dtype for weights, --dtype for activations.")
+    print("  q4_k_m requires --weights-manifest and does not force global K-alignment.")
     print("  Block structures match llama.cpp/GGML for GGUF model compatibility.")
     print("  Training mode auto-detects system memory and computes optimal config.")
     print()
@@ -2532,6 +2532,13 @@ def main(argv: List[str]) -> int:
             manifest_weight_dtype = next(iter(non_fp))
         elif len(dtype_set) == 1:
             manifest_weight_dtype = next(iter(dtype_set))
+
+    if args.get("weight_dtype") == "q4_k_m":
+        if weights_manifest:
+            print("[WEIGHTS] q4_k_m is mixed; using manifest dtypes for weights")
+            args["weight_dtype"] = None
+        else:
+            raise ValueError("--weight-dtype=q4_k_m requires --weights-manifest")
 
     if args.get("weight_dtype"):
         config["weight_dtype"] = args["weight_dtype"]

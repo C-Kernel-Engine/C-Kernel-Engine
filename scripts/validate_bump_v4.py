@@ -136,14 +136,14 @@ def main() -> int:
             )
         dtype = str(entry.get("dtype", "")).lower()
         if dtype and dtype != buf["dtype"]:
-            warnings.append(f"{name}: dtype mismatch (manifest={dtype}, layout={buf['dtype']})")
+            errors.append(f"{name}: dtype mismatch (manifest={dtype}, layout={buf['dtype']})")
 
         # Optional size sanity via compute_size (best-effort).
         if buf["shape"] and buf["dtype"]:
             try:
                 expected = v3.compute_size(buf["shape"], buf["dtype"])
                 if expected != int(buf["size"]):
-                    warnings.append(
+                    errors.append(
                         f"{name}: computed size {expected} != layout size {buf['size']} (dtype={buf['dtype']})"
                     )
             except Exception:

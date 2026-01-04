@@ -79,6 +79,54 @@ def run_cmd_allow_fail(cmd: list, cwd: Path = None) -> subprocess.CompletedProce
     return subprocess.run(cmd, cwd=cwd)
 
 
+def load_manifest_non_fp_dtypes(manifest_path: Path) -> set[str]:
+    """Return non-FP dtype set from a v4 weights manifest."""
+    try:
+        with manifest_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return set()
+
+    dtypes = {str(entry.get("dtype", "")).lower() for entry in data.get("entries", [])}
+    return {dt for dt in dtypes if dt and dt not in {"fp32", "f32", "bf16", "fp16"}}
+
+
+def normalize_weight_dtype(weight_dtype: Optional[str], manifest_path: Optional[Path]) -> Optional[str]:
+    """Normalize weight dtype and guard against mixed-quant overrides."""
+    if not weight_dtype:
+        return None
+
+    dtype = weight_dtype.lower()
+    if dtype == "float32":
+        dtype = "f32"
+
+    if dtype == "q4_k_m":
+        if not manifest_path or not manifest_path.exists():
+            log_error("q4_k_m requires a weights manifest (GGUF conversion).")
+            sys.exit(1)
+        log("  q4_k_m is mixed quant; using per-weight dtypes from manifest", C_DIM)
+        return None
+
+    if manifest_path and manifest_path.exists():
+        non_fp = load_manifest_non_fp_dtypes(manifest_path)
+        if non_fp:
+            if dtype in {"f32", "bf16"}:
+                log_error("Manifest has quantized weights; do not force float --weight-dtype.")
+                sys.exit(1)
+            if len(non_fp) > 1:
+                types = ", ".join(sorted(non_fp))
+                log_error(
+                    f"Manifest has mixed quant dtypes ({types}); omit --weight-dtype or use --weight-dtype=q4_k_m."
+                )
+                sys.exit(1)
+            only = next(iter(non_fp))
+            if dtype != only:
+                log_error(f"Manifest dtype is {only}; --weight-dtype={dtype} is incompatible.")
+                sys.exit(1)
+
+    return dtype
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Input Detection
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -822,10 +870,6 @@ def run_pipeline(args: argparse.Namespace):
     model_input = args.model
     weights_path = None
 
-    # Normalize weight dtype aliases
-    if args.weight_dtype == 'q4_k_m':
-        args.weight_dtype = 'q4_k'
-
     # Detect input type
     input_type, info = detect_input_type(model_input)
     log(f"{C_ORANGE}C-Kernel-Engine v4{C_RESET}")
@@ -847,8 +891,6 @@ def run_pipeline(args: argparse.Namespace):
 
             # Prefer Q4_K_M if available, otherwise first file
             gguf_path = None
-            weight_dtype = args.weight_dtype or "q4_k"
-
             for pattern in ["*q4_k_m*", "*q4_k*", "*q6_k*", "*"]:
                 matches = list(model_dir.glob(pattern + ".gguf"))
                 if matches:
@@ -925,10 +967,11 @@ def run_pipeline(args: argparse.Namespace):
     # Build IR
     # If debug or parity is enabled, force recompile to ensure special code is generated
     force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
+    weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_path)
     layout_path = step_build_ir(
         config_path, work_dir,
         manifest_path=manifest_path,
-        weight_dtype=args.weight_dtype,
+        weight_dtype=weight_dtype,
         force=force_for_debug,
         debug=getattr(args, 'debug', False),
         parity=getattr(args, 'parity', False),
@@ -1024,7 +1067,7 @@ Examples:
     run_parser = subparsers.add_parser('run', help='Run model')
     run_parser.add_argument('model', help='Model ID, URL, GGUF file, or local path')
     run_parser.add_argument('--weight-dtype', choices=['float32', 'bf16', 'q4_k', 'q4_k_m', 'q6_k'],
-                           help='Weight dtype (default: float32). q4_k_m is alias for q4_k')
+                           help='Weight dtype override (default: auto). q4_k_m uses mixed GGUF dtypes.')
     run_parser.add_argument('--temperature', type=float, default=0.7,
                            help='Sampling temperature (default: 0.7)')
     run_parser.add_argument('--max-tokens', type=int, default=512,

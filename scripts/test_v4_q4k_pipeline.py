@@ -19,6 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 import re
+import json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -114,12 +115,13 @@ int ck_model_init(const char *weights_path) {{
         return -1;
     }}
 
-    if ({prefix}_init(&g_model) != 0) {{
-        fprintf(stderr, "ck_model_init: model init failed\\n");
+    if ({prefix}_model_allocate(&g_model) != 0) {{
+        fprintf(stderr, "ck_model_init: model allocate failed\\n");
         return -2;
     }}
+    {prefix}_precompute_rope(&g_model);
 
-    if (ck_load_weights_manifest_v4(g_model.memory, weights_path, manifest_path) != 0) {{
+    if (ck_load_weights_manifest_v4(g_model.base, weights_path, manifest_path) != 0) {{
         fprintf(stderr, "ck_model_init: weights load failed\\n");
         return -3;
     }}
@@ -130,67 +132,94 @@ int ck_model_init(const char *weights_path) {{
 
 void ck_model_free(void) {{
     if (!g_initialized) return;
-    {prefix}_free(&g_model);
+    {prefix}_model_free(&g_model);
     free(g_tokens);
-    free(g_logits);
     g_tokens = NULL;
-    g_logits = NULL;
     g_tokens_cap = 0;
+    free(g_logits);
+    g_logits = NULL;
     g_logits_cap = 0;
     g_initialized = 0;
+    g_active_tokens = 0;
+    g_kv_cache_tokens = 0;
 }}
 
-int ck_model_kv_cache_enable(int capacity) {{
-    g_kv_cache_enabled = 1;
-    g_kv_cache_capacity = capacity;
-    return 0;
-}}
-
-int ck_model_embed_tokens(const int32_t *tokens, int n_tokens) {{
-    if (!g_initialized) return -1;
-    if (ensure_tokens_capacity(n_tokens) != 0) return -2;
-    memcpy(g_tokens, tokens, (size_t)n_tokens * sizeof(int32_t));
-    g_active_tokens = n_tokens;
+int ck_model_embed_tokens(const int32_t *tokens, int num_tokens) {{
+    if (!g_initialized || !tokens) return -1;
+    int cap = {safe_name}_MAX_SEQ_LEN;
+    if (g_kv_cache_enabled && g_kv_cache_capacity > 0 && g_kv_cache_capacity < cap) {{
+        cap = g_kv_cache_capacity;
+    }}
+    if (num_tokens > cap) num_tokens = cap;
+    if (num_tokens < 1) num_tokens = 1;
+    if (ensure_tokens_capacity(num_tokens) != 0) return -2;
+    memcpy(g_tokens, tokens, (size_t)num_tokens * sizeof(int32_t));
+    g_active_tokens = num_tokens;
+    if (g_kv_cache_enabled) {{
+        g_kv_cache_tokens = 0;
+    }}
     return 0;
 }}
 
 int ck_model_forward(float *logits_out) {{
     if (!g_initialized) return -1;
-    if (g_active_tokens <= 0) return -2;
+    if (!g_tokens || g_active_tokens <= 0) return -2;
     if (ensure_logits_capacity(g_active_tokens) != 0) return -3;
-
-    if ({prefix}_prefill(&g_model, g_tokens, g_active_tokens) != 0) {{
-        fprintf(stderr, "ck_model_forward: prefill failed\\n");
-        return -4;
+    float *model_logits = {safe_name}_PTR(&g_model, {safe_name}_FOOTER.logits);
+    for (int i = 0; i < g_active_tokens; ++i) {{
+        {prefix}_decode(&g_model, (const int *)&g_tokens[i], i);
+        memcpy(g_logits + (size_t)i * {safe_name}_VOCAB_SIZE,
+               model_logits,
+               (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
     }}
-
+    if (g_kv_cache_enabled) {{
+        g_kv_cache_tokens = g_active_tokens;
+    }}
     if (logits_out) {{
-        memcpy(logits_out,
-               g_model.logits,
+        memcpy(logits_out, g_logits,
                (size_t)g_active_tokens * (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
     }}
-    g_kv_cache_tokens = g_active_tokens;
     return 0;
+}}
+
+int ck_model_kv_cache_enable(int capacity) {{
+    if (!g_initialized) return -1;
+    g_kv_cache_enabled = 1;
+    int cap = capacity;
+    if (cap <= 0 || cap > {safe_name}_MAX_SEQ_LEN) cap = {safe_name}_MAX_SEQ_LEN;
+    g_kv_cache_capacity = cap;
+    g_kv_cache_tokens = 0;
+    g_active_tokens = 0;
+    return 0;
+}}
+
+void ck_model_kv_cache_reset(void) {{
+    g_kv_cache_tokens = 0;
+    g_active_tokens = 0;
 }}
 
 int ck_model_decode(int32_t token, float *logits_out) {{
     if (!g_initialized) return -1;
-    if (!g_kv_cache_enabled) return -2;
-    if (g_kv_cache_tokens >= g_kv_cache_capacity) return -3;
-
-    if ({prefix}_decode(&g_model, &token, g_kv_cache_tokens) != 0) {{
-        fprintf(stderr, "ck_model_decode: decode failed\\n");
-        return -4;
-    }}
-
+    int token_index = g_kv_cache_tokens;
+    if (token_index < 0 || token_index >= g_kv_cache_capacity) return -2;
+    if (ensure_logits_capacity(token_index + 1) != 0) return -3;
+    {prefix}_decode(&g_model, (const int *)&token, token_index);
+    float *model_logits = {safe_name}_PTR(&g_model, {safe_name}_FOOTER.logits);
+    memcpy(g_logits + (size_t)token_index * {safe_name}_VOCAB_SIZE,
+           model_logits,
+           (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
+    g_kv_cache_tokens = token_index + 1;
+    g_active_tokens = g_kv_cache_tokens;
     if (logits_out) {{
         memcpy(logits_out,
-               g_model.logits + (size_t)g_kv_cache_tokens * {safe_name}_VOCAB_SIZE,
+               g_logits + (size_t)token_index * {safe_name}_VOCAB_SIZE,
                (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
     }}
-    g_kv_cache_tokens += 1;
-    g_active_tokens = g_kv_cache_tokens;
     return 0;
+}}
+
+float *ck_model_get_logits(void) {{
+    return g_logits;
 }}
 
 int ck_model_get_vocab_size(void) {{
@@ -216,6 +245,16 @@ int ck_model_verify_canaries(void) {{
     if verbose:
         print(f"[emit] {model_c_path}")
     return model_c_path
+
+
+def infer_weight_dtype(manifest_path: Path) -> str | None:
+    with manifest_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    dtypes = {str(e.get("dtype", "")).lower() for e in data.get("entries", [])}
+    non_fp = {dt for dt in dtypes if dt and dt not in {"fp32", "f32", "bf16", "fp16"}}
+    if len(non_fp) == 1:
+        return next(iter(non_fp))
+    return None
 
 
 def compile_generated(out_dir: Path, verbose: bool) -> Path:
@@ -273,6 +312,10 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
         convert_cmd.append("--validate")
     run(convert_cmd, verbose)
 
+    weight_dtype = infer_weight_dtype(manifest)
+    if verbose:
+        print(f"[info] manifest weight dtype for IR: {weight_dtype or 'fp32'}")
+
     ir_cmd = [
         sys.executable,
         str(ROOT / "scripts" / "build_ir_v4.py"),
@@ -286,8 +329,6 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
         "prefill,decode",
         "--dtype",
         "fp32",
-        "--weight-dtype",
-        "q4_k",
         "--weights-manifest",
         str(manifest),
         "--max-layers",
@@ -295,6 +336,8 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
         "--emit",
         "lib",
     ]
+    if weight_dtype:
+        ir_cmd.extend(["--weight-dtype", weight_dtype])
     run(ir_cmd, verbose)
 
     validate_cmd = [
@@ -403,13 +446,14 @@ def main() -> None:
             "prefill,decode",
             "--dtype",
             "fp32",
-            "--weight-dtype",
-            "q4_k",
             "--weights-manifest",
             str(manifest),
             "--emit",
             "lib",
         ]
+        weight_dtype = infer_weight_dtype(manifest)
+        if weight_dtype:
+            ir_cmd.extend(["--weight-dtype", weight_dtype])
         run(ir_cmd, args.verbose)
         validate_cmd = [
             sys.executable,
