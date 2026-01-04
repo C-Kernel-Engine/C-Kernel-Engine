@@ -1135,6 +1135,72 @@ def emit_c_header(layout: ModelLayout, output_path: str, extra_api: Optional[Lis
         add(f"#define {safe_name}_LAYER_STRIDE  0x{stride:08X}ULL")
         add()
 
+    # Per-layer dtype arrays for mixed quantization support
+    def _get_layer_dtype_maps(layers):
+        """Build per-layer dtype maps from layer buffers."""
+        layer_dtype_maps = []
+        for layer in layers:
+            layer_map = {}
+            for buf in layer.buffers:
+                # Parse "layer.N.weight_name"
+                parts = buf.name.split(".", 2)
+                if len(parts) == 3 and parts[0] == "layer":
+                    layer_map[parts[2]] = str(buf.dtype).lower()
+            layer_dtype_maps.append(layer_map)
+        return layer_dtype_maps
+
+    def _has_mixed_layer_dtypes(layer_dtype_maps):
+        """Check if any layer differs from layer 0 in weight dtypes."""
+        if len(layer_dtype_maps) <= 1:
+            return False
+        ref = layer_dtype_maps[0]
+        for layer_map in layer_dtype_maps[1:]:
+            for key in ["wq", "wk", "wv", "wo", "w1", "w2"]:
+                if layer_map.get(key, "") != ref.get(key, ""):
+                    return True
+        return False
+
+    def _dtype_const(dtype: str) -> str:
+        """Convert dtype string to CK_DT_* constant."""
+        if dtype.startswith("q4_k"):
+            return "CK_DT_Q4_K"
+        if dtype.startswith("q6_k"):
+            return "CK_DT_Q6_K"
+        if dtype.startswith("q4_0"):
+            return "CK_DT_Q4_0"
+        if dtype.startswith("q4_1"):
+            return "CK_DT_Q4_1"
+        if dtype.startswith("q5_0"):
+            return "CK_DT_Q5_0"
+        if dtype.startswith("q5_1"):
+            return "CK_DT_Q5_1"
+        if dtype.startswith("q8_0"):
+            return "CK_DT_Q8_0"
+        if dtype.startswith("q8_k"):
+            return "CK_DT_Q8_K"
+        return "CK_DT_FP32"
+
+    if section.layers:
+        layer_dtype_maps = _get_layer_dtype_maps(section.layers)
+        mixed_quant = _has_mixed_layer_dtypes(layer_dtype_maps)
+
+        if mixed_quant:
+            add("/* ============================================================================")
+            add(" * PER-LAYER DTYPE ARRAYS (mixed quantization)")
+            add(" * ============================================================================ */")
+            add()
+            add('#include "ckernel_dtype.h"  /* For CKDataType */')
+            add()
+
+            weight_keys = ["wq", "wk", "wv", "wo", "w1", "w2"]
+            for key in weight_keys:
+                array_name = f"{safe_name}_LAYER_{key.upper()}_DTYPE"
+                values = [_dtype_const(layer_dtype_maps[i].get(key, "")) for i in range(len(section.layers))]
+                add(f"static const CKDataType {array_name}[] = {{")
+                add(f"    {', '.join(values)}")
+                add("};")
+                add()
+
     # Footer offsets
     add("/* ============================================================================")
     add(" * FOOTER OFFSETS")

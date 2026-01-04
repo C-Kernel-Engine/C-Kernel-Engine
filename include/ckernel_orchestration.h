@@ -148,6 +148,14 @@ void ck_residual_add_token_major(const float *a,
                                  int tokens,
                                  int aligned_embed_dim);
 
+/* Generic quantized GEMM dispatcher (NT layout) */
+void ck_gemm_nt_quant(const float *A,
+                      const void *B,
+                      const float *bias,
+                      float *C,
+                      int M, int N, int K,
+                      CKDataType dtype);
+
 void ck_qkv_project_head_major(const float *input,
                                const float *wq, const float *bq,
                                const float *wk, const float *bk,

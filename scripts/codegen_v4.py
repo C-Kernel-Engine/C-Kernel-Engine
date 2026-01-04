@@ -58,7 +58,9 @@ def emit_c_source_v4(layout: v3.ModelLayout,
 
     token_emb_dtype = buffer_dtype(section.header_buffers, "token_emb")
     lm_head_dtype = buffer_dtype(section.footer_buffers, "lm_head_weight")
-    if not lm_head_dtype and config.get("tie_word_embeddings", True):
+    # When embeddings are tied, lm_head uses same weights as token_emb
+    # so it inherits the token_emb dtype (even if layout says fp32)
+    if config.get("tie_word_embeddings", True) and token_emb_dtype:
         lm_head_dtype = token_emb_dtype
 
     # Determine embedding quantization type (None = FP32, or specific quant type)
@@ -87,16 +89,38 @@ def emit_c_source_v4(layout: v3.ModelLayout,
     embed_use_q4_k = embed_quant_type == "q4_k"
     lm_head_use_q4_k = lm_head_quant_type == "q4_k"
 
-    layer_dtype_map = {}
+    # Build per-layer dtype maps for mixed quant support
+    layer_dtype_maps = []  # List of {weight_name: dtype} per layer
     if section.layers:
-        for buf in section.layers[0].buffers:
-            if buf.name.startswith("layer.0."):
+        for layer in section.layers:
+            layer_map = {}
+            for buf in layer.buffers:
+                # Parse "layer.N.weight_name"
                 parts = buf.name.split(".", 2)
-                if len(parts) == 3:
-                    layer_dtype_map[parts[2]] = str(buf.dtype).lower()
+                if len(parts) == 3 and parts[0] == "layer":
+                    layer_map[parts[2]] = str(buf.dtype).lower()
+            layer_dtype_maps.append(layer_map)
 
-    def layer_weight_dtype(name: str) -> str:
+    # Legacy: use layer 0 for backwards compat checks
+    layer_dtype_map = layer_dtype_maps[0] if layer_dtype_maps else {}
+
+    def layer_weight_dtype(name: str, layer_id: int = 0) -> str:
+        if layer_id < len(layer_dtype_maps):
+            return layer_dtype_maps[layer_id].get(name, "")
         return layer_dtype_map.get(name, "")
+
+    # Check if any layer differs from layer 0 (mixed quant)
+    def has_mixed_layer_dtypes() -> bool:
+        if len(layer_dtype_maps) <= 1:
+            return False
+        ref = layer_dtype_maps[0]
+        for layer_map in layer_dtype_maps[1:]:
+            for key in ["wq", "wk", "wv", "wo", "w1", "w2"]:
+                if layer_map.get(key, "") != ref.get(key, ""):
+                    return True
+        return False
+
+    mixed_quant = has_mixed_layer_dtypes()
 
     def dtype_const(dtype: str) -> str:
         """Convert dtype string to CK_DT_* constant."""
@@ -565,12 +589,22 @@ def emit_c_source_v4(layout: v3.ModelLayout,
             add("    p.b2 = NULL;")
         add()
         if has_quant:
-            add(f"    p.wq_dtype = {dtype_const(wq_dtype)};")
-            add(f"    p.wk_dtype = {dtype_const(wk_dtype)};")
-            add(f"    p.wv_dtype = {dtype_const(wv_dtype)};")
-            add(f"    p.wo_dtype = {dtype_const(wo_dtype)};")
-            add(f"    p.w1_dtype = {dtype_const(w1_dtype)};")
-            add(f"    p.w2_dtype = {dtype_const(w2_dtype)};")
+            if mixed_quant:
+                # Per-layer dtypes for mixed quant models
+                add(f"    p.wq_dtype = {safe_name}_LAYER_WQ_DTYPE[layer_id];")
+                add(f"    p.wk_dtype = {safe_name}_LAYER_WK_DTYPE[layer_id];")
+                add(f"    p.wv_dtype = {safe_name}_LAYER_WV_DTYPE[layer_id];")
+                add(f"    p.wo_dtype = {safe_name}_LAYER_WO_DTYPE[layer_id];")
+                add(f"    p.w1_dtype = {safe_name}_LAYER_W1_DTYPE[layer_id];")
+                add(f"    p.w2_dtype = {safe_name}_LAYER_W2_DTYPE[layer_id];")
+            else:
+                # All layers use same dtype
+                add(f"    p.wq_dtype = {dtype_const(wq_dtype)};")
+                add(f"    p.wk_dtype = {dtype_const(wk_dtype)};")
+                add(f"    p.wv_dtype = {dtype_const(wv_dtype)};")
+                add(f"    p.wo_dtype = {dtype_const(wo_dtype)};")
+                add(f"    p.w1_dtype = {dtype_const(w1_dtype)};")
+                add(f"    p.w2_dtype = {dtype_const(w2_dtype)};")
             add()
         add(f"    p.ln1_out = {safe_name}_PTR(model, L->ln1_out);")
         add("    p.ln1_rstd = NULL;")
@@ -689,22 +723,38 @@ def emit_c_source_v4(layout: v3.ModelLayout,
         add(f"                   {config.get('rms_norm_eps', 1e-6)}f);")
         add()
         add(f"    float *logits = {safe_name}_PTR(model, {safe_name}_FOOTER.logits);")
-        if lm_head_use_q4_k:
+        if lm_head_quant_type:
+            # Quantized lm_head - use appropriate gemm kernel
             add(f"    const void *lm_head = (const void *){safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
-            add("    const size_t q8_bytes = ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)aligned_embed_dim);")
-            add("    for (int t = 0; t < num_tokens; ++t) {")
-            add("        uint8_t q8_buf[q8_bytes];")
-            add("        const float *row = final_out + (size_t)t * (size_t)aligned_embed_dim;")
-            add(f"        float *logits_row = logits + (size_t)t * (size_t){safe_name}_VOCAB_SIZE;")
-            add("        quantize_row_q8_k(row, q8_buf, aligned_embed_dim);")
-            add("        gemm_nt_q4_k_q8_k(q8_buf,")
-            add("                          lm_head,")
-            add("                          NULL,")
-            add("                          logits_row,")
-            add("                          1,")
-            add(f"                          {safe_name}_VOCAB_SIZE,")
-            add("                          aligned_embed_dim);")
-            add("    }")
+            if lm_head_use_q4_k:
+                add("    const size_t q8_bytes = ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)aligned_embed_dim);")
+                add("    for (int t = 0; t < num_tokens; ++t) {")
+                add("        uint8_t q8_buf[q8_bytes];")
+                add("        const float *row = final_out + (size_t)t * (size_t)aligned_embed_dim;")
+                add(f"        float *logits_row = logits + (size_t)t * (size_t){safe_name}_VOCAB_SIZE;")
+                add("        quantize_row_q8_k(row, q8_buf, aligned_embed_dim);")
+                add("        gemm_nt_q4_k_q8_k(q8_buf,")
+                add("                          lm_head,")
+                add("                          NULL,")
+                add("                          logits_row,")
+                add("                          1,")
+                add(f"                          {safe_name}_VOCAB_SIZE,")
+                add("                          aligned_embed_dim);")
+                add("    }")
+            else:
+                # Other quant types (Q8_0, Q6_K, Q5_0, etc.) - process row by row
+                add("    for (int t = 0; t < num_tokens; ++t) {")
+                add("        const float *row = final_out + (size_t)t * (size_t)aligned_embed_dim;")
+                add(f"        float *logits_row = logits + (size_t)t * (size_t){safe_name}_VOCAB_SIZE;")
+                add("        ck_gemm_nt_quant(row,")
+                add("                         lm_head,")
+                add("                         NULL,")
+                add("                         logits_row,")
+                add("                         1,")
+                add(f"                         {safe_name}_VOCAB_SIZE,")
+                add("                         aligned_embed_dim,")
+                add(f"                         {dtype_const(lm_head_dtype)});")
+                add("    }")
         else:
             add(f"    float *lm_head = {safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
             add("    gemm_blocked_serial(final_out,")
@@ -777,12 +827,21 @@ def emit_c_source_v4(layout: v3.ModelLayout,
             add(f"    p.w2 = (const void *){safe_name}_PTR(model, L->w2);")
             add("    p.b2 = NULL;")
             add()
-            add(f"    p.wq_dtype = {dtype_const(wq_dtype)};")
-            add(f"    p.wk_dtype = {dtype_const(wk_dtype)};")
-            add(f"    p.wv_dtype = {dtype_const(wv_dtype)};")
-            add(f"    p.wo_dtype = {dtype_const(wo_dtype)};")
-            add(f"    p.w1_dtype = {dtype_const(w1_dtype)};")
-            add(f"    p.w2_dtype = {dtype_const(w2_dtype)};")
+            if mixed_quant:
+                # Per-layer dtypes for mixed quant models
+                add(f"    p.wq_dtype = {safe_name}_LAYER_WQ_DTYPE[layer_id];")
+                add(f"    p.wk_dtype = {safe_name}_LAYER_WK_DTYPE[layer_id];")
+                add(f"    p.wv_dtype = {safe_name}_LAYER_WV_DTYPE[layer_id];")
+                add(f"    p.wo_dtype = {safe_name}_LAYER_WO_DTYPE[layer_id];")
+                add(f"    p.w1_dtype = {safe_name}_LAYER_W1_DTYPE[layer_id];")
+                add(f"    p.w2_dtype = {safe_name}_LAYER_W2_DTYPE[layer_id];")
+            else:
+                add(f"    p.wq_dtype = {dtype_const(wq_dtype)};")
+                add(f"    p.wk_dtype = {dtype_const(wk_dtype)};")
+                add(f"    p.wv_dtype = {dtype_const(wv_dtype)};")
+                add(f"    p.wo_dtype = {dtype_const(wo_dtype)};")
+                add(f"    p.w1_dtype = {dtype_const(w1_dtype)};")
+                add(f"    p.w2_dtype = {dtype_const(w2_dtype)};")
             add()
             add(f"    p.ln1_out = {safe_name}_PTR(model, L->ln1_out);")
             add("    p.ln1_rstd = NULL;")
@@ -1077,22 +1136,34 @@ def emit_c_source_v4(layout: v3.ModelLayout,
             add("    parity_save_buffer(\"final_rmsnorm_out\", final_out, aligned_embed_dim);")
         add()
         add(f"    float *logits = {safe_name}_PTR(model, {safe_name}_FOOTER.logits);")
-        if lm_head_use_q4_k:
+        if lm_head_quant_type:
+            # Quantized lm_head - use appropriate gemm kernel
             add(f"    const void *lm_head = (const void *){safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
-            if emit_debug:
-                add()
-                add("    /* DEBUG: Check Q4K lm_head weights */")
-                add(f"    debug_check_q4k_weights(\"lm_head (q4k)\", lm_head, {safe_name}_VOCAB_SIZE, aligned_embed_dim);")
-            add("    const size_t q8_bytes = ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)aligned_embed_dim);")
-            add("    uint8_t q8_buf[q8_bytes];")
-            add("    quantize_row_q8_k(final_out, q8_buf, aligned_embed_dim);")
-            add("    gemm_nt_q4_k_q8_k(q8_buf,")
-            add("                      lm_head,")
-            add("                      NULL,")
-            add("                      logits,")
-            add("                      1,")
-            add(f"                      {safe_name}_VOCAB_SIZE,")
-            add("                      aligned_embed_dim);")
+            if lm_head_use_q4_k:
+                if emit_debug:
+                    add()
+                    add("    /* DEBUG: Check Q4K lm_head weights */")
+                    add(f"    debug_check_q4k_weights(\"lm_head (q4k)\", lm_head, {safe_name}_VOCAB_SIZE, aligned_embed_dim);")
+                add("    const size_t q8_bytes = ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)aligned_embed_dim);")
+                add("    uint8_t q8_buf[q8_bytes];")
+                add("    quantize_row_q8_k(final_out, q8_buf, aligned_embed_dim);")
+                add("    gemm_nt_q4_k_q8_k(q8_buf,")
+                add("                      lm_head,")
+                add("                      NULL,")
+                add("                      logits,")
+                add("                      1,")
+                add(f"                      {safe_name}_VOCAB_SIZE,")
+                add("                      aligned_embed_dim);")
+            else:
+                # Other quant types (Q8_0, Q6_K, Q5_0, etc.) - use generic quant gemm
+                add(f"    ck_gemm_nt_quant(final_out,")
+                add("                      lm_head,")
+                add("                      NULL,")
+                add("                      logits,")
+                add("                      1,")
+                add(f"                      {safe_name}_VOCAB_SIZE,")
+                add("                      aligned_embed_dim,")
+                add(f"                      {dtype_const(lm_head_dtype)});")
         else:
             add(f"    float *lm_head = {safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
             add("    gemm_blocked_serial(final_out,")

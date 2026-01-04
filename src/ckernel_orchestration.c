@@ -210,12 +210,12 @@ static int ck_q8k_activations_enabled(void)
     return cached;
 }
 
-static void ck_gemm_nt_quant(const float *A,
-                             const void *B,
-                             const float *bias,
-                             float *C,
-                             int M, int N, int K,
-                             CKDataType dtype)
+void ck_gemm_nt_quant(const float *A,
+                      const void *B,
+                      const float *bias,
+                      float *C,
+                      int M, int N, int K,
+                      CKDataType dtype)
 {
     switch (dtype) {
     case CK_DT_FP32:
@@ -443,10 +443,6 @@ static void ck_attention_project_head_major_quant(const float *attn_out,
         return;
     }
 
-    if (wo_dtype != CK_DT_Q4_K && wo_dtype != CK_DT_Q6_K) {
-        return;
-    }
-
     const int K = num_heads * aligned_head_dim;
     if (K != aligned_embed_dim) {
         return;
@@ -464,13 +460,8 @@ static void ck_attention_project_head_major_quant(const float *attn_out,
         }
     }
 
-    if (wo_dtype == CK_DT_Q4_K) {
-        gemm_nt_q4_k(scratch, wo, bo, out,
-                     tokens, aligned_embed_dim, aligned_embed_dim);
-    } else {
-        gemm_nt_q6_k(scratch, wo, bo, out,
-                     tokens, aligned_embed_dim, aligned_embed_dim);
-    }
+    ck_gemm_nt_quant(scratch, wo, bo, out,
+                     tokens, aligned_embed_dim, aligned_embed_dim, wo_dtype);
 }
 
 static void ck_mlp_swiglu_forward_q4_k(const float *input,
@@ -2506,25 +2497,16 @@ void ck_layer_forward_rmsnorm_swiglu_decode_quant(const CKLayerForwardParamsQ4K 
                                                      aligned_D,
                                                      H,
                                                      ad);
-    } else if (p->wo_dtype == CK_DT_Q4_K) {
-        gemm_nt_q4_k(attn_token,
-                     p->wo,
-                     p->bo,
-                     proj_row,
-                     /*M=*/1,
-                     aligned_D,
-                     /*K=*/K_concat);
-        for (int j = D; j < aligned_D; ++j) {
-            proj_row[j] = 0.0f;
-        }
-    } else if (p->wo_dtype == CK_DT_Q6_K) {
-        gemm_nt_q6_k(attn_token,
-                     p->wo,
-                     p->bo,
-                     proj_row,
-                     /*M=*/1,
-                     aligned_D,
-                     /*K=*/K_concat);
+    } else {
+        /* Quantized attention output projection - handle all quant types */
+        ck_gemm_nt_quant(attn_token,
+                         p->wo,
+                         p->bo,
+                         proj_row,
+                         /*M=*/1,
+                         aligned_D,
+                         /*K=*/K_concat,
+                         p->wo_dtype);
         for (int j = D; j < aligned_D; ++j) {
             proj_row[j] = 0.0f;
         }
