@@ -297,6 +297,20 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
     ]
     run(ir_cmd, verbose)
 
+    validate_cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "validate_bump_v4.py"),
+        "--layout",
+        str(out_dir / "layout_decode.json"),
+        "--manifest",
+        str(out_dir / "weights_manifest.json"),
+        "--manifest-input",
+        str(manifest),
+        "--weights",
+        str(weights),
+    ]
+    run(validate_cmd, verbose)
+
     compile_generated(out_dir, verbose)
 
     run_env = os.environ.copy()
@@ -397,6 +411,19 @@ def main() -> None:
             "lib",
         ]
         run(ir_cmd, args.verbose)
+        validate_cmd = [
+            sys.executable,
+            str(ROOT / "scripts" / "validate_bump_v4.py"),
+            "--layout",
+            str(out_dir / "layout_decode.json"),
+            "--manifest",
+            str(out_dir / "weights_manifest.json"),
+            "--manifest-input",
+            str(manifest),
+            "--weights",
+            str(weights),
+        ]
+        run(validate_cmd, args.verbose)
         compile_generated(out_dir, args.verbose)
 
     print("[v4-q4k] done")
