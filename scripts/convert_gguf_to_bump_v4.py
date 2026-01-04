@@ -256,6 +256,62 @@ def main() -> None:
                     continue
                 print(f"  - {name}: {gguf.ggml_type_name(info.ggml_type)} dims={info.dims}")
 
+            # Kernel coverage check
+            SUPPORTED_KERNELS = {
+                # Embedding kernels
+                "embedding": {"f32", "f16", "bf16", "q4_k", "q6_k", "q8_0"},
+                # Linear/GEMV kernels (decode)
+                "linear": {"f32", "bf16", "q4_0", "q4_1", "q4_k", "q5_0", "q5_1", "q6_k", "q8_0"},
+                # Linear/GEMM kernels (prefill)
+                "linear_prefill": {"f32", "bf16", "q4_0", "q4_1", "q4_k", "q5_0", "q5_1", "q6_k", "q8_0"},
+                # Dequant kernels
+                "dequant": {"q4_0", "q4_1", "q4_k", "q5_0", "q5_1", "q6_k", "q8_0"},
+            }
+
+            def dtype_from_ggml(tcode: int) -> str:
+                name_map = {
+                    gguf.GGML_TYPE_F32: "f32",
+                    gguf.GGML_TYPE_F16: "f16",
+                    gguf.GGML_TYPE_BF16: "bf16",
+                    gguf.GGML_TYPE_Q4_0: "q4_0",
+                    gguf.GGML_TYPE_Q4_1: "q4_1",
+                    gguf.GGML_TYPE_Q5_0: "q5_0",
+                    gguf.GGML_TYPE_Q5_1: "q5_1",
+                    gguf.GGML_TYPE_Q8_0: "q8_0",
+                    gguf.GGML_TYPE_Q4_K: "q4_k",
+                    gguf.GGML_TYPE_Q6_K: "q6_k",
+                }
+                return name_map.get(tcode, f"ggml_{tcode}")
+
+            # Check kernel coverage
+            model_dtypes = {dtype_from_ggml(tcode) for tcode in counts.keys()}
+            quant_dtypes = {d for d in model_dtypes if d.startswith("q")}
+
+            missing_embed = set()
+            missing_linear = set()
+            embed_info = tensors.get("token_embd.weight")
+            if embed_info:
+                embed_dtype = dtype_from_ggml(embed_info.ggml_type)
+                if embed_dtype not in SUPPORTED_KERNELS["embedding"]:
+                    missing_embed.add(embed_dtype)
+
+            for d in quant_dtypes:
+                if d not in SUPPORTED_KERNELS["linear"]:
+                    missing_linear.add(d)
+
+            print("[gguf] kernel coverage:")
+            if missing_embed or missing_linear:
+                if missing_embed:
+                    print(f"  ❌ MISSING embedding kernel: {', '.join(sorted(missing_embed))}")
+                if missing_linear:
+                    print(f"  ❌ MISSING linear kernel: {', '.join(sorted(missing_linear))}")
+                print("  → Some tensor types are not supported. Inference may fail or produce NaN.")
+            else:
+                print(f"  ✓ All {len(quant_dtypes)} quant types supported: {', '.join(sorted(quant_dtypes))}")
+                if embed_info:
+                    embed_dtype = dtype_from_ggml(embed_info.ggml_type)
+                    print(f"  ✓ Embedding type {embed_dtype} supported")
+
             if args.list:
                 print("[gguf] all tensors:")
                 for name in sorted(tensors.keys()):

@@ -1003,6 +1003,28 @@ void embedding_forward_q4_k(const int32_t *token_ids,
                             int context_window,
                             int add_pos);
 
+void embedding_forward_q6_k(const int32_t *token_ids,
+                            int token_count,
+                            int vocab_size,
+                            const void *token_embeddings,
+                            const float *pos_embeddings,
+                            float *output,
+                            int embed_dim,
+                            int aligned_embed_dim,
+                            int context_window,
+                            int add_pos);
+
+void embedding_forward_q8_0(const int32_t *token_ids,
+                            int token_count,
+                            int vocab_size,
+                            const void *token_embeddings,
+                            const float *pos_embeddings,
+                            float *output,
+                            int embed_dim,
+                            int aligned_embed_dim,
+                            int context_window,
+                            int add_pos);
+
 	void embedding_forward_bf16(const int32_t *token_ids,
 	                            int token_count,
 	                            int vocab_size,

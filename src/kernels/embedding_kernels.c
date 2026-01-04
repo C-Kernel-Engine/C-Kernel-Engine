@@ -112,6 +112,116 @@ void embedding_forward_q4_k(const int32_t *token_ids,
     }
 }
 
+void embedding_forward_q8_0(const int32_t *token_ids,
+                            int token_count,
+                            int vocab_size,
+                            const void *token_embeddings,
+                            const float *pos_embeddings,
+                            float *output,
+                            int embed_dim,
+                            int aligned_embed_dim,
+                            int context_window,
+                            int add_pos)
+{
+    if (!token_ids || !token_embeddings || !output) {
+        return;
+    }
+
+    int tokens = token_count;
+    if (tokens < 0) {
+        tokens = 0;
+    }
+    if (tokens > context_window) {
+        tokens = context_window;
+    }
+
+    const size_t row_bytes = ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)aligned_embed_dim);
+    const uint8_t *base = (const uint8_t *)token_embeddings;
+
+    for (int t = 0; t < tokens; ++t) {
+        int id = token_ids[t];
+        if (id < 0 || id >= vocab_size) {
+            id = 0;
+        }
+
+        const void *tok = base + (size_t)id * row_bytes;
+        const float *pos = pos_embeddings ? (pos_embeddings + (size_t)t * (size_t)aligned_embed_dim) : NULL;
+        float *out = output + (size_t)t * (size_t)aligned_embed_dim;
+
+        dequant_q8_0_row(tok, out, (size_t)aligned_embed_dim);
+
+        if (add_pos && pos) {
+            for (int d = 0; d < embed_dim; ++d) {
+                out[d] += pos[d];
+            }
+        }
+
+        for (int d = embed_dim; d < aligned_embed_dim; ++d) {
+            out[d] = 0.0f;
+        }
+    }
+
+    for (int t = tokens; t < context_window; ++t) {
+        float *out = output + (size_t)t * (size_t)aligned_embed_dim;
+        memset(out, 0, (size_t)aligned_embed_dim * sizeof(float));
+    }
+}
+
+void embedding_forward_q6_k(const int32_t *token_ids,
+                            int token_count,
+                            int vocab_size,
+                            const void *token_embeddings,
+                            const float *pos_embeddings,
+                            float *output,
+                            int embed_dim,
+                            int aligned_embed_dim,
+                            int context_window,
+                            int add_pos)
+{
+    if (!token_ids || !token_embeddings || !output) {
+        return;
+    }
+
+    int tokens = token_count;
+    if (tokens < 0) {
+        tokens = 0;
+    }
+    if (tokens > context_window) {
+        tokens = context_window;
+    }
+
+    const size_t row_bytes = ck_dtype_row_bytes(CK_DT_Q6_K, (size_t)aligned_embed_dim);
+    const uint8_t *base = (const uint8_t *)token_embeddings;
+
+    for (int t = 0; t < tokens; ++t) {
+        int id = token_ids[t];
+        if (id < 0 || id >= vocab_size) {
+            id = 0;
+        }
+
+        const void *tok = base + (size_t)id * row_bytes;
+        const float *pos = pos_embeddings ? (pos_embeddings + (size_t)t * (size_t)aligned_embed_dim) : NULL;
+        float *out = output + (size_t)t * (size_t)aligned_embed_dim;
+
+        dequant_q6_k_row(tok, out, (size_t)aligned_embed_dim);
+
+        if (add_pos && pos) {
+            for (int d = 0; d < embed_dim; ++d) {
+                out[d] += pos[d];
+            }
+        }
+
+        for (int d = embed_dim; d < aligned_embed_dim; ++d) {
+            out[d] = 0.0f;
+        }
+    }
+
+    for (int t = tokens; t < context_window; ++t) {
+        float *out = output + (size_t)t * (size_t)aligned_embed_dim;
+        memset(out, 0, (size_t)aligned_embed_dim * sizeof(float));
+    }
+}
+
 void embedding_backward(const int32_t *token_ids,
                         int token_count,
                         const float *d_output,

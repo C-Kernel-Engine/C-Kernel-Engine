@@ -60,8 +60,32 @@ def emit_c_source_v4(layout: v3.ModelLayout,
     lm_head_dtype = buffer_dtype(section.footer_buffers, "lm_head_weight")
     if not lm_head_dtype and config.get("tie_word_embeddings", True):
         lm_head_dtype = token_emb_dtype
-    embed_use_q4_k = token_emb_dtype.startswith("q4_k")
-    lm_head_use_q4_k = lm_head_dtype.startswith("q4_k")
+
+    # Determine embedding quantization type (None = FP32, or specific quant type)
+    def get_quant_type(dtype: str) -> str:
+        """Return quant type string or empty string for FP32."""
+        if dtype.startswith("q4_k"):
+            return "q4_k"
+        if dtype.startswith("q6_k"):
+            return "q6_k"
+        if dtype.startswith("q8_0"):
+            return "q8_0"
+        if dtype.startswith("q5_0"):
+            return "q5_0"
+        if dtype.startswith("q5_1"):
+            return "q5_1"
+        if dtype.startswith("q4_0"):
+            return "q4_0"
+        if dtype.startswith("q4_1"):
+            return "q4_1"
+        return ""
+
+    embed_quant_type = get_quant_type(token_emb_dtype)
+    lm_head_quant_type = get_quant_type(lm_head_dtype)
+
+    # Backwards compatibility
+    embed_use_q4_k = embed_quant_type == "q4_k"
+    lm_head_use_q4_k = lm_head_quant_type == "q4_k"
 
     layer_dtype_map = {}
     if section.layers:
@@ -588,9 +612,11 @@ def emit_c_source_v4(layout: v3.ModelLayout,
         add(f"    const int aligned_context_window = {aligned_expr(aligned_context, f'{safe_name_lower}_align_elems({safe_name}_MAX_SEQ_LEN, elem_bytes, 64)')};")
         add()
         add(f"    float *embed_out = {safe_name}_PTR(model, {safe_name}_HEADER.embedded_input);")
-        if embed_use_q4_k:
+        if embed_quant_type:
+            # Quantized embedding - use appropriate dequant kernel
+            embed_func = f"embedding_forward_{embed_quant_type}"
             add(f"    const void *embed_weight = (const void *){safe_name}_PTR(model, {safe_name}_HEADER.token_emb);")
-            add("    embedding_forward_q4_k((const int32_t *)tokens,")
+            add(f"    {embed_func}((const int32_t *)tokens,")
             add("                          num_tokens,")
             add(f"                          {safe_name}_VOCAB_SIZE,")
             add("                          embed_weight,")
@@ -957,9 +983,11 @@ def emit_c_source_v4(layout: v3.ModelLayout,
         add("    }")
         add()
         add(f"    float *embed_out = {safe_name}_PTR(model, {safe_name}_HEADER.embedded_input);")
-        if embed_use_q4_k:
+        if embed_quant_type:
+            # Quantized embedding - use appropriate dequant kernel
+            embed_func = f"embedding_forward_{embed_quant_type}"
             add(f"    const void *embed_weight = (const void *){safe_name}_PTR(model, {safe_name}_HEADER.token_emb);")
-            add("    embedding_forward_q4_k((const int32_t *)token,")
+            add(f"    {embed_func}((const int32_t *)token,")
             add("                          1,")
             add(f"                          {safe_name}_VOCAB_SIZE,")
             add("                          embed_weight,")
