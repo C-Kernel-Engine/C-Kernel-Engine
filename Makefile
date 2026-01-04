@@ -641,6 +641,7 @@ showtests:
 	@echo "  make test             Run core kernel tests"
 	@echo "  make test-bf16        Run BF16 kernel tests"
 	@echo "  make test-quant       Run quantization kernel tests"
+	@echo "  make test-v4-q4k      Run v4 Q4_K conversion pipeline (requires GGUF)"
 	@echo "  make nightly          Run full test suite (doesn't stop on failure)"
 	@echo ""
 	@echo "Per-Kernel Libraries:"
@@ -756,6 +757,17 @@ test-bf16: $(LIB) test-libs
 	fi; \
 	echo "BF16 Python kernel tests completed."
 
+test-v4-q4k:
+	@if [ -z "$(GGUF_PATH)" ]; then \
+	  echo "Usage: make test-v4-q4k GGUF_PATH=/path/to/model.gguf [V4_LAYERS=1,2] [V4_VALIDATE=1] [V4_FULL=1]"; \
+	  exit 2; \
+	fi
+	@$(PYTHON) $(PYTHONFLAGS) scripts/test_v4_q4k_pipeline.py \
+	  --gguf "$(GGUF_PATH)" \
+	  $(if $(V4_LAYERS),--layers "$(V4_LAYERS)") \
+	  $(if $(V4_VALIDATE),--validate) \
+	  $(if $(V4_FULL),--full)
+
 # GEMM benchmark comparing CKernel (Native + MKL if available) vs PyTorch
 bench_gemm:
 	@echo "Building native kernels..."
@@ -808,6 +820,7 @@ tests-list:
 	@echo "Run all tests:     make test"
 	@echo "Run BF16 tests:    make test-bf16"
 	@echo "Run single test:   python3 <script>"
+	@echo "Run v4 pipeline:  make test-v4-q4k GGUF_PATH=/path/to/model.gguf"
 	@echo ""
 	@echo "┌──────────────────────────────────────────────────────────────────────────────┐"
 	@echo "│  FP32 Unit Tests                                                             │"
@@ -836,6 +849,7 @@ tests-list:
 	@echo "  unittest/test_lm_head_litmus.py    - LM head + CE end-to-end test"
 	@echo "  unittest/test_fused_swiglu_decode.py - Fused SwiGLU decode MLP parity"
 	@echo "  unittest/test_fused_attention_decode.py - Fused attention decode parity"
+	@echo "  unittest/test_v4_conversion.py    - GGUF -> bump v4 conversion sanity (requires GGUF)"
 	@echo "  unittest/test_v4_conversion.py    - GGUF -> bump v4 conversion sanity (requires GGUF)"
 	@echo ""
 	@echo "┌──────────────────────────────────────────────────────────────────────────────┐"

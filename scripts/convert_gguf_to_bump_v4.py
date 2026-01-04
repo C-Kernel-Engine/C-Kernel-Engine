@@ -153,6 +153,8 @@ def main() -> None:
     ap.add_argument("--context", type=int, help="Override context length (max_position_embeddings)")
     ap.add_argument("--inspect", action="store_true", help="Show GGUF summary and exit")
     ap.add_argument("--list", action="store_true", help="List all tensors and exit")
+    ap.add_argument("--max-layers", type=int, help="Limit number of layers to convert (for quick tests)")
+    ap.add_argument("--validate", action="store_true", help="Validate quantized alignment before conversion")
     ap.add_argument("--config-out", help="Optional config JSON output path")
     ap.add_argument("--map-out", help="Optional JSON map of weight order/dtypes")
     ap.add_argument("--manifest-out", help="Optional JSON manifest with file offsets/sizes")
@@ -366,6 +368,13 @@ def main() -> None:
         quant_embed = is_quantized(token_dt)
         quant_intermediate = False
 
+        if args.max_layers is not None:
+            if args.max_layers <= 0:
+                raise gguf.GGUFError(f"--max-layers must be >= 1 (got {args.max_layers})")
+            if args.max_layers < num_layers:
+                print(f"[info] limiting layers: {args.max_layers}/{num_layers}")
+            num_layers = min(num_layers, args.max_layers)
+
         layer_infos = []
         dtype_table = [token_dt]
         weight_names = ["token_emb"]
@@ -497,6 +506,20 @@ def main() -> None:
         else:
             if aligned_intermediate != intermediate:
                 print(f"[warn] aligned_intermediate={aligned_intermediate} (intermediate={intermediate}) - padding FP32 weights")
+
+        if args.validate:
+            issues = []
+            if quant_embed and aligned_embed_dim != embed_dim:
+                issues.append(
+                    f"K-quant weights require embed_dim aligned to 256 (embed_dim={embed_dim}, aligned={aligned_embed_dim})"
+                )
+            if quant_intermediate and aligned_intermediate != intermediate:
+                issues.append(
+                    f"K-quant weights require intermediate aligned to 256 (intermediate={intermediate}, aligned={aligned_intermediate})"
+                )
+            if issues:
+                details = "\n  - " + "\n  - ".join(issues)
+                raise gguf.GGUFError(f"Validation failed:{details}")
 
         dtype_table_bytes = bytes(dtype_table)
         manifest_entries = []

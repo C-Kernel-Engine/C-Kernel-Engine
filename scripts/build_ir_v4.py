@@ -2179,6 +2179,7 @@ def parse_args(argv: List[str]) -> Dict:
             "--batch-size",
             "--micro-batch-size",
             "--context-length",
+            "--max-layers",
             "--optimizer",
             "--learning-rate",
             "--weight-decay",
@@ -2218,6 +2219,7 @@ def parse_args(argv: List[str]) -> Dict:
         "kernel_specs": None,
         "preset": None,
         "emit": "exe",
+        "max_layers": None,
         # Fusion options
         "fusion": "auto",  # on/off/auto
         "fusion_verbose": False,
@@ -2281,6 +2283,8 @@ def parse_args(argv: List[str]) -> Dict:
         elif arg.startswith("--modes="):
             modes = arg.split("=", 1)[1]
             args["modes"] = [m.strip() for m in modes.split(",") if m.strip()]
+        elif arg.startswith("--max-layers="):
+            args["max_layers"] = int(arg.split("=", 1)[1])
         elif arg.startswith("--preset="):
             args["preset"] = arg.split("=", 1)[1]
         elif arg.startswith("--fusion="):
@@ -2355,6 +2359,7 @@ def print_usage():
     print("  --emit=lib|exe          Emit shared-library C (lib) or standalone main (exe)")
     print("  --emit-lib              Shorthand for --emit=lib")
     print("  --emit-exe              Shorthand for --emit=exe")
+    print("  --max-layers=N          Limit layers for quick parity tests")
     print()
     print("Available Modes:")
     print("  prefill                 Forward pass for prompt processing (S=tokens)")
@@ -2467,6 +2472,16 @@ def main(argv: List[str]) -> int:
         if dtype not in ("fp32", "bf16", "fp16"):
             raise ValueError(f"--dtype must be fp32|bf16|fp16, got: {dtype}")
         config["dtype"] = dtype
+
+    if args.get("max_layers") is not None:
+        max_layers = int(args["max_layers"])
+        if max_layers <= 0:
+            raise ValueError(f"--max-layers must be >= 1 (got {max_layers})")
+        if max_layers < config["num_layers"]:
+            print(f"[CONFIG] Limiting layers: {max_layers}/{config['num_layers']}")
+            config["num_layers"] = max_layers
+        elif max_layers > config["num_layers"]:
+            print(f"[CONFIG] max-layers={max_layers} > num_layers={config['num_layers']} (using {config['num_layers']})")
 
     if args["tokens"]:
         tokens = args["tokens"]
