@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,26 +30,219 @@ def run(cmd, verbose=False, env=None) -> None:
     subprocess.run(cmd, check=True, cwd=ROOT, env=env)
 
 
+def emit_wrapper(out_dir: Path, verbose: bool) -> Path:
+    decode_headers = sorted(out_dir.glob("generated_*_decode.h"))
+    decode_sources = sorted(out_dir.glob("generated_*_decode.c"))
+    if not decode_headers or not decode_sources:
+        raise SystemExit(f"Missing generated decode C/H files in {out_dir}")
+
+    decode_header = decode_headers[0].name
+    decode_source = decode_sources[0].name
+    prefix = decode_header.replace("generated_", "").replace(".h", "")
+    safe_name = re.sub(r"[^A-Za-z0-9]", "_", prefix).upper()
+
+    wrapper = f"""\
+// AUTO-GENERATED v4 wrapper: {prefix}
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "{decode_header}"
+#include "ckernel_model_load_v4.h"
+
+#include "{decode_source}"
+
+static {safe_name}Model g_model;
+static int g_initialized = 0;
+static int g_active_tokens = 0;
+static int g_kv_cache_enabled = 0;
+static int g_kv_cache_capacity = {safe_name}_MAX_SEQ_LEN;
+static int g_kv_cache_tokens = 0;
+
+static int32_t *g_tokens = NULL;
+static int g_tokens_cap = 0;
+
+static float *g_logits = NULL;
+static size_t g_logits_cap = 0;
+
+static int ensure_tokens_capacity(int n) {{
+    if (n <= g_tokens_cap) return 0;
+    int32_t *buf = (int32_t *)realloc(g_tokens, (size_t)n * sizeof(int32_t));
+    if (!buf) return -1;
+    g_tokens = buf;
+    g_tokens_cap = n;
+    return 0;
+}}
+
+static int ensure_logits_capacity(int n) {{
+    size_t needed = (size_t)n * (size_t){safe_name}_VOCAB_SIZE;
+    if (needed <= g_logits_cap) return 0;
+    float *buf = (float *)realloc(g_logits, needed * sizeof(float));
+    if (!buf) return -1;
+    g_logits = buf;
+    g_logits_cap = needed;
+    return 0;
+}}
+
+static const char *manifest_path_from_weights(const char *weights_path,
+                                             char *out,
+                                             size_t out_len) {{
+    if (!weights_path || !out || out_len == 0) return NULL;
+    const char *slash = strrchr(weights_path, '/');
+    size_t dir_len = slash ? (size_t)(slash - weights_path + 1) : 0;
+    const char *fname = "weights_manifest.map";
+    size_t fname_len = strlen(fname);
+    if (dir_len + fname_len + 1 > out_len) return NULL;
+    if (dir_len) {{
+        memcpy(out, weights_path, dir_len);
+    }}
+    memcpy(out + dir_len, fname, fname_len + 1);
+    return out;
+}}
+
+int ck_model_init(const char *weights_path) {{
+    if (g_initialized) return 0;
+    if (!weights_path) {{
+        fprintf(stderr, "ck_model_init: missing weights path\\n");
+        return -1;
+    }}
+
+    char manifest_path[1024];
+    if (!manifest_path_from_weights(weights_path, manifest_path, sizeof(manifest_path))) {{
+        fprintf(stderr, "ck_model_init: failed to resolve manifest path\\n");
+        return -1;
+    }}
+
+    if ({prefix}_init(&g_model) != 0) {{
+        fprintf(stderr, "ck_model_init: model init failed\\n");
+        return -2;
+    }}
+
+    if (ck_load_weights_manifest_v4(g_model.memory, weights_path, manifest_path) != 0) {{
+        fprintf(stderr, "ck_model_init: weights load failed\\n");
+        return -3;
+    }}
+
+    g_initialized = 1;
+    return 0;
+}}
+
+void ck_model_free(void) {{
+    if (!g_initialized) return;
+    {prefix}_free(&g_model);
+    free(g_tokens);
+    free(g_logits);
+    g_tokens = NULL;
+    g_logits = NULL;
+    g_tokens_cap = 0;
+    g_logits_cap = 0;
+    g_initialized = 0;
+}}
+
+int ck_model_kv_cache_enable(int capacity) {{
+    g_kv_cache_enabled = 1;
+    g_kv_cache_capacity = capacity;
+    return 0;
+}}
+
+int ck_model_embed_tokens(const int32_t *tokens, int n_tokens) {{
+    if (!g_initialized) return -1;
+    if (ensure_tokens_capacity(n_tokens) != 0) return -2;
+    memcpy(g_tokens, tokens, (size_t)n_tokens * sizeof(int32_t));
+    g_active_tokens = n_tokens;
+    return 0;
+}}
+
+int ck_model_forward(float *logits_out) {{
+    if (!g_initialized) return -1;
+    if (g_active_tokens <= 0) return -2;
+    if (ensure_logits_capacity(g_active_tokens) != 0) return -3;
+
+    if ({prefix}_prefill(&g_model, g_tokens, g_active_tokens) != 0) {{
+        fprintf(stderr, "ck_model_forward: prefill failed\\n");
+        return -4;
+    }}
+
+    if (logits_out) {{
+        memcpy(logits_out,
+               g_model.logits,
+               (size_t)g_active_tokens * (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
+    }}
+    g_kv_cache_tokens = g_active_tokens;
+    return 0;
+}}
+
+int ck_model_decode(int32_t token, float *logits_out) {{
+    if (!g_initialized) return -1;
+    if (!g_kv_cache_enabled) return -2;
+    if (g_kv_cache_tokens >= g_kv_cache_capacity) return -3;
+
+    if ({prefix}_decode(&g_model, &token, g_kv_cache_tokens) != 0) {{
+        fprintf(stderr, "ck_model_decode: decode failed\\n");
+        return -4;
+    }}
+
+    if (logits_out) {{
+        memcpy(logits_out,
+               g_model.logits + (size_t)g_kv_cache_tokens * {safe_name}_VOCAB_SIZE,
+               (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
+    }}
+    g_kv_cache_tokens += 1;
+    g_active_tokens = g_kv_cache_tokens;
+    return 0;
+}}
+
+int ck_model_get_vocab_size(void) {{
+    return {safe_name}_VOCAB_SIZE;
+}}
+
+int ck_model_get_context_window(void) {{
+    return {safe_name}_MAX_SEQ_LEN;
+}}
+
+int ck_model_get_active_tokens(void) {{
+    return g_active_tokens;
+}}
+
+int ck_model_verify_canaries(void) {{
+    if (!g_initialized) return -1;
+    return {prefix}_verify_canaries(&g_model);
+}}
+"""
+
+    model_c_path = out_dir / "model.c"
+    model_c_path.write_text(wrapper)
+    if verbose:
+        print(f"[emit] {model_c_path}")
+    return model_c_path
+
+
 def compile_generated(out_dir: Path, verbose: bool) -> Path:
-    c_files = sorted(out_dir.glob("generated_*_decode.c"))
-    if not c_files:
-        raise SystemExit(f"No generated decode C file found in {out_dir}")
-    c_file = c_files[0]
+    model_c = emit_wrapper(out_dir, verbose)
     so_path = out_dir / "libmodel.so"
+
+    kernel_sources = [str(p) for p in (ROOT / "src" / "kernels").glob("*.c")]
+    extra_sources = [
+        str(ROOT / "src" / "ckernel_model_load_v4.c"),
+        str(ROOT / "src" / "ckernel_orchestration.c"),
+        str(ROOT / "src" / "ckernel_strict.c"),
+        str(ROOT / "src" / "cpu_features.c"),
+    ]
+
     cmd = [
         "gcc",
-        "-shared",
+        "-O3",
         "-fPIC",
-        "-O2",
-        "-Iinclude",
+        "-fopenmp",
+        "-shared",
+        f"-I{ROOT / 'include'}",
         f"-I{out_dir}",
-        str(c_file),
-        "-Lbuild",
-        "-lckernel_engine",
-        "-lm",
         "-o",
         str(so_path),
-    ]
+        str(model_c),
+    ] + kernel_sources + extra_sources + ["-lm"]
+
     run(cmd, verbose)
     return so_path
 
@@ -89,7 +283,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
         "--prefix",
         str(out_dir),
         "--modes",
-        "decode",
+        "prefill,decode",
         "--dtype",
         "fp32",
         "--weight-dtype",
@@ -192,7 +386,7 @@ def main() -> None:
             "--prefix",
             str(out_dir),
             "--modes",
-            "decode",
+            "prefill,decode",
             "--dtype",
             "fp32",
             "--weight-dtype",
