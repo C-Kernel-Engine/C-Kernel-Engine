@@ -94,14 +94,30 @@ def load_manifest_non_fp_dtypes(manifest_path: Path) -> set[str]:
 
 
 def normalize_weight_dtype(weight_dtype: Optional[str], manifest_path: Optional[Path]) -> Optional[str]:
-    """Normalize weight dtype and guard against mixed-quant overrides."""
+    """Normalize weight dtype and guard against mixed-quant overrides.
+
+    Returns None when per-tensor dtypes from manifest should be used (mixed quant mode).
+    Returns a dtype string when a uniform dtype should be applied.
+    """
+    # Load manifest dtypes upfront if available
+    non_fp = set()
+    if manifest_path and manifest_path.exists():
+        non_fp = load_manifest_non_fp_dtypes(manifest_path)
+
+    # No explicit dtype specified
     if not weight_dtype:
+        # If manifest has mixed quant types, use per-tensor mode automatically
+        if len(non_fp) > 1:
+            types = ", ".join(sorted(non_fp))
+            log(f"  Mixed quant detected ({types}); using per-tensor dtypes from manifest", C_DIM)
+            return None
         return None
 
     dtype = weight_dtype.lower()
     if dtype == "float32":
         dtype = "f32"
 
+    # Explicit q4_k_m means mixed quant mode
     if dtype == "q4_k_m":
         if not manifest_path or not manifest_path.exists():
             log_error("q4_k_m requires a weights manifest (GGUF conversion).")
@@ -109,22 +125,24 @@ def normalize_weight_dtype(weight_dtype: Optional[str], manifest_path: Optional[
         log("  q4_k_m is mixed quant; using per-weight dtypes from manifest", C_DIM)
         return None
 
-    if manifest_path and manifest_path.exists():
-        non_fp = load_manifest_non_fp_dtypes(manifest_path)
-        if non_fp:
-            if dtype in {"f32", "bf16"}:
-                log_error("Manifest has quantized weights; do not force float --weight-dtype.")
-                sys.exit(1)
-            if len(non_fp) > 1:
-                types = ", ".join(sorted(non_fp))
-                log_error(
-                    f"Manifest has mixed quant dtypes ({types}); omit --weight-dtype or use --weight-dtype=q4_k_m."
-                )
-                sys.exit(1)
-            only = next(iter(non_fp))
-            if dtype != only:
-                log_error(f"Manifest dtype is {only}; --weight-dtype={dtype} is incompatible.")
-                sys.exit(1)
+    # Check manifest compatibility
+    if non_fp:
+        # Don't allow forcing float on quantized weights
+        if dtype in {"f32", "bf16"}:
+            log_error("Manifest has quantized weights; do not force float --weight-dtype.")
+            sys.exit(1)
+
+        # Mixed quant in manifest - accept and use per-tensor mode
+        if len(non_fp) > 1:
+            types = ", ".join(sorted(non_fp))
+            log(f"  Mixed quant detected ({types}); using per-tensor dtypes from manifest", C_DIM)
+            return None
+
+        # Single quant type - verify it matches
+        only = next(iter(non_fp))
+        if dtype != only:
+            log_error(f"Manifest dtype is {only}; --weight-dtype={dtype} is incompatible.")
+            sys.exit(1)
 
     return dtype
 
@@ -1146,7 +1164,9 @@ Examples:
     # Run command
     run_parser = subparsers.add_parser('run', help='Run model')
     run_parser.add_argument('model', help='Model ID, URL, GGUF file, or local path')
-    run_parser.add_argument('--weight-dtype', choices=['float32', 'bf16', 'q4_k', 'q4_k_m', 'q6_k'],
+    run_parser.add_argument('--weight-dtype',
+                           choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
+                                    'q5_0', 'q5_1', 'q6_k', 'q8_0'],
                            help='Weight dtype override (default: auto). q4_k_m uses mixed GGUF dtypes.')
     run_parser.add_argument('--temperature', type=float, default=0.7,
                            help='Sampling temperature (default: 0.7)')

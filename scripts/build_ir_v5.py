@@ -41,11 +41,11 @@ def validate_manifest_override(manifest_path: Path, weight_dtype: str) -> None:
     non_fp = load_manifest_dtypes(manifest_path)
     if not non_fp:
         return
+    # Mixed quant manifests are allowed - per-tensor dtypes will be used
     if len(non_fp) > 1:
         types = ", ".join(sorted(non_fp))
-        raise SystemExit(
-            f"Manifest has mixed quant dtypes ({types}); omit --weight-dtype or use --weight-dtype=q4_k_m."
-        )
+        print(f"  Mixed quant detected ({types}); using per-tensor dtypes from manifest")
+        return
     only = next(iter(non_fp))
     if weight_dtype not in (only, "q4_k_m"):
         raise SystemExit(f"Manifest dtype is {only}; --weight-dtype={weight_dtype} is incompatible.")
