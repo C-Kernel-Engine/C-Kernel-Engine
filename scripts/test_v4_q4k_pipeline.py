@@ -23,10 +23,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(cmd, verbose=False) -> None:
+def run(cmd, verbose=False, env=None) -> None:
     if verbose:
         print("[cmd]", " ".join(cmd))
-    subprocess.run(cmd, check=True, cwd=ROOT)
+    subprocess.run(cmd, check=True, cwd=ROOT, env=env)
 
 
 def compile_generated(out_dir: Path, verbose: bool) -> Path:
@@ -105,6 +105,12 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
 
     compile_generated(out_dir, verbose)
 
+    run_env = os.environ.copy()
+    lib_dir = str(ROOT / "build")
+    run_env["LD_LIBRARY_PATH"] = lib_dir + (
+        (":" + run_env["LD_LIBRARY_PATH"]) if run_env.get("LD_LIBRARY_PATH") else ""
+    )
+
     smoke_cmd = [
         sys.executable,
         str(ROOT / "scripts" / "ck_model_smoke_v4.py"),
@@ -117,7 +123,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
         "--decode-steps",
         "2",
     ]
-    run(smoke_cmd, verbose)
+    run(smoke_cmd, verbose, env=run_env)
 
     if run_parity:
         parity_cmd = [
@@ -126,7 +132,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
             "--layers",
             str(layers),
         ]
-        run(parity_cmd, verbose)
+        run(parity_cmd, verbose, env=run_env)
 
 
 def main() -> None:
