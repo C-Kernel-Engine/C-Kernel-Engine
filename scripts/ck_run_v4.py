@@ -335,9 +335,38 @@ def step_convert_hf(model_dir: Path, output_dir: Path, weight_dtype: str = "floa
     return weights_path
 
 
-def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False) -> tuple[Path, Path]:
+def validate_gguf_kernel_coverage(gguf_path: Path) -> bool:
+    """Validate that all GGUF tensor types have kernel support. Returns True if all supported."""
+    cmd = [
+        sys.executable,
+        str(SCRIPTS_DIR / "convert_gguf_to_bump_v4.py"),
+        f"--gguf={gguf_path}",
+        "--inspect",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Check for missing kernel warnings
+    if "❌ MISSING" in result.stdout:
+        log(f"{C_RED}[validate]{C_RESET} Kernel coverage check failed:")
+        for line in result.stdout.split('\n'):
+            if "kernel coverage:" in line or "MISSING" in line or "→" in line:
+                print(f"  {line.strip()}")
+        return False
+    elif "✓" in result.stdout:
+        log(f"  Kernel coverage: {C_GREEN}OK{C_RESET}", C_DIM)
+    return True
+
+
+def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False, validate: bool = True) -> tuple[Path, Path]:
     """Convert GGUF to bump format."""
     log_step(2, f"Converting GGUF to bump format")
+
+    # Validate kernel coverage first
+    if validate:
+        if not validate_gguf_kernel_coverage(gguf_path):
+            log_error("GGUF contains unsupported tensor types. See above for details.")
+            log(f"  {C_DIM}Tip: Check src/kernels/ for available quant kernels{C_RESET}")
+            sys.exit(1)
 
     weights_path = output_dir / "weights.bump"
     config_path = output_dir / "config.json"
