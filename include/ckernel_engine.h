@@ -122,6 +122,13 @@ void gemm_nt_q6_k(const float *A,
                   float *C,
                   int M, int N, int K);
 
+// Simple quant GEMM (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
+void gemm_nt_q4_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q4_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+
 void dequant_q6_k_row(const void *src, float *dst, size_t n_elements);
 
 // Simple quant dequantization (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)

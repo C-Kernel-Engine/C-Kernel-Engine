@@ -150,6 +150,56 @@ void gemm_q4_0(float *Y,
 }
 
 /* ============================================================================
+ * GEMM NT: C = A @ B^T + bias  (B stored as N rows of K elements)
+ * ============================================================================ */
+
+/**
+ * @brief Matrix-matrix multiply: C[M,N] = A[M,K] @ B[N,K]^T + bias
+ *
+ * @param A Input matrix [M x K], row-major FP32
+ * @param B Weight matrix in Q4_0 format, [N x K] stored row-major
+ * @param bias Optional bias [N], NULL if not used
+ * @param C Output [M x N], row-major FP32
+ * @param M Batch size (number of tokens)
+ * @param N Output dimension (number of rows in B)
+ * @param K Input dimension
+ */
+void gemm_nt_q4_0(const float *A,
+                  const void *B,
+                  const float *bias,
+                  float *C,
+                  int M, int N, int K)
+{
+    const block_q4_0 *blocks = (const block_q4_0 *)B;
+    const int blocks_per_row = K / QK4_0;
+
+    for (int m = 0; m < M; m++) {
+        const float *a_row = &A[m * K];
+
+        for (int n = 0; n < N; n++) {
+            float sum = 0.0f;
+
+            for (int b = 0; b < blocks_per_row; b++) {
+                const block_q4_0 *block = &blocks[n * blocks_per_row + b];
+                const float d = CK_FP16_TO_FP32(block->d);
+                const float *ap = &a_row[b * QK4_0];
+
+                for (int i = 0; i < QK4_0 / 2; i++) {
+                    const uint8_t packed = block->qs[i];
+                    const int q0 = (packed & 0x0F) - 8;
+                    const int q1 = (packed >> 4) - 8;
+
+                    sum += d * (float)q0 * ap[2 * i + 0];
+                    sum += d * (float)q1 * ap[2 * i + 1];
+                }
+            }
+
+            C[m * N + n] = sum + (bias ? bias[n] : 0.0f);
+        }
+    }
+}
+
+/* ============================================================================
  * Backward Pass: Gradient w.r.t. Input
  *
  * Given: dL/dY (gradient of loss w.r.t. output)

@@ -227,6 +227,21 @@ static void ck_gemm_nt_quant(const float *A,
     case CK_DT_Q6_K:
         gemm_nt_q6_k(A, B, bias, C, M, N, K);
         break;
+    case CK_DT_Q4_0:
+        gemm_nt_q4_0(A, B, bias, C, M, N, K);
+        break;
+    case CK_DT_Q4_1:
+        gemm_nt_q4_1(A, B, bias, C, M, N, K);
+        break;
+    case CK_DT_Q5_0:
+        gemm_nt_q5_0(A, B, bias, C, M, N, K);
+        break;
+    case CK_DT_Q5_1:
+        gemm_nt_q5_1(A, B, bias, C, M, N, K);
+        break;
+    case CK_DT_Q8_0:
+        gemm_nt_q8_0(A, B, bias, C, M, N, K);
+        break;
     default:
         break;
     }

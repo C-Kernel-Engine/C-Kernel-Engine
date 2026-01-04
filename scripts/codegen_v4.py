@@ -99,10 +99,23 @@ def emit_c_source_v4(layout: v3.ModelLayout,
         return layer_dtype_map.get(name, "")
 
     def dtype_const(dtype: str) -> str:
+        """Convert dtype string to CK_DT_* constant."""
         if dtype.startswith("q4_k"):
             return "CK_DT_Q4_K"
         if dtype.startswith("q6_k"):
             return "CK_DT_Q6_K"
+        if dtype.startswith("q4_0"):
+            return "CK_DT_Q4_0"
+        if dtype.startswith("q4_1"):
+            return "CK_DT_Q4_1"
+        if dtype.startswith("q5_0"):
+            return "CK_DT_Q5_0"
+        if dtype.startswith("q5_1"):
+            return "CK_DT_Q5_1"
+        if dtype.startswith("q8_0"):
+            return "CK_DT_Q8_0"
+        if dtype.startswith("q8_k"):
+            return "CK_DT_Q8_K"
         return "CK_DT_FP32"
 
     wq_dtype = layer_weight_dtype("wq")
@@ -113,7 +126,7 @@ def emit_c_source_v4(layout: v3.ModelLayout,
     w2_dtype = layer_weight_dtype("w2")
 
     weight_dtypes = [wq_dtype, wk_dtype, wv_dtype, wo_dtype, w1_dtype, w2_dtype]
-    has_quant = any(d.startswith(("q4_k", "q6_k")) for d in weight_dtypes if d)
+    has_quant = any(d.startswith(("q4_k", "q6_k", "q4_0", "q4_1", "q5_0", "q5_1", "q8_0", "q8_k")) for d in weight_dtypes if d)
     all_q4_k = all(d.startswith("q4_k") for d in weight_dtypes if d)
     use_fast_q4 = use_q4_k and all_q4_k
     use_quant_path = has_quant and not use_fast_q4
