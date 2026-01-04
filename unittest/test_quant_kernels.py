@@ -34,9 +34,13 @@ except Exception as e:
 
 # Constants
 QK4_0 = 32          # Q4_0 block size
+QK5_0 = 32          # Q5_0 block size
+QK5_1 = 32          # Q5_1 block size
 QK8_0 = 32          # Q8_0 block size
 QK_K = 256          # Q4_K block size
 BLOCK_Q4_0_SIZE = 18
+BLOCK_Q5_0_SIZE = 22  # 2 (scale) + 4 (high bits) + 16 (low 4-bits)
+BLOCK_Q5_1_SIZE = 24  # 2 (scale) + 2 (min) + 4 (high bits) + 16 (low 4-bits)
 BLOCK_Q8_0_SIZE = 34
 BLOCK_Q4_K_SIZE = 144
 
@@ -102,6 +106,119 @@ def gemv_q4_0_ref(W_blocks: bytes, x: np.ndarray, M: int, K: int) -> np.ndarray:
             block_data = W_blocks[offset:offset + BLOCK_Q4_0_SIZE]
             w_fp32 = dequant_q4_0_block_ref(block_data)
             y[row] += np.dot(w_fp32, x[b * QK4_0:(b + 1) * QK4_0])
+    return y
+
+
+# ============================================================================
+# Q5_0 Reference Implementation
+# ============================================================================
+
+def create_random_q5_0_block() -> bytes:
+    """Create a random Q5_0 block for testing."""
+    d = np.random.uniform(0.01, 0.5)
+    d_bits = np.float16(d).view(np.uint16)
+    # High bits: 4 bytes = 32 bits (one per weight)
+    qh = np.random.randint(0, 2**32, dtype=np.uint32)
+    qh_bytes = qh.tobytes()
+    # Low 4-bits: 16 bytes (2 weights per byte)
+    qs = np.random.randint(0, 256, QK5_0 // 2, dtype=np.uint8).tobytes()
+    return struct.pack('<H', d_bits) + qh_bytes + qs
+
+
+def dequant_q5_0_block_ref(block_data: bytes) -> np.ndarray:
+    """Reference dequantization of Q5_0 block."""
+    d_bits = struct.unpack('<H', block_data[0:2])[0]
+    d = fp16_to_fp32(d_bits)
+    qh = struct.unpack('<I', block_data[2:6])[0]
+    qs = block_data[6:22]
+
+    output = np.zeros(QK5_0, dtype=np.float32)
+    for i in range(QK5_0 // 2):
+        packed = qs[i]
+        # Extract low 4 bits
+        lo0 = packed & 0x0F
+        lo1 = packed >> 4
+        # Extract high bits
+        hi0 = ((qh >> (2 * i + 0)) & 1) << 4
+        hi1 = ((qh >> (2 * i + 1)) & 1) << 4
+        # Combine: 5-bit signed value (-16 to +15)
+        q0 = (lo0 | hi0) - 16
+        q1 = (lo1 | hi1) - 16
+        output[2*i + 0] = d * q0
+        output[2*i + 1] = d * q1
+    return output
+
+
+def gemv_q5_0_ref(W_blocks: bytes, x: np.ndarray, M: int, K: int) -> np.ndarray:
+    """Reference Q5_0 GEMV."""
+    blocks_per_row = K // QK5_0
+    y = np.zeros(M, dtype=np.float32)
+
+    for row in range(M):
+        for b in range(blocks_per_row):
+            offset = (row * blocks_per_row + b) * BLOCK_Q5_0_SIZE
+            block_data = W_blocks[offset:offset + BLOCK_Q5_0_SIZE]
+            w_fp32 = dequant_q5_0_block_ref(block_data)
+            y[row] += np.dot(w_fp32, x[b * QK5_0:(b + 1) * QK5_0])
+    return y
+
+
+# ============================================================================
+# Q5_1 Reference Implementation
+# ============================================================================
+
+def create_random_q5_1_block() -> bytes:
+    """Create a random Q5_1 block for testing."""
+    d = np.random.uniform(0.01, 0.5)
+    m = np.random.uniform(-0.5, 0.0)
+    d_bits = np.float16(d).view(np.uint16)
+    m_bits = np.float16(m).view(np.uint16)
+    # High bits: 4 bytes = 32 bits (one per weight)
+    qh = np.random.randint(0, 2**32, dtype=np.uint32)
+    qh_bytes = qh.tobytes()
+    # Low 4-bits: 16 bytes (2 weights per byte)
+    qs = np.random.randint(0, 256, QK5_1 // 2, dtype=np.uint8).tobytes()
+    return struct.pack('<H', d_bits) + struct.pack('<H', m_bits) + qh_bytes + qs
+
+
+def dequant_q5_1_block_ref(block_data: bytes) -> np.ndarray:
+    """Reference dequantization of Q5_1 block."""
+    d_bits = struct.unpack('<H', block_data[0:2])[0]
+    m_bits = struct.unpack('<H', block_data[2:4])[0]
+    d = fp16_to_fp32(d_bits)
+    m = fp16_to_fp32(m_bits)
+    qh = struct.unpack('<I', block_data[4:8])[0]
+    qs = block_data[8:24]
+
+    output = np.zeros(QK5_1, dtype=np.float32)
+    for i in range(QK5_1 // 2):
+        packed = qs[i]
+        # Extract low 4 bits
+        lo0 = packed & 0x0F
+        lo1 = packed >> 4
+        # Extract high bits
+        hi0 = ((qh >> (2 * i + 0)) & 1) << 4
+        hi1 = ((qh >> (2 * i + 1)) & 1) << 4
+        # Combine: 5-bit unsigned value (0 to 31)
+        q0 = lo0 | hi0
+        q1 = lo1 | hi1
+        # Dequantize: w = d * q + m
+        output[2*i + 0] = d * q0 + m
+        output[2*i + 1] = d * q1 + m
+    return output
+
+
+def gemv_q5_1_ref(W_blocks: bytes, x: np.ndarray, M: int, K: int) -> np.ndarray:
+    """Reference Q5_1 GEMV."""
+    blocks_per_row = K // QK5_1
+    y = np.zeros(M, dtype=np.float32)
+
+    for row in range(M):
+        for b in range(blocks_per_row):
+            offset = (row * blocks_per_row + b) * BLOCK_Q5_1_SIZE
+            block_data = W_blocks[offset:offset + BLOCK_Q5_1_SIZE]
+            w_fp32 = dequant_q5_1_block_ref(block_data)
+            y[row] += np.dot(w_fp32, x[b * QK5_1:(b + 1) * QK5_1])
     return y
 
 
@@ -309,6 +426,85 @@ def test_gemv_q4_0():
         return False, str(e)
 
 
+def test_dequant_q5_0():
+    """Test Q5_0 dequantization accuracy."""
+    np.random.seed(42)
+    block_data = create_random_q5_0_block()
+    ref_output = dequant_q5_0_block_ref(block_data)
+
+    try:
+        lib.dequant_q5_0_row.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_size_t
+        ]
+        lib.dequant_q5_0_row.restype = None
+
+        c_output = np.zeros(QK5_0, dtype=np.float32)
+        block_arr = np.frombuffer(block_data, dtype=np.uint8)
+        lib.dequant_q5_0_row(
+            block_arr.ctypes.data_as(ctypes.c_void_p),
+            c_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ctypes.c_size_t(QK5_0)
+        )
+        diff = np.max(np.abs(c_output - ref_output))
+        return diff <= 1e-5, diff
+    except Exception as e:
+        return False, str(e)
+
+
+def test_gemv_q5_0():
+    """Test Q5_0 GEMV accuracy."""
+    np.random.seed(42)
+    M, K = 32, 64
+    blocks = b''.join([create_random_q5_0_block() for _ in range(M * K // QK5_0)])
+    x = np.random.randn(K).astype(np.float32)
+    ref_y = gemv_q5_0_ref(blocks, x, M, K)
+
+    try:
+        lib.gemv_q5_0.argtypes = [
+            ctypes.POINTER(ctypes.c_float), ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int
+        ]
+        lib.gemv_q5_0.restype = None
+
+        c_y = np.zeros(M, dtype=np.float32)
+        blocks_arr = np.frombuffer(blocks, dtype=np.uint8)
+        lib.gemv_q5_0(
+            c_y.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            blocks_arr.ctypes.data_as(ctypes.c_void_p),
+            x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ctypes.c_int(M), ctypes.c_int(K)
+        )
+        diff = np.max(np.abs(c_y - ref_y))
+        return diff <= 1e-3, diff
+    except Exception as e:
+        return False, str(e)
+
+
+def test_dequant_q5_1():
+    """Test Q5_1 dequantization accuracy."""
+    np.random.seed(42)
+    block_data = create_random_q5_1_block()
+    ref_output = dequant_q5_1_block_ref(block_data)
+
+    try:
+        lib.dequant_q5_1_row.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_size_t
+        ]
+        lib.dequant_q5_1_row.restype = None
+
+        c_output = np.zeros(QK5_1, dtype=np.float32)
+        block_arr = np.frombuffer(block_data, dtype=np.uint8)
+        lib.dequant_q5_1_row(
+            block_arr.ctypes.data_as(ctypes.c_void_p),
+            c_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ctypes.c_size_t(QK5_1)
+        )
+        diff = np.max(np.abs(c_output - ref_output))
+        return diff <= 1e-5, diff
+    except Exception as e:
+        return False, str(e)
+
+
 def test_dequant_q8_0():
     """Test Q8_0 dequantization accuracy."""
     np.random.seed(42)
@@ -500,6 +696,9 @@ if __name__ == "__main__":
     tests = [
         ("Q4_0 Dequantization", test_dequant_q4_0),
         ("Q4_0 GEMV Forward", test_gemv_q4_0),
+        ("Q5_0 Dequantization", test_dequant_q5_0),
+        ("Q5_0 GEMV Forward", test_gemv_q5_0),
+        ("Q5_1 Dequantization", test_dequant_q5_1),
         ("Q8_0 Dequantization", test_dequant_q8_0),
         ("Q8_0 GEMV Forward", test_gemv_q8_0),
         ("Q4_K Dequantization", test_dequant_q4_k),

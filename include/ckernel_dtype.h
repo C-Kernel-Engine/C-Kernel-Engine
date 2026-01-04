@@ -22,6 +22,7 @@
  *   - CK_DT_Q6_K: 6-bit k-quant, 256 weights/block, per-16 scales
  *   - CK_DT_Q8_0: 8-bit, 32 weights/block, 1 FP16 scale
  *   - CK_DT_Q8_K: 8-bit k-quant, 256 weights/block, FP32 scale + bsums
+ *   - CK_DT_Q5_0: 5-bit, 32 weights/block, 1 FP16 scale
  */
 typedef enum {
     /* Standard floating-point types */
@@ -35,10 +36,13 @@ typedef enum {
 
     /* GGML-compatible block quantization */
     CK_DT_Q4_0,          /* 4.5 bits/weight (18 bytes per 32 weights) */
+    CK_DT_Q4_1,          /* 5.0 bits/weight (20 bytes per 32 weights) */
     CK_DT_Q4_K,          /* 4.5 bits/weight (144 bytes per 256 weights) - Q4_K_M */
     CK_DT_Q6_K,          /* 6.5 bits/weight (210 bytes per 256 weights) */
     CK_DT_Q8_0,          /* 8.5 bits/weight (34 bytes per 32 weights) */
     CK_DT_Q8_K,          /* 9.125 bits/weight (292 bytes per 256 weights) */
+    CK_DT_Q5_0,          /* 5.5 bits/weight (22 bytes per 32 weights) */
+    CK_DT_Q5_1,          /* 6.0 bits/weight (24 bytes per 32 weights) */
 
     CK_DT_COUNT
 } CKDataType;
@@ -52,8 +56,8 @@ typedef uint32_t CKDataTypeMask;
  */
 static inline int ck_dtype_is_quantized(CKDataType dt)
 {
-    return dt == CK_DT_Q4_0 || dt == CK_DT_Q4_K || dt == CK_DT_Q6_K ||
-           dt == CK_DT_Q8_0 || dt == CK_DT_Q8_K;
+    return dt == CK_DT_Q4_0 || dt == CK_DT_Q4_1 || dt == CK_DT_Q5_0 || dt == CK_DT_Q5_1 ||
+           dt == CK_DT_Q4_K || dt == CK_DT_Q6_K || dt == CK_DT_Q8_0 || dt == CK_DT_Q8_K;
 }
 
 /**
@@ -83,6 +87,9 @@ static inline size_t ck_dtype_block_size(CKDataType dt)
 {
     switch (dt) {
     case CK_DT_Q4_0:
+    case CK_DT_Q4_1:
+    case CK_DT_Q5_0:
+    case CK_DT_Q5_1:
     case CK_DT_Q8_0:
         return 32;
     case CK_DT_Q4_K:
@@ -102,6 +109,12 @@ static inline size_t ck_dtype_block_bytes(CKDataType dt)
     switch (dt) {
     case CK_DT_Q4_0:
         return 18;   /* 2 (scale) + 16 (32 x 4-bit) */
+    case CK_DT_Q4_1:
+        return 20;   /* 2 (scale) + 2 (min) + 16 (32 x 4-bit) */
+    case CK_DT_Q5_0:
+        return 22;   /* 2 (scale) + 4 (high bit) + 16 (low 4-bit) */
+    case CK_DT_Q5_1:
+        return 24;   /* 2 (scale) + 2 (min) + 4 (high bit) + 16 (low 4-bit) */
     case CK_DT_Q4_K:
         return 144;  /* 2 + 2 + 12 + 128 */
     case CK_DT_Q6_K:

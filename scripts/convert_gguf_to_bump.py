@@ -31,11 +31,20 @@ import numpy as np
 HEADER_SIZE = 128
 CACHE_ALIGN = 64
 
+# Must match ckernel_dtype.h enum order exactly
 CK_DT_FP32 = 0
 CK_DT_BF16 = 1
 CK_DT_FP16 = 2
-CK_DT_Q4_K = 6
-CK_DT_Q6_K = 7
+CK_DT_INT8 = 3
+CK_DT_INT4 = 4
+CK_DT_Q4_0 = 5
+CK_DT_Q4_1 = 6
+CK_DT_Q4_K = 7
+CK_DT_Q6_K = 8
+CK_DT_Q8_0 = 9
+CK_DT_Q8_K = 10
+CK_DT_Q5_0 = 11
+CK_DT_Q5_1 = 12
 
 
 def align_up(n: int, a: int) -> int:
@@ -296,10 +305,18 @@ def ck_dtype_from_ggml_type(ggml_type: int) -> int:
         return CK_DT_FP16
     if ggml_type == GGML_TYPE_BF16:
         return CK_DT_BF16
+    if ggml_type == GGML_TYPE_Q4_0:
+        return CK_DT_Q4_0
     if ggml_type == GGML_TYPE_Q4_K:
         return CK_DT_Q4_K
+    if ggml_type == GGML_TYPE_Q5_0:
+        return CK_DT_Q5_0
+    if ggml_type == GGML_TYPE_Q5_1:
+        return CK_DT_Q5_1
     if ggml_type == GGML_TYPE_Q6_K:
         return CK_DT_Q6_K
+    if ggml_type == GGML_TYPE_Q8_0:
+        return CK_DT_Q8_0
     raise GGUFError(f"Unsupported ggml_type={ggml_type_name(ggml_type)} for bump output")
 
 
@@ -308,8 +325,12 @@ def ck_dtype_name(dt: int) -> str:
         CK_DT_FP32: "FP32",
         CK_DT_BF16: "BF16",
         CK_DT_FP16: "FP16",
+        CK_DT_Q4_0: "Q4_0",
         CK_DT_Q4_K: "Q4_K",
+        CK_DT_Q5_0: "Q5_0",
+        CK_DT_Q5_1: "Q5_1",
         CK_DT_Q6_K: "Q6_K",
+        CK_DT_Q8_0: "Q8_0",
     }.get(dt, f"DT({dt})")
 
 

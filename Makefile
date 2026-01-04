@@ -183,6 +183,9 @@ SRCS    := src/backend_native.c \
 	           src/kernels/dequant_kernels.c \
 	           src/kernels/gemm_kernels_bf16.c \
 	           src/kernels/gemm_kernels_q4_0.c \
+	           src/kernels/gemm_kernels_q4_1.c \
+	           src/kernels/gemm_kernels_q5_0.c \
+	           src/kernels/gemm_kernels_q5_1.c \
 	           src/kernels/gemm_kernels_q4k.c \
 	           src/kernels/gemm_kernels_q6k.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
@@ -523,8 +526,8 @@ $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/sof
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c -lm
 
-$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c include/ckernel_quant.h include/ckernel_dtype.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c -lm
+$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c include/ckernel_quant.h include/ckernel_dtype.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c -lm
 
 # Convenience alias targets so existing commands still work.
 libckernel_gelu.so: $(LIB_GELU)
@@ -1058,6 +1061,7 @@ help:
 	@echo "  CLI (main entry point):"
 	@echo "  make ck-cli          Build CLI tool with all dependencies"
 	@echo "  make ck-cli-v4       Build v4 CLI (IR v4 codegen + compile)"
+	@echo "  ./ck-v5 run <model>  Run v5 pipeline (manifest-first; inspect-only supported)"
 	@echo "  make generate-model MODEL=<name>  Generate C code for model (inspect before compile)"
 	@echo ""
 	@echo "  Testing:"
@@ -1135,6 +1139,7 @@ help:
 	@echo "    ./build/ck list     List cached models"
 	@echo "    ./build/ck remove <model>  Remove cached model"
 	@echo "    ./build/ck-v4 build Qwen/Qwen2-0.5B"
+	@echo "    ./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf --weight-dtype=q4_k_m"
 	@echo ""
 	@echo "Interactive Tools (llama.cpp style):"
 	@echo "  make ck-chat          Build interactive CLI (C-based)"

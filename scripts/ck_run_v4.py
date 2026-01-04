@@ -25,7 +25,9 @@ from typing import Optional
 # Configuration
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CACHE_DIR = Path.home() / ".cache" / "ck-engine-v4" / "models"
+V5_MODE = os.environ.get("CK_V5") == "1"
+_cache_root = ".cache/ck-engine-v5" if V5_MODE else ".cache/ck-engine-v4"
+CACHE_DIR = Path.home() / _cache_root / "models"
 SCRIPTS_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPTS_DIR.parent
 BUILD_DIR = PROJECT_ROOT / "build"
@@ -345,6 +347,35 @@ def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False) ->
     return weights_path, config_path
 
 
+def step_inspect_weights_v5(input_type: str, model_dir: Optional[Path], gguf_path: Optional[Path],
+                            output_dir: Path, force: bool = False) -> Path:
+    """Emit a lightweight weights manifest for v5 (no conversion)."""
+    manifest_path = output_dir / "weights_manifest_input.json"
+    if manifest_path.exists() and not force:
+        log(f"  Using cached manifest at {manifest_path}", C_DIM)
+        return manifest_path
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        str(SCRIPTS_DIR / "inspect_weights_v5.py"),
+        f"--manifest-out={manifest_path}",
+    ]
+
+    if gguf_path is not None:
+        cmd.append(f"--gguf={gguf_path}")
+        cmd.append(f"--config-out={output_dir / 'config.json'}")
+    elif model_dir is not None:
+        cmd.append(f"--checkpoint={model_dir}")
+    else:
+        log_error("inspect requires gguf or checkpoint directory")
+        sys.exit(1)
+
+    run_cmd(cmd)
+    log(f"  Created {manifest_path}", C_GREEN)
+    return manifest_path
+
+
 def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = None,
                   weight_dtype: str = None, modes: list = None, force: bool = False,
                   debug: bool = False, parity: bool = False) -> Path:
@@ -364,9 +395,10 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    build_script = "build_ir_v5.py" if V5_MODE else "build_ir_v4.py"
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "build_ir_v4.py"),
+        str(SCRIPTS_DIR / build_script),
         f"--config={config_path}",
         f"--prefix={output_dir}",
         "--emit=lib",
@@ -869,10 +901,13 @@ def run_pipeline(args: argparse.Namespace):
     """Run the full v4 pipeline."""
     model_input = args.model
     weights_path = None
+    manifest_input_path = None
+    v5_mode = V5_MODE
 
     # Detect input type
     input_type, info = detect_input_type(model_input)
-    log(f"{C_ORANGE}C-Kernel-Engine v4{C_RESET}")
+    version_tag = "v5" if v5_mode else "v4"
+    log(f"{C_ORANGE}C-Kernel-Engine {version_tag}{C_RESET}")
     log(f"Input: {model_input} ({input_type})", C_DIM)
 
     # Determine working directory
@@ -901,6 +936,12 @@ def run_pipeline(args: argparse.Namespace):
                 gguf_path = gguf_files[0]
 
             log(f"  Using GGUF: {gguf_path.name}", C_GREEN)
+            if v5_mode:
+                manifest_input_path = step_inspect_weights_v5(
+                    input_type, model_dir, gguf_path, work_dir, force=args.force_inspect
+                )
+                if args.inspect_only:
+                    return
             weights_path, config_path = step_convert_gguf(
                 gguf_path, work_dir,
                 force=args.force_convert
@@ -910,6 +951,12 @@ def run_pipeline(args: argparse.Namespace):
         else:
             # Standard HF repo with safetensors
             config_path = model_dir / "config.json"
+            if v5_mode:
+                manifest_input_path = step_inspect_weights_v5(
+                    input_type, model_dir, None, work_dir, force=args.force_inspect
+                )
+                if args.inspect_only:
+                    return
             weights_path = step_convert_hf(
                 model_dir, work_dir,
                 weight_dtype=args.weight_dtype or "float32",
@@ -920,6 +967,12 @@ def run_pipeline(args: argparse.Namespace):
     elif input_type == 'gguf':
         gguf_path = info['path']
         work_dir = CACHE_DIR / gguf_path.stem
+        if v5_mode:
+            manifest_input_path = step_inspect_weights_v5(
+                input_type, None, gguf_path, work_dir, force=args.force_inspect
+            )
+            if args.inspect_only:
+                return
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
             force=args.force_convert
@@ -933,6 +986,12 @@ def run_pipeline(args: argparse.Namespace):
         config_path = model_dir / "config.json"
 
         # Convert weights
+        if v5_mode:
+            manifest_input_path = step_inspect_weights_v5(
+                input_type, model_dir, None, work_dir, force=args.force_inspect
+            )
+            if args.inspect_only:
+                return
         weights_path = step_convert_hf(
             model_dir, work_dir,
             weight_dtype=args.weight_dtype or "float32",
@@ -945,6 +1004,12 @@ def run_pipeline(args: argparse.Namespace):
         work_dir = config_path.parent / ".ck_build"
         manifest_path = None
         # No weight conversion for config-only (assume weights.bump exists)
+        if v5_mode and not args.weight_dtype:
+            log_error("v5 requires a weights manifest for config-only runs (or pass --weight-dtype)")
+            sys.exit(1)
+        if v5_mode and args.inspect_only:
+            log_error("inspect-only requires a weights source (GGUF or checkpoint directory)")
+            sys.exit(1)
 
     elif input_type == 'hf_gguf':
         # Download single GGUF file from HuggingFace
@@ -953,6 +1018,12 @@ def run_pipeline(args: argparse.Namespace):
         work_dir = CACHE_DIR / repo_id.replace('/', '--')
 
         gguf_path = step_download_gguf(repo_id, filename, CACHE_DIR, force=args.force_download)
+        if v5_mode:
+            manifest_input_path = step_inspect_weights_v5(
+                input_type, None, gguf_path, work_dir, force=args.force_inspect
+            )
+            if args.inspect_only:
+                return
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
             force=args.force_convert
@@ -964,13 +1035,22 @@ def run_pipeline(args: argparse.Namespace):
         log_error(f"Unknown input type: {input_type}")
         sys.exit(1)
 
+    if v5_mode and not manifest_input_path and not args.weight_dtype and manifest_path is None:
+        log_error("v5 requires a weights manifest (inspect-only or conversion) unless --weight-dtype is provided")
+        sys.exit(1)
+
     # Build IR
     # If debug or parity is enabled, force recompile to ensure special code is generated
     force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
-    weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_path)
+    manifest_for_dtype = None
+    if manifest_path and manifest_path.exists():
+        manifest_for_dtype = manifest_path
+    elif manifest_input_path and manifest_input_path.exists():
+        manifest_for_dtype = manifest_input_path
+    weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_for_dtype)
     layout_path = step_build_ir(
         config_path, work_dir,
-        manifest_path=manifest_path,
+        manifest_path=manifest_path or manifest_input_path,
         weight_dtype=weight_dtype,
         force=force_for_debug,
         debug=getattr(args, 'debug', False),
@@ -1085,6 +1165,10 @@ Examples:
                            help='Run smoke tests after build')
     run_parser.add_argument('--test-only', action='store_true',
                            help='Run tests and exit (skip chat)')
+    run_parser.add_argument('--inspect-only', action='store_true',
+                           help='Inspect weights and emit manifest only (v5)')
+    run_parser.add_argument('--force-inspect', action='store_true',
+                           help='Re-run inspect step even if cached (v5)')
     run_parser.add_argument('--debug', action='store_true',
                            help='Emit debug prints in generated C code to trace NaN/zero issues')
     run_parser.add_argument('--parity', action='store_true',

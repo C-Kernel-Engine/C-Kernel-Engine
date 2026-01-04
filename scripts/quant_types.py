@@ -59,6 +59,33 @@ QUANT_TYPES: Dict[str, QuantType] = {
         has_min=False,
         description="4-bit, 32/block, 1 FP16 scale, zero-centered",
     ),
+    "q4_1": QuantType(
+        name="q4_1",
+        ggml_name="GGML_TYPE_Q4_1",
+        block_size=32,
+        block_bytes=20,  # 2 (FP16 scale) + 2 (FP16 min) + 16 (32 x 4-bit packed)
+        bits_per_weight=5.0,
+        has_min=True,
+        description="4-bit, 32/block, FP16 scale + min",
+    ),
+    "q5_0": QuantType(
+        name="q5_0",
+        ggml_name="GGML_TYPE_Q5_0",
+        block_size=32,
+        block_bytes=22,  # 2 (FP16 scale) + 4 (high bits) + 16 (low 4-bit)
+        bits_per_weight=5.5,
+        has_min=False,
+        description="5-bit, 32/block, 1 FP16 scale, zero-centered",
+    ),
+    "q5_1": QuantType(
+        name="q5_1",
+        ggml_name="GGML_TYPE_Q5_1",
+        block_size=32,
+        block_bytes=24,  # 2 (FP16 scale) + 2 (FP16 min) + 4 (high bits) + 16 (low 4-bit)
+        bits_per_weight=6.0,
+        has_min=True,
+        description="5-bit, 32/block, FP16 scale + min",
+    ),
     "q8_0": QuantType(
         name="q8_0",
         ggml_name="GGML_TYPE_Q8_0",
@@ -119,8 +146,24 @@ QUANTIZED_KERNELS = {
     ("linear", "q6_k", "q8_k"): "gemv_q6_k_q8_k",
 
     # GEMV with Q4_0 weights (simpler format)
-    ("linear", "q4_0", "f32"): "gemv_q4_0_f32",
-    ("linear", "q4_0", "bf16"): "gemv_q4_0_bf16",
+    ("linear", "q4_0", "f32"): "gemv_q4_0",
+    ("linear", "q4_0", "bf16"): "gemv_q4_0",
+
+    # GEMV with Q4_1 weights (4-bit with min)
+    ("linear", "q4_1", "f32"): "gemv_q4_1",
+    ("linear", "q4_1", "bf16"): "gemv_q4_1",
+
+    # GEMV with Q5_0 weights (5-bit simple format)
+    ("linear", "q5_0", "f32"): "gemv_q5_0",
+    ("linear", "q5_0", "bf16"): "gemv_q5_0",
+
+    # GEMV with Q5_1 weights (5-bit with min)
+    ("linear", "q5_1", "f32"): "gemv_q5_1",
+    ("linear", "q5_1", "bf16"): "gemv_q5_1",
+
+    # GEMV with Q8_0 weights (8-bit simple format)
+    ("linear", "q8_0", "f32"): "gemv_q8_0",
+    ("linear", "q8_0", "bf16"): "gemv_q8_0",
 
     # Fused MLP kernels (gate + up + SwiGLU + down) - decode mode
     ("fused_mlp", "q4_k", "f32"): "mlp_fused_decode_q4_k_f32",
@@ -130,6 +173,9 @@ QUANTIZED_KERNELS = {
     ("dequant", "q4_k", "f32"): "dequant_q4_k_row",
     ("dequant", "q6_k", "f32"): "dequant_q6_k_row",
     ("dequant", "q4_0", "f32"): "dequant_q4_0_row",
+    ("dequant", "q4_1", "f32"): "dequant_q4_1_row",
+    ("dequant", "q5_0", "f32"): "dequant_q5_0_row",
+    ("dequant", "q5_1", "f32"): "dequant_q5_1_row",
     ("dequant", "q8_0", "f32"): "dequant_q8_0_row",
 
     # Quantization kernels (for on-the-fly activation quantization)
@@ -207,6 +253,9 @@ GGUF_TYPE_MAP = {
     0: "f32",      # GGML_TYPE_F32
     1: "f16",      # GGML_TYPE_F16
     2: "q4_0",     # GGML_TYPE_Q4_0
+    3: "q4_1",     # GGML_TYPE_Q4_1
+    6: "q5_0",     # GGML_TYPE_Q5_0
+    7: "q5_1",     # GGML_TYPE_Q5_1
     8: "q8_0",     # GGML_TYPE_Q8_0
     12: "q4_k",    # GGML_TYPE_Q4_K
     14: "q6_k",    # GGML_TYPE_Q6_K

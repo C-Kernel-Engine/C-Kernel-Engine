@@ -41,6 +41,57 @@ typedef struct {
 /* Total: 18 bytes per 32 weights */
 
 /* ============================================================================
+ * Q4_1: Simple 4-bit Quantization with Min
+ * - 32 weights per block
+ * - 2 FP16 values: scale (d) and min (m)
+ * - 20 bytes per 32 weights = 5.0 bits/weight
+ * ============================================================================ */
+
+#define QK4_1 32
+
+typedef struct {
+    ck_half d;             /* 2 bytes: scale (delta) */
+    ck_half m;             /* 2 bytes: minimum */
+    uint8_t qs[QK4_1 / 2]; /* 16 bytes: 32 x 4-bit weights (2 per byte) */
+} block_q4_1;
+/* Total: 20 bytes per 32 weights */
+
+/* ============================================================================
+ * Q5_0: Simple 5-bit Quantization
+ * - 32 weights per block
+ * - 1 FP16 scale per block
+ * - Low 4 bits stored like Q4_0, high 1 bit packed separately
+ * - 22 bytes per 32 weights = 5.5 bits/weight
+ * ============================================================================ */
+
+#define QK5_0 32
+
+typedef struct {
+    ck_half d;             /* 2 bytes: scale (delta) */
+    uint8_t qh[4];         /* 4 bytes: high 1-bit of each weight (32 bits total) */
+    uint8_t qs[QK5_0 / 2]; /* 16 bytes: low 4-bits of 32 weights (2 per byte) */
+} block_q5_0;
+/* Total: 22 bytes per 32 weights */
+
+/* ============================================================================
+ * Q5_1: Simple 5-bit Quantization with Min
+ * - 32 weights per block
+ * - 2 FP16 values: scale (d) and min (m)
+ * - Low 4 bits stored like Q4_1, high 1 bit packed separately
+ * - 24 bytes per 32 weights = 6.0 bits/weight
+ * ============================================================================ */
+
+#define QK5_1 32
+
+typedef struct {
+    ck_half d;             /* 2 bytes: scale (delta) */
+    ck_half m;             /* 2 bytes: minimum */
+    uint8_t qh[4];         /* 4 bytes: high 1-bit of each weight (32 bits total) */
+    uint8_t qs[QK5_1 / 2]; /* 16 bytes: low 4-bits of 32 weights (2 per byte) */
+} block_q5_1;
+/* Total: 24 bytes per 32 weights */
+
+/* ============================================================================
  * Q8_0: Simple 8-bit Quantization
  * - 32 weights per block
  * - 1 FP16 scale per block
@@ -118,6 +169,9 @@ static inline size_t ck_quant_block_size(int type) {
         case 1: return QK8_0;    /* Q8_0 */
         case 2: return QK_K;     /* Q4_K */
         case 3: return QK_K;     /* Q8_K */
+        case CK_DT_Q4_1: return QK4_1;
+        case CK_DT_Q5_0: return QK5_0;
+        case CK_DT_Q5_1: return QK5_1;
         case CK_DT_Q6_K: return QK_K;
         default: return 1;
     }
@@ -132,6 +186,9 @@ static inline size_t ck_quant_type_size(int type) {
         case 1: return sizeof(block_q8_0);
         case 2: return sizeof(block_q4_K);
         case 3: return sizeof(block_q8_K);
+        case CK_DT_Q4_1: return sizeof(block_q4_1);
+        case CK_DT_Q5_0: return sizeof(block_q5_0);
+        case CK_DT_Q5_1: return sizeof(block_q5_1);
         case CK_DT_Q6_K: return sizeof(block_q6_K);
         default: return 4; /* FP32 */
     }

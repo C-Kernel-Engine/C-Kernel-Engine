@@ -40,6 +40,9 @@ QK_ALIGN_BYTES = 256 * FLOAT_SIZE
 CK_DT_FP32 = gguf.CK_DT_FP32
 CK_DT_Q4_K = gguf.CK_DT_Q4_K
 CK_DT_Q6_K = gguf.CK_DT_Q6_K
+CK_DT_Q5_0 = gguf.CK_DT_Q5_0
+CK_DT_Q5_1 = gguf.CK_DT_Q5_1
+CK_DT_Q8_0 = gguf.CK_DT_Q8_0
 
 
 def read_matrix_f32(f, base: int, info: gguf.TensorInfo) -> np.ndarray:
@@ -126,15 +129,20 @@ def read_matrix_f32(f, base: int, info: gguf.TensorInfo) -> np.ndarray:
 
 
 def weight_dtype(info: gguf.TensorInfo, label: str) -> int:
-    if info.ggml_type in (gguf.GGML_TYPE_Q4_K, gguf.GGML_TYPE_Q6_K):
+    # Keep K-quants and simple quants in quantized form at runtime
+    if info.ggml_type in (
+        gguf.GGML_TYPE_Q4_K,
+        gguf.GGML_TYPE_Q6_K,
+        gguf.GGML_TYPE_Q5_0,
+        gguf.GGML_TYPE_Q5_1,
+        gguf.GGML_TYPE_Q8_0,
+    ):
         return gguf.ck_dtype_from_ggml_type(info.ggml_type)
+    # Dequantize F16/BF16 to F32 (we don't have native F16 kernels yet)
     if info.ggml_type in (
         gguf.GGML_TYPE_F32,
         gguf.GGML_TYPE_F16,
         gguf.GGML_TYPE_BF16,
-        gguf.GGML_TYPE_Q8_0,
-        gguf.GGML_TYPE_Q5_0,
-        gguf.GGML_TYPE_Q5_1,
     ):
         return CK_DT_FP32
     raise gguf.GGUFError(
@@ -143,7 +151,7 @@ def weight_dtype(info: gguf.TensorInfo, label: str) -> int:
 
 
 def is_quantized(dt: int) -> bool:
-    return dt in (CK_DT_Q4_K, CK_DT_Q6_K)
+    return dt in (CK_DT_Q4_K, CK_DT_Q6_K, CK_DT_Q5_0, CK_DT_Q5_1, CK_DT_Q8_0)
 
 
 def main() -> None:
@@ -529,6 +537,12 @@ def main() -> None:
                 return "q4_k"
             if dt == CK_DT_Q6_K:
                 return "q6_k"
+            if dt == CK_DT_Q5_0:
+                return "q5_0"
+            if dt == CK_DT_Q5_1:
+                return "q5_1"
+            if dt == CK_DT_Q8_0:
+                return "q8_0"
             return "fp32"
 
         def record_entry(name: str, dtype_str: str, start: int, size: int) -> None:

@@ -2,7 +2,7 @@
  * @file dequant_kernels.c
  * @brief Dequantization kernels for GGML-compatible formats
  *
- * Implements dequantization from Q4_0, Q4_K, Q6_K, Q8_0 to FP32.
+ * Implements dequantization from Q4_0, Q5_0, Q5_1, Q4_K, Q6_K, Q8_0 to FP32.
  * These kernels are used as building blocks for quantized GEMM/GEMV.
  *
  * Key optimization: Dequantize into registers, use immediately in FMA,
@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #include <immintrin.h>
 #include "ckernel_quant.h"
 
@@ -92,6 +93,157 @@ void dequant_q4_0_block_avx512(const block_q4_0 *block,
      * For proper sequential order, would need shuffle/blend */
 }
 #endif /* __AVX512F__ */
+
+/* ============================================================================
+ * Q4_1 Dequantization
+ * - 32 weights per block, 1 FP16 scale + 1 FP16 min
+ * - Weights stored as unsigned 4-bit (0 to 15)
+ * ============================================================================ */
+
+/**
+ * @brief Dequantize a single Q4_1 block to FP32
+ * @param block Pointer to Q4_1 block (20 bytes)
+ * @param output Output FP32 array (32 floats)
+ */
+void dequant_q4_1_block(const block_q4_1 *block, float *output)
+{
+    const float d = GGML_FP16_TO_FP32(block->d);
+    const float m = GGML_FP16_TO_FP32(block->m);
+
+    for (int i = 0; i < QK4_1 / 2; i++) {
+        const uint8_t packed = block->qs[i];
+
+        /* Lower nibble: unsigned 0-15 */
+        const int q0 = (packed & 0x0F);
+        /* Upper nibble: unsigned 0-15 */
+        const int q1 = (packed >> 4);
+
+        /* Dequantize: w = d * q + m */
+        output[2*i + 0] = d * (float)q0 + m;
+        output[2*i + 1] = d * (float)q1 + m;
+    }
+}
+
+/**
+ * @brief Dequantize Q4_1 row (multiple blocks)
+ */
+void dequant_q4_1_row(const void *src, float *dst, size_t n_elements)
+{
+    const block_q4_1 *blocks = (const block_q4_1 *)src;
+    const size_t n_blocks = n_elements / QK4_1;
+
+    for (size_t b = 0; b < n_blocks; b++) {
+        dequant_q4_1_block(&blocks[b], &dst[b * QK4_1]);
+    }
+}
+
+/* ============================================================================
+ * Q5_0 Dequantization
+ * - 32 weights per block, 1 FP16 scale
+ * - Low 4 bits + 1 high bit packed separately
+ * - Weights are 5-bit signed (-16 to +15)
+ * ============================================================================ */
+
+/**
+ * @brief Dequantize a single Q5_0 block to FP32
+ * @param block Pointer to Q5_0 block (22 bytes)
+ * @param output Output FP32 array (32 floats)
+ */
+void dequant_q5_0_block(const block_q5_0 *block, float *output)
+{
+    const float d = GGML_FP16_TO_FP32(block->d);
+
+    /* Get high bits as a 32-bit integer */
+    uint32_t qh;
+    memcpy(&qh, block->qh, sizeof(qh));
+
+    for (int i = 0; i < QK5_0 / 2; i++) {
+        const uint8_t packed = block->qs[i];
+
+        /* Extract low 4 bits for two weights */
+        const int lo0 = (packed & 0x0F);
+        const int lo1 = (packed >> 4);
+
+        /* Extract high bits from qh */
+        const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
+        const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
+
+        /* Combine: 5-bit value = lo4 | (hi1 << 4), range 0-31, then subtract 16 */
+        const int q0 = (lo0 | hi0) - 16;
+        const int q1 = (lo1 | hi1) - 16;
+
+        output[2 * i + 0] = d * (float)q0;
+        output[2 * i + 1] = d * (float)q1;
+    }
+}
+
+/**
+ * @brief Dequantize Q5_0 row (multiple blocks)
+ */
+void dequant_q5_0_row(const void *src, float *dst, size_t n_elements)
+{
+    const block_q5_0 *blocks = (const block_q5_0 *)src;
+    const size_t n_blocks = n_elements / QK5_0;
+
+    for (size_t b = 0; b < n_blocks; b++) {
+        dequant_q5_0_block(&blocks[b], &dst[b * QK5_0]);
+    }
+}
+
+/* ============================================================================
+ * Q5_1 Dequantization
+ * - 32 weights per block, 1 FP16 scale + 1 FP16 min
+ * - Low 4 bits + 1 high bit packed separately
+ * - Weights are unsigned 5-bit (0 to 31), scaled and offset by min
+ * ============================================================================ */
+
+/**
+ * @brief Dequantize a single Q5_1 block to FP32
+ * @param block Pointer to Q5_1 block (24 bytes)
+ * @param output Output FP32 array (32 floats)
+ */
+void dequant_q5_1_block(const block_q5_1 *block, float *output)
+{
+    const float d = GGML_FP16_TO_FP32(block->d);
+    const float m = GGML_FP16_TO_FP32(block->m);
+
+    /* Get high bits as a 32-bit integer */
+    uint32_t qh;
+    memcpy(&qh, block->qh, sizeof(qh));
+
+    for (int i = 0; i < QK5_1 / 2; i++) {
+        const uint8_t packed = block->qs[i];
+
+        /* Extract low 4 bits for two weights */
+        const int lo0 = (packed & 0x0F);
+        const int lo1 = (packed >> 4);
+
+        /* Extract high bits from qh */
+        const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
+        const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
+
+        /* Combine: 5-bit unsigned value = lo4 | (hi1 << 4), range 0-31 */
+        const int q0 = (lo0 | hi0);
+        const int q1 = (lo1 | hi1);
+
+        /* Dequantize: w = d * q + m */
+        output[2 * i + 0] = d * (float)q0 + m;
+        output[2 * i + 1] = d * (float)q1 + m;
+    }
+}
+
+/**
+ * @brief Dequantize Q5_1 row (multiple blocks)
+ */
+void dequant_q5_1_row(const void *src, float *dst, size_t n_elements)
+{
+    const block_q5_1 *blocks = (const block_q5_1 *)src;
+    const size_t n_blocks = n_elements / QK5_1;
+
+    for (size_t b = 0; b < n_blocks; b++) {
+        dequant_q5_1_block(&blocks[b], &dst[b * QK5_1]);
+    }
+}
 
 /* ============================================================================
  * Q8_0 Dequantization
@@ -347,6 +499,15 @@ void dequant_row(CKDataType dtype, const void *src, float *dst, size_t n_element
     switch (dtype) {
     case CK_DT_Q4_0:
         dequant_q4_0_row(src, dst, n_elements);
+        break;
+    case CK_DT_Q4_1:
+        dequant_q4_1_row(src, dst, n_elements);
+        break;
+    case CK_DT_Q5_0:
+        dequant_q5_0_row(src, dst, n_elements);
+        break;
+    case CK_DT_Q5_1:
+        dequant_q5_1_row(src, dst, n_elements);
         break;
     case CK_DT_Q4_K:
         dequant_q4_k_row(src, dst, n_elements);
