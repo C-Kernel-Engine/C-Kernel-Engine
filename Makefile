@@ -612,6 +612,7 @@ unittest:
 	@echo "  unittest/test_q6k_kernels.py           - Q6_K dequant + matvec"
 	@echo "  unittest/test_q4_k_quantize.py         - Q4_K quantization"
 	@echo "  unittest/test_q4k_q8k_matvec.py        - Q4_K x Q8_K matmul"
+	@echo "  unittest/test_v4_conversion.py         - GGUF -> bump v4 conversion sanity (requires GGUF)"
 	@echo ""
 	@echo "BF16 Tests:"
 	@echo "  unittest/bf16/test_sigmoid_bf16.py     - BF16 sigmoid"
@@ -835,6 +836,7 @@ tests-list:
 	@echo "  unittest/test_lm_head_litmus.py    - LM head + CE end-to-end test"
 	@echo "  unittest/test_fused_swiglu_decode.py - Fused SwiGLU decode MLP parity"
 	@echo "  unittest/test_fused_attention_decode.py - Fused attention decode parity"
+	@echo "  unittest/test_v4_conversion.py    - GGUF -> bump v4 conversion sanity (requires GGUF)"
 	@echo ""
 	@echo "┌──────────────────────────────────────────────────────────────────────────────┐"
 	@echo "│  BF16 Unit Tests                                                             │"
@@ -1253,8 +1255,45 @@ demo-q4-codegen: $(LIB)
 # TEST TARGETS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Run kernel unit tests (fast, catches SIMD bugs)
+test-kernels:
+	@echo ""
+	@echo "  $(C_ORANGE)Running Kernel Unit Tests$(C_RESET)"
+	@echo "  Tests Q4_K x Q8_K GEMV kernels (ref, AVX2, VNNI)"
+	@echo ""
+	@cd unittest && make clean && make
+	@cd unittest && ./test_q4k_kernels
+	@echo ""
+	@echo "  $(C_GREEN)All kernel tests passed!$(C_RESET)"
+	@echo ""
+
+# Test quantization kernels on VNNI-capable server (Xeon)
+# This MUST be run on the server to catch VNNI bugs
+test-quant-server: $(LIB)
+	@echo ""
+	@echo "  $(C_ORANGE)Quantization Tests for VNNI Server$(C_RESET)"
+	@echo "  Run this on Xeon with AVX-512 VNNI!"
+	@echo ""
+	@echo "  Checking CPU features..."
+	@grep -q avx512vnni /proc/cpuinfo && echo "  $(C_GREEN)✓ AVX-512 VNNI detected$(C_RESET)" || \
+		(echo "  $(C_RED)✗ WARNING: No VNNI - tests won't validate VNNI code!$(C_RESET)" && exit 1)
+	@echo ""
+	@echo "  Step 1: C Kernel Tests (standalone, no library)"
+	@cd unittest && make clean && make
+	@cd unittest && ./test_q4k_kernels --verbose
+	@echo ""
+	@echo "  Step 2: Python Quant Tests (uses library)"
+	@set -e; \
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_quant_kernels.py; \
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_q4_k_q8_k_matvec.py; \
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_q6k_kernels.py; \
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_q4_k_quantize.py
+	@echo ""
+	@echo "  $(C_GREEN)All VNNI quantization tests passed!$(C_RESET)"
+	@echo ""
+
 # Run unit tests only (fast, no model download)
-test-unit: $(LIB)
+test-unit: $(LIB) test-kernels
 	@echo ""
 	@echo "  $(C_ORANGE)Running Unit Tests$(C_RESET)"
 	@echo "  (Auto-escalates to DEBUG mode on failure)"
@@ -1287,7 +1326,7 @@ test-v4-clean: $(LIB)
 		--force-compile \
 		--force-convert
 
-.PHONY: test-unit test-v4 test-v4-clean
+.PHONY: test-unit test-v4 test-v4-clean test-kernels test-quant-server
 
 # Generate C code for a model without compiling (for inspection)
 # Usage: make generate-model MODEL=HuggingFaceTB/SmolLM-135M
