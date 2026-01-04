@@ -124,6 +124,13 @@ void gemm_nt_q6_k(const float *A,
 
 void dequant_q6_k_row(const void *src, float *dst, size_t n_elements);
 
+// Simple quant dequantization (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
+void dequant_q4_0_row(const void *src, float *dst, size_t n_elements);
+void dequant_q4_1_row(const void *src, float *dst, size_t n_elements);
+void dequant_q5_0_row(const void *src, float *dst, size_t n_elements);
+void dequant_q5_1_row(const void *src, float *dst, size_t n_elements);
+void dequant_q8_0_row(const void *src, float *dst, size_t n_elements);
+
 // Q4_K weights with Q8_K activations (inference-only)
 void quantize_row_q8_k(const float *x, void *y, int k);
 
