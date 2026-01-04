@@ -37,9 +37,13 @@
     "fp16": "IEEE Float 16",
     "int8": "8-bit integer",
     "int4": "4-bit integer",
-    "q4_0": "GGML Q4_0 quantization",
-    "q4_k": "GGML Q4_K quantization",
-    "q8_0": "GGML Q8_0 quantization"
+    "q4_0": "GGML Q4_0 quantization (4-bit, 32/block, zero-centered)",
+    "q4_1": "GGML Q4_1 quantization (4-bit, 32/block, with min)",
+    "q5_0": "GGML Q5_0 quantization (5-bit, 32/block, zero-centered)",
+    "q5_1": "GGML Q5_1 quantization (5-bit, 32/block, with min)",
+    "q8_0": "GGML Q8_0 quantization (8-bit, 32/block)",
+    "q4_k": "GGML Q4_K quantization (4-bit K-quant, 256/block)",
+    "q6_k": "GGML Q6_K quantization (6-bit K-quant, 256/block)"
   },
   "kernels": {
     "gemm": {
@@ -177,6 +181,72 @@
               "scalar"
             ],
             "file": "gemm_kernels_q8_0.c"
+          }
+        },
+        "q4_1": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "blocked",
+              "simd_avx512"
+            ],
+            "file": "gemm_kernels_q4_1.c"
+          },
+          "backward_dx": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "gemm_kernels_q4_1.c"
+          }
+        },
+        "q5_0": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "blocked",
+              "simd_avx512"
+            ],
+            "file": "gemm_kernels_q5_0.c"
+          },
+          "backward_dx": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "gemm_kernels_q5_0.c"
+          }
+        },
+        "q5_1": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "blocked",
+              "simd_avx512"
+            ],
+            "file": "gemm_kernels_q5_1.c"
+          },
+          "backward_dx": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "gemm_kernels_q5_1.c"
+          }
+        },
+        "q6_k": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "blocked",
+              "simd_avx512"
+            ],
+            "file": "gemm_kernels_q6k.c"
+          },
+          "backward_dx": {
+            "status": "pending",
+            "opt_level": [],
+            "file": "gemm_kernels_q6k.c"
           }
         }
       },
@@ -895,6 +965,42 @@
             "status": "done",
             "opt_level": [
               "simd_avx512"
+            ],
+            "file": "dequant_kernels.c"
+          }
+        },
+        "q4_1": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "dequant_kernels.c"
+          }
+        },
+        "q5_0": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "dequant_kernels.c"
+          }
+        },
+        "q5_1": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
+            ],
+            "file": "dequant_kernels.c"
+          }
+        },
+        "q6_k": {
+          "forward": {
+            "status": "done",
+            "opt_level": [
+              "scalar"
             ],
             "file": "dequant_kernels.c"
           }

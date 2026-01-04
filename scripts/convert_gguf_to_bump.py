@@ -428,8 +428,13 @@ def copy_qk_head_packed(
     aligned_head_dim: int,
     aligned_embed_dim: int,
 ) -> None:
-    if info.ggml_type not in (GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32):
-        raise GGUFError(f"{info.name}: expected Q4_K/Q6_K/F32, got {ggml_type_name(info.ggml_type)}")
+    # Supported quantized types: K-quants (Q4_K, Q6_K) and simple quants (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
+    supported_types = (
+        GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32,
+        GGML_TYPE_Q4_0, GGML_TYPE_Q4_1, GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0
+    )
+    if info.ggml_type not in supported_types:
+        raise GGUFError(f"{info.name}: expected Q4_K/Q6_K/Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/F32, got {ggml_type_name(info.ggml_type)}")
     if len(info.dims) != 2:
         raise GGUFError(f"{info.name}: expected 2D, got dims={info.dims}")
 
@@ -437,8 +442,11 @@ def copy_qk_head_packed(
     out_dim = info.ne1
     if in_dim > aligned_embed_dim:
         raise GGUFError(f"{info.name}: expected in_dim<=aligned_embed_dim (got {in_dim} > {aligned_embed_dim})")
+    # K-quants require 256-element alignment, simple quants require 32-element alignment
     if info.ggml_type in (GGML_TYPE_Q4_K, GGML_TYPE_Q6_K) and (aligned_embed_dim % 256) != 0:
         raise GGUFError(f"{info.name}: aligned_embed_dim must be multiple of 256 for K-quant (got {aligned_embed_dim})")
+    if info.ggml_type in (GGML_TYPE_Q4_0, GGML_TYPE_Q4_1, GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0) and (aligned_embed_dim % 32) != 0:
+        raise GGUFError(f"{info.name}: aligned_embed_dim must be multiple of 32 for simple quant (got {aligned_embed_dim})")
     if out_dim != group_count * head_dim:
         raise GGUFError(
             f"{info.name}: expected out_dim={group_count * head_dim} (group_count*head_dim), got {out_dim}"
