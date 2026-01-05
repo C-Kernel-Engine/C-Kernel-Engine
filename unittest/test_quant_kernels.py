@@ -261,33 +261,51 @@ def gemv_q8_0_ref(W_blocks: bytes, x: np.ndarray, M: int, K: int) -> np.ndarray:
 # ============================================================================
 
 def unpack_q4_k_scales(scales: bytes) -> tuple:
-    """Unpack 6-bit scales and mins from 12-byte packed array."""
+    """Unpack 6-bit scales and mins from 12-byte packed array.
+
+    This matches llama.cpp's get_scale_min_k4() function exactly.
+    Layout:
+      - bytes 0-3: 6-bit scales[0-3] (high 2 bits used for scales[4-7])
+      - bytes 4-7: 6-bit mins[0-3] (high 2 bits used for mins[4-7])
+      - bytes 8-11: low 4 bits for scales[4-7], high 4 bits for mins[4-7]
+    """
     sc = [0] * 8
     m = [0] * 8
 
+    # Direct 6-bit values for indices 0-3
     sc[0] = scales[0] & 0x3F
-    sc[1] = (scales[0] >> 6) | ((scales[1] & 0x0F) << 2)
-    sc[2] = (scales[1] >> 4) | ((scales[2] & 0x03) << 4)
-    sc[3] = scales[2] >> 2
-    sc[4] = scales[3] & 0x3F
-    sc[5] = (scales[3] >> 6) | ((scales[4] & 0x0F) << 2)
-    sc[6] = (scales[4] >> 4) | ((scales[5] & 0x03) << 4)
-    sc[7] = scales[5] >> 2
+    sc[1] = scales[1] & 0x3F
+    sc[2] = scales[2] & 0x3F
+    sc[3] = scales[3] & 0x3F
 
-    m[0] = scales[6] & 0x3F
-    m[1] = (scales[6] >> 6) | ((scales[7] & 0x0F) << 2)
-    m[2] = (scales[7] >> 4) | ((scales[8] & 0x03) << 4)
-    m[3] = scales[8] >> 2
-    m[4] = scales[9] & 0x3F
-    m[5] = (scales[9] >> 6) | ((scales[10] & 0x0F) << 2)
-    m[6] = (scales[10] >> 4) | ((scales[11] & 0x03) << 4)
-    m[7] = scales[11] >> 2
+    m[0] = scales[4] & 0x3F
+    m[1] = scales[5] & 0x3F
+    m[2] = scales[6] & 0x3F
+    m[3] = scales[7] & 0x3F
+
+    # 6-bit values for indices 4-7: low 4 bits from bytes 8-11,
+    # high 2 bits from upper bits of bytes 0-3 (scales) and 4-7 (mins)
+    sc[4] = (scales[8]  & 0x0F) | ((scales[0] >> 6) << 4)
+    sc[5] = (scales[9]  & 0x0F) | ((scales[1] >> 6) << 4)
+    sc[6] = (scales[10] & 0x0F) | ((scales[2] >> 6) << 4)
+    sc[7] = (scales[11] & 0x0F) | ((scales[3] >> 6) << 4)
+
+    m[4] = (scales[8]  >> 4) | ((scales[4] >> 6) << 4)
+    m[5] = (scales[9]  >> 4) | ((scales[5] >> 6) << 4)
+    m[6] = (scales[10] >> 4) | ((scales[6] >> 6) << 4)
+    m[7] = (scales[11] >> 4) | ((scales[7] >> 6) << 4)
 
     return sc, m
 
 
 def create_random_q4_k_block() -> bytes:
-    """Create a random Q4_K block for testing."""
+    """Create a random Q4_K block for testing.
+
+    Packing matches llama.cpp's get_scale_min_k4() layout:
+      - bytes 0-3: (sc[0..3] & 0x3F) | ((sc[4..7] high 2 bits) << 6)
+      - bytes 4-7: (m[0..3] & 0x3F) | ((m[4..7] high 2 bits) << 6)
+      - bytes 8-11: (sc[4..7] low 4 bits) | ((m[4..7] low 4 bits) << 4)
+    """
     d = np.random.uniform(0.01, 0.5)
     dmin = np.random.uniform(0.0, 0.1)
     d_bits = np.float16(d).view(np.uint16)
@@ -296,19 +314,20 @@ def create_random_q4_k_block() -> bytes:
     sc = np.random.randint(0, 64, 8, dtype=np.uint8)
     m = np.random.randint(0, 64, 8, dtype=np.uint8)
 
+    # Pack according to llama.cpp layout
     scales = bytes([
-        (sc[0] & 0x3F) | ((sc[1] & 0x03) << 6),
-        ((sc[1] >> 2) & 0x0F) | ((sc[2] & 0x0F) << 4),
-        ((sc[2] >> 4) & 0x03) | ((sc[3] & 0x3F) << 2),
-        (sc[4] & 0x3F) | ((sc[5] & 0x03) << 6),
-        ((sc[5] >> 2) & 0x0F) | ((sc[6] & 0x0F) << 4),
-        ((sc[6] >> 4) & 0x03) | ((sc[7] & 0x3F) << 2),
-        (m[0] & 0x3F) | ((m[1] & 0x03) << 6),
-        ((m[1] >> 2) & 0x0F) | ((m[2] & 0x0F) << 4),
-        ((m[2] >> 4) & 0x03) | ((m[3] & 0x3F) << 2),
-        (m[4] & 0x3F) | ((m[5] & 0x03) << 6),
-        ((m[5] >> 2) & 0x0F) | ((m[6] & 0x0F) << 4),
-        ((m[6] >> 4) & 0x03) | ((m[7] & 0x3F) << 2),
+        (sc[0] & 0x3F) | ((sc[4] >> 4) << 6),  # byte 0
+        (sc[1] & 0x3F) | ((sc[5] >> 4) << 6),  # byte 1
+        (sc[2] & 0x3F) | ((sc[6] >> 4) << 6),  # byte 2
+        (sc[3] & 0x3F) | ((sc[7] >> 4) << 6),  # byte 3
+        (m[0] & 0x3F) | ((m[4] >> 4) << 6),    # byte 4
+        (m[1] & 0x3F) | ((m[5] >> 4) << 6),    # byte 5
+        (m[2] & 0x3F) | ((m[6] >> 4) << 6),    # byte 6
+        (m[3] & 0x3F) | ((m[7] >> 4) << 6),    # byte 7
+        (sc[4] & 0x0F) | ((m[4] & 0x0F) << 4), # byte 8
+        (sc[5] & 0x0F) | ((m[5] & 0x0F) << 4), # byte 9
+        (sc[6] & 0x0F) | ((m[6] & 0x0F) << 4), # byte 10
+        (sc[7] & 0x0F) | ((m[7] & 0x0F) << 4), # byte 11
     ])
 
     qs = np.random.randint(0, 256, 128, dtype=np.uint8).tobytes()
@@ -316,7 +335,14 @@ def create_random_q4_k_block() -> bytes:
 
 
 def dequant_q4_k_block_ref(block_data: bytes) -> np.ndarray:
-    """Reference dequantization of Q4_K block."""
+    """Reference dequantization of Q4_K block.
+
+    This matches llama.cpp's dequantize_row_q4_K exactly:
+    - Formula: weight = d * scale * q - dmin * m
+    - Layout: 4 iterations of 64 weights each
+      - First 32: low nibbles with scale[2*iter], min[2*iter]
+      - Next 32: high nibbles with scale[2*iter+1], min[2*iter+1]
+    """
     d_bits = struct.unpack('<H', block_data[0:2])[0]
     dmin_bits = struct.unpack('<H', block_data[2:4])[0]
     scales = block_data[4:16]
@@ -327,15 +353,27 @@ def dequant_q4_k_block_ref(block_data: bytes) -> np.ndarray:
     sc, m = unpack_q4_k_scales(scales)
 
     output = np.zeros(256, dtype=np.float32)
-    for sub in range(8):
-        scale = d * sc[sub]
-        min_val = dmin * m[sub]
-        for i in range(16):
-            packed = qs[sub * 16 + i]
-            q0 = (packed & 0x0F) - 8
-            q1 = (packed >> 4) - 8
-            output[sub * 32 + 2*i + 0] = scale * q0 + min_val
-            output[sub * 32 + 2*i + 1] = scale * q1 + min_val
+
+    # llama.cpp layout: 4 iterations of 64 weights each
+    for iter in range(4):
+        d1 = d * sc[2 * iter]
+        m1 = dmin * m[2 * iter]
+        d2 = d * sc[2 * iter + 1]
+        m2 = dmin * m[2 * iter + 1]
+
+        q_ptr = iter * 32
+        y_ptr = iter * 64
+
+        # First 32 weights: low nibbles
+        for l in range(32):
+            q = qs[q_ptr + l] & 0x0F
+            output[y_ptr + l] = d1 * q - m1
+
+        # Next 32 weights: high nibbles
+        for l in range(32):
+            q = qs[q_ptr + l] >> 4
+            output[y_ptr + 32 + l] = d2 * q - m2
+
     return output
 
 

@@ -157,23 +157,27 @@ void dequant_q5_0_block(const block_q5_0 *block, float *output)
     uint32_t qh;
     memcpy(&qh, block->qh, sizeof(qh));
 
-    for (int i = 0; i < QK5_0 / 2; i++) {
-        const uint8_t packed = block->qs[i];
+    /* llama.cpp Q5_0 layout:
+     * - Weight j uses: low nibble of qs[j], high bit from qh bit j
+     * - Weight j+16 uses: high nibble of qs[j], high bit from qh bit (j+12)
+     */
+    for (int j = 0; j < QK5_0 / 2; j++) {
+        const uint8_t packed = block->qs[j];
 
         /* Extract low 4 bits for two weights */
-        const int lo0 = (packed & 0x0F);
-        const int lo1 = (packed >> 4);
+        const int lo = (packed & 0x0F);
+        const int hi = (packed >> 4);
 
-        /* Extract high bits from qh */
-        const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
-        const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
+        /* Extract high bits from qh - matches llama.cpp exactly */
+        const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+        const int xh_1 = ((qh >> (j + 12))) & 0x10;
 
-        /* Combine: 5-bit value = lo4 | (hi1 << 4), range 0-31, then subtract 16 */
-        const int q0 = (lo0 | hi0) - 16;
-        const int q1 = (lo1 | hi1) - 16;
+        /* Combine: 5-bit value, range 0-31, then subtract 16 */
+        const int q0 = (lo | xh_0) - 16;
+        const int q1 = (hi | xh_1) - 16;
 
-        output[2 * i + 0] = d * (float)q0;
-        output[2 * i + 1] = d * (float)q1;
+        output[j] = d * (float)q0;
+        output[j + 16] = d * (float)q1;
     }
 }
 
@@ -211,24 +215,28 @@ void dequant_q5_1_block(const block_q5_1 *block, float *output)
     uint32_t qh;
     memcpy(&qh, block->qh, sizeof(qh));
 
-    for (int i = 0; i < QK5_1 / 2; i++) {
-        const uint8_t packed = block->qs[i];
+    /* llama.cpp Q5_1 layout (same as Q5_0):
+     * - Weight j uses: low nibble of qs[j], high bit from qh bit j
+     * - Weight j+16 uses: high nibble of qs[j], high bit from qh bit (j+12)
+     */
+    for (int j = 0; j < QK5_1 / 2; j++) {
+        const uint8_t packed = block->qs[j];
 
         /* Extract low 4 bits for two weights */
-        const int lo0 = (packed & 0x0F);
-        const int lo1 = (packed >> 4);
+        const int lo = (packed & 0x0F);
+        const int hi = (packed >> 4);
 
-        /* Extract high bits from qh */
-        const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
-        const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
+        /* Extract high bits from qh - matches llama.cpp exactly */
+        const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+        const int xh_1 = ((qh >> (j + 12))) & 0x10;
 
-        /* Combine: 5-bit unsigned value = lo4 | (hi1 << 4), range 0-31 */
-        const int q0 = (lo0 | hi0);
-        const int q1 = (lo1 | hi1);
+        /* Combine: 5-bit unsigned value, range 0-31 */
+        const int q0 = (lo | xh_0);
+        const int q1 = (hi | xh_1);
 
         /* Dequantize: w = d * q + m */
-        output[2 * i + 0] = d * (float)q0 + m;
-        output[2 * i + 1] = d * (float)q1 + m;
+        output[j] = d * (float)q0 + m;
+        output[j + 16] = d * (float)q1 + m;
     }
 }
 
@@ -308,13 +316,11 @@ void dequant_q8_0_block_avx512(const block_q8_0 *block,
 /**
  * @brief Dequantize a single Q4_K block to FP32
  *
- * Q4_K uses nested scales:
- *   w_fp32 = q * (d * sub_scale) + dmin * sub_min
- *
- * Where:
- *   - d, dmin are FP16 super-block values
- *   - sub_scale, sub_min are 6-bit values packed in scales[12]
- *   - q is the 4-bit quantized weight (-8 to +7 after offset)
+ * This matches llama.cpp's dequantize_row_q4_K exactly:
+ * - Formula: weight = d * scale * q - dmin * m
+ * - Layout: 4 iterations of 64 weights each
+ *   - First 32: low nibbles of qs[0..31] with scale[2*iter], min[2*iter]
+ *   - Next 32: high nibbles of qs[0..31] with scale[2*iter+1], min[2*iter+1]
  */
 void dequant_q4_k_block(const block_q4_K *block, float *output)
 {
@@ -325,25 +331,26 @@ void dequant_q4_k_block(const block_q4_K *block, float *output)
     uint8_t sc[8], m[8];
     unpack_q4_k_scales(block->scales, sc, m);
 
-    /* Process 8 sub-blocks of 32 weights each */
-    for (int sub = 0; sub < 8; sub++) {
-        const float scale = d * (float)sc[sub];
-        const float min_val = dmin * (float)m[sub];
+    /* llama.cpp layout: 4 iterations of 64 weights each */
+    for (int iter = 0; iter < 4; iter++) {
+        const float d1 = d * (float)sc[2 * iter];
+        const float m1 = dmin * (float)m[2 * iter];
+        const float d2 = d * (float)sc[2 * iter + 1];
+        const float m2 = dmin * (float)m[2 * iter + 1];
 
-        /* Each sub-block has 32 weights = 16 bytes */
-        const uint8_t *qs = &block->qs[sub * 16];
-        float *out = &output[sub * 32];
+        const uint8_t *qs = &block->qs[iter * 32];
+        float *out = &output[iter * 64];
 
-        for (int i = 0; i < 16; i++) {
-            const uint8_t packed = qs[i];
+        /* First 32 weights: low nibbles */
+        for (int l = 0; l < 32; l++) {
+            const int q = (qs[l] & 0x0F);
+            out[l] = d1 * (float)q - m1;
+        }
 
-            /* Lower nibble */
-            const int8_t q0 = (packed & 0x0F) - 8;
-            /* Upper nibble */
-            const int8_t q1 = (packed >> 4) - 8;
-
-            out[2*i + 0] = scale * (float)q0 + min_val;
-            out[2*i + 1] = scale * (float)q1 + min_val;
+        /* Next 32 weights: high nibbles */
+        for (int l = 0; l < 32; l++) {
+            const int q = (qs[l] >> 4);
+            out[32 + l] = d2 * (float)q - m2;
         }
     }
 }
@@ -421,41 +428,14 @@ void dequant_q6_k_row(const void *src, float *dst, size_t n_elements)
  * @param out0 Output: weights 0-15
  * @param out1 Output: weights 16-31
  */
-static inline void dequant_q4_k_subblock_avx512(
-    const uint8_t *qs,
-    float scale,
-    float min_val,
-    __m512 *out0,
-    __m512 *out1)
-{
-    const __m512 vscale = _mm512_set1_ps(scale);
-    const __m512 vmin = _mm512_set1_ps(min_val);
-    const __m512i offset = _mm512_set1_epi32(8);
-    const __m512i mask_lo = _mm512_set1_epi32(0x0F);
-
-    /* Load 16 bytes = 32 x 4-bit weights */
-    __m128i packed = _mm_loadu_si128((const __m128i *)qs);
-
-    /* Expand to 32-bit for lower and upper nibbles */
-    __m512i bytes = _mm512_cvtepu8_epi32(packed);
-
-    /* Extract lower nibbles */
-    __m512i lo = _mm512_and_epi32(bytes, mask_lo);
-    lo = _mm512_sub_epi32(lo, offset);
-
-    /* Extract upper nibbles */
-    __m512i hi = _mm512_srli_epi32(bytes, 4);
-    hi = _mm512_sub_epi32(hi, offset);
-
-    /* Convert to float, scale, and add min */
-    *out0 = _mm512_fmadd_ps(_mm512_cvtepi32_ps(lo), vscale, vmin);
-    *out1 = _mm512_fmadd_ps(_mm512_cvtepi32_ps(hi), vscale, vmin);
-}
-
 /**
  * @brief Dequantize full Q4_K block using AVX-512
- * @param block Q4_K block (144 bytes)
- * @param output 256 floats output
+ *
+ * This matches llama.cpp's dequantize_row_q4_K exactly:
+ * - Formula: weight = d * scale * q - dmin * m
+ * - Layout: 4 iterations of 64 weights each
+ *   - First 32: low nibbles of qs[0..31] with scale[2*iter], min[2*iter]
+ *   - Next 32: high nibbles of qs[0..31] with scale[2*iter+1], min[2*iter+1]
  */
 void dequant_q4_k_block_avx512(const block_q4_K *block, float *output)
 {
@@ -465,18 +445,44 @@ void dequant_q4_k_block_avx512(const block_q4_K *block, float *output)
     uint8_t sc[8], m[8];
     unpack_q4_k_scales(block->scales, sc, m);
 
-    for (int sub = 0; sub < 8; sub++) {
-        const float scale = d * (float)sc[sub];
-        const float min_val = dmin * (float)m[sub];
+    const __m512i mask_lo = _mm512_set1_epi32(0x0F);
 
-        __m512 out0, out1;
-        dequant_q4_k_subblock_avx512(&block->qs[sub * 16], scale, min_val,
-                                      &out0, &out1);
+    /* llama.cpp layout: 4 iterations of 64 weights each */
+    for (int iter = 0; iter < 4; iter++) {
+        const float d1 = d * (float)sc[2 * iter];
+        const float m1 = dmin * (float)m[2 * iter];
+        const float d2 = d * (float)sc[2 * iter + 1];
+        const float m2 = dmin * (float)m[2 * iter + 1];
 
-        /* Store interleaved - need to de-interleave for correct order */
-        /* For now, store as-is (caller must handle interleaving) */
-        _mm512_storeu_ps(&output[sub * 32], out0);
-        _mm512_storeu_ps(&output[sub * 32 + 16], out1);
+        const __m512 vd1 = _mm512_set1_ps(d1);
+        const __m512 vm1 = _mm512_set1_ps(m1);
+        const __m512 vd2 = _mm512_set1_ps(d2);
+        const __m512 vm2 = _mm512_set1_ps(m2);
+
+        const uint8_t *qs = &block->qs[iter * 32];
+        float *out = &output[iter * 64];
+
+        /* Process first 32 weights (low nibbles) in two 16-float chunks */
+        for (int chunk = 0; chunk < 2; chunk++) {
+            __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+            __m512i bytes = _mm512_cvtepu8_epi32(packed);
+            __m512i lo = _mm512_and_epi32(bytes, mask_lo);
+            /* w = d1 * q - m1: fnmadd computes -(a*b) + c = c - a*b = -m1 + d1*q */
+            __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vm1,
+                       _mm512_mul_ps(_mm512_cvtepi32_ps(lo), vd1));
+            _mm512_storeu_ps(&out[chunk * 16], w);
+        }
+
+        /* Process next 32 weights (high nibbles) in two 16-float chunks */
+        for (int chunk = 0; chunk < 2; chunk++) {
+            __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+            __m512i bytes = _mm512_cvtepu8_epi32(packed);
+            __m512i hi = _mm512_srli_epi32(bytes, 4);
+            /* w = d2 * q - m2 */
+            __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vm2,
+                       _mm512_mul_ps(_mm512_cvtepi32_ps(hi), vd2));
+            _mm512_storeu_ps(&out[32 + chunk * 16], w);
+        }
     }
 }
 #endif /* __AVX512F__ */

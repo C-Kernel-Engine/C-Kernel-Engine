@@ -216,33 +216,37 @@ static inline size_t ck_quant_row_size(int type, int64_t n_elements) {
  * @param scales The packed scales[12] array from block_q4_K
  * @param sc Output: 8 unpacked scale values (multiply by super-block d)
  * @param m Output: 8 unpacked min values (multiply by super-block dmin)
+ *
+ * This matches llama.cpp's get_scale_min_k4() function exactly.
+ * The 12-byte scales array layout:
+ *   - bytes 0-3: 6-bit scales[0-3] (high 2 bits used for scales[4-7])
+ *   - bytes 4-7: 6-bit mins[0-3] (high 2 bits used for mins[4-7])
+ *   - bytes 8-11: low 4 bits for scales[4-7], high 4 bits for mins[4-7]
  */
 static inline void unpack_q4_k_scales(const uint8_t *scales,
                                        uint8_t *sc, uint8_t *m) {
-    /*
-     * The 12-byte scales array encodes 8 scales and 8 mins in 6-bit each.
-     * Each 6-bit value is split across byte boundaries.
-     */
+    /* Direct 6-bit values for indices 0-3 */
+    sc[0] = scales[0] & 0x3F;
+    sc[1] = scales[1] & 0x3F;
+    sc[2] = scales[2] & 0x3F;
+    sc[3] = scales[3] & 0x3F;
 
-    /* Unpack scales (sc[0..7]) from bytes 0-5 */
-    sc[0] = (scales[0] & 0x3F);
-    sc[1] = (scales[0] >> 6) | ((scales[1] & 0x0F) << 2);
-    sc[2] = (scales[1] >> 4) | ((scales[2] & 0x03) << 4);
-    sc[3] = (scales[2] >> 2);
-    sc[4] = (scales[3] & 0x3F);
-    sc[5] = (scales[3] >> 6) | ((scales[4] & 0x0F) << 2);
-    sc[6] = (scales[4] >> 4) | ((scales[5] & 0x03) << 4);
-    sc[7] = (scales[5] >> 2);
+    m[0] = scales[4] & 0x3F;
+    m[1] = scales[5] & 0x3F;
+    m[2] = scales[6] & 0x3F;
+    m[3] = scales[7] & 0x3F;
 
-    /* Unpack mins (m[0..7]) from bytes 6-11 */
-    m[0] = (scales[6] & 0x3F);
-    m[1] = (scales[6] >> 6) | ((scales[7] & 0x0F) << 2);
-    m[2] = (scales[7] >> 4) | ((scales[8] & 0x03) << 4);
-    m[3] = (scales[8] >> 2);
-    m[4] = (scales[9] & 0x3F);
-    m[5] = (scales[9] >> 6) | ((scales[10] & 0x0F) << 2);
-    m[6] = (scales[10] >> 4) | ((scales[11] & 0x03) << 4);
-    m[7] = (scales[11] >> 2);
+    /* 6-bit values for indices 4-7: low 4 bits from bytes 8-11,
+     * high 2 bits from upper bits of bytes 0-3 (scales) and 4-7 (mins) */
+    sc[4] = (scales[8]  & 0x0F) | ((scales[0] >> 6) << 4);
+    sc[5] = (scales[9]  & 0x0F) | ((scales[1] >> 6) << 4);
+    sc[6] = (scales[10] & 0x0F) | ((scales[2] >> 6) << 4);
+    sc[7] = (scales[11] & 0x0F) | ((scales[3] >> 6) << 4);
+
+    m[4] = (scales[8]  >> 4) | ((scales[4] >> 6) << 4);
+    m[5] = (scales[9]  >> 4) | ((scales[5] >> 6) << 4);
+    m[6] = (scales[10] >> 4) | ((scales[6] >> 6) << 4);
+    m[7] = (scales[11] >> 4) | ((scales[7] >> 6) << 4);
 }
 
 /* ============================================================================

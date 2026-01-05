@@ -345,6 +345,28 @@ def emit_c_source_v5(layout: v3.ModelLayout,
     add("}")
     add()
 
+    # Canary verify
+    add(f"int {safe_name_lower}_verify_canaries({safe_name}Model *model) {{")
+    add("    int errors = 0;")
+    add("    uint32_t *ptr;")
+    add()
+    add(f"    for (int i = 0; i < {safe_name}_CANARY_COUNT; i++) {{")
+    add(f"        ptr = (uint32_t*)((char*)model->base + {safe_name}_CANARIES[i].offset);")
+    add(f"        for (int j = 0; j < 4; j++) {{")  # CANARY_SIZE / 4 = 16 / 4 = 4
+    add(f"            if (ptr[j] != {safe_name}_CANARY_VALUE) {{")
+    add(f'                fprintf(stderr, "CANARY CORRUPTION: %s at offset 0x%lX\\n",')
+    add(f"                        {safe_name}_CANARIES[i].name,")
+    add(f"                        {safe_name}_CANARIES[i].offset);")
+    add("                errors++;")
+    add("                break;")
+    add("            }")
+    add("        }")
+    add("    }")
+    add()
+    add("    return errors;")
+    add("}")
+    add()
+
     # RoPE precompute
     add("/* ============================================================================")
     add(" * ROPE PRECOMPUTE")
@@ -569,6 +591,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
 
             add(f"    /* Gate+Up projection: {w1_dt.upper()} -> {w1_kernel} */")
             add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+            if emit_debug:
+                add(f'    debug_check_buffer("layer{layer_id}_fc1_out", fc1_out, 2 * aligned_intermediate_dim);')
             add()
             add("    /* SwiGLU activation */")
             add(f"    swiglu_forward(fc1_out, swiglu_out, 1, aligned_intermediate_dim);")

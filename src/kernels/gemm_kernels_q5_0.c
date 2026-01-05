@@ -63,23 +63,29 @@ void gemv_q5_0_ref(float *y,
             uint32_t qh;
             memcpy(&qh, block->qh, sizeof(qh));
 
-            for (int i = 0; i < QK5_0 / 2; i++) {
-                const uint8_t packed = block->qs[i];
+            /* llama.cpp Q5_0 layout:
+             * - Weight j uses: low nibble of qs[j], high bit from qh bit j
+             * - Weight j+16 uses: high nibble of qs[j], high bit from qh bit (j+12)
+             * Note: j+12 not j+16 for the high bit of the second weight!
+             */
+            for (int j = 0; j < QK5_0 / 2; j++) {
+                const uint8_t packed = block->qs[j];
 
-                /* Extract low 4 bits */
-                const int lo0 = (packed & 0x0F);
-                const int lo1 = (packed >> 4);
+                /* Extract nibbles */
+                const int lo = (packed & 0x0F);
+                const int hi = (packed >> 4);
 
-                /* Extract high bits */
-                const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
-                const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
+                /* Extract high bits - matches llama.cpp exactly */
+                const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+                const int xh_1 = ((qh >> (j + 12))) & 0x10;
 
                 /* Combine to 5-bit signed value */
-                const int q0 = (lo0 | hi0) - 16;
-                const int q1 = (lo1 | hi1) - 16;
+                const int q0 = (lo | xh_0) - 16;
+                const int q1 = (hi | xh_1) - 16;
 
-                sum += d * (float)q0 * xp[2 * i + 0];
-                sum += d * (float)q1 * xp[2 * i + 1];
+                /* Weights at indices j and j+16 */
+                sum += d * (float)q0 * xp[j];
+                sum += d * (float)q1 * xp[j + 16];
             }
         }
 
@@ -122,28 +128,33 @@ void gemv_q5_0_avx512(float *y,
             __m512i lo = _mm512_and_epi32(bytes, mask_lo);
             __m512i hi_shift = _mm512_srli_epi32(bytes, 4);
 
-            /* Build high bit contribution for first 16 weights (indices 0,2,4,...,30) */
+            /* llama.cpp Q5_0 layout:
+             * - Weights 0-15: high bits from qh bits 0-15
+             * - Weights 16-31: high bits from qh bits 12-27 (j+12 where j=0..15)
+             */
+            /* Build high bit contribution for first 16 weights (indices 0-15) */
             __m512i qh_lo = _mm512_set_epi32(
-                ((qh >> 30) & 1) << 4, ((qh >> 28) & 1) << 4,
-                ((qh >> 26) & 1) << 4, ((qh >> 24) & 1) << 4,
-                ((qh >> 22) & 1) << 4, ((qh >> 20) & 1) << 4,
-                ((qh >> 18) & 1) << 4, ((qh >> 16) & 1) << 4,
-                ((qh >> 14) & 1) << 4, ((qh >> 12) & 1) << 4,
-                ((qh >> 10) & 1) << 4, ((qh >> 8) & 1) << 4,
-                ((qh >> 6) & 1) << 4, ((qh >> 4) & 1) << 4,
-                ((qh >> 2) & 1) << 4, ((qh >> 0) & 1) << 4
+                ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
+                ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4,
+                ((qh >> 11) & 1) << 4, ((qh >> 10) & 1) << 4,
+                ((qh >> 9) & 1) << 4, ((qh >> 8) & 1) << 4,
+                ((qh >> 7) & 1) << 4, ((qh >> 6) & 1) << 4,
+                ((qh >> 5) & 1) << 4, ((qh >> 4) & 1) << 4,
+                ((qh >> 3) & 1) << 4, ((qh >> 2) & 1) << 4,
+                ((qh >> 1) & 1) << 4, ((qh >> 0) & 1) << 4
             );
 
-            /* Build high bit contribution for second 16 weights (indices 1,3,5,...,31) */
+            /* Build high bit contribution for second 16 weights (indices 16-31)
+             * Uses bits 12-27 (j+12 where j=0..15), NOT bits 16-31 */
             __m512i qh_hi = _mm512_set_epi32(
-                ((qh >> 31) & 1) << 4, ((qh >> 29) & 1) << 4,
-                ((qh >> 27) & 1) << 4, ((qh >> 25) & 1) << 4,
-                ((qh >> 23) & 1) << 4, ((qh >> 21) & 1) << 4,
-                ((qh >> 19) & 1) << 4, ((qh >> 17) & 1) << 4,
-                ((qh >> 15) & 1) << 4, ((qh >> 13) & 1) << 4,
-                ((qh >> 11) & 1) << 4, ((qh >> 9) & 1) << 4,
-                ((qh >> 7) & 1) << 4, ((qh >> 5) & 1) << 4,
-                ((qh >> 3) & 1) << 4, ((qh >> 1) & 1) << 4
+                ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
+                ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
+                ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
+                ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
+                ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
+                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
+                ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
+                ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
             );
 
             /* Combine low + high bits and subtract offset */
@@ -154,16 +165,12 @@ void gemv_q5_0_avx512(float *y,
             __m512 w_lo = _mm512_mul_ps(_mm512_cvtepi32_ps(q_lo), vscale);
             __m512 w_hi = _mm512_mul_ps(_mm512_cvtepi32_ps(q_hi), vscale);
 
-            /* Load interleaved input */
-            __m512 x_even = _mm512_set_ps(
-                xp[30], xp[28], xp[26], xp[24], xp[22], xp[20], xp[18], xp[16],
-                xp[14], xp[12], xp[10], xp[8], xp[6], xp[4], xp[2], xp[0]);
-            __m512 x_odd = _mm512_set_ps(
-                xp[31], xp[29], xp[27], xp[25], xp[23], xp[21], xp[19], xp[17],
-                xp[15], xp[13], xp[11], xp[9], xp[7], xp[5], xp[3], xp[1]);
+            /* Load sequential input: x[0-15] and x[16-31] */
+            __m512 x_first = _mm512_loadu_ps(&xp[0]);    /* x[0..15] */
+            __m512 x_second = _mm512_loadu_ps(&xp[16]);  /* x[16..31] */
 
-            acc = _mm512_fmadd_ps(w_lo, x_even, acc);
-            acc = _mm512_fmadd_ps(w_hi, x_odd, acc);
+            acc = _mm512_fmadd_ps(w_lo, x_first, acc);
+            acc = _mm512_fmadd_ps(w_hi, x_second, acc);
         }
 
         y[row] = _mm512_reduce_add_ps(acc);
@@ -240,19 +247,20 @@ void gemv_q5_0_backward_ref(float *dX,
             uint32_t qh;
             memcpy(&qh, block->qh, sizeof(qh));
 
-            for (int i = 0; i < QK5_0 / 2; i++) {
-                const uint8_t packed = block->qs[i];
+            /* llama.cpp Q5_0 layout - note j+12 for second weight high bit */
+            for (int j = 0; j < QK5_0 / 2; j++) {
+                const uint8_t packed = block->qs[j];
 
                 /* Extract and reconstruct 5-bit values */
-                const int lo0 = (packed & 0x0F);
-                const int lo1 = (packed >> 4);
-                const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
-                const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
-                const int q0 = (lo0 | hi0) - 16;
-                const int q1 = (lo1 | hi1) - 16;
+                const int lo = (packed & 0x0F);
+                const int hi = (packed >> 4);
+                const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+                const int xh_1 = ((qh >> (j + 12))) & 0x10;
+                const int q0 = (lo | xh_0) - 16;
+                const int q1 = (hi | xh_1) - 16;
 
-                dxp[2 * i + 0] += d * (float)q0 * dy;
-                dxp[2 * i + 1] += d * (float)q1 * dy;
+                dxp[j] += d * (float)q0 * dy;
+                dxp[j + 16] += d * (float)q1 * dy;
             }
         }
     }
@@ -321,17 +329,18 @@ void gemm_nt_q5_0(const float *A,
                 uint32_t qh;
                 memcpy(&qh, block->qh, sizeof(qh));
 
-                for (int i = 0; i < QK5_0 / 2; i++) {
-                    const uint8_t packed = block->qs[i];
-                    const int lo0 = (packed & 0x0F);
-                    const int lo1 = (packed >> 4);
-                    const int hi0 = ((qh >> (2 * i + 0)) & 1) << 4;
-                    const int hi1 = ((qh >> (2 * i + 1)) & 1) << 4;
-                    const int q0 = (lo0 | hi0) - 16;
-                    const int q1 = (lo1 | hi1) - 16;
+                /* llama.cpp Q5_0 layout - note j+12 for second weight high bit */
+                for (int j = 0; j < QK5_0 / 2; j++) {
+                    const uint8_t packed = block->qs[j];
+                    const int lo = (packed & 0x0F);
+                    const int hi = (packed >> 4);
+                    const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+                    const int xh_1 = ((qh >> (j + 12))) & 0x10;
+                    const int q0 = (lo | xh_0) - 16;
+                    const int q1 = (hi | xh_1) - 16;
 
-                    sum += d * (float)q0 * ap[2 * i + 0];
-                    sum += d * (float)q1 * ap[2 * i + 1];
+                    sum += d * (float)q0 * ap[j];
+                    sum += d * (float)q1 * ap[j + 16];
                 }
             }
 

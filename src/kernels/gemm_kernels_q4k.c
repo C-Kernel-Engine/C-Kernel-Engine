@@ -60,23 +60,28 @@ void gemv_q4_k_ref(float *y,
             uint8_t sc[8], m[8];
             unpack_q4_k_scales(block->scales, sc, m);
 
-            /* Process 8 sub-blocks of 32 weights each */
-            for (int sub = 0; sub < 8; sub++) {
-                const float scale = d * (float)sc[sub];
-                const float min_val = dmin * (float)m[sub];
-                const uint8_t *qs = &block->qs[sub * 16];
-                const float *xp = &x[b * QK_K + sub * 32];
+            /* llama.cpp Q4_K layout: 4 iterations of 64 weights each
+             * Each iteration uses 32 bytes of qs and 2 scales:
+             *   - First 32 weights (indices 0-31): low nibbles with scale[2*iter]
+             *   - Next 32 weights (indices 32-63): high nibbles with scale[2*iter+1]
+             */
+            for (int iter = 0; iter < 4; iter++) {
+                const float d1 = d * (float)sc[2*iter];
+                const float m1 = dmin * (float)m[2*iter];
+                const float d2 = d * (float)sc[2*iter + 1];
+                const float m2 = dmin * (float)m[2*iter + 1];
+                const uint8_t *qs = &block->qs[iter * 32];
+                const float *xp = &x[b * QK_K + iter * 64];
 
-                for (int i = 0; i < 16; i++) {
-                    const uint8_t packed = qs[i];
-                    const int8_t q0 = (packed & 0x0F) - 8;
-                    const int8_t q1 = (packed >> 4) - 8;
-
-                    const float w0 = scale * (float)q0 + min_val;
-                    const float w1 = scale * (float)q1 + min_val;
-
-                    sum += w0 * xp[2*i + 0];
-                    sum += w1 * xp[2*i + 1];
+                /* First 32 weights: low nibbles of qs[0..31] */
+                for (int l = 0; l < 32; l++) {
+                    const int8_t q = (qs[l] & 0x0F);
+                    sum += (d1 * (float)q - m1) * xp[l];
+                }
+                /* Next 32 weights: high nibbles of qs[0..31] */
+                for (int l = 0; l < 32; l++) {
+                    const int8_t q = (qs[l] >> 4);
+                    sum += (d2 * (float)q - m2) * xp[l + 32];
                 }
             }
         }
@@ -110,45 +115,49 @@ void gemv_q4_k_avx512(float *y,
             uint8_t sc[8], m_arr[8];
             unpack_q4_k_scales(block->scales, sc, m_arr);
 
-            /* Process 8 sub-blocks */
-            for (int sub = 0; sub < 8; sub++) {
-                const float scale = d * (float)sc[sub];
-                const float min_val = dmin * (float)m_arr[sub];
-                const __m512 vscale = _mm512_set1_ps(scale);
-                const __m512 vmin = _mm512_set1_ps(min_val);
-                const __m512i offset = _mm512_set1_epi32(8);
-                const __m512i mask_lo = _mm512_set1_epi32(0x0F);
+            const __m512i mask_lo = _mm512_set1_epi32(0x0F);
 
-                const uint8_t *qs = &block->qs[sub * 16];
-                const float *xp = &x[b * QK_K + sub * 32];
+            /* llama.cpp Q4_K layout: 4 iterations of 64 weights each
+             * Formula: w = d * q - m (NOT d * (q-8) + m)
+             */
+            for (int iter = 0; iter < 4; iter++) {
+                const float d1 = d * (float)sc[2*iter];
+                const float m1 = dmin * (float)m_arr[2*iter];
+                const float d2 = d * (float)sc[2*iter + 1];
+                const float m2 = dmin * (float)m_arr[2*iter + 1];
 
-                /* Load 16 bytes = 32 x 4-bit weights */
-                __m128i packed = _mm_loadu_si128((const __m128i *)qs);
-                __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                const __m512 vscale1 = _mm512_set1_ps(d1);
+                const __m512 vmin1 = _mm512_set1_ps(m1);
+                const __m512 vscale2 = _mm512_set1_ps(d2);
+                const __m512 vmin2 = _mm512_set1_ps(m2);
 
-                /* Extract lower nibbles (weights at even indices) */
-                __m512i lo = _mm512_and_epi32(bytes, mask_lo);
-                lo = _mm512_sub_epi32(lo, offset);
-                __m512 w_lo = _mm512_fmadd_ps(_mm512_cvtepi32_ps(lo), vscale, vmin);
+                const uint8_t *qs = &block->qs[iter * 32];
+                const float *xp = &x[b * QK_K + iter * 64];
 
-                /* Extract upper nibbles (weights at odd indices) */
-                __m512i hi = _mm512_srli_epi32(bytes, 4);
-                hi = _mm512_sub_epi32(hi, offset);
-                __m512 w_hi = _mm512_fmadd_ps(_mm512_cvtepi32_ps(hi), vscale, vmin);
+                /* Process first 32 weights (low nibbles) */
+                /* Load 16 bytes at a time */
+                for (int chunk = 0; chunk < 2; chunk++) {
+                    __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+                    __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                    __m512i lo = _mm512_and_epi32(bytes, mask_lo);
+                    /* w = d * q - m: use fnmadd (negative m) */
+                    __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vmin1,
+                               _mm512_mul_ps(_mm512_cvtepi32_ps(lo), vscale1));
+                    __m512 x_vec = _mm512_loadu_ps(&xp[chunk * 16]);
+                    acc = _mm512_fmadd_ps(w, x_vec, acc);
+                }
 
-                /* Load input vectors */
-                /* Note: weights are interleaved (lo=even indices, hi=odd indices)
-                 * We need to load x accordingly */
-                __m512 x_even = _mm512_set_ps(
-                    xp[30], xp[28], xp[26], xp[24], xp[22], xp[20], xp[18], xp[16],
-                    xp[14], xp[12], xp[10], xp[8], xp[6], xp[4], xp[2], xp[0]);
-                __m512 x_odd = _mm512_set_ps(
-                    xp[31], xp[29], xp[27], xp[25], xp[23], xp[21], xp[19], xp[17],
-                    xp[15], xp[13], xp[11], xp[9], xp[7], xp[5], xp[3], xp[1]);
-
-                /* FMA: acc += w * x */
-                acc = _mm512_fmadd_ps(w_lo, x_even, acc);
-                acc = _mm512_fmadd_ps(w_hi, x_odd, acc);
+                /* Process next 32 weights (high nibbles) */
+                for (int chunk = 0; chunk < 2; chunk++) {
+                    __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+                    __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                    __m512i hi = _mm512_srli_epi32(bytes, 4);
+                    /* w = d * q - m: use fnmadd (negative m) */
+                    __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vmin2,
+                               _mm512_mul_ps(_mm512_cvtepi32_ps(hi), vscale2));
+                    __m512 x_vec = _mm512_loadu_ps(&xp[32 + chunk * 16]);
+                    acc = _mm512_fmadd_ps(w, x_vec, acc);
+                }
             }
         }
 
@@ -339,11 +348,9 @@ void gemm_q4_k(float *Y,
                const float *X,
                int M, int N, int K)
 {
-#ifdef __AVX512F__
-    gemm_q4_k_avx512(Y, W, X, M, N, K);
-#else
+    /* Use reference implementation for correctness
+     * TODO: Fix AVX-512 version to match llama.cpp layout */
     gemm_q4_k_ref(Y, W, X, M, N, K);
-#endif
 }
 
 /* ============================================================================
@@ -397,7 +404,8 @@ void gemv_q4_k_backward_ref(float *dX,
     /* Zero output gradient */
     memset(dX, 0, K * sizeof(float));
 
-    /* Accumulate: dX += W^T @ dY */
+    /* Accumulate: dX += W^T @ dY
+     * Uses llama.cpp layout: 4 iterations of 64 weights each */
     for (int row = 0; row < M; row++) {
         const float dy = dY[row];
 
@@ -409,22 +417,28 @@ void gemv_q4_k_backward_ref(float *dX,
             uint8_t sc[8], m[8];
             unpack_q4_k_scales(block->scales, sc, m);
 
-            for (int sub = 0; sub < 8; sub++) {
-                const float scale = d * (float)sc[sub];
-                const float min_val = dmin * (float)m[sub];
-                const uint8_t *qs = &block->qs[sub * 16];
-                float *dxp = &dX[b * QK_K + sub * 32];
+            /* llama.cpp layout: 4 iterations of 64 weights each */
+            for (int iter = 0; iter < 4; iter++) {
+                const float d1 = d * (float)sc[2 * iter];
+                const float m1 = dmin * (float)m[2 * iter];
+                const float d2 = d * (float)sc[2 * iter + 1];
+                const float m2 = dmin * (float)m[2 * iter + 1];
 
-                for (int i = 0; i < 16; i++) {
-                    const uint8_t packed = qs[i];
-                    const int8_t q0 = (packed & 0x0F) - 8;
-                    const int8_t q1 = (packed >> 4) - 8;
+                const uint8_t *qs = &block->qs[iter * 32];
+                float *dxp = &dX[b * QK_K + iter * 64];
 
-                    const float w0 = scale * (float)q0 + min_val;
-                    const float w1 = scale * (float)q1 + min_val;
+                /* First 32 weights: low nibbles */
+                for (int l = 0; l < 32; l++) {
+                    const int q = (qs[l] & 0x0F);
+                    const float w = d1 * (float)q - m1;
+                    dxp[l] += w * dy;
+                }
 
-                    dxp[2*i + 0] += w0 * dy;
-                    dxp[2*i + 1] += w1 * dy;
+                /* Next 32 weights: high nibbles */
+                for (int l = 0; l < 32; l++) {
+                    const int q = (qs[l] >> 4);
+                    const float w = d2 * (float)q - m2;
+                    dxp[32 + l] += w * dy;
                 }
             }
         }
@@ -434,6 +448,8 @@ void gemv_q4_k_backward_ref(float *dX,
 #ifdef __AVX512F__
 /**
  * @brief Backward pass with AVX-512
+ *
+ * Uses llama.cpp layout: 4 iterations of 64 weights each
  */
 void gemv_q4_k_backward_avx512(float *dX,
                                const void *W,
@@ -442,6 +458,7 @@ void gemv_q4_k_backward_avx512(float *dX,
 {
     const block_q4_K *blocks = (const block_q4_K *)W;
     const int blocks_per_row = K / QK_K;
+    const __m512i mask_lo = _mm512_set1_epi32(0x0F);
 
     /* Zero output */
     memset(dX, 0, K * sizeof(float));
@@ -457,39 +474,45 @@ void gemv_q4_k_backward_avx512(float *dX,
             uint8_t sc[8], m_arr[8];
             unpack_q4_k_scales(block->scales, sc, m_arr);
 
-            for (int sub = 0; sub < 8; sub++) {
-                const float scale = d * (float)sc[sub];
-                const float min_val = dmin * (float)m_arr[sub];
-                const __m512 vscale = _mm512_set1_ps(scale);
-                const __m512 vmin = _mm512_set1_ps(min_val);
-                const __m512i offset = _mm512_set1_epi32(8);
-                const __m512i mask_lo = _mm512_set1_epi32(0x0F);
+            /* llama.cpp layout: 4 iterations of 64 weights each */
+            for (int iter = 0; iter < 4; iter++) {
+                const float d1 = d * (float)sc[2 * iter];
+                const float m1 = dmin * (float)m_arr[2 * iter];
+                const float d2 = d * (float)sc[2 * iter + 1];
+                const float m2 = dmin * (float)m_arr[2 * iter + 1];
 
-                const uint8_t *qs = &block->qs[sub * 16];
-                float *dxp = &dX[b * QK_K + sub * 32];
+                const __m512 vd1 = _mm512_set1_ps(d1);
+                const __m512 vm1 = _mm512_set1_ps(m1);
+                const __m512 vd2 = _mm512_set1_ps(d2);
+                const __m512 vm2 = _mm512_set1_ps(m2);
 
-                /* Dequantize weights */
-                __m128i packed = _mm_loadu_si128((const __m128i *)qs);
-                __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                const uint8_t *qs = &block->qs[iter * 32];
+                float *dxp = &dX[b * QK_K + iter * 64];
 
-                __m512i lo = _mm512_sub_epi32(_mm512_and_epi32(bytes, mask_lo), offset);
-                __m512i hi = _mm512_sub_epi32(_mm512_srli_epi32(bytes, 4), offset);
+                /* Process first 32 weights (low nibbles) */
+                for (int chunk = 0; chunk < 2; chunk++) {
+                    __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+                    __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                    __m512i lo = _mm512_and_epi32(bytes, mask_lo);
+                    /* w = d1 * q - m1 */
+                    __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vm1,
+                               _mm512_mul_ps(_mm512_cvtepi32_ps(lo), vd1));
+                    __m512 grad = _mm512_mul_ps(w, vdy);
+                    __m512 existing = _mm512_loadu_ps(&dxp[chunk * 16]);
+                    _mm512_storeu_ps(&dxp[chunk * 16], _mm512_add_ps(existing, grad));
+                }
 
-                __m512 w_lo = _mm512_fmadd_ps(_mm512_cvtepi32_ps(lo), vscale, vmin);
-                __m512 w_hi = _mm512_fmadd_ps(_mm512_cvtepi32_ps(hi), vscale, vmin);
-
-                /* Compute gradients: dX += W * dY */
-                __m512 grad_lo = _mm512_mul_ps(w_lo, vdy);
-                __m512 grad_hi = _mm512_mul_ps(w_hi, vdy);
-
-                /* Scatter to interleaved positions */
-                float grad_lo_arr[16], grad_hi_arr[16];
-                _mm512_storeu_ps(grad_lo_arr, grad_lo);
-                _mm512_storeu_ps(grad_hi_arr, grad_hi);
-
-                for (int i = 0; i < 16; i++) {
-                    dxp[2*i + 0] += grad_lo_arr[i];
-                    dxp[2*i + 1] += grad_hi_arr[i];
+                /* Process next 32 weights (high nibbles) */
+                for (int chunk = 0; chunk < 2; chunk++) {
+                    __m128i packed = _mm_loadu_si128((const __m128i *)&qs[chunk * 16]);
+                    __m512i bytes = _mm512_cvtepu8_epi32(packed);
+                    __m512i hi = _mm512_srli_epi32(bytes, 4);
+                    /* w = d2 * q - m2 */
+                    __m512 w = _mm512_fnmadd_ps(_mm512_set1_ps(1.0f), vm2,
+                               _mm512_mul_ps(_mm512_cvtepi32_ps(hi), vd2));
+                    __m512 grad = _mm512_mul_ps(w, vdy);
+                    __m512 existing = _mm512_loadu_ps(&dxp[32 + chunk * 16]);
+                    _mm512_storeu_ps(&dxp[32 + chunk * 16], _mm512_add_ps(existing, grad));
                 }
             }
         }

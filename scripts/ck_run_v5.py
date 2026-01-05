@@ -112,6 +112,53 @@ def detect_input(model_input: str) -> tuple[str, dict]:
 # Pipeline Steps
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _strip_gguf_suffix(model_id: str) -> str:
+    """Strip -GGUF or similar suffix to get base model ID."""
+    suffixes = ["-GGUF", "-gguf", "_GGUF", "_gguf"]
+    lower = model_id.lower()
+    for suffix in suffixes:
+        if lower.endswith(suffix.lower()):
+            return model_id[:-len(suffix)]
+    return model_id
+
+
+def ensure_tokenizer_files(repo_id: str, work_dir: Path) -> None:
+    """Ensure tokenizer.json exists in work_dir (fetch from base repo if needed)."""
+    tokenizer_path = work_dir / "tokenizer.json"
+    if tokenizer_path.exists():
+        log(f"  Tokenizer found: {tokenizer_path}", C_DIM)
+        return
+
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        log_error("huggingface_hub not installed. Run: pip install huggingface_hub")
+        return
+
+    # Try base repo (strip -GGUF suffix) first, then original repo
+    candidates = []
+    base_id = _strip_gguf_suffix(repo_id)
+    if base_id != repo_id:
+        candidates.append(base_id)
+    candidates.append(repo_id)
+
+    for candidate_repo in candidates:
+        log(f"  Fetching tokenizer.json from {candidate_repo}", C_DIM)
+        try:
+            hf_hub_download(
+                repo_id=candidate_repo,
+                filename="tokenizer.json",
+                local_dir=str(work_dir),
+            )
+            if tokenizer_path.exists():
+                log(f"  Tokenizer downloaded: {tokenizer_path}", C_GREEN)
+                return
+        except Exception as e:
+            log(f"  Could not fetch from {candidate_repo}: {e}", C_DIM)
+
+    log(f"  Warning: tokenizer.json not found for {repo_id}", C_RED)
+
+
 def step_download_gguf(repo_id: str, filename: str, force: bool = False) -> Path:
     """Download GGUF from HuggingFace."""
     log_step(1, f"Downloading {filename} from {repo_id}")
@@ -122,16 +169,19 @@ def step_download_gguf(repo_id: str, filename: str, force: bool = False) -> Path
 
     if gguf_path.exists() and not force:
         log(f"  Using cached: {gguf_path}", C_DIM)
-        return gguf_path
+    else:
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError:
+            log_error("huggingface_hub not installed. Run: pip install huggingface_hub")
+            sys.exit(1)
 
-    try:
-        from huggingface_hub import hf_hub_download
-    except ImportError:
-        log_error("huggingface_hub not installed. Run: pip install huggingface_hub")
-        sys.exit(1)
+        hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(model_dir))
+        log(f"  Downloaded: {gguf_path}", C_GREEN)
 
-    hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(model_dir))
-    log(f"  Downloaded: {gguf_path}", C_GREEN)
+    # Always ensure tokenizer is available
+    ensure_tokenizer_files(repo_id, model_dir)
+
     return gguf_path
 
 
@@ -290,12 +340,16 @@ def run_pipeline(args):
     print(f"  Library:   {lib_path}")
 
     if args.generate_only:
-        print(f"\n{C_DIM}Use --generate-only was set, skipping inference.{C_RESET}")
+        print(f"\n{C_DIM}--generate-only was set, skipping inference.{C_RESET}")
         return
 
-    # Step 6: Run (placeholder)
-    log_step(6, "Ready for inference")
-    print(f"  {C_DIM}Inference not implemented yet. Use the generated library.{C_RESET}")
+    # Step 6: Run inference using v4 chat system
+    log_step(6, "Running inference")
+
+    # Use the v4 chat system which works with the generated library
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import ck_run_v4
+    ck_run_v4.step_run_chat(work_dir, args)
 
 
 def list_models():
@@ -357,6 +411,12 @@ Examples:
                            help="Re-convert weights")
     run_parser.add_argument("--force-compile", action="store_true",
                            help="Re-generate and recompile")
+    run_parser.add_argument("--prompt",
+                           help="Single prompt (non-interactive)")
+    run_parser.add_argument("--temperature", type=float, default=0.7,
+                           help="Sampling temperature (default: 0.7)")
+    run_parser.add_argument("--max-tokens", type=int, default=100,
+                           help="Max tokens to generate (default: 100)")
 
     # List command
     subparsers.add_parser("list", help="List cached v5 models")
