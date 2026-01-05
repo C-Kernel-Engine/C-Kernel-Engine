@@ -235,14 +235,18 @@ def build_graph_ir_v4(config: Dict, model_name: str, alignment_bytes: int = 64) 
         buf("layer.{L}.ln1_out", "activation", ["S", "AE"]),
         buf("layer.{L}.ln1_rstd", "activation", ["S"], when=["backward", "training"]),
         buf("layer.{L}.wq", "weight", ["H", "AD", "AE"]),
+        buf("layer.{L}.bq", "weight", ["H", "AD"]),  # Attention Q bias (Qwen2-style)
         buf("layer.{L}.wk", "weight", ["KV", "AD", "AE"]),
+        buf("layer.{L}.bk", "weight", ["KV", "AD"]),  # Attention K bias (Qwen2-style)
         buf("layer.{L}.wv", "weight", ["KV", "AD", "AE"]),
+        buf("layer.{L}.bv", "weight", ["KV", "AD"]),  # Attention V bias (Qwen2-style)
         buf("layer.{L}.q", "activation", ["H", "S", "AD"]),
         buf("layer.{L}.k", "activation", ["KV", "AC", "AD"]),
         buf("layer.{L}.v", "activation", ["KV", "AC", "AD"]),
         buf("layer.{L}.scores", "activation", ["H", "AC", "AC"], when=["prefill", "backward"]),
         buf("layer.{L}.attn_out", "activation", ["H", "S", "AD"]),
         buf("layer.{L}.wo", "weight", ["H", "AE", "AD"]),
+        buf("layer.{L}.bo", "weight", ["AE"]),  # Attention output bias (zeros placeholder)
         buf("layer.{L}.proj_tmp", "activation", ["S", "AE"]),
         buf("layer.{L}.proj_scratch", "scratch", ["S", "AE"]),
         buf("layer.{L}.residual1", "activation", ["S", "AE"]),
@@ -250,9 +254,11 @@ def build_graph_ir_v4(config: Dict, model_name: str, alignment_bytes: int = 64) 
         buf("layer.{L}.ln2_out", "activation", ["S", "AE"]),
         buf("layer.{L}.ln2_rstd", "activation", ["S"], when=["backward", "training"]),
         buf("layer.{L}.w1", "weight", ["2*AI", "AE"]),
+        buf("layer.{L}.b1", "weight", ["2*AI"]),  # FFN bias (zeros placeholder)
         buf("layer.{L}.fc1_out", "activation", ["S", "2*AI"]),
         buf("layer.{L}.swiglu_out", "activation", ["S", "AI"]),
         buf("layer.{L}.w2", "weight", ["AE", "AI"]),
+        buf("layer.{L}.b2", "weight", ["AE"]),  # FFN output bias (zeros placeholder)
         buf("layer.{L}.mlp_out", "activation", ["S", "AE"]),
         buf("layer.{L}.output", "activation", ["S", "AE"]),
         # Backward gradients (d_x = gradient w.r.t. x)
@@ -359,6 +365,7 @@ def build_graph_ir_v4(config: Dict, model_name: str, alignment_bytes: int = 64) 
             "name": "qkv_project",
             "inputs": ["layer.{L}.ln1_out"],
             "weights": ["layer.{L}.wq", "layer.{L}.wk", "layer.{L}.wv"],
+            "biases": ["layer.{L}.bq", "layer.{L}.bk", "layer.{L}.bv"],
             "outputs": ["layer.{L}.q", "layer.{L}.k", "layer.{L}.v"],
         },
         {
@@ -1105,7 +1112,7 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
             if op_out["kernel"]:
                 op_out["kernel_dtype"] = config["dtype"]
 
-            for key in ("inputs", "outputs", "weights", "scratch", "weight_grads", "cache"):
+            for key in ("inputs", "outputs", "weights", "biases", "scratch", "weight_grads", "cache"):
                 if key in op_out:
                     names = resolve_names(op_out[key], layer_id, bindings)
                     op_out[key] = names
@@ -2624,6 +2631,7 @@ def main(argv: List[str]) -> int:
             "format": "ck-bumpwgt4-merged-v1",
             "generated": datetime.utcnow().isoformat() + "Z",
             "model": layout.name,
+            "has_attention_biases": manifest.get("has_attention_biases", False),
             "missing": missing,
             "entries": merged,
         }
@@ -2832,6 +2840,7 @@ def main(argv: List[str]) -> int:
                         emit_main=(args.get("emit") == "exe"),
                         emit_debug=args.get("debug", False),
                         emit_parity=args.get("parity", False),
+                        weights_manifest=weights_manifest,
                     )
                 else:
                     codegen_v4.emit_c_source_v4(

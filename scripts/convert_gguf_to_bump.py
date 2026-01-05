@@ -11,7 +11,7 @@ Notes:
     writing the bump file so runtime code stays simple (no format juggling).
   - For Q4_K/Q6_K models, we treat GGUF tensors of type GGML_TYPE_Q4_K/Q6_K as the
     canonical on-disk representation (same block layout as llama.cpp).
-  - The bump file encodes a per-tensor dtype table (BUMPWGT3). The runtime reads
+  - The bump file encodes a per-tensor dtype table (BUMPWGT4). The runtime reads
     it automatically to select the right kernel path.
 """
 
@@ -567,7 +567,7 @@ def print_conversion_report(
         if gguf_name == "token_embd.weight":
             return "token_emb"
         if gguf_name == "output_norm.weight":
-            return "final_ln_gamma"
+            return "final_ln_weight"
         if gguf_name == "output.weight":
             return None  # Tied with token_emb, not separately stored
 
@@ -599,7 +599,7 @@ def print_conversion_report(
         """Map bump entry name back to GGUF tensor name."""
         if bump_name == "token_emb":
             return "token_embd.weight"
-        if bump_name == "final_ln_gamma":
+        if bump_name == "final_ln_weight":
             return "output_norm.weight"
         if bump_name == "final_ln_bias":
             return None  # No GGUF source
@@ -816,8 +816,8 @@ def verify_bump_parity(
         # Read bump header
         bf.seek(0)
         bump_magic = bf.read(8)
-        if bump_magic != b"BUMPWGT3":
-            errors.append(f"Invalid bump magic: {bump_magic}")
+        if bump_magic != b"BUMPWGT4":
+            errors.append(f"Invalid bump magic: {bump_magic} (expected BUMPWGT4)")
             return False
 
         # Skip rest of header (120 bytes remaining)
@@ -921,8 +921,114 @@ def build_llama_config(
     }
 
 
+def _scan_cached_models() -> list:
+    """Scan cache directories for existing GGUF models."""
+    import glob
+    cache_dirs = [
+        os.path.expanduser("~/.cache/ck-engine-v5/models"),
+        os.path.expanduser("~/.cache/ck-engine/models"),
+        ".",
+    ]
+    found = []
+    for cache_dir in cache_dirs:
+        if os.path.isdir(cache_dir):
+            # Find all .gguf files
+            pattern = os.path.join(cache_dir, "**", "*.gguf")
+            for gguf_path in glob.glob(pattern, recursive=True):
+                size_mb = os.path.getsize(gguf_path) / (1024 * 1024)
+                model_dir = os.path.dirname(gguf_path)
+                model_name = os.path.basename(model_dir)
+                # Use filename if model_name is unhelpful
+                if model_name in (".", "", "models"):
+                    model_name = os.path.basename(gguf_path).replace(".gguf", "")
+                found.append({
+                    "path": gguf_path,
+                    "name": model_name,
+                    "size_mb": size_mb,
+                    "dir": model_dir,
+                })
+    # Sort by size (larger models first, likely more useful)
+    found.sort(key=lambda x: -x["size_mb"])
+    return found
+
+
+def _build_examples() -> str:
+    """Build examples section, using real cached models if available."""
+    cached = _scan_cached_models()
+
+    # Use first cached model or fallback to generic
+    if cached:
+        m = cached[0]
+        gguf = m["path"]
+        model_dir = m["dir"]
+        example_gguf = gguf
+        example_output = os.path.join(model_dir, "weights.bump")
+        example_config = os.path.join(model_dir, "config.json")
+        example_manifest = os.path.join(model_dir, "weights_manifest.json")
+    else:
+        example_gguf = "model.gguf"
+        example_output = "weights.bump"
+        example_config = "config.json"
+        example_manifest = "weights_manifest.json"
+
+    # Build cached models section
+    if cached:
+        cached_section = "\nCached Models Found:\n"
+        for i, m in enumerate(cached[:5]):  # Show max 5
+            cached_section += f"  [{i+1}] {m['name']}\n"
+            cached_section += f"      {m['path']}\n"
+            cached_section += f"      Size: {m['size_mb']:.1f} MB\n"
+        if len(cached) > 5:
+            cached_section += f"  ... and {len(cached) - 5} more\n"
+    else:
+        cached_section = "\nNo cached models found. Download a GGUF model first.\n"
+
+    examples = f"""{cached_section}
+Examples:
+  # 1. INSPECT: Quick look at GGUF metadata and tensor types (no conversion)
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --inspect
+
+  # 2. INSPECT with per-layer details (shows quant type per layer)
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --inspect --inspect-layers
+
+  # 3. LIST: Show every tensor name, type, and shape
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --list
+
+  # 4. CONVERT: Generate weights.bump file for C-Kernel-Engine
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --output {example_output}
+
+  # 5. CONVERT with config and manifest (full pipeline)
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} \\
+      --output {example_output} \\
+      --config-out {example_config} \\
+      --manifest-out {example_manifest}
+
+  # 6. CONVERT and VERIFY (check parity between GGUF and bump)
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --output {example_output} --verify
+
+Tensor Mapping (GGUF → C-Kernel-Engine):
+  token_embd.weight      → token_emb
+  output_norm.weight     → final_ln_weight
+  blk.X.attn_norm.weight → layer.X.ln1_gamma
+  blk.X.ffn_norm.weight  → layer.X.ln2_gamma
+  blk.X.attn_q.weight    → layer.X.wq
+  blk.X.attn_k.weight    → layer.X.wk
+  blk.X.attn_v.weight    → layer.X.wv
+  blk.X.attn_output.weight → layer.X.wo
+  blk.X.ffn_gate.weight  → layer.X.w1 (combined with up)
+  blk.X.ffn_up.weight    → layer.X.w1 (combined with gate)
+  blk.X.ffn_down.weight  → layer.X.w2
+"""
+    return examples
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Convert GGUF (Q4_K / Q6_K) weights to weights.bump")
+    examples = _build_examples()
+    ap = argparse.ArgumentParser(
+        description="Convert GGUF (Q4_K / Q6_K) weights to weights.bump for C-Kernel-Engine",
+        epilog=examples,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--gguf", required=True, help="Input GGUF file (e.g. model.Q4_K_M.gguf)")
     ap.add_argument("--output", help="Output weights.bump path (required unless --inspect/--list)")
     ap.add_argument("--config-out", help="Optional config.json output path (HF-style minimal config)")
@@ -1231,6 +1337,7 @@ def main() -> None:
 
         aligned_embed_dim = embed_dim
         aligned_head_dim = head_dim
+        aligned_intermediate = intermediate
         aligned_context = align_up_elems(context_len, 4, CACHE_ALIGN)
 
         required = {
@@ -1499,32 +1606,34 @@ def main() -> None:
                 record_entry(f"layer.{layer}.b2", "fp32", b2_size)
                 write_f32_zeros(w, aligned_embed_dim)  # b2
 
-            # 4) final RMSNorm (gamma) and bias placeholder
+            # 4) final RMSNorm weight and bias placeholder
             final_norm = read_vector_f32(f, data_start, tensors["output_norm.weight"])
-            record_entry("final_ln_gamma", "fp32", aligned_embed_dim * 4)
+            record_entry("final_ln_weight", "fp32", aligned_embed_dim * 4)
             write_f32_padded(w, final_norm, aligned_embed_dim)
             record_entry("final_ln_bias", "fp32", aligned_embed_dim * 4)
             write_f32_zeros(w, aligned_embed_dim)
 
             checksum = w.digest()
 
-            # Header: matches scripts/convert_hf_to_bump.py (BUMPWGT3, version 3).
+            # Header: BUMPWGT4 format for v4 loader compatibility.
             out_f.flush()
             out_f.seek(0, os.SEEK_SET)
-            out_f.write(b"BUMPWGT3")
-            out_f.write(struct.pack("<I", 3))  # version
+            out_f.write(b"BUMPWGT4")
+            out_f.write(struct.pack("<I", 4))  # version
             out_f.write(struct.pack("<I", 1))  # model_type (legacy)
             out_f.write(struct.pack("<I", int(num_layers)))
             out_f.write(struct.pack("<I", int(vocab_size)))
             out_f.write(struct.pack("<I", int(embed_dim)))
+            out_f.write(struct.pack("<I", int(intermediate)))
             out_f.write(struct.pack("<I", int(context_len)))
             out_f.write(struct.pack("<I", int(num_heads)))
+            out_f.write(struct.pack("<I", int(num_kv_heads)))
             out_f.write(struct.pack("<I", int(head_dim)))
             out_f.write(struct.pack("<Q", int(aligned_embed_dim)))
             out_f.write(struct.pack("<Q", int(aligned_head_dim)))
+            out_f.write(struct.pack("<Q", int(aligned_intermediate)))
             out_f.write(struct.pack("<Q", int(aligned_context)))
             out_f.write(checksum)
-            out_f.write(b"\x00" * 32)
 
     if args.config_out:
         os.makedirs(os.path.dirname(args.config_out) or ".", exist_ok=True)

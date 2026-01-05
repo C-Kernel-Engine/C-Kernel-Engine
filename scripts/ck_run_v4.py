@@ -943,6 +943,8 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace):
         cmd.extend(["--max-tokens", str(args.max_tokens)])
     if args.prompt:
         cmd.extend(["--prompt", args.prompt])
+    if getattr(args, 'parity', False):
+        cmd.append("--parity")
 
     # Replace current process with chat
     os.execvp(sys.executable, cmd)

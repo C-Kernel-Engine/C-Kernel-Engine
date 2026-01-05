@@ -26,13 +26,15 @@ except ImportError:
 class CKModel:
     """Wrapper for the C model library."""
 
-    def __init__(self, model_dir: str):
+    def __init__(self, model_dir: str, parity_dir: str = None):
         self.model_dir = Path(model_dir)
+        self.parity_dir = Path(parity_dir) if parity_dir else None
         self.lib = None
         self.tokenizer = None
         self.vocab_size = 0
         self.context_window = 0
         self.has_kv_decode = False
+        self.has_parity = False
 
     def load(self) -> bool:
         """Load model library and tokenizer."""
@@ -88,6 +90,23 @@ class CKModel:
         except AttributeError:
             self.has_kv_decode = False
 
+        # Optional parity dump API (generated with --parity flag).
+        try:
+            self.lib.parity_set_output_dir.argtypes = [ctypes.c_char_p]
+            self.lib.parity_set_output_dir.restype = None
+            self.lib.parity_set_token_index.argtypes = [ctypes.c_int]
+            self.lib.parity_set_token_index.restype = None
+            self.has_parity = True
+        except AttributeError:
+            self.has_parity = False
+
+        # Setup parity dir if requested
+        if self.parity_dir and self.has_parity:
+            self.parity_dir.mkdir(parents=True, exist_ok=True)
+            # Keep reference to encoded string to prevent garbage collection
+            self._parity_dir_bytes = str(self.parity_dir).encode()
+            self.lib.parity_set_output_dir(self._parity_dir_bytes)
+
         # Initialize model
         weights_path = self.model_dir / "weights.bump"
         if not weights_path.exists():
@@ -115,6 +134,11 @@ class CKModel:
     def kv_cache_reset(self):
         if self.has_kv_decode:
             self.lib.ck_model_kv_cache_reset()
+
+    def set_parity_token_index(self, idx: int):
+        """Set current token index for parity dumps."""
+        if self.has_parity and self.parity_dir:
+            self.lib.parity_set_token_index(idx)
 
     def encode(self, text: str) -> list:
         """Tokenize text."""
@@ -207,6 +231,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     if model.has_kv_decode and model.kv_cache_enable():
         # KV-cache path: prefill once, then decode token-by-token.
         t0 = time.time()
+        model.set_parity_token_index(0)  # Token 0 for prefill output
         logits = model.prefill(token_ids)
         prefill_time = time.time() - t0
 
@@ -231,6 +256,9 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             print(token_text, end='', flush=True)
             if len(token_ids) >= model.context_window - 1:
                 break
+
+            # Set parity token index before decode
+            model.set_parity_token_index(prompt_tokens + i)
 
             # Decode step
             t_decode = time.time()
@@ -373,11 +401,21 @@ def main():
                        help="Show performance stats (default: on)")
     parser.add_argument("--no-stats", action="store_false", dest="stats",
                        help="Disable performance stats")
+    parser.add_argument("--parity", action="store_true",
+                       help="Save intermediate buffers for comparison (requires --parity in codegen)")
+    parser.add_argument("--parity-dir",
+                       help="Directory for parity dumps (default: model-dir/parity)")
     args = parser.parse_args()
+
+    # Determine parity directory
+    parity_dir = None
+    if args.parity:
+        parity_dir = args.parity_dir or str(Path(args.model_dir) / "parity")
+        print(f"Parity dumps will be saved to: {parity_dir}")
 
     # Load model
     print(f"Loading model from {args.model_dir}...")
-    model = CKModel(args.model_dir)
+    model = CKModel(args.model_dir, parity_dir=parity_dir)
 
     if not model.load():
         sys.exit(1)

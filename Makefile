@@ -1248,6 +1248,30 @@ ck-cli-v4: $(LIB)
 	@echo "    --force-compile        Re-generate and recompile"
 	@echo ""
 
+# v5 CLI (Python wrapper for IR v5 explicit codegen pipeline)
+ck-cli-v5: $(LIB)
+	@echo ""
+	@echo "  $(C_ORANGE)C-Kernel-Engine v5 CLI$(C_RESET) (Explicit Unrolled Codegen)"
+	@echo "  Pipeline: download -> GGUF convert -> IR v5 -> explicit codegen -> compile -> run"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    python scripts/ck_run_v5.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf"
+	@echo "    python scripts/ck_run_v5.py run ./model.gguf"
+	@echo "    python scripts/ck_run_v5.py run MODEL --debug        # Buffer stats after each op"
+	@echo "    python scripts/ck_run_v5.py run MODEL --parity       # Save layer outputs for comparison"
+	@echo "    python scripts/ck_run_v5.py run MODEL --generate-only"
+	@echo "    python scripts/ck_run_v5.py list"
+	@echo "    python scripts/ck_run_v5.py clean"
+	@echo ""
+	@echo "  Options:"
+	@echo "    --weight-dtype=TYPE    Weight type: q4_k, q4_k_m, q5_0, q6_k, q8_0"
+	@echo "    --debug                Insert debug prints (buffer stats after each op)"
+	@echo "    --parity               Save layer outputs for PyTorch/HuggingFace comparison"
+	@echo "    --generate-only        Generate C code without running"
+	@echo "    --force-convert        Re-convert weights"
+	@echo "    --force-compile        Re-generate and recompile"
+	@echo ""
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # V5 PIPELINE (Explicit Unrolled Codegen)
 # ═══════════════════════════════════════════════════════════════════════════════

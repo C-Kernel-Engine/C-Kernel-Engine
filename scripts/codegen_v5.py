@@ -84,21 +84,134 @@ def dtype_const(dtype: str) -> str:
     }.get(qt, "CK_DT_FP32")
 
 
+def validate_layout_vs_manifest(layout: v3.ModelLayout, manifest: Dict) -> List[str]:
+    """Validate layout dtypes against manifest dtypes.
+
+    Returns list of error messages (empty if all OK).
+    """
+    errors = []
+    warnings = []
+
+    if not manifest or "entries" not in manifest:
+        return ["No manifest entries found"]
+
+    # Build manifest lookup
+    manifest_lookup = {e["name"]: e for e in manifest["entries"]}
+
+    section = layout.sections[0]
+    config = layout.config
+    num_layers = config.get("num_hidden_layers", len(section.layers))
+
+    # Check token_emb
+    for buf in section.header_buffers:
+        if buf.name == "token_emb":
+            mentry = manifest_lookup.get("token_emb")
+            if mentry:
+                layout_dtype = get_quant_type(str(buf.dtype).lower())
+                manifest_dtype = get_quant_type(mentry["dtype"])
+                if layout_dtype != manifest_dtype:
+                    errors.append(f"token_emb: layout={layout_dtype} vs manifest={manifest_dtype}")
+
+    # Check per-layer weights
+    for layer_id, layer in enumerate(section.layers):
+        for buf in layer.buffers:
+            parts = buf.name.split(".", 2)
+            if len(parts) == 3 and parts[0] == "layer":
+                weight_suffix = parts[2]
+                manifest_name = f"layer.{layer_id}.{weight_suffix}"
+                mentry = manifest_lookup.get(manifest_name)
+                if mentry:
+                    layout_dtype = get_quant_type(str(buf.dtype).lower())
+                    manifest_dtype = get_quant_type(mentry["dtype"])
+                    if layout_dtype != manifest_dtype:
+                        errors.append(f"{manifest_name}: layout={layout_dtype} vs manifest={manifest_dtype}")
+
+    return errors
+
+
+def print_manifest_validation_table(manifest: Dict, num_layers: int) -> List[str]:
+    """Generate a validation table showing manifest entries for code comments."""
+    lines = []
+
+    if not manifest or "entries" not in manifest:
+        return lines
+
+    # Build per-layer summary
+    lines.append(" * ")
+    lines.append(" * ═══════════════════════════════════════════════════════════════════════════")
+    lines.append(" * MANIFEST VALIDATION (from weights_manifest.json)")
+    lines.append(" * ═══════════════════════════════════════════════════════════════════════════")
+    lines.append(" * ")
+    lines.append(" * Layer | WQ    | WK    | WV    | WO    | W1    | W2    | BQ | BK | BV | BO")
+    lines.append(" * ------|-------|-------|-------|-------|-------|-------|----|----|----|----|")
+
+    manifest_lookup = {e["name"]: e for e in manifest["entries"]}
+
+    for layer_id in range(num_layers):
+        wq = manifest_lookup.get(f"layer.{layer_id}.wq", {}).get("dtype", "-")
+        wk = manifest_lookup.get(f"layer.{layer_id}.wk", {}).get("dtype", "-")
+        wv = manifest_lookup.get(f"layer.{layer_id}.wv", {}).get("dtype", "-")
+        wo = manifest_lookup.get(f"layer.{layer_id}.wo", {}).get("dtype", "-")
+        w1 = manifest_lookup.get(f"layer.{layer_id}.w1", {}).get("dtype", "-")
+        w2 = manifest_lookup.get(f"layer.{layer_id}.w2", {}).get("dtype", "-")
+
+        # Check biases - ✓ if from GGUF (size > 0 and not zeros), ○ if zeros
+        bq_entry = manifest_lookup.get(f"layer.{layer_id}.bq", {})
+        bk_entry = manifest_lookup.get(f"layer.{layer_id}.bk", {})
+        bv_entry = manifest_lookup.get(f"layer.{layer_id}.bv", {})
+        bo_entry = manifest_lookup.get(f"layer.{layer_id}.bo", {})
+
+        # For now, assume any bias entry exists
+        bq = "✓" if bq_entry.get("size", 0) > 0 else "○"
+        bk = "✓" if bk_entry.get("size", 0) > 0 else "○"
+        bv = "✓" if bv_entry.get("size", 0) > 0 else "○"
+        bo = "○"  # bo is always zeros for Qwen2
+
+        lines.append(f" * {layer_id:5d} | {wq:5s} | {wk:5s} | {wv:5s} | {wo:5s} | {w1:5s} | {w2:5s} | {bq:2s} | {bk:2s} | {bv:2s} | {bo:2s}")
+
+    lines.append(" * ")
+    lines.append(f" * Total manifest entries: {len(manifest['entries'])}")
+    if manifest.get("has_attention_biases"):
+        lines.append(" * Attention biases: PRESENT (Qwen2-style)")
+    else:
+        lines.append(" * Attention biases: NONE (LLaMA-style)")
+    lines.append(" * ═══════════════════════════════════════════════════════════════════════════")
+    lines.append(" * ")
+
+    return lines
+
+
 def emit_c_source_v5(layout: v3.ModelLayout,
                      output_path: str,
                      header_name: str,
                      mode: str,
                      emit_main: bool = False,
                      emit_debug: bool = False,
-                     emit_parity: bool = False) -> None:
+                     emit_parity: bool = False,
+                     weights_manifest: Optional[Dict] = None) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
         emit_debug: If True, insert debug prints after each layer to detect NaN/zero outputs.
         emit_parity: If True, save intermediate buffers to files for comparison with PyTorch.
+        weights_manifest: If provided, validate layout against manifest and embed validation table.
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v5 codegen only supports prefill/decode (got: {mode})")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Manifest validation - catch dtype mismatches at codegen time
+    # ═══════════════════════════════════════════════════════════════════════════
+    if weights_manifest:
+        print(f"[CODEGEN] Validating layout against manifest...")
+        validation_errors = validate_layout_vs_manifest(layout, weights_manifest)
+        if validation_errors:
+            print(f"[CODEGEN] ⚠ VALIDATION ERRORS:")
+            for err in validation_errors:
+                print(f"[CODEGEN]   - {err}")
+            raise ValueError(f"Layout/manifest dtype mismatch: {len(validation_errors)} errors. Fix conversion or regenerate IR.")
+        print(f"[CODEGEN] ✓ Layout matches manifest ({len(weights_manifest.get('entries', []))} entries)")
+
     config = layout.config
     section = layout.sections[0]
 
@@ -149,6 +262,7 @@ def emit_c_source_v5(layout: v3.ModelLayout,
     layer_names = _layer_buffer_names(section)
     has_rope = any(buf.name in {"rope_cos_cache", "rope_sin_cache"} for buf in section.globals)
     has_proj_scratch = _layer_has_field(layer_names, "proj_scratch")
+    has_attention_biases = weights_manifest.get("has_attention_biases", False) if weights_manifest else False
 
     lines = []
     def add(s=""):
@@ -176,6 +290,13 @@ def emit_c_source_v5(layout: v3.ModelLayout,
         add(f" *   Layer {layer_id}: wq={wq_dt} wk={wk_dt} wv={wv_dt} wo={wo_dt} w1={w1_dt} w2={w2_dt}")
     if num_layers > 3:
         add(f" *   ... ({num_layers - 3} more layers)")
+
+    # Add manifest validation table if available
+    if weights_manifest:
+        manifest_lines = print_manifest_validation_table(weights_manifest, num_layers)
+        for line in manifest_lines:
+            add(line)
+
     add(f" *")
     add(f" * DO NOT EDIT - Regenerate with build_ir_v5.py or codegen_v5.py")
     add(f" */")
@@ -229,33 +350,42 @@ def emit_c_source_v5(layout: v3.ModelLayout,
         add("}")
         add()
 
-    # Parity helpers
+    # Parity helpers - only define in decode mode, use extern in prefill
     if emit_parity:
         add("/* ============================================================================")
         add(" * PARITY HELPERS (save buffers for PyTorch comparison)")
         add(" * ============================================================================ */")
         add()
-        add("static const char *g_parity_dir = NULL;")
-        add("static int g_parity_token_idx = 0;")
-        add()
-        add("void parity_set_output_dir(const char *dir) {")
-        add("    g_parity_dir = dir;")
-        add("}")
-        add()
-        add("void parity_set_token_index(int idx) {")
-        add("    g_parity_token_idx = idx;")
-        add("}")
-        add()
-        add("static void parity_save_buffer(const char *name, const float *buf, int size) {")
-        add("    if (!g_parity_dir) return;")
-        add("    char path[512];")
-        add('    snprintf(path, sizeof(path), "%s/%s_tok%d.bin", g_parity_dir, name, g_parity_token_idx);')
-        add('    FILE *f = fopen(path, "wb");')
-        add('    if (!f) { fprintf(stderr, "[PARITY] Failed to open %s\\n", path); return; }')
-        add("    fwrite(buf, sizeof(float), size, f);")
-        add("    fclose(f);")
-        add('    fprintf(stderr, "[PARITY] Saved %s (%d floats)\\n", path, size);')
-        add("}")
+        if mode == "decode":
+            # Define the globals and functions only in decode
+            add("const char *g_parity_dir = NULL;")
+            add("int g_parity_token_idx = 0;")
+            add()
+            add("void parity_set_output_dir(const char *dir) {")
+            add("    g_parity_dir = dir;")
+            add("}")
+            add()
+            add("void parity_set_token_index(int idx) {")
+            add("    g_parity_token_idx = idx;")
+            add("}")
+            add()
+            add("void parity_save_buffer(const char *name, const float *buf, int size) {")
+            add("    if (!g_parity_dir) return;")
+            add("    char path[512];")
+            add('    snprintf(path, sizeof(path), "%s/%s_tok%d.bin", g_parity_dir, name, g_parity_token_idx);')
+            add('    FILE *f = fopen(path, "wb");')
+            add('    if (!f) { fprintf(stderr, "[PARITY] Failed to open %s\\n", path); return; }')
+            add("    fwrite(buf, sizeof(float), size, f);")
+            add("    fclose(f);")
+            add('    fprintf(stderr, "[PARITY] Saved %s (%d floats)\\n", path, size);')
+            add("}")
+        else:
+            # Prefill: use extern declarations to reference decode's definitions
+            add("extern const char *g_parity_dir;")
+            add("extern int g_parity_token_idx;")
+            add("extern void parity_set_output_dir(const char *dir);")
+            add("extern void parity_set_token_index(int idx);")
+            add("extern void parity_save_buffer(const char *name, const float *buf, int size);")
         add()
 
     # Magic header
@@ -443,8 +573,6 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             if has_proj_scratch:
                 add(f"    float *proj_scratch = {safe_name}_PTR(model, L->proj_scratch);")
             add(f"    float *residual1 = {safe_name}_PTR(model, L->residual1);")
-            add(f"    float *fc1_out = {safe_name}_PTR(model, L->fc1_out);")
-            add(f"    float *swiglu_out = {safe_name}_PTR(model, L->swiglu_out);")
             add(f"    float *mlp_out = {safe_name}_PTR(model, L->mlp_out);")
             add(f"    float *output = {safe_name}_PTR(model, L->output);")
             add()
@@ -458,6 +586,14 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add(f"    const void *W1 = (const void *){safe_name}_PTR(model, L->w1);  /* {w1_dt.upper()} (gate+up) */")
             add(f"    const void *W2 = (const void *){safe_name}_PTR(model, L->w2);  /* {w2_dt.upper()} (down) */")
             add()
+
+            # Attention biases (Qwen2-style)
+            if has_attention_biases:
+                add(f"    /* Attention biases (Qwen2-style) */")
+                add(f"    const float *BQ = (const float *){safe_name}_PTR(model, L->bq);")
+                add(f"    const float *BK = (const float *){safe_name}_PTR(model, L->bk);")
+                add(f"    const float *BV = (const float *){safe_name}_PTR(model, L->bv);")
+                add()
 
             # RoPE pointers
             if has_rope:
@@ -475,6 +611,11 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add("    float v_token[H_kv * aligned_head_dim];")
             add("    float attn_token[H * aligned_head_dim];")
             add()
+            # Local buffers for MLP (fc1_out = 2x intermediate for gate+up, swiglu_out = intermediate)
+            add("    /* Local MLP buffers (avoid layout dependencies for intermediate values) */")
+            add("    float fc1_out[2 * aligned_intermediate_dim];")
+            add("    float swiglu_out[aligned_intermediate_dim];")
+            add()
 
             # Step 1: RMSNorm
             add("    /* Step 1: RMSNorm before attention */")
@@ -488,6 +629,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_ln1_out", ln1_out, aligned_embed_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_ln1_out", ln1_out, aligned_embed_dim);')
             add()
 
             # Step 2: QKV projection with explicit kernel names
@@ -496,18 +639,27 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             wk_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wk_dt, "gemm_blocked_serial")
             wv_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wv_dt, "gemm_blocked_serial")
 
+            # Use actual biases if model has attention biases, otherwise NULL
+            bq_arg = "BQ" if has_attention_biases else "NULL"
+            bk_arg = "BK" if has_attention_biases else "NULL"
+            bv_arg = "BV" if has_attention_biases else "NULL"
+
             add(f"    /* Q projection: {wq_dt.upper()} -> {wq_kernel} */")
-            add(f"    {wq_kernel}(ln1_out, WQ, NULL, q_token, 1, H * head_dim, aligned_embed_dim);")
+            add(f"    {wq_kernel}(ln1_out, WQ, {bq_arg}, q_token, 1, H * head_dim, aligned_embed_dim);")
             add()
             add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} */")
-            add(f"    {wk_kernel}(ln1_out, WK, NULL, k_token, 1, H_kv * head_dim, aligned_embed_dim);")
+            add(f"    {wk_kernel}(ln1_out, WK, {bk_arg}, k_token, 1, H_kv * head_dim, aligned_embed_dim);")
             add()
             add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} */")
-            add(f"    {wv_kernel}(ln1_out, WV, NULL, v_token, 1, H_kv * head_dim, aligned_embed_dim);")
+            add(f"    {wv_kernel}(ln1_out, WV, {bv_arg}, v_token, 1, H_kv * head_dim, aligned_embed_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_q_token", q_token, H * aligned_head_dim);')
                 add(f'    debug_check_buffer("layer{layer_id}_k_token", k_token, H_kv * aligned_head_dim);')
                 add(f'    debug_check_buffer("layer{layer_id}_v_token", v_token, H_kv * aligned_head_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_q_proj", q_token, H * aligned_head_dim);')
+                add(f'    parity_save_buffer("layer_{layer_id}_k_proj", k_token, H_kv * aligned_head_dim);')
+                add(f'    parity_save_buffer("layer_{layer_id}_v_proj", v_token, H_kv * aligned_head_dim);')
             add()
 
             # Step 3: RoPE
@@ -523,6 +675,9 @@ def emit_c_source_v5(layout: v3.ModelLayout,
                 add("                    head_dim,")
                 add("                    aligned_head_dim,")
                 add("                    token_index);")
+                if emit_parity:
+                    add(f'    parity_save_buffer("layer_{layer_id}_q_rope", q_token, H * aligned_head_dim);')
+                    add(f'    parity_save_buffer("layer_{layer_id}_k_rope", k_token, H_kv * aligned_head_dim);')
                 add()
 
             # Step 4: KV cache write
@@ -552,6 +707,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add("                                                   aligned_head_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_attn_token", attn_token, H * aligned_head_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_attn", attn_token, H * aligned_head_dim);')
             add()
 
             # Step 6: Output projection
@@ -561,6 +718,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add(f"    {wo_kernel}(attn_token, WO, NULL, proj_tmp, 1, aligned_embed_dim, H * head_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_proj_tmp", proj_tmp, aligned_embed_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_attn_proj", proj_tmp, aligned_embed_dim);')
             add()
 
             # Step 7: Residual add
@@ -568,6 +727,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add("    ck_residual_add_token_major(input, proj_tmp, residual1, 1, aligned_embed_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_residual1", residual1, aligned_embed_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_residual1", residual1, aligned_embed_dim);')
             add()
 
             # Step 8: RMSNorm before MLP
@@ -582,6 +743,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_ln2_out", ln2_out, aligned_embed_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_ln2_out", ln2_out, aligned_embed_dim);')
             add()
 
             # Step 9: MLP (gate + up + SwiGLU + down)
@@ -593,16 +756,22 @@ def emit_c_source_v5(layout: v3.ModelLayout,
             add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_fc1_out", fc1_out, 2 * aligned_intermediate_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_fc1", fc1_out, 2 * aligned_intermediate_dim);')
             add()
             add("    /* SwiGLU activation */")
             add(f"    swiglu_forward(fc1_out, swiglu_out, 1, aligned_intermediate_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_swiglu_out", swiglu_out, aligned_intermediate_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_swiglu", swiglu_out, aligned_intermediate_dim);')
             add()
             add(f"    /* Down projection: {w2_dt.upper()} -> {w2_kernel} */")
             add(f"    {w2_kernel}(swiglu_out, W2, NULL, mlp_out, 1, aligned_embed_dim, aligned_intermediate_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_mlp_out", mlp_out, aligned_embed_dim);')
+            if emit_parity:
+                add(f'    parity_save_buffer("layer_{layer_id}_mlp", mlp_out, aligned_embed_dim);')
             add()
 
             # Step 10: Final residual add
@@ -691,6 +860,8 @@ def emit_c_source_v5(layout: v3.ModelLayout,
         add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
         if emit_debug:
             add('    debug_check_buffer("final_out", final_out, aligned_embed_dim);')
+        if emit_parity:
+            add('    parity_save_buffer("final_out", final_out, aligned_embed_dim);')
         add()
 
         # LM head
