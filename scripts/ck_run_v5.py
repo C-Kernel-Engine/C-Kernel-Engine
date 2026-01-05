@@ -199,11 +199,12 @@ def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False) ->
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_gguf_to_bump_v4.py"),
+        str(SCRIPTS_DIR / "convert_gguf_to_bump.py"),
         f"--gguf={gguf_path}",
         f"--output={weights_path}",
         f"--config-out={config_path}",
         f"--manifest-out={manifest_path}",
+        "--verify",  # Enable parity verification
     ]
     run_cmd(cmd)
     log(f"  Created: {weights_path}", C_GREEN)

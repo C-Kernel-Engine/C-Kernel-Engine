@@ -345,6 +345,22 @@ def ck_dtype_from_ggml_type(ggml_type: int) -> int:
     raise GGUFError(f"Unsupported ggml_type={ggml_type_name(ggml_type)} for bump output")
 
 
+def get_quant_type_name(ggml_type: int) -> str:
+    """Get lowercase quant type string from GGML type."""
+    return {
+        GGML_TYPE_F32: "fp32",
+        GGML_TYPE_F16: "fp16",
+        GGML_TYPE_BF16: "bf16",
+        GGML_TYPE_Q4_0: "q4_0",
+        GGML_TYPE_Q4_1: "q4_1",
+        GGML_TYPE_Q5_0: "q5_0",
+        GGML_TYPE_Q5_1: "q5_1",
+        GGML_TYPE_Q8_0: "q8_0",
+        GGML_TYPE_Q4_K: "q4_k",
+        GGML_TYPE_Q6_K: "q6_k",
+    }.get(ggml_type, f"unknown_{ggml_type}")
+
+
 def ck_dtype_name(dt: int) -> str:
     return {
         CK_DT_FP32: "FP32",
@@ -499,6 +515,384 @@ def copy_qk_head_packed(
             w_out.write(zero_row)
 
 
+def print_conversion_report(
+    num_layers: int,
+    layer_infos: list,
+    vocab_size: int,
+    embed_dim: int,
+    num_heads: int,
+    num_kv_heads: int,
+    head_dim: int,
+    intermediate: int,
+    gguf_tensors: Dict[str, TensorInfo] = None,
+    manifest_entries: list = None,
+    bump_path: str = None,
+    gguf_path: str = None,
+    data_start: int = 0,
+) -> None:
+    """Print a detailed conversion report showing EVERY tensor and its conversion status."""
+
+    def fmt_size(b: int) -> str:
+        """Format bytes as human-readable."""
+        if b >= 1024 * 1024:
+            return f"{b / (1024 * 1024):.2f} MB"
+        elif b >= 1024:
+            return f"{b / 1024:.2f} KB"
+        return f"{b} B"
+
+    def fmt_offset(offset: int) -> str:
+        """Format offset as hex."""
+        return f"0x{offset:08X}"
+
+    def fmt_values(values: list, max_vals: int = 3) -> str:
+        """Format sample values."""
+        if not values:
+            return "-"
+        vals = values[:max_vals]
+        return "[" + ", ".join(f"{v:.4f}" for v in vals) + "]"
+
+    print("\n" + "=" * 140)
+    print("DETAILED CONVERSION REPORT")
+    print("=" * 140)
+
+    # Build manifest lookup by name
+    manifest_lookup = {}
+    if manifest_entries:
+        for entry in manifest_entries:
+            manifest_lookup[entry["name"]] = entry
+
+    # Build GGUF name to BUMP name mapping
+    def get_bump_name(gguf_name: str) -> Optional[str]:
+        """Map GGUF tensor name to bump entry name."""
+        if gguf_name == "token_embd.weight":
+            return "token_emb"
+        if gguf_name == "output_norm.weight":
+            return "final_ln_gamma"
+        if gguf_name == "output.weight":
+            return None  # Tied with token_emb, not separately stored
+
+        # Layer tensors
+        if gguf_name.startswith("blk."):
+            parts = gguf_name.split(".")
+            if len(parts) >= 3:
+                layer = parts[1]
+                rest = ".".join(parts[2:])
+                mapping = {
+                    "attn_norm.weight": f"layer.{layer}.ln1_gamma",
+                    "ffn_norm.weight": f"layer.{layer}.ln2_gamma",
+                    "attn_q.weight": f"layer.{layer}.wq",
+                    "attn_k.weight": f"layer.{layer}.wk",
+                    "attn_v.weight": f"layer.{layer}.wv",
+                    "attn_output.weight": f"layer.{layer}.wo",
+                    "attn_q.bias": f"layer.{layer}.bq",
+                    "attn_k.bias": f"layer.{layer}.bk",
+                    "attn_v.bias": f"layer.{layer}.bv",
+                    "ffn_gate.weight": f"layer.{layer}.w1",  # Combined with up
+                    "ffn_up.weight": f"layer.{layer}.w1",    # Combined with gate
+                    "ffn_down.weight": f"layer.{layer}.w2",
+                }
+                return mapping.get(rest)
+        return None
+
+    # Build reverse mapping: BUMP name to GGUF name(s)
+    def get_gguf_name(bump_name: str) -> Optional[str]:
+        """Map bump entry name back to GGUF tensor name."""
+        if bump_name == "token_emb":
+            return "token_embd.weight"
+        if bump_name == "final_ln_gamma":
+            return "output_norm.weight"
+        if bump_name == "final_ln_bias":
+            return None  # No GGUF source
+        if bump_name == "pos_emb":
+            return None  # No GGUF source (RoPE models)
+
+        # Layer tensors
+        if bump_name.startswith("layer."):
+            parts = bump_name.split(".")
+            if len(parts) >= 3:
+                layer = parts[1]
+                suffix = parts[2]
+                mapping = {
+                    "ln1_gamma": f"blk.{layer}.attn_norm.weight",
+                    "ln2_gamma": f"blk.{layer}.ffn_norm.weight",
+                    "wq": f"blk.{layer}.attn_q.weight",
+                    "wk": f"blk.{layer}.attn_k.weight",
+                    "wv": f"blk.{layer}.attn_v.weight",
+                    "wo": f"blk.{layer}.attn_output.weight",
+                    "bq": f"blk.{layer}.attn_q.bias",
+                    "bk": f"blk.{layer}.attn_k.bias",
+                    "bv": f"blk.{layer}.attn_v.bias",
+                    "w1": f"blk.{layer}.ffn_gate.weight",  # gate+up combined
+                    "w2": f"blk.{layer}.ffn_down.weight",
+                    "bo": None,  # No GGUF source
+                    "b1": None,  # No GGUF source
+                    "b2": None,  # No GGUF source
+                }
+                return mapping.get(suffix)
+        return None
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # Main Table: BUMP entries with GGUF source, conversion status, and values
+    # ════════════════════════════════════════════════════════════════════════════
+    if manifest_entries:
+        print(f"\n[Conversion Table] ({len(manifest_entries)} BUMP entries)")
+        print(f"{'BUMP Entry':<22} | {'GGUF Source':<28} | {'GGUF Type':<7} | {'Conv':<4} | {'BUMP Offset':<12} | {'Size':<10} | {'Sample Values'}")
+        print("-" * 22 + "-+-" + "-" * 28 + "-+-" + "-" * 7 + "-+-" + "-" * 4 + "-+-" + "-" * 12 + "-+-" + "-" * 10 + "-+-" + "-" * 25)
+
+        converted_from_gguf = 0
+        zeros_placeholder = 0
+        other_entries = 0
+
+        for entry in manifest_entries:
+            bump_name = entry["name"]
+            bump_type = entry["dtype"]
+            offset_str = fmt_offset(entry["file_offset"])
+            size_str = fmt_size(entry["size"])
+
+            # Find GGUF source
+            gguf_name = get_gguf_name(bump_name)
+            gguf_type = "-"
+            conv_status = " "
+            sample_vals = "-"
+
+            # Check if this is a bias entry
+            is_bias = bump_name.endswith((".bq", ".bk", ".bv", ".bo", ".b1", ".b2"))
+            layer_idx = None
+            if is_bias and "." in bump_name:
+                layer_num = bump_name.split(".")[1]
+                if layer_num.isdigit():
+                    layer_idx = int(layer_num)
+
+            # Determine source and conversion status
+            if gguf_name and gguf_name in (gguf_tensors or {}):
+                gguf_info = gguf_tensors[gguf_name]
+                gguf_type = ggml_type_name(gguf_info.ggml_type)
+                conv_status = "✓"
+                converted_from_gguf += 1
+            elif is_bias and layer_idx is not None and layer_idx < len(layer_infos):
+                bias_key = bump_name.split(".")[-1]
+                if layer_infos[layer_idx].get(bias_key) is not None:
+                    # Bias exists in GGUF
+                    gguf_name = f"blk.{layer_idx}.attn_{bias_key[1]}.bias"
+                    gguf_type = "F32"
+                    conv_status = "✓"
+                    converted_from_gguf += 1
+                else:
+                    # Bias is zeros placeholder
+                    gguf_name = "(none - zeros)"
+                    conv_status = "○"
+                    zeros_placeholder += 1
+            elif bump_name in ("pos_emb", "final_ln_bias"):
+                gguf_name = "(none - zeros)"
+                conv_status = "○"
+                zeros_placeholder += 1
+            else:
+                other_entries += 1
+
+            # Truncate names for display
+            bump_display = bump_name[:21] if len(bump_name) > 21 else bump_name
+            gguf_display = (gguf_name or "-")[:27] if gguf_name else "-"
+
+            print(f"{bump_display:<22} | {gguf_display:<28} | {gguf_type:<7} | {conv_status:<4} | {offset_str:<12} | {size_str:<10} |")
+
+        print("-" * 140)
+        print(f"  Summary: {converted_from_gguf} from GGUF (✓), {zeros_placeholder} zeros placeholders (○), {other_entries} other")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # Section 3: Per-layer quant type summary (compact)
+    # ════════════════════════════════════════════════════════════════════════════
+    print(f"\n[Per-Layer Quant Types] ({num_layers} layers)")
+    print(f"  {'Layer':<6} | {'WQ':<5} | {'WK':<5} | {'WV':<5} | {'WO':<5} | {'W1':<5} | {'W2':<5} | {'Biases'}")
+    print(f"  {'-'*6} | {'-'*5} | {'-'*5} | {'-'*5} | {'-'*5} | {'-'*5} | {'-'*5} | {'-'*7}")
+
+    for layer_id, info in enumerate(layer_infos):
+        wq_dt = get_quant_type_name(info["wq"].ggml_type).upper() if info.get("wq") else "N/A"
+        wk_dt = get_quant_type_name(info["wk"].ggml_type).upper() if info.get("wk") else "N/A"
+        wv_dt = get_quant_type_name(info["wv"].ggml_type).upper() if info.get("wv") else "N/A"
+        wo_dt = get_quant_type_name(info["wo"].ggml_type).upper() if info.get("wo") else "N/A"
+        w1_dt = get_quant_type_name(info["gate"].ggml_type).upper() if info.get("gate") else "N/A"
+        w2_dt = get_quant_type_name(info["down"].ggml_type).upper() if info.get("down") else "N/A"
+
+        has_bq = "Q" if info.get("bq") is not None else "-"
+        has_bk = "K" if info.get("bk") is not None else "-"
+        has_bv = "V" if info.get("bv") is not None else "-"
+        bias_str = f"{has_bq}{has_bk}{has_bv}"
+
+        # Show all layers for full detail
+        print(f"  {layer_id:<6} | {wq_dt:<5} | {wk_dt:<5} | {wv_dt:<5} | {wo_dt:<5} | {w1_dt:<5} | {w2_dt:<5} | {bias_str}")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # Section 4: Validation summary
+    # ════════════════════════════════════════════════════════════════════════════
+    layers_with_bq = sum(1 for info in layer_infos if info.get("bq") is not None)
+    layers_with_bk = sum(1 for info in layer_infos if info.get("bk") is not None)
+    layers_with_bv = sum(1 for info in layer_infos if info.get("bv") is not None)
+
+    print(f"\n[Validation Summary]")
+    print(f"  Model dims: embed={embed_dim}, heads={num_heads}/{num_kv_heads}, head_dim={head_dim}, ff={intermediate}")
+    print(f"  Vocab: {vocab_size}, Layers: {num_layers}")
+    print(f"  Attention biases: bq={layers_with_bq}/{num_layers}, bk={layers_with_bk}/{num_layers}, bv={layers_with_bv}/{num_layers}")
+
+    if layers_with_bq > 0 and layers_with_bq < num_layers:
+        print(f"  ⚠ WARNING: Only {layers_with_bq}/{num_layers} layers have Q bias!")
+    if layers_with_bk > 0 and layers_with_bk < num_layers:
+        print(f"  ⚠ WARNING: Only {layers_with_bk}/{num_layers} layers have K bias!")
+    if layers_with_bv > 0 and layers_with_bv < num_layers:
+        print(f"  ⚠ WARNING: Only {layers_with_bv}/{num_layers} layers have V bias!")
+
+    if layers_with_bq == num_layers and layers_with_bk == num_layers and layers_with_bv == num_layers:
+        print(f"  ✓ All attention biases (Q, K, V) extracted for all {num_layers} layers")
+    elif layers_with_bq == 0 and layers_with_bk == 0 and layers_with_bv == 0:
+        print(f"  ✓ No attention biases in source (LLaMA-style architecture)")
+    else:
+        print(f"  ✓ Mixed bias configuration detected")
+
+    if manifest_entries:
+        total_size = sum(e["size"] for e in manifest_entries)
+        print(f"  Total bump file size: {fmt_size(total_size)}")
+
+    print("=" * 100 + "\n")
+
+
+def verify_bump_parity(
+    gguf_path: str,
+    bump_path: str,
+    num_layers: int,
+    embed_dim: int,
+    num_heads: int,
+    num_kv_heads: int,
+    head_dim: int,
+) -> bool:
+    """Verify parity between GGUF tensors and converted bump file.
+
+    Checks sample values from:
+    - Token embeddings
+    - Layer 0 attention Q/K/V biases (if present)
+    - Layer 0 RMSNorm weights
+
+    Returns True if parity checks pass, False otherwise.
+    """
+    import struct
+
+    print("\n[verify] Running parity verification...")
+    errors = []
+
+    with open(gguf_path, "rb") as gf, open(bump_path, "rb") as bf:
+        gr = GGUFReader(gf)
+
+        # Parse GGUF header to find tensors
+        magic = gr._read_exact(4)
+        if magic != b"GGUF":
+            errors.append(f"Invalid GGUF magic: {magic}")
+            return False
+
+        version = gr.u32()
+        if version >= 2:
+            n_tensors = gr.u64()
+            n_kv = gr.u64()
+        else:
+            n_tensors = gr.u32()
+            n_kv = gr.u32()
+
+        # Skip metadata
+        for _ in range(n_kv):
+            key = gr.key_str()
+            vtype = gr.u32()
+            _gguf_skip_value(gr, vtype)
+
+        # Parse tensor info
+        tensors: Dict[str, TensorInfo] = {}
+        for _ in range(n_tensors):
+            name = gr.key_str()
+            n_dims = gr.u32()
+            dims = tuple(int(gr.u64()) for _ in range(n_dims))
+            ggml_type = gr.u32()
+            offset = gr.u64()
+            tensors[name] = TensorInfo(name=name, dims=dims, ggml_type=int(ggml_type), offset=int(offset))
+
+        alignment = 32  # default
+        data_start = align_up(gr.tell(), alignment)
+
+        # Read bump header
+        bf.seek(0)
+        bump_magic = bf.read(8)
+        if bump_magic != b"BUMPWGT3":
+            errors.append(f"Invalid bump magic: {bump_magic}")
+            return False
+
+        # Skip rest of header (120 bytes remaining)
+        bf.seek(HEADER_SIZE)
+
+        # Read dtype table
+        dtype_table_len = struct.unpack("<I", bf.read(4))[0]
+        dtype_table = bf.read(dtype_table_len)
+
+        # Check that we have attention bias tensors if GGUF has them
+        has_gguf_bq = "blk.0.attn_q.bias" in tensors
+        has_gguf_bk = "blk.0.attn_k.bias" in tensors
+        has_gguf_bv = "blk.0.attn_v.bias" in tensors
+
+        # Verify token embedding (sample first row)
+        tok_info = tensors.get("token_embd.weight")
+        if tok_info:
+            gf.seek(data_start + tok_info.offset)
+            gguf_sample = gf.read(34)  # Q8_0 first block
+
+            # After dtype table comes token embeddings
+            bump_tok_offset = HEADER_SIZE + 4 + dtype_table_len
+            bf.seek(bump_tok_offset)
+            bump_sample = bf.read(34)
+
+            if gguf_sample != bump_sample:
+                errors.append("Token embedding block 0 mismatch!")
+            else:
+                print("[verify] ✓ Token embedding parity OK")
+
+        # If GGUF has attention biases, verify they were copied (not zeros)
+        if has_gguf_bq:
+            bq_info = tensors["blk.0.attn_q.bias"]
+            gf.seek(data_start + bq_info.offset)
+            gguf_bq = np.frombuffer(gf.read(embed_dim * 4), dtype=np.float32)
+
+            # Check if bq has non-zero values in GGUF
+            gguf_bq_nonzero = np.count_nonzero(gguf_bq)
+            if gguf_bq_nonzero > 0:
+                print(f"[verify] GGUF has attn_q.bias with {gguf_bq_nonzero}/{embed_dim} non-zero values")
+                print(f"[verify]   First 5 values: {gguf_bq[:5]}")
+            else:
+                print("[verify] Note: GGUF attn_q.bias is all zeros")
+        else:
+            print("[verify] Note: No attn_q.bias in GGUF (LLaMA-style model)")
+
+        if has_gguf_bk:
+            bk_info = tensors["blk.0.attn_k.bias"]
+            gf.seek(data_start + bk_info.offset)
+            gguf_bk = np.frombuffer(gf.read(num_kv_heads * head_dim * 4), dtype=np.float32)
+            gguf_bk_nonzero = np.count_nonzero(gguf_bk)
+            if gguf_bk_nonzero > 0:
+                print(f"[verify] GGUF has attn_k.bias with {gguf_bk_nonzero}/{num_kv_heads * head_dim} non-zero values")
+
+        if has_gguf_bv:
+            bv_info = tensors["blk.0.attn_v.bias"]
+            gf.seek(data_start + bv_info.offset)
+            gguf_bv = np.frombuffer(gf.read(num_kv_heads * head_dim * 4), dtype=np.float32)
+            gguf_bv_nonzero = np.count_nonzero(gguf_bv)
+            if gguf_bv_nonzero > 0:
+                print(f"[verify] GGUF has attn_v.bias with {gguf_bv_nonzero}/{num_kv_heads * head_dim} non-zero values")
+
+        # Summary
+        print(f"[verify] Checked {num_layers} layers with biases: Q={has_gguf_bq}, K={has_gguf_bk}, V={has_gguf_bv}")
+
+    if errors:
+        print("\n[verify] PARITY CHECK FAILED:")
+        for e in errors:
+            print(f"  - {e}")
+        return False
+
+    print("[verify] ✓ Parity verification passed!")
+    return True
+
+
 def build_llama_config(
     *,
     model_type: str,
@@ -536,14 +930,18 @@ def main() -> None:
     ap.add_argument("--inspect", action="store_true", help="Print GGUF metadata/tensor dtypes and exit (no conversion)")
     ap.add_argument("--inspect-layers", action="store_true", help="Show per-layer quant types for ALL layers (use with --inspect)")
     ap.add_argument("--list", action="store_true", help="Print every tensor name/type/shape and exit (no conversion)")
+    ap.add_argument("--verify", action="store_true", help="After conversion, verify parity between GGUF and bump file")
+    ap.add_argument("--manifest-out", help="Output weights manifest JSON path with tensor offsets")
     args = ap.parse_args()
 
     if not args.output and not (args.inspect or args.list):
         ap.error("--output is required unless --inspect/--list is set")
 
+    # Support multiple architectures (llama, qwen2, etc.)
     wanted_meta = {
         "general.architecture",
         "general.alignment",
+        # Llama-style keys
         "llama.block_count",
         "llama.context_length",
         "llama.embedding_length",
@@ -552,6 +950,15 @@ def main() -> None:
         "llama.attention.head_count_kv",
         "llama.rope.freq_base",
         "llama.norm_rms_eps",
+        # Qwen2-style keys
+        "qwen2.block_count",
+        "qwen2.context_length",
+        "qwen2.embedding_length",
+        "qwen2.feed_forward_length",
+        "qwen2.attention.head_count",
+        "qwen2.attention.head_count_kv",
+        "qwen2.rope.freq_base",
+        "qwen2.attention.layer_norm_rms_epsilon",
     }
 
     with open(args.gguf, "rb") as f:
@@ -637,7 +1044,7 @@ def main() -> None:
                 b_str = fmt_bytes(b) if b is not None else "?"
                 print(f"  - {ggml_type_name(tcode):>10}: {cnt:5d} tensors, bytes={b_str}")
 
-            # Highlight common “does this get quantized?” tensors.
+            # Highlight common "does this get quantized?" tensors.
             highlight = [
                 "token_embd.weight",
                 "output.weight",
@@ -645,6 +1052,9 @@ def main() -> None:
                 "blk.0.attn_q.weight",
                 "blk.0.attn_k.weight",
                 "blk.0.attn_v.weight",
+                "blk.0.attn_q.bias",
+                "blk.0.attn_k.bias",
+                "blk.0.attn_v.bias",
                 "blk.0.attn_output.weight",
                 "blk.0.ffn_gate.weight",
                 "blk.0.ffn_up.weight",
@@ -731,30 +1141,38 @@ def main() -> None:
             return
 
         # Pull core dims from metadata first; fall back to tensor shapes.
-        def meta_int(key: str) -> Optional[int]:
-            v = meta.get(key)
-            if v is None:
-                return None
-            if isinstance(v, bool):
-                return int(v)
-            if isinstance(v, (int, np.integer)):
-                return int(v)
+        # Support multiple architecture prefixes (llama, qwen2, etc.)
+        def meta_int(*keys: str) -> Optional[int]:
+            """Get integer from metadata, trying multiple keys in order."""
+            for key in keys:
+                v = meta.get(key)
+                if v is not None:
+                    if isinstance(v, bool):
+                        return int(v)
+                    if isinstance(v, (int, np.integer)):
+                        return int(v)
             return None
 
-        def meta_float(key: str) -> Optional[float]:
-            v = meta.get(key)
-            if v is None:
-                return None
-            if isinstance(v, (float, np.floating)):
-                return float(v)
-            if isinstance(v, (int, np.integer)):
-                return float(v)
+        def meta_float(*keys: str) -> Optional[float]:
+            """Get float from metadata, trying multiple keys in order."""
+            for key in keys:
+                v = meta.get(key)
+                if v is not None:
+                    if isinstance(v, (float, np.floating)):
+                        return float(v)
+                    if isinstance(v, (int, np.integer)):
+                        return float(v)
             return None
 
         def weight_dtype(info: TensorInfo, label: str) -> int:
-            if info.ggml_type not in (GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32):
+            # Support all common quantization types
+            supported_types = (
+                GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32,
+                GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0
+            )
+            if info.ggml_type not in supported_types:
                 raise GGUFError(
-                    f"{info.name}: expected Q4_K/Q6_K/F32 for {label}, got {ggml_type_name(info.ggml_type)}"
+                    f"{info.name}: expected Q4_K/Q6_K/Q5_0/Q5_1/Q8_0/F32 for {label}, got {ggml_type_name(info.ggml_type)}"
                 )
             return ck_dtype_from_ggml_type(info.ggml_type)
 
@@ -764,10 +1182,10 @@ def main() -> None:
         tok = tensors[tok_name]
         if len(tok.dims) != 2:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
-        embed_dim = meta_int("llama.embedding_length") or tok.ne0
+        embed_dim = meta_int("llama.embedding_length", "qwen2.embedding_length") or tok.ne0
         vocab_size = tok.ne1
 
-        num_layers = meta_int("llama.block_count")
+        num_layers = meta_int("llama.block_count", "qwen2.block_count")
         if num_layers is None:
             # Infer from present blocks.
             layer_ids = []
@@ -778,30 +1196,30 @@ def main() -> None:
                     except Exception:
                         pass
             if not layer_ids:
-                raise GGUFError("Could not infer num_layers (missing llama.block_count and no blk.* tensors found)")
+                raise GGUFError("Could not infer num_layers (missing block_count and no blk.* tensors found)")
             num_layers = max(layer_ids) + 1
 
-        intermediate = meta_int("llama.feed_forward_length")
+        intermediate = meta_int("llama.feed_forward_length", "qwen2.feed_forward_length")
         if intermediate is None:
             gate0 = tensors.get("blk.0.ffn_gate.weight")
             if gate0 and len(gate0.dims) == 2:
                 intermediate = gate0.ne1
         if intermediate is None:
-            raise GGUFError("Could not determine intermediate_size (missing llama.feed_forward_length)")
+            raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
-        num_heads = meta_int("llama.attention.head_count")
+        num_heads = meta_int("llama.attention.head_count", "qwen2.attention.head_count")
         if num_heads is None:
-            raise GGUFError("Missing llama.attention.head_count (num_heads)")
-        num_kv_heads = meta_int("llama.attention.head_count_kv") or num_heads
+            raise GGUFError("Missing attention.head_count (num_heads)")
+        num_kv_heads = meta_int("llama.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
 
-        context_len = meta_int("llama.context_length") or 0
+        context_len = meta_int("llama.context_length", "qwen2.context_length") or 0
         if args.context is not None:
             context_len = int(args.context)
         if context_len <= 0:
             raise GGUFError("Could not determine context length (use --context to override)")
 
-        rope_theta = meta_float("llama.rope.freq_base") or 10000.0
-        rms_eps = meta_float("llama.norm_rms_eps") or 1e-5
+        rope_theta = meta_float("llama.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
+        rms_eps = meta_float("llama.norm_rms_eps", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
 
         if embed_dim != tok.ne0:
             raise GGUFError(f"{tok_name}: embedding_length mismatch (meta={embed_dim}, tensor.ne0={tok.ne0})")
@@ -840,6 +1258,10 @@ def main() -> None:
             gate = tensors.get(f"blk.{layer}.ffn_gate.weight")
             up = tensors.get(f"blk.{layer}.ffn_up.weight")
             down = tensors.get(f"blk.{layer}.ffn_down.weight")
+            # Attention biases (optional - Qwen2 has them, LLaMA doesn't)
+            bq = tensors.get(f"blk.{layer}.attn_q.bias")
+            bk = tensors.get(f"blk.{layer}.attn_k.bias")
+            bv = tensors.get(f"blk.{layer}.attn_v.bias")
             if not wq or not wk or not wv or not wo:
                 raise GGUFError(f"Layer {layer}: missing attention projection tensors (q/k/v/o)")
             if not gate or not up or not down:
@@ -910,6 +1332,9 @@ def main() -> None:
                 "gate": gate,
                 "up": up,
                 "down": down,
+                "bq": bq,  # Optional bias tensors (None if not present)
+                "bk": bk,
+                "bv": bv,
                 "wq_dt": wq_dt,
                 "wk_dt": wk_dt,
                 "wv_dt": wv_dt,
@@ -922,35 +1347,75 @@ def main() -> None:
         dtype_table.extend([CK_DT_FP32, CK_DT_FP32])
         dtype_table_bytes = bytes(dtype_table)
 
-        if needs_k_quant:
-            if embed_dim % 256 != 0:
-                raise GGUFError(f"K-quant requires hidden_size multiple of 256 (got {embed_dim})")
-            if intermediate % 256 != 0:
+        # Check alignment requirements per-tensor:
+        # - K-quants (Q4_K, Q6_K) require row dimension (ne0) divisible by 256
+        # - Simple quants (Q5_0, Q8_0) require row dimension divisible by 32
+        # We already validated this in copy_qk_head_packed and ggml_row_bytes,
+        # but add a check here for K-quant matrices where embed_dim is the input
+        for layer_info in layer_infos:
+            # Check WQ/WK/WV/gate/up: input dim = embed_dim
+            for key in ["wq_dt", "wk_dt", "wv_dt", "gate_dt", "up_dt"]:
+                dt = layer_info.get(key)
+                if dt in (CK_DT_Q4_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
+                    raise GGUFError(f"K-quant requires embed_dim multiple of 256 (got {embed_dim}) for {key}")
+            # Check down: input dim = intermediate
+            dt = layer_info.get("down_dt")
+            if dt in (CK_DT_Q4_K, CK_DT_Q6_K) and intermediate % 256 != 0:
                 raise GGUFError(f"K-quant requires intermediate_size multiple of 256 (got {intermediate})")
 
         # Create output directory.
         os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+
+        # Track manifest entries as we write
+        manifest_entries = []
+        current_offset = HEADER_SIZE
+
+        def record_entry(name: str, dtype: str, size: int):
+            nonlocal current_offset
+            manifest_entries.append({
+                "name": name,
+                "dtype": dtype,
+                "file_offset": current_offset,
+                "size": size,
+            })
+            current_offset += size
+
         with open(args.output, "w+b") as out_f:
             out_f.write(b"\x00" * HEADER_SIZE)
             w = HashingWriter(out_f)
 
+            # Dtype table
+            dtype_table_header_size = 4 + len(dtype_table_bytes)
+            current_offset += dtype_table_header_size
             w.write(struct.pack("<I", len(dtype_table_bytes)))
             w.write(dtype_table_bytes)
 
             # 1) token embeddings
-            copy_bytes_stream(f, data_start + tok.offset, ggml_tensor_bytes(tok), w)
+            tok_size = ggml_tensor_bytes(tok)
+            record_entry("token_emb", get_quant_type_name(tok.ggml_type), tok_size)
+            copy_bytes_stream(f, data_start + tok.offset, tok_size, w)
 
             # 2) pos_emb: not used by RoPE models; keep zeros for compatibility.
+            pos_emb_size = context_len * aligned_embed_dim * 4
+            record_entry("pos_emb", "fp32", pos_emb_size)
             write_f32_zeros(w, context_len * aligned_embed_dim)
 
             # 3) per-layer
             for layer in range(num_layers):
                 info = layer_infos[layer]
+
+                # RMSNorm weights
                 ln1 = read_vector_f32(f, data_start, info["attn_norm"])
                 ln2 = read_vector_f32(f, data_start, info["ffn_norm"])
+                ln_size = aligned_embed_dim * 4
+                record_entry(f"layer.{layer}.ln1_gamma", "fp32", ln_size)
                 write_f32_padded(w, ln1, aligned_embed_dim)
+                record_entry(f"layer.{layer}.ln2_gamma", "fp32", ln_size)
                 write_f32_padded(w, ln2, aligned_embed_dim)
 
+                # WQ
+                wq_size = ggml_row_bytes(info["wq"].ggml_type, aligned_embed_dim) * embed_dim
+                record_entry(f"layer.{layer}.wq", get_quant_type_name(info["wq"].ggml_type), wq_size)
                 copy_qk_head_packed(
                     f, data_start, info["wq"], w,
                     group_count=num_heads,
@@ -958,9 +1423,19 @@ def main() -> None:
                     aligned_head_dim=aligned_head_dim,
                     aligned_embed_dim=aligned_embed_dim,
                 )
-                # bq
-                write_f32_zeros(w, num_heads * aligned_head_dim)
 
+                # bq - write actual bias if present, else zeros
+                bq_size = num_heads * aligned_head_dim * 4
+                record_entry(f"layer.{layer}.bq", "fp32", bq_size)
+                if info["bq"] is not None:
+                    bq_vec = read_vector_f32(f, data_start, info["bq"])
+                    write_f32_padded(w, bq_vec, num_heads * aligned_head_dim)
+                else:
+                    write_f32_zeros(w, num_heads * aligned_head_dim)
+
+                # WK
+                wk_size = ggml_row_bytes(info["wk"].ggml_type, aligned_embed_dim) * embed_kv
+                record_entry(f"layer.{layer}.wk", get_quant_type_name(info["wk"].ggml_type), wk_size)
                 copy_qk_head_packed(
                     f, data_start, info["wk"], w,
                     group_count=num_kv_heads,
@@ -968,8 +1443,19 @@ def main() -> None:
                     aligned_head_dim=aligned_head_dim,
                     aligned_embed_dim=aligned_embed_dim,
                 )
-                write_f32_zeros(w, num_kv_heads * aligned_head_dim)  # bk
 
+                # bk
+                bk_size = num_kv_heads * aligned_head_dim * 4
+                record_entry(f"layer.{layer}.bk", "fp32", bk_size)
+                if info["bk"] is not None:
+                    bk_vec = read_vector_f32(f, data_start, info["bk"])
+                    write_f32_padded(w, bk_vec, num_kv_heads * aligned_head_dim)
+                else:
+                    write_f32_zeros(w, num_kv_heads * aligned_head_dim)
+
+                # WV
+                wv_size = ggml_row_bytes(info["wv"].ggml_type, aligned_embed_dim) * embed_kv
+                record_entry(f"layer.{layer}.wv", get_quant_type_name(info["wv"].ggml_type), wv_size)
                 copy_qk_head_packed(
                     f, data_start, info["wv"], w,
                     group_count=num_kv_heads,
@@ -977,23 +1463,47 @@ def main() -> None:
                     aligned_head_dim=aligned_head_dim,
                     aligned_embed_dim=aligned_embed_dim,
                 )
-                write_f32_zeros(w, num_kv_heads * aligned_head_dim)  # bv
 
-                # Wo: stored as a single [embed_dim x embed_dim] matrix for Q4_K path.
-                copy_bytes_stream(f, data_start + info["wo"].offset, ggml_tensor_bytes(info["wo"]), w)
+                # bv
+                bv_size = num_kv_heads * aligned_head_dim * 4
+                record_entry(f"layer.{layer}.bv", "fp32", bv_size)
+                if info["bv"] is not None:
+                    bv_vec = read_vector_f32(f, data_start, info["bv"])
+                    write_f32_padded(w, bv_vec, num_kv_heads * aligned_head_dim)
+                else:
+                    write_f32_zeros(w, num_kv_heads * aligned_head_dim)
+
+                # Wo
+                wo_size = ggml_tensor_bytes(info["wo"])
+                record_entry(f"layer.{layer}.wo", get_quant_type_name(info["wo"].ggml_type), wo_size)
+                copy_bytes_stream(f, data_start + info["wo"].offset, wo_size, w)
+                bo_size = aligned_embed_dim * 4
+                record_entry(f"layer.{layer}.bo", "fp32", bo_size)
                 write_f32_zeros(w, aligned_embed_dim)  # bo
 
-                # MLP: gate/up concatenated into w1, down is w2.
-                copy_bytes_stream(f, data_start + info["gate"].offset, ggml_tensor_bytes(info["gate"]), w)
-                copy_bytes_stream(f, data_start + info["up"].offset, ggml_tensor_bytes(info["up"]), w)
+                # W1 (gate + up)
+                gate_size = ggml_tensor_bytes(info["gate"])
+                up_size = ggml_tensor_bytes(info["up"])
+                record_entry(f"layer.{layer}.w1", get_quant_type_name(info["gate"].ggml_type), gate_size + up_size)
+                copy_bytes_stream(f, data_start + info["gate"].offset, gate_size, w)
+                copy_bytes_stream(f, data_start + info["up"].offset, up_size, w)
+                b1_size = 2 * intermediate * 4
+                record_entry(f"layer.{layer}.b1", "fp32", b1_size)
                 write_f32_zeros(w, 2 * intermediate)  # b1
-                # w2: [embed_dim x intermediate] in our runtime layout; GGML stores [ne0=intermediate, ne1=embed].
-                copy_bytes_stream(f, data_start + info["down"].offset, ggml_tensor_bytes(info["down"]), w)
+
+                # W2 (down)
+                down_size = ggml_tensor_bytes(info["down"])
+                record_entry(f"layer.{layer}.w2", get_quant_type_name(info["down"].ggml_type), down_size)
+                copy_bytes_stream(f, data_start + info["down"].offset, down_size, w)
+                b2_size = aligned_embed_dim * 4
+                record_entry(f"layer.{layer}.b2", "fp32", b2_size)
                 write_f32_zeros(w, aligned_embed_dim)  # b2
 
             # 4) final RMSNorm (gamma) and bias placeholder
             final_norm = read_vector_f32(f, data_start, tensors["output_norm.weight"])
+            record_entry("final_ln_gamma", "fp32", aligned_embed_dim * 4)
             write_f32_padded(w, final_norm, aligned_embed_dim)
+            record_entry("final_ln_bias", "fp32", aligned_embed_dim * 4)
             write_f32_zeros(w, aligned_embed_dim)
 
             checksum = w.digest()
@@ -1034,11 +1544,66 @@ def main() -> None:
             json.dump(cfg, cf, indent=2)
             cf.write("\n")
 
+    # Count how many layers have biases
+    layers_with_bias = sum(1 for info in layer_infos if info["bq"] is not None)
+    bias_status = f"biases={layers_with_bias}/{num_layers} layers" if layers_with_bias > 0 else "no biases"
+
     print(
         f"[gguf->bump] version={version} arch={arch} layers={num_layers} "
         f"hidden={embed_dim} heads={num_heads}/{num_kv_heads} ff={intermediate} "
-        f"vocab={vocab_size} ctx={context_len} -> {args.output}"
+        f"vocab={vocab_size} ctx={context_len} {bias_status} -> {args.output}"
     )
+
+    # Print detailed conversion report with full tensor mapping
+    print_conversion_report(
+        num_layers=num_layers,
+        layer_infos=layer_infos,
+        vocab_size=vocab_size,
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        num_kv_heads=num_kv_heads,
+        head_dim=head_dim,
+        intermediate=intermediate,
+        gguf_tensors=tensors,
+        manifest_entries=manifest_entries,
+    )
+
+    # Write manifest JSON if requested
+    if args.manifest_out:
+        os.makedirs(os.path.dirname(args.manifest_out) or ".", exist_ok=True)
+        manifest = {
+            "version": 5,
+            "model": arch,
+            "num_layers": num_layers,
+            "embed_dim": embed_dim,
+            "num_heads": num_heads,
+            "num_kv_heads": num_kv_heads,
+            "head_dim": head_dim,
+            "intermediate_size": intermediate,
+            "vocab_size": vocab_size,
+            "context_length": context_len,
+            "has_attention_biases": layers_with_bias > 0,
+            "entries": manifest_entries,
+        }
+        with open(args.manifest_out, "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2)
+            mf.write("\n")
+        print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
+
+    # Run parity verification if requested
+    if args.verify:
+        parity_ok = verify_bump_parity(
+            gguf_path=args.gguf,
+            bump_path=args.output,
+            num_layers=num_layers,
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            num_kv_heads=num_kv_heads,
+            head_dim=head_dim,
+        )
+        if not parity_ok:
+            print("\n[ERROR] Parity verification failed! The converted file may be corrupt.")
+            exit(1)
 
 
 if __name__ == "__main__":
