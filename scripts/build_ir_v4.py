@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Tuple
 
 import build_ir_v3 as v3
 import codegen_v4
+import codegen_v5
 import fusion_patterns as fp
 import parallel_planner as pp
 import quant_types as qt
@@ -2196,6 +2197,7 @@ def parse_args(argv: List[str]) -> Dict:
             "--weight-decay",
             "--data-parallel",
             "--tensor-parallel",
+            "--codegen",
         }
         normalized: List[str] = []
         i = 0
@@ -2240,6 +2242,7 @@ def parse_args(argv: List[str]) -> Dict:
         # Debug options
         "debug": False,  # Emit debug prints in generated C code
         "parity": False,  # Emit buffer saves for parity comparison with PyTorch
+        "codegen": "v4",  # Codegen version: v4 (default) or v5 (explicit unrolled)
         # Training options
         "memory": None,  # Available memory in GB (auto-detect if None)
         "batch_size": None,  # Target batch size
@@ -2314,6 +2317,11 @@ def parse_args(argv: List[str]) -> Dict:
             args["debug"] = True
         elif arg == "--parity":
             args["parity"] = True
+        elif arg.startswith("--codegen="):
+            codegen_val = arg.split("=", 1)[1].lower()
+            if codegen_val not in ("v4", "v5"):
+                raise ValueError(f"--codegen must be v4/v5, got: {codegen_val}")
+            args["codegen"] = codegen_val
         # Training options
         elif arg.startswith("--memory="):
             args["memory"] = float(arg.split("=", 1)[1])
@@ -2383,6 +2391,13 @@ def print_usage():
     print("Parallel Options:")
     print("  --parallel=on|off       Enable/disable parallel planning (default: on)")
     print("  --parallel-verbose      Print parallel strategy decisions")
+    print()
+    print("Codegen Options:")
+    print("  --codegen=v4|v5         Codegen version (default: v4)")
+    print("                          v4: Loop-based with runtime dtype dispatch")
+    print("                          v5: Explicit unrolled (each layer separate, explicit kernels)")
+    print("  --debug                 Emit debug prints in generated C code")
+    print("  --parity                Emit buffer saves for PyTorch comparison")
     print()
     print("Training Options (for --modes=training):")
     print("  --memory=GB             Available memory in GB (auto-detect if not set)")
@@ -2805,16 +2820,29 @@ def main(argv: List[str]) -> int:
             v3.emit_c_header(layout, os.path.join(output_dir, header_name), extra_api=extra_api)
             if mode in ("prefill", "decode"):
                 if config["dtype"] != "fp32":
-                    print("[WARN] v4 codegen currently emits fp32 activations only. Use --dtype=fp32 for runnable C.")
-                codegen_v4.emit_c_source_v4(
-                    layout,
-                    os.path.join(output_dir, f"generated_{safe_name}.c"),
-                    header_name,
-                    mode,
-                    emit_main=(args.get("emit") == "exe"),
-                    emit_debug=args.get("debug", False),
-                    emit_parity=args.get("parity", False),
-                )
+                    print("[WARN] v4/v5 codegen currently emits fp32 activations only. Use --dtype=fp32 for runnable C.")
+                codegen_version = args.get("codegen", "v4")
+                if codegen_version == "v5":
+                    print(f"[CODEGEN] Using v5 (explicit unrolled) for {mode}")
+                    codegen_v5.emit_c_source_v5(
+                        layout,
+                        os.path.join(output_dir, f"generated_{safe_name}.c"),
+                        header_name,
+                        mode,
+                        emit_main=(args.get("emit") == "exe"),
+                        emit_debug=args.get("debug", False),
+                        emit_parity=args.get("parity", False),
+                    )
+                else:
+                    codegen_v4.emit_c_source_v4(
+                        layout,
+                        os.path.join(output_dir, f"generated_{safe_name}.c"),
+                        header_name,
+                        mode,
+                        emit_main=(args.get("emit") == "exe"),
+                        emit_debug=args.get("debug", False),
+                        emit_parity=args.get("parity", False),
+                    )
             else:
                 v3.emit_c_source(
                     layout,

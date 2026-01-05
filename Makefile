@@ -1248,6 +1248,46 @@ ck-cli-v4: $(LIB)
 	@echo "    --force-compile        Re-generate and recompile"
 	@echo ""
 
+# v5 CLI: Explicit unrolled codegen (per-layer kernel calls)
+ck-cli-v5: $(LIB)
+	@echo ""
+	@echo "  $(C_ORANGE)C-Kernel-Engine v5 CLI (Explicit Unrolled)$(C_RESET)"
+	@echo "  Pipeline: download -> convert -> IR v4 -> v5 codegen -> compile -> run"
+	@echo ""
+	@echo "  v5 generates explicit per-layer kernel calls:"
+	@echo "    - Each layer has separate function (qwen2_layer_0_decode, etc.)"
+	@echo "    - Explicit kernel names per quant type (gemm_nt_q5_0, gemm_nt_q8_0)"
+	@echo "    - Easy to insert debug hooks for PyTorch parity testing"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    python scripts/ck_run_v4.py run MODEL --codegen=v5"
+	@echo ""
+	@echo "  Examples:"
+	@echo "    python scripts/ck_run_v4.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \\"
+	@echo "        --weight-dtype=q4_k_m --codegen=v5 --generate-only"
+	@echo ""
+	@echo "  Full pipeline demo:"
+	@echo "    make demo-v5"
+	@echo ""
+
+# Demo: v5 explicit codegen
+demo-v5: $(LIB)
+	@echo ""
+	@echo "  $(C_ORANGE)Demo: Qwen2-0.5B v5 Explicit Codegen$(C_RESET)"
+	@echo "  This generates explicit per-layer kernel calls for mixed Q4_K_M"
+	@echo ""
+	@python3 scripts/ck_run_v4.py run \
+		"hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" \
+		--weight-dtype=q4_k_m \
+		--codegen=v5 \
+		--generate-only
+	@echo ""
+	@echo "  Generated files:"
+	@ls -la ~/.cache/ck-engine-v4/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_*.c 2>/dev/null || true
+	@echo ""
+	@echo "  View per-layer quant types:"
+	@head -20 ~/.cache/ck-engine-v4/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_qwen2_decode.c 2>/dev/null || true
+
 # Demo: Download Qwen2-0.5B Q4_K_M GGUF and run end-to-end
 demo-q4: $(LIB)
 	@echo ""
@@ -1534,4 +1574,4 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config
+.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config demo-v5

@@ -280,9 +280,21 @@ GGML_TYPE_Q4_1 = 3
 GGML_TYPE_Q5_0 = 6
 GGML_TYPE_Q5_1 = 7
 GGML_TYPE_Q8_0 = 8
+GGML_TYPE_Q2_K = 10
+GGML_TYPE_Q3_K = 11
 GGML_TYPE_Q4_K = 12
+GGML_TYPE_Q5_K = 13
 GGML_TYPE_Q6_K = 14
-GGML_TYPE_BF16 = 16  # present in newer GGUFs
+GGML_TYPE_Q8_K = 15
+GGML_TYPE_BF16 = 30  # present in newer GGUFs (was 16, moved in recent llama.cpp)
+# I-quants (importance matrix quantization)
+GGML_TYPE_IQ2_XXS = 16
+GGML_TYPE_IQ2_XS = 17
+GGML_TYPE_IQ3_XXS = 18
+GGML_TYPE_IQ1_S = 19
+GGML_TYPE_IQ4_NL = 20
+GGML_TYPE_IQ3_S = 21
+GGML_TYPE_IQ2_S = 22
 
 
 def ggml_type_name(t: int) -> str:
@@ -295,8 +307,19 @@ def ggml_type_name(t: int) -> str:
         GGML_TYPE_Q5_0: "Q5_0",
         GGML_TYPE_Q5_1: "Q5_1",
         GGML_TYPE_Q8_0: "Q8_0",
+        GGML_TYPE_Q2_K: "Q2_K",
+        GGML_TYPE_Q3_K: "Q3_K",
         GGML_TYPE_Q4_K: "Q4_K",
+        GGML_TYPE_Q5_K: "Q5_K",
         GGML_TYPE_Q6_K: "Q6_K",
+        GGML_TYPE_Q8_K: "Q8_K",
+        GGML_TYPE_IQ2_XXS: "IQ2_XXS",
+        GGML_TYPE_IQ2_XS: "IQ2_XS",
+        GGML_TYPE_IQ3_XXS: "IQ3_XXS",
+        GGML_TYPE_IQ1_S: "IQ1_S",
+        GGML_TYPE_IQ4_NL: "IQ4_NL",
+        GGML_TYPE_IQ3_S: "IQ3_S",
+        GGML_TYPE_IQ2_S: "IQ2_S",
     }.get(t, f"UNKNOWN({t})")
 
 
@@ -511,6 +534,7 @@ def main() -> None:
     ap.add_argument("--config-out", help="Optional config.json output path (HF-style minimal config)")
     ap.add_argument("--context", type=int, help="Override context length (max_position_embeddings)")
     ap.add_argument("--inspect", action="store_true", help="Print GGUF metadata/tensor dtypes and exit (no conversion)")
+    ap.add_argument("--inspect-layers", action="store_true", help="Show per-layer quant types for ALL layers (use with --inspect)")
     ap.add_argument("--list", action="store_true", help="Print every tensor name/type/shape and exit (no conversion)")
     args = ap.parse_args()
 
@@ -582,7 +606,6 @@ def main() -> None:
 
         arch = str(meta.get("general.architecture", "llama"))
 
-        inspect_only = False
         if args.inspect or args.list:
             # Summarize tensor dtypes so you can confirm what is actually quantized
             # in a given GGUF file (e.g. whether token embeddings / output head are
@@ -634,13 +657,78 @@ def main() -> None:
                     continue
                 print(f"  - {name}: {ggml_type_name(info.ggml_type)} dims={info.dims}")
 
+            # Show per-layer quant types if --inspect-layers is set
+            if args.inspect_layers:
+                # Count total layers
+                layer_ids = set()
+                for name in tensors:
+                    if name.startswith("blk."):
+                        try:
+                            layer_ids.add(int(name.split(".")[1]))
+                        except Exception:
+                            pass
+                num_layers = max(layer_ids) + 1 if layer_ids else 0
+
+                print(f"\n[gguf] per-layer quant types ({num_layers} layers):")
+                print("  Layer | WQ      | WK      | WV      | WO      | Gate    | Up      | Down    |")
+                print("  ------|---------|---------|---------|---------|---------|---------|---------|")
+
+                for layer in range(num_layers):
+                    wq = tensors.get(f"blk.{layer}.attn_q.weight")
+                    wk = tensors.get(f"blk.{layer}.attn_k.weight")
+                    wv = tensors.get(f"blk.{layer}.attn_v.weight")
+                    wo = tensors.get(f"blk.{layer}.attn_output.weight")
+                    gate = tensors.get(f"blk.{layer}.ffn_gate.weight")
+                    up = tensors.get(f"blk.{layer}.ffn_up.weight")
+                    down = tensors.get(f"blk.{layer}.ffn_down.weight")
+
+                    wq_t = ggml_type_name(wq.ggml_type) if wq else "N/A"
+                    wk_t = ggml_type_name(wk.ggml_type) if wk else "N/A"
+                    wv_t = ggml_type_name(wv.ggml_type) if wv else "N/A"
+                    wo_t = ggml_type_name(wo.ggml_type) if wo else "N/A"
+                    gate_t = ggml_type_name(gate.ggml_type) if gate else "N/A"
+                    up_t = ggml_type_name(up.ggml_type) if up else "N/A"
+                    down_t = ggml_type_name(down.ggml_type) if down else "N/A"
+
+                    print(f"  {layer:5d} | {wq_t:7s} | {wk_t:7s} | {wv_t:7s} | {wo_t:7s} | {gate_t:7s} | {up_t:7s} | {down_t:7s} |")
+
+                # Show summary of which layers differ
+                print("\n[gguf] mixed quant analysis:")
+                first_layer_types = {}
+                mixed_weights = []
+                for layer in range(num_layers):
+                    for weight_name, tensor_suffix in [
+                        ("WQ", "attn_q.weight"),
+                        ("WK", "attn_k.weight"),
+                        ("WV", "attn_v.weight"),
+                        ("WO", "attn_output.weight"),
+                        ("Gate", "ffn_gate.weight"),
+                        ("Up", "ffn_up.weight"),
+                        ("Down", "ffn_down.weight"),
+                    ]:
+                        info = tensors.get(f"blk.{layer}.{tensor_suffix}")
+                        if not info:
+                            continue
+                        if layer == 0:
+                            first_layer_types[weight_name] = info.ggml_type
+                        elif info.ggml_type != first_layer_types.get(weight_name):
+                            if weight_name not in mixed_weights:
+                                mixed_weights.append(weight_name)
+
+                if mixed_weights:
+                    print(f"  Mixed quant detected in: {', '.join(mixed_weights)}")
+                    print("  (Different layers use different quant types for these weights)")
+                else:
+                    print("  All layers use uniform quant types (no mixed quant)")
+
             if args.list:
                 print("[gguf] all tensors:")
                 for name in sorted(tensors.keys()):
                     info = tensors[name]
                     print(f"  - {name}: {ggml_type_name(info.ggml_type)} dims={info.dims}")
-                return
-            inspect_only = True
+
+            # Exit after inspection (don't try to parse model config)
+            return
 
         # Pull core dims from metadata first; fall back to tensor shapes.
         def meta_int(key: str) -> Optional[int]:
@@ -833,33 +921,6 @@ def main() -> None:
 
         dtype_table.extend([CK_DT_FP32, CK_DT_FP32])
         dtype_table_bytes = bytes(dtype_table)
-
-        if inspect_only:
-            expected_entries = num_layers * 14 + 4
-            counts = {}
-            for dt in dtype_table:
-                name = ck_dtype_name(dt)
-                counts[name] = counts.get(name, 0) + 1
-
-            print("[bump] dtype table preview:")
-            print(f"  entries={len(dtype_table)} expected={expected_entries}")
-            print(f"  token_emb={ck_dtype_name(dtype_table[0])} pos_emb={ck_dtype_name(dtype_table[1])}")
-            if num_layers > 0:
-                def layer_fmt(layer: int) -> str:
-                    base = 2 + layer * 14
-                    return (
-                        f"wq={ck_dtype_name(dtype_table[base + 2])} "
-                        f"wk={ck_dtype_name(dtype_table[base + 4])} "
-                        f"wv={ck_dtype_name(dtype_table[base + 6])} "
-                        f"wo={ck_dtype_name(dtype_table[base + 8])} "
-                        f"w1={ck_dtype_name(dtype_table[base + 10])} "
-                        f"w2={ck_dtype_name(dtype_table[base + 12])}"
-                    )
-                print(f"  layer0: {layer_fmt(0)}")
-                if num_layers > 1:
-                    print(f"  layer{num_layers - 1}: {layer_fmt(num_layers - 1)}")
-            print(f"  counts: {', '.join(f'{k}={v}' for k, v in sorted(counts.items()))}")
-            return
 
         if needs_k_quant:
             if embed_dim % 256 != 0:
