@@ -1248,45 +1248,90 @@ ck-cli-v4: $(LIB)
 	@echo "    --force-compile        Re-generate and recompile"
 	@echo ""
 
-# v5 CLI: Explicit unrolled codegen (per-layer kernel calls)
-ck-cli-v5: $(LIB)
+# ═══════════════════════════════════════════════════════════════════════════════
+# V5 PIPELINE (Explicit Unrolled Codegen)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+v5:
 	@echo ""
-	@echo "  $(C_ORANGE)C-Kernel-Engine v5 CLI (Explicit Unrolled)$(C_RESET)"
-	@echo "  Pipeline: download -> convert -> IR v4 -> v5 codegen -> compile -> run"
+	@echo "  $(C_ORANGE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(C_RESET)"
+	@echo "  $(C_ORANGE)C-Kernel-Engine v5$(C_RESET) - Explicit Unrolled Codegen"
+	@echo "  $(C_ORANGE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(C_RESET)"
 	@echo ""
-	@echo "  v5 generates explicit per-layer kernel calls:"
-	@echo "    - Each layer has separate function (qwen2_layer_0_decode, etc.)"
-	@echo "    - Explicit kernel names per quant type (gemm_nt_q5_0, gemm_nt_q8_0)"
-	@echo "    - Easy to insert debug hooks for PyTorch parity testing"
+	@echo "  $(C_GREEN)v5 Features:$(C_RESET)"
+	@echo "    • Each layer has separate function (qwen2_layer_0_decode, qwen2_layer_1_decode, ...)"
+	@echo "    • Explicit kernel names per quant type (gemm_nt_q5_0, gemm_nt_q8_0, gemm_nt_q4_k)"
+	@echo "    • Per-layer quant types shown in header comments"
+	@echo "    • Easy to insert debug hooks for PyTorch parity testing"
+	@echo "    • --debug: Print buffer stats (NaN/Inf/range) after each operation"
+	@echo "    • --parity: Save layer outputs to .bin files for comparison"
 	@echo ""
-	@echo "  Usage:"
-	@echo "    python scripts/ck_run_v4.py run MODEL --codegen=v5"
+	@echo "  $(C_GREEN)Quick Start:$(C_RESET)"
+	@echo "    python scripts/ck_run_v5.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf"
 	@echo ""
-	@echo "  Examples:"
-	@echo "    python scripts/ck_run_v4.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \\"
-	@echo "        --weight-dtype=q4_k_m --codegen=v5 --generate-only"
+	@echo "  $(C_GREEN)Commands:$(C_RESET)"
+	@echo "    python scripts/ck_run_v5.py run MODEL              # Full pipeline: download → convert → codegen → compile"
+	@echo "    python scripts/ck_run_v5.py run MODEL --debug      # With debug buffer checks"
+	@echo "    python scripts/ck_run_v5.py run MODEL --parity     # Save outputs for PyTorch comparison"
+	@echo "    python scripts/ck_run_v5.py run MODEL --generate-only  # Generate code, don't run"
+	@echo "    python scripts/ck_run_v5.py list                   # List cached v5 models"
+	@echo "    python scripts/ck_run_v5.py clean                  # Clean all v5 cache"
+	@echo "    python scripts/ck_run_v5.py clean MODEL            # Clean specific model"
 	@echo ""
-	@echo "  Full pipeline demo:"
-	@echo "    make demo-v5"
+	@echo "  $(C_GREEN)Examples:$(C_RESET)"
+	@echo "    # Download Qwen2-0.5B Q4_K_M and generate v5 code:"
+	@echo "    python scripts/ck_run_v5.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf --generate-only"
+	@echo ""
+	@echo "    # With debug mode (prints buffer stats after each op):"
+	@echo "    python scripts/ck_run_v5.py run MODEL --debug --generate-only"
+	@echo ""
+	@echo "    # With parity mode (saves .bin files for PyTorch comparison):"
+	@echo "    python scripts/ck_run_v5.py run MODEL --parity --generate-only"
+	@echo ""
+	@echo "  $(C_GREEN)Output Location:$(C_RESET)"
+	@echo "    ~/.cache/ck-engine-v5/models/<model-name>/"
+	@echo "      ├── generated_*_decode.c   # v5 explicit decode code (24 layers unrolled)"
+	@echo "      ├── generated_*_prefill.c  # v5 explicit prefill code"
+	@echo "      ├── weights.bump           # Converted weights"
+	@echo "      ├── weights_manifest.json  # Per-weight quant types"
+	@echo "      └── libmodel.so            # Compiled shared library"
+	@echo ""
+	@echo "  $(C_GREEN)Makefile Targets:$(C_RESET)"
+	@echo "    make v5              # This help"
+	@echo "    make demo-v5         # Run full v5 demo with Qwen2-0.5B"
+	@echo "    make demo-v5-debug   # Run with --debug enabled"
 	@echo ""
 
 # Demo: v5 explicit codegen
 demo-v5: $(LIB)
 	@echo ""
 	@echo "  $(C_ORANGE)Demo: Qwen2-0.5B v5 Explicit Codegen$(C_RESET)"
-	@echo "  This generates explicit per-layer kernel calls for mixed Q4_K_M"
+	@echo "  Generates explicit per-layer kernel calls for mixed Q4_K_M"
 	@echo ""
-	@python3 scripts/ck_run_v4.py run \
+	@python3 scripts/ck_run_v5.py run \
 		"hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" \
-		--weight-dtype=q4_k_m \
-		--codegen=v5 \
 		--generate-only
 	@echo ""
-	@echo "  Generated files:"
-	@ls -la ~/.cache/ck-engine-v4/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_*.c 2>/dev/null || true
+	@echo "  $(C_GREEN)Generated files:$(C_RESET)"
+	@ls -la ~/.cache/ck-engine-v5/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_*.c 2>/dev/null || true
 	@echo ""
-	@echo "  View per-layer quant types:"
-	@head -20 ~/.cache/ck-engine-v4/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_qwen2_decode.c 2>/dev/null || true
+	@echo "  $(C_GREEN)Per-layer quant types:$(C_RESET)"
+	@head -20 ~/.cache/ck-engine-v5/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_qwen2_decode.c 2>/dev/null || true
+
+# Demo: v5 with debug enabled
+demo-v5-debug: $(LIB)
+	@echo ""
+	@echo "  $(C_ORANGE)Demo: Qwen2-0.5B v5 with Debug$(C_RESET)"
+	@echo "  Generates code with buffer stats after each operation"
+	@echo ""
+	@python3 scripts/ck_run_v5.py run \
+		"hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" \
+		--debug \
+		--generate-only \
+		--force-compile
+	@echo ""
+	@echo "  $(C_GREEN)Debug checks in generated code:$(C_RESET)"
+	@grep -n "debug_check_buffer" ~/.cache/ck-engine-v5/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_qwen2_decode.c 2>/dev/null | head -10 || true
 
 # Demo: Download Qwen2-0.5B Q4_K_M GGUF and run end-to-end
 demo-q4: $(LIB)
@@ -1574,4 +1619,4 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config demo-v5
+.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug
