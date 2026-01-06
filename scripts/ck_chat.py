@@ -2,7 +2,7 @@
 """
 C-Kernel-Engine Chat Interface
 
-Uses the HuggingFace tokenizer and calls the compiled C model library.
+Uses the HuggingFace tokenizer or GGUF tokenizer and calls the compiled C model library.
 """
 from __future__ import annotations  # Python 3.9 compatibility
 
@@ -15,12 +15,16 @@ from typing import Optional
 
 import numpy as np
 
-# Try to import tokenizers
+# Try to import tokenizers (HuggingFace or our GGUF tokenizer)
+HF_TOKENIZER_AVAILABLE = False
 try:
     from tokenizers import Tokenizer
+    HF_TOKENIZER_AVAILABLE = True
 except ImportError:
-    print("Error: tokenizers package not found. Install with: pip install tokenizers")
-    sys.exit(1)
+    pass
+
+# Always have GGUF tokenizer available
+from gguf_tokenizer import GGUFTokenizer, Tokenizer as GGUFTokenizerWrapper
 
 
 class CKModel:
@@ -36,14 +40,34 @@ class CKModel:
         self.has_kv_decode = False
         self.has_parity = False
 
-    def load(self) -> bool:
+    def load(self, gguf_path: str = None) -> bool:
         """Load model library and tokenizer."""
-        # Load tokenizer
-        tokenizer_path = self.model_dir / "tokenizer.json"
-        if not tokenizer_path.exists():
-            print(f"Error: Tokenizer not found: {tokenizer_path}")
+        # Load tokenizer - try multiple sources
+        tokenizer_json = self.model_dir / "tokenizer.json"
+        vocab_json = self.model_dir / "vocab.json"
+
+        if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
+            # Use HuggingFace tokenizer if available
+            self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
+            print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
+        elif vocab_json.exists():
+            # Use extracted vocab JSON
+            self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
+            print(f"Loaded GGUF tokenizer from {vocab_json}")
+        elif gguf_path and Path(gguf_path).exists():
+            # Extract directly from GGUF
+            print(f"Extracting tokenizer from GGUF: {gguf_path}")
+            self.tokenizer = GGUFTokenizerWrapper(GGUFTokenizer.from_gguf(gguf_path))
+            # Save for next time
+            self.tokenizer._tokenizer.save(str(vocab_json))
+            print(f"Saved vocab to {vocab_json}")
+        else:
+            print(f"Error: No tokenizer found. Tried:")
+            print(f"  - {tokenizer_json}")
+            print(f"  - {vocab_json}")
+            if gguf_path:
+                print(f"  - {gguf_path}")
             return False
-        self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
 
         # Load C library
         lib_path = self.model_dir / "libmodel.so"
@@ -393,6 +417,7 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
 def main():
     parser = argparse.ArgumentParser(description="C-Kernel-Engine Chat Interface")
     parser.add_argument("--model-dir", required=True, help="Path to model directory")
+    parser.add_argument("--gguf", help="Path to GGUF file (for tokenizer extraction)")
     parser.add_argument("--prompt", help="Single prompt (non-interactive mode)")
     parser.add_argument("--max-tokens", type=int, default=100, help="Max tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature")
@@ -417,7 +442,7 @@ def main():
     print(f"Loading model from {args.model_dir}...")
     model = CKModel(args.model_dir, parity_dir=parity_dir)
 
-    if not model.load():
+    if not model.load(gguf_path=args.gguf):
         sys.exit(1)
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")

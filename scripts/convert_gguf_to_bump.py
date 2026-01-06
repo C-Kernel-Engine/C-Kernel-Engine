@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import struct
+import sys
 from dataclasses import dataclass
 from typing import BinaryIO, Dict, Optional, Sequence, Tuple
 
@@ -965,45 +966,56 @@ def _build_examples() -> str:
         example_output = os.path.join(model_dir, "weights.bump")
         example_config = os.path.join(model_dir, "config.json")
         example_manifest = os.path.join(model_dir, "weights_manifest.json")
+        example_vocab = os.path.join(model_dir, "vocab.json")
+        recommendation = f"""
+Recommended command for '{m['name']}':
+  (Performs weights conversion + metadata extraction + vocabulary extraction)
+
+  python scripts/convert_gguf_to_bump.py \\
+      --gguf {gguf} \\
+      --output {example_output} \\
+      --config-out {example_config} \\
+      --manifest-out {example_manifest} \\
+      --extract-vocab {example_vocab}
+"""
     else:
         example_gguf = "model.gguf"
         example_output = "weights.bump"
         example_config = "config.json"
         example_manifest = "weights_manifest.json"
+        example_vocab = "vocab.json"
+        recommendation = ""
 
     # Build cached models section
     if cached:
         cached_section = "\nCached Models Found:\n"
         for i, m in enumerate(cached[:5]):  # Show max 5
-            cached_section += f"  [{i+1}] {m['name']}\n"
+            cached_section += f"  [{i+1}] {m['name']} ({m['size_mb']:.1f} MB)\n"
             cached_section += f"      {m['path']}\n"
-            cached_section += f"      Size: {m['size_mb']:.1f} MB\n"
         if len(cached) > 5:
             cached_section += f"  ... and {len(cached) - 5} more\n"
     else:
         cached_section = "\nNo cached models found. Download a GGUF model first.\n"
 
-    examples = f"""{cached_section}
-Examples:
-  # 1. INSPECT: Quick look at GGUF metadata and tensor types (no conversion)
+    examples = f"""{cached_section}{recommendation}
+Workflow Examples:
+  # A. INSPECT: Quick look at GGUF metadata and tensor types (no conversion)
   python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --inspect
 
-  # 2. INSPECT with per-layer details (shows quant type per layer)
-  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --inspect --inspect-layers
+  # B. TOKENIZER ONLY: Extract vocabulary and tokenizer stats to JSON
+  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --extract-vocab {example_vocab}
 
-  # 3. LIST: Show every tensor name, type, and shape
-  python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --list
-
-  # 4. CONVERT: Generate weights.bump file for C-Kernel-Engine
+  # C. CONVERT: Generate weights.bump file for C-Kernel-Engine
   python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --output {example_output}
 
-  # 5. CONVERT with config and manifest (full pipeline)
+  # D. FULL PIPELINE: Weights + Config + Manifest + Vocabulary
   python scripts/convert_gguf_to_bump.py --gguf {example_gguf} \\
       --output {example_output} \\
       --config-out {example_config} \\
-      --manifest-out {example_manifest}
+      --manifest-out {example_manifest} \\
+      --extract-vocab {example_vocab}
 
-  # 6. CONVERT and VERIFY (check parity between GGUF and bump)
+  # E. VERIFY: Convert and check parity between GGUF and bump file
   python scripts/convert_gguf_to_bump.py --gguf {example_gguf} --output {example_output} --verify
 
 Tensor Mapping (GGUF → C-Kernel-Engine):
@@ -1038,10 +1050,11 @@ def main() -> None:
     ap.add_argument("--list", action="store_true", help="Print every tensor name/type/shape and exit (no conversion)")
     ap.add_argument("--verify", action="store_true", help="After conversion, verify parity between GGUF and bump file")
     ap.add_argument("--manifest-out", help="Output weights manifest JSON path with tensor offsets")
+    ap.add_argument("--extract-vocab", help="Extract tokenizer to JSON file (runs scripts/extract_gguf_vocab.py)")
     args = ap.parse_args()
 
-    if not args.output and not (args.inspect or args.list):
-        ap.error("--output is required unless --inspect/--list is set")
+    if not args.output and not (args.inspect or args.list or args.extract_vocab):
+        ap.error("--output is required unless --inspect/--list/--extract-vocab is set")
 
     # Support multiple architectures (llama, qwen2, etc.)
     wanted_meta = {
@@ -1066,6 +1079,23 @@ def main() -> None:
         "qwen2.rope.freq_base",
         "qwen2.attention.layer_norm_rms_epsilon",
     }
+
+    if args.extract_vocab:
+        import subprocess
+        print(f"[convert] Extracting vocabulary to {args.extract_vocab}...")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        vocab_script = os.path.join(script_dir, "extract_gguf_vocab.py")
+        
+        try:
+            subprocess.run(
+                [sys.executable, vocab_script, "--gguf", args.gguf, "--output", args.extract_vocab],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"[convert] Error extracting vocab: {e}")
+            # Don't exit, might still want to convert weights
+        except Exception as e:
+            print(f"[convert] Failed to run vocab script: {e}")
 
     with open(args.gguf, "rb") as f:
         r = GGUFReader(f)

@@ -86,49 +86,9 @@ void gemv_q4_k_q8_k_vnni(float *y,
                          const void *x_q8,
                          int M, int K)
 {
-#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
-    if (!y || !W || !x_q8 || M <= 0 || K <= 0) {
-        return;
-    }
-
-    const block_q4_K *blocks = (const block_q4_K *)W;
-    const block_q8_K *x = (const block_q8_K *)x_q8;
-    const int blocks_per_row = K / QK_K;
-
-    for (int row = 0; row < M; ++row) {
-        const block_q4_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-        float sumf = 0.0f;
-
-        for (int i = 0; i < blocks_per_row; ++i) {
-            uint8_t sc[8], m[8];
-            unpack_q4_k_scales(w_row[i].scales, sc, m);
-
-            int32_t sum_scale = 0;
-            int32_t sum_min = 0;
-
-            for (int sub = 0; sub < 8; ++sub) {
-                const uint8_t *qs = &w_row[i].qs[sub * 16];
-                const int8_t *q8 = &x[i].qs[sub * 32];
-
-                const int32_t sum_q4q8 = dot_q4_q8_32_vnni(qs, q8);
-                const int32_t sum_q8 = (int32_t)x[i].bsums[sub * 2] +
-                                       (int32_t)x[i].bsums[sub * 2 + 1];
-
-                sum_scale += (int32_t)sc[sub] * (sum_q4q8 - 8 * sum_q8);
-                sum_min += (int32_t)m[sub] * sum_q8;
-            }
-
-            const float d = CK_FP16_TO_FP32(w_row[i].d) * x[i].d;
-            const float dmin = CK_FP16_TO_FP32(w_row[i].dmin) * x[i].d;
-            sumf += d * (float)sum_scale;
-            sumf += dmin * (float)sum_min;
-        }
-
-        y[row] = sumf;
-    }
-#elif defined(__AVX2__)
-    gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);
-#else
+    /* TODO: Implement VNNI version with correct Q4_K memory layout.
+     * For now, fall back to reference implementation which has been
+     * fixed to use the correct layout.
+     */
     gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
-#endif
 }

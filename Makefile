@@ -1152,6 +1152,80 @@ help:
 clean:
 	rm -rf $(BUILD_DIR)
 
+# =============================================================================
+# Parity Testing: CK vs llama.cpp/ggml
+# =============================================================================
+# Tests individual CK kernels against llama.cpp's ggml implementations.
+
+# Source files for CK parity library
+PARITY_SRCS := src/ck_parity_api.c \
+               src/kernels/dequant_kernels.c \
+               src/kernels/gemm_kernels_q4k_q8k.c \
+               src/kernels/gemm_kernels_q4k_q8k_avx2.c \
+               src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+               src/kernels/rmsnorm_kernels.c \
+               src/kernels/rope_kernels.c \
+               src/kernels/swiglu_kernels.c \
+               src/kernels/softmax_kernels.c \
+               src/kernels/sigmoid_kernels.c
+
+LIB_PARITY := $(BUILD_DIR)/libck_parity.so
+
+# Build CK parity testing library
+$(LIB_PARITY): $(BUILD_DIR) $(PARITY_SRCS)
+	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) -lm
+
+libck_parity.so: $(LIB_PARITY)
+	@echo "Built CK parity library: $(LIB_PARITY)"
+
+# Build llama.cpp kernel test library
+# Requires llama.cpp to be cloned in llama.cpp/ subdirectory
+LLAMA_CPP_DIR := llama.cpp
+LLAMA_KERNEL_TEST := $(LLAMA_CPP_DIR)/libggml_kernel_test.so
+
+$(LLAMA_KERNEL_TEST):
+	@echo "Building llama.cpp kernel test library..."
+	@if [ ! -d "$(LLAMA_CPP_DIR)" ]; then \
+		echo "ERROR: llama.cpp not found. Clone it first:"; \
+		echo "  git clone https://github.com/ggerganov/llama.cpp llama.cpp"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(LLAMA_CPP_DIR)/build/bin/libggml.so" ] && [ ! -f "$(LLAMA_CPP_DIR)/build/lib/libggml.so" ]; then \
+		echo "Building llama.cpp..."; \
+		cd $(LLAMA_CPP_DIR) && mkdir -p build && cd build && cmake .. && make -j$$(nproc); \
+	fi
+	@# Detect library location (build/bin or build/lib)
+	cd $(LLAMA_CPP_DIR) && \
+	GGML_LIB_DIR=$$(if [ -f build/bin/libggml.so ]; then echo build/bin; else echo build/lib; fi) && \
+	$(CXX) -shared -fPIC -o libggml_kernel_test.so \
+		tests/test-kernel-parity.cpp \
+		-I ggml/include -I ggml/src \
+		-L $$GGML_LIB_DIR -lggml -lggml-cpu -lggml-base -lm -lpthread \
+		-Wl,-rpath,$(PWD)/$(LLAMA_CPP_DIR)/$$GGML_LIB_DIR
+
+llama_kernel_test: $(LLAMA_KERNEL_TEST)
+	@echo "Built llama.cpp kernel test library: $(LLAMA_KERNEL_TEST)"
+
+# Build both parity libraries
+parity-libs: $(LIB_PARITY) $(LLAMA_KERNEL_TEST)
+	@echo ""
+	@echo "Parity testing libraries built:"
+	@echo "  CK:        $(LIB_PARITY)"
+	@echo "  llama.cpp: $(LLAMA_KERNEL_TEST)"
+
+# Run kernel parity tests
+test-kernels: parity-libs
+	@echo ""
+	@echo "Running kernel parity tests: CK vs llama.cpp/ggml"
+	@echo "=================================================="
+	$(PYTHON) $(PYTHONFLAGS) scripts/test_kernels_vs_llamacpp.py --all
+
+# Run specific kernel test
+test-kernel-%: parity-libs
+	$(PYTHON) $(PYTHONFLAGS) scripts/test_kernels_vs_llamacpp.py --kernel $*
+
+.PHONY: libck_parity.so llama_kernel_test parity-libs test-kernels
+
 # Litmus test for full forward pass parity with PyTorch
 # ==============================================================================
 TEST_HARNESS_SRCS := src/backend_native.c \

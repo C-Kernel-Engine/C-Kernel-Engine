@@ -91,35 +91,55 @@ static float dot_q4_k_q8_k_ref(const block_q4_K *w,
     float sumf = 0.0f;
 
     for (int i = 0; i < nb; ++i) {
-        uint8_t sc[8], m[8];
-        unpack_q4_k_scales(w[i].scales, sc, m);
-
-        int32_t sum_scale = 0;
-        int32_t sum_min = 0;
-
-        for (int sub = 0; sub < 8; ++sub) {
-            const uint8_t *qs = &w[i].qs[sub * 16];
-            const int8_t *q8 = &x[i].qs[sub * 32];
-
-            int32_t sum_q4q8 = 0;
-            for (int j = 0; j < 16; ++j) {
-                const uint8_t packed = qs[j];
-                const int q4_0 = (int)(packed & 0x0F) - 8;
-                const int q4_1 = (int)(packed >> 4) - 8;
-                sum_q4q8 += q4_0 * q8[2 * j];
-                sum_q4q8 += q4_1 * q8[2 * j + 1];
-            }
-
-            const int32_t sum_q8 = (int32_t)x[i].bsums[sub * 2] +
-                                   (int32_t)x[i].bsums[sub * 2 + 1];
-            sum_scale += (int32_t)sc[sub] * sum_q4q8;
-            sum_min += (int32_t)m[sub] * sum_q8;
-        }
+        uint8_t sc[8], m_val[8];
+        unpack_q4_k_scales(w[i].scales, sc, m_val);
 
         const float d = CK_FP16_TO_FP32(w[i].d) * x[i].d;
         const float dmin = CK_FP16_TO_FP32(w[i].dmin) * x[i].d;
-        sumf += d * (float)sum_scale;
-        sumf += dmin * (float)sum_min;
+
+        /* Q4_K layout: process 64 elements at a time
+         * - Low nibbles of qs[0..31] → elements 0..31 → uses sc[0], m[0]
+         * - High nibbles of qs[0..31] → elements 32..63 → uses sc[1], m[1]
+         * - Low nibbles of qs[32..63] → elements 64..95 → uses sc[2], m[2]
+         * - etc.
+         */
+        int is = 0;
+        int q_offset = 0;
+
+        for (int j = 0; j < QK_K; j += 64) {
+            const uint8_t *qs = &w[i].qs[q_offset];
+            const int8_t *q8_lo = &x[i].qs[j];       /* Elements j to j+31 */
+            const int8_t *q8_hi = &x[i].qs[j + 32];  /* Elements j+32 to j+63 */
+
+            /* Sum for low nibbles (elements j to j+31) */
+            int32_t sum_q4q8_lo = 0;
+            for (int l = 0; l < 32; ++l) {
+                int q4_val = qs[l] & 0x0F;
+                sum_q4q8_lo += q4_val * q8_lo[l];
+            }
+
+            /* Sum for high nibbles (elements j+32 to j+63) */
+            int32_t sum_q4q8_hi = 0;
+            for (int l = 0; l < 32; ++l) {
+                int q4_val = qs[l] >> 4;
+                sum_q4q8_hi += q4_val * q8_hi[l];
+            }
+
+            /* bsums: each bsum is 16 elements */
+            int32_t bsum_lo = (int32_t)x[i].bsums[j / 16] +
+                              (int32_t)x[i].bsums[j / 16 + 1];
+            int32_t bsum_hi = (int32_t)x[i].bsums[(j + 32) / 16] +
+                              (int32_t)x[i].bsums[(j + 32) / 16 + 1];
+
+            /* Accumulate: d * sc * sum(q4*q8) - dmin * m * sum(q8) */
+            sumf += d * (float)sc[is] * (float)sum_q4q8_lo;
+            sumf -= dmin * (float)m_val[is] * (float)bsum_lo;
+            sumf += d * (float)sc[is + 1] * (float)sum_q4q8_hi;
+            sumf -= dmin * (float)m_val[is + 1] * (float)bsum_hi;
+
+            q_offset += 32;
+            is += 2;
+        }
     }
 
     return sumf;
