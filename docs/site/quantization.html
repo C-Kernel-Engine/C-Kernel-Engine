@@ -1062,7 +1062,7 @@ Superblock (256 weights)
     ├── scales[i] (6-bit): local scale adjustment
     └── qs[...]: 4-bit quantized weights
 
-Dequant: weight = q * (d * sub_scale) + dmin * sub_min
+Dequant: weight = q * (d * sub_scale) - dmin * sub_min
     </pre>
     <p><strong>Best of both worlds:</strong> Fine-grained local scales without per-32-weight FP16 overhead.</p>
 </div>
@@ -1535,7 +1535,7 @@ Super-block (256 weights)
     └── qs[...]: 4-bit quantized weights
 
 Dequantization:
-  w_fp32 = q * (d * sub_scale) + dmin * sub_min
+  w_fp32 = q * (d * sub_scale) - dmin * sub_min
     </pre>
     <p><strong>Why nested scales?</strong> Best of both worlds: fine-grained local adaptation without per-32-weight FP16 overhead.</p>
 </div>
