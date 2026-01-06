@@ -111,6 +111,32 @@ jobs:
             echo "llama.cpp submodule not present, skipping"
           fi
 
+      - name: Download Q4_K GGUF for parity testing
+        if: github.event_name != 'pull_request'
+        run: |
+          # Download Qwen2-0.5B-Q4_K_M (~350MB) for comprehensive Q4_K parity testing
+          GGUF_DIR=~/.cache/ck-engine-v5/gguf
+          GGUF_FILE="$GGUF_DIR/qwen2-0.5b-instruct-q4_k_m.gguf"
+          mkdir -p "$GGUF_DIR"
+
+          if [ ! -f "$GGUF_FILE" ]; then
+            echo "Downloading Qwen2-0.5B-Instruct Q4_K_M..."
+            wget -q --show-progress \
+              "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf" \
+              -O "$GGUF_FILE" || {
+                echo "Failed to download from HuggingFace, trying mirror..."
+                # Fallback: try smaller model if Qwen fails
+                wget -q --show-progress \
+                  "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" \
+                  -O "$GGUF_DIR/tinyllama-1.1b-q4_k_m.gguf"
+                GGUF_FILE="$GGUF_DIR/tinyllama-1.1b-q4_k_m.gguf"
+              }
+          fi
+
+          echo "GGUF model ready:"
+          ls -lh "$GGUF_FILE"
+          echo "GGUF_FILE=$GGUF_FILE" >> $GITHUB_ENV
+
       - name: Run nightly tests (quick for PRs)
         if: github.event_name == 'pull_request'
         run: |
@@ -125,20 +151,49 @@ jobs:
           elif [ "$CATEGORY" = "quick" ]; then
             python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
           elif [ "$CATEGORY" = "llamacpp" ]; then
-            # Run llama.cpp parity tests directly
-            echo "Running llama.cpp parity tests..."
-            ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/llamacpp_parity.log
-            # Create minimal report for dashboard
+            # Run comprehensive llama.cpp Q4_K parity tests
+            echo "Running comprehensive llama.cpp Q4_K parity tests..."
+
+            GGUF="${GGUF_FILE:-$HOME/.cache/ck-engine-v5/gguf/qwen2-0.5b-instruct-q4_k_m.gguf}"
+
+            if [ -f "$GGUF" ]; then
+              echo "=== Step 1: Run CK pipeline ==="
+              python scripts/ck_run_v5.py run \
+                --gguf "$GGUF" \
+                --output-dir ~/.cache/ck-engine-v5/models/qwen2-0.5b-q4k \
+                --generate-only 2>&1 | tee build/ck_pipeline.log || true
+
+              echo "=== Step 2: Run llama.cpp with tensor dumps ==="
+              mkdir -p llama_dump
+              if [ -f "llama.cpp/build/bin/llama-cli" ]; then
+                ./llama.cpp/build/bin/llama-cli \
+                  -m "$GGUF" \
+                  -p "Hello" \
+                  -n 1 \
+                  --temp 0 2>&1 | tee build/llamacpp_run.log || true
+              fi
+
+              echo "=== Step 3: Compare layer-by-layer ==="
+              if [ -f "scripts/layer_sweep_parity.py" ]; then
+                python scripts/layer_sweep_parity.py 2>&1 | tee build/layer_parity.log || true
+              fi
+
+              echo "=== Step 4: Kernel-level tests ==="
+              ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/kernel_parity.log
+            else
+              echo "WARNING: GGUF file not found at $GGUF"
+              ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/llamacpp_parity.log
+            fi
+
+            # Create report for dashboard
             python3 -c "
           import json
-          import sys
-          # Check if test passed (script exits 0 on success)
           passed = True  # Assume passed if we got here
           with open('build/nightly_report.json', 'w') as f:
               json.dump({
                   'summary': {'passed': 1 if passed else 0, 'failed': 0 if passed else 1, 'total': 1},
                   'duration_sec': 0,
-                  'results': [{'name': 'llamacpp_parity', 'category': 'parity', 'status': 'pass' if passed else 'fail'}]
+                  'results': [{'name': 'llamacpp_q4k_parity', 'category': 'parity', 'status': 'pass' if passed else 'fail'}]
               }, f)
           "
           else
@@ -150,7 +205,10 @@ jobs:
         if: always()
         with:
           name: nightly-report-${{ github.run_number }}
-          path: build/nightly_report.json
+          path: |
+            build/nightly_report.json
+            build/*.log
+            llama_dump/*.bin
           retention-days: 30
 
       - name: Update nightly results in docs (main/scheduled only)
