@@ -100,7 +100,10 @@ jobs:
           if [ -d "llama.cpp" ] && [ -f "llama.cpp/CMakeLists.txt" ]; then
             echo "Building llama.cpp..."
             cd llama.cpp
-            cmake -B build -DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF
+            cmake -B build \
+              -DGGML_CPU=ON \
+              -DLLAMA_BUILD_TESTS=OFF \
+              -DLLAMA_CURL=OFF
             cmake --build build -j$(nproc)
             echo "llama.cpp built successfully"
             ls -la build/bin/llama-cli || echo "llama-cli not found"
