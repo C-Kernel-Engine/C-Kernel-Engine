@@ -852,11 +852,17 @@ static int emit_kernel_manifest(const CKIRGraph *forward, const char *runtime_pa
     emit_unique_source(f, "src/ckernel_strict.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/cpu_features.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/embedding_kernels.c", seen, &seen_count, seen_cap);
-    /* Quantized inference support (Q4_K_M / Q4_K / Q6_K). */
+    /* Quantized inference support (K-quants: Q4_K_M / Q4_K / Q6_K). */
     emit_unique_source(f, "src/kernels/dequant_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/gemm_kernels_q4k.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/gemm_kernels_q4k_q8k.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/gemm_kernels_q6k.c", seen, &seen_count, seen_cap);
+    /* Legacy quant support (Q4_0 / Q4_1 / Q5_0 / Q5_1 / Q8_0). */
+    emit_unique_source(f, "src/kernels/gemm_kernels_q4_0.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q4_1.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q5_0.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q5_1.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q8_0.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/rope_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/loss_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/kv_cache_kernels.c", seen, &seen_count, seen_cap);

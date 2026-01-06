@@ -980,11 +980,19 @@ smollm-train-parity: $(LIB)
 # Requires llama.cpp submodule: git submodule add https://github.com/ggerganov/llama.cpp.git
 llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
-	@./scripts/run_parity_smoketest.sh --quick
+	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
+		./scripts/run_parity_smoketest.sh --quick; \
+	else \
+		echo "SKIP: llama.cpp not built (run 'git submodule update --init' and build llama.cpp first)"; \
+	fi
 
 llamacpp-parity-full:
 	@echo "Running full llama.cpp parity test..."
-	@./scripts/run_parity_smoketest.sh
+	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
+		./scripts/run_parity_smoketest.sh; \
+	else \
+		echo "SKIP: llama.cpp not built"; \
+	fi
 
 all-tests: $(LIB)
 	$(MAKE) test
