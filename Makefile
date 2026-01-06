@@ -412,6 +412,14 @@ fetch-v2:
 	    --cache-dir $(BUILD_DIR); \
 	fi
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEGACY V4 PIPELINE (Deprecated - use v5 instead)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Note: v4 targets are kept for backwards compatibility but v5 is recommended.
+# v5 provides: explicit per-layer functions, better debugging, parity testing.
+# See: make v5 for documentation on the new pipeline.
+# ═══════════════════════════════════════════════════════════════════════════════
+
 ir-v4:
 	@echo "Generating IR v4 into $(IR_V4_PREFIX)..."
 	@if [ -n "$(IR_V4_PRESET)" ]; then \
@@ -644,19 +652,49 @@ showtests:
 	@echo "  make test             Run core kernel tests"
 	@echo "  make test-bf16        Run BF16 kernel tests"
 	@echo "  make test-quant       Run quantization kernel tests"
-	@echo "  make test-v4-q4k      Run v4 Q4_K conversion pipeline (requires GGUF)"
 	@echo "  make nightly          Run full test suite (doesn't stop on failure)"
 	@echo ""
 	@echo "Per-Kernel Libraries:"
 	@echo "  make test-libs        Build per-kernel .so files for testing"
 	@echo "  make test-relu        Run isolated ReLU C kernel tests (with PyTorch parity)"
 	@echo ""
-	@echo "Parity Tests (vs PyTorch):"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  QUANTIZATION TESTS (All Formats)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "Legacy Quant Formats:"
+	@echo "  unittest/test_q4_0_kernels.py     Q4_0 (4-bit, simple block)"
+	@echo "  unittest/test_q4_1_kernels.py     Q4_1 (4-bit with min)"
+	@echo "  unittest/test_q5_0_kernels.py     Q5_0 (5-bit, simple block)"
+	@echo "  unittest/test_q5_1_kernels.py     Q5_1 (5-bit with min)"
+	@echo "  unittest/test_q8_0_kernels.py     Q8_0 (8-bit, simple block)"
+	@echo ""
+	@echo "K-Quant Formats (Recommended):"
+	@echo "  unittest/test_q4k_kernels.py      Q4_K dequant/quantize/gemv"
+	@echo "  unittest/test_q6k_kernels.py      Q6_K dequant/quantize"
+	@echo "  unittest/test_q4_k_quantize.py    Q4_K quantization"
+	@echo "  unittest/test_q4_k_q8_k_matvec.py Q4_K x Q8_K matrix-vector"
+	@echo "  unittest/test_quant_kernels.py    General quant kernel tests"
+	@echo ""
+	@echo "Batch Commands:"
+	@echo "  make test-quant       Run all quantization tests"
+	@echo "  make test-quant-server  Run on VNNI server (AVX-512)"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  PARITY TESTS"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "PyTorch Parity:"
 	@echo "  make litmus           LM head + cross-entropy backward parity"
 	@echo "  make litmus-demo      100x100 litmus demo with SVG output"
 	@echo "  make layer-parity     Full layer forward parity (GQA/MHA)"
 	@echo "  make layer-parity-scalar  Layer parity with scalar build"
 	@echo "  make tiny-parity      Tiny end-to-end training parity (1 step)"
+	@echo ""
+	@echo "llama.cpp Parity (Q4_K kernel validation):"
+	@echo "  make llamacpp-parity      Quick parity vs llama.cpp/ggml"
+	@echo "  make llamacpp-parity-full Full parity test (all kernels)"
+	@echo "  Note: Requires llama.cpp submodule (git submodule update --init)"
 	@echo ""
 	@echo "End-to-End Tests:"
 	@echo "  make tiny-e2e         Random weights + tiny forward pass"
@@ -669,7 +707,10 @@ showtests:
 	@echo "  make smollm-layer-stack  Per-layer outputs across full stack"
 	@echo "  make smollm-train-parity  Full forward+backward parity"
 	@echo ""
-	@echo "Comprehensive Test Suites:"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  COMPREHENSIVE TEST SUITES"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
 	@echo "  make all-tests        Kernel tests + layer parity + tiny parity"
 	@echo "  make test-quick       Quick tests (<1 min)"
 	@echo "  make test-full        Full tests (5-10 min)"
@@ -682,7 +723,7 @@ showtests:
 	@echo "  make nightly-kernels  Only kernel tests"
 	@echo "  make nightly-bf16     Only BF16 tests"
 	@echo "  make nightly-quant    Only quantization tests"
-	@echo "  make nightly-parity   Only parity tests"
+	@echo "  make nightly-parity   Only parity tests (PyTorch + llama.cpp)"
 	@echo ""
 	@echo "For Python unittest scripts: make unittest"
 	@echo ""
@@ -1320,7 +1361,7 @@ ck-cli: $(LIB) $(IR_DEMO) $(BUILD_DIR)/ck
 	@echo "    sudo cp $(BUILD_DIR)/ck /usr/local/bin/"
 	@echo ""
 
-# v4 CLI (Python wrapper for IR v4 pipeline)
+# v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
 ck-cli-v4: $(LIB)
 	@echo ""
 	@echo "  $(C_ORANGE)C-Kernel-Engine v4 CLI$(C_RESET)"
@@ -1449,7 +1490,11 @@ demo-v5-debug: $(LIB)
 	@echo "  $(C_GREEN)Debug checks in generated code:$(C_RESET)"
 	@grep -n "debug_check_buffer" ~/.cache/ck-engine-v5/models/Qwen--Qwen2-0.5B-Instruct-GGUF/generated_qwen2_decode.c 2>/dev/null | head -10 || true
 
-# Demo: Download Qwen2-0.5B Q4_K_M GGUF and run end-to-end
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEGACY V4 DEMOS (Deprecated - use demo-v5 instead)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Demo: Download Qwen2-0.5B Q4_K_M GGUF and run end-to-end (LEGACY - use demo-v5)
 demo-q4: $(LIB)
 	@echo ""
 	@echo "  $(C_ORANGE)Demo: Qwen2-0.5B Q4_K_M End-to-End$(C_RESET)"
@@ -1476,7 +1521,9 @@ demo-q4-codegen: $(LIB)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Run kernel unit tests (fast, catches SIMD bugs)
-test-kernels:
+# Note: test-kernels target at line ~1276 runs Python parity tests vs llama.cpp
+# This target (test-kernel-unit) runs standalone C kernel unit tests
+test-kernel-unit:
 	@echo ""
 	@echo "  $(C_ORANGE)Running Kernel Unit Tests$(C_RESET)"
 	@echo "  Tests Q4_K x Q8_K GEMV kernels (ref, AVX2, VNNI)"
@@ -1711,13 +1758,29 @@ report:
 	@$(PYTHON) scripts/optimization_status.py --targets
 	@echo ""
 	@echo "┌──────────────────────────────────────────────────────────────────────────────────────────────────┐"
-	@echo "│  5. TEST COVERAGE                                                                                │"
+	@echo "│  5. QUANTIZATION FORMAT SUPPORT                                                                  │"
+	@echo "│     Formats: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0 (legacy) | Q4_K, Q6_K, Q8_K (k-quants, recommended)    │"
+	@echo "└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+	@echo "  K-Quants (recommended for inference):"
+	@echo "    Q4_K  - 4-bit k-quant with super-blocks (most GGUF models use this)"
+	@echo "    Q6_K  - 6-bit k-quant (higher quality)"
+	@echo "    Q8_K  - 8-bit k-quant (activation quantization)"
+	@echo ""
+	@echo "  Legacy Formats (for compatibility):"
+	@echo "    Q4_0, Q4_1, Q5_0, Q5_1, Q8_0"
+	@echo ""
+	@echo "  Parity Tests:"
+	@echo "    PyTorch: make layer-parity, make smollm-train-parity"
+	@echo "    llama.cpp: make llamacpp-parity (requires submodule)"
+	@echo ""
+	@echo "┌──────────────────────────────────────────────────────────────────────────────────────────────────┐"
+	@echo "│  6. TEST COVERAGE                                                                                │"
 	@echo "└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
 	@$(PYTHON) scripts/test_coverage.py --summary
 	@$(PYTHON) scripts/test_coverage.py --missing
 	@echo ""
 	@echo "┌──────────────────────────────────────────────────────────────────────────────────────────────────┐"
-	@echo "│  6. HIGH-PRIORITY PENDING WORK                                                                   │"
+	@echo "│  7. HIGH-PRIORITY PENDING WORK                                                                   │"
 	@echo "└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
 	@$(PYTHON) scripts/optimization_status.py --pending
 	@echo ""
@@ -1735,4 +1798,4 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug
+.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests
