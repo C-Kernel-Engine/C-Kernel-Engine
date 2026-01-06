@@ -237,6 +237,12 @@ MAKE_TARGETS = {
         "target": "smollm-train-parity",
         "timeout_sec": 600,
     },
+    "llamacpp_parity": {
+        "name": "llama.cpp Parity",
+        "category": "parity",
+        "target": "llamacpp-parity",
+        "timeout_sec": 600,
+    },
 }
 
 # Benchmark targets with perf extraction

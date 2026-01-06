@@ -976,6 +976,16 @@ smollm-train-parity: $(LIB)
 	  --steps 1 \
 	  --lr 1e-4
 
+# llama.cpp parity test (compares CK kernels against llama.cpp/ggml)
+# Requires llama.cpp submodule: git submodule add https://github.com/ggerganov/llama.cpp.git
+llamacpp-parity:
+	@echo "Running llama.cpp parity smoketest..."
+	@./scripts/run_parity_smoketest.sh --quick
+
+llamacpp-parity-full:
+	@echo "Running full llama.cpp parity test..."
+	@./scripts/run_parity_smoketest.sh
+
 all-tests: $(LIB)
 	$(MAKE) test
 	$(MAKE) layer-parity-scalar TOL=$(ALL_TEST_LAYER_TOL) ARGS="$(ALL_TEST_LAYER_ARGS)"

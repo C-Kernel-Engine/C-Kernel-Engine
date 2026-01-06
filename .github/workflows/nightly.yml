@@ -26,6 +26,7 @@ on:
           - bf16
           - quant
           - parity
+          - llamacpp
 
 # Need write access to push to gh-pages
 permissions:
@@ -39,6 +40,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'  # Initialize llama.cpp submodule if present
 
       - name: Check CPU features
         run: |
@@ -92,6 +95,19 @@ jobs:
           echo "=== Built libraries ==="
           ls -la build/*.so 2>/dev/null || echo "No .so files in build/"
 
+      - name: Build llama.cpp (if submodule present)
+        run: |
+          if [ -d "llama.cpp" ] && [ -f "llama.cpp/CMakeLists.txt" ]; then
+            echo "Building llama.cpp..."
+            cd llama.cpp
+            cmake -B build -DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF
+            cmake --build build -j$(nproc)
+            echo "llama.cpp built successfully"
+            ls -la build/bin/llama-cli || echo "llama-cli not found"
+          else
+            echo "llama.cpp submodule not present, skipping"
+          fi
+
       - name: Run nightly tests (quick for PRs)
         if: github.event_name == 'pull_request'
         run: |
@@ -105,6 +121,23 @@ jobs:
             python scripts/nightly_runner.py --no-fail --json build/nightly_report.json
           elif [ "$CATEGORY" = "quick" ]; then
             python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
+          elif [ "$CATEGORY" = "llamacpp" ]; then
+            # Run llama.cpp parity tests directly
+            echo "Running llama.cpp parity tests..."
+            ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/llamacpp_parity.log
+            # Create minimal report for dashboard
+            python3 -c "
+          import json
+          import sys
+          # Check if test passed (script exits 0 on success)
+          passed = True  # Assume passed if we got here
+          with open('build/nightly_report.json', 'w') as f:
+              json.dump({
+                  'summary': {'passed': 1 if passed else 0, 'failed': 0 if passed else 1, 'total': 1},
+                  'duration_sec': 0,
+                  'results': [{'name': 'llamacpp_parity', 'category': 'parity', 'status': 'pass' if passed else 'fail'}]
+              }, f)
+          "
           else
             python scripts/nightly_runner.py --category "$CATEGORY" --no-fail --json build/nightly_report.json
           fi

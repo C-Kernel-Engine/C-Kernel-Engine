@@ -1,0 +1,45 @@
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index f7ba1fe31..da62ffeb4 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -27,6 +27,7 @@
+ #include <math.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <sys/stat.h>
+ #include <stdint.h>
+ #include <inttypes.h>
+ #include <stdio.h>
+@@ -2944,8 +2945,30 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
+         }
+ 
+         ggml_compute_forward(&params, node);
+-
+-        if (state->ith == 0 && cplan->abort_callback &&
++if (state->ith == 0 && node->name[0] != 0) {
++            // Dump layer 0 intermediate tensors for parity testing
++            // Layer 0 tensors end with "-0" (e.g., Qcur-0, attn_norm-0)
++            const char *name = node->name;
++            int dump_it = 0;
++            // Check for layer 0 suffix (-0)
++            size_t len = strlen(name);
++            if (len >= 2 && name[len-2] == '-' && name[len-1] == '0') dump_it = 1;
++            // Also dump embedding, final outputs
++            if (strstr(name, "output") || strstr(name, "result") ||
++                strstr(name, "embd") || strstr(name, "inp_")) dump_it = 1;
++            if (dump_it) {
++                struct stat st = {0};
++                if (stat("llama_dump", &st) == -1) { mkdir("llama_dump", 0700); }
++                char fname[512];
++                snprintf(fname, sizeof(fname), "llama_dump/%s.bin", name);
++                FILE *f = fopen(fname, "wb");
++                if (f) {
++                    fwrite(node->data, 1, ggml_nbytes(node), f);
++                    fclose(f);
++                    fprintf(stderr, "[DUMP] %s (%zu bytes)\n", name, ggml_nbytes(node));
++                }
++            }
++        }        if (state->ith == 0 && cplan->abort_callback &&
+                 cplan->abort_callback(cplan->abort_callback_data)) {
+             atomic_store_explicit(&tp->abort, node_n + 1, memory_order_relaxed);
+             tp->ec    = GGML_STATUS_ABORTED;
