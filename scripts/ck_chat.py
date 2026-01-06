@@ -30,6 +30,17 @@ from gguf_tokenizer import GGUFTokenizer, Tokenizer as GGUFTokenizerWrapper
 class CKModel:
     """Wrapper for the C model library."""
 
+    # Common EOS token names across different model families
+    EOS_TOKEN_NAMES = [
+        "<|endoftext|>",      # Qwen, GPT-2
+        "<|im_end|>",         # Qwen chat format
+        "</s>",               # Llama, Mistral
+        "<|eot_id|>",         # Llama 3
+        "<eos>",              # Gemma
+        "[EOS]",              # Some models
+        "<|end|>",            # Phi
+    ]
+
     def __init__(self, model_dir: str, parity_dir: str = None):
         self.model_dir = Path(model_dir)
         self.parity_dir = Path(parity_dir) if parity_dir else None
@@ -39,6 +50,7 @@ class CKModel:
         self.context_window = 0
         self.has_kv_decode = False
         self.has_parity = False
+        self.eos_tokens = set()  # Will be populated during load
 
     def load(self, gguf_path: str = None) -> bool:
         """Load model library and tokenizer."""
@@ -145,7 +157,44 @@ class CKModel:
         self.vocab_size = self.lib.ck_model_get_vocab_size()
         self.context_window = self.lib.ck_model_get_context_window()
 
+        # Detect EOS tokens from tokenizer
+        self._detect_eos_tokens()
+
         return True
+
+    def _detect_eos_tokens(self):
+        """Detect EOS token IDs from tokenizer vocabulary."""
+        self.eos_tokens = set()
+
+        # Try to get vocab from tokenizer
+        vocab = None
+        try:
+            # HuggingFace tokenizer
+            if hasattr(self.tokenizer, 'get_vocab'):
+                vocab = self.tokenizer.get_vocab()
+            # Our GGUF tokenizer wrapper
+            elif hasattr(self.tokenizer, '_tokenizer') and hasattr(self.tokenizer._tokenizer, 'vocab'):
+                vocab = self.tokenizer._tokenizer.vocab
+        except Exception:
+            pass
+
+        if vocab:
+            # Look for known EOS token names
+            for name in self.EOS_TOKEN_NAMES:
+                if name in vocab:
+                    self.eos_tokens.add(vocab[name])
+
+        # Always include low token IDs as fallback (PAD, BOS, EOS typically < 3)
+        self.eos_tokens.update([0, 1, 2])
+
+        if len(self.eos_tokens) > 3:  # Found some model-specific ones
+            print(f"Detected EOS tokens: {sorted(self.eos_tokens)}")
+        else:
+            print(f"Using default EOS tokens: {sorted(self.eos_tokens)}")
+
+    def is_eos_token(self, token_id: int) -> bool:
+        """Check if token is an EOS token."""
+        return token_id in self.eos_tokens
 
     def kv_cache_enable(self, capacity: Optional[int] = None) -> bool:
         if not self.has_kv_decode:
@@ -272,7 +321,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             next_token = sample_top_k(logits, k=40, temperature=temperature)
             sample_times.append(time.time() - t_sample)
 
-            if next_token <= 2:
+            if model.is_eos_token(next_token):
                 break
             generated.append(next_token)
             token_ids.append(next_token)
@@ -310,8 +359,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             next_token = sample_top_k(logits, k=40, temperature=temperature)
             sample_times.append(time.time() - t_sample)
 
-            # Check for EOS (typically 0, 1, or 2)
-            if next_token <= 2:
+            # Check for EOS token
+            if model.is_eos_token(next_token):
                 break
 
             generated.append(next_token)
