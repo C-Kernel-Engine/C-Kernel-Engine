@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 #include "ckernel_quant.h"
 
 #ifdef __AVX512F__
@@ -29,6 +30,12 @@
 /* Forward declarations for dequant functions (defined in dequant_kernels.c) */
 void dequant_q5_0_block(const block_q5_0 *block, float *output);
 void dequant_q5_0_row(const void *src, float *dst, size_t n_elements);
+
+void gemm_nt_q5_0_sse_v2(const float *A,
+                         const void *B,
+                         const float *bias,
+                         float *C,
+                         int M, int N, int K);
 
 /* ============================================================================
  * Forward Pass: GEMV y = W @ x
@@ -306,11 +313,11 @@ void gemm_q5_0_backward(float *dX,
  * @param N Output dimension (number of rows in B)
  * @param K Input dimension
  */
-void gemm_nt_q5_0(const float *A,
-                  const void *B,
-                  const float *bias,
-                  float *C,
-                  int M, int N, int K)
+void gemm_nt_q5_0_ref(const float *A,
+                      const void *B,
+                      const float *bias,
+                      float *C,
+                      int M, int N, int K)
 {
     const block_q5_0 *blocks = (const block_q5_0 *)B;
     const int blocks_per_row = K / QK5_0;
@@ -347,6 +354,19 @@ void gemm_nt_q5_0(const float *A,
             C[m * N + n] = sum + (bias ? bias[n] : 0.0f);
         }
     }
+}
+
+void gemm_nt_q5_0(const float *A,
+                  const void *B,
+                  const float *bias,
+                  float *C,
+                  int M, int N, int K)
+{
+#if defined(__SSE4_1__)
+    gemm_nt_q5_0_sse_v2(A, B, bias, C, M, N, K);
+    return;
+#endif
+    gemm_nt_q5_0_ref(A, B, bias, C, M, N, K);
 }
 
 /* ============================================================================

@@ -23,6 +23,11 @@ void gemv_q4_k_q8_k_vnni(float *y,
                          const void *x_q8,
                          int M, int K);
 
+void gemv_q4_k_q8_k_sse(float *y,
+                        const void *W,
+                        const void *x_q8,
+                        int M, int K);
+
 static inline int ck_nearest_int(float fval) {
     /* Bit-level round-to-nearest from llama.cpp (fast + deterministic). */
     float val = fval + 12582912.f;
@@ -31,7 +36,7 @@ static inline int ck_nearest_int(float fval) {
     return (i & 0x007fffff) - 0x00400000;
 }
 
-void quantize_row_q8_k(const float *x, void *vy, int k) {
+void quantize_row_q8_k_ref(const float *x, void *vy, int k) {
     if (!x || !vy || k <= 0) {
         return;
     }
@@ -81,6 +86,16 @@ void quantize_row_q8_k(const float *x, void *vy, int k) {
         y[i].d = 1.0f / iscale;
         x += QK_K;
     }
+}
+
+void quantize_row_q8_k_sse(const float *x, void *vy, int k);
+
+void quantize_row_q8_k(const float *x, void *vy, int k) {
+#if defined(__SSE4_1__)
+    quantize_row_q8_k_sse(x, vy, k);
+#else
+    quantize_row_q8_k_ref(x, vy, k);
+#endif
 }
 
 static float dot_q4_k_q8_k_ref(const block_q4_K *w,
@@ -173,6 +188,8 @@ void gemv_q4_k_q8_k(float *y,
     gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__SSE4_1__)
+    gemv_q4_k_q8_k_sse(y, W, x_q8, M, K);
 #else
     gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
 #endif
