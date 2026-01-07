@@ -168,6 +168,11 @@ class KernelTester:
         """Set up ctypes signatures for llama.cpp functions."""
         lib = self.libggml
 
+        # Init
+        lib.test_init.argtypes = []
+        lib.test_init.restype = None
+        lib.test_init()
+
         # Dequantization
         lib.test_dequant_q4_k.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
         lib.test_dequant_q4_k.restype = None
@@ -327,11 +332,7 @@ class KernelTester:
         return self.compare("dequant_q4_0", ggml_out, ck_out)
 
     def test_gemv_q4k(self, cols: int = 256):
-        """Test Q4_K GEMV (matrix-vector multiply).
-
-        Since ggml_vec_dot_q4_K_q8_K has issues in our test harness,
-        we use dequant+FP32 as reference (dequant already verified to match).
-        """
+        """Test Q4_K GEMV (matrix-vector multiply)."""
         print(f"\n--- test_gemv_q4k (cols={cols}) ---")
 
         if not self.libggml or not self.libck:
@@ -342,13 +343,12 @@ class KernelTester:
         q4k_weights = random_q4k_weights(cols)
         input_f32 = np.random.randn(cols).astype(np.float32)
 
-        # Reference: Dequantize weights to FP32 (using ggml dequant which matches CK)
-        # then compute FP32 dot product
-        dequant_weights = np.zeros(cols, dtype=np.float32)
-        self.libggml.test_dequant_q4_k(q4k_weights,
-                                        dequant_weights.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                                        cols)
-        ref_out = np.array([np.dot(dequant_weights, input_f32)], dtype=np.float32)
+        # GGML gemv (reference)
+        ggml_out = np.zeros(1, dtype=np.float32)
+        self.libggml.test_gemv_q4_k(q4k_weights,
+                                     input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                     ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                     cols)
 
         # CK gemv (quantized)
         ck_out = np.zeros(1, dtype=np.float32)
@@ -357,16 +357,10 @@ class KernelTester:
                                       ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                                       cols)
 
-        # Compare CK quantized GEMV against FP32 reference
-        # Note: some error expected due to Q8_K quantization of activations
-        return self.compare("gemv_q4_k", ref_out, ck_out)
+        return self.compare("gemv_q4_k", ggml_out, ck_out)
 
     def test_gemm_q4k(self, rows: int = 64, cols: int = 256, n_tokens: int = 4):
-        """Test Q4_K GEMM (batched matrix multiply).
-
-        Since ggml_vec_dot_q4_K_q8_K has issues in our test harness,
-        we use dequant+FP32 as reference (dequant already verified to match).
-        """
+        """Test Q4_K GEMM (batched matrix multiply)."""
         print(f"\n--- test_gemm_q4k (rows={rows}, cols={cols}, tokens={n_tokens}) ---")
 
         if not self.libggml or not self.libck:
@@ -376,13 +370,12 @@ class KernelTester:
         q4k_weights = random_q4k_weights(rows * cols)
         input_f32 = np.random.randn(n_tokens, cols).astype(np.float32)
 
-        # Reference: Dequantize weights to FP32, then compute FP32 GEMM
-        dequant_weights = np.zeros(rows * cols, dtype=np.float32)
-        self.libggml.test_dequant_q4_k(q4k_weights,
-                                        dequant_weights.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                                        rows * cols)
-        weight_matrix = dequant_weights.reshape(rows, cols)
-        ref_out = np.dot(input_f32, weight_matrix.T).astype(np.float32)
+        # GGML GEMM (reference)
+        ggml_out = np.zeros((n_tokens, rows), dtype=np.float32)
+        self.libggml.test_gemm_q4_k(q4k_weights,
+                                     input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                     ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                     rows, cols, n_tokens)
 
         # CK GEMM (quantized)
         ck_out = np.zeros((n_tokens, rows), dtype=np.float32)
@@ -391,9 +384,7 @@ class KernelTester:
                                       ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                                       rows, cols, n_tokens)
 
-        # Compare CK quantized GEMM against FP32 reference
-        # Note: some error expected due to Q8_K quantization of activations
-        return self.compare("gemm_q4_k", ref_out, ck_out)
+        return self.compare("gemm_q4_k", ggml_out, ck_out)
 
     def test_rmsnorm(self, n_tokens: int = 4, dim: int = 256):
         """Test RMSNorm."""
@@ -500,7 +491,7 @@ class KernelTester:
 
         return self.compare("softmax", ggml_out, ck_out)
 
-    def run_all(self):
+    def run_all(self, quick=False):
         """Run all kernel tests."""
         print("=" * 70)
         print(f"{BOLD}KERNEL PARITY TESTS: C-Kernel-Engine vs llama.cpp/ggml{RESET}")
@@ -508,31 +499,39 @@ class KernelTester:
 
         # Dequantization kernels
         self.test_dequant_q4k(256)
-        self.test_dequant_q4k(512)
+        if not quick:
+            self.test_dequant_q4k(512)
         self.test_dequant_q4_0(32)
-        self.test_dequant_q4_0(64)
+        if not quick:
+            self.test_dequant_q4_0(64)
 
         # Quantized GEMV/GEMM
         self.test_gemv_q4k(256)
-        self.test_gemv_q4k(512)
+        if not quick:
+            self.test_gemv_q4k(512)
         self.test_gemm_q4k(64, 256, 4)
-        self.test_gemm_q4k(256, 512, 8)
+        if not quick:
+            self.test_gemm_q4k(256, 512, 8)
 
         # Activation kernels
         self.test_rmsnorm(4, 256)
-        self.test_rmsnorm(1, 2048)
+        if not quick:
+            self.test_rmsnorm(1, 2048)
 
         self.test_rope(4, 8, 64)
-        self.test_rope(1, 32, 128)
+        if not quick:
+            self.test_rope(1, 32, 128)
 
         self.test_swiglu(4, 256)
-        self.test_swiglu(1, 1024)
+        if not quick:
+            self.test_swiglu(1, 1024)
 
         self.test_softmax(128)
-        self.test_softmax(512)
+        if not quick:
+            self.test_softmax(512)
 
         # Summary
-        self.print_summary()
+        return self.print_summary()
 
     def print_summary(self):
         """Print test summary."""
@@ -563,6 +562,7 @@ class KernelTester:
 def main():
     parser = argparse.ArgumentParser(description="Kernel-level parity tests: CK vs llama.cpp")
     parser.add_argument("--all", action="store_true", help="Run all tests")
+    parser.add_argument("--quick", action="store_true", help="Run quick tests only")
     parser.add_argument("--kernel", type=str, help="Test specific kernel")
     parser.add_argument("--tol", type=float, default=1e-3, help="Tolerance (default: 1e-3)")
     args = parser.parse_args()
@@ -602,7 +602,7 @@ def main():
             sys.exit(1)
     else:
         # Run all tests
-        success = tester.run_all()
+        success = tester.run_all(quick=args.quick)
         sys.exit(0 if success else 1)
 
 

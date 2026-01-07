@@ -177,22 +177,25 @@ log_step "[3/5] Running kernel-level tests..."
 # Check if test script exists
 KERNEL_TEST="$SCRIPT_DIR/test_kernels_vs_llamacpp.py"
 if [ -f "$KERNEL_TEST" ]; then
+    # Ensure dependencies are found
+    export LD_LIBRARY_PATH="$LLAMA_DIR/build/bin:$BUILD_DIR:$LD_LIBRARY_PATH"
+    
+    set +e
     if [ "$QUICK_MODE" = true ]; then
-        python3 "$KERNEL_TEST" --quick 2>&1 && {
-            log_success "Kernel tests passed"
-            ((TESTS_PASSED++))
-        } || {
-            log_error "Kernel tests failed"
-            ((TESTS_FAILED++))
-        }
+        python3 "$KERNEL_TEST" --quick
+        RET=$?
     else
-        python3 "$KERNEL_TEST" --all 2>&1 && {
-            log_success "Kernel tests passed"
-            ((TESTS_PASSED++))
-        } || {
-            log_error "Kernel tests failed"
-            ((TESTS_FAILED++))
-        }
+        python3 "$KERNEL_TEST" --all
+        RET=$?
+    fi
+    set -e
+
+    if [ $RET -eq 0 ]; then
+        log_success "Kernel tests passed"
+        ((TESTS_PASSED++))
+    else
+        log_error "Kernel tests failed"
+        ((TESTS_FAILED++))
     fi
 else
     log_warn "Kernel test script not found: $KERNEL_TEST"
@@ -218,25 +221,28 @@ fi
 if [ "$KERNELS_ONLY" = false ]; then
     log_step "[4/5] Running PyTorch reference tests..."
 
+    # Ensure engine library can be loaded
+    export LD_LIBRARY_PATH="$ROOT_DIR/build:$LD_LIBRARY_PATH"
+
     PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
     if [ -f "$PYTORCH_TEST" ]; then
+        set +e
         if [ "$QUICK_MODE" = true ]; then
             # Quick mode: run subset
-            python3 "$PYTORCH_TEST" -k "gemm or rmsnorm or softmax" 2>&1 && {
-                log_success "PyTorch reference tests passed"
-                ((TESTS_PASSED++))
-            } || {
-                log_error "PyTorch reference tests failed"
-                ((TESTS_FAILED++))
-            }
+            python3 "$PYTORCH_TEST" --quick
+            RET=$?
         else
-            python3 "$PYTORCH_TEST" 2>&1 && {
-                log_success "PyTorch reference tests passed"
-                ((TESTS_PASSED++))
-            } || {
-                log_error "PyTorch reference tests failed"
-                ((TESTS_FAILED++))
-            }
+            python3 "$PYTORCH_TEST"
+            RET=$?
+        fi
+        set -e
+
+        if [ $RET -eq 0 ]; then
+            log_success "PyTorch reference tests passed"
+            ((TESTS_PASSED++))
+        else
+            log_error "PyTorch reference tests failed"
+            ((TESTS_FAILED++))
         fi
     else
         log_warn "PyTorch parity test not found"

@@ -197,13 +197,16 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q4_0.c \
 	           src/kernels/gemm_kernels_q4_1.c \
 	           src/kernels/gemm_kernels_q5_0.c \
+	           src/kernels/gemm_kernels_q5_0_sse_v2.c \
 	           src/kernels/gemm_kernels_q5_1.c \
 	           src/kernels/gemm_kernels_q4k.c \
+	           src/kernels/gemm_kernels_q4k_sse.c \
 	           src/kernels/gemm_kernels_q6k.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
 	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
 	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
 	           src/kernels/gemm_kernels_q8_0.c \
+	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/gemm_kernels_f16.c \
 	           src/kernels/optimizer_kernels.c \
 	           src/kernels/optimizer_kernels_bf16.c \
@@ -220,6 +223,12 @@ LIB_RELU     := $(BUILD_DIR)/libckernel_relu.so
 LIB_VISION   := $(BUILD_DIR)/libckernel_vision.so
 LIB_ATTENTION := $(BUILD_DIR)/libckernel_attention.so
 LIB_ROPE     := $(BUILD_DIR)/libckernel_rope.so
+
+# Tokenizer library (new - from src/tokenizer/)
+SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
+                  src/tokenizer/hash_table.c \
+                  src/tokenizer/tokenizer.c
+LIB_TOKENIZER := $(BUILD_DIR)/libckernel_tokenizer.so
 
 IR_DEMO := $(BUILD_DIR)/ck_ir_demo
 IR_V2_DEMO := $(BUILD_DIR)/ck_ir_v2_demo
@@ -388,6 +397,13 @@ ck-v2: $(IR_V2_DEMO)
 	./$(IR_V2_DEMO) $(DEFAULT_CONFIG)
 
 ck_V2: ck-v2
+
+# Tokenizer library
+$(LIB_TOKENIZER): $(SRCS_TOKENIZER)
+	$(CC) $(CFLAGS) -shared -o $@ $(SRCS_TOKENIZER) -lm
+
+tokenizer: $(LIB_TOKENIZER)
+	@echo "Tokenizer library built: $(LIB_TOKENIZER)"
 	@true
 
 ir-v2-meta: $(IR_V2_DEMO)
@@ -1257,6 +1273,9 @@ help:
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f ~/.cache/ck-engine-v5/models/*/libmodel.so
+	rm -f ~/.cache/ck-engine-v5/models/*/model.c
+	rm -f ~/.cache/ck-engine-v5/models/*/*.o
 
 # =============================================================================
 # Parity Testing: CK vs llama.cpp/ggml
@@ -1269,11 +1288,15 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q4k_q8k.c \
                src/kernels/gemm_kernels_q4k_q8k_avx2.c \
                src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+               src/kernels/gemm_kernels_q4k_sse.c \
+               src/kernels/gemm_kernels_q5_0.c \
+               src/kernels/gemm_kernels_q5_0_sse_v2.c \
+               src/kernels/quantize_row_q8_k_sse.c \
                src/kernels/rmsnorm_kernels.c \
                src/kernels/rope_kernels.c \
                src/kernels/swiglu_kernels.c \
                src/kernels/softmax_kernels.c \
-               src/kernels/sigmoid_kernels.c
+               src/kernels/sigmoid_kernels.c \
 
 LIB_PARITY := $(BUILD_DIR)/libck_parity.so
 

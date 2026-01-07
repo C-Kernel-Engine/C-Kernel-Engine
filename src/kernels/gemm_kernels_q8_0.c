@@ -21,6 +21,8 @@
 #include <string.h>
 #include "ckernel_quant.h"
 
+void quantize_row_q8_k(const float *x, void *vy, int k);
+
 #ifdef __AVX512F__
 #include <immintrin.h>
 #endif
@@ -217,10 +219,11 @@ void gemm_nt_q8_0_sse(const float *A,
         quantize_row_q8_k(&A[m * K], A_q8, K);
 
         for (int n = 0; n < N; n++) {
-            __m128i acc_i32 = _mm_setzero_si128();
+            float sumf = 0.0f;
             const block_q8_0 *w_row = weights + n * blocks_per_row;
 
             for (int b = 0; b < blocks_per_row; b++) {
+                __m128i acc_i32 = _mm_setzero_si128();
                 int q8_block_idx = (b * 32) / QK_K;
                 int q8_offset = (b * 32) % QK_K;
                 
@@ -230,11 +233,6 @@ void gemm_nt_q8_0_sse(const float *A,
                 __m128i va1 = _mm_loadu_si128((const __m128i *)&A_q8[q8_block_idx].qs[q8_offset + 16]);
 
                 // dot(q8_w, q8_a)
-                __m128i p0 = _mm_maddubs_epi16(vw0, va0); // Error: q8_0 is signed, q8_k is signed. 
-                // maddubs is unsigned * signed.
-                // We need signed * signed.
-                // madd_epi16 is signed * signed.
-                
                 __m128i vw0_lo = _mm_cvtepi8_epi16(vw0);
                 __m128i vw0_hi = _mm_cvtepi8_epi16(_mm_srli_si128(vw0, 8));
                 __m128i va0_lo = _mm_cvtepi8_epi16(va0);
@@ -251,12 +249,21 @@ void gemm_nt_q8_0_sse(const float *A,
                 acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw1_lo, va1_lo));
                 acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw1_hi, va1_hi));
                 
-                // Scale by d_w later? No, per block.
-                // sum += dot * d_w * d_a
-                // This is still slow if we do it per block.
+                // Scale by per-block deltas
+                // Note: Q8_0 has per-block d, Q8_K has per-block d.
+                // For Q8_0, each block is 32 elements.
+                // For Q8_K, each block is 256 elements.
+                
+                // Horizontal sum of acc_i32
+                __m128i shuf = _mm_shuffle_epi32(acc_i32, _MM_SHUFFLE(1, 0, 3, 2));
+                __m128i sums = _mm_add_epi32(acc_i32, shuf);
+                shuf = _mm_shuffle_epi32(sums, _MM_SHUFFLE(2, 3, 0, 1));
+                sums = _mm_add_epi32(sums, shuf);
+                int32_t dot_wa = _mm_cvtsi128_si32(sums);
+
+                sumf += (float)dot_wa * CK_FP16_TO_FP32(w_row[b].d) * A_q8[q8_block_idx].d;
             }
-            // Better to scale after the K loop if scales were same, but they aren't.
-            // Reference Q8_0 has per-block scale.
+            C[m * N + n] = sumf + (bias ? bias[n] : 0.0f);
         }
     }
 }
@@ -280,13 +287,7 @@ void gemm_nt_q8_0(const float *A,
                   int M, int N, int K)
 {
 #if defined(__SSE4_1__)
-    // For now use gemv unrolled as it's safer
-    for (int m = 0; m < M; m++) {
-        gemv_q8_0_sse(&C[m * N], B, &A[m * K], N, K);
-        if (bias) {
-            for (int n = 0; n < N; n++) C[m * N + n] += bias[n];
-        }
-    }
+    gemm_nt_q8_0_sse(A, B, bias, C, M, N, K);
     return;
 #endif
 

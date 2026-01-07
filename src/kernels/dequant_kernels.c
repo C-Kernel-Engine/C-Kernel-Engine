@@ -33,13 +33,13 @@ void dequant_q4_0_block(const block_q4_0 *block, float *output)
     for (int i = 0; i < QK4_0 / 2; i++) {
         const uint8_t packed = block->qs[i];
 
-        /* Lower nibble: subtract 8 to get signed value */
+        /* Lower nibble: elements 0..15 */
         const int8_t q0 = (packed & 0x0F) - 8;
-        /* Upper nibble: subtract 8 to get signed value */
+        /* Upper nibble: elements 16..31 */
         const int8_t q1 = (packed >> 4) - 8;
 
-        output[2*i + 0] = d * (float)q0;
-        output[2*i + 1] = d * (float)q1;
+        output[i] = d * (float)q0;
+        output[i + QK4_0 / 2] = d * (float)q1;
     }
 }
 
@@ -119,8 +119,8 @@ void dequant_q4_1_block(const block_q4_1 *block, float *output)
         const int q1 = (packed >> 4);
 
         /* Dequantize: w = d * q + m */
-        output[2*i + 0] = d * (float)q0 + m;
-        output[2*i + 1] = d * (float)q1 + m;
+        output[i] = d * (float)q0 + m;
+        output[i + QK4_1 / 2] = d * (float)q1 + m;
     }
 }
 

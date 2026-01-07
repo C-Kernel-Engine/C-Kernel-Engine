@@ -332,6 +332,14 @@ typedef ck_half ggml_half;
 #define GGML_FP16_TO_FP32 CK_FP16_TO_FP32
 #define GGML_FP32_TO_FP16 CK_FP32_TO_FP16
 
+/* ============================================================================
+ * SSE Optimized Kernels
+ * ============================================================================ */
+
+void gemm_nt_q5_0_sse_v2(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemv_q4_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K);
+void quantize_row_q8_k_sse(const float *x, void *vy, int k);
+
 #ifdef __cplusplus
 }
 #endif
