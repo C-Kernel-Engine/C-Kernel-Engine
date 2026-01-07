@@ -146,6 +146,8 @@ SRCS    := src/backend_native.c \
            src/ckernel_model_layout.c \
            src/ckernel_model_load.c \
            src/ckernel_model_load_v4.c \
+           src/ck_tokenizer.c \
+           src/ck_tokenizer_v2.c \
            src/cpu_features.c \
             src/kernels/gemm_kernels.c \
             src/kernels/gemm_fused_kernels.c \
@@ -1395,6 +1397,12 @@ ck-cli: $(LIB) $(IR_DEMO) $(BUILD_DIR)/ck
 	@echo "  To install system-wide:"
 	@echo "    sudo cp $(BUILD_DIR)/ck /usr/local/bin/"
 	@echo ""
+
+$(BUILD_DIR)/ck-cli-v5: src/ck_cli_v5.c src/ck_tokenizer_v2.c $(LIB)
+	$(CC) $(CFLAGS) -o $@ src/ck_cli_v5.c src/ck_tokenizer_v2.c -L$(BUILD_DIR) -lckernel_engine -ldl -lpthread -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v5-native: $(BUILD_DIR)/ck-cli-v5
+	@echo "Native V5 CLI built: $<"
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
 ck-cli-v4: $(LIB)
