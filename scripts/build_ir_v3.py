@@ -141,6 +141,8 @@ DTYPE_BYTES = {
     "i32": 4,
     "i16": 2,
     "i8": 1,
+    "u8": 1,
+    "u16": 2,
 }
 
 # Quantized types: (block_size, bytes_per_block) - llama.cpp compatible
@@ -1076,6 +1078,8 @@ def emit_c_header(layout: ModelLayout, output_path: str, extra_api: Optional[Lis
     add(f"#define {safe_name}_NUM_LAYERS         {config['num_layers']}")
     add(f"#define {safe_name}_VOCAB_SIZE         {config['vocab_size']}")
     add(f"#define {safe_name}_MAX_SEQ_LEN        {config['max_seq_len']}")
+    add(f"#define {safe_name}_NUM_MERGES         {config.get('num_merges', 0)}")
+    add(f"#define {safe_name}_TOTAL_VOCAB_BYTES  {config.get('total_vocab_bytes', 0)}")
     add(f"#define {safe_name}_DTYPE_BYTES        {DTYPE_BYTES[config['dtype']]}")
     add()
     add(f"#define {safe_name}_TOTAL_BYTES        {layout.total_bytes}ULL")

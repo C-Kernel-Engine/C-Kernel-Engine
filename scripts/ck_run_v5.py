@@ -674,12 +674,50 @@ int ck_model_get_vocab_size(void) {{
     return {safe_name}_VOCAB_SIZE;
 }}
 
+int ck_model_get_num_merges(void) {{
+    return {safe_name}_NUM_MERGES;
+}}
+
+int ck_model_get_vocab_strings_size(void) {{
+    return {safe_name}_TOTAL_VOCAB_BYTES;
+}}
+
 int ck_model_get_context_window(void) {{
     return {safe_name}_MAX_SEQ_LEN;
 }}
 
 int ck_model_get_active_tokens(void) {{
     return g_active_tokens;
+}}
+
+int ck_model_sample_argmax(void) {{
+    if (!g_initialized || !g_logits) return -1;
+    int vocab_size = {safe_name}_VOCAB_SIZE;
+    float *logits = g_logits + (size_t)(g_active_tokens - 1) * vocab_size;
+    int best_token = 0;
+    float max_logit = -1e30f;
+    for (int i = 0; i < vocab_size; i++) {{
+        if (logits[i] > max_logit) {{
+            max_logit = logits[i];
+            best_token = i;
+        }}
+    }}
+    return best_token;
+}}
+
+void *ck_model_get_vocab_offsets(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_offsets);
+}}
+
+void *ck_model_get_vocab_strings(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_strings);
+}}
+
+void *ck_model_get_vocab_merges(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_merges);
 }}
 
 int ck_model_verify_canaries(void) {{
@@ -710,7 +748,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         src_dir = PROJECT_ROOT / "src" / "kernels"
         kernel_sources = [str(f) for f in src_dir.glob("*.c")]
     extra_sources = [
-        PROJECT_ROOT / "src" / "ckernel_model_load_v4.c",
+        PROJECT_ROOT / "src" / "v4_legacy" / "ckernel_model_load_v4.c",
         PROJECT_ROOT / "src" / "ckernel_orchestration.c",
         PROJECT_ROOT / "src" / "ckernel_strict.c",
         PROJECT_ROOT / "src" / "cpu_features.c",
@@ -724,7 +762,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
 
     # Build command
     cmd = [
-        "gcc", "-O3", "-fPIC", "-fopenmp", "-shared",
+        "gcc", "-O3", "-march=native", "-fPIC", "-fopenmp", "-shared",
         f"-I{PROJECT_ROOT / 'include'}",
         "-o", str(lib_path),
         str(model_c_path),
@@ -1110,10 +1148,35 @@ def run_pipeline(args: argparse.Namespace):
     # If debug or parity is enabled, force recompile to ensure special code is generated
     force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
     manifest_for_dtype = None
+    
+    # Vocabulary metadata
+    num_merges = 0
+    total_vocab_bytes = 0
+
     if manifest_path and manifest_path.exists():
         manifest_for_dtype = manifest_path
+        try:
+            with open(manifest_path, "r") as f:
+                mdata = json.load(f)
+                num_merges = mdata.get("num_merges", 0)
+                total_vocab_bytes = mdata.get("total_vocab_bytes", 0)
+        except Exception:
+            pass
     elif manifest_input_path and manifest_input_path.exists():
         manifest_for_dtype = manifest_input_path
+
+    # Inject metadata into config.json for build_ir_v5
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                cfg_data = json.load(f)
+            cfg_data["num_merges"] = num_merges
+            cfg_data["total_vocab_bytes"] = total_vocab_bytes
+            with open(config_path, "w") as f:
+                json.dump(cfg_data, f, indent=2)
+        except Exception:
+            pass
+
     weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_for_dtype)
     layout_path = step_build_ir(
         config_path, work_dir,

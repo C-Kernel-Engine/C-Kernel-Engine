@@ -189,6 +189,8 @@ def build_graph_ir_v5(config: Dict, model_name: str, alignment_bytes: int = 64) 
         "AC": {"name": "aligned_context", "value": AC},
         "S": {"name": "tokens", "value": T},
         "V": {"name": "vocab_size", "value": V},
+        "NUM_MERGES": {"name": "num_merges", "value": config.get("num_merges", 0)},
+        "VOCAB_BYTES": {"name": "total_vocab_bytes", "value": config.get("total_vocab_bytes", 0)},
         # Training-specific symbols (set during lowering)
         "B": {"name": "batch_size", "value": 1},
         "MB": {"name": "micro_batch_size", "value": 1},
@@ -223,6 +225,10 @@ def build_graph_ir_v5(config: Dict, model_name: str, alignment_bytes: int = 64) 
 
     header_buffers = [
         buf("token_emb", "weight", ["V", "AE"]),
+        # Vocabulary binary data (part of model weights)
+        buf("vocab_offsets", "weight", ["V"], buf_dtype="i32"),
+        buf("vocab_strings", "weight", ["VOCAB_BYTES"], buf_dtype="u8"),
+        buf("vocab_merges", "weight", ["NUM_MERGES", "3"], buf_dtype="i32"),
         buf("embedded_input", "activation", ["S", "AE"]),
         # Backward gradients
         buf("d_embedded_input", "gradient", ["S", "AE"], when=["backward", "training"]),
@@ -1165,7 +1171,7 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
         footer_ops_source = section["footer"]["ops"]
 
     # Track used buffers
-    used_bufs = {"header": set(), "footer": set(), "globals": set(), "layer": set()}
+    used_bufs = {"header": {"vocab_offsets", "vocab_strings", "vocab_merges"}, "footer": set(), "globals": set(), "layer": set()}
 
     # Header ops (no layer expansion)
     header_ops = process_ops(header_ops_source, 0, {}, used_bufs, skip_registry)

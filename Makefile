@@ -46,8 +46,16 @@ else ifneq (,$(findstring avx,$(CPU_FLAGS)))
 DEFAULT_AVX_FLAGS := -mavx $(FMA_FLAGS)
 endif
 AVX_FLAGS ?= $(DEFAULT_AVX_FLAGS)
+
+# Detect SSSE3 support (needed for _mm_maddubs_epi16 etc.)
+ifneq (,$(findstring ssse3,$(CPU_FLAGS)))
+SSSE3_FLAGS := -mssse3
+else
+SSSE3_FLAGS :=
+endif
+
 INCLUDES := -Iinclude
-CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) -Wall $(AVX_FLAGS) $(INCLUDES)
+CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
 CXX ?= g++
 BENCH_CC ?= gcc
 BENCH_CXX ?= $(CXX)
@@ -126,17 +134,21 @@ ifndef USE_ONEDNN
 endif
 endif
 
+SRCS_v2 := src/v2_legacy/ckernel_ir_v2.c \
+            src/v2_legacy/ckernel_ir_v2_builder.c \
+            src/v2_legacy/ckernel_ir_v2_lower.c \
+            src/v2_legacy/ckernel_codegen_v2.c \
+            src/v2_legacy/ckernel_codegen_v2_struct.c \
+            src/v2_legacy/ckernel_codegen_v2_dispatch.c \
+            src/v2_legacy/ckernel_codegen_v2_schedule.c \
+            src/v2_legacy/ckernel_codegen_v2_sections.c \
+            src/v2_legacy/ck_tokenizer_v2.c \
+
+SRCS_v4 := src/ckernel_model_load_v4.c \
+
 SRCS    := src/backend_native.c \
            src/ckernel_ir.c \
-           src/ckernel_ir_v2.c \
-           src/ckernel_ir_v2_builder.c \
-           src/ckernel_ir_v2_lower.c \
            src/ckernel_codegen.c \
-           src/ckernel_codegen_v2.c \
-           src/ckernel_codegen_v2_struct.c \
-           src/ckernel_codegen_v2_dispatch.c \
-           src/ckernel_codegen_v2_schedule.c \
-           src/ckernel_codegen_v2_sections.c \
            src/ckernel_kernel_specs.c \
            src/ckernel_mem_plan.c \
            src/ckernel_alloc.c \
@@ -145,9 +157,7 @@ SRCS    := src/backend_native.c \
            src/ckernel_orchestration.c \
            src/ckernel_model_layout.c \
            src/ckernel_model_load.c \
-           src/ckernel_model_load_v4.c \
            src/ck_tokenizer.c \
-           src/ck_tokenizer_v2.c \
            src/cpu_features.c \
             src/kernels/gemm_kernels.c \
             src/kernels/gemm_fused_kernels.c \
