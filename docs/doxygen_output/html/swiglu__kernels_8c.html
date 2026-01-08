@@ -244,8 +244,8 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
 <div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;        <span class="comment">// AVX1: Vectorize arithmetic, use scalar sigmoid</span></div>
 <div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;        __m256 one = _mm256_set1_ps(1.0f);</div>
-<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;        <span class="keywordtype">float</span> a_arr[8] <a class="code" href="gemm__kernels__bf16_8c.html#a36f229bbda63818246ec86181b1fdd42">__attribute__</a>((aligned(32)));</div>
-<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;        <span class="keywordtype">float</span> s_arr[8] <a class="code" href="gemm__kernels__bf16_8c.html#a36f229bbda63818246ec86181b1fdd42">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;        <span class="keywordtype">float</span> a_arr[8] <a class="code" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;        <span class="keywordtype">float</span> s_arr[8] <a class="code" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
 <div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160; </div>
 <div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
 <div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
@@ -295,11 +295,11 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00300"></a><span class="lineno">  300</span>&#160;    }</div>
 <div class="line"><a name="l00301"></a><span class="lineno">  301</span>&#160;}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aaa76ef661048368434b452a237bc3669"><div class="ttname"><a href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a></div><div class="ttdeci">float sigmoid_scalar(float x)</div><div class="ttdef"><b>Definition:</b> <a href="sigmoid__kernels_8c_source.html#l00011">sigmoid_kernels.c:11</a></div></div>
-<div class="ttc" id="agemm__kernels__bf16_8c_html_a36f229bbda63818246ec86181b1fdd42"><div class="ttname"><a href="gemm__kernels__bf16_8c.html#a36f229bbda63818246ec86181b1fdd42">__attribute__</a></div><div class="ttdeci">__attribute__((unused))</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__bf16_8c_source.html#l00041">gemm_kernels_bf16.c:41</a></div></div>
+<div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__bf16_8c_source.html#l00041">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02410">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -455,8 +455,8 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00147"></a><span class="lineno">  147</span>&#160;        }</div>
 <div class="line"><a name="l00148"></a><span class="lineno">  148</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
 <div class="line"><a name="l00149"></a><span class="lineno">  149</span>&#160;        <span class="comment">// AVX1: Vectorize arithmetic, use scalar sigmoid</span></div>
-<div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;        <span class="keywordtype">float</span> a_arr[8] <a class="code" href="gemm__kernels__bf16_8c.html#a36f229bbda63818246ec86181b1fdd42">__attribute__</a>((aligned(32)));</div>
-<div class="line"><a name="l00151"></a><span class="lineno">  151</span>&#160;        <span class="keywordtype">float</span> s_arr[8] <a class="code" href="gemm__kernels__bf16_8c.html#a36f229bbda63818246ec86181b1fdd42">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;        <span class="keywordtype">float</span> a_arr[8] <a class="code" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a name="l00151"></a><span class="lineno">  151</span>&#160;        <span class="keywordtype">float</span> s_arr[8] <a class="code" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
 <div class="line"><a name="l00152"></a><span class="lineno">  152</span>&#160; </div>
 <div class="line"><a name="l00153"></a><span class="lineno">  153</span>&#160;        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
 <div class="line"><a name="l00154"></a><span class="lineno">  154</span>&#160;            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
@@ -489,9 +489,9 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00181"></a><span class="lineno">  181</span>&#160;    }</div>
 <div class="line"><a name="l00182"></a><span class="lineno">  182</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__bf16_8c_source.html#l00041">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00705">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00347">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00393">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01550">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00369">ck_mlp_swiglu_forward_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00727">ck_mlp_swiglu_forward_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00830">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00467">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00513">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01686">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00489">ck_mlp_swiglu_forward_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00852">ck_mlp_swiglu_forward_ref()</a>, and <a class="el" href="ck__parity__api_8c_source.html#l00306">ck_test_swiglu()</a>.</p>
 
 </div>
 </div>

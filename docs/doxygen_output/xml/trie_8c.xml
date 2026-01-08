@@ -1,0 +1,486 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="trie_8c" kind="file" language="C++">
+    <compoundname>trie.c</compoundname>
+    <includes local="no">stdio.h</includes>
+    <includes local="no">stdlib.h</includes>
+    <includes local="no">string.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdbool.h</includes>
+    <includes local="yes">data_structures/tries/trie.h</includes>
+    <incdepgraph>
+      <node id="6">
+        <label>stdbool.h</label>
+      </node>
+      <node id="1">
+        <label>trie.c</label>
+        <link refid="trie_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stdlib.h</label>
+      </node>
+      <node id="4">
+        <label>string.h</label>
+      </node>
+      <node id="7">
+        <label>data_structures/tries/trie.h</label>
+      </node>
+      <node id="2">
+        <label>stdio.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="trie_8c_1a40e9010120e61b5e94dd0bd1f0b6b41d" prot="public" static="no">
+        <name>DEFAULT_MAX_NODES</name>
+        <initializer>1000000</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="16" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="16" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="trie_8c_1a245a64683ba5bb40cdffa0c4a6de6980" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_trie_clear</definition>
+        <argsstring>(CKTrie *trie)</argsstring>
+        <name>ck_trie_clear</name>
+        <param>
+          <type><ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="80" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="80" bodyend="108"/>
+        <references refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" compoundref="include_2data__structures_2tries_2trie_8h" startline="21">CKTrieNode::children</references>
+        <references refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" compoundref="include_2data__structures_2tries_2trie_8h" startline="36">CKTrie::node_count</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <references refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" compoundref="include_2data__structures_2tries_2trie_8h" startline="24">CKTrieNode::token_id</references>
+        <referencedby refid="tokenizer_8c_1ac7d72e1402cc099d9307f86e01099bb2" compoundref="tokenizer_8c" startline="144" endline="161">ck_tokenizer_reset</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1ae53d1f895db72f9ef152b97ddfe032de" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+        <definition>CKTrie* ck_trie_create</definition>
+        <argsstring>(size_t max_nodes)</argsstring>
+        <name>ck_trie_create</name>
+        <param>
+          <type>size_t</type>
+          <declname>max_nodes</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="29" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="29" bodyend="49"/>
+        <references refid="trie_8c_1afaaf2986c8608c017775c4da52193900" compoundref="trie_8c" startline="19" endline="27">create_node</references>
+        <references refid="trie_8c_1a40e9010120e61b5e94dd0bd1f0b6b41d" compoundref="trie_8c" startline="16">DEFAULT_MAX_NODES</references>
+        <references refid="structCKTrie_1a82ef124b5228ed534e3b9d861c12ad21" compoundref="include_2data__structures_2tries_2trie_8h" startline="37">CKTrie::max_nodes</references>
+        <references refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" compoundref="include_2data__structures_2tries_2trie_8h" startline="36">CKTrie::node_count</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1a77957858c36d4cf9efea8049948f7df3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int32_t</type>
+        <definition>int32_t ck_trie_find_longest</definition>
+        <argsstring>(const CKTrie *trie, const char *text, size_t text_len, size_t start_pos, size_t *match_len)</argsstring>
+        <name>ck_trie_find_longest</name>
+        <param>
+          <type>const <ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>text</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>text_len</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>start_pos</declname>
+        </param>
+        <param>
+          <type>size_t *</type>
+          <declname>match_len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="142" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="142" bodyend="179"/>
+        <references refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" compoundref="include_2data__structures_2tries_2trie_8h" startline="21">CKTrieNode::children</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <references refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" compoundref="tokenizer_8h" startline="464">text</references>
+        <references refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" compoundref="include_2data__structures_2tries_2trie_8h" startline="24">CKTrieNode::token_id</references>
+        <referencedby refid="tokenizer_8c_1ac300919bef1f23da17327134992f7490" compoundref="tokenizer_8c" startline="270" endline="278">find_longest_match_trie</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1ab747873883085231decec598e26d69ff" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_trie_free</definition>
+        <argsstring>(CKTrie *trie)</argsstring>
+        <name>ck_trie_free</name>
+        <param>
+          <type><ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="51" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="51" bodyend="78"/>
+        <references refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" compoundref="include_2data__structures_2tries_2trie_8h" startline="21">CKTrieNode::children</references>
+        <references refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" compoundref="include_2data__structures_2tries_2trie_8h" startline="36">CKTrie::node_count</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <referencedby refid="tokenizer_8c_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="tokenizer_8c" startline="115" endline="141">ck_tokenizer_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1aac71332e656ae70059359842c870230e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>bool</type>
+        <definition>bool ck_trie_has_prefix</definition>
+        <argsstring>(const CKTrie *trie, const char *text, size_t text_len, size_t pos)</argsstring>
+        <name>ck_trie_has_prefix</name>
+        <param>
+          <type>const <ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>text</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>text_len</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>pos</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="181" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="181" bodyend="193"/>
+        <references refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" compoundref="include_2data__structures_2tries_2trie_8h" startline="21">CKTrieNode::children</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <references refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" compoundref="tokenizer_8h" startline="464">text</references>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1a7b254dc2cd5611e6eee69114e479266d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_trie_insert</definition>
+        <argsstring>(CKTrie *trie, const char *token, int32_t token_id, bool is_special, int32_t priority)</argsstring>
+        <name>ck_trie_insert</name>
+        <param>
+          <type><ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>token</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>token_id</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>is_special</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>priority</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="110" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="110" bodyend="140"/>
+        <references refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" compoundref="include_2data__structures_2tries_2trie_8h" startline="21">CKTrieNode::children</references>
+        <references refid="trie_8c_1afaaf2986c8608c017775c4da52193900" compoundref="trie_8c" startline="19" endline="27">create_node</references>
+        <references refid="structCKTrieNode_1a316472d591daedc90299616e28bda4da" compoundref="include_2data__structures_2tries_2trie_8h" startline="27">CKTrieNode::is_special</references>
+        <references refid="structCKTrie_1a82ef124b5228ed534e3b9d861c12ad21" compoundref="include_2data__structures_2tries_2trie_8h" startline="37">CKTrie::max_nodes</references>
+        <references refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" compoundref="include_2data__structures_2tries_2trie_8h" startline="36">CKTrie::node_count</references>
+        <references refid="structCKTrieNode_1aace4764a43a80b9f2039dd91fb50c649" compoundref="include_2data__structures_2tries_2trie_8h" startline="30">CKTrieNode::priority</references>
+        <references refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" compoundref="include_2data__structures_2tries_2trie_8h" startline="35">CKTrie::root</references>
+        <references refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" compoundref="tokenizer_8h" startline="232">token</references>
+        <references refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" compoundref="include_2data__structures_2tries_2trie_8h" startline="24">CKTrieNode::token_id</references>
+        <referencedby refid="tokenizer_8h_1ad6c5fe6b7a2df85a99504e702348a0bb" compoundref="tokenizer_8c" startline="220" endline="238">ck_tokenizer_add_special_token</referencedby>
+        <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1ab8035bc5fe0a2b35f00ee8acbba4cba3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_trie_node_count</definition>
+        <argsstring>(const CKTrie *trie)</argsstring>
+        <name>ck_trie_node_count</name>
+        <param>
+          <type>const <ref refid="structCKTrie" kindref="compound">CKTrie</ref> *</type>
+          <declname>trie</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="195" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="195" bodyend="197"/>
+        <references refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" compoundref="include_2data__structures_2tries_2trie_8h" startline="36">CKTrie::node_count</references>
+      </memberdef>
+      <memberdef kind="function" id="trie_8c_1afaaf2986c8608c017775c4da52193900" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref> *</type>
+        <definition>static CKTrieNode* create_node</definition>
+        <argsstring>(void)</argsstring>
+        <name>create_node</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" line="19" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c" bodystart="19" bodyend="27"/>
+        <references refid="structCKTrieNode_1a316472d591daedc90299616e28bda4da" compoundref="include_2data__structures_2tries_2trie_8h" startline="27">CKTrieNode::is_special</references>
+        <references refid="structCKTrieNode_1aace4764a43a80b9f2039dd91fb50c649" compoundref="include_2data__structures_2tries_2trie_8h" startline="30">CKTrieNode::priority</references>
+        <references refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" compoundref="include_2data__structures_2tries_2trie_8h" startline="24">CKTrieNode::token_id</references>
+        <referencedby refid="include_2data__structures_2tries_2trie_8h_1ae53d1f895db72f9ef152b97ddfe032de" compoundref="trie_8c" startline="29" endline="49">ck_trie_create</referencedby>
+        <referencedby refid="include_2data__structures_2tries_2trie_8h_1a7b254dc2cd5611e6eee69114e479266d" compoundref="trie_8c" startline="110" endline="140">ck_trie_insert</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Trie<sp/>Implementation</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>High-performance<sp/>trie<sp/>for<sp/>token<sp/>lookups</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdbool.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;data_structures/tries/trie.h&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Default<sp/>max<sp/>nodes<sp/>for<sp/>a<sp/>vocabulary<sp/>of<sp/>~50k<sp/>tokens<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16" refid="trie_8c_1a40e9010120e61b5e94dd0bd1f0b6b41d" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>DEFAULT_MAX_NODES<sp/>1000000</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Create<sp/>a<sp/>new<sp/>trie<sp/>node<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19" refid="trie_8c_1afaaf2986c8608c017775c4da52193900" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*<ref refid="trie_8c_1afaaf2986c8608c017775c4da52193900" kindref="member">create_node</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*)calloc(1,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref>));</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(node)<sp/>{</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kindref="member">token_id</ref><sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1a316472d591daedc90299616e28bda4da" kindref="member">is_special</ref><sp/>=<sp/></highlight><highlight class="keyword">false</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1aace4764a43a80b9f2039dd91fb50c649" kindref="member">priority</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>node;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29" refid="include_2data__structures_2tries_2trie_8h_1ae53d1f895db72f9ef152b97ddfe032de" refkind="member"><highlight class="normal"><ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*<ref refid="trie_8c_1ae53d1f895db72f9ef152b97ddfe032de" kindref="member">ck_trie_create</ref>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>max_nodes)<sp/>{</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie<sp/>=<sp/>(<ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*)malloc(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTrie" kindref="compound">CKTrie</ref>));</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie)<sp/>{</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max_nodes<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>max_nodes<sp/>=<sp/><ref refid="trie_8c_1a40e9010120e61b5e94dd0bd1f0b6b41d" kindref="member">DEFAULT_MAX_NODES</ref>;</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref><sp/>=<sp/><ref refid="trie_8c_1afaaf2986c8608c017775c4da52193900" kindref="member">create_node</ref>();</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(trie);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"></highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/>trie-&gt;<ref refid="structCKTrie_1a82ef124b5228ed534e3b9d861c12ad21" kindref="member">max_nodes</ref><sp/>=<sp/>max_nodes;</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/>trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>=<sp/>1;<sp/></highlight><highlight class="comment">/*<sp/>Root<sp/>node<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>trie;</highlight></codeline>
+<codeline lineno="49"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"></highlight></codeline>
+<codeline lineno="51" refid="include_2data__structures_2tries_2trie_8h_1ab747873883085231decec598e26d69ff" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="trie_8c_1ab747873883085231decec598e26d69ff" kindref="member">ck_trie_free</ref>(<ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie)<sp/>{</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Free<sp/>all<sp/>nodes<sp/>using<sp/>BFS<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>**queue<sp/>=<sp/>(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>**)malloc(trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*));</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!queue)<sp/>{</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Fallback<sp/>to<sp/>simple<sp/>free<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>);</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(trie);</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head<sp/>=<sp/>0,<sp/>tail<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/>queue[tail++]<sp/>=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>;</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(head<sp/>&lt;<sp/>tail)<sp/>{</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>queue[head++];</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>256;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[i])<sp/>{</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>queue[tail++]<sp/>=<sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[i];</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(node);</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/>free(queue);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/>free(trie);</highlight></codeline>
+<codeline lineno="78"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80" refid="include_2data__structures_2tries_2trie_8h_1a245a64683ba5bb40cdffa0c4a6de6980" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="trie_8c_1a245a64683ba5bb40cdffa0c4a6de6980" kindref="member">ck_trie_clear</ref>(<ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie)<sp/>{</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Free<sp/>all<sp/>nodes<sp/>except<sp/>root<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>**queue<sp/>=<sp/>(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>**)malloc(trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*));</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!queue)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head<sp/>=<sp/>0,<sp/>tail<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/>queue[tail++]<sp/>=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>;</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(head<sp/>&lt;<sp/>tail)<sp/>{</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>queue[head++];</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>256;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[i])<sp/>{</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>queue[tail++]<sp/>=<sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[i];</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Clear<sp/>children<sp/>pointers<sp/>but<sp/>don&apos;t<sp/>free<sp/>root<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(node<sp/>!=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(node);</highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memset(node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>));</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kindref="member">token_id</ref><sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/>free(queue);</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/>trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>=<sp/>1;</highlight></codeline>
+<codeline lineno="108"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight></codeline>
+<codeline lineno="110" refid="include_2data__structures_2tries_2trie_8h_1a7b254dc2cd5611e6eee69114e479266d" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="trie_8c_1a7b254dc2cd5611e6eee69114e479266d" kindref="member">ck_trie_insert</ref>(<ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>,<sp/>int32_t<sp/>token_id,<sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>is_special,<sp/>int32_t<sp/>priority)<sp/>{</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie<sp/>||<sp/>!<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"></highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>;</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*p<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>;</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(*p)<sp/>{</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>*p++;</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c])<sp/>{</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>&gt;=<sp/>trie-&gt;<ref refid="structCKTrie_1a82ef124b5228ed534e3b9d861c12ad21" kindref="member">max_nodes</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;<sp/></highlight><highlight class="comment">/*<sp/>Out<sp/>of<sp/>nodes<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"></highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*new_node<sp/>=<sp/><ref refid="trie_8c_1afaaf2986c8608c017775c4da52193900" kindref="member">create_node</ref>();</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!new_node)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c]<sp/>=<sp/>new_node;</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref>++;</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"></highlight></codeline>
+<codeline lineno="131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node<sp/>=<sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c];</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Mark<sp/>end<sp/>of<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kindref="member">token_id</ref><sp/>=<sp/>token_id;</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1a316472d591daedc90299616e28bda4da" kindref="member">is_special</ref><sp/>=<sp/>is_special;</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/>node-&gt;<ref refid="structCKTrieNode_1aace4764a43a80b9f2039dd91fb50c649" kindref="member">priority</ref><sp/>=<sp/>priority;</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="140"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"></highlight></codeline>
+<codeline lineno="142" refid="include_2data__structures_2tries_2trie_8h_1a77957858c36d4cf9efea8049948f7df3" refkind="member"><highlight class="normal">int32_t<sp/><ref refid="trie_8c_1a77957858c36d4cf9efea8049948f7df3" kindref="member">ck_trie_find_longest</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref>,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>text_len,</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>start_pos,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>*match_len)<sp/>{</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie<sp/>||<sp/>!<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref><sp/>||<sp/>start_pos<sp/>&gt;=<sp/>text_len<sp/>||<sp/>!match_len)<sp/>{</highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>*match_len<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"></highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>;</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*last_token_node<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>last_token_len<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>pos<sp/>=<sp/>start_pos;</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Traverse<sp/>as<sp/>long<sp/>as<sp/>we<sp/>have<sp/>matching<sp/>children<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(pos<sp/>&lt;<sp/>text_len<sp/>&amp;&amp;<sp/>node)<sp/>{</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>(</highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/>char)<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref>[pos];</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c])<sp/>{</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"></highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node<sp/>=<sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c];</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>pos++;</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Record<sp/>if<sp/>this<sp/>is<sp/>a<sp/>valid<sp/>token<sp/>end<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(node-&gt;<ref refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kindref="member">token_id</ref><sp/>&gt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>last_token_node<sp/>=<sp/>node;</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>last_token_len<sp/>=<sp/>pos<sp/>-<sp/>start_pos;</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/>*match_len<sp/>=<sp/>last_token_len;</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"></highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(last_token_node)<sp/>{</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>last_token_node-&gt;<ref refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kindref="member">token_id</ref>;</highlight></codeline>
+<codeline lineno="176"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"></highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="179"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"></highlight></codeline>
+<codeline lineno="181" refid="include_2data__structures_2tries_2trie_8h_1aac71332e656ae70059359842c870230e" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="trie_8c_1aac71332e656ae70059359842c870230e" kindref="member">ck_trie_has_prefix</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref>,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>text_len,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>pos)<sp/>{</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!trie<sp/>||<sp/>!<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref><sp/>||<sp/>pos<sp/>&gt;=<sp/>text_len)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">false</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"></highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTrieNode" kindref="compound">CKTrieNode</ref><sp/>*node<sp/>=<sp/>trie-&gt;<ref refid="structCKTrie_1a8684910b0e136ebc6be4bd48d57f3ce1" kindref="member">root</ref>;</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"></highlight></codeline>
+<codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(pos<sp/>&lt;<sp/>text_len<sp/>&amp;&amp;<sp/>node)<sp/>{</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>(</highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/>char)<ref refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kindref="member">text</ref>[pos];</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>node<sp/>=<sp/>node-&gt;<ref refid="structCKTrieNode_1a80ca1a9924999b6499c6770c014e7fce" kindref="member">children</ref>[c];</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>pos++;</highlight></codeline>
+<codeline lineno="190"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"></highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>node<sp/>!=<sp/>NULL;</highlight></codeline>
+<codeline lineno="193"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"></highlight></codeline>
+<codeline lineno="195" refid="include_2data__structures_2tries_2trie_8h_1ab8035bc5fe0a2b35f00ee8acbba4cba3" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="trie_8c_1ab8035bc5fe0a2b35f00ee8acbba4cba3" kindref="member">ck_trie_node_count</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTrie" kindref="compound">CKTrie</ref><sp/>*trie)<sp/>{</highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>trie<sp/>?<sp/>trie-&gt;<ref refid="structCKTrie_1a83868dcb850147794f7cb150568cece0" kindref="member">node_count</ref><sp/>:<sp/>0;</highlight></codeline>
+<codeline lineno="197"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/data_structures/tries/trie.c"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,385 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="murmurhash3_8h" kind="file" language="C++">
+    <compoundname>murmurhash3.h</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stddef.h</includes>
+    <includedby refid="tokenizer_8h" local="yes">tokenizer.h</includedby>
+    <includedby refid="hash__table_8c" local="yes">hash_table.c</includedby>
+    <includedby refid="tokenizer_8c" local="yes">tokenizer.c</includedby>
+    <incdepgraph>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>murmurhash3.h</label>
+        <link refid="murmurhash3_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="4">
+        <label>test_tokenizer.c</label>
+        <link refid="test__tokenizer_8c"/>
+      </node>
+      <node id="5">
+        <label>tokenizer.c</label>
+        <link refid="tokenizer_8c"/>
+      </node>
+      <node id="6">
+        <label>hash_table.c</label>
+        <link refid="hash__table_8c"/>
+      </node>
+      <node id="2">
+        <label>tokenizer.h</label>
+        <link refid="tokenizer_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="1">
+        <label>murmurhash3.h</label>
+        <link refid="murmurhash3_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>ck_cli_v5.c</label>
+        <link refid="ck__cli__v5_8c"/>
+      </node>
+    </invincdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>uint32_t ck_murmurhash3</definition>
+        <argsstring>(const char *key, uint32_t len, uint32_t seed)</argsstring>
+        <name>ck_murmurhash3</name>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>len</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>seed</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MurmurHash3-32bit hash function (original HPC_Embeddings version).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Data to hash </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>len</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Length in bytes </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>seed</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Seed value </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>32-bit hash value </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" line="28" column="10" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/murmurhash3.c" bodystart="11" bodyend="60" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" declline="28" declcolumn="10"/>
+        <referencedby refid="murmurhash3_8h_1a85422d9b050958858d7d0dcbdaeba4a4" compoundref="murmurhash3_8c" startline="68" endline="70">ck_murmurhash3_32</referencedby>
+        <referencedby refid="murmurhash3_8c_1a5a3e48b90a419b3f7e1d1338a4283ac7" compoundref="murmurhash3_8c" startline="63" endline="65">ck_murmurhash3_str</referencedby>
+        <referencedby refid="murmurhash3_8h_1a194d2225ffa04b60cde649beaf1a85e6" compoundref="murmurhash3_8h" startline="62" endline="64">ck_murmurhash3_strn</referencedby>
+        <referencedby refid="hash__table_8c_1aca592de9ebe7baad906c049a9b262a35" compoundref="hash__table_8c" startline="18" endline="20">ck_tokenizer_hash</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="murmurhash3_8h_1ad42ad343330899419c8db70f45263979" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_murmurhash3_128</definition>
+        <argsstring>(const void *key, size_t len, uint32_t seed, uint64_t *out1, uint64_t *out2)</argsstring>
+        <name>ck_murmurhash3_128</name>
+        <param>
+          <type>const void *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>len</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>seed</declname>
+        </param>
+        <param>
+          <type>uint64_t *</type>
+          <declname>out1</declname>
+        </param>
+        <param>
+          <type>uint64_t *</type>
+          <declname>out2</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MurmurHash3-128bit hash function (produces two 64-bit values).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Data to hash </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>len</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Length in bytes </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>seed</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Optional seed value (use 0 for default) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>out1</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>First 64 bits of hash output </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>out2</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Second 64 bits of hash output </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" line="49" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" declline="49" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="murmurhash3_8h_1a85422d9b050958858d7d0dcbdaeba4a4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>uint32_t ck_murmurhash3_32</definition>
+        <argsstring>(const void *key, size_t len, uint32_t seed)</argsstring>
+        <name>ck_murmurhash3_32</name>
+        <param>
+          <type>const void *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>len</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>seed</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MurmurHash3-32bit hash function (alternative name).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Data to hash </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>len</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Length in bytes </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>seed</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Optional seed value (use 0 for default) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>32-bit hash value </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" line="38" column="10" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/murmurhash3.c" bodystart="68" bodyend="70" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" declline="38" declcolumn="10"/>
+        <references refid="murmurhash3_8c_1ade6144552507c82df209f93a2543f85e" compoundref="murmurhash3_8c" startline="11" endline="60">ck_murmurhash3</references>
+        <referencedby refid="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" compoundref="murmurhash3_8h" startline="55" endline="57">ck_murmurhash3_str</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>static uint32_t ck_murmurhash3_str</definition>
+        <argsstring>(const char *str, uint32_t seed)</argsstring>
+        <name>ck_murmurhash3_str</name>
+        <param>
+          <type>const char *</type>
+          <declname>str</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>seed</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MurmurHash3-32bit for string (null-terminated). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" line="55" column="24" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" bodystart="55" bodyend="57"/>
+        <references refid="murmurhash3_8h_1a85422d9b050958858d7d0dcbdaeba4a4" compoundref="murmurhash3_8c" startline="68" endline="70">ck_murmurhash3_32</references>
+        <referencedby refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="murmurhash3_8h_1a194d2225ffa04b60cde649beaf1a85e6" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>static uint32_t ck_murmurhash3_strn</definition>
+        <argsstring>(const char *str, size_t len, uint32_t seed)</argsstring>
+        <name>ck_murmurhash3_strn</name>
+        <param>
+          <type>const char *</type>
+          <declname>str</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>len</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>seed</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MurmurHash3-32bit for string with length. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" line="62" column="24" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h" bodystart="62" bodyend="64"/>
+        <references refid="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" compoundref="murmurhash3_8c" startline="11" endline="60">ck_murmurhash3</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>MurmurHash3<sp/>-<sp/>32-bit<sp/>and<sp/>128-bit<sp/>versions</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Ported<sp/>from<sp/>HPC_Embeddings<sp/>for<sp/>use<sp/>in<sp/>C-Kernel-Engine<sp/>tokenizer.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Provides<sp/>consistent,<sp/>high-quality<sp/>hashing<sp/>for<sp/>vocabulary<sp/>lookups.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>Original<sp/>by<sp/>Austin<sp/>Appleby,<sp/>ported<sp/>for<sp/>C-Kernel-Engine.</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_MURMURHASH3_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_MURMURHASH3_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="20"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*<sp/>MurmurHash3-32bit<sp/>hash<sp/>function<sp/>(original<sp/>HPC_Embeddings<sp/>version).</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="23"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/><sp/>Data<sp/>to<sp/>hash</highlight></codeline>
+<codeline lineno="24"><highlight class="comment"><sp/>*<sp/>@param<sp/>len<sp/><sp/><sp/><sp/><sp/><sp/>Length<sp/>in<sp/>bytes</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/>@param<sp/>seed<sp/><sp/><sp/><sp/><sp/>Seed<sp/>value</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>32-bit<sp/>hash<sp/>value</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal">uint32_t<sp/><ref refid="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" kindref="member">ck_murmurhash3</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,<sp/>uint32_t<sp/>len,<sp/>uint32_t<sp/>seed);</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="30"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="31"><highlight class="comment"><sp/>*<sp/>MurmurHash3-32bit<sp/>hash<sp/>function<sp/>(alternative<sp/>name).</highlight></codeline>
+<codeline lineno="32"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="33"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/><sp/>Data<sp/>to<sp/>hash</highlight></codeline>
+<codeline lineno="34"><highlight class="comment"><sp/>*<sp/>@param<sp/>len<sp/><sp/><sp/><sp/><sp/><sp/>Length<sp/>in<sp/>bytes</highlight></codeline>
+<codeline lineno="35"><highlight class="comment"><sp/>*<sp/>@param<sp/>seed<sp/><sp/><sp/><sp/><sp/>Optional<sp/>seed<sp/>value<sp/>(use<sp/>0<sp/>for<sp/>default)</highlight></codeline>
+<codeline lineno="36"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>32-bit<sp/>hash<sp/>value</highlight></codeline>
+<codeline lineno="37"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal">uint32_t<sp/><ref refid="murmurhash3_8h_1a85422d9b050958858d7d0dcbdaeba4a4" kindref="member">ck_murmurhash3_32</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*key,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len,<sp/>uint32_t<sp/>seed);</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="40"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="41"><highlight class="comment"><sp/>*<sp/>MurmurHash3-128bit<sp/>hash<sp/>function<sp/>(produces<sp/>two<sp/>64-bit<sp/>values).</highlight></codeline>
+<codeline lineno="42"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="43"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/><sp/>Data<sp/>to<sp/>hash</highlight></codeline>
+<codeline lineno="44"><highlight class="comment"><sp/>*<sp/>@param<sp/>len<sp/><sp/><sp/><sp/><sp/><sp/>Length<sp/>in<sp/>bytes</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*<sp/>@param<sp/>seed<sp/><sp/><sp/><sp/><sp/>Optional<sp/>seed<sp/>value<sp/>(use<sp/>0<sp/>for<sp/>default)</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*<sp/>@param<sp/>out1<sp/><sp/><sp/><sp/><sp/>First<sp/>64<sp/>bits<sp/>of<sp/>hash<sp/>output</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*<sp/>@param<sp/>out2<sp/><sp/><sp/><sp/><sp/>Second<sp/>64<sp/>bits<sp/>of<sp/>hash<sp/>output</highlight></codeline>
+<codeline lineno="48"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="49" refid="murmurhash3_8h_1ad42ad343330899419c8db70f45263979" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="murmurhash3_8h_1ad42ad343330899419c8db70f45263979" kindref="member">ck_murmurhash3_128</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*key,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len,<sp/>uint32_t<sp/>seed,</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint64_t<sp/>*out1,<sp/>uint64_t<sp/>*out2);</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="52"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>MurmurHash3-32bit<sp/>for<sp/>string<sp/>(null-terminated).</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55" refid="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>uint32_t<sp/><ref refid="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" kindref="member">ck_murmurhash3_str</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*str,<sp/>uint32_t<sp/>seed)<sp/>{</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="murmurhash3_8h_1a85422d9b050958858d7d0dcbdaeba4a4" kindref="member">ck_murmurhash3_32</ref>(str,<sp/>strlen(str),<sp/>seed);</highlight></codeline>
+<codeline lineno="57"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="59"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="60"><highlight class="comment"><sp/>*<sp/>MurmurHash3-32bit<sp/>for<sp/>string<sp/>with<sp/>length.</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62" refid="murmurhash3_8h_1a194d2225ffa04b60cde649beaf1a85e6" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>uint32_t<sp/><ref refid="murmurhash3_8h_1a194d2225ffa04b60cde649beaf1a85e6" kindref="member">ck_murmurhash3_strn</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*str,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len,<sp/>uint32_t<sp/>seed)<sp/>{</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" kindref="member">ck_murmurhash3</ref>(str,<sp/>len,<sp/>seed);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_MURMURHASH3_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/murmurhash3.h"/>
+  </compounddef>
+</doxygen>

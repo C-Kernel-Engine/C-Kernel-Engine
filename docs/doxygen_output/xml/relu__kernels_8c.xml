@@ -55,6 +55,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/relu_kernels.c" line="68" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/relu_kernels.c" bodystart="68" bodyend="100"/>
+        <references refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" compoundref="tokenizer_8h" startline="207">mask</references>
       </memberdef>
       <memberdef kind="function" id="relu__kernels_8c_1a856216dca72f3534c079f429d1d58d48" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -187,8 +188,8 @@
 <codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>+<sp/>15<sp/>&lt;<sp/>n;<sp/>i<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
 <codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>vx<sp/>=<sp/>_mm512_loadu_ps(input<sp/>+<sp/>i);</highlight></codeline>
 <codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>vdy<sp/>=<sp/>_mm512_loadu_ps(d_output<sp/>+<sp/>i);</highlight></codeline>
-<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__mmask16<sp/>mask<sp/>=<sp/>_mm512_cmp_ps_mask(vx,<sp/>vzero,<sp/>_CMP_GT_OQ);</highlight></codeline>
-<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>vdx<sp/>=<sp/>_mm512_maskz_mov_ps(mask,<sp/>vdy);</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__mmask16<sp/><ref refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" kindref="member">mask</ref><sp/>=<sp/>_mm512_cmp_ps_mask(vx,<sp/>vzero,<sp/>_CMP_GT_OQ);</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>vdx<sp/>=<sp/>_mm512_maskz_mov_ps(<ref refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" kindref="member">mask</ref>,<sp/>vdy);</highlight></codeline>
 <codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(d_input<sp/>+<sp/>i,<sp/>vdx);</highlight></codeline>
 <codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="84"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX2__)<sp/>||<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
@@ -197,8 +198,8 @@
 <codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vx<sp/>=<sp/>_mm256_loadu_ps(input<sp/>+<sp/>i);</highlight></codeline>
 <codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vdy<sp/>=<sp/>_mm256_loadu_ps(d_output<sp/>+<sp/>i);</highlight></codeline>
 <codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Result<sp/>is<sp/>all<sp/>1s<sp/>(0xFFFFFFFF)<sp/>if<sp/>true,<sp/>0<sp/>if<sp/>false.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>mask<sp/>=<sp/>_mm256_cmp_ps(vx,<sp/>vzero,<sp/>_CMP_GT_OQ);</highlight></codeline>
-<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vdx<sp/>=<sp/>_mm256_and_ps(mask,<sp/>vdy);</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/><ref refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" kindref="member">mask</ref><sp/>=<sp/>_mm256_cmp_ps(vx,<sp/>vzero,<sp/>_CMP_GT_OQ);</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vdx<sp/>=<sp/>_mm256_and_ps(<ref refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" kindref="member">mask</ref>,<sp/>vdy);</highlight></codeline>
 <codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(d_input<sp/>+<sp/>i,<sp/>vdx);</highlight></codeline>
 <codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="94"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>

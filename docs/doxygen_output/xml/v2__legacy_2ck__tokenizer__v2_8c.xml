@@ -1,0 +1,252 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="v2__legacy_2ck__tokenizer__v2_8c" kind="file" language="C++">
+    <compoundname>v2_legacy/ck_tokenizer_v2.c</compoundname>
+    <includes local="no">stdio.h</includes>
+    <includes local="no">stdlib.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">string.h</includes>
+    <includes local="no">ctype.h</includes>
+    <includes refid="ck__tokenizer_8h" local="yes">ck_tokenizer.h</includes>
+    <incdepgraph>
+      <node id="9">
+        <label>stdbool.h</label>
+      </node>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stdlib.h</label>
+      </node>
+      <node id="7">
+        <label>ck_tokenizer.h</label>
+        <link refid="ck__tokenizer_8h"/>
+        <childnode refid="8" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
+        </childnode>
+      </node>
+      <node id="8">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>ck_tokenizer_v2.c</label>
+        <link refid="v2__legacy_2ck__tokenizer__v2_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>string.h</label>
+      </node>
+      <node id="6">
+        <label>ctype.h</label>
+      </node>
+      <node id="2">
+        <label>stdio.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="v2__legacy_2ck__tokenizer__v2_8c_1a4de5533c0e1c9f89bfb77bee05cf97fd" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_load_binary</definition>
+        <argsstring>(CKTokenizer *tok, int vocab_size, const int32_t *offsets, const char *strings, int num_merges, const int32_t *merges)</argsstring>
+        <name>ck_tokenizer_load_binary</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>vocab_size</declname>
+        </param>
+        <param>
+          <type>const int32_t *</type>
+          <declname>offsets</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>strings</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_merges</declname>
+        </param>
+        <param>
+          <type>const int32_t *</type>
+          <declname>merges</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Load vocabulary from memory-mapped binary data.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>tok</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Tokenizer </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>vocab_size</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of tokens </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>offsets</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Array of offsets into strings pool </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>strings</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>String pool containing null-terminated tokens </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_merges</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of BPE merges </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>merges</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Merge rules as (left, right, merged) triplets </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, -1 on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ck_tokenizer_v2.c" line="18" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ck_tokenizer_v2.c" bodystart="18" bodyend="56"/>
+        <references refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="49" endline="76">ck_pool_alloc</references>
+        <references refid="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" compoundref="ck__tokenizer_8c" startline="228" endline="254">ck_tokenizer_add_merge</references>
+        <references refid="ck__tokenizer__v2_8c_1a6f11f138126f83f02adef65dc6ceef4b" compoundref="ck__tokenizer__v2_8c" startline="9" endline="16">hash_string</references>
+        <references refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" compoundref="ck__tokenizer_8h" startline="58">CKVocabEntry::id</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" compoundref="ck__tokenizer_8h" startline="59">CKVocabEntry::next</references>
+        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" compoundref="ck__tokenizer_8h" startline="56">CKVocabEntry::token</references>
+        <references refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" compoundref="tokenizer_8h" startline="232">token</references>
+        <references refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" compoundref="ck__tokenizer_8h" startline="57">CKVocabEntry::token_len</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="v2__legacy_2ck__tokenizer__v2_8c_1a6f11f138126f83f02adef65dc6ceef4b" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>static uint32_t hash_string</definition>
+        <argsstring>(const char *s, int len)</argsstring>
+        <name>hash_string</name>
+        <param>
+          <type>const char *</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ck_tokenizer_v2.c" line="9" column="17" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ck_tokenizer_v2.c" bodystart="9" bodyend="16"/>
+        <referencedby refid="v2__legacy_2ck__tokenizer__v2_8c_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="v2__legacy_2ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;ctype.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ck__tokenizer_8h" kindref="compound">ck_tokenizer.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight></codeline>
+<codeline lineno="9" refid="v2__legacy_2ck__tokenizer__v2_8c_1a6f11f138126f83f02adef65dc6ceef4b" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/>uint32_t<sp/><ref refid="v2__legacy_2ck__tokenizer__v2_8c_1a6f11f138126f83f02adef65dc6ceef4b" kindref="member">hash_string</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*s,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len)<sp/>{</highlight></codeline>
+<codeline lineno="10"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>hash<sp/>=<sp/>2166136261u;</highlight></codeline>
+<codeline lineno="11"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>len;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hash<sp/>^=<sp/>(uint8_t)s[i];</highlight></codeline>
+<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hash<sp/>*=<sp/>16777619u;</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>hash;</highlight></codeline>
+<codeline lineno="16"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18" refid="v2__legacy_2ck__tokenizer__v2_8c_1a4de5533c0e1c9f89bfb77bee05cf97fd" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="v2__legacy_2ck__tokenizer__v2_8c_1a4de5533c0e1c9f89bfb77bee05cf97fd" kindref="member">ck_tokenizer_load_binary</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>vocab_size,</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*offsets,</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*strings,</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_merges,</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*merges)<sp/>{</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!tok<sp/>||<sp/>!offsets<sp/>||<sp/>!strings)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>We<sp/>assume<sp/>ck_tokenizer_init<sp/>was<sp/>already<sp/>called<sp/>to<sp/>alloc<sp/>hash<sp/>tables</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>vocab_size;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref><sp/>=<sp/>strings<sp/>+<sp/>offsets[i];</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len<sp/>=<sp/>(int)strlen(<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*entry<sp/>=<sp/>(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*)<ref refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" kindref="member">ck_pool_alloc</ref>(&amp;tok-&gt;<ref refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" kindref="member">pool</ref>,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref>));</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" kindref="member">token</ref><sp/>=<sp/>(</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>;<sp/></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" kindref="member">token_len</ref><sp/>=<sp/>len;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" kindref="member">id</ref><sp/>=<sp/>i;</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint32_t<sp/>bucket<sp/>=<sp/><ref refid="v2__legacy_2ck__tokenizer__v2_8c_1a6f11f138126f83f02adef65dc6ceef4b" kindref="member">hash_string</ref>(<ref refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kindref="member">token</ref>,<sp/>len)<sp/>%<sp/>tok-&gt;<ref refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" kindref="member">vocab_hash_size</ref>;</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" kindref="member">next</ref><sp/>=<sp/>tok-&gt;<ref refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" kindref="member">vocab_hash</ref>[bucket];</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" kindref="member">vocab_hash</ref>[bucket]<sp/>=<sp/>entry;</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" kindref="member">id_to_token</ref>[i]<sp/>=<sp/>entry-&gt;<ref refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" kindref="member">token</ref>;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref>++;</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"></highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(merges<sp/>&amp;&amp;<sp/>num_merges<sp/>&gt;<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>num_merges;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>left<sp/>=<sp/>merges[i*3<sp/>+<sp/>0];</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>right<sp/>=<sp/>merges[i*3<sp/>+<sp/>1];</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>merged<sp/>=<sp/>merges[i*3<sp/>+<sp/>2];</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" kindref="member">ck_tokenizer_add_merge</ref>(tok,<sp/>left,<sp/>right,<sp/>merged);</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"></highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="56"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ck_tokenizer_v2.c"/>
+  </compounddef>
+</doxygen>

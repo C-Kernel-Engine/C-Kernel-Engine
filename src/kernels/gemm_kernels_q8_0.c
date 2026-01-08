@@ -193,82 +193,6 @@ void gemm_q8_0(float *Y,
  * GEMM NT: C = A @ B^T + bias  (B stored as N rows of K elements)
  * ============================================================================ */
 
-#if defined(__SSE4_1__)
-void gemm_nt_q8_0_sse(const float *A,
-                      const void *B,
-                      const float *bias,
-                      float *C,
-                      int M, int N, int K)
-{
-    if (K % QK_K != 0) {
-        // Fallback for odd sizes (though Q8_0 weights usually aligned)
-        for (int m = 0; m < M; m++) {
-            gemv_q8_0_sse(&C[m * N], B, &A[m * K], N, K);
-            if (bias) for (int n=0; n<N; n++) C[m*N + n] += bias[n];
-        }
-        return;
-    }
-
-    size_t q8_size = (K / QK_K) * sizeof(block_q8_K);
-    block_q8_K *A_q8 = (block_q8_K *)alloca(q8_size);
-
-    const block_q8_0 *weights = (const block_q8_0 *)B;
-    const int blocks_per_row = K / 32;
-
-    for (int m = 0; m < M; m++) {
-        quantize_row_q8_k(&A[m * K], A_q8, K);
-
-        for (int n = 0; n < N; n++) {
-            float sumf = 0.0f;
-            const block_q8_0 *w_row = weights + n * blocks_per_row;
-
-            for (int b = 0; b < blocks_per_row; b++) {
-                __m128i acc_i32 = _mm_setzero_si128();
-                int q8_block_idx = (b * 32) / QK_K;
-                int q8_offset = (b * 32) % QK_K;
-                
-                __m128i vw0 = _mm_loadu_si128((const __m128i *)&w_row[b].qs[0]);
-                __m128i vw1 = _mm_loadu_si128((const __m128i *)&w_row[b].qs[16]);
-                __m128i va0 = _mm_loadu_si128((const __m128i *)&A_q8[q8_block_idx].qs[q8_offset]);
-                __m128i va1 = _mm_loadu_si128((const __m128i *)&A_q8[q8_block_idx].qs[q8_offset + 16]);
-
-                // dot(q8_w, q8_a)
-                __m128i vw0_lo = _mm_cvtepi8_epi16(vw0);
-                __m128i vw0_hi = _mm_cvtepi8_epi16(_mm_srli_si128(vw0, 8));
-                __m128i va0_lo = _mm_cvtepi8_epi16(va0);
-                __m128i va0_hi = _mm_cvtepi8_epi16(_mm_srli_si128(va0, 8));
-                
-                acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw0_lo, va0_lo));
-                acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw0_hi, va0_hi));
-
-                __m128i vw1_lo = _mm_cvtepi8_epi16(vw1);
-                __m128i vw1_hi = _mm_cvtepi8_epi16(_mm_srli_si128(vw1, 8));
-                __m128i va1_lo = _mm_cvtepi8_epi16(va1);
-                __m128i va1_hi = _mm_cvtepi8_epi16(_mm_srli_si128(va1, 8));
-
-                acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw1_lo, va1_lo));
-                acc_i32 = _mm_add_epi32(acc_i32, _mm_madd_epi16(vw1_hi, va1_hi));
-                
-                // Scale by per-block deltas
-                // Note: Q8_0 has per-block d, Q8_K has per-block d.
-                // For Q8_0, each block is 32 elements.
-                // For Q8_K, each block is 256 elements.
-                
-                // Horizontal sum of acc_i32
-                __m128i shuf = _mm_shuffle_epi32(acc_i32, _MM_SHUFFLE(1, 0, 3, 2));
-                __m128i sums = _mm_add_epi32(acc_i32, shuf);
-                shuf = _mm_shuffle_epi32(sums, _MM_SHUFFLE(2, 3, 0, 1));
-                sums = _mm_add_epi32(sums, shuf);
-                int32_t dot_wa = _mm_cvtsi128_si32(sums);
-
-                sumf += (float)dot_wa * CK_FP16_TO_FP32(w_row[b].d) * A_q8[q8_block_idx].d;
-            }
-            C[m * N + n] = sumf + (bias ? bias[n] : 0.0f);
-        }
-    }
-}
-#endif
-
 /**
  * @brief Matrix-matrix multiply: C[M,N] = A[M,K] @ B[N,K]^T + bias
  *
@@ -287,7 +211,13 @@ void gemm_nt_q8_0(const float *A,
                   int M, int N, int K)
 {
 #if defined(__SSE4_1__)
-    gemm_nt_q8_0_sse(A, B, bias, C, M, N, K);
+    // For now use gemv unrolled as it's safer
+    for (int m = 0; m < M; m++) {
+        gemv_q8_0_sse(&C[m * N], B, &A[m * K], N, K);
+        if (bias) {
+            for (int n = 0; n < N; n++) C[m * N + n] += bias[n];
+        }
+    }
     return;
 #endif
 

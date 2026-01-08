@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "ck_tokenizer.h"
+#include "tokenizer/tokenizer.h"
 
 // Types
 typedef int (*init_t)(const char *weights_path);
@@ -142,9 +142,8 @@ int main(int argc, char **argv) {
     sleep(1);
 
     // Tokenizer setup
-    CKTokenizer tokenizer;
-    ck_tokenizer_init(&tokenizer);
-    ck_tokenizer_load_binary(&tokenizer, get_vocab_size(), get_offsets(), get_strings(), get_num_merges(), NULL);
+    CKTokenizer *tokenizer = ck_tokenizer_create(CK_TOKENIZER_BPE);
+    ck_tokenizer_load_binary(tokenizer, get_vocab_size(), get_offsets(), get_strings(), get_num_merges(), NULL);
 
     char input[1024];
     while (1) {
@@ -154,7 +153,7 @@ int main(int argc, char **argv) {
 
         // Tokenize
         int32_t ids[1024];
-        int n = ck_tokenizer_encode(&tokenizer, input, -1, ids, 1024);
+        int n = ck_tokenizer_encode(tokenizer, input, -1, ids, 1024);
 
         // Submit Task
         pthread_mutex_lock(&state.mutex);
@@ -181,7 +180,7 @@ int main(int argc, char **argv) {
 
             if (tok == 151643 || tok == 151645) break;
 
-            const char *word = ck_tokenizer_id_to_token(&tokenizer, tok);
+            const char *word = ck_tokenizer_id_to_token(tokenizer, tok);
             if (word) {
                 if ((unsigned char)word[0] == 0xC4 && (unsigned char)word[1] == 0xA0) {
                     printf(" %s", word + 2);

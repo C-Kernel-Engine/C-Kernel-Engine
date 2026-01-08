@@ -337,8 +337,11 @@ typedef ck_half ggml_half;
  * ============================================================================ */
 
 void gemm_nt_q5_0_sse_v2(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q6_k_sse(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q6_k_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemv_q4_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K);
 void quantize_row_q8_k_sse(const float *x, void *vy, int k);
+void rmsnorm_q8_k_fused(const float *input, const float *gamma, void *vy, int tokens, int d_model, int aligned_embed_dim, float eps);
 
 #ifdef __cplusplus
 }

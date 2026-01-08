@@ -49,7 +49,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" line="228" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" bodystart="228" bodyend="412"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
       </memberdef>
       <memberdef kind="function" id="gelu__kernels_8c_1aeaf518a5239f4588f8c28b05b96d5478" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -79,7 +79,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" line="457" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" bodystart="457" bodyend="579"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
         <referencedby refid="ckernel__engine_8h_1a27adb4761d436aeea3317ce0595dc67a" compoundref="gelu__kernels__bf16_8c" startline="66" endline="91">gelu_backward_fast_bf16</referencedby>
       </memberdef>
       <memberdef kind="function" id="gelu__kernels_8c_1ac4d3711dee095194f24437af73ad1763" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
@@ -155,7 +155,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" line="103" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels.c" bodystart="103" bodyend="220"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
         <referencedby refid="ckernel__engine_8h_1a5b4ac7df82788956de18c6e1b4f37609" compoundref="mlp__kernels_8c" startline="22" endline="53">mlp_token_parallel</referencedby>
       </memberdef>
       </sectiondef>
@@ -341,8 +341,8 @@
 <codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>one_vec<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
 <codeline lineno="176"><highlight class="normal"></highlight></codeline>
 <codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>inner_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
-<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>tanh_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>inner_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>tanh_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
 <codeline lineno="180"><highlight class="normal"></highlight></codeline>
 <codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>+<sp/>8<sp/>&lt;=<sp/>n;<sp/>i<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
 <codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>x<sp/>=<sp/>_mm256_loadu_ps(&amp;data[i]);</highlight></codeline>
@@ -506,8 +506,8 @@
 <codeline lineno="340"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>one_vec<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
 <codeline lineno="341"><highlight class="normal"></highlight></codeline>
 <codeline lineno="342"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>g_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
-<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>tanh_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>g_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>tanh_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
 <codeline lineno="345"><highlight class="normal"></highlight></codeline>
 <codeline lineno="346"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>+<sp/>8<sp/>&lt;=<sp/>n;<sp/>i<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
 <codeline lineno="347"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>x<sp/>=<sp/>_mm256_loadu_ps(&amp;input[i]);</highlight></codeline>
@@ -696,8 +696,8 @@
 <codeline lineno="530"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>neg_beta_vec<sp/>=<sp/>_mm256_set1_ps(-beta);</highlight></codeline>
 <codeline lineno="531"><highlight class="normal"></highlight></codeline>
 <codeline lineno="532"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="533"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>neg_beta_x_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
-<codeline lineno="534"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>exp_arr[8]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="533"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>neg_beta_x_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="534"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>exp_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
 <codeline lineno="535"><highlight class="normal"></highlight></codeline>
 <codeline lineno="536"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>+<sp/>8<sp/>&lt;=<sp/>n;<sp/>i<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
 <codeline lineno="537"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>x<sp/>=<sp/>_mm256_loadu_ps(&amp;input[i]);</highlight></codeline>

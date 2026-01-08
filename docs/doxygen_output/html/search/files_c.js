@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['vision_5fkernels_2ec_1528',['vision_kernels.c',['../vision__kernels_8c.html',1,'']]],
-  ['vision_5fkernels_5fbf16_2ec_1529',['vision_kernels_bf16.c',['../vision__kernels__bf16_8c.html',1,'']]]
+  ['quantize_5frow_5fq8_5fk_5fsse_2ec_1864',['quantize_row_q8_k_sse.c',['../quantize__row__q8__k__sse_8c.html',1,'']]]
 ];

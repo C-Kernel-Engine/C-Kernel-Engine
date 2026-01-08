@@ -1,7 +1,4 @@
 var searchData=
 [
-  ['layernorm_5fkernels_2ec_1502',['layernorm_kernels.c',['../layernorm__kernels_8c.html',1,'']]],
-  ['layernorm_5fkernels_5fbf16_2ec_1503',['layernorm_kernels_bf16.c',['../layernorm__kernels__bf16_8c.html',1,'']]],
-  ['loss_5fkernels_2ec_1504',['loss_kernels.c',['../loss__kernels_8c.html',1,'']]],
-  ['loss_5fkernels_5fbf16_2ec_1505',['loss_kernels_bf16.c',['../loss__kernels__bf16_8c.html',1,'']]]
+  ['trie_2eh_1849',['trie.h',['../include_2data__structures_2tries_2trie_8h.html',1,'']]]
 ];

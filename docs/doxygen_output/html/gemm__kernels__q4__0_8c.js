@@ -1,6 +1,7 @@
 var gemm__kernels__q4__0_8c =
 [
     [ "dot_q4_0", "gemm__kernels__q4__0_8c.html#a6763f04380f5c2a885ef0d5b6fcd1cd2", null ],
+    [ "gemm_nt_q4_0", "gemm__kernels__q4__0_8c.html#a001c2346f83b345676e8c54a27cf7bb1", null ],
     [ "gemm_q4_0", "gemm__kernels__q4__0_8c.html#aa2d4cca5c7fc6941f9218d2882612ddc", null ],
     [ "gemm_q4_0_backward", "gemm__kernels__q4__0_8c.html#a5922964b94d53325488493e8aeeb9a9b", null ],
     [ "gemv_q4_0", "gemm__kernels__q4__0_8c.html#afabf6422c50382a3bcc897b43c18f0ac", null ],

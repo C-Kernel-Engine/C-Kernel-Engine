@@ -58,9 +58,13 @@
       </node>
     </incdepgraph>
     <invincdepgraph>
-      <node id="15">
-        <label>ckernel_ir_v2_builder.c</label>
-        <link refid="ckernel__ir__v2__builder_8c"/>
+      <node id="6">
+        <label>ckernel_ir_v2_lower.c</label>
+        <link refid="ckernel__ir__v2__lower_8c"/>
+      </node>
+      <node id="3">
+        <label>ckernel_codegen_v2.c</label>
+        <link refid="ckernel__codegen__v2_8c"/>
       </node>
       <node id="5">
         <label>ckernel_ir_v2_lower.h</label>
@@ -70,39 +74,17 @@
         <childnode refid="6" relation="include">
         </childnode>
       </node>
-      <node id="11">
-        <label>ckernel_codegen_v2_sections.c</label>
-        <link refid="ckernel__codegen__v2__sections_8c"/>
+      <node id="10">
+        <label>ckernel_codegen_v2_dispatch.c</label>
+        <link refid="ckernel__codegen__v2__dispatch_8c"/>
       </node>
       <node id="8">
-        <label>ckernel_codegen_v2_emit.h</label>
-        <link refid="ckernel__codegen__v2__emit_8h"/>
-        <childnode refid="3" relation="include">
-        </childnode>
-        <childnode refid="9" relation="include">
-        </childnode>
-        <childnode refid="10" relation="include">
-        </childnode>
-        <childnode refid="11" relation="include">
-        </childnode>
-        <childnode refid="12" relation="include">
-        </childnode>
-      </node>
-      <node id="12">
-        <label>ckernel_codegen_v2_struct.c</label>
-        <link refid="ckernel__codegen__v2__struct_8c"/>
-      </node>
-      <node id="14">
         <label>ckernel_mem_plan.c</label>
         <link refid="ckernel__mem__plan_8c"/>
       </node>
-      <node id="6">
-        <label>ckernel_ir_v2_lower.c</label>
-        <link refid="ckernel__ir__v2__lower_8c"/>
-      </node>
-      <node id="9">
-        <label>ckernel_codegen_v2_dispatch.c</label>
-        <link refid="ckernel__codegen__v2__dispatch_8c"/>
+      <node id="15">
+        <label>ckernel_ir_v2_builder.c</label>
+        <link refid="ckernel__ir__v2__builder_8c"/>
       </node>
       <node id="1">
         <label>ckernel_ir_v2.h</label>
@@ -113,14 +95,18 @@
         </childnode>
         <childnode refid="7" relation="include">
         </childnode>
-        <childnode refid="8" relation="include">
+        <childnode refid="9" relation="include">
         </childnode>
-        <childnode refid="13" relation="include">
+        <childnode refid="14" relation="include">
         </childnode>
         <childnode refid="15" relation="include">
         </childnode>
         <childnode refid="4" relation="include">
         </childnode>
+      </node>
+      <node id="12">
+        <label>ckernel_codegen_v2_sections.c</label>
+        <link refid="ckernel__codegen__v2__sections_8c"/>
       </node>
       <node id="2">
         <label>ckernel_codegen_v2.h</label>
@@ -130,35 +116,49 @@
         <childnode refid="4" relation="include">
         </childnode>
       </node>
-      <node id="3">
-        <label>ckernel_codegen_v2.c</label>
-        <link refid="ckernel__codegen__v2_8c"/>
+      <node id="13">
+        <label>ckernel_codegen_v2_struct.c</label>
+        <link refid="ckernel__codegen__v2__struct_8c"/>
+      </node>
+      <node id="9">
+        <label>ckernel_codegen_v2_emit.h</label>
+        <link refid="ckernel__codegen__v2__emit_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="10" relation="include">
+        </childnode>
+        <childnode refid="11" relation="include">
+        </childnode>
+        <childnode refid="12" relation="include">
+        </childnode>
+        <childnode refid="13" relation="include">
+        </childnode>
+      </node>
+      <node id="14">
+        <label>ckernel_ir_v2.c</label>
+        <link refid="ckernel__ir__v2_8c"/>
       </node>
       <node id="7">
         <label>ckernel_mem_plan.h</label>
         <link refid="ckernel__mem__plan_8h"/>
         <childnode refid="5" relation="include">
         </childnode>
-        <childnode refid="3" relation="include">
-        </childnode>
         <childnode refid="8" relation="include">
         </childnode>
-        <childnode refid="13" relation="include">
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
         </childnode>
         <childnode refid="14" relation="include">
         </childnode>
       </node>
-      <node id="10">
-        <label>ckernel_codegen_v2_schedule.c</label>
-        <link refid="ckernel__codegen__v2__schedule_8c"/>
-      </node>
-      <node id="13">
-        <label>ckernel_ir_v2.c</label>
-        <link refid="ckernel__ir__v2_8c"/>
-      </node>
       <node id="4">
         <label>ckernel_ir_v2_demo.c</label>
         <link refid="ckernel__ir__v2__demo_8c"/>
+      </node>
+      <node id="11">
+        <label>ckernel_codegen_v2_schedule.c</label>
+        <link refid="ckernel__codegen__v2__schedule_8c"/>
       </node>
     </invincdepgraph>
     <innerclass refid="structCKIRV2Binding" prot="public">CKIRV2Binding</innerclass>
@@ -268,13 +268,14 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="71" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2_builder.c" bodystart="220" bodyend="283" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="71" declcolumn="5"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="71" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2_builder.c" bodystart="220" bodyend="283" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="71" declcolumn="5"/>
         <references refid="structCKIRV2Buffer_1a92f6356a2149550923b521d604bc9486" compoundref="ckernel__ir__v2_8h" startline="31">CKIRV2Buffer::alias_of</references>
         <references refid="structCKIRV2Graph_1ad2d61568dda8232b3252da14a53ffc03" compoundref="ckernel__ir__v2_8h" startline="62">CKIRV2Graph::buffers</references>
         <references refid="ckernel__ir__v2__builder_8c_1a1878230b08b02341da1bbcab15e6950f" compoundref="ckernel__ir__v2__builder_8c" startline="174" endline="218">ck_ir_v2_apply_weight_dtypes</references>
         <references refid="ckernel__ir__v2__builder_8c_1ad0ca6b1fd812a332aa86eef694f67a8f" compoundref="ckernel__ir__v2__builder_8c" startline="44" endline="55">ck_ir_v2_find_buffer_index</references>
         <references refid="ckernel__ir__v2__builder_8c_1a39594713511ebb496afee8c67c18c60b" compoundref="ckernel__ir__v2__builder_8c" startline="139" endline="159">ck_ir_v2_parse_bool</references>
         <references refid="ckernel__ir__v2__builder_8c_1a104bb744263fc943e02e9fb5e66632bf" compoundref="ckernel__ir__v2__builder_8c" startline="8" endline="20">ck_ir_v2_strdup</references>
+        <references refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" compoundref="utf8_8c" startline="215">end</references>
         <references refid="structCKIRV2Graph_1adfc2e02d30a154499cfa803b1095dc6a" compoundref="ckernel__ir__v2_8h" startline="59">CKIRV2Graph::fused_qkv</references>
         <references refid="structCKIRV2Graph_1a6e330ed95df881c765d7fbb5f5c62d35" compoundref="ckernel__ir__v2_8h" startline="60">CKIRV2Graph::gated_mlp</references>
         <references refid="structCKIRV2Graph_1a520e755b859ef64a2f7299c9472e9911" compoundref="ckernel__ir__v2_8h" startline="57">CKIRV2Graph::has_pos_emb</references>
@@ -300,7 +301,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="69" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2_builder.c" bodystart="285" bodyend="354" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="69" declcolumn="5"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="69" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2_builder.c" bodystart="285" bodyend="354" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="69" declcolumn="5"/>
         <references refid="structCKIRV2Binding_1a0e50855a2852b3018c3b87ae5e53db19" compoundref="ckernel__ir__v2_8h" startline="36">CKIRV2Binding::arg</references>
         <references refid="structCKPlanBinding_1adf2dd85574e578a94cd1fc656d077505" compoundref="ckernel__kernel__specs_8h" startline="71">CKPlanBinding::arg</references>
         <references refid="structCKIRV2Node_1a8c7183052806860180f236095880ec04" compoundref="ckernel__ir__v2_8h" startline="47">CKIRV2Node::bindings</references>
@@ -312,7 +313,7 @@
         <references refid="ckernel__kernel__specs_8h_1ad9257c11ae490b3da865862c61a8c5cf" compoundref="ckernel__kernel__specs_8c" startline="3">ck_decoder_buffers</references>
         <references refid="ckernel__kernel__specs_8h_1a2ca67fec5e711b5cbdde5b1c602b949e" compoundref="ckernel__kernel__specs_8c" startline="313">ck_decoder_forward_plan_v2</references>
         <references refid="ckernel__kernel__specs_8h_1a5313b833dc861ada85f37e9ef379dee3" compoundref="ckernel__kernel__specs_8c" startline="327">ck_decoder_forward_plan_v2_count</references>
-        <references refid="ckernel__dtype_8h_1a9d2373b6c685cf9421a6fb638964aa65a9b7d39257d8dd8044a4012bc6db08e2b" compoundref="ckernel__dtype_8h" startline="27">CK_DT_FP32</references>
+        <references refid="ckernel__dtype_8h_1a9d2373b6c685cf9421a6fb638964aa65a9b7d39257d8dd8044a4012bc6db08e2b" compoundref="ckernel__dtype_8h" startline="29">CK_DT_FP32</references>
         <references refid="ckernel__ir__v2__builder_8c_1a29e53bd4efe76f71f9f493bd6ca03364" compoundref="ckernel__ir__v2__builder_8c" startline="27" endline="42">ck_ir_v2_copy_buffer_spec</references>
         <references refid="ckernel__ir__v2__builder_8c_1ad0ca6b1fd812a332aa86eef694f67a8f" compoundref="ckernel__ir__v2__builder_8c" startline="44" endline="55">ck_ir_v2_find_buffer_index</references>
         <references refid="ckernel__ir__v2__builder_8c_1af49195eecf6a337b1d16a56ed0e37922" compoundref="ckernel__ir__v2__builder_8c" startline="57" endline="68">ck_ir_v2_find_kernel_spec</references>
@@ -365,7 +366,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="70" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2_builder.c" bodystart="356" bodyend="427" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="70" declcolumn="5"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="70" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2_builder.c" bodystart="356" bodyend="427" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="70" declcolumn="5"/>
         <references refid="structCKIRV2Buffer_1a92f6356a2149550923b521d604bc9486" compoundref="ckernel__ir__v2_8h" startline="31">CKIRV2Buffer::alias_of</references>
         <references refid="structCKBufferSpec_1a3d2e80ce499f08ea3e9d969de367f945" compoundref="ckernel__kernel__specs_8h" startline="51">CKBufferSpec::alias_of</references>
         <references refid="structCKIRV2Binding_1a0e50855a2852b3018c3b87ae5e53db19" compoundref="ckernel__ir__v2_8h" startline="36">CKIRV2Binding::arg</references>
@@ -377,7 +378,7 @@
         <references refid="structCKIRV2Graph_1ad2d61568dda8232b3252da14a53ffc03" compoundref="ckernel__ir__v2_8h" startline="62">CKIRV2Graph::buffers</references>
         <references refid="ckernel__kernel__specs_8h_1ac454d061133c2eff4e5084be4ebacb00" compoundref="ckernel__kernel__specs_8c" startline="329">ck_decoder_backward_plan_v2</references>
         <references refid="ckernel__kernel__specs_8h_1a78253557cd8c8795464f1988cd7c23a5" compoundref="ckernel__kernel__specs_8c" startline="343">ck_decoder_backward_plan_v2_count</references>
-        <references refid="ckernel__dtype_8h_1a9d2373b6c685cf9421a6fb638964aa65a9b7d39257d8dd8044a4012bc6db08e2b" compoundref="ckernel__dtype_8h" startline="27">CK_DT_FP32</references>
+        <references refid="ckernel__dtype_8h_1a9d2373b6c685cf9421a6fb638964aa65a9b7d39257d8dd8044a4012bc6db08e2b" compoundref="ckernel__dtype_8h" startline="29">CK_DT_FP32</references>
         <references refid="ckernel__ir__v2__builder_8c_1a29e53bd4efe76f71f9f493bd6ca03364" compoundref="ckernel__ir__v2__builder_8c" startline="27" endline="42">ck_ir_v2_copy_buffer_spec</references>
         <references refid="ckernel__ir__v2__builder_8c_1ad0ca6b1fd812a332aa86eef694f67a8f" compoundref="ckernel__ir__v2__builder_8c" startline="44" endline="55">ck_ir_v2_find_buffer_index</references>
         <references refid="ckernel__ir__v2__builder_8c_1af49195eecf6a337b1d16a56ed0e37922" compoundref="ckernel__ir__v2__builder_8c" startline="57" endline="68">ck_ir_v2_find_kernel_spec</references>
@@ -434,7 +435,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="80" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2.c" bodystart="34" bodyend="52" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="80" declcolumn="6"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="80" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2.c" bodystart="34" bodyend="52" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="80" declcolumn="6"/>
         <references refid="structCKIRV2Graph_1ad2d61568dda8232b3252da14a53ffc03" compoundref="ckernel__ir__v2_8h" startline="62">CKIRV2Graph::buffers</references>
         <references refid="ckernel__ir__v2_8c_1a2d4b092eeda3d5fd6f4827738c392cf0" compoundref="ckernel__ir__v2_8c" startline="9" endline="18">ck_ir_v2_free_buffer</references>
         <references refid="ckernel__ir__v2_8c_1a2991dcb555833cd8219bb72c0bb1365e" compoundref="ckernel__ir__v2_8c" startline="20" endline="32">ck_ir_v2_free_node</references>
@@ -467,7 +468,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="79" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2.c" bodystart="1100" bodyend="1176" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="79" declcolumn="5"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="79" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2.c" bodystart="1100" bodyend="1176" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="79" declcolumn="5"/>
         <references refid="ckernel__ir__v2_8c_1a8be1b56b21de19f8cde1e7bfe390ffad" compoundref="ckernel__ir__v2_8c" startline="637" endline="650">ck_ir_v2_find_key</references>
         <references refid="ckernel__ir__v2_8c_1a681eb8d191d9589d6ff0ecb59536c671" compoundref="ckernel__ir__v2_8c" startline="34" endline="52">ck_ir_v2_free</references>
         <references refid="ckernel__ir__v2_8c_1a5b2b1869a20c7dfb93ad9ac0e8c8973e" compoundref="ckernel__ir__v2_8c" startline="577" endline="608">ck_ir_v2_next_object</references>
@@ -478,6 +479,7 @@
         <references refid="ckernel__ir__v2_8c_1aaa7bca993e64a4a003405af642a6a7f4" compoundref="ckernel__ir__v2_8c" startline="1005" endline="1098">ck_ir_v2_parse_nodes</references>
         <references refid="structCKIRV2Graph_1a49f1785b410e7bcae526d0b1dec440f3" compoundref="ckernel__ir__v2_8h" startline="56">CKIRV2Graph::config</references>
         <references refid="structCKModelConfig_1a18a327829d25405e92ba46a79009b89f" compoundref="ckernel__ir_8h" startline="30">CKModelConfig::context_window</references>
+        <references refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" compoundref="utf8_8c" startline="215">end</references>
         <references refid="structCKIRV2Graph_1adfc2e02d30a154499cfa803b1095dc6a" compoundref="ckernel__ir__v2_8h" startline="59">CKIRV2Graph::fused_qkv</references>
         <references refid="structCKIRV2Graph_1a6e330ed95df881c765d7fbb5f5c62d35" compoundref="ckernel__ir__v2_8h" startline="60">CKIRV2Graph::gated_mlp</references>
         <references refid="structCKIRV2Graph_1a520e755b859ef64a2f7299c9472e9911" compoundref="ckernel__ir__v2_8h" startline="57">CKIRV2Graph::has_pos_emb</references>
@@ -511,7 +513,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="72" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_ir_v2.c" bodystart="511" bodyend="514" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="72" declcolumn="5"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" line="72" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v2_legacy/ckernel_ir_v2.c" bodystart="511" bodyend="514" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_ir_v2.h" declline="72" declcolumn="5"/>
         <references refid="ckernel__ir__v2_8c_1a209e3eb32f2a8291f63a6503e031b78a" compoundref="ckernel__ir__v2_8c" startline="365" endline="509">ck_ir_v2_serialize_json_internal</references>
         <referencedby refid="ckernel__ir__v2__demo_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ckernel__ir__v2__demo_8c" startline="25" endline="141">main</referencedby>
       </memberdef>

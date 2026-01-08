@@ -147,7 +147,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" line="142" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" bodystart="142" bodyend="284"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
         <references refid="mlp__fused__decode_8c_1a6caa91a6fc1f8f0503d2bb8f0248a4f3" compoundref="mlp__fused__decode_8c" startline="40">MLP_TILE_SIZE</references>
         <references refid="mlp__fused__decode_8c_1a7e1099a11aedb31545ad636aeb9d97ed" compoundref="mlp__fused__decode_8c" startline="122" endline="124">silu_scalar</references>
       </memberdef>
@@ -203,7 +203,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" line="415" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" bodystart="415" bodyend="534" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" declline="287" declcolumn="6"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
         <references refid="mlp__fused__decode_8c_1a7e1099a11aedb31545ad636aeb9d97ed" compoundref="mlp__fused__decode_8c" startline="122" endline="124">silu_scalar</references>
         <referencedby refid="ckernel__engine_8h_1ac7e379fa8eb4c8b963e70daf7e761277" compoundref="mlp__fused__decode_8c" startline="304" endline="404">fused_mlp_swiglu_decode_v2</referencedby>
       </memberdef>
@@ -259,11 +259,11 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" line="304" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_fused_decode.c" bodystart="304" bodyend="404"/>
-        <references refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" compoundref="gemm__kernels__bf16_8c" startline="41" endline="59">__attribute__</references>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
         <references refid="mlp__fused__decode_8c_1a36d3ddf5aa9f0d689888e2782eb9e608" compoundref="mlp__fused__decode_8c" startline="415" endline="534">fused_mlp_swiglu_decode_tiled</references>
         <references refid="mlp__fused__decode_8c_1af121c16885cb3138dea592522e77e592" compoundref="mlp__fused__decode_8c" startline="302">MAX_SWIGLU_STACK</references>
         <references refid="mlp__fused__decode_8c_1a7e1099a11aedb31545ad636aeb9d97ed" compoundref="mlp__fused__decode_8c" startline="122" endline="124">silu_scalar</references>
-        <referencedby refid="ckernel__orchestration_8h_1a6aaebd943ca5ad278729a207b401ab45" compoundref="ckernel__orchestration_8c" startline="998" endline="1038">ck_mlp_swiglu_forward_fully_fused_token</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a6aaebd943ca5ad278729a207b401ab45" compoundref="ckernel__orchestration_8c" startline="1125" endline="1165">ck_mlp_swiglu_forward_fully_fused_token</referencedby>
       </memberdef>
       <memberdef kind="function" id="mlp__fused__decode_8c_1a7e1099a11aedb31545ad636aeb9d97ed" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
         <type>float</type>
@@ -468,7 +468,7 @@
 <codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tile_size<sp/>=<sp/>tile_end<sp/>-<sp/>t;</highlight></codeline>
 <codeline lineno="176"><highlight class="normal"></highlight></codeline>
 <codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>SwiGLU<sp/>for<sp/>this<sp/>tile<sp/>(stays<sp/>in<sp/>L1<sp/>cache)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu_tile[<ref refid="mlp__fused__decode_8c_1a6caa91a6fc1f8f0503d2bb8f0248a4f3" kindref="member">MLP_TILE_SIZE</ref>]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu_tile[<ref refid="mlp__fused__decode_8c_1a6caa91a6fc1f8f0503d2bb8f0248a4f3" kindref="member">MLP_TILE_SIZE</ref>]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
 <codeline lineno="179"><highlight class="normal"></highlight></codeline>
 <codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>t;<sp/>j<sp/>&lt;<sp/>tile_end;<sp/>j++)<sp/>{</highlight></codeline>
 <codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wg_row<sp/>=<sp/>&amp;W_gate[j<sp/>*<sp/>D];</highlight></codeline>
@@ -615,7 +615,7 @@
 <codeline lineno="322"><highlight class="normal"></highlight></codeline>
 <codeline lineno="323"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Stack-allocated<sp/>swiglu<sp/>buffer<sp/>(max<sp/>32KB)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu[<ref refid="mlp__fused__decode_8c_1af121c16885cb3138dea592522e77e592" kindref="member">MAX_SWIGLU_STACK</ref>]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
+<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu[<ref refid="mlp__fused__decode_8c_1af121c16885cb3138dea592522e77e592" kindref="member">MAX_SWIGLU_STACK</ref>]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
 <codeline lineno="326"><highlight class="normal"></highlight></codeline>
 <codeline lineno="327"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Phase<sp/>1:<sp/>Compute<sp/>all<sp/>swiglu<sp/>values<sp/>(parallelize<sp/>over<sp/>Hff)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="328"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
@@ -736,7 +736,7 @@
 <codeline lineno="443"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tile_size<sp/>=<sp/>tile_end<sp/>-<sp/>t;</highlight></codeline>
 <codeline lineno="444"><highlight class="normal"></highlight></codeline>
 <codeline lineno="445"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>swiglu<sp/>tile</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="446"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu_tile[256]<sp/><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
+<codeline lineno="446"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>swiglu_tile[256]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(64)));</highlight></codeline>
 <codeline lineno="447"><highlight class="normal"></highlight></codeline>
 <codeline lineno="448"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="449"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>jj<sp/>=<sp/>0;<sp/>jj<sp/>&lt;<sp/>tile_size;<sp/>jj++)<sp/>{</highlight></codeline>

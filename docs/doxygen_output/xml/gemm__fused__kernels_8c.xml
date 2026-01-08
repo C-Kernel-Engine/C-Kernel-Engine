@@ -117,6 +117,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" line="121" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" bodystart="121" bodyend="160"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
         <references refid="gemm__fused__kernels_8c_1aa3c6303c8ab2632fbd29c489de4968f2" compoundref="gemm__fused__kernels_8c" startline="64" endline="68">fast_gelu_scalar</references>
+        <references refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" compoundref="rmsnorm__q8__k__fused_8c" startline="10" endline="17">hsum256_ps_fused</references>
       </memberdef>
       <memberdef kind="function" id="gemm__fused__kernels_8c_1a3b3b32e0000c63586cddb9be0eda5daf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -159,6 +160,7 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" line="74" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" bodystart="74" bodyend="114"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" compoundref="rmsnorm__q8__k__fused_8c" startline="10" endline="17">hsum256_ps_fused</references>
       </memberdef>
       <memberdef kind="function" id="gemm__fused__kernels_8c_1a26763168556236dee899fe08699cc826" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -201,6 +203,7 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" line="167" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" bodystart="167" bodyend="209"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" compoundref="rmsnorm__q8__k__fused_8c" startline="10" endline="17">hsum256_ps_fused</references>
       </memberdef>
       <memberdef kind="function" id="gemm__fused__kernels_8c_1a2ae3bbf03cebc529c1e7962a7dba2568" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -250,7 +253,8 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" line="231" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_fused_kernels.c" bodystart="231" bodyend="306"/>
-        <referencedby refid="ckernel__orchestration_8h_1a266b9c19eafb8e11f3e51253c8dd0b45" compoundref="ckernel__orchestration_8c" startline="963" endline="996">ck_mlp_swiglu_forward_fused_token</referencedby>
+        <references refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" compoundref="rmsnorm__q8__k__fused_8c" startline="10" endline="17">hsum256_ps_fused</references>
+        <referencedby refid="ckernel__orchestration_8h_1a266b9c19eafb8e11f3e51253c8dd0b45" compoundref="ckernel__orchestration_8c" startline="1090" endline="1123">ck_mlp_swiglu_forward_fused_token</referencedby>
       </memberdef>
       </sectiondef>
     <briefdescription>
@@ -294,7 +298,7 @@
 <codeline lineno="34"><highlight class="normal"></highlight></codeline>
 <codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>||<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="36"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Horizontal<sp/>sum<sp/>of<sp/>8<sp/>floats<sp/>in<sp/>__m256<sp/>(works<sp/>for<sp/>both<sp/>AVX<sp/>and<sp/>AVX-512)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="37"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>hsum256_ps_fused(__m256<sp/>v)<sp/>{</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(__m256<sp/>v)<sp/>{</highlight></codeline>
 <codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>lo<sp/>=<sp/>_mm256_castps256_ps128(v);</highlight></codeline>
 <codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>hi<sp/>=<sp/>_mm256_extractf128_ps(v,<sp/>1);</highlight></codeline>
 <codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>sum128<sp/>=<sp/>_mm_add_ps(lo,<sp/>hi);</highlight></codeline>
@@ -312,7 +316,7 @@
 <codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>lo<sp/>=<sp/>_mm512_castps512_ps256(v);</highlight></codeline>
 <codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>hi<sp/>=<sp/>_mm512_extractf32x8_ps(v,<sp/>1);</highlight></codeline>
 <codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>sum256<sp/>=<sp/>_mm256_add_ps(lo,<sp/>hi);</highlight></codeline>
-<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>hsum256_ps_fused(sum256);</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(sum256);</highlight></codeline>
 <codeline lineno="56"><highlight class="normal">}</highlight></codeline>
 <codeline lineno="57"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="58"><highlight class="normal"></highlight></codeline>
@@ -349,7 +353,7 @@
 <codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>prod<sp/>=<sp/>_mm256_mul_ps(a_vec,<sp/>b_vec);</highlight></codeline>
 <codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum_vec<sp/>=<sp/>_mm256_add_ps(sum_vec,<sp/>prod);</highlight></codeline>
 <codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>hsum256_ps_fused(sum_vec);</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(sum_vec);</highlight></codeline>
 <codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>k<sp/>&lt;<sp/>K;<sp/>k++)<sp/>{</highlight></codeline>
 <codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>A[i<sp/>*<sp/>K<sp/>+<sp/>k]<sp/>*<sp/>B[j<sp/>*<sp/>K<sp/>+<sp/>k];</highlight></codeline>
 <codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
@@ -396,7 +400,7 @@
 <codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>prod<sp/>=<sp/>_mm256_mul_ps(a_vec,<sp/>b_vec);</highlight></codeline>
 <codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum_vec<sp/>=<sp/>_mm256_add_ps(sum_vec,<sp/>prod);</highlight></codeline>
 <codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>hsum256_ps_fused(sum_vec);</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(sum_vec);</highlight></codeline>
 <codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>k<sp/>&lt;<sp/>K;<sp/>k++)<sp/>{</highlight></codeline>
 <codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>A[i<sp/>*<sp/>K<sp/>+<sp/>k]<sp/>*<sp/>B[j<sp/>*<sp/>K<sp/>+<sp/>k];</highlight></codeline>
 <codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
@@ -442,7 +446,7 @@
 <codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>prod<sp/>=<sp/>_mm256_mul_ps(a_vec,<sp/>b_vec);</highlight></codeline>
 <codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum_vec<sp/>=<sp/>_mm256_add_ps(sum_vec,<sp/>prod);</highlight></codeline>
 <codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>hsum256_ps_fused(sum_vec);</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(sum_vec);</highlight></codeline>
 <codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>k<sp/>&lt;<sp/>K;<sp/>k++)<sp/>{</highlight></codeline>
 <codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>A[i<sp/>*<sp/>K<sp/>+<sp/>k]<sp/>*<sp/>B[j<sp/>*<sp/>K<sp/>+<sp/>k];</highlight></codeline>
 <codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
@@ -523,8 +527,8 @@
 <codeline lineno="263"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="264"><highlight class="normal"></highlight></codeline>
 <codeline lineno="265"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Horizontal<sp/>sum</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="266"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>gate<sp/>=<sp/>hsum256_ps_fused(gate_vec);</highlight></codeline>
-<codeline lineno="267"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>up<sp/>=<sp/>hsum256_ps_fused(up_vec);</highlight></codeline>
+<codeline lineno="266"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>gate<sp/>=<sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(gate_vec);</highlight></codeline>
+<codeline lineno="267"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>up<sp/>=<sp/><ref refid="rmsnorm__q8__k__fused_8c_1ad21132e6998918bbc4987a97a39d38ba" kindref="member">hsum256_ps_fused</ref>(up_vec);</highlight></codeline>
 <codeline lineno="268"><highlight class="normal"></highlight></codeline>
 <codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Scalar<sp/>remainder</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>k<sp/>&lt;<sp/>K;<sp/>k++)<sp/>{</highlight></codeline>

@@ -51,14 +51,16 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ckernel__engine_8h.html#a476c5068e2670813bcd9d5fd0ae6d0b4",
-"ckernel__kernel__specs_8c.html#a384132179c5765f7201d295d743216b0",
-"ckernel__section__layout_8h.html#abc25629d856fc301f5dcb0af8a63d03c",
-"gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5",
-"softmax__kernels__bf16_8c_source.html",
-"structCKLayerForwardParamsQ4K.html#a66da64885aa1cf87cb9e687ad7fcd34b",
-"structCKSection.html#a0651f7c9b1f55618e1ed1285fc803eab",
-"structblock__q6__K.html#a2804e4fef4f6c2eaf41230ddbed8e479"
+"ckernel__codegen__v2_8c.html#a359e5ca69869c47ed1af896696d5fa2a",
+"ckernel__ir_8h.html#a37376e6b0c13d2069c36be3bbc93c933ae7f5ae404d8c67ac8e81271922983a8c",
+"ckernel__model__layout_8c.html#a19108c1ddea653d46840daefcf542bb5",
+"functions_vars_f.html",
+"globals_func_t.html",
+"show__config_8c.html#a4d42196463c5ba39847e24ebe52bfbad",
+"structCKLayerForwardParams.html#a5aac19a779c176623a55fd48bb9502cf",
+"structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949",
+"structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46",
+"tokenizer_8c.html#ae246055217081d433db25cb6a754f5b9"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

@@ -319,160 +319,162 @@ $(document).ready(function(){initNavTree('attention__decode__fused_8c_source.htm
 <div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> ad = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4eb2bdb409cf3a010bbb554a98e61e65">aligned_head_dim</a>;</div>
 <div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> aligned_intermediate = p-&gt;<a class="code" href="structCKLayerForwardParams.html#add2c7b423bea0a7261e1fbdc2820d3d6">aligned_intermediate_dim</a>;</div>
 <div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160; </div>
-<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> *input_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#ad678ed659e2a04e07062a4aff3fe50a7">input</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_D;</div>
-<div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160;    <span class="keywordtype">float</span> *proj_row = NULL;</div>
-<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;    <span class="keywordtype">float</span> *residual_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a97ce8698227c9cf419c8e21d17cebc12">residual1</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_D;</div>
-<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;    <span class="keywordtype">float</span> *ln2_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a122026c6f33e91f706fc37dab39c10b2">ln2_out</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_D;</div>
-<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;    <span class="keywordtype">float</span> *swiglu_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a">swiglu_out</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_intermediate;</div>
-<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;    <span class="keywordtype">float</span> *mlp_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a86060e45304124966b764eb8db0365b7">mlp_out</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_D;</div>
-<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;    <span class="keywordtype">float</span> *out_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1">output</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)aligned_D;</div>
-<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160; </div>
-<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;    <span class="keywordtype">float</span> ln1_rstd_tmp = 0.0f;</div>
-<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;    <span class="keywordtype">float</span> ln2_rstd_tmp = 0.0f;</div>
-<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;    <span class="keywordtype">float</span> *ln2_rstd = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4bad26d55e52ce0462fb8b4081880a0f">ln2_rstd</a> ? (p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4bad26d55e52ce0462fb8b4081880a0f">ln2_rstd</a> + token_index) : &amp;ln2_rstd_tmp;</div>
-<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160; </div>
-<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;    <span class="keywordtype">float</span> ln1_row[aligned_D];</div>
+<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;    <span class="comment">/* Decode buffers are single-token; token_index only applies to KV cache. */</span></div>
+<div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> token_slot = 0;</div>
+<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> *input_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#ad678ed659e2a04e07062a4aff3fe50a7">input</a> + token_slot * (size_t)aligned_D;</div>
+<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;    <span class="keywordtype">float</span> *proj_row = NULL;</div>
+<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;    <span class="keywordtype">float</span> *residual_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a97ce8698227c9cf419c8e21d17cebc12">residual1</a> + token_slot * (size_t)aligned_D;</div>
+<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;    <span class="keywordtype">float</span> *ln2_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a122026c6f33e91f706fc37dab39c10b2">ln2_out</a> + token_slot * (size_t)aligned_D;</div>
+<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;    <span class="keywordtype">float</span> *swiglu_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a">swiglu_out</a> + token_slot * (size_t)aligned_intermediate;</div>
+<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;    <span class="keywordtype">float</span> *mlp_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a86060e45304124966b764eb8db0365b7">mlp_out</a> + token_slot * (size_t)aligned_D;</div>
+<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;    <span class="keywordtype">float</span> *out_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1">output</a> + token_slot * (size_t)aligned_D;</div>
+<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160; </div>
+<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;    <span class="keywordtype">float</span> ln1_rstd_tmp = 0.0f;</div>
+<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;    <span class="keywordtype">float</span> ln2_rstd_tmp = 0.0f;</div>
+<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;    <span class="keywordtype">float</span> *ln2_rstd = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4bad26d55e52ce0462fb8b4081880a0f">ln2_rstd</a> ? (p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4bad26d55e52ce0462fb8b4081880a0f">ln2_rstd</a> + token_slot) : &amp;ln2_rstd_tmp;</div>
 <div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160; </div>
-<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(input_row,</div>
-<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4a3337a600f787d4b2fe9ab83f7594c9">ln1_gamma</a>,</div>
-<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;                    ln1_row,</div>
-<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;                    &amp;ln1_rstd_tmp,</div>
-<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;                    <span class="comment">/*tokens=*/</span>1,</div>
-<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;                    D,</div>
-<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;                    aligned_D,</div>
-<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595">eps</a>);</div>
-<div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160; </div>
-<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;    <span class="keywordtype">size_t</span> q_elems = (size_t)H * (<span class="keywordtype">size_t</span>)ad;</div>
-<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160;    <span class="keywordtype">size_t</span> kv_elems = (size_t)H_kv * (<span class="keywordtype">size_t</span>)ad;</div>
-<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;    <span class="keywordtype">float</span> q_token[q_elems];</div>
-<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;    <span class="keywordtype">float</span> k_token[kv_elems];</div>
-<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;    <span class="keywordtype">float</span> v_token[kv_elems];</div>
-<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;    <span class="keywordtype">float</span> attn_token[q_elems];</div>
-<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160; </div>
-<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#ab6c6524b0f30733a077e3783bb55a592">ck_qkv_project_head_major_token</a>(ln1_row,</div>
-<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a621ed21298acc47932068d4a97ba72d7">wq</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#a1002972e750e6b75ba1151cc4de47a05">bq</a>,</div>
-<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a14ca061d781c1ed9631ff94df3e6278b">wk</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7e508ab8ae215c31fbae4f78b23d5929">bk</a>,</div>
-<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7e8ccf20ccec87eb230737334d589f5d">wv</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6">bv</a>,</div>
-<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;                                    q_token, k_token, v_token,</div>
-<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;                                    aligned_D,</div>
-<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;                                    H,</div>
-<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;                                    H_kv,</div>
-<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;                                    ad);</div>
-<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160; </div>
-<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;    <span class="keywordflow">if</span> (p-&gt;<a class="code" href="structCKLayerForwardParams.html#a3be9a0f9fae1ab8fddc30e14628d74a0">rope_cos</a> &amp;&amp; p-&gt;<a class="code" href="structCKLayerForwardParams.html#a332fc12fb11a99adfd72dba034c56ea7">rope_sin</a>) {</div>
-<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160;        <a class="code" href="ckernel__engine_8h.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a>(q_token,</div>
-<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;                        k_token,</div>
-<div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#a3be9a0f9fae1ab8fddc30e14628d74a0">rope_cos</a>,</div>
-<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#a332fc12fb11a99adfd72dba034c56ea7">rope_sin</a>,</div>
-<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;                        H,</div>
-<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;                        H_kv,</div>
-<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;                        <span class="comment">/*num_tokens=*/</span>1,</div>
-<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;                        hd,</div>
-<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;                        ad,</div>
-<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#ad0e18a97d0cd2746890333bcc2d0d0e1">rope_pos_offset</a>);</div>
-<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;    }</div>
-<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160; </div>
-<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a1b1c905b9d69fc8aadca4c714147ce45">kv_cache_write_head_major</a>(k_token,</div>
-<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;                              v_token,</div>
-<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac4abe1c97c14c49d953ae5dd8f910c96">k</a>,</div>
-<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16">v</a>,</div>
-<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;                              H_kv,</div>
-<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;                              token_index,</div>
-<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;                              cache_capacity,</div>
-<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;                              hd,</div>
-<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;                              ad);</div>
-<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160; </div>
-<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a>(q_token,</div>
-<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160;                                                  p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac4abe1c97c14c49d953ae5dd8f910c96">k</a>,</div>
-<div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160;                                                  p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16">v</a>,</div>
-<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;                                                  attn_token,</div>
-<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;                                                  H,</div>
-<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;                                                  H_kv,</div>
-<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;                                                  <span class="comment">/*kv_tokens=*/</span>token_index + 1,</div>
-<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;                                                  cache_capacity,</div>
-<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;                                                  hd,</div>
-<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;                                                  ad);</div>
-<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160; </div>
-<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a606857bd1c4a89fc378a6787ce01d348">ck_attention_project_head_major_decode_token_residual</a>(attn_token,</div>
-<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160;                                                          p-&gt;<a class="code" href="structCKLayerForwardParams.html#a98753685d03e778a1d655f8f3cd486ea">wo</a>,</div>
-<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;                                                          p-&gt;<a class="code" href="structCKLayerForwardParams.html#ae1e3ff68d1bc957125df225fec96dcc2">bo</a>,</div>
-<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;                                                          input_row,</div>
-<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160;                                                          proj_row,</div>
-<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160;                                                          residual_row,</div>
-<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;                                                          D,</div>
-<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;                                                          aligned_D,</div>
-<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160;                                                          H,</div>
-<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;                                                          ad);</div>
-<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160; </div>
-<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(residual_row,</div>
-<div class="line"><a name="l00282"></a><span class="lineno">  282</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#aace627c9eb6644fac5c3fc5a4748f1f4">ln2_gamma</a>,</div>
-<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;                    ln2_row,</div>
-<div class="line"><a name="l00284"></a><span class="lineno">  284</span>&#160;                    ln2_rstd,</div>
-<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;                    <span class="comment">/*tokens=*/</span>1,</div>
-<div class="line"><a name="l00286"></a><span class="lineno">  286</span>&#160;                    D,</div>
-<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;                    aligned_D,</div>
-<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595">eps</a>);</div>
-<div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160; </div>
-<div class="line"><a name="l00290"></a><span class="lineno">  290</span>&#160;    <span class="keywordflow">if</span> (fuse_mlp) {</div>
-<div class="line"><a name="l00291"></a><span class="lineno">  291</span>&#160;        <span class="comment">// Fully fused MLP avoids writing SwiGLU activations to DRAM (aligned dims</span></div>
-<div class="line"><a name="l00292"></a><span class="lineno">  292</span>&#160;        <span class="comment">// match padded weight layout).</span></div>
-<div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;        <a class="code" href="ckernel__orchestration_8h.html#a6aaebd943ca5ad278729a207b401ab45">ck_mlp_swiglu_forward_fully_fused_token</a>(ln2_row,</div>
-<div class="line"><a name="l00294"></a><span class="lineno">  294</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a72a52720f195370d45e7cc00a6985651">w1</a>,</div>
-<div class="line"><a name="l00295"></a><span class="lineno">  295</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445">b1</a>,</div>
-<div class="line"><a name="l00296"></a><span class="lineno">  296</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a070376c4c42bb40d7cdd919ea74c669b">w2</a>,</div>
-<div class="line"><a name="l00297"></a><span class="lineno">  297</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#acc91fa02742733363b55e38ff2305e7f">b2</a>,</div>
-<div class="line"><a name="l00298"></a><span class="lineno">  298</span>&#160;                                                 mlp_row,</div>
-<div class="line"><a name="l00299"></a><span class="lineno">  299</span>&#160;                                                 aligned_D,</div>
-<div class="line"><a name="l00300"></a><span class="lineno">  300</span>&#160;                                                 aligned_intermediate);</div>
-<div class="line"><a name="l00301"></a><span class="lineno">  301</span>&#160;    } <span class="keywordflow">else</span> {</div>
-<div class="line"><a name="l00302"></a><span class="lineno">  302</span>&#160;        <span class="keywordtype">int</span> up_dim = 2 * aligned_intermediate;</div>
-<div class="line"><a name="l00303"></a><span class="lineno">  303</span>&#160;        <span class="keywordtype">float</span> *fc1_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7ca0c2bd14cfcde3504bd43030609e4b">fc1_out</a> + (size_t)token_index * (<span class="keywordtype">size_t</span>)up_dim;</div>
-<div class="line"><a name="l00304"></a><span class="lineno">  304</span>&#160; </div>
-<div class="line"><a name="l00305"></a><span class="lineno">  305</span>&#160;        <a class="code" href="ckernel__orchestration_8h.html#a2e894b79792aaf694427446c1d89fab8">ck_mlp_swiglu_forward</a>(ln2_row,</div>
-<div class="line"><a name="l00306"></a><span class="lineno">  306</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a72a52720f195370d45e7cc00a6985651">w1</a>,</div>
-<div class="line"><a name="l00307"></a><span class="lineno">  307</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445">b1</a>,</div>
-<div class="line"><a name="l00308"></a><span class="lineno">  308</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a070376c4c42bb40d7cdd919ea74c669b">w2</a>,</div>
-<div class="line"><a name="l00309"></a><span class="lineno">  309</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#acc91fa02742733363b55e38ff2305e7f">b2</a>,</div>
-<div class="line"><a name="l00310"></a><span class="lineno">  310</span>&#160;                              fc1_row,</div>
-<div class="line"><a name="l00311"></a><span class="lineno">  311</span>&#160;                              swiglu_row,</div>
-<div class="line"><a name="l00312"></a><span class="lineno">  312</span>&#160;                              mlp_row,</div>
-<div class="line"><a name="l00313"></a><span class="lineno">  313</span>&#160;                              <span class="comment">/*tokens=*/</span>1,</div>
-<div class="line"><a name="l00314"></a><span class="lineno">  314</span>&#160;                              aligned_D,</div>
-<div class="line"><a name="l00315"></a><span class="lineno">  315</span>&#160;                              aligned_intermediate);</div>
-<div class="line"><a name="l00316"></a><span class="lineno">  316</span>&#160;    }</div>
-<div class="line"><a name="l00317"></a><span class="lineno">  317</span>&#160; </div>
-<div class="line"><a name="l00318"></a><span class="lineno">  318</span>&#160;    <a class="code" href="ckernel__orchestration_8h.html#ab0948def8f4a6c6fd8a5288aacd22f01">ck_residual_add_token_major</a>(residual_row,</div>
-<div class="line"><a name="l00319"></a><span class="lineno">  319</span>&#160;                                mlp_row,</div>
-<div class="line"><a name="l00320"></a><span class="lineno">  320</span>&#160;                                out_row,</div>
-<div class="line"><a name="l00321"></a><span class="lineno">  321</span>&#160;                                <span class="comment">/*tokens=*/</span>1,</div>
-<div class="line"><a name="l00322"></a><span class="lineno">  322</span>&#160;                                aligned_D);</div>
-<div class="line"><a name="l00323"></a><span class="lineno">  323</span>&#160;}</div>
-<div class="line"><a name="l00324"></a><span class="lineno">  324</span>&#160; </div>
-<div class="line"><a name="l00325"></a><span class="lineno"><a class="line" href="ckernel__orchestration_8h.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">  325</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="attention__decode__fused_8c.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</a>(<span class="keyword">const</span> <a class="code" href="structCKLayerForwardParams.html">CKLayerForwardParams</a> *p,</div>
-<div class="line"><a name="l00326"></a><span class="lineno">  326</span>&#160;                                                      <span class="keywordtype">int</span> token_index,</div>
-<div class="line"><a name="l00327"></a><span class="lineno">  327</span>&#160;                                                      <span class="keywordtype">int</span> cache_capacity)</div>
-<div class="line"><a name="l00328"></a><span class="lineno">  328</span>&#160;{</div>
-<div class="line"><a name="l00329"></a><span class="lineno">  329</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a1e6628f9f140c9749a6dd7c2c9ce263a">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</a>(p,</div>
-<div class="line"><a name="l00330"></a><span class="lineno">  330</span>&#160;                                                           token_index,</div>
-<div class="line"><a name="l00331"></a><span class="lineno">  331</span>&#160;                                                           cache_capacity,</div>
-<div class="line"><a name="l00332"></a><span class="lineno">  332</span>&#160;                                                           <span class="comment">/*fuse_mlp=*/</span>0);</div>
-<div class="line"><a name="l00333"></a><span class="lineno">  333</span>&#160;}</div>
-<div class="line"><a name="l00334"></a><span class="lineno">  334</span>&#160; </div>
-<div class="line"><a name="l00335"></a><span class="lineno"><a class="line" href="ckernel__orchestration_8h.html#a50899fc552648f5d1cadd0e4c5671dc1">  335</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="attention__decode__fused_8c.html#a50899fc552648f5d1cadd0e4c5671dc1">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</a>(<span class="keyword">const</span> <a class="code" href="structCKLayerForwardParams.html">CKLayerForwardParams</a> *p,</div>
-<div class="line"><a name="l00336"></a><span class="lineno">  336</span>&#160;                                                          <span class="keywordtype">int</span> token_index,</div>
-<div class="line"><a name="l00337"></a><span class="lineno">  337</span>&#160;                                                          <span class="keywordtype">int</span> cache_capacity)</div>
-<div class="line"><a name="l00338"></a><span class="lineno">  338</span>&#160;{</div>
-<div class="line"><a name="l00339"></a><span class="lineno">  339</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a1e6628f9f140c9749a6dd7c2c9ce263a">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</a>(p,</div>
-<div class="line"><a name="l00340"></a><span class="lineno">  340</span>&#160;                                                           token_index,</div>
-<div class="line"><a name="l00341"></a><span class="lineno">  341</span>&#160;                                                           cache_capacity,</div>
-<div class="line"><a name="l00342"></a><span class="lineno">  342</span>&#160;                                                           <span class="comment">/*fuse_mlp=*/</span>1);</div>
-<div class="line"><a name="l00343"></a><span class="lineno">  343</span>&#160;}</div>
+<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;    <span class="keywordtype">float</span> ln1_row[aligned_D];</div>
+<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160; </div>
+<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(input_row,</div>
+<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a4a3337a600f787d4b2fe9ab83f7594c9">ln1_gamma</a>,</div>
+<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;                    ln1_row,</div>
+<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;                    &amp;ln1_rstd_tmp,</div>
+<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;                    <span class="comment">/*tokens=*/</span>1,</div>
+<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;                    D,</div>
+<div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160;                    aligned_D,</div>
+<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595">eps</a>);</div>
+<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160; </div>
+<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;    <span class="keywordtype">size_t</span> q_elems = (size_t)H * (<span class="keywordtype">size_t</span>)ad;</div>
+<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;    <span class="keywordtype">size_t</span> kv_elems = (size_t)H_kv * (<span class="keywordtype">size_t</span>)ad;</div>
+<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;    <span class="keywordtype">float</span> q_token[q_elems];</div>
+<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;    <span class="keywordtype">float</span> k_token[kv_elems];</div>
+<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;    <span class="keywordtype">float</span> v_token[kv_elems];</div>
+<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;    <span class="keywordtype">float</span> attn_token[q_elems];</div>
+<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160; </div>
+<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#ab6c6524b0f30733a077e3783bb55a592">ck_qkv_project_head_major_token</a>(ln1_row,</div>
+<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a621ed21298acc47932068d4a97ba72d7">wq</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#a1002972e750e6b75ba1151cc4de47a05">bq</a>,</div>
+<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a14ca061d781c1ed9631ff94df3e6278b">wk</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7e508ab8ae215c31fbae4f78b23d5929">bk</a>,</div>
+<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;                                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7e8ccf20ccec87eb230737334d589f5d">wv</a>, p-&gt;<a class="code" href="structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6">bv</a>,</div>
+<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;                                    q_token, k_token, v_token,</div>
+<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;                                    aligned_D,</div>
+<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;                                    H,</div>
+<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;                                    H_kv,</div>
+<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;                                    ad);</div>
+<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160; </div>
+<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;    <span class="keywordflow">if</span> (p-&gt;<a class="code" href="structCKLayerForwardParams.html#a3be9a0f9fae1ab8fddc30e14628d74a0">rope_cos</a> &amp;&amp; p-&gt;<a class="code" href="structCKLayerForwardParams.html#a332fc12fb11a99adfd72dba034c56ea7">rope_sin</a>) {</div>
+<div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;        <a class="code" href="ckernel__engine_8h.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a>(q_token,</div>
+<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;                        k_token,</div>
+<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#a3be9a0f9fae1ab8fddc30e14628d74a0">rope_cos</a>,</div>
+<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#a332fc12fb11a99adfd72dba034c56ea7">rope_sin</a>,</div>
+<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;                        H,</div>
+<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;                        H_kv,</div>
+<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;                        <span class="comment">/*num_tokens=*/</span>1,</div>
+<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;                        hd,</div>
+<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;                        ad,</div>
+<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;                        p-&gt;<a class="code" href="structCKLayerForwardParams.html#ad0e18a97d0cd2746890333bcc2d0d0e1">rope_pos_offset</a>);</div>
+<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;    }</div>
+<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160; </div>
+<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a1b1c905b9d69fc8aadca4c714147ce45">kv_cache_write_head_major</a>(k_token,</div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;                              v_token,</div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac4abe1c97c14c49d953ae5dd8f910c96">k</a>,</div>
+<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16">v</a>,</div>
+<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;                              H_kv,</div>
+<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;                              token_index,</div>
+<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;                              cache_capacity,</div>
+<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160;                              hd,</div>
+<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;                              ad);</div>
+<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160; </div>
+<div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a>(q_token,</div>
+<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;                                                  p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac4abe1c97c14c49d953ae5dd8f910c96">k</a>,</div>
+<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;                                                  p-&gt;<a class="code" href="structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16">v</a>,</div>
+<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;                                                  attn_token,</div>
+<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;                                                  H,</div>
+<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;                                                  H_kv,</div>
+<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;                                                  <span class="comment">/*kv_tokens=*/</span>token_index + 1,</div>
+<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;                                                  cache_capacity,</div>
+<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;                                                  hd,</div>
+<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;                                                  ad);</div>
+<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160; </div>
+<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a606857bd1c4a89fc378a6787ce01d348">ck_attention_project_head_major_decode_token_residual</a>(attn_token,</div>
+<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;                                                          p-&gt;<a class="code" href="structCKLayerForwardParams.html#a98753685d03e778a1d655f8f3cd486ea">wo</a>,</div>
+<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160;                                                          p-&gt;<a class="code" href="structCKLayerForwardParams.html#ae1e3ff68d1bc957125df225fec96dcc2">bo</a>,</div>
+<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160;                                                          input_row,</div>
+<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;                                                          proj_row,</div>
+<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;                                                          residual_row,</div>
+<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160;                                                          D,</div>
+<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;                                                          aligned_D,</div>
+<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160;                                                          H,</div>
+<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;                                                          ad);</div>
+<div class="line"><a name="l00282"></a><span class="lineno">  282</span>&#160; </div>
+<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(residual_row,</div>
+<div class="line"><a name="l00284"></a><span class="lineno">  284</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#aace627c9eb6644fac5c3fc5a4748f1f4">ln2_gamma</a>,</div>
+<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;                    ln2_row,</div>
+<div class="line"><a name="l00286"></a><span class="lineno">  286</span>&#160;                    ln2_rstd,</div>
+<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;                    <span class="comment">/*tokens=*/</span>1,</div>
+<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;                    D,</div>
+<div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160;                    aligned_D,</div>
+<div class="line"><a name="l00290"></a><span class="lineno">  290</span>&#160;                    p-&gt;<a class="code" href="structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595">eps</a>);</div>
+<div class="line"><a name="l00291"></a><span class="lineno">  291</span>&#160; </div>
+<div class="line"><a name="l00292"></a><span class="lineno">  292</span>&#160;    <span class="keywordflow">if</span> (fuse_mlp) {</div>
+<div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;        <span class="comment">// Fully fused MLP avoids writing SwiGLU activations to DRAM (aligned dims</span></div>
+<div class="line"><a name="l00294"></a><span class="lineno">  294</span>&#160;        <span class="comment">// match padded weight layout).</span></div>
+<div class="line"><a name="l00295"></a><span class="lineno">  295</span>&#160;        <a class="code" href="ckernel__orchestration_8h.html#a6aaebd943ca5ad278729a207b401ab45">ck_mlp_swiglu_forward_fully_fused_token</a>(ln2_row,</div>
+<div class="line"><a name="l00296"></a><span class="lineno">  296</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a72a52720f195370d45e7cc00a6985651">w1</a>,</div>
+<div class="line"><a name="l00297"></a><span class="lineno">  297</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445">b1</a>,</div>
+<div class="line"><a name="l00298"></a><span class="lineno">  298</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#a070376c4c42bb40d7cdd919ea74c669b">w2</a>,</div>
+<div class="line"><a name="l00299"></a><span class="lineno">  299</span>&#160;                                                 p-&gt;<a class="code" href="structCKLayerForwardParams.html#acc91fa02742733363b55e38ff2305e7f">b2</a>,</div>
+<div class="line"><a name="l00300"></a><span class="lineno">  300</span>&#160;                                                 mlp_row,</div>
+<div class="line"><a name="l00301"></a><span class="lineno">  301</span>&#160;                                                 aligned_D,</div>
+<div class="line"><a name="l00302"></a><span class="lineno">  302</span>&#160;                                                 aligned_intermediate);</div>
+<div class="line"><a name="l00303"></a><span class="lineno">  303</span>&#160;    } <span class="keywordflow">else</span> {</div>
+<div class="line"><a name="l00304"></a><span class="lineno">  304</span>&#160;        <span class="keywordtype">int</span> up_dim = 2 * aligned_intermediate;</div>
+<div class="line"><a name="l00305"></a><span class="lineno">  305</span>&#160;        <span class="keywordtype">float</span> *fc1_row = p-&gt;<a class="code" href="structCKLayerForwardParams.html#a7ca0c2bd14cfcde3504bd43030609e4b">fc1_out</a> + token_slot * (size_t)up_dim;</div>
+<div class="line"><a name="l00306"></a><span class="lineno">  306</span>&#160; </div>
+<div class="line"><a name="l00307"></a><span class="lineno">  307</span>&#160;        <a class="code" href="ckernel__orchestration_8h.html#a2e894b79792aaf694427446c1d89fab8">ck_mlp_swiglu_forward</a>(ln2_row,</div>
+<div class="line"><a name="l00308"></a><span class="lineno">  308</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a72a52720f195370d45e7cc00a6985651">w1</a>,</div>
+<div class="line"><a name="l00309"></a><span class="lineno">  309</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445">b1</a>,</div>
+<div class="line"><a name="l00310"></a><span class="lineno">  310</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#a070376c4c42bb40d7cdd919ea74c669b">w2</a>,</div>
+<div class="line"><a name="l00311"></a><span class="lineno">  311</span>&#160;                              p-&gt;<a class="code" href="structCKLayerForwardParams.html#acc91fa02742733363b55e38ff2305e7f">b2</a>,</div>
+<div class="line"><a name="l00312"></a><span class="lineno">  312</span>&#160;                              fc1_row,</div>
+<div class="line"><a name="l00313"></a><span class="lineno">  313</span>&#160;                              swiglu_row,</div>
+<div class="line"><a name="l00314"></a><span class="lineno">  314</span>&#160;                              mlp_row,</div>
+<div class="line"><a name="l00315"></a><span class="lineno">  315</span>&#160;                              <span class="comment">/*tokens=*/</span>1,</div>
+<div class="line"><a name="l00316"></a><span class="lineno">  316</span>&#160;                              aligned_D,</div>
+<div class="line"><a name="l00317"></a><span class="lineno">  317</span>&#160;                              aligned_intermediate);</div>
+<div class="line"><a name="l00318"></a><span class="lineno">  318</span>&#160;    }</div>
+<div class="line"><a name="l00319"></a><span class="lineno">  319</span>&#160; </div>
+<div class="line"><a name="l00320"></a><span class="lineno">  320</span>&#160;    <a class="code" href="ckernel__orchestration_8h.html#ab0948def8f4a6c6fd8a5288aacd22f01">ck_residual_add_token_major</a>(residual_row,</div>
+<div class="line"><a name="l00321"></a><span class="lineno">  321</span>&#160;                                mlp_row,</div>
+<div class="line"><a name="l00322"></a><span class="lineno">  322</span>&#160;                                out_row,</div>
+<div class="line"><a name="l00323"></a><span class="lineno">  323</span>&#160;                                <span class="comment">/*tokens=*/</span>1,</div>
+<div class="line"><a name="l00324"></a><span class="lineno">  324</span>&#160;                                aligned_D);</div>
+<div class="line"><a name="l00325"></a><span class="lineno">  325</span>&#160;}</div>
+<div class="line"><a name="l00326"></a><span class="lineno">  326</span>&#160; </div>
+<div class="line"><a name="l00327"></a><span class="lineno"><a class="line" href="ckernel__orchestration_8h.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">  327</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="attention__decode__fused_8c.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</a>(<span class="keyword">const</span> <a class="code" href="structCKLayerForwardParams.html">CKLayerForwardParams</a> *p,</div>
+<div class="line"><a name="l00328"></a><span class="lineno">  328</span>&#160;                                                      <span class="keywordtype">int</span> token_index,</div>
+<div class="line"><a name="l00329"></a><span class="lineno">  329</span>&#160;                                                      <span class="keywordtype">int</span> cache_capacity)</div>
+<div class="line"><a name="l00330"></a><span class="lineno">  330</span>&#160;{</div>
+<div class="line"><a name="l00331"></a><span class="lineno">  331</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a1e6628f9f140c9749a6dd7c2c9ce263a">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</a>(p,</div>
+<div class="line"><a name="l00332"></a><span class="lineno">  332</span>&#160;                                                           token_index,</div>
+<div class="line"><a name="l00333"></a><span class="lineno">  333</span>&#160;                                                           cache_capacity,</div>
+<div class="line"><a name="l00334"></a><span class="lineno">  334</span>&#160;                                                           <span class="comment">/*fuse_mlp=*/</span>0);</div>
+<div class="line"><a name="l00335"></a><span class="lineno">  335</span>&#160;}</div>
+<div class="line"><a name="l00336"></a><span class="lineno">  336</span>&#160; </div>
+<div class="line"><a name="l00337"></a><span class="lineno"><a class="line" href="ckernel__orchestration_8h.html#a50899fc552648f5d1cadd0e4c5671dc1">  337</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="attention__decode__fused_8c.html#a50899fc552648f5d1cadd0e4c5671dc1">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</a>(<span class="keyword">const</span> <a class="code" href="structCKLayerForwardParams.html">CKLayerForwardParams</a> *p,</div>
+<div class="line"><a name="l00338"></a><span class="lineno">  338</span>&#160;                                                          <span class="keywordtype">int</span> token_index,</div>
+<div class="line"><a name="l00339"></a><span class="lineno">  339</span>&#160;                                                          <span class="keywordtype">int</span> cache_capacity)</div>
+<div class="line"><a name="l00340"></a><span class="lineno">  340</span>&#160;{</div>
+<div class="line"><a name="l00341"></a><span class="lineno">  341</span>&#160;    <a class="code" href="attention__decode__fused_8c.html#a1e6628f9f140c9749a6dd7c2c9ce263a">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</a>(p,</div>
+<div class="line"><a name="l00342"></a><span class="lineno">  342</span>&#160;                                                           token_index,</div>
+<div class="line"><a name="l00343"></a><span class="lineno">  343</span>&#160;                                                           cache_capacity,</div>
+<div class="line"><a name="l00344"></a><span class="lineno">  344</span>&#160;                                                           <span class="comment">/*fuse_mlp=*/</span>1);</div>
+<div class="line"><a name="l00345"></a><span class="lineno">  345</span>&#160;}</div>
 <div class="ttc" id="aattention__decode__fused_8c_html_a1e6628f9f140c9749a6dd7c2c9ce263a"><div class="ttname"><a href="attention__decode__fused_8c.html#a1e6628f9f140c9749a6dd7c2c9ce263a">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</a></div><div class="ttdeci">static void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl(const CKLayerForwardParams *p, int token_index, int cache_capacity, int fuse_mlp)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00165">attention_decode_fused.c:165</a></div></div>
 <div class="ttc" id="aattention__decode__fused_8c_html_a481d5a4d4ee37e40f432109b3873bc05"><div class="ttname"><a href="attention__decode__fused_8c.html#a481d5a4d4ee37e40f432109b3873bc05">ck_dot_f32</a></div><div class="ttdeci">static float ck_dot_f32(const float *a, const float *b, int len)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00025">attention_decode_fused.c:25</a></div></div>
-<div class="ttc" id="aattention__decode__fused_8c_html_a50899fc552648f5d1cadd0e4c5671dc1"><div class="ttname"><a href="attention__decode__fused_8c.html#a50899fc552648f5d1cadd0e4c5671dc1">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</a></div><div class="ttdeci">void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp(const CKLayerForwardParams *p, int token_index, int cache_capacity)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00335">attention_decode_fused.c:335</a></div></div>
+<div class="ttc" id="aattention__decode__fused_8c_html_a50899fc552648f5d1cadd0e4c5671dc1"><div class="ttname"><a href="attention__decode__fused_8c.html#a50899fc552648f5d1cadd0e4c5671dc1">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</a></div><div class="ttdeci">void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp(const CKLayerForwardParams *p, int token_index, int cache_capacity)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00337">attention_decode_fused.c:337</a></div></div>
 <div class="ttc" id="aattention__decode__fused_8c_html_a606857bd1c4a89fc378a6787ce01d348"><div class="ttname"><a href="attention__decode__fused_8c.html#a606857bd1c4a89fc378a6787ce01d348">ck_attention_project_head_major_decode_token_residual</a></div><div class="ttdeci">static void ck_attention_project_head_major_decode_token_residual(const float *attn_token, const float *wo, const float *bo, const float *residual_in, float *proj_out, float *residual_out, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00129">attention_decode_fused.c:129</a></div></div>
 <div class="ttc" id="aattention__decode__fused_8c_html_ab6c6524b0f30733a077e3783bb55a592"><div class="ttname"><a href="attention__decode__fused_8c.html#ab6c6524b0f30733a077e3783bb55a592">ck_qkv_project_head_major_token</a></div><div class="ttdeci">void ck_qkv_project_head_major_token(const float *input_row, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, float *q_token, float *k_token, float *v_token, int aligned_embed_dim, int num_heads, int num_kv_heads, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00062">attention_decode_fused.c:62</a></div></div>
-<div class="ttc" id="aattention__decode__fused_8c_html_ad466e4eeb1c0ab92d9c9bf15cb51f679"><div class="ttname"><a href="attention__decode__fused_8c.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</a></div><div class="ttdeci">void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn(const CKLayerForwardParams *p, int token_index, int cache_capacity)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00325">attention_decode_fused.c:325</a></div></div>
+<div class="ttc" id="aattention__decode__fused_8c_html_ad466e4eeb1c0ab92d9c9bf15cb51f679"><div class="ttname"><a href="attention__decode__fused_8c.html#ad466e4eeb1c0ab92d9c9bf15cb51f679">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</a></div><div class="ttdeci">void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn(const CKLayerForwardParams *p, int token_index, int cache_capacity)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00327">attention_decode_fused.c:327</a></div></div>
 <div class="ttc" id="aattention__decode__fused_8c_html_ade31f5d0f381b108e331db103adc6251"><div class="ttname"><a href="attention__decode__fused_8c.html#ade31f5d0f381b108e331db103adc6251">ck_attention_project_head_major_decode_token</a></div><div class="ttdeci">void ck_attention_project_head_major_decode_token(const float *attn_token, const float *wo, const float *bo, float *out_token, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="attention__decode__fused_8c_source.html#l00099">attention_decode_fused.c:99</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a1b1c905b9d69fc8aadca4c714147ce45"><div class="ttname"><a href="ckernel__engine_8h.html#a1b1c905b9d69fc8aadca4c714147ce45">kv_cache_write_head_major</a></div><div class="ttdeci">void kv_cache_write_head_major(const float *k_token, const float *v_token, float *k_cache, float *v_cache, int num_kv_heads, int token_index, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="kv__cache__kernels_8c_source.html#l00048">kv_cache_kernels.c:48</a></div></div>
@@ -481,9 +483,9 @@ $(document).ready(function(){initNavTree('attention__decode__fused_8c_source.htm
 <div class="ttc" id="ackernel__engine_8h_html_ab18869516e9a6ab5998038716ac8a179"><div class="ttname"><a href="ckernel__engine_8h.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a></div><div class="ttdeci">void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels_8c_source.html#l00375">rope_kernels.c:375</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_af4f0e756d3ac00b45ce2c7a296b61ae3"><div class="ttname"><a href="ckernel__engine_8h.html#af4f0e756d3ac00b45ce2c7a296b61ae3">gemm_blocked_serial</a></div><div class="ttdeci">void gemm_blocked_serial(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels_8c_source.html#l00642">gemm_kernels.c:642</a></div></div>
 <div class="ttc" id="ackernel__orchestration_8h_html"><div class="ttname"><a href="ckernel__orchestration_8h.html">ckernel_orchestration.h</a></div></div>
-<div class="ttc" id="ackernel__orchestration_8h_html_a2e894b79792aaf694427446c1d89fab8"><div class="ttname"><a href="ckernel__orchestration_8h.html#a2e894b79792aaf694427446c1d89fab8">ck_mlp_swiglu_forward</a></div><div class="ttdeci">void ck_mlp_swiglu_forward(const float *input, const float *w1, const float *b1, const float *w2, const float *b2, float *fc1_out, float *swiglu_out, float *output, int tokens, int aligned_embed_dim, int aligned_intermediate_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l00705">ckernel_orchestration.c:705</a></div></div>
-<div class="ttc" id="ackernel__orchestration_8h_html_a6aaebd943ca5ad278729a207b401ab45"><div class="ttname"><a href="ckernel__orchestration_8h.html#a6aaebd943ca5ad278729a207b401ab45">ck_mlp_swiglu_forward_fully_fused_token</a></div><div class="ttdeci">void ck_mlp_swiglu_forward_fully_fused_token(const float *input_row, const float *w1, const float *b1, const float *w2, const float *b2, float *output_row, int aligned_embed_dim, int aligned_intermediate_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l00998">ckernel_orchestration.c:998</a></div></div>
-<div class="ttc" id="ackernel__orchestration_8h_html_ab0948def8f4a6c6fd8a5288aacd22f01"><div class="ttname"><a href="ckernel__orchestration_8h.html#ab0948def8f4a6c6fd8a5288aacd22f01">ck_residual_add_token_major</a></div><div class="ttdeci">void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l00015">ckernel_orchestration.c:15</a></div></div>
+<div class="ttc" id="ackernel__orchestration_8h_html_a2e894b79792aaf694427446c1d89fab8"><div class="ttname"><a href="ckernel__orchestration_8h.html#a2e894b79792aaf694427446c1d89fab8">ck_mlp_swiglu_forward</a></div><div class="ttdeci">void ck_mlp_swiglu_forward(const float *input, const float *w1, const float *b1, const float *w2, const float *b2, float *fc1_out, float *swiglu_out, float *output, int tokens, int aligned_embed_dim, int aligned_intermediate_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l00830">ckernel_orchestration.c:830</a></div></div>
+<div class="ttc" id="ackernel__orchestration_8h_html_a6aaebd943ca5ad278729a207b401ab45"><div class="ttname"><a href="ckernel__orchestration_8h.html#a6aaebd943ca5ad278729a207b401ab45">ck_mlp_swiglu_forward_fully_fused_token</a></div><div class="ttdeci">void ck_mlp_swiglu_forward_fully_fused_token(const float *input_row, const float *w1, const float *b1, const float *w2, const float *b2, float *output_row, int aligned_embed_dim, int aligned_intermediate_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l01125">ckernel_orchestration.c:1125</a></div></div>
+<div class="ttc" id="ackernel__orchestration_8h_html_ab0948def8f4a6c6fd8a5288aacd22f01"><div class="ttname"><a href="ckernel__orchestration_8h.html#ab0948def8f4a6c6fd8a5288aacd22f01">ck_residual_add_token_major</a></div><div class="ttdeci">void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8c_source.html#l00017">ckernel_orchestration.c:17</a></div></div>
 <div class="ttc" id="astructCKLayerForwardParams_html"><div class="ttname"><a href="structCKLayerForwardParams.html">CKLayerForwardParams</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8h_source.html#l00011">ckernel_orchestration.h:11</a></div></div>
 <div class="ttc" id="astructCKLayerForwardParams_html_a070376c4c42bb40d7cdd919ea74c669b"><div class="ttname"><a href="structCKLayerForwardParams.html#a070376c4c42bb40d7cdd919ea74c669b">CKLayerForwardParams::w2</a></div><div class="ttdeci">const float * w2</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8h_source.html#l00044">ckernel_orchestration.h:44</a></div></div>
 <div class="ttc" id="astructCKLayerForwardParams_html_a0a48ad009d13315fb1a18ec1f9aff5c8"><div class="ttname"><a href="structCKLayerForwardParams.html#a0a48ad009d13315fb1a18ec1f9aff5c8">CKLayerForwardParams::embed_dim</a></div><div class="ttdeci">int embed_dim</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__orchestration_8h_source.html#l00013">ckernel_orchestration.h:13</a></div></div>

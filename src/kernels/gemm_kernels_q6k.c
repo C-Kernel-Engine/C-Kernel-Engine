@@ -23,7 +23,7 @@ static float dot_q6_k_ref(const block_q6_K *w,
                           int K)
 {
     const int blocks_per_row = K / QK_K;
-    double sum = 0.0;
+    float sum = 0.0f;
 
     for (int b = 0; b < blocks_per_row; ++b) {
         const block_q6_K *block = &w[b];
@@ -42,10 +42,10 @@ static float dot_q6_k_ref(const block_q6_K *w,
                 const int8_t q3 = (int8_t)((ql[l + 0] >> 4) | (((qh[l] >> 4) & 3) << 4)) - 32;
                 const int8_t q4 = (int8_t)((ql[l + 32] >> 4) | (((qh[l] >> 6) & 3) << 4)) - 32;
 
-                sum += (double)(d * (float)sc[is + 0] * (float)q1) * (double)xp[l + 0];
-                sum += (double)(d * (float)sc[is + 2] * (float)q2) * (double)xp[l + 32];
-                sum += (double)(d * (float)sc[is + 4] * (float)q3) * (double)xp[l + 64];
-                sum += (double)(d * (float)sc[is + 6] * (float)q4) * (double)xp[l + 96];
+                sum += (d * (float)sc[is + 0] * (float)q1) * xp[l + 0];
+                sum += (d * (float)sc[is + 2] * (float)q2) * xp[l + 32];
+                sum += (d * (float)sc[is + 4] * (float)q3) * xp[l + 64];
+                sum += (d * (float)sc[is + 6] * (float)q4) * xp[l + 96];
             }
             xp += 128;
             ql += 64;
@@ -54,7 +54,7 @@ static float dot_q6_k_ref(const block_q6_K *w,
         }
     }
 
-    return (float)sum;
+    return sum;
 }
 
 void gemv_q6_k(float *y,
@@ -123,4 +123,14 @@ void gemm_nt_q6_k(const float *A,
             row[j] += bias[j];
         }
     }
+}
+
+/* Reference implementation - used as fallback from SSE when K not aligned */
+void gemm_nt_q6_k_ref(const float *A,
+                      const void *B,
+                      const float *bias,
+                      float *C,
+                      int M, int N, int K)
+{
+    gemm_nt_q6_k(A, B, bias, C, M, N, K);
 }

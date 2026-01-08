@@ -1,15 +1,21 @@
 var searchData=
 [
-  ['q_1144',['q',['../structCKLayerForwardParams.html#a6d0ecfad1a74e3fe0583785851741e71',1,'CKLayerForwardParams::q()'],['../structCKLayerBackwardParams.html#aab3a0f3828a687d937a07f74131b2a3f',1,'CKLayerBackwardParams::q()'],['../structCKLayerForwardParamsQ4K.html#a63efa0f23630574508730fb141c113e9',1,'CKLayerForwardParamsQ4K::q()'],['../structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4',1,'CKLayerOffsets::q()']]],
-  ['q_5frope_1145',['q_rope',['../structCKLayerOffsets.html#ab14ce44efa1d300b3dd913e03dfb7aca',1,'CKLayerOffsets']]],
-  ['qh_1146',['qh',['../structblock__q6__K.html#aae24d4e8e582b9b2c5e8f219c467d008',1,'block_q6_K']]],
-  ['qk4_5f0_1147',['QK4_0',['../ckernel__quant_8h.html#a997a3f77c076f00da9fd4f6eb3d2b9da',1,'ckernel_quant.h']]],
-  ['qk8_5f0_1148',['QK8_0',['../ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a',1,'ckernel_quant.h']]],
-  ['qk_5fk_1149',['QK_K',['../ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50',1,'ckernel_quant.h']]],
-  ['qkv_5fbias_5foffset_1150',['qkv_bias_offset',['../structCKLayerLayout.html#a284fb7cde23a33d443234aeb3d34f1aa',1,'CKLayerLayout']]],
-  ['qkv_5findex_1151',['qkv_index',['../attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1',1,'attention_kernels.c']]],
-  ['qkv_5fweight_5foffset_1152',['qkv_weight_offset',['../structCKLayerLayout.html#aa04c864979d24512fe185bd224f2e851',1,'CKLayerLayout']]],
-  ['ql_1153',['ql',['../structblock__q6__K.html#a2804e4fef4f6c2eaf41230ddbed8e479',1,'block_q6_K']]],
-  ['qs_1154',['qs',['../structblock__q4__0.html#a494b8bced6d0e46eb9b990397dfe2721',1,'block_q4_0::qs()'],['../structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc',1,'block_q8_K::qs()'],['../structblock__q4__K.html#a74d5a6318849909fb1c19248961d7ac9',1,'block_q4_K::qs()'],['../structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488',1,'block_q8_0::qs()']]],
-  ['quantize_5frow_5fq8_5fk_1155',['quantize_row_q8_k',['../ckernel__engine_8h.html#a8a2064dd87b86a56f41b163bef7bdd9d',1,'quantize_row_q8_k(const float *x, void *y, int k):&#160;gemm_kernels_q4k_q8k.c'],['../gemm__kernels__q4k__q8k_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c']]]
+  ['q_1431',['q',['../structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4',1,'CKLayerOffsets::q()'],['../structCKLayerForwardParams.html#a6d0ecfad1a74e3fe0583785851741e71',1,'CKLayerForwardParams::q()'],['../structCKLayerBackwardParams.html#aab3a0f3828a687d937a07f74131b2a3f',1,'CKLayerBackwardParams::q()'],['../structCKLayerForwardParamsQ4K.html#a63efa0f23630574508730fb141c113e9',1,'CKLayerForwardParamsQ4K::q()']]],
+  ['q_5frope_1432',['q_rope',['../structCKLayerOffsets.html#ab14ce44efa1d300b3dd913e03dfb7aca',1,'CKLayerOffsets']]],
+  ['qh_1433',['qh',['../structblock__q5__0.html#a823c98aafc2ecd999f30689d289fb963',1,'block_q5_0::qh()'],['../structblock__q5__1.html#a57e83b7b1798c40d7930f057202cd07f',1,'block_q5_1::qh()'],['../structblock__q6__K.html#aae24d4e8e582b9b2c5e8f219c467d008',1,'block_q6_K::qh()']]],
+  ['qk4_5f0_1434',['QK4_0',['../ckernel__quant_8h.html#a997a3f77c076f00da9fd4f6eb3d2b9da',1,'ckernel_quant.h']]],
+  ['qk4_5f1_1435',['QK4_1',['../ckernel__quant_8h.html#aad813e4bdcbac9185791f31e3558f770',1,'ckernel_quant.h']]],
+  ['qk5_5f0_1436',['QK5_0',['../ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac',1,'ckernel_quant.h']]],
+  ['qk5_5f1_1437',['QK5_1',['../ckernel__quant_8h.html#a836a94f5a50863402da0b8505992fc51',1,'ckernel_quant.h']]],
+  ['qk8_5f0_1438',['QK8_0',['../ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a',1,'ckernel_quant.h']]],
+  ['qk_5fk_1439',['QK_K',['../ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50',1,'ckernel_quant.h']]],
+  ['qkv_5fbias_5foffset_1440',['qkv_bias_offset',['../structCKLayerLayout.html#a284fb7cde23a33d443234aeb3d34f1aa',1,'CKLayerLayout']]],
+  ['qkv_5findex_1441',['qkv_index',['../attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1',1,'attention_kernels.c']]],
+  ['qkv_5fweight_5foffset_1442',['qkv_weight_offset',['../structCKLayerLayout.html#aa04c864979d24512fe185bd224f2e851',1,'CKLayerLayout']]],
+  ['ql_1443',['ql',['../structblock__q6__K.html#a2804e4fef4f6c2eaf41230ddbed8e479',1,'block_q6_K']]],
+  ['qs_1444',['qs',['../structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc',1,'block_q8_K::qs()'],['../structblock__q4__K.html#a74d5a6318849909fb1c19248961d7ac9',1,'block_q4_K::qs()'],['../structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488',1,'block_q8_0::qs()'],['../structblock__q5__1.html#a2e2687253c0dd02a543b99691aa4144d',1,'block_q5_1::qs()'],['../structblock__q5__0.html#aeb5285bb56ae2ed55bfb99a2bcb53282',1,'block_q5_0::qs()'],['../structblock__q4__1.html#aeb92b2e6f95f7d40848e1783459e6dc7',1,'block_q4_1::qs()'],['../structblock__q4__0.html#a494b8bced6d0e46eb9b990397dfe2721',1,'block_q4_0::qs()']]],
+  ['quantize_5frow_5fq8_5fk_1445',['quantize_row_q8_k',['../ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c'],['../gemm__kernels__q8__0_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c'],['../gemm__kernels__q6k__sse_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c'],['../gemm__kernels__q5__0__sse__v2_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c'],['../gemm__kernels__q4k__q8k_8c.html#a64b28ca8a25883986a0d22e39a574a32',1,'quantize_row_q8_k(const float *x, void *vy, int k):&#160;gemm_kernels_q4k_q8k.c'],['../ckernel__engine_8h.html#a8a2064dd87b86a56f41b163bef7bdd9d',1,'quantize_row_q8_k(const float *x, void *y, int k):&#160;gemm_kernels_q4k_q8k.c']]],
+  ['quantize_5frow_5fq8_5fk_5fref_1446',['quantize_row_q8_k_ref',['../gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5',1,'gemm_kernels_q4k_q8k.c']]],
+  ['quantize_5frow_5fq8_5fk_5fsse_1447',['quantize_row_q8_k_sse',['../ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f',1,'quantize_row_q8_k_sse(const float *x, void *vy, int k):&#160;quantize_row_q8_k_sse.c'],['../gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f',1,'quantize_row_q8_k_sse(const float *x, void *vy, int k):&#160;quantize_row_q8_k_sse.c'],['../quantize__row__q8__k__sse_8c.html#ad7fa7d735b58b52c90cbd6160676e86f',1,'quantize_row_q8_k_sse(const float *x, void *vy, int k):&#160;quantize_row_q8_k_sse.c']]],
+  ['quantize_5frow_5fq8_5fk_5fsse_2ec_1448',['quantize_row_q8_k_sse.c',['../quantize__row__q8__k__sse_8c.html',1,'']]]
 ];

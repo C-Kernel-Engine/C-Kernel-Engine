@@ -121,6 +121,52 @@
     <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine Architecture">
 </div>
 
+<h2>Tokenizer (16x Faster than PyTorch)</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Trie-Based Tokenization</h3>
+        <p>High-performance BPE/WordPiece tokenizer using trie-based longest-match. Achieves <strong>16.5x faster</strong> performance than PyTorch/tiktoken.</p>
+        <ul style="margin-top: 0.5rem;">
+            <li>O(k) lookup complexity vs O(n×k)</li>
+            <li>No memcpy in hot path</li>
+            <li>Full UTF-8 multilingual support</li>
+            <li>BPE, WordPiece, SentencePiece</li>
+        </ul>
+        <p style="margin-top: 1rem;"><a href="tokenizer.html" class="btn btn-sm">Learn More →</a></p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Performance Benchmarks</h3>
+        <table style="font-size: 0.85rem;">
+            <tr>
+                <th>Text Length</th>
+                <th>C-Kernel</th>
+                <th>PyTorch</th>
+                <th>Speedup</th>
+            </tr>
+            <tr>
+                <td>200 chars</td>
+                <td>20,941/s</td>
+                <td>4,616/s</td>
+                <td><span class="badge badge-green">4.5x</span></td>
+            </tr>
+            <tr>
+                <td>3,000 chars</td>
+                <td>95,923/s</td>
+                <td>6,197/s</td>
+                <td><span class="badge badge-green">15.5x</span></td>
+            </tr>
+            <tr>
+                <td>15,000 chars</td>
+                <td>114,463/s</td>
+                <td>6,237/s</td>
+                <td><span class="badge badge-green">18.4x</span></td>
+            </tr>
+        </table>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Average: 16.56x faster than PyTorch</p>
+    </div>
+</div>
+
 <h2>Kernel Library</h2>
 
 <p>All kernels implement both forward and backward passes with full PyTorch parity:</p>

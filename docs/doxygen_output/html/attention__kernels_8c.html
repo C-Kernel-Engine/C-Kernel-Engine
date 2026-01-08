@@ -535,7 +535,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00035">score_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l01071">attention_backward_causal_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00884">attention_backward_causal_head_major_gqa_bf16()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02410">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l01071">attention_backward_causal_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00884">attention_backward_causal_head_major_gqa_bf16()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -786,10 +786,10 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00715"></a><span class="lineno">  715</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><a name="l00716"></a><span class="lineno">  716</span>&#160;            dot += q_vec[d] * k_vec[d];</div>
 <div class="line"><a name="l00717"></a><span class="lineno">  717</span>&#160;        }</div>
-<div class="line"><a name="l00718"></a><span class="lineno">  718</span>&#160;        <span class="keywordtype">float</span> score = dot * scale;</div>
+<div class="line"><a name="l00718"></a><span class="lineno">  718</span>&#160;        <span class="keywordtype">float</span> <a class="code" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
 <div class="line"><a name="l00719"></a><span class="lineno">  719</span>&#160; </div>
-<div class="line"><a name="l00720"></a><span class="lineno">  720</span>&#160;        <span class="keywordflow">if</span> (score &gt; m) {</div>
-<div class="line"><a name="l00721"></a><span class="lineno">  721</span>&#160;            <span class="keywordtype">float</span> exp_m = (m == -INFINITY) ? 0.0f : expf(m - score);</div>
+<div class="line"><a name="l00720"></a><span class="lineno">  720</span>&#160;        <span class="keywordflow">if</span> (<a class="code" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m) {</div>
+<div class="line"><a name="l00721"></a><span class="lineno">  721</span>&#160;            <span class="keywordtype">float</span> exp_m = (m == -INFINITY) ? 0.0f : expf(m - <a class="code" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>);</div>
 <div class="line"><a name="l00722"></a><span class="lineno">  722</span>&#160;            s *= exp_m;</div>
 <div class="line"><a name="l00723"></a><span class="lineno">  723</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><a name="l00724"></a><span class="lineno">  724</span>&#160;                out_vec[d] *= exp_m;</div>
@@ -798,9 +798,9 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00727"></a><span class="lineno">  727</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><a name="l00728"></a><span class="lineno">  728</span>&#160;                out_vec[d] += v_vec[d];</div>
 <div class="line"><a name="l00729"></a><span class="lineno">  729</span>&#160;            }</div>
-<div class="line"><a name="l00730"></a><span class="lineno">  730</span>&#160;            m = score;</div>
+<div class="line"><a name="l00730"></a><span class="lineno">  730</span>&#160;            m = <a class="code" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><a name="l00731"></a><span class="lineno">  731</span>&#160;        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a name="l00732"></a><span class="lineno">  732</span>&#160;            <span class="keywordtype">float</span> e = expf(score - m);</div>
+<div class="line"><a name="l00732"></a><span class="lineno">  732</span>&#160;            <span class="keywordtype">float</span> e = expf(<a class="code" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> - m);</div>
 <div class="line"><a name="l00733"></a><span class="lineno">  733</span>&#160;            s += e;</div>
 <div class="line"><a name="l00734"></a><span class="lineno">  734</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><a name="l00735"></a><span class="lineno">  735</span>&#160;                out_vec[d] += e * v_vec[d];</div>
@@ -816,7 +816,10 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00745"></a><span class="lineno">  745</span>&#160;        out_vec[d] = 0.0f;</div>
 <div class="line"><a name="l00746"></a><span class="lineno">  746</span>&#160;    }</div>
 <div class="line"><a name="l00747"></a><span class="lineno">  747</span>&#160;}</div>
+<div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition:</b> <a href="tokenizer_8h_source.html#l00253">tokenizer.h:253</a></div></div>
 </div><!-- fragment -->
+<p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00253">score</a>.</p>
+
 </div>
 </div>
 <a id="a3d8664b9e0808546484af9ec7d4ddfe1"></a>
@@ -1223,7 +1226,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="softmax__kernels_8c_source.html#l00117">causal_softmax_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00035">score_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00749">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01652">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02128">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00856">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
 
 </div>
 </div>
@@ -1593,7 +1596,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c.html#a686599872afcb86c5fc7ad5e5e5b4773">FLASH_QUERY_IMPL</a>, and <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00749">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01652">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02128">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00856">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
 
 </div>
 </div>
@@ -1716,7 +1719,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4">FLASH_QUERY_IMPL_DECODE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01040">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01198">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01857">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02238">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01167">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01327">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02390">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
 
 </div>
 </div>

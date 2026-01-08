@@ -5,15 +5,26 @@ Unit test for GEMM microkernel with 8x8 register blocking.
 Tests:
 1. Accuracy vs PyTorch matmul (B not transposed)
 2. Accuracy vs PyTorch matmul (B transposed)
-3. Performance comparison vs naive GEMM
-4. Performance comparison vs PyTorch (MKL/OpenBLAS)
+3. Performance comparison vs naive GEMM (skipped in --quick mode)
+4. Performance comparison vs PyTorch (skipped in --quick mode)
+
+Usage:
+  python test_gemm_microkernel.py           # Full test with benchmarks
+  python test_gemm_microkernel.py --quick   # Fast accuracy tests only
 """
 
+import argparse
 import ctypes
 import numpy as np
 import time
 import os
 import sys
+
+# Parse arguments early
+parser = argparse.ArgumentParser(description='GEMM microkernel unit test')
+parser.add_argument('--quick', action='store_true',
+                    help='Quick mode: accuracy tests only, skip benchmarks')
+args = parser.parse_args()
 
 # Try to import torch for reference
 try:
@@ -288,60 +299,66 @@ def main():
         accuracy_results.append(("B_transposed", M, N, K, max_diff, rel_err, passed))
 
     # ==========================================================================
-    # Test 3: Performance vs Naive GEMM
+    # Test 3: Performance vs Naive GEMM (skip in --quick mode)
     # ==========================================================================
-    print("\n" + "=" * 80)
-    print("3. PERFORMANCE: Microkernel vs Naive GEMM")
-    print("=" * 80)
-    print(f"{'Size':>15} | {'Naive':>12} | {'Micro':>12} | {'Speedup':>8}")
-    print("-" * 55)
+    avg_naive_speedup = 0.0
+    avg_ratio = 0.0
+    pytorch_ratios = []
 
-    bench_sizes = [
-        (32, 32, 32),
-        (64, 64, 64),
-        (128, 128, 128),
-        (256, 256, 256),
-        (512, 512, 512),
-        (1024, 1024, 1024),
-    ]
-
-    naive_speedups = []
-    for M, N, K in bench_sizes:
-        naive_t, micro_t, naive_gf, micro_gf, speedup = benchmark_microkernel_vs_naive(lib, M, N, K)
-        naive_speedups.append(speedup)
-        print(f"{M}x{N}x{K:>4} | {naive_gf:>8.2f} GF/s | {micro_gf:>8.2f} GF/s | {speedup:>6.2f}x")
-
-    avg_naive_speedup = sum(naive_speedups) / len(naive_speedups)
-    print("-" * 55)
-    print(f"{'Average speedup vs naive:':<40} {avg_naive_speedup:.2f}x")
-
-    # ==========================================================================
-    # Test 4: Performance vs PyTorch
-    # ==========================================================================
-    if HAS_TORCH:
-        print("\n" + "=" * 80)
-        print("4. PERFORMANCE: Microkernel vs PyTorch (multi-threaded)")
-        print("=" * 80)
-        print(f"{'Size':>15} | {'PyTorch':>12} | {'Micro':>12} | {'Ratio':>10}")
-        print("-" * 60)
-
-        pytorch_ratios = []
-        for M, N, K in bench_sizes:
-            torch_t, micro_t, torch_gf, micro_gf, ratio = benchmark_vs_pytorch(lib, M, N, K)
-            if ratio is not None:
-                pytorch_ratios.append(ratio)
-                status = "FASTER" if ratio < 1.0 else "slower"
-                print(f"{M}x{N}x{K:>4} | {torch_gf:>8.2f} GF/s | {micro_gf:>8.2f} GF/s | {ratio:>5.2f}x ({status})")
-
-        if pytorch_ratios:
-            avg_ratio = sum(pytorch_ratios) / len(pytorch_ratios)
-            print("-" * 60)
-            if avg_ratio < 1.0:
-                print(f"{'Average:':<40} {avg_ratio:.2f}x (microkernel is {1/avg_ratio:.2f}x FASTER)")
-            else:
-                print(f"{'Average:':<40} {avg_ratio:.2f}x (PyTorch is {avg_ratio:.2f}x faster)")
+    if args.quick:
+        print("\n[SKIPPED] Benchmark tests (--quick mode)")
     else:
-        print("\n[SKIPPED] PyTorch comparison - torch not installed")
+        print("\n" + "=" * 80)
+        print("3. PERFORMANCE: Microkernel vs Naive GEMM")
+        print("=" * 80)
+        print(f"{'Size':>15} | {'Naive':>12} | {'Micro':>12} | {'Speedup':>8}")
+        print("-" * 55)
+
+        bench_sizes = [
+            (32, 32, 32),
+            (64, 64, 64),
+            (128, 128, 128),
+            (256, 256, 256),
+            (512, 512, 512),
+            (1024, 1024, 1024),
+        ]
+
+        naive_speedups = []
+        for M, N, K in bench_sizes:
+            naive_t, micro_t, naive_gf, micro_gf, speedup = benchmark_microkernel_vs_naive(lib, M, N, K)
+            naive_speedups.append(speedup)
+            print(f"{M}x{N}x{K:>4} | {naive_gf:>8.2f} GF/s | {micro_gf:>8.2f} GF/s | {speedup:>6.2f}x")
+
+        avg_naive_speedup = sum(naive_speedups) / len(naive_speedups)
+        print("-" * 55)
+        print(f"{'Average speedup vs naive:':<40} {avg_naive_speedup:.2f}x")
+
+        # ==========================================================================
+        # Test 4: Performance vs PyTorch
+        # ==========================================================================
+        if HAS_TORCH:
+            print("\n" + "=" * 80)
+            print("4. PERFORMANCE: Microkernel vs PyTorch (multi-threaded)")
+            print("=" * 80)
+            print(f"{'Size':>15} | {'PyTorch':>12} | {'Micro':>12} | {'Ratio':>10}")
+            print("-" * 60)
+
+            for M, N, K in bench_sizes:
+                torch_t, micro_t, torch_gf, micro_gf, ratio = benchmark_vs_pytorch(lib, M, N, K)
+                if ratio is not None:
+                    pytorch_ratios.append(ratio)
+                    status = "FASTER" if ratio < 1.0 else "slower"
+                    print(f"{M}x{N}x{K:>4} | {torch_gf:>8.2f} GF/s | {micro_gf:>8.2f} GF/s | {ratio:>5.2f}x ({status})")
+
+            if pytorch_ratios:
+                avg_ratio = sum(pytorch_ratios) / len(pytorch_ratios)
+                print("-" * 60)
+                if avg_ratio < 1.0:
+                    print(f"{'Average:':<40} {avg_ratio:.2f}x (microkernel is {1/avg_ratio:.2f}x FASTER)")
+                else:
+                    print(f"{'Average:':<40} {avg_ratio:.2f}x (PyTorch is {avg_ratio:.2f}x faster)")
+        else:
+            print("\n[SKIPPED] PyTorch comparison - torch not installed")
 
     # ==========================================================================
     # Summary
@@ -354,14 +371,17 @@ def main():
     max_errors = [r[4] for r in accuracy_results]
     print(f"  Accuracy:     max_diff range = [{min(max_errors):.2e}, {max(max_errors):.2e}]")
 
-    # Performance summary
-    print(f"  vs Naive:     {avg_naive_speedup:.2f}x average speedup")
-    if HAS_TORCH and pytorch_ratios:
-        if avg_ratio < 1.0:
-            print(f"  vs PyTorch:   {1/avg_ratio:.2f}x FASTER than PyTorch/MKL")
-        else:
-            print(f"  vs PyTorch:   {avg_ratio:.2f}x slower than PyTorch/MKL")
-            print(f"                (PyTorch uses highly optimized MKL/OpenBLAS)")
+    # Performance summary (only if benchmarks were run)
+    if not args.quick:
+        print(f"  vs Naive:     {avg_naive_speedup:.2f}x average speedup")
+        if HAS_TORCH and pytorch_ratios:
+            if avg_ratio < 1.0:
+                print(f"  vs PyTorch:   {1/avg_ratio:.2f}x FASTER than PyTorch/MKL")
+            else:
+                print(f"  vs PyTorch:   {avg_ratio:.2f}x slower than PyTorch/MKL")
+                print(f"                (PyTorch uses highly optimized MKL/OpenBLAS)")
+    else:
+        print("  Benchmarks:   [SKIPPED] (--quick mode)")
 
     print()
     if all_passed:

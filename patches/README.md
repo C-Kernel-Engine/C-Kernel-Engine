@@ -67,16 +67,58 @@ git diff > ../patches/llama_tensor_dump.patch
 
 ## CI Integration
 
-The nightly workflow will:
-1. Initialize submodules automatically
-2. Build llama.cpp if present
-3. Run parity tests via `scripts/run_parity_smoketest.sh`
+The parity smoketest script (`scripts/run_parity_smoketest.sh`) will automatically:
+1. Clone llama.cpp if not present (or init submodule)
+2. Checkout a pinned commit for reproducibility (default: `b4876`)
+3. Apply patches from this directory
+4. Build llama.cpp with CPU support
+5. Build the kernel test library
+6. Run parity tests
 
-To trigger manually:
+### GitHub Actions / CI
+
+```yaml
+# In your workflow:
+- name: Run llama.cpp parity tests
+  run: |
+    # Script handles clone, patch, build automatically
+    ./scripts/run_parity_smoketest.sh --quick
+```
+
+### Local Usage
+
+```bash
+# Quick kernel tests (clones/patches if needed)
+./scripts/run_parity_smoketest.sh --quick
+
+# Full parity test
+./scripts/run_parity_smoketest.sh
+
+# Force rebuild (clean build)
+./scripts/run_parity_smoketest.sh --force-rebuild
+
+# Use specific llama.cpp commit
+LLAMA_CPP_COMMIT=abc1234 ./scripts/run_parity_smoketest.sh
+
+# Via make
+make llamacpp-parity-full
+```
+
+### Pinned Version
+
+The script pins llama.cpp to a known-good commit for reproducible testing.
+To update the pinned version:
+
+1. Test with new commit: `LLAMA_CPP_COMMIT=<new_commit> ./scripts/run_parity_smoketest.sh`
+2. If tests pass, update `LLAMA_CPP_COMMIT` in `scripts/run_parity_smoketest.sh`
+3. Update submodule: `cd llama.cpp && git checkout <new_commit> && cd .. && git add llama.cpp`
+
+### Manual Trigger
+
 ```bash
 # Via GitHub Actions
 gh workflow run nightly.yml -f test_category=llamacpp
 
-# Locally
-./scripts/run_parity_smoketest.sh --quick
+# Locally with fresh clone
+rm -rf llama.cpp && ./scripts/run_parity_smoketest.sh
 ```

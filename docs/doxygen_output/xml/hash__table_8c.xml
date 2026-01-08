@@ -1,0 +1,1038 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="hash__table_8c" kind="file" language="C++">
+    <compoundname>hash_table.c</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdlib.h</includes>
+    <includes local="no">string.h</includes>
+    <includes local="no">immintrin.h</includes>
+    <includes local="no">stdio.h</includes>
+    <includes refid="hash__table_8h" local="yes">tokenizer/hash_table.h</includes>
+    <includes refid="murmurhash3_8h" local="yes">tokenizer/murmurhash3.h</includes>
+    <incdepgraph>
+      <node id="9">
+        <label>stdbool.h</label>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stdlib.h</label>
+      </node>
+      <node id="5">
+        <label>immintrin.h</label>
+      </node>
+      <node id="8">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>hash_table.c</label>
+        <link refid="hash__table_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="10" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>string.h</label>
+      </node>
+      <node id="7">
+        <label>tokenizer/hash_table.h</label>
+        <link refid="hash__table_8h"/>
+        <childnode refid="8" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
+        </childnode>
+      </node>
+      <node id="10">
+        <label>tokenizer/murmurhash3.h</label>
+        <link refid="murmurhash3_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="6">
+        <label>stdio.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" prot="public" static="no">
+        <name>CK_TOKENIZER_HASH_SEED</name>
+        <initializer>0x9747b28c</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="16" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="16" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="hash__table_8c_1aca592de9ebe7baad906c049a9b262a35" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>uint32_t ck_tokenizer_hash</definition>
+        <argsstring>(const char *key, size_t len)</argsstring>
+        <name>ck_tokenizer_hash</name>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="18" column="10" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="18" bodyend="20"/>
+        <references refid="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" compoundref="murmurhash3_8c" startline="11" endline="60">ck_murmurhash3</references>
+        <references refid="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" compoundref="hash__table_8c" startline="16">CK_TOKENIZER_HASH_SEED</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>uint32_t</type>
+        <definition>uint32_t ck_tokenizer_hash_str</definition>
+        <argsstring>(const char *key)</argsstring>
+        <name>ck_tokenizer_hash_str</name>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="22" column="10" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="22" bodyend="24"/>
+        <references refid="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" compoundref="murmurhash3_8h" startline="55" endline="57">ck_murmurhash3_str</references>
+        <references refid="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" compoundref="hash__table_8c" startline="16">CK_TOKENIZER_HASH_SEED</references>
+        <referencedby refid="hash__table_8h_1af9702d4ef5621d02bcd87a3390c0aefc" compoundref="hash__table_8c" startline="235" endline="262">ck_tokenizer_hash_table_delete</referencedby>
+        <referencedby refid="hash__table_8h_1ab4009b6a76738c2ad1c3ff4854f20d87" compoundref="hash__table_8c" startline="158" endline="196">ck_tokenizer_hash_table_insert</referencedby>
+        <referencedby refid="hash__table_8h_1ae526e6690bf6b8d95fd8a127b1b93acc" compoundref="hash__table_8c" startline="198" endline="214">ck_tokenizer_hash_table_lookup</referencedby>
+        <referencedby refid="hash__table_8c_1adbe3e35973873ca30d78f12a31a65fed" compoundref="hash__table_8c" startline="217" endline="233">ck_tokenizer_hash_table_lookup_avx</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1afe7abb14ee631582c7585b8a67debe1e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_hash_table_clear</definition>
+        <argsstring>(CKTokenizerHashTable *table, bool free_values)</argsstring>
+        <name>ck_tokenizer_hash_table_clear</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_values</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Clear all entries (but keep bucket array).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_values</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, free all value pointers </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="312" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="312" bodyend="328"/>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1ac7d72e1402cc099d9307f86e01099bb2" compoundref="tokenizer_8c" startline="144" endline="161">ck_tokenizer_reset</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a0e16265f47b209eccc74d3b82d56b1c3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>bool</type>
+        <definition>bool ck_tokenizer_hash_table_contains</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key)</argsstring>
+        <name>ck_tokenizer_hash_table_contains</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Check if key exists.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to check </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>true if key exists </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="268" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="268" bodyend="270"/>
+        <references refid="hash__table_8c_1ae526e6690bf6b8d95fd8a127b1b93acc" compoundref="hash__table_8c" startline="198" endline="214">ck_tokenizer_hash_table_lookup</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a65e19011e07f1a22c523261e659a5ce1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_hash_table_count</definition>
+        <argsstring>(CKTokenizerHashTable *table)</argsstring>
+        <name>ck_tokenizer_hash_table_count</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get the number of entries.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of entries </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="264" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="264" bodyend="266"/>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a9844f9fc91f4ac36c8875a54f4db167d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+        <definition>CKTokenizerHashTable* ck_tokenizer_hash_table_create</definition>
+        <argsstring>(size_t bucket_count)</argsstring>
+        <name>ck_tokenizer_hash_table_create</name>
+        <param>
+          <type>size_t</type>
+          <declname>bucket_count</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Create a hash table.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>bucket_count</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of buckets (0 = auto-size) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Newly allocated hash table, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="80" column="22" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="80" bodyend="101"/>
+        <references refid="hash__table_8h_1ad0dfa14a00ae4169b772559ee1d1a2bd" compoundref="hash__table_8h" startline="140">CK_TOKENIZER_HT_BUCKETS_SMALL</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashTable_1a152ddc4a230c3f1c98073cd3c3b48d58" compoundref="hash__table_8h" startline="33">CKTokenizerHashTable::load_factor</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1af9702d4ef5621d02bcd87a3390c0aefc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_delete</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key, bool free_value)</argsstring>
+        <name>ck_tokenizer_hash_table_delete</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_value</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Delete a key.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to delete </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_value</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, free the value pointer </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 if found and deleted, -1 if not found </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="235" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="235" bodyend="262"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a7a93b1af26ca875e7f75de188d6fc39d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_hash_table_free</definition>
+        <argsstring>(CKTokenizerHashTable *table, bool free_values)</argsstring>
+        <name>ck_tokenizer_hash_table_free</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_values</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free a hash table.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table to free </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_values</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, also free all value pointers </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="140" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="140" bodyend="156"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+        <referencedby refid="tokenizer_8c_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="tokenizer_8c" startline="115" endline="141">ck_tokenizer_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1ab4009b6a76738c2ad1c3ff4854f20d87" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_insert</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key, void *value)</argsstring>
+        <name>ck_tokenizer_hash_table_insert</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>value</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Insert a key-value pair.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key string </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>value</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Value pointer </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, -1 on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="158" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="158" bodyend="196"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+        <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a9d089f807b84052dfb30b9a390e305f8" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_iterate</definition>
+        <argsstring>(CKTokenizerHashTable *table, CKTokenizerHashCallback callback, void *user_data)</argsstring>
+        <name>ck_tokenizer_hash_table_iterate</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type><ref refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" kindref="member">CKTokenizerHashCallback</ref></type>
+          <declname>callback</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>user_data</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="272" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="272" bodyend="291"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a74ea90a2aeb358e8daa596041a081d12" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_hash_table_keys</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char **out_keys, size_t max_keys)</argsstring>
+        <name>ck_tokenizer_hash_table_keys</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char **</type>
+          <declname>out_keys</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>max_keys</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get all keys as an array.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>out_keys</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output array for keys (must be pre-allocated) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>max_keys</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Maximum keys to write </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of keys written </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="293" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="293" bodyend="310"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1ae526e6690bf6b8d95fd8a127b1b93acc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_tokenizer_hash_table_lookup</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key)</argsstring>
+        <name>ck_tokenizer_hash_table_lookup</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Look up a key.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to look up </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Value pointer, or NULL if not found </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="198" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="198" bodyend="214"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+        <referencedby refid="tokenizer_8h_1ad6c5fe6b7a2df85a99504e702348a0bb" compoundref="tokenizer_8c" startline="220" endline="238">ck_tokenizer_add_special_token</referencedby>
+        <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="hash__table_8h_1a0e16265f47b209eccc74d3b82d56b1c3" compoundref="hash__table_8c" startline="268" endline="270">ck_tokenizer_hash_table_contains</referencedby>
+        <referencedby refid="tokenizer_8c_1a18ff60efe6bd542c238441292f7d1833" compoundref="tokenizer_8c" startline="257" endline="261">ck_tokenizer_lookup</referencedby>
+        <referencedby refid="tokenizer_8c_1aeec3f3e9fcc1faea770cb1e0e1b65b12" compoundref="tokenizer_8c" startline="281" endline="308">find_longest_match_hash</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1adbe3e35973873ca30d78f12a31a65fed" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_tokenizer_hash_table_lookup_avx</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key)</argsstring>
+        <name>ck_tokenizer_hash_table_lookup_avx</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="217" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="217" bodyend="233"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="hash__table_8c_1aef91982d5e7f9ee528aa966b08badd03" compoundref="hash__table_8c" startline="28" endline="78">simd_strcmp</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1ae91b857b893e372d4d7438cdbd58506b" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref> *</type>
+        <definition>static CKTokenizerHashEntry* create_entry</definition>
+        <argsstring>(const char *key, const void *value, size_t value_size)</argsstring>
+        <name>create_entry</name>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>value</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>value_size</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="103" column="29" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="103" bodyend="129"/>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>static void free_entry</definition>
+        <argsstring>(CKTokenizerHashEntry *entry, bool free_value)</argsstring>
+        <name>free_entry</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref> *</type>
+          <declname>entry</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_value</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="131" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="131" bodyend="138"/>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+        <referencedby refid="hash__table_8h_1afe7abb14ee631582c7585b8a67debe1e" compoundref="hash__table_8c" startline="312" endline="328">ck_tokenizer_hash_table_clear</referencedby>
+        <referencedby refid="hash__table_8h_1af9702d4ef5621d02bcd87a3390c0aefc" compoundref="hash__table_8c" startline="235" endline="262">ck_tokenizer_hash_table_delete</referencedby>
+        <referencedby refid="hash__table_8h_1a7a93b1af26ca875e7f75de188d6fc39d" compoundref="hash__table_8c" startline="140" endline="156">ck_tokenizer_hash_table_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8c_1aef91982d5e7f9ee528aa966b08badd03" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>int</type>
+        <definition>static int simd_strcmp</definition>
+        <argsstring>(const char *s1, const char *s2)</argsstring>
+        <name>simd_strcmp</name>
+        <param>
+          <type>const char *</type>
+          <declname>s1</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>s2</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" line="28" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="28" bodyend="78"/>
+        <referencedby refid="hash__table_8c_1adbe3e35973873ca30d78f12a31a65fed" compoundref="hash__table_8c" startline="217" endline="233">ck_tokenizer_hash_table_lookup_avx</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Hash<sp/>Table<sp/>with<sp/>AVX-512<sp/>Optimized<sp/>String<sp/>Comparison</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Direct<sp/>copy<sp/>from<sp/>HPC_Embeddings<sp/>with<sp/>SIMD<sp/>optimizations.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="hash__table_8h" kindref="compound">tokenizer/hash_table.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="murmurhash3_8h" kindref="compound">tokenizer/murmurhash3.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Hash<sp/>seed<sp/>constant<sp/>from<sp/>HPC_Embeddings<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16" refid="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HASH_SEED<sp/>0x9747b28c</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18" refid="hash__table_8c_1aca592de9ebe7baad906c049a9b262a35" refkind="member"><highlight class="normal">uint32_t<sp/><ref refid="hash__table_8c_1aca592de9ebe7baad906c049a9b262a35" kindref="member">ck_tokenizer_hash</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len)<sp/>{</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="murmurhash3_8h_1ade6144552507c82df209f93a2543f85e" kindref="member">ck_murmurhash3</ref>(key,<sp/>(uint32_t)len,<sp/><ref refid="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" kindref="member">CK_TOKENIZER_HASH_SEED</ref>);</highlight></codeline>
+<codeline lineno="20"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" refkind="member"><highlight class="normal">uint32_t<sp/><ref refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" kindref="member">ck_tokenizer_hash_str</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key)<sp/>{</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="murmurhash3_8h_1ae8f90f9cebde2f057d0eb50592af0c94" kindref="member">ck_murmurhash3_str</ref>(key,<sp/><ref refid="hash__table_8c_1a3087be1b3a49b7a46ea950f45f8c002a" kindref="member">CK_TOKENIZER_HASH_SEED</ref>);</highlight></codeline>
+<codeline lineno="24"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>SIMD-optimized<sp/>string<sp/>comparison<sp/>using<sp/>AVX-512<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Falls<sp/>back<sp/>to<sp/>regular<sp/>strcmp<sp/>if<sp/>AVX-512<sp/>is<sp/>not<sp/>available<sp/>at<sp/>compile<sp/>time<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28" refid="hash__table_8c_1aef91982d5e7f9ee528aa966b08badd03" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1aef91982d5e7f9ee528aa966b08badd03" kindref="member">simd_strcmp</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*s1,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*s2)<sp/>{</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len1<sp/>=<sp/>strlen(s1);</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len2<sp/>=<sp/>strlen(s2);</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Fallback<sp/>to<sp/>regular<sp/>strcmp<sp/>for<sp/>short<sp/>strings<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(len1<sp/>&lt;<sp/>64<sp/>||<sp/>len2<sp/>&lt;<sp/>64)<sp/>{</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>strcmp(s1,<sp/>s2);</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)<sp/>&amp;&amp;<sp/>defined(__AVX512BW__)<sp/>&amp;&amp;<sp/>defined(__AVX512DQ__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>AVX-512<sp/>path<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(1)<sp/>{</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Load<sp/>64<sp/>bytes<sp/>from<sp/>each<sp/>string<sp/>into<sp/>AVX-512<sp/>registers<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>chunk1<sp/>=<sp/>_mm512_loadu_si512((</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512i<sp/>*)s1);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>chunk2<sp/>=<sp/>_mm512_loadu_si512((</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512i<sp/>*)s2);</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Compare<sp/>the<sp/>chunks<sp/>byte<sp/>by<sp/>byte<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__mmask64<sp/>cmp_mask<sp/>=<sp/>_mm512_cmpeq_epu8_mask(chunk1,<sp/>chunk2);</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Check<sp/>if<sp/>all<sp/>bytes<sp/>are<sp/>equal<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cmp_mask<sp/>!=<sp/>0xFFFFFFFFFFFFFFFF)<sp/>{</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Find<sp/>the<sp/>first<sp/>differing<sp/>byte<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>first_diff<sp/>=<sp/>__builtin_ctzll(~cmp_mask);</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal">)s1[first_diff]<sp/>-<sp/>(</highlight><highlight class="keywordtype">unsigned</highlight><highlight class="normal"><sp/>char)s2[first_diff];</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Check<sp/>if<sp/>we<sp/>hit<sp/>a<sp/>null<sp/>character<sp/>in<sp/>s1<sp/>or<sp/>s2<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__mmask64<sp/>null_mask1<sp/>=<sp/>_mm512_test_epi8_mask(chunk1,<sp/>_mm512_set1_epi8(</highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__mmask64<sp/>null_mask2<sp/>=<sp/>_mm512_test_epi8_mask(chunk2,<sp/>_mm512_set1_epi8(</highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(null_mask1<sp/>||<sp/>null_mask2)<sp/>{</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(len1<sp/>==<sp/>len2)<sp/>{</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(len1<sp/>&lt;<sp/>len2)<sp/>?<sp/>-1<sp/>:<sp/>1;</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Advance<sp/>the<sp/>pointers<sp/>by<sp/>64<sp/>bytes<sp/>for<sp/>the<sp/>next<sp/>iteration<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>s1<sp/>+=<sp/>64;</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>s2<sp/>+=<sp/>64;</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>SSE/AVX<sp/>fallback<sp/>-<sp/>just<sp/>use<sp/>regular<sp/>strcmp<sp/>for<sp/>simplicity<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)s1;</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)s2;</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)len1;</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)len2;</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>strcmp(s1,<sp/>s2);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="78"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80" refid="hash__table_8h_1a9844f9fc91f4ac36c8875a54f4db167d" refkind="member"><highlight class="normal"><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*<ref refid="hash__table_8c_1a9844f9fc91f4ac36c8875a54f4db167d" kindref="member">ck_tokenizer_hash_table_create</ref>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>bucket_count)<sp/>{</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(bucket_count<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>bucket_count<sp/>=<sp/><ref refid="hash__table_8h_1ad0dfa14a00ae4169b772559ee1d1a2bd" kindref="member">CK_TOKENIZER_HT_BUCKETS_SMALL</ref>;</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table<sp/>=<sp/>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*)malloc(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref>));</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table)<sp/>{</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref><sp/>=<sp/>(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>**)calloc(bucket_count,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*));</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(table);</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"></highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref><sp/>=<sp/>bucket_count;</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a152ddc4a230c3f1c98073cd3c3b48d58" kindref="member">load_factor</ref><sp/>=<sp/>0.75f;</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"></highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>table;</highlight></codeline>
+<codeline lineno="101"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"></highlight></codeline>
+<codeline lineno="103" refid="hash__table_8c_1ae91b857b893e372d4d7438cdbd58506b" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*<ref refid="hash__table_8c_1ae91b857b893e372d4d7438cdbd58506b" kindref="member">create_entry</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*value,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>value_size)<sp/>{</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*)malloc(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref>));</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!entry)<sp/>{</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref><sp/>=<sp/>strdup(key);</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(entry);</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(value)<sp/>{</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref><sp/>=<sp/>malloc(value_size);</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>);</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(entry);</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memcpy(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>,<sp/>value,<sp/>value_size);</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref><sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref><sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>entry;</highlight></codeline>
+<codeline lineno="129"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"></highlight></codeline>
+<codeline lineno="131" refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" kindref="member">free_entry</ref>(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry,<sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_value)<sp/>{</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!entry)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"><sp/><sp/><sp/><sp/>free(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>);</highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(free_value<sp/>&amp;&amp;<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>);</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/>free(entry);</highlight></codeline>
+<codeline lineno="138"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"></highlight></codeline>
+<codeline lineno="140" refid="hash__table_8h_1a7a93b1af26ca875e7f75de188d6fc39d" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a7a93b1af26ca875e7f75de188d6fc39d" kindref="member">ck_tokenizer_hash_table_free</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_values)<sp/>{</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table)<sp/>{</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[i];</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*next<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" kindref="member">free_entry</ref>(entry,<sp/>free_values);</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>next;</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/>free(table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>);</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/>free(table);</highlight></codeline>
+<codeline lineno="156"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight></codeline>
+<codeline lineno="158" refid="hash__table_8h_1ab4009b6a76738c2ad1c3ff4854f20d87" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1ab4009b6a76738c2ad1c3ff4854f20d87" kindref="member">ck_tokenizer_hash_table_insert</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*value)<sp/>{</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!key)<sp/>{</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>bucket<sp/>=<sp/><ref refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" kindref="member">ck_tokenizer_hash_str</ref>(key)<sp/>%<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket];</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"></highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Check<sp/>if<sp/>key<sp/>already<sp/>exists<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>,<sp/>key)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Update<sp/>existing<sp/>entry<sp/>-<sp/>just<sp/>replace<sp/>value<sp/>pointer<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref><sp/>=<sp/>value;</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="176"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"></highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Create<sp/>new<sp/>entry<sp/>with<sp/>NULL<sp/>value<sp/>(caller<sp/>manages<sp/>memory)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*new_entry<sp/>=<sp/>(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*)malloc(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref>));</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!new_entry)<sp/>{</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"></highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/>new_entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref><sp/>=<sp/>strdup(key);</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!new_entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>free(new_entry);</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"></highlight></codeline>
+<codeline lineno="190"><highlight class="normal"><sp/><sp/><sp/><sp/>new_entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref><sp/>=<sp/>value;</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"><sp/><sp/><sp/><sp/>new_entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref><sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket];</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket]<sp/>=<sp/>new_entry;</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref>++;</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"></highlight></codeline>
+<codeline lineno="195"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="196"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"></highlight></codeline>
+<codeline lineno="198" refid="hash__table_8h_1ae526e6690bf6b8d95fd8a127b1b93acc" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="hash__table_8c_1ae526e6690bf6b8d95fd8a127b1b93acc" kindref="member">ck_tokenizer_hash_table_lookup</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key)<sp/>{</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!key)<sp/>{</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"></highlight></codeline>
+<codeline lineno="203"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>bucket<sp/>=<sp/><ref refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" kindref="member">ck_tokenizer_hash_str</ref>(key)<sp/>%<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket];</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"></highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>,<sp/>key)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>;</highlight></codeline>
+<codeline lineno="209"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="212"><highlight class="normal"></highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="214"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"></highlight></codeline>
+<codeline lineno="216"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>AVX-512<sp/>optimized<sp/>lookup<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="217" refid="hash__table_8c_1adbe3e35973873ca30d78f12a31a65fed" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="hash__table_8c_1adbe3e35973873ca30d78f12a31a65fed" kindref="member">ck_tokenizer_hash_table_lookup_avx</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key)<sp/>{</highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!key)<sp/>{</highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="221"><highlight class="normal"></highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>bucket<sp/>=<sp/><ref refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" kindref="member">ck_tokenizer_hash_str</ref>(key)<sp/>%<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;</highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket];</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"></highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="hash__table_8c_1aef91982d5e7f9ee528aa966b08badd03" kindref="member">simd_strcmp</ref>(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>,<sp/>key)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>;</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="230"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="231"><highlight class="normal"></highlight></codeline>
+<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>NULL;</highlight></codeline>
+<codeline lineno="233"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="234"><highlight class="normal"></highlight></codeline>
+<codeline lineno="235" refid="hash__table_8h_1af9702d4ef5621d02bcd87a3390c0aefc" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1af9702d4ef5621d02bcd87a3390c0aefc" kindref="member">ck_tokenizer_hash_table_delete</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_value)<sp/>{</highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!key)<sp/>{</highlight></codeline>
+<codeline lineno="239"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="240"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="241"><highlight class="normal"></highlight></codeline>
+<codeline lineno="242"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>bucket<sp/>=<sp/><ref refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" kindref="member">ck_tokenizer_hash_str</ref>(key)<sp/>%<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;</highlight></codeline>
+<codeline lineno="243"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket];</highlight></codeline>
+<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*prev<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="245"><highlight class="normal"></highlight></codeline>
+<codeline lineno="246"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>,<sp/>key)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(prev)<sp/>{</highlight></codeline>
+<codeline lineno="249"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prev-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref><sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="250"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[bucket]<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" kindref="member">free_entry</ref>(entry,<sp/>free_value);</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref>--;</highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prev<sp/>=<sp/>entry;</highlight></codeline>
+<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="259"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="260"><highlight class="normal"></highlight></codeline>
+<codeline lineno="261"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="262"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="263"><highlight class="normal"></highlight></codeline>
+<codeline lineno="264" refid="hash__table_8h_1a65e19011e07f1a22c523261e659a5ce1" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a65e19011e07f1a22c523261e659a5ce1" kindref="member">ck_tokenizer_hash_table_count</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table)<sp/>{</highlight></codeline>
+<codeline lineno="265"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>table<sp/>?<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref><sp/>:<sp/>0;</highlight></codeline>
+<codeline lineno="266"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="267"><highlight class="normal"></highlight></codeline>
+<codeline lineno="268" refid="hash__table_8h_1a0e16265f47b209eccc74d3b82d56b1c3" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a0e16265f47b209eccc74d3b82d56b1c3" kindref="member">ck_tokenizer_hash_table_contains</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key)<sp/>{</highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1ae526e6690bf6b8d95fd8a127b1b93acc" kindref="member">ck_tokenizer_hash_table_lookup</ref>(table,<sp/>key)<sp/>!=<sp/>NULL;</highlight></codeline>
+<codeline lineno="270"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="271"><highlight class="normal"></highlight></codeline>
+<codeline lineno="272" refid="hash__table_8h_1a9d089f807b84052dfb30b9a390e305f8" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a9d089f807b84052dfb30b9a390e305f8" kindref="member">ck_tokenizer_hash_table_iterate</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" kindref="member">CKTokenizerHashCallback</ref><sp/>callback,</highlight></codeline>
+<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*user_data)<sp/>{</highlight></codeline>
+<codeline lineno="275"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!callback)<sp/>{</highlight></codeline>
+<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="278"><highlight class="normal"></highlight></codeline>
+<codeline lineno="279"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="280"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[i];</highlight></codeline>
+<codeline lineno="281"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="282"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ret<sp/>=<sp/>callback(entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>,<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>,<sp/>user_data);</highlight></codeline>
+<codeline lineno="283"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(ret<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="284"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>ret;</highlight></codeline>
+<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="286"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="287"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="288"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="289"><highlight class="normal"></highlight></codeline>
+<codeline lineno="290"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="291"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="292"><highlight class="normal"></highlight></codeline>
+<codeline lineno="293" refid="hash__table_8h_1a74ea90a2aeb358e8daa596041a081d12" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1a74ea90a2aeb358e8daa596041a081d12" kindref="member">ck_tokenizer_hash_table_keys</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>**out_keys,</highlight></codeline>
+<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>max_keys)<sp/>{</highlight></codeline>
+<codeline lineno="296"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table<sp/>||<sp/>!out_keys)<sp/>{</highlight></codeline>
+<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="298"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="299"><highlight class="normal"></highlight></codeline>
+<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>written<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref><sp/>&amp;&amp;<sp/>written<sp/>&lt;<sp/>max_keys;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="302"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[i];</highlight></codeline>
+<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry<sp/>&amp;&amp;<sp/>written<sp/>&lt;<sp/>max_keys)<sp/>{</highlight></codeline>
+<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_keys[written++]<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>;</highlight></codeline>
+<codeline lineno="305"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="306"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="307"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="308"><highlight class="normal"></highlight></codeline>
+<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>written;</highlight></codeline>
+<codeline lineno="310"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="311"><highlight class="normal"></highlight></codeline>
+<codeline lineno="312" refid="hash__table_8h_1afe7abb14ee631582c7585b8a67debe1e" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="hash__table_8c_1afe7abb14ee631582c7585b8a67debe1e" kindref="member">ck_tokenizer_hash_table_clear</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_values)<sp/>{</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!table)<sp/>{</highlight></codeline>
+<codeline lineno="314"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="315"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="316"><highlight class="normal"></highlight></codeline>
+<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="318"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*entry<sp/>=<sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[i];</highlight></codeline>
+<codeline lineno="319"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(entry)<sp/>{</highlight></codeline>
+<codeline lineno="320"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*next<sp/>=<sp/>entry-&gt;<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" kindref="member">free_entry</ref>(entry,<sp/>free_values);</highlight></codeline>
+<codeline lineno="322"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry<sp/>=<sp/>next;</highlight></codeline>
+<codeline lineno="323"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>[i]<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="326"><highlight class="normal"></highlight></codeline>
+<codeline lineno="327"><highlight class="normal"><sp/><sp/><sp/><sp/>table-&gt;<ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="328"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c"/>
+  </compounddef>
+</doxygen>

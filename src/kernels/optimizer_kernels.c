@@ -18,7 +18,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(__AVX512F__)
+/* Include SIMD headers based on available instruction sets */
+#if defined(__AVX512F__) || defined(__AVX__) || defined(__SSE2__)
 #include <immintrin.h>
 #endif
 
@@ -66,7 +67,7 @@ void adamw_update_f32(
     float one_minus_beta2 = 1.0f - beta2;
 
 #if defined(__AVX512F__)
-    // Vectorized path: process 16 floats at a time
+    // AVX-512 path: process 16 floats at a time
     __m512 v_beta1 = _mm512_set1_ps(beta1);
     __m512 v_beta2 = _mm512_set1_ps(beta2);
     __m512 v_one_minus_beta1 = _mm512_set1_ps(one_minus_beta1);
@@ -79,16 +80,15 @@ void adamw_update_f32(
 
     size_t i = 0;
     for (; i + 16 <= numel; i += 16) {
-        // Load gradient, weight, m, v
         __m512 g = _mm512_loadu_ps(&grad[i]);
         __m512 w = _mm512_loadu_ps(&weight[i]);
         __m512 m_val = _mm512_loadu_ps(&m[i]);
         __m512 v_val = _mm512_loadu_ps(&v[i]);
 
-        // Update m: m = beta1 * m + (1 - beta1) * g
+        // m = beta1 * m + (1 - beta1) * g
         m_val = _mm512_fmadd_ps(v_beta1, m_val, _mm512_mul_ps(v_one_minus_beta1, g));
 
-        // Update v: v = beta2 * v + (1 - beta2) * g^2
+        // v = beta2 * v + (1 - beta2) * g^2
         __m512 g_sq = _mm512_mul_ps(g, g);
         v_val = _mm512_fmadd_ps(v_beta2, v_val, _mm512_mul_ps(v_one_minus_beta2, g_sq));
 
@@ -96,13 +96,12 @@ void adamw_update_f32(
         __m512 m_hat = _mm512_mul_ps(m_val, v_bc1_inv);
         __m512 v_hat = _mm512_mul_ps(v_val, v_bc2_inv);
 
-        // Update weight: w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)
+        // w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)
         __m512 denom = _mm512_add_ps(_mm512_sqrt_ps(v_hat), v_eps);
         __m512 update = _mm512_div_ps(m_hat, denom);
-        update = _mm512_fmadd_ps(v_weight_decay, w, update);  // + weight_decay * w
-        w = _mm512_fnmadd_ps(v_lr, update, w);  // w - lr * update
+        update = _mm512_fmadd_ps(v_weight_decay, w, update);
+        w = _mm512_fnmadd_ps(v_lr, update, w);
 
-        // Store updated values
         _mm512_storeu_ps(&weight[i], w);
         _mm512_storeu_ps(&m[i], m_val);
         _mm512_storeu_ps(&v[i], v_val);
@@ -112,33 +111,130 @@ void adamw_update_f32(
     for (; i < numel; ++i) {
         float g = grad[i];
         float w = weight[i];
-
-        // Update m and v
         m[i] = beta1 * m[i] + one_minus_beta1 * g;
         v[i] = beta2 * v[i] + one_minus_beta2 * g * g;
-
-        // Bias-corrected estimates
         float m_hat = m[i] / bias_correction1;
         float v_hat = v[i] / bias_correction2;
-
-        // Update weight
         weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);
     }
+
+#elif defined(__AVX__)
+    // AVX path: process 8 floats at a time (no FMA on older CPUs like Ivy Bridge)
+    __m256 v_beta1 = _mm256_set1_ps(beta1);
+    __m256 v_beta2 = _mm256_set1_ps(beta2);
+    __m256 v_one_minus_beta1 = _mm256_set1_ps(one_minus_beta1);
+    __m256 v_one_minus_beta2 = _mm256_set1_ps(one_minus_beta2);
+    __m256 v_lr = _mm256_set1_ps(lr);
+    __m256 v_eps = _mm256_set1_ps(eps);
+    __m256 v_weight_decay = _mm256_set1_ps(weight_decay);
+    __m256 v_bc1_inv = _mm256_set1_ps(1.0f / bias_correction1);
+    __m256 v_bc2_inv = _mm256_set1_ps(1.0f / bias_correction2);
+
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 g = _mm256_loadu_ps(&grad[i]);
+        __m256 w = _mm256_loadu_ps(&weight[i]);
+        __m256 m_val = _mm256_loadu_ps(&m[i]);
+        __m256 v_val = _mm256_loadu_ps(&v[i]);
+
+        // m = beta1 * m + (1 - beta1) * g
+        m_val = _mm256_add_ps(_mm256_mul_ps(v_beta1, m_val),
+                              _mm256_mul_ps(v_one_minus_beta1, g));
+
+        // v = beta2 * v + (1 - beta2) * g^2
+        __m256 g_sq = _mm256_mul_ps(g, g);
+        v_val = _mm256_add_ps(_mm256_mul_ps(v_beta2, v_val),
+                              _mm256_mul_ps(v_one_minus_beta2, g_sq));
+
+        // Bias-corrected estimates
+        __m256 m_hat = _mm256_mul_ps(m_val, v_bc1_inv);
+        __m256 v_hat = _mm256_mul_ps(v_val, v_bc2_inv);
+
+        // w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)
+        __m256 denom = _mm256_add_ps(_mm256_sqrt_ps(v_hat), v_eps);
+        __m256 update = _mm256_div_ps(m_hat, denom);
+        update = _mm256_add_ps(update, _mm256_mul_ps(v_weight_decay, w));
+        w = _mm256_sub_ps(w, _mm256_mul_ps(v_lr, update));
+
+        _mm256_storeu_ps(&weight[i], w);
+        _mm256_storeu_ps(&m[i], m_val);
+        _mm256_storeu_ps(&v[i], v_val);
+    }
+
+    // Scalar tail
+    for (; i < numel; ++i) {
+        float g = grad[i];
+        float w = weight[i];
+        m[i] = beta1 * m[i] + one_minus_beta1 * g;
+        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;
+        float m_hat = m[i] / bias_correction1;
+        float v_hat = v[i] / bias_correction2;
+        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);
+    }
+
+#elif defined(__SSE2__)
+    // SSE2 path: process 4 floats at a time
+    __m128 v_beta1 = _mm_set1_ps(beta1);
+    __m128 v_beta2 = _mm_set1_ps(beta2);
+    __m128 v_one_minus_beta1 = _mm_set1_ps(one_minus_beta1);
+    __m128 v_one_minus_beta2 = _mm_set1_ps(one_minus_beta2);
+    __m128 v_lr = _mm_set1_ps(lr);
+    __m128 v_eps = _mm_set1_ps(eps);
+    __m128 v_weight_decay = _mm_set1_ps(weight_decay);
+    __m128 v_bc1_inv = _mm_set1_ps(1.0f / bias_correction1);
+    __m128 v_bc2_inv = _mm_set1_ps(1.0f / bias_correction2);
+
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 g = _mm_loadu_ps(&grad[i]);
+        __m128 w = _mm_loadu_ps(&weight[i]);
+        __m128 m_val = _mm_loadu_ps(&m[i]);
+        __m128 v_val = _mm_loadu_ps(&v[i]);
+
+        // m = beta1 * m + (1 - beta1) * g
+        m_val = _mm_add_ps(_mm_mul_ps(v_beta1, m_val),
+                           _mm_mul_ps(v_one_minus_beta1, g));
+
+        // v = beta2 * v + (1 - beta2) * g^2
+        __m128 g_sq = _mm_mul_ps(g, g);
+        v_val = _mm_add_ps(_mm_mul_ps(v_beta2, v_val),
+                           _mm_mul_ps(v_one_minus_beta2, g_sq));
+
+        // Bias-corrected estimates
+        __m128 m_hat = _mm_mul_ps(m_val, v_bc1_inv);
+        __m128 v_hat = _mm_mul_ps(v_val, v_bc2_inv);
+
+        // w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)
+        __m128 denom = _mm_add_ps(_mm_sqrt_ps(v_hat), v_eps);
+        __m128 update = _mm_div_ps(m_hat, denom);
+        update = _mm_add_ps(update, _mm_mul_ps(v_weight_decay, w));
+        w = _mm_sub_ps(w, _mm_mul_ps(v_lr, update));
+
+        _mm_storeu_ps(&weight[i], w);
+        _mm_storeu_ps(&m[i], m_val);
+        _mm_storeu_ps(&v[i], v_val);
+    }
+
+    // Scalar tail
+    for (; i < numel; ++i) {
+        float g = grad[i];
+        float w = weight[i];
+        m[i] = beta1 * m[i] + one_minus_beta1 * g;
+        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;
+        float m_hat = m[i] / bias_correction1;
+        float v_hat = v[i] / bias_correction2;
+        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);
+    }
+
 #else
     // Scalar path
     for (size_t i = 0; i < numel; ++i) {
         float g = grad[i];
         float w = weight[i];
-
-        // Update m and v
         m[i] = beta1 * m[i] + one_minus_beta1 * g;
         v[i] = beta2 * v[i] + one_minus_beta2 * g * g;
-
-        // Bias-corrected estimates
         float m_hat = m[i] / bias_correction1;
         float v_hat = v[i] / bias_correction2;
-
-        // Update weight
         weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);
     }
 #endif
@@ -173,6 +269,7 @@ void sgd_momentum_update_f32(
     }
 
 #if defined(__AVX512F__)
+    // AVX-512 path: process 16 floats at a time
     __m512 v_lr = _mm512_set1_ps(lr);
     __m512 v_momentum = _mm512_set1_ps(momentum);
     __m512 v_weight_decay = _mm512_set1_ps(weight_decay);
@@ -183,10 +280,7 @@ void sgd_momentum_update_f32(
         __m512 w = _mm512_loadu_ps(&weight[i]);
         __m512 vel = _mm512_loadu_ps(&velocity[i]);
 
-        // v = momentum * v + g
         vel = _mm512_fmadd_ps(v_momentum, vel, g);
-
-        // w = w - lr * (v + weight_decay * w)
         __m512 update = _mm512_fmadd_ps(v_weight_decay, w, vel);
         w = _mm512_fnmadd_ps(v_lr, update, w);
 
@@ -198,7 +292,62 @@ void sgd_momentum_update_f32(
         velocity[i] = momentum * velocity[i] + grad[i];
         weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);
     }
+
+#elif defined(__AVX__)
+    // AVX path: process 8 floats at a time
+    __m256 v_lr = _mm256_set1_ps(lr);
+    __m256 v_momentum = _mm256_set1_ps(momentum);
+    __m256 v_weight_decay = _mm256_set1_ps(weight_decay);
+
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 g = _mm256_loadu_ps(&grad[i]);
+        __m256 w = _mm256_loadu_ps(&weight[i]);
+        __m256 vel = _mm256_loadu_ps(&velocity[i]);
+
+        // v = momentum * v + g
+        vel = _mm256_add_ps(_mm256_mul_ps(v_momentum, vel), g);
+
+        // w = w - lr * (v + weight_decay * w)
+        __m256 update = _mm256_add_ps(vel, _mm256_mul_ps(v_weight_decay, w));
+        w = _mm256_sub_ps(w, _mm256_mul_ps(v_lr, update));
+
+        _mm256_storeu_ps(&weight[i], w);
+        _mm256_storeu_ps(&velocity[i], vel);
+    }
+
+    for (; i < numel; ++i) {
+        velocity[i] = momentum * velocity[i] + grad[i];
+        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);
+    }
+
+#elif defined(__SSE2__)
+    // SSE2 path: process 4 floats at a time
+    __m128 v_lr = _mm_set1_ps(lr);
+    __m128 v_momentum = _mm_set1_ps(momentum);
+    __m128 v_weight_decay = _mm_set1_ps(weight_decay);
+
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 g = _mm_loadu_ps(&grad[i]);
+        __m128 w = _mm_loadu_ps(&weight[i]);
+        __m128 vel = _mm_loadu_ps(&velocity[i]);
+
+        vel = _mm_add_ps(_mm_mul_ps(v_momentum, vel), g);
+        __m128 update = _mm_add_ps(vel, _mm_mul_ps(v_weight_decay, w));
+        w = _mm_sub_ps(w, _mm_mul_ps(v_lr, update));
+
+        _mm_storeu_ps(&weight[i], w);
+        _mm_storeu_ps(&velocity[i], vel);
+    }
+
+    for (; i < numel; ++i) {
+        velocity[i] = momentum * velocity[i] + grad[i];
+        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);
+    }
+
 #else
+    // Scalar path
     for (size_t i = 0; i < numel; ++i) {
         velocity[i] = momentum * velocity[i] + grad[i];
         weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);
@@ -247,6 +396,29 @@ void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
     for (; i < numel; ++i) {
         dst[i] += src[i];
     }
+
+#elif defined(__AVX__)
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 d = _mm256_loadu_ps(&dst[i]);
+        __m256 s = _mm256_loadu_ps(&src[i]);
+        _mm256_storeu_ps(&dst[i], _mm256_add_ps(d, s));
+    }
+    for (; i < numel; ++i) {
+        dst[i] += src[i];
+    }
+
+#elif defined(__SSE2__)
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 d = _mm_loadu_ps(&dst[i]);
+        __m128 s = _mm_loadu_ps(&src[i]);
+        _mm_storeu_ps(&dst[i], _mm_add_ps(d, s));
+    }
+    for (; i < numel; ++i) {
+        dst[i] += src[i];
+    }
+
 #else
     for (size_t i = 0; i < numel; ++i) {
         dst[i] += src[i];
@@ -280,6 +452,29 @@ void gradient_scale_f32(float *grad, size_t numel, float scale)
     for (; i < numel; ++i) {
         grad[i] *= scale;
     }
+
+#elif defined(__AVX__)
+    __m256 v_scale = _mm256_set1_ps(scale);
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 g = _mm256_loadu_ps(&grad[i]);
+        _mm256_storeu_ps(&grad[i], _mm256_mul_ps(g, v_scale));
+    }
+    for (; i < numel; ++i) {
+        grad[i] *= scale;
+    }
+
+#elif defined(__SSE2__)
+    __m128 v_scale = _mm_set1_ps(scale);
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 g = _mm_loadu_ps(&grad[i]);
+        _mm_storeu_ps(&grad[i], _mm_mul_ps(g, v_scale));
+    }
+    for (; i < numel; ++i) {
+        grad[i] *= scale;
+    }
+
 #else
     for (size_t i = 0; i < numel; ++i) {
         grad[i] *= scale;
@@ -317,6 +512,44 @@ float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm)
     for (; i < numel; ++i) {
         sum_sq += (double)grad[i] * (double)grad[i];
     }
+
+#elif defined(__AVX__)
+    __m256 acc = _mm256_setzero_ps();
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 g = _mm256_loadu_ps(&grad[i]);
+        acc = _mm256_add_ps(acc, _mm256_mul_ps(g, g));
+    }
+    // Horizontal sum of 8 floats in acc
+    __m128 hi = _mm256_extractf128_ps(acc, 1);
+    __m128 lo = _mm256_castps256_ps128(acc);
+    __m128 sum4 = _mm_add_ps(lo, hi);
+    __m128 shuf = _mm_movehdup_ps(sum4);
+    __m128 sums = _mm_add_ps(sum4, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    sum_sq = _mm_cvtss_f32(sums);
+    for (; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+
+#elif defined(__SSE2__)
+    __m128 acc = _mm_setzero_ps();
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 g = _mm_loadu_ps(&grad[i]);
+        acc = _mm_add_ps(acc, _mm_mul_ps(g, g));
+    }
+    // Horizontal sum of 4 floats in acc
+    __m128 shuf = _mm_shuffle_ps(acc, acc, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 sums = _mm_add_ps(acc, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    sum_sq = _mm_cvtss_f32(sums);
+    for (; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+
 #else
     for (size_t i = 0; i < numel; ++i) {
         sum_sq += (double)grad[i] * (double)grad[i];

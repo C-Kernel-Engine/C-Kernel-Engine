@@ -7,6 +7,7 @@
 #include "tokenizer/utf8.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 int ck_utf8_char_length(unsigned char c) {
     if ((c & 0x80) == 0) {

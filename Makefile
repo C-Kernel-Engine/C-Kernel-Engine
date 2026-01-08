@@ -202,11 +202,13 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q4k.c \
 	           src/kernels/gemm_kernels_q4k_sse.c \
 	           src/kernels/gemm_kernels_q6k.c \
+	           src/kernels/gemm_kernels_q6k_sse.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
 	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
 	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
 	           src/kernels/gemm_kernels_q8_0.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
+	           src/kernels/rmsnorm_q8_k_fused.c \
 	           src/kernels/gemm_kernels_f16.c \
 	           src/kernels/optimizer_kernels.c \
 	           src/kernels/optimizer_kernels_bf16.c \
@@ -227,7 +229,10 @@ LIB_ROPE     := $(BUILD_DIR)/libckernel_rope.so
 # Tokenizer library (new - from src/tokenizer/)
 SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
                   src/tokenizer/hash_table.c \
-                  src/tokenizer/tokenizer.c
+                  src/tokenizer/memory_pool.c \
+                  src/tokenizer/utf8.c \
+                  src/tokenizer/tokenizer.c \
+                  src/data_structures/tries/trie.c
 LIB_TOKENIZER := $(BUILD_DIR)/libckernel_tokenizer.so
 
 IR_DEMO := $(BUILD_DIR)/ck_ir_demo
@@ -562,8 +567,8 @@ $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/sof
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c -lm
 
-$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c include/ckernel_quant.h include/ckernel_dtype.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c -lm
+$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c include/ckernel_quant.h include/ckernel_dtype.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c -lm
 
 # Convenience alias targets so existing commands still work.
 libckernel_gelu.so: $(LIB_GELU)
@@ -811,9 +816,16 @@ test: $(LIB) test-libs
 	@set -e; \
 	for t in $(PY_TESTS); do \
 	  echo "Running $$t"; \
-	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t; \
+	  extra_args=""; \
+	  case "$$t" in *test_gemm_microkernel.py) extra_args="--quick";; esac; \
+	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
+
+# Run full benchmarks (including GEMM microkernel performance tests)
+test-bench: $(LIB) test-libs
+	@echo "Running GEMM microkernel benchmarks (this may take a few minutes)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_gemm_microkernel.py
 
 test-bf16: $(LIB) test-libs
 	@failed=0; \

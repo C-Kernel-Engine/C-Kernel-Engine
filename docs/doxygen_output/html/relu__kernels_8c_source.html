@@ -203,8 +203,8 @@ $(document).ready(function(){initNavTree('relu__kernels_8c_source.html',''); ini
 <div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    <span class="keywordflow">for</span> (; i + 15 &lt; n; i += 16) {</div>
 <div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;        __m512 vx = _mm512_loadu_ps(input + i);</div>
 <div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;        __m512 vdy = _mm512_loadu_ps(d_output + i);</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;        __mmask16 mask = _mm512_cmp_ps_mask(vx, vzero, _CMP_GT_OQ);</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;        __m512 vdx = _mm512_maskz_mov_ps(mask, vdy);</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;        __mmask16 <a class="code" href="tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f">mask</a> = _mm512_cmp_ps_mask(vx, vzero, _CMP_GT_OQ);</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;        __m512 vdx = _mm512_maskz_mov_ps(<a class="code" href="tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f">mask</a>, vdy);</div>
 <div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;        _mm512_storeu_ps(d_input + i, vdx);</div>
 <div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    }</div>
 <div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;<span class="preprocessor">#elif defined(__AVX2__) || defined(__AVX__)</span></div>
@@ -213,8 +213,8 @@ $(document).ready(function(){initNavTree('relu__kernels_8c_source.html',''); ini
 <div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;        __m256 vx = _mm256_loadu_ps(input + i);</div>
 <div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;        __m256 vdy = _mm256_loadu_ps(d_output + i);</div>
 <div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;        <span class="comment">// Result is all 1s (0xFFFFFFFF) if true, 0 if false.</span></div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;        __m256 mask = _mm256_cmp_ps(vx, vzero, _CMP_GT_OQ);</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;        __m256 vdx = _mm256_and_ps(mask, vdy);</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;        __m256 <a class="code" href="tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f">mask</a> = _mm256_cmp_ps(vx, vzero, _CMP_GT_OQ);</div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;        __m256 vdx = _mm256_and_ps(<a class="code" href="tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f">mask</a>, vdy);</div>
 <div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;        _mm256_storeu_ps(d_input + i, vdx);</div>
 <div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;    }</div>
 <div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;<span class="preprocessor">#endif</span></div>
@@ -227,6 +227,7 @@ $(document).ready(function(){initNavTree('relu__kernels_8c_source.html',''); ini
 <div class="ttc" id="arelu__kernels_8c_html_a434da7f0647cdada09cd6ad435560467"><div class="ttname"><a href="relu__kernels_8c.html#a434da7f0647cdada09cd6ad435560467">relu_backward</a></div><div class="ttdeci">void relu_backward(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="relu__kernels_8c_source.html#l00068">relu_kernels.c:68</a></div></div>
 <div class="ttc" id="arelu__kernels_8c_html_a856216dca72f3534c079f429d1d58d48"><div class="ttname"><a href="relu__kernels_8c.html#a856216dca72f3534c079f429d1d58d48">relu_forward</a></div><div class="ttdeci">void relu_forward(const float *input, float *output, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="relu__kernels_8c_source.html#l00010">relu_kernels.c:10</a></div></div>
 <div class="ttc" id="arelu__kernels_8c_html_abbc4f192b13bed9ed1614c99cee2db91"><div class="ttname"><a href="relu__kernels_8c.html#abbc4f192b13bed9ed1614c99cee2db91">relu_forward_inplace</a></div><div class="ttdeci">void relu_forward_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="relu__kernels_8c_source.html#l00038">relu_kernels.c:38</a></div></div>
+<div class="ttc" id="atokenizer_8h_html_a03e2f161893f8f58a0999812d5274d2f"><div class="ttname"><a href="tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f">mask</a></div><div class="ttdeci">int32_t int32_t int32_t int32_t int32_t mask</div><div class="ttdef"><b>Definition:</b> <a href="tokenizer_8h_source.html#l00207">tokenizer.h:207</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
