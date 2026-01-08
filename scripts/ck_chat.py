@@ -163,7 +163,29 @@ class CKModel:
         return True
 
     def _detect_eos_tokens(self):
-        """Detect EOS token IDs from tokenizer vocabulary."""
+        """Detect EOS (End-Of-Sequence) token IDs from tokenizer vocabulary.
+
+        WHY THIS MATTERS:
+        =================
+        When generating text, we need to know when to STOP. EOS tokens signal
+        "generation is complete." Without proper EOS detection:
+
+        - Model generates forever (until max_tokens)
+        - Or worse: stops immediately on common tokens
+
+        BUG WE HAD (2025-01):
+        =====================
+        We assumed tokens 0,1,2 are always special (PAD, BOS, EOS) like in GPT-2.
+        But in Qwen tokenizer:
+            Token 0 = "!"
+            Token 1 = '"'
+            Token 2 = "#"
+
+        So if model generated "Hello!" -> token "!" (ID=0) -> treated as EOS -> STOP
+        Result: Only generated one token before stopping.
+
+        FIX: Only use 0,1,2 as fallback if NO model-specific EOS tokens found.
+        """
         self.eos_tokens = set()
 
         # Try to get vocab from tokenizer
@@ -179,18 +201,18 @@ class CKModel:
             pass
 
         if vocab:
-            # Look for known EOS token names
+            # Look for known EOS token names (model-specific)
             for name in self.EOS_TOKEN_NAMES:
                 if name in vocab:
                     self.eos_tokens.add(vocab[name])
 
-        # Always include low token IDs as fallback (PAD, BOS, EOS typically < 3)
-        self.eos_tokens.update([0, 1, 2])
+        # IMPORTANT: Only use low token IDs as fallback if we found NOTHING
+        # Different tokenizers assign different meanings to low IDs!
+        if not self.eos_tokens:
+            print(f"Warning: No EOS tokens detected, using conservative defaults")
+            self.eos_tokens.update([0, 1, 2])
 
-        if len(self.eos_tokens) > 3:  # Found some model-specific ones
-            print(f"Detected EOS tokens: {sorted(self.eos_tokens)}")
-        else:
-            print(f"Using default EOS tokens: {sorted(self.eos_tokens)}")
+        print(f"EOS tokens: {sorted(self.eos_tokens)}")
 
     def is_eos_token(self, token_id: int) -> bool:
         """Check if token is an EOS token."""
@@ -220,6 +242,46 @@ class CKModel:
     def decode(self, token_ids: list) -> str:
         """Decode token IDs to text."""
         return self.tokenizer.decode(token_ids)
+
+    def format_chat_prompt(self, user_message: str, system_prompt: str = None) -> str:
+        """Format user message with chat template for instruction models.
+
+        WHY THIS IS NEEDED:
+        ===================
+        Language models predict "what comes next" - they don't inherently know
+        they should answer questions. Without a chat template:
+
+            Input:  "hello"
+            Output: Random continuation (could be anything from training data)
+
+        Instruction-tuned models (Qwen-Instruct, Llama-Instruct, etc.) are trained
+        on conversations with specific markers. The model learns:
+        - <|im_start|>user means "human is talking"
+        - <|im_start|>assistant means "I should respond helpfully"
+
+        With chat template:
+            Input:  "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n"
+            Output: "Hello! How can I help you today?"
+
+        The weights don't "know" to be helpful - they learned patterns from
+        training data that used this exact format.
+
+        FORMAT (ChatML - used by Qwen, and many others):
+        ================================================
+        <|im_start|>system
+        {system_prompt}<|im_end|>
+        <|im_start|>user
+        {user_message}<|im_end|>
+        <|im_start|>assistant
+        {model generates response here...}
+        """
+        if system_prompt is None:
+            system_prompt = "You are a helpful assistant."
+
+        prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+        prompt += f"<|im_start|>user\n{user_message}<|im_end|>\n"
+        prompt += "<|im_start|>assistant\n"
+        return prompt
 
     def forward(self, token_ids: list) -> np.ndarray:
         """Run forward pass and return logits for last position."""
@@ -452,8 +514,8 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
             print(f"  Performance stats: {'ON' if show_stats else 'OFF'}")
             continue
 
-        # Build prompt (simple format)
-        prompt = user_input
+        # Build prompt with chat template
+        prompt = model.format_chat_prompt(user_input)
 
         # Generate response
         print("\033[94mAssistant: \033[0m", end='', flush=True)
