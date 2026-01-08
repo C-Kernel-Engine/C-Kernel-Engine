@@ -7,6 +7,14 @@ var tokenizer_8h =
     [ "CK_TOKENIZER_DEFAULT_HT_SIZE", "tokenizer_8h.html#ab046b8725b078826c08dd8bf474e1bd9", null ],
     [ "CK_TOKENIZER_MAX_TOKEN_LEN", "tokenizer_8h.html#ae4588e8ec34270c75f204c1888792113", null ],
     [ "CK_TOKENIZER_MAX_VOCAB_SIZE", "tokenizer_8h.html#a7b861b5a4ce2546abb39e12cedd14cb2", null ],
+    [ "CKSpacePrefixStyle", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6", [
+      [ "CK_SPACE_PREFIX_AUTO", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
+      [ "CK_SPACE_PREFIX_GPT2", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
+      [ "CK_SPACE_PREFIX_SPM", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ],
+      [ "CK_SPACE_PREFIX_AUTO", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
+      [ "CK_SPACE_PREFIX_GPT2", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
+      [ "CK_SPACE_PREFIX_SPM", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ]
+    ] ],
     [ "CKTokenizerType", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa", [
       [ "CK_TOKENIZER_BPE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaaacc79f950f4619c0f760920d41453dc0", null ],
       [ "CK_TOKENIZER_WORDPIECE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaae3780f9d7b735346810efb8302a88621", null ],
@@ -32,15 +40,16 @@ var tokenizer_8h =
     [ "bos", "tokenizer_8h.html#afbcf72e6f3f003096f1fb9ce31a13736", null ],
     [ "eos", "tokenizer_8h.html#ae2ac59d55593a1262747f8e0c4b575d9", null ],
     [ "id", "tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e", null ],
-    [ "ids", "tokenizer_8h.html#a565e8e39ec6c411166ddc3b89eb781e4", null ],
+    [ "ids", "tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c", null ],
     [ "lowercase", "tokenizer_8h.html#a65b78014f5b24adcc90623cfa9ba6123", null ],
     [ "mask", "tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f", null ],
     [ "num_ids", "tokenizer_8h.html#a2f30fc798d162629916e2faa69137745", null ],
     [ "out_len", "tokenizer_8h.html#afcd8f560b02b3c7a2bc2b3effa325fcf", null ],
     [ "pad", "tokenizer_8h.html#ae478acd31a350e380062e576e1d8d61c", null ],
     [ "score", "tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741", null ],
-    [ "text", "tokenizer_8h.html#a16343090e80c4472521560f30113d96c", null ],
-    [ "token", "tokenizer_8h.html#a1b07b985c8c5b1d267df858fb9d378e1", null ],
+    [ "style", "tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346", null ],
+    [ "text", "tokenizer_8h.html#a462f1390f421769e5f487370f8f21ee9", null ],
+    [ "token", "tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6", null ],
     [ "unk", "tokenizer_8h.html#a9b857f7ce4dd3bca5a537e67f77a2b44", null ],
     [ "use_trie", "tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15", null ]
 ];

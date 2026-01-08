@@ -11,6 +11,7 @@ var annotated_dup =
     [ "block_q8_K", "structblock__q8__K.html", "structblock__q8__K" ],
     [ "CacheInfo", "structCacheInfo.html", "structCacheInfo" ],
     [ "CacheTopology", "structCacheTopology.html", "structCacheTopology" ],
+    [ "CKBPEConfig", "structCKBPEConfig.html", "structCKBPEConfig" ],
     [ "CKBufferSpec", "structCKBufferSpec.html", "structCKBufferSpec" ],
     [ "CKDimToken", "structCKDimToken.html", "structCKDimToken" ],
     [ "CKFooterGradOffsets", "structCKFooterGradOffsets.html", "structCKFooterGradOffsets" ],

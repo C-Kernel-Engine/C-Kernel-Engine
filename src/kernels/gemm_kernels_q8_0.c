@@ -111,6 +111,15 @@ void gemv_q8_0_avx512(float *y,
 
 #if defined(__SSE4_1__)
 #include <immintrin.h>
+
+/* Helper macro: extract 4 int8 weights at byte offset, convert to float, multiply with x */
+#define SSE_Q8_BLOCK(q8_reg, offset, xp, d_val, acc) do { \
+    __m128 vx = _mm_loadu_ps(&(xp)[offset]); \
+    __m128i qw = _mm_cvtepi8_epi32(_mm_srli_si128(q8_reg, offset)); \
+    __m128 vw = _mm_cvtepi32_ps(qw); \
+    acc = _mm_add_ps(acc, _mm_mul_ps(_mm_mul_ps(vw, vx), _mm_set1_ps(d_val))); \
+} while(0)
+
 void gemv_q8_0_sse(float *y,
                    const void *W,
                    const float *x,
@@ -127,32 +136,32 @@ void gemv_q8_0_sse(float *y,
             const float d_val = CK_FP16_TO_FP32(block->d);
             const float *xp = &x[b * QK8_0];
 
-            // Load 32 weights (signed 8-bit)
+            /* Load 32 weights (signed 8-bit) in two 16-byte chunks */
             __m128i q8_0 = _mm_loadu_si128((const __m128i *)&block->qs[0]);
             __m128i q8_1 = _mm_loadu_si128((const __m128i *)&block->qs[16]);
 
-            // Process in chunks of 4 floats for input
-            for (int i=0; i<32; i+=4) {
-                __m128 vx = _mm_loadu_ps(&xp[i]);
-                
-                // Extract 4 weights, convert to float
-                __m128i qw;
-                if (i < 16) {
-                    qw = _mm_cvtepi8_epi32(_mm_srli_si128(q8_0, i));
-                } else {
-                    qw = _mm_cvtepi8_epi32(_mm_srli_si128(q8_1, i - 16));
-                }
-                __m128 vw = _mm_cvtepi32_ps(qw);
-                acc = _mm_add_ps(acc, _mm_mul_ps(_mm_mul_ps(vw, vx), _mm_set1_ps(d_val)));
-            }
+            /* Process first 16 weights (q8_0) - unrolled with compile-time constants */
+            SSE_Q8_BLOCK(q8_0, 0, xp, d_val, acc);
+            SSE_Q8_BLOCK(q8_0, 4, xp, d_val, acc);
+            SSE_Q8_BLOCK(q8_0, 8, xp, d_val, acc);
+            SSE_Q8_BLOCK(q8_0, 12, xp, d_val, acc);
+
+            /* Process second 16 weights (q8_1) - offset xp by 16 */
+            const float *xp1 = xp + 16;
+            SSE_Q8_BLOCK(q8_1, 0, xp1, d_val, acc);
+            SSE_Q8_BLOCK(q8_1, 4, xp1, d_val, acc);
+            SSE_Q8_BLOCK(q8_1, 8, xp1, d_val, acc);
+            SSE_Q8_BLOCK(q8_1, 12, xp1, d_val, acc);
         }
-        
-        // Hsum
+
+        /* Horizontal sum */
         acc = _mm_add_ps(acc, _mm_shuffle_ps(acc, acc, _MM_SHUFFLE(1, 0, 3, 2)));
         acc = _mm_add_ps(acc, _mm_shuffle_ps(acc, acc, _MM_SHUFFLE(0, 1, 0, 1)));
         _mm_store_ss(&y[row], acc);
     }
 }
+
+#undef SSE_Q8_BLOCK
 #endif
 
 /**

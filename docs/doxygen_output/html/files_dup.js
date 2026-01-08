@@ -119,6 +119,8 @@ var files_dup =
     [ "trie.c", "trie_8c.html", "trie_8c" ],
     [ "include/data_structures/tries/trie.h", "include_2data__structures_2tries_2trie_8h.html", "include_2data__structures_2tries_2trie_8h" ],
     [ "src/data_structures/tries/trie.h", "src_2data__structures_2tries_2trie_8h.html", "src_2data__structures_2tries_2trie_8h" ],
+    [ "true_bpe.c", "true__bpe_8c.html", "true__bpe_8c" ],
+    [ "true_bpe.h", "true__bpe_8h.html", "true__bpe_8h" ],
     [ "utf8.c", "utf8_8c.html", "utf8_8c" ],
     [ "utf8.h", "utf8_8h.html", "utf8_8h" ],
     [ "vision_kernels.c", "vision__kernels_8c.html", "vision__kernels_8c" ],

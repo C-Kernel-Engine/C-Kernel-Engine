@@ -232,6 +232,7 @@ SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
                   src/tokenizer/memory_pool.c \
                   src/tokenizer/utf8.c \
                   src/tokenizer/tokenizer.c \
+                  src/tokenizer/true_bpe.c \
                   src/data_structures/tries/trie.c
 LIB_TOKENIZER := $(BUILD_DIR)/libckernel_tokenizer.so
 
@@ -410,6 +411,26 @@ $(LIB_TOKENIZER): $(SRCS_TOKENIZER)
 tokenizer: $(LIB_TOKENIZER)
 	@echo "Tokenizer library built: $(LIB_TOKENIZER)"
 	@true
+
+# Tokenizer tests (unified test suite)
+test-tokenizer: $(LIB_TOKENIZER)
+	@echo ""
+	@echo "========================================"
+	@echo "  Running Unified Tokenizer Tests"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_unified.py
+
+test-tokenizer-quick: $(LIB_TOKENIZER)
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_unified.py --quick
+
+test-tokenizer-llama: $(LIB_TOKENIZER)
+	@echo ""
+	@echo "========================================"
+	@echo "  C-Kernel vs llama.cpp Comparison"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_llamacpp.py
+
+.PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama
 
 ir-v2-meta: $(IR_V2_DEMO)
 	@echo "Generating IR v2 from $(CONFIG) + $(IR_V2_META)..."
@@ -664,9 +685,16 @@ unittest:
 	@echo "  unittest/bf16/test_mlp_bf16.py         - BF16 MLP"
 	@echo "  unittest/bf16/test_attention_bf16.py   - BF16 attention"
 	@echo ""
+	@echo "Tokenizer Tests:"
+	@echo "  unittest/test_tokenizer_unified.py     - Unified tokenizer test suite"
+	@echo "    - Foundation Tests: Custom vocab, UTF-8, emojis"
+	@echo "    - True BPE Parity: 100% HuggingFace parity"
+	@echo "    - Performance: Hash vs Trie vs Python"
+	@echo ""
 	@echo "Batch Commands:"
 	@echo "  make test             - Run core kernel tests"
 	@echo "  make test-bf16        - Run BF16 kernel tests"
+	@echo "  make test-tokenizer   - Run tokenizer tests"
 	@echo "  make nightly          - Run full nightly test suite (scripts/nightly_runner.py)"
 	@echo ""
 

@@ -49,6 +49,10 @@
     <member refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kind="variable"><name>d</name></member>
     <member refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" kind="variable"><name>qs</name></member>
   </compound>
+  <compound refid="structBPETokenInfo" kind="struct"><name>BPETokenInfo</name>
+    <member refid="structBPETokenInfo_1af8493b977292de9574a489b4a4a15b77" kind="variable"><name>id</name></member>
+    <member refid="structBPETokenInfo_1acb4bd3ccb4bb786dd5184e6357024d11" kind="variable"><name>score</name></member>
+  </compound>
   <compound refid="structCacheInfo" kind="struct"><name>CacheInfo</name>
     <member refid="structCacheInfo_1a2bbafb632144b03c4ac4d74fea63b438" kind="variable"><name>level</name></member>
     <member refid="structCacheInfo_1a6998f8578822bdc01a41f3a9d695e7ac" kind="variable"><name>line_size_bytes</name></member>
@@ -67,6 +71,29 @@
     <member refid="structck__huge__alloc__entry__t_1acc59918b46c1dfacca2f51488d3d4d8c" kind="variable"><name>next</name></member>
     <member refid="structck__huge__alloc__entry__t_1a4766536c5036b2f9a9366a2e95b5a8b5" kind="variable"><name>ptr</name></member>
     <member refid="structck__huge__alloc__entry__t_1a6b3feb34af8cb376ae922b914c5503ff" kind="variable"><name>was_mmap</name></member>
+  </compound>
+  <compound refid="structCKBPEConfig" kind="struct"><name>CKBPEConfig</name>
+    <member refid="structCKBPEConfig_1abfb01eec95857319bd1dafbaf6336238" kind="variable"><name>add_bos</name></member>
+    <member refid="structCKBPEConfig_1af3e1a881a51c302240ff8581f4cfcba5" kind="variable"><name>add_eos</name></member>
+    <member refid="structCKBPEConfig_1a6d2ef23c628fac092ae6085b54705bb5" kind="variable"><name>byte_fallback</name></member>
+    <member refid="structCKBPEConfig_1a8425351ff0b3ec6e13ab4dd55644911c" kind="variable"><name>space_prefix_style</name></member>
+  </compound>
+  <compound refid="structCKBPEMerge" kind="struct"><name>CKBPEMerge</name>
+    <member refid="structCKBPEMerge_1a6fec946f6ad6d539481b5e92a3c1d6bc" kind="variable"><name>left_id</name></member>
+    <member refid="structCKBPEMerge_1a2d76bd00c62867ab8068cc69c4b1f62b" kind="variable"><name>merged_id</name></member>
+    <member refid="structCKBPEMerge_1a0f8cad4cee8615da856bb42dc6ef2c86" kind="variable"><name>priority</name></member>
+    <member refid="structCKBPEMerge_1a181a237fdff0148cc4803933d09e380e" kind="variable"><name>right_id</name></member>
+  </compound>
+  <compound refid="structCKBPEToken" kind="struct"><name>CKBPEToken</name>
+    <member refid="structCKBPEToken_1a5d2d4eb0332787d191df303bdf6b476a" kind="variable"><name>id</name></member>
+    <member refid="structCKBPEToken_1a82f9f594c5d01653bb348f23800b6e39" kind="variable"><name>is_merged</name></member>
+    <member refid="structCKBPEToken_1afbdf2aa7f46273247603e470f1fba1f4" kind="variable"><name>len</name></member>
+    <member refid="structCKBPEToken_1a8130740a201e215719917bcf079a5ba5" kind="variable"><name>str</name></member>
+  </compound>
+  <compound refid="structCKBPETokenList" kind="struct"><name>CKBPETokenList</name>
+    <member refid="structCKBPETokenList_1a9b9e481d6cd5ad67c009c12ab4fb4ae0" kind="variable"><name>capacity</name></member>
+    <member refid="structCKBPETokenList_1aac7f833d239cbca56af24bc6c20a482d" kind="variable"><name>count</name></member>
+    <member refid="structCKBPETokenList_1a10c32ddaaa0ebff861f195ba1c95dc8d" kind="variable"><name>tokens</name></member>
   </compound>
   <compound refid="structCKBufferSpec" kind="struct"><name>CKBufferSpec</name>
     <member refid="structCKBufferSpec_1a3d2e80ce499f08ea3e9d969de367f945" kind="variable"><name>alias_of</name></member>
@@ -537,11 +564,21 @@
     <member refid="structCKMemSpan_1af281883bfadbea82697819bbf12aa759" kind="variable"><name>offset_bytes</name></member>
     <member refid="structCKMemSpan_1a1a8d564452e900aa6e0978ac20b63c5e" kind="variable"><name>size_bytes</name></member>
   </compound>
+  <compound refid="structCKMergeEntry" kind="struct"><name>CKMergeEntry</name>
+    <member refid="structCKMergeEntry_1a525830d41b63b0a0aae6d2d1f887b7c4" kind="variable"><name>key</name></member>
+    <member refid="structCKMergeEntry_1afe60077fca4daa02397b8301cb4093d2" kind="variable"><name>merge</name></member>
+    <member refid="structCKMergeEntry_1a55868f9c777d593da788fe4433ff8751" kind="variable"><name>next</name></member>
+  </compound>
   <compound refid="structCKMergeRule" kind="struct"><name>CKMergeRule</name>
     <member refid="structCKMergeRule_1a2f4fb999c8ad7581926948836ad96949" kind="variable"><name>left</name></member>
     <member refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" kind="variable"><name>merged</name></member>
     <member refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" kind="variable"><name>priority</name></member>
     <member refid="structCKMergeRule_1ad429814a773c9faa0526991078347e4f" kind="variable"><name>right</name></member>
+  </compound>
+  <compound refid="structCKMergeTable" kind="struct"><name>CKMergeTable</name>
+    <member refid="structCKMergeTable_1a01da63d9edb9ea4d15662c7d85228f6c" kind="variable"><name>buckets</name></member>
+    <member refid="structCKMergeTable_1a1bd73c7bca02c6fb7c24e68148ee78f5" kind="variable"><name>num_buckets</name></member>
+    <member refid="structCKMergeTable_1aab47156016af6008747a837ff7ce1fb1" kind="variable"><name>num_entries</name></member>
   </compound>
   <compound refid="structCKMetric" kind="struct"><name>CKMetric</name>
     <member refid="structCKMetric_1a303423e9bf3c73c0111cfc897e515f40" kind="variable"><name>f</name></member>
@@ -708,6 +745,8 @@
     <member refid="structCKTokenizerConfig_1a1c6c52e64b87d70be97a2e9547f950e5" kind="variable"><name>add_bos</name></member>
     <member refid="structCKTokenizerConfig_1adf662a4222984144966097373043a51f" kind="variable"><name>add_eos</name></member>
     <member refid="structCKTokenizerConfig_1ad33c5d657dea175cb8c1ae9fdff33816" kind="variable"><name>lowercase</name></member>
+    <member refid="structCKTokenizerConfig_1af82fde6580003dff44ed719380e61673" kind="variable"><name>space_prefix_detected</name></member>
+    <member refid="structCKTokenizerConfig_1af8f0acf8af0468b0c852db59df1172bb" kind="variable"><name>space_prefix_style</name></member>
     <member refid="structCKTokenizerConfig_1a61cf1a1974d46e1da99c1c86f43fad4b" kind="variable"><name>treat_whitespace_as_suffix</name></member>
     <member refid="structCKTokenizerConfig_1adeee37aac61b482ef54dc4262852a035" kind="variable"><name>type</name></member>
     <member refid="structCKTokenizerConfig_1a25de8175fe44fc209d958136ce3c669e" kind="variable"><name>unk_score</name></member>
@@ -745,6 +784,21 @@
     <member refid="structCKTrieNode_1a316472d591daedc90299616e28bda4da" kind="variable"><name>is_special</name></member>
     <member refid="structCKTrieNode_1aace4764a43a80b9f2039dd91fb50c649" kind="variable"><name>priority</name></member>
     <member refid="structCKTrieNode_1aa55f70549c1823d3325218b0b71a42b8" kind="variable"><name>token_id</name></member>
+  </compound>
+  <compound refid="structCKTrueBPE" kind="struct"><name>CKTrueBPE</name>
+    <member refid="structCKTrueBPE_1a92d8750deb9cbb01719af1c9d399c2a5" kind="variable"><name>bos_id</name></member>
+    <member refid="structCKTrueBPE_1a25ae228bd6363d52fe405a59c205c07f" kind="variable"><name>config</name></member>
+    <member refid="structCKTrueBPE_1a4aa353b274b4b6f32f7ef663655d67a4" kind="variable"><name>eos_id</name></member>
+    <member refid="structCKTrueBPE_1a6f857e328dd5d91b46e32826a8174c4b" kind="variable"><name>id_to_token</name></member>
+    <member refid="structCKTrueBPE_1adad16ae21d5512e425445f9c8e14e6f8" kind="variable"><name>merges</name></member>
+    <member refid="structCKTrueBPE_1aa21dad236a400f412ac349e0de11eb78" kind="variable"><name>num_merges</name></member>
+    <member refid="structCKTrueBPE_1a62796044b5f663dee591dd146b6c4c49" kind="variable"><name>pad_id</name></member>
+    <member refid="structCKTrueBPE_1aa932f3b3c217b8e3f186c96050105a1c" kind="variable"><name>str_buffer</name></member>
+    <member refid="structCKTrueBPE_1a1afebb895c97a59f2fa21c3f0d02b558" kind="variable"><name>str_buffer_size</name></member>
+    <member refid="structCKTrueBPE_1a5fb07caf20ccb48034ea5c7efbe27755" kind="variable"><name>unk_id</name></member>
+    <member refid="structCKTrueBPE_1a479aec4347c7cfe8d6f971ccb154f877" kind="variable"><name>vocab</name></member>
+    <member refid="structCKTrueBPE_1aa016690e175871f1b98426a786a308d6" kind="variable"><name>vocab_capacity</name></member>
+    <member refid="structCKTrueBPE_1abd3c8efef47041b1c4458ed95dbe44fd" kind="variable"><name>vocab_size</name></member>
   </compound>
   <compound refid="structCKV2AlignInfo" kind="struct"><name>CKV2AlignInfo</name>
     <member refid="structCKV2AlignInfo_1adf80701e61a4816d8743217c210fb42c" kind="variable"><name>aligned_context</name></member>
@@ -897,6 +951,11 @@
     <member refid="structPCIeTopology_1ac42eaf6c16f881a6098cf8e443503936" kind="variable"><name>num_devices</name></member>
     <member refid="structPCIeTopology_1a8fabded9e6dd8d7efb115abfd5d38044" kind="variable"><name>total_lanes_available</name></member>
     <member refid="structPCIeTopology_1ad6202b8874dbca1e0fdd88dc9a899203" kind="variable"><name>total_lanes_used</name></member>
+  </compound>
+  <compound refid="structPretokChunk" kind="struct"><name>PretokChunk</name>
+    <member refid="structPretokChunk_1a20d33a37c304d87ba2cbfaf0960a5d62" kind="variable"><name>len</name></member>
+    <member refid="structPretokChunk_1a7031ed12874f60b92634d01ec640633b" kind="variable"><name>start</name></member>
+    <member refid="structPretokChunk_1aded517f6a7ff54234a623202cf02cc64" kind="variable"><name>type</name></member>
   </compound>
   <compound refid="structRecommendation" kind="struct"><name>Recommendation</name>
     <member refid="structRecommendation_1ad4009263d6f5d6e3feeab261f071beaf" kind="variable"><name>action</name></member>
@@ -2486,6 +2545,7 @@
     <member refid="tokenizer_8c_1a276dfd23dea6a3a888d21be343086124" kind="function"><name>ck_tokenizer_add_token</name></member>
     <member refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" kind="function"><name>ck_tokenizer_create</name></member>
     <member refid="tokenizer_8c_1a25fd8f38cf8e62b1e19e347e53225e8c" kind="function"><name>ck_tokenizer_decode</name></member>
+    <member refid="tokenizer_8c_1a27e99a6c67a48907701e99edec568b9d" kind="function"><name>ck_tokenizer_detect_space_prefix_style</name></member>
     <member refid="tokenizer_8c_1aad7d008ac73952c45a288cbb69806835" kind="function"><name>ck_tokenizer_encode</name></member>
     <member refid="tokenizer_8c_1adcfcdd58b3b91d043d6974b35aea1ad4" kind="function"><name>ck_tokenizer_free</name></member>
     <member refid="tokenizer_8c_1a8305a4a576ed2473bccd0a5dff347aa1" kind="function"><name>ck_tokenizer_id_to_token</name></member>
@@ -2496,17 +2556,26 @@
     <member refid="tokenizer_8c_1a39187b4d68c71ab61cdab7dbf8ab0d68" kind="function"><name>ck_tokenizer_load_text</name></member>
     <member refid="tokenizer_8c_1a18ff60efe6bd542c238441292f7d1833" kind="function"><name>ck_tokenizer_lookup</name></member>
     <member refid="tokenizer_8c_1ac7d72e1402cc099d9307f86e01099bb2" kind="function"><name>ck_tokenizer_reset</name></member>
+    <member refid="tokenizer_8c_1af62b561a1a9af69c1082f1d617801838" kind="function"><name>ck_tokenizer_set_space_prefix_style</name></member>
     <member refid="tokenizer_8c_1ab6aad37269a5b849a167c07a50c79ee8" kind="function"><name>ck_tokenizer_set_special_ids</name></member>
     <member refid="tokenizer_8c_1aec44767b58e6c10421a99b4b7f2f65b1" kind="function"><name>ck_tokenizer_set_use_trie</name></member>
     <member refid="tokenizer_8c_1a4a8056a40f88ea8ea10abf0fb7036897" kind="function"><name>find_longest_match</name></member>
     <member refid="tokenizer_8c_1aeec3f3e9fcc1faea770cb1e0e1b65b12" kind="function"><name>find_longest_match_hash</name></member>
     <member refid="tokenizer_8c_1ac300919bef1f23da17327134992f7490" kind="function"><name>find_longest_match_trie</name></member>
+    <member refid="tokenizer_8c_1ae3e35fa650168d9f2b0260828c0e7938" kind="function"><name>preprocess_bpe_spaces</name></member>
   </compound>
   <compound refid="tokenizer_8h" kind="file"><name>tokenizer.h</name>
     <member refid="tokenizer_8h_1ae3d34509ad9d854b81ca3af3ea4b2198" kind="define"><name>CK_TOKENIZER_API</name></member>
     <member refid="tokenizer_8h_1ab046b8725b078826c08dd8bf474e1bd9" kind="define"><name>CK_TOKENIZER_DEFAULT_HT_SIZE</name></member>
     <member refid="tokenizer_8h_1ae4588e8ec34270c75f204c1888792113" kind="define"><name>CK_TOKENIZER_MAX_TOKEN_LEN</name></member>
     <member refid="tokenizer_8h_1a7b861b5a4ce2546abb39e12cedd14cb2" kind="define"><name>CK_TOKENIZER_MAX_VOCAB_SIZE</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6" kind="enum"><name>CKSpacePrefixStyle</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be" kind="enumvalue"><name>CK_SPACE_PREFIX_AUTO</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a" kind="enumvalue"><name>CK_SPACE_PREFIX_GPT2</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b" kind="enumvalue"><name>CK_SPACE_PREFIX_SPM</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be" kind="enumvalue"><name>CK_SPACE_PREFIX_AUTO</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a" kind="enumvalue"><name>CK_SPACE_PREFIX_GPT2</name></member>
+    <member refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b" kind="enumvalue"><name>CK_SPACE_PREFIX_SPM</name></member>
     <member refid="tokenizer_8h_1a2fed9709848fc75201063ec8f8f99baa" kind="enum"><name>CKTokenizerType</name></member>
     <member refid="tokenizer_8h_1a2fed9709848fc75201063ec8f8f99baaaacc79f950f4619c0f760920d41453dc0" kind="enumvalue"><name>CK_TOKENIZER_BPE</name></member>
     <member refid="tokenizer_8h_1a2fed9709848fc75201063ec8f8f99baaae3780f9d7b735346810efb8302a88621" kind="enumvalue"><name>CK_TOKENIZER_WORDPIECE</name></member>
@@ -2514,15 +2583,16 @@
     <member refid="tokenizer_8h_1afbcf72e6f3f003096f1fb9ce31a13736" kind="variable"><name>bos</name></member>
     <member refid="tokenizer_8h_1ae2ac59d55593a1262747f8e0c4b575d9" kind="variable"><name>eos</name></member>
     <member refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" kind="variable"><name>id</name></member>
-    <member refid="tokenizer_8h_1a565e8e39ec6c411166ddc3b89eb781e4" kind="variable"><name>ids</name></member>
+    <member refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" kind="variable"><name>ids</name></member>
     <member refid="tokenizer_8h_1a65b78014f5b24adcc90623cfa9ba6123" kind="variable"><name>lowercase</name></member>
     <member refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" kind="variable"><name>mask</name></member>
     <member refid="tokenizer_8h_1a2f30fc798d162629916e2faa69137745" kind="variable"><name>num_ids</name></member>
     <member refid="tokenizer_8h_1afcd8f560b02b3c7a2bc2b3effa325fcf" kind="variable"><name>out_len</name></member>
     <member refid="tokenizer_8h_1ae478acd31a350e380062e576e1d8d61c" kind="variable"><name>pad</name></member>
     <member refid="tokenizer_8h_1a86dbad16ac00b8aa3c450398e4f8b741" kind="variable"><name>score</name></member>
-    <member refid="tokenizer_8h_1a16343090e80c4472521560f30113d96c" kind="variable"><name>text</name></member>
-    <member refid="tokenizer_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kind="variable"><name>token</name></member>
+    <member refid="tokenizer_8h_1aebee6a319ed22559d77672c8b7663346" kind="variable"><name>style</name></member>
+    <member refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" kind="variable"><name>text</name></member>
+    <member refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kind="variable"><name>token</name></member>
     <member refid="tokenizer_8h_1a9b857f7ce4dd3bca5a537e67f77a2b44" kind="variable"><name>unk</name></member>
     <member refid="tokenizer_8h_1abba2eff6b3bd59ba528a2828b636dc15" kind="variable"><name>use_trie</name></member>
     <member refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kind="function"><name>__attribute__</name></member>
@@ -2571,6 +2641,89 @@
     <member refid="src_2data__structures_2tries_2trie_8h_1aac71332e656ae70059359842c870230e" kind="function"><name>ck_trie_has_prefix</name></member>
     <member refid="src_2data__structures_2tries_2trie_8h_1a7b254dc2cd5611e6eee69114e479266d" kind="function"><name>ck_trie_insert</name></member>
     <member refid="src_2data__structures_2tries_2trie_8h_1ab8035bc5fe0a2b35f00ee8acbba4cba3" kind="function"><name>ck_trie_node_count</name></member>
+  </compound>
+  <compound refid="true__bpe_8c" kind="file"><name>true_bpe.c</name>
+    <member refid="true__bpe_8c_1aeee34d11578416e6e7ba54873260f34d" kind="define"><name>INITIAL_TOKEN_CAPACITY</name></member>
+    <member refid="true__bpe_8c_1a3f6d16dfdf7920e1e5f1dad5db5347f2" kind="define"><name>MAX_TOKEN_LEN</name></member>
+    <member refid="true__bpe_8c_1aa4cd3b9c68870f9874e953080d27b0a7" kind="define"><name>MERGE_HASH_SIZE</name></member>
+    <member refid="true__bpe_8c_1a6742d03aa1e93ba39b234d0ea402ee6d" kind="enum"><name>ChunkType</name></member>
+    <member refid="true__bpe_8c_1a6742d03aa1e93ba39b234d0ea402ee6dafb99a9959a47f3bd1dd00d1fccf2bceb" kind="enumvalue"><name>CHUNK_WORD</name></member>
+    <member refid="true__bpe_8c_1a6742d03aa1e93ba39b234d0ea402ee6da004e21d60d90cd07504126187843dab7" kind="enumvalue"><name>CHUNK_NUMBER</name></member>
+    <member refid="true__bpe_8c_1a6742d03aa1e93ba39b234d0ea402ee6dad6afd17c2bf07a77e6ab5d4f82a4e693" kind="enumvalue"><name>CHUNK_WHITESPACE</name></member>
+    <member refid="true__bpe_8c_1a6742d03aa1e93ba39b234d0ea402ee6da5d5611feda79c9239ab48285c32eca7f" kind="enumvalue"><name>CHUNK_OTHER</name></member>
+    <member refid="true__bpe_8c_1aab3d45acbc17a6ebeba4d58fd007e6b1" kind="function"><name>apply_bpe_merges</name></member>
+    <member refid="true__bpe_8c_1ae3fa01999c02fdd82a6745e66e5bc74e" kind="function"><name>byte_to_gpt2</name></member>
+    <member refid="true__bpe_8c_1a727da777d7f46240f3836da6055b6759" kind="function"><name>ck_true_bpe_add_merge</name></member>
+    <member refid="true__bpe_8c_1ae818deba4ff4981c20c903bfffb2fdb6" kind="function"><name>ck_true_bpe_add_merge_by_tokens</name></member>
+    <member refid="true__bpe_8c_1ac1960ecac16a47716d98aee961070323" kind="function"><name>ck_true_bpe_add_token</name></member>
+    <member refid="true__bpe_8c_1a5a78bb4542b285c7f2f1fb0187444544" kind="function"><name>ck_true_bpe_create</name></member>
+    <member refid="true__bpe_8c_1a11af45a409593cf28602d2cbfb3df00e" kind="function"><name>ck_true_bpe_decode</name></member>
+    <member refid="true__bpe_8c_1a43e5cb689cfbcd8b4f80920c1416d991" kind="function"><name>ck_true_bpe_detect_space_style</name></member>
+    <member refid="true__bpe_8c_1a2575ccc3febd74fd764ead2153ac9c11" kind="function"><name>ck_true_bpe_encode</name></member>
+    <member refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kind="function"><name>ck_true_bpe_free</name></member>
+    <member refid="true__bpe_8c_1ae82c7c3dbdf0bac7969abcc359888f63" kind="function"><name>ck_true_bpe_id_to_token</name></member>
+    <member refid="true__bpe_8c_1ae74dd1b70452d2e51b83fed3ae67855c" kind="function"><name>ck_true_bpe_lookup</name></member>
+    <member refid="true__bpe_8c_1a950f1534938dd1a899d74146b5e86dd1" kind="function"><name>ck_true_bpe_num_merges</name></member>
+    <member refid="true__bpe_8c_1a3611b29ff15905af00375ebc2d6b2750" kind="function"><name>ck_true_bpe_set_config</name></member>
+    <member refid="true__bpe_8c_1a5abdd31dde87c8f630e7a394c2cc7764" kind="function"><name>ck_true_bpe_set_special_ids</name></member>
+    <member refid="true__bpe_8c_1abcefe990fad8049af6c05fa756c518b5" kind="function"><name>ck_true_bpe_vocab_size</name></member>
+    <member refid="true__bpe_8c_1a745ee862b3e4ffa89ecc661e34abbaf2" kind="function"><name>encode_chunk</name></member>
+    <member refid="true__bpe_8c_1ab3bb7d16e6375ff25bae21d80f35a1a7" kind="function"><name>find_best_merge</name></member>
+    <member refid="true__bpe_8c_1a75677b0ab168d7bf958f8d1b258f016a" kind="function"><name>gpt2_pretokenize</name></member>
+    <member refid="true__bpe_8c_1a658fd44fe4b1abd5a95855fdb35775bf" kind="function"><name>init_tokens_from_text</name></member>
+    <member refid="true__bpe_8c_1a6f0f624284b853f714b83338e9b07b74" kind="function"><name>is_bpe_digit</name></member>
+    <member refid="true__bpe_8c_1a60316458b2abb5dd6096fa9862df8da2" kind="function"><name>is_bpe_letter</name></member>
+    <member refid="true__bpe_8c_1a6df5febf7bddcfd1db0995279b28c584" kind="function"><name>is_bpe_newline</name></member>
+    <member refid="true__bpe_8c_1a03f513f94a3f4171cfc80b568df3073e" kind="function"><name>is_bpe_punct</name></member>
+    <member refid="true__bpe_8c_1adc1caedaf2134f45e58b384a33bd8818" kind="function"><name>is_digit</name></member>
+    <member refid="true__bpe_8c_1a136114a1da9e0646aff5e045c91cffff" kind="function"><name>is_gpt2_space</name></member>
+    <member refid="true__bpe_8c_1a2661d3a5aec088c75126c08a32e355d1" kind="function"><name>is_letter</name></member>
+    <member refid="true__bpe_8c_1a8f8799a3df3ab598e163ab91b50423c6" kind="function"><name>is_whitespace</name></member>
+    <member refid="true__bpe_8c_1ab5b6476ecc972bb40a826d6066a98817" kind="function"><name>is_word_prefix_char</name></member>
+    <member refid="true__bpe_8c_1aaaa185f311d9d89550cb0b8223c5dcc3" kind="function"><name>merge_hash</name></member>
+    <member refid="true__bpe_8c_1ad85c42e889510c385f21508b66d103b5" kind="function"><name>merge_key</name></member>
+    <member refid="true__bpe_8c_1acca11f8747f0bdef7f6cd3456497752b" kind="function"><name>merge_table_create</name></member>
+    <member refid="true__bpe_8c_1a39ba4e1472d4ab3144b1877708ea5163" kind="function"><name>merge_table_free</name></member>
+    <member refid="true__bpe_8c_1abb66f64d1c5dff523feb9d632f23d630" kind="function"><name>merge_table_insert</name></member>
+    <member refid="true__bpe_8c_1a21be3f8e42c6c0abfe2c3de60dcbfbc5" kind="function"><name>merge_table_lookup</name></member>
+    <member refid="true__bpe_8c_1a782d1c06da75ca70c98690a59eeede43" kind="function"><name>preprocess_text</name></member>
+    <member refid="true__bpe_8c_1a8686fc27c2c25e81c582041e5c335e0d" kind="function"><name>token_list_append</name></member>
+    <member refid="true__bpe_8c_1a72a2743792c98b19ab360f088f0ab746" kind="function"><name>token_list_clear</name></member>
+    <member refid="true__bpe_8c_1a2e8ecdcffc30ce2924584df65d6ae04a" kind="function"><name>token_list_create</name></member>
+    <member refid="true__bpe_8c_1a7642beb8f8967804ec0ef16c0b595f59" kind="function"><name>token_list_free</name></member>
+    <member refid="true__bpe_8c_1ae746bce99e22b210138991c81124d884" kind="function"><name>token_list_merge_at</name></member>
+    <member refid="true__bpe_8c_1a75cb6719be3c165611a4b97047856b6b" kind="function"><name>utf8_char_len</name></member>
+  </compound>
+  <compound refid="true__bpe_8h" kind="file"><name>true_bpe.h</name>
+    <member refid="true__bpe_8h_1aad53eaecf0a0944b0b9c62652972a758" kind="define"><name>CK_TRUE_BPE_API</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6" kind="enum"><name>CKSpacePrefixStyle</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be" kind="enumvalue"><name>CK_SPACE_PREFIX_AUTO</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a" kind="enumvalue"><name>CK_SPACE_PREFIX_GPT2</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b" kind="enumvalue"><name>CK_SPACE_PREFIX_SPM</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be" kind="enumvalue"><name>CK_SPACE_PREFIX_AUTO</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a" kind="enumvalue"><name>CK_SPACE_PREFIX_GPT2</name></member>
+    <member refid="true__bpe_8h_1a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b" kind="enumvalue"><name>CK_SPACE_PREFIX_SPM</name></member>
+    <member refid="true__bpe_8h_1afbcf72e6f3f003096f1fb9ce31a13736" kind="variable"><name>bos</name></member>
+    <member refid="true__bpe_8h_1a07efc1bc43abbb792d810a797747ae6f" kind="variable"><name>config</name></member>
+    <member refid="true__bpe_8h_1ae2ac59d55593a1262747f8e0c4b575d9" kind="variable"><name>eos</name></member>
+    <member refid="true__bpe_8h_1a2708c0bbb6f926149707c2c61fe43c3e" kind="variable"><name>id</name></member>
+    <member refid="true__bpe_8h_1a565e8e39ec6c411166ddc3b89eb781e4" kind="variable"><name>ids</name></member>
+    <member refid="true__bpe_8h_1abf33d3f8e74eb48d5a4394c67ac4f1cd" kind="variable"><name>left</name></member>
+    <member refid="true__bpe_8h_1a653610ea9bf7b912ffcd7b95ba5b37eb" kind="variable"><name>left_id</name></member>
+    <member refid="true__bpe_8h_1adc7b8f0514fd7d4fefa123e27ce8922d" kind="variable"><name>max_ids</name></member>
+    <member refid="true__bpe_8h_1a59dd98a65ac03cdb1deea39c7580fb33" kind="variable"><name>max_len</name></member>
+    <member refid="true__bpe_8h_1acc4488e0b6a8a2700b10d41c0371df4a" kind="variable"><name>merged_id</name></member>
+    <member refid="true__bpe_8h_1a2f30fc798d162629916e2faa69137745" kind="variable"><name>num_ids</name></member>
+    <member refid="true__bpe_8h_1ae478acd31a350e380062e576e1d8d61c" kind="variable"><name>pad</name></member>
+    <member refid="true__bpe_8h_1a328f69c6aefebd48ef10a1c553458d04" kind="variable"><name>priority</name></member>
+    <member refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" kind="variable"><name>right</name></member>
+    <member refid="true__bpe_8h_1aa50e5dfadaeded74c9ed39708c06737b" kind="variable"><name>right_id</name></member>
+    <member refid="true__bpe_8h_1a396a22fb293f339694f80705521d0dfa" kind="variable"><name>score</name></member>
+    <member refid="true__bpe_8h_1a66c43cd207a5a3d05689fa20dd19ef66" kind="variable"><name>text</name></member>
+    <member refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" kind="variable"><name>text_len</name></member>
+    <member refid="true__bpe_8h_1a1b07b985c8c5b1d267df858fb9d378e1" kind="variable"><name>token</name></member>
+    <member refid="true__bpe_8h_1a9b857f7ce4dd3bca5a537e67f77a2b44" kind="variable"><name>unk</name></member>
+    <member refid="true__bpe_8h_1ac33d61fabbeba23ba208eec1f7a14cb2" kind="function"><name>__attribute__</name></member>
   </compound>
   <compound refid="utf8_8c" kind="file"><name>utf8.c</name>
     <member refid="utf8_8c_1a99351866c99dd535b491e8143169f52b" kind="variable"><name>CK_UTF8_WHITESPACE_RANGES</name></member>
