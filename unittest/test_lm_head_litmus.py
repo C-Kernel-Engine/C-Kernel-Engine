@@ -481,7 +481,7 @@ def main():
     if not args.skip_compile:
         manifest = gen_c + ".kernels"
         cc = os.environ.get("CC", detect_cc())
-        cmd = [cc, "-O2", "-Iinclude", gen_c, "-lm", "-o", gen_bin]
+        cmd = [cc, "-O2", "-march=native", "-Iinclude", gen_c, "-lm", "-o", gen_bin]
         if os.path.exists(os.path.join(root, manifest)):
             with open(os.path.join(root, manifest), "r", encoding="utf-8") as f:
                 extra_sources = [line.strip() for line in f if line.strip()]

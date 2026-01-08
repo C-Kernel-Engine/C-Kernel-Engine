@@ -1246,6 +1246,162 @@ def run_pipeline(args: argparse.Namespace):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Interactive Model Selector
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def find_available_models() -> list[dict]:
+    """Find all available GGUF models (local + cached)."""
+    models = []
+
+    # 1. Local GGUF files in project root
+    for gguf in PROJECT_ROOT.glob("*.gguf"):
+        size_mb = gguf.stat().st_size / 1e6
+        if size_mb < 50:  # Skip very small files (vocab only)
+            continue
+        models.append({
+            'type': 'local',
+            'name': gguf.stem,
+            'path': str(gguf),
+            'size_mb': size_mb,
+            'display': f"{gguf.name} ({size_mb:.1f} MB)",
+        })
+
+    # 2. Cached models
+    if CACHE_DIR.exists():
+        for model_dir in CACHE_DIR.iterdir():
+            if not model_dir.is_dir():
+                continue
+
+            # Check for GGUF files
+            gguf_files = list(model_dir.glob("*.gguf"))
+            if gguf_files:
+                gguf = gguf_files[0]
+                size_mb = gguf.stat().st_size / 1e6
+                models.append({
+                    'type': 'cached_gguf',
+                    'name': model_dir.name.replace('--', '/'),
+                    'path': str(gguf),
+                    'size_mb': size_mb,
+                    'display': f"{model_dir.name.replace('--', '/')} ({size_mb:.1f} MB)",
+                })
+            # Check for config.json (HF models)
+            elif (model_dir / "config.json").exists():
+                size_mb = sum(f.stat().st_size for f in model_dir.rglob('*') if f.is_file()) / 1e6
+                models.append({
+                    'type': 'cached_hf',
+                    'name': model_dir.name.replace('--', '/'),
+                    'path': str(model_dir),
+                    'size_mb': size_mb,
+                    'display': f"{model_dir.name.replace('--', '/')} ({size_mb:.1f} MB)",
+                })
+
+    # Sort by size (largest first)
+    models.sort(key=lambda x: -x['size_mb'])
+    return models
+
+
+def interactive_model_select() -> Optional[str]:
+    """Interactive model selection menu."""
+    print()
+    print(f"{C_ORANGE}╔══════════════════════════════════════════════════════════════════════╗{C_RESET}")
+    print(f"{C_ORANGE}║{C_RESET}  {C_BOLD}C-Kernel-Engine v5 - Interactive Model Selector{C_RESET}                     {C_ORANGE}║{C_RESET}")
+    print(f"{C_ORANGE}╚══════════════════════════════════════════════════════════════════════╝{C_RESET}")
+    print()
+
+    models = find_available_models()
+
+    if not models:
+        print(f"  {C_DIM}No models found.{C_RESET}")
+        print()
+        print(f"  {C_BOLD}Options:{C_RESET}")
+        print(f"    1. Download a model from HuggingFace:")
+        print(f"       {C_CYAN}./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf{C_RESET}")
+        print()
+        print(f"    2. Download a GGUF file manually:")
+        print(f"       {C_CYAN}huggingface-cli download Qwen/Qwen2.5-3B-Instruct-GGUF qwen2.5-3b-instruct-q4_k_m.gguf --local-dir .{C_RESET}")
+        print()
+        return None
+
+    print(f"  {C_BOLD}Available Models:{C_RESET}")
+    print()
+
+    for i, model in enumerate(models, 1):
+        type_tag = {
+            'local': f"{C_GREEN}[local]{C_RESET}",
+            'cached_gguf': f"{C_BLUE}[cached]{C_RESET}",
+            'cached_hf': f"{C_CYAN}[HF]{C_RESET}",
+        }.get(model['type'], '')
+        print(f"    {C_BOLD}[{i}]{C_RESET} {type_tag} {model['display']}")
+
+    print()
+    print(f"    {C_DIM}[h] Download from HuggingFace{C_RESET}")
+    print(f"    {C_DIM}[q] Quit{C_RESET}")
+    print()
+
+    try:
+        choice = input(f"  {C_BOLD}Select model (1-{len(models)}):{C_RESET} ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return None
+
+    if choice == 'q' or choice == '':
+        return None
+
+    if choice == 'h':
+        print()
+        print(f"  {C_BOLD}Enter HuggingFace model (examples):{C_RESET}")
+        print(f"    - hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf")
+        print(f"    - Qwen/Qwen2.5-3B-Instruct-GGUF")
+        print(f"    - HuggingFaceTB/SmolLM-135M")
+        print()
+        try:
+            hf_input = input(f"  {C_BOLD}Model:{C_RESET} ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return None
+        return hf_input if hf_input else None
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(models):
+            return models[idx]['path']
+    except ValueError:
+        pass
+
+    print(f"  {C_RED}Invalid selection{C_RESET}")
+    return None
+
+
+def run_interactive(args: argparse.Namespace):
+    """Run interactive model selection and pipeline."""
+    model_path = interactive_model_select()
+
+    if not model_path:
+        return
+
+    print()
+    log(f"Selected: {model_path}", C_GREEN)
+    print()
+
+    # Create args for run_pipeline
+    args.model = model_path
+    args.force_download = False
+    args.force_convert = False
+    args.force_compile = False
+    args.force_inspect = False
+    args.generate_only = False
+    args.test = False
+    args.test_only = False
+    args.inspect_only = False
+    args.debug = False
+    args.parity = False
+    args.codegen = 'v5'
+    args.prompt = None
+
+    run_pipeline(args)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CLI
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1255,20 +1411,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Download GGUF directly (recommended for quantized models)
-  python scripts/ck_run_v5.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf --weight-dtype=q4_k_m
+  # Interactive mode (default - just run with no args)
+  ./ck-v5
+  python scripts/ck_run_v5.py
 
-  # Full HuggingFace model (downloads all files)
-  python scripts/ck_run_v5.py run HuggingFaceTB/SmolLM-135M
+  # Download GGUF directly (recommended for quantized models)
+  ./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
   # Local GGUF file
-  python scripts/ck_run_v5.py run ./model.gguf --weight-dtype=q4_k
+  ./ck-v5 run ./model.gguf
+
+  # Full HuggingFace model (downloads all files)
+  ./ck-v5 run HuggingFaceTB/SmolLM-135M
 
   # Generate code only (inspect before running)
-  python scripts/ck_run_v5.py run Qwen/Qwen2-0.5B --generate-only
+  ./ck-v5 run Qwen/Qwen2-0.5B --generate-only
 
   # Single prompt mode
-  python scripts/ck_run_v5.py run ./model.gguf --prompt "What is 2+2?" --max-tokens 50
+  ./ck-v5 run ./model.gguf --prompt "What is 2+2?" --max-tokens 50
 """
     )
 
@@ -1309,6 +1469,16 @@ Examples:
     run_parser.add_argument('--codegen', choices=['v4', 'v5'], default='v5',
                            help='Codegen version: v5=explicit unrolled (default), v4=loop-based (legacy)')
 
+    # Interactive command (also default when no command given)
+    interactive_parser = subparsers.add_parser('interactive', aliases=['i'],
+                                               help='Interactive model selector (default)')
+    interactive_parser.add_argument('--weight-dtype',
+                                   choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
+                                            'q5_0', 'q5_1', 'q6_k', 'q8_0'],
+                                   help='Weight dtype override')
+    interactive_parser.add_argument('--temperature', type=float, default=0.7)
+    interactive_parser.add_argument('--max-tokens', type=int, default=512)
+
     # List command
     list_parser = subparsers.add_parser('list', help='List cached models')
 
@@ -1318,8 +1488,17 @@ Examples:
 
     args = parser.parse_args()
 
-    if args.command == 'run':
+    # Default to interactive mode if no command given
+    if args.command is None:
+        # Set defaults for interactive mode
+        args.weight_dtype = None
+        args.temperature = 0.7
+        args.max_tokens = 512
+        run_interactive(args)
+    elif args.command == 'run':
         run_pipeline(args)
+    elif args.command in ('interactive', 'i'):
+        run_interactive(args)
     elif args.command == 'list':
         if CACHE_DIR.exists():
             models = list(CACHE_DIR.iterdir())
