@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlashAttentionAnalysis | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Portable model representation</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="active">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<h1>Flash Attention: Performance Comparison</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0" 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Key Finding</strong><br>
+        Performance is <strong>workload-dependent</strong>: C-Kernel and llama.cpp each win 50% of tested cases. C-Kernel tends to win with long contexts (1K-8K tokens) and many heads (32+). llama.cpp tends to win with few heads (4-8) and medium contexts (256-512 tokens).
+    </div>
+</div>
+
+<h2>Executive Summary</h2>
+
+<p>This analysis compares attention implementations: C-Kernel-Engine's standard approach vs llama.cpp's ggml flash attention. <strong>Each implementation wins 50% of tested workloads</strong>, with clear patterns based on context length and head count.</p>
+
+<p>Performance varies significantly by workload characteristics, and understanding these trade-offs helps guide optimization efforts.</p>
+
+<h2>1. Custom CPU Implementation (Not BLAS)</h2>
+
+<div class="card">
+    <h3>Philosophy: Own the Hot Path</h3>
+    <p>Unlike PyTorch/TensorFlow which delegate to MKL/Accelerate, llama.cpp writes attention kernels specifically optimized for transformer inference:</p>
+
+    <ul>
+        <li><strong>No BLAS dependency</strong>: Direct implementation in <code>ggml_compute_forward_flash_attn_ext_*</code></li>
+        <li><strong>Inference-first design</strong>: Optimized for the specific attention patterns in decoder-only models</li>
+        <li><strong>Memory-layout aware</strong>: Designed for head-major and token-major layouts common in LLM inference</li>
+    </ul>
+
+    <pre><code class="language-c">// ggml/src/ggml-cpu/ops.cpp
+void ggml_compute_forward_flash_attn_ext(...) {
+    // Custom CPU implementation, not MKL/Accelerate
+    // Uses ggml_vec_dot/ggml_vec_mad directly
+}</code></pre>
+</div>
+
+<h2>2. SIMD Vector Operations: ggml_vec_dot/ggml_vec_mad</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Vector Dot Product (ggml_vec_dot)</h3>
+        <p>Specialized for attention computation with AVX/AVX-512 intrinsics:</p>
+
+        <ul>
+            <li><strong>AVX-512 path</strong>: 16 floats per iteration using <code>_mm512_*</code> intrinsics</li>
+            <li><strong>AVX2 path</strong>: 8 floats per iteration using <code>_mm256_*</code> intrinsics</li>
+            <li><strong>Accumulator pattern</strong>: Fused multiply-add for Q×Kᵀ computation</li>
+            <li><strong>Horizontal reduction</strong>: Efficient sum across vector lanes</li>
+        </ul>
+
+        <pre><code class="language-c">// Simplified AVX-512 version
+__m512 acc = _mm512_setzero_ps();
+for (int i = 0; i &lt; n; i += 16) {
+    __m512 va = _mm512_loadu_ps(&a[i]);
+    __m512 vb = _mm512_loadu_ps(&b[i]);
+    acc = _mm512_fmadd_ps(va, vb, acc); // fused multiply-add
+}
+float sum = _mm512_reduce_add_ps(acc);</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>Vector Multiply-Add (ggml_vec_mad)</h3>
+        <p>For attention score normalization and value multiplication:</p>
+
+        <ul>
+            <li><strong>Fused operations</strong>: (a * b) + c in single instruction</li>
+            <li><strong>In-place updates</strong>: Avoids temporary arrays</li>
+            <li><strong>Cache-friendly</strong>: Streamed memory access patterns</li>
+        </ul>
+
+        <pre><code class="language-c">// Softmax application
+for (int i = 0; i &lt; n; i += 16) {
+    __m512 scores = _mm512_loadu_ps(&score[i]);
+    __m512 max_val = _mm512_broadcastss_ps(max_scalar);
+    scores = _mm512_sub_ps(scores, max_val);
+    scores = _mm512_exp_ps(scores);
+    _mm512_storeu_ps(&score[i], scores);
+}</code></pre>
+    </div>
+</div>
+
+<h2>3. Threadpool + Chunk Scheduler</h2>
+
+<div class="card">
+    <h3>Work Partitioning Strategy</h3>
+    <p>ggml uses a sophisticated thread scheduling approach that differs from naive OpenMP:</p>
+
+    <h4>3.1 Row-Based Distribution</h4>
+    <pre><code class="language-c">const int nth = params->nth;  // total threads
+const int ith = params->ith;  // this thread's index
+
+// Divide rows evenly among threads
+const int nr = ggml_nrows(src0);
+const int dr = (nr + nth - 1) / nth;  // rows per thread
+const int ir0 = dr * ith;              // start row for this thread
+const int ir1 = MIN(ir0 + dr, nr);     // end row for this thread</code></pre>
+
+    <h4>3.2 Chunk-Based Attention</h4>
+    <p>For long sequences, attention is computed in chunks to fit L2/L3 cache:</p>
+
+    <pre><code class="language-c">// Process attention in cache-sized chunks
+const int chunk_size = 256;  // Fits in L2 cache
+for (int k_start = 0; k_start &lt; T_k; k_start += chunk_size) {
+    int k_end = MIN(k_start + chunk_size, T_k);
+
+    // Each thread processes its row range for this chunk
+    for (int i = ir0; i &lt; ir1; ++i) {
+        // Compute Q[i] × K[k_start:k_end]ᵀ
+        compute_chunk(i, k_start, k_end);
+    }
+}</code></pre>
+
+    <h4>3.3 Benefits</h4>
+    <ul>
+        <li><strong>Load balancing</strong>: Even distribution of work across cores</li>
+        <li><strong>Cache locality</strong>: Chunks fit in L2/L3, reducing memory bandwidth</li>
+        <li><strong>NUMA-aware</strong>: Thread binding to specific cores reduces cross-socket traffic</li>
+    </ul>
+</div>
+
+<h2>4. Type-Specific Optimizations</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>4.1 FP16 Path</h3>
+        <p>Half-precision optimization for memory bandwidth:</p>
+
+        <pre><code class="language-c">case GGML_TYPE_F16:
+    // Specialized FP16 SIMD path
+    // Uses F16C instructions (_mm256_cvtph_ps)
+    for (int i = 0; i &lt; n; i += 8) {
+        __m256i packed = _mm_loadu_si256((__m256i*)&src[i]);
+        __m256 fp32 = _mm256_cvtph_ps(packed);
+        // ... vector operations ...
+    }</code></pre>
+
+        <p><strong>Benefits</strong>:</p>
+        <ul>
+            <li>2x memory bandwidth efficiency</li>
+            <li>Faster cache loading</li>
+            <li>Reduced memory footprint (useful for large models)</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>4.2 Quantized Types</h3>
+        <p>Optimized paths for Q4_0, Q4_1, Q5_0, Q6_K, Q8_0:</p>
+
+        <pre><code class="language-c">case GGML_TYPE_Q4_0:
+case GGML_TYPE_Q4_1:
+    // Dequantize on-the-fly during computation
+    ggml_to_float_t dequant_row = ggml_get_type_traits(type)->to_float;
+
+    for (int i = 0; i &lt; n; i += block_size) {
+        // Dequantize 32/64 elements
+        __m256i q = _mm_loadu_si128((__m256i*)&src[i]);
+
+        // Convert to FP32
+        float f = dequantize_and_compute(q);
+
+        // Accumulate in attention score
+        acc = _mm256_fmadd_ps(f, weight, acc);
+    }</code></pre>
+
+        <p><strong>Benefits</strong>:</p>
+        <ul>
+            <li>No separate dequantization pass</li>
+            <li>Compute during conversion</li>
+            <li>4x (Q4) or 8x (Q8) memory savings</li>
+        </ul>
+    </div>
+</div>
+
+<h2>5. Memory Access Patterns</h2>
+
+<div class="card">
+    <h3>Cache-Friendly Tiling</h3>
+    <p>ggml's flash attention uses multi-level tiling to maximize cache utilization:</p>
+
+    <h4>5.1 L1 Cache Tiling (32KB)</h4>
+    <pre><code class="language-c">// Tile size chosen to fit in L1 cache (32KB)
+const int TILE_Q = 32;   // Query tokens per tile
+const int TILE_K = 32;   // Key tokens per tile
+
+// Process tiles that fit in L1
+for (int qt = 0; qt &lt; T_q; qt += TILE_Q) {
+    for (int kt = 0; kt &lt; T_k; kt += TILE_K) {
+        // Load Q[qt:qt+TILE_Q] into L1
+        // Load K[kt:kt+TILE_K] into L1
+        compute_tile(qt, kt);
+    }
+}</code></pre>
+
+    <h4>5.2 L2/L3 Cache Tiling (256KB/1MB)</h4>
+    <pre><code class="language-c">// Larger tiles for L2/L3
+const int BLOCK_HEAD = 8;  // Heads per block (fits in L2)
+const int BLOCK_DIM = 64;  // Head dimension per block
+
+// Block decomposition
+for (int h0 = 0; h0 &lt; H; h0 += BLOCK_HEAD) {
+    for (int d0 = 0; d0 &lt; D; d0 += BLOCK_DIM) {
+        // Each block fits in L2/L3
+        process_block(h0, d0);
+    }
+}</code></pre>
+
+    <h4>5.3 Benefits</h4>
+    <ul>
+        <li><strong>L1 hit rate &gt; 90%</strong>: Frequent data stays in L1</li>
+        <li><strong>Reduced memory bandwidth</strong>: Each value loaded once, used multiple times</li>
+        <li><strong>NUMA locality</strong>: Data stays close to computing core</li>
+    </ul>
+</div>
+
+<h2>6. Comparison: ggml vs. C-Kernel-Engine</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Aspect</th>
+            <th>ggml (llama.cpp)</th>
+            <th>C-Kernel-Engine (Current)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Implementation</strong></td>
+            <td>Custom CPU SIMD in <code>ops.cpp</code></td>
+            <td>C with inline SIMD in <code>attention_kernels.c</code></td>
+        </tr>
+        <tr>
+            <td><strong>Threading</strong></td>
+            <td>Threadpool with chunk scheduling, NUMA-aware</td>
+            <td>OpenMP parallel for (simpler)</td>
+        </tr>
+        <tr>
+            <td><strong>SIMD Width</strong></td>
+            <td>AVX-512 (16 floats), AVX2 (8 floats)</td>
+            <td>AVX-512, AVX2, generic fallback</td>
+        </tr>
+        <tr>
+            <td><strong>Quantization</strong></td>
+            <td>Specialized dequant+compute fused paths</td>
+            <td>Dequantize separately, then compute</td>
+        </tr>
+        <tr>
+            <td><strong>Memory Layout</strong></td>
+            <td>Head-major optimized, multiple variants</td>
+            <td>Head-major and token-major</td>
+        </tr>
+        <tr>
+            <td><strong>Caching Strategy</strong></td>
+            <td>Multi-level tiling (L1/L2/L3 aware)</td>
+            <td>Basic blocking, less aggressive tiling</td>
+        </tr>
+        <tr>
+            <td><strong>FP16 Support</strong></td>
+            <td>F16C intrinsics, memory bandwidth optimized</td>
+            <td>Basic FP16 support</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>7. Key Optimizations to Borrow</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>7.1 Fused Dequant+Compute</h3>
+        <p>Instead of:</p>
+        <pre><code class="language-c">// Separate dequantization
+for (int i = 0; i &lt; n; i++) {
+    float f = dequantize(src[i]);
+    acc += f * weight[i];
+}</code></pre>
+
+        <p>Use:</p>
+        <pre><code class="language-c">// Fused path
+for (int i = 0; i &lt; n; i += BLOCK) {
+    auto q = load_quant_block(src[i]);
+    acc = vector_fmadd(q, weight[i], acc);
+}</code></pre>
+
+        <p><strong>Benefit</strong>: Saves memory bandwidth, reduces temp storage</p>
+    </div>
+
+    <div class="card">
+        <h3>7.2 Chunk-Based Threading</h3>
+        <p>Replace naive OpenMP:</p>
+        <pre><code class="language-c">#pragma omp parallel for
+for (int i = 0; i &lt; T; i++) {
+    compute_attention_row(i);
+}</code></pre>
+
+        <p>With:</p>
+        <pre><code class="language-c">// Each thread gets chunk of rows
+int chunk = T / nth;
+int start = ith * chunk;
+int end = (ith == nth-1) ? T : (ith+1) * chunk;
+
+for (int i = start; i &lt; end; i += CACHE_TILE) {
+    // Process in cache-sized tiles
+    process_tile(i, CACHE_TILE);
+}</code></pre>
+
+        <p><strong>Benefit</strong>: Better cache locality, reduced false sharing</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>7.3 NUMA-Aware Memory Allocation</h3>
+    <pre><code class="language-c">// Allocate on local NUMA node
+float* data = numa_alloc_onnode(
+    size * sizeof(float),
+    numa_node_of_cpu(sched_getcpu())
+);
+
+// Thread binding
+cpu_set_t cpuset;
+CPU_ZERO(&cpuset);
+CPU_SET(ith, &cpuset);
+pthread_setaffinity_np(pthread_self(),
+                       sizeof(cpu_set_t), &cpuset);</code></pre>
+
+    <p><strong>Benefit</strong>: Eliminates cross-socket memory traffic on multi-socket systems</p>
+</div>
+
+<h2>8. Performance Reality Check: When ggml is Faster (and When It's Not)</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Important Nuance</strong><br>
+        Performance varies significantly by workload! Our tests show ggml is sometimes slower (0.66x-0.82x) and sometimes faster (1.66x-1.91x). The "2-3x faster" claim depends on specific conditions.
+    </div>
+</div>
+
+<h3>8.1 Actual Performance Data</h3>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Kernel</th>
+                <th>llama.cpp (us)</th>
+                <th>C-Kernel (us)</th>
+                <th>Speedup</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>decode_4h_512</code> (Tq=1,Tk=512,H=4,D=64)</td>
+                <td>80.7</td>
+                <td>107.2</td>
+                <td style="color: #f66;">0.75x (slower)</td>
+            </tr>
+            <tr>
+                <td><code>decode_8h_512</code> (Tq=1,Tk=512,H=8,D=64)</td>
+                <td>92.9</td>
+                <td>141.7</td>
+                <td style="color: #f66;">0.66x (slower)</td>
+            </tr>
+            <tr>
+                <td><code>decode_32h_512</code> (Tq=1,Tk=512,H=32,D=64)</td>
+                <td>1301.1</td>
+                <td>720.7</td>
+                <td style="color: #6f6;">1.81x (faster)</td>
+            </tr>
+            <tr>
+                <td><code>decode_4h_1k</code> (Tq=1,Tk=1024,H=4,D=64)</td>
+                <td>242.6</td>
+                <td>145.9</td>
+                <td style="color: #6f6;">1.66x (faster)</td>
+            </tr>
+            <tr>
+                <td><code>decode_4h_8k</code> (Tq=1,Tk=8192,H=4,D=64)</td>
+                <td>3258.6</td>
+                <td>1701.7</td>
+                <td style="color: #6f6;">1.91x (faster)</td>
+            </tr>
+            <tr>
+                <td><code>decode_4h_hd128</code> (Tq=1,Tk=256,H=4,D=128)</td>
+                <td>59.1</td>
+                <td>72.5</td>
+                <td style="color: #f66;">0.82x (slower)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>8.2 Why Performance Varies</h3>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>When C-Kernel is Faster (1.66x-1.91x)</h3>
+        <ul>
+            <li><strong>Long contexts (Tk &gt;= 1024)</strong>: OpenMP parallel for scales well with sequence length</li>
+            <li><strong>Many heads (H &gt;= 32)</strong>: More parallel work per token</li>
+            <li><strong>Medium head dims (D=64)</strong>: Workload fits well with our approach</li>
+        </ul>
+        <p><em>Our simpler OpenMP approach works well for these workloads. No thread scheduling overhead when work is substantial.</em></p>
+    </div>
+
+    <div class="card">
+        <h3>When llama.cpp is Faster (0.66x-0.82x)</h3>
+        <ul>
+            <li><strong>Few heads (H &lt;= 8)</strong>: ggml's threadpool handles this better</li>
+            <li><strong>Medium contexts (Tk &lt;= 512)</strong>: Custom scheduling wins here</li>
+            <li><strong>Large head dims (D=128)</strong>: ggml's optimizations for larger dimensions</li>
+        </ul>
+        <p><em>ggml's custom threadpool + chunking is advantageous for these specific patterns.</em></p>
+    </div>
+</div>
+
+<h3>8.3 Key Insights</h3>
+
+<div class="card">
+    <ol>
+        <li><strong>50/50 Split</strong>: C-Kernel and llama.cpp each win 3 out of 6 tested workloads</li>
+        <li><strong>Context Length Matters</strong>: C-Kernel wins with long contexts (1K-8K), llama.cpp wins with medium (256-512)</li>
+        <li><strong>Head Count Pattern</strong>: C-Kernel wins with many heads (32), llama.cpp wins with few heads (4-8)</li>
+        <li><strong>No Universal Winner</strong>: Performance depends on workload characteristics, not implementation quality</li>
+    </ol>
+</div>
+
+<h3>8.4 What This Means for C-Kernel-Engine</h3>
+
+<div class="card">
+    <h4>Where C-Kernel Wins</h4>
+    <ul>
+        <li><strong>Long Contexts</strong>: 1K-8K tokens benefit from our OpenMP approach</li>
+        <li><strong>Many Heads</strong>: 32+ heads show good parallelization</li>
+        <li><strong>Simplicity</strong>: OpenMP parallel for is easier to maintain</li>
+        <li><strong>No Thread Overhead</strong>: Works well for appropriate workloads</li>
+    </ul>
+
+    <h4>Where llama.cpp Wins</h4>
+    <ul>
+        <li><strong>Few Heads</strong>: 4-8 heads benefit from their threading strategy</li>
+        <li><strong>Medium Contexts</strong>: 256-512 tokens show ggml's strength</li>
+        <li><strong>Large Head Dims</strong>: 128-dim heads outperform our approach</li>
+    </ul>
+
+    <h4>Optimization Strategy</h4>
+    <ul>
+        <li><strong>Understand Your Workload</strong>: Choose approach based on context length and head count</li>
+        <li><strong>Target Weaknesses</strong>: Optimize for few-head, medium-context cases</li>
+        <li><strong>Learn from ggml</strong>: Their threading strategy works well for specific patterns</li>
+    </ul>
+</div>
+
+<h2>9. Performance Breakdown: What Actually Matters</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Memory Bandwidth (When It Matters)</h3>
+        <ul>
+            <li><strong>Long sequences (8K+)</strong>: Tiling reduces DRAM bandwidth by 2-3x</li>
+            <li><strong>Quantized models</strong>: 4x less data = significant win</li>
+            <li><strong>Small sequences</strong>: Data fits in cache, bandwidth not the bottleneck</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>Threading Overhead (When It Hurts)</h3>
+        <ul>
+            <li><strong>Short sequences</strong>: Thread creation/scheduling overhead &gt; compute time</li>
+            <li><strong>Few heads</strong>: Not enough parallel work</li>
+            <li><strong>Solution</strong>: Use fewer threads or stick with OpenMP for small cases</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>Cache Utilization (Always Matters)</h3>
+        <ul>
+            <li><strong>L1 hit rate</strong>: Multi-level tiling improves locality</li>
+            <li><strong>Register pressure</strong>: Wider SIMD (AVX-512) needs careful register allocation</li>
+            <li><strong>Prefetch</strong>: Regular memory patterns help hardware prefetcher</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>SIMD Efficiency (Architecture-Dependent)</h3>
+        <ul>
+            <li><strong>AVX-512 CPUs</strong>: Can see 2x throughput vs AVX2</li>
+            <li><strong>Older CPUs</strong>: Less benefit from SIMD optimizations</li>
+            <li><strong>Fused ops</strong>: FMA instructions reduce latency</li>
+        </ul>
+    </div>
+</div>
+
+<h2>10. Implementation Roadmap for C-Kernel-Engine</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    </div>
+    <div>
+        <strong>Balanced Approach</strong><br>
+        Each implementation wins 50% of workloads. Optimize based on your target use case rather than chasing universal performance.
+    </div>
+</div>
+
+<div class="card">
+    <h3>Phase 1: Address Weaknesses (Priority: Medium)</h3>
+    <ol>
+        <li><strong>Few Heads (4-8)</strong>: Investigate why llama.cpp wins here</li>
+        <li><strong>Medium Contexts (256-512)</strong>: Add specialized handling</li>
+        <li><strong>Large Head Dims (128)</strong>: Optimize for this configuration</li>
+    </ol>
+
+    <h3>Phase 2: Learn from ggml (Priority: Low)</h3>
+    <ol>
+        <li>Study their threadpool strategy for few-head cases</li>
+        <li>Implement chunk-based distribution for medium contexts</li>
+        <li>Test fused operations on quantized types</li>
+    </ol>
+
+    <h3>Phase 3: Strengthen Wins (Priority: Very Low)</h3>
+    <ol>
+        <li>Further optimize for long contexts (1K-8K)</li>
+        <li>Enhance many-head (32+) parallelization</li>
+        <li>NUMA-aware allocation for server deployments</li>
+    </ol>
+</div>
+
+<h2>11. Conclusion</h2>
+
+<p>This analysis reveals that <strong>neither implementation universally wins</strong>. Key takeaways:</p>
+
+<ol>
+    <li><strong>50/50 Split</strong>: C-Kernel and llama.cpp each win 3 out of 6 tested workloads</li>
+    <li><strong>Context Length Pattern</strong>: C-Kernel wins with long contexts (1K-8K), llama.cpp with medium (256-512)</li>
+    <li><strong>Head Count Matters</strong>: C-Kernel wins with many heads (32), llama.cpp with few heads (4-8)</li>
+    <li><strong>Workload-Specific Optimization</strong>: Choose approach based on your specific use case</li>
+    <li><strong>Learn from Each Other</strong>: Both implementations have strengths to learn from</li>
+</ol>
+
+<p><strong>Bottom line</strong>: Performance is workload-dependent, not implementation-dependent. Understand your context length and head count to choose the right approach. Neither is "better" - they're optimized for different scenarios.</p>
+
+<h2>References</h2>
+
+<ul>
+    <li><a href="https://github.com/ggerganov/llama.cpp/blob/master/ggml/src/ggml-cpu/ops.cpp">llama.cpp: ggml-cpu/ops.cpp</a> - Flash attention implementation</li>
+    <li><a href="https://github.com/ggerganov/llama.cpp/blob/master/ggml/src/ggml-cpu/vec.h">ggml: vec.h</a> - SIMD vector operations</li>
+    <li><a href="https://github.com/ggerganov/llama.cpp/tree/master/ggml/src">ggml: CPU optimizations</a> - Complete CPU kernel suite</li>
+</ul>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-09</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

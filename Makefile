@@ -377,6 +377,15 @@ TEST_ENV += MKL_DEBUG_CPU_TYPE=5
 endif
 endif
 
+FLASH_ATTN_LONG_CONTEXTS ?= 51200
+FLASH_ATTN_LONG_HEADS ?= 32
+FLASH_ATTN_LONG_KV_HEADS ?= $(FLASH_ATTN_LONG_HEADS)
+FLASH_ATTN_TILE_K ?= 32
+FLASH_ATTN_FAST_EXP ?= 1
+FLASH_ATTN_OMP_THREADS ?= $(shell nproc 2>/dev/null || echo 1)
+FLASH_ATTN_LLAMA_PERF ?= 1
+FLASH_ATTN_LLAMA_PERF_MAX_TK ?= 51200
+
 all: $(BUILD_DIR) $(LIB)
 
 $(BUILD_DIR):
@@ -702,6 +711,7 @@ unittest:
 # Typo aliases
 uittest: unittest
 unittest-show: unittest
+show_test: showtests
 
 # Show all test-related make targets
 showtests:
@@ -714,6 +724,7 @@ showtests:
 	@echo "  make test             Run core kernel tests"
 	@echo "  make test-bf16        Run BF16 kernel tests"
 	@echo "  make test-quant       Run quantization kernel tests"
+	@echo "  make test-flash-attention  Run flash attention tests (50K+ contexts)"
 	@echo "  make nightly          Run full test suite (doesn't stop on failure)"
 	@echo ""
 	@echo "Per-Kernel Libraries:"
@@ -880,6 +891,21 @@ test-v4-q4k:
 	  $(if $(V4_LAYERS),--layers "$(V4_LAYERS)") \
 	  $(if $(V4_VALIDATE),--validate) \
 	  $(if $(V4_FULL),--full)
+
+test-flash-attention: $(LIB)
+	@echo "Running flash attention tests (long context enforced)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		CK_FLASH_ATTN_LONG_CONTEXTS=$(FLASH_ATTN_LONG_CONTEXTS) \
+		CK_FLASH_ATTN_LONG_HEADS=$(FLASH_ATTN_LONG_HEADS) \
+		CK_FLASH_ATTN_LONG_KV_HEADS=$(FLASH_ATTN_LONG_KV_HEADS) \
+		CK_FLASH_ATTN_TILE_K=$(FLASH_ATTN_TILE_K) \
+		CK_FLASH_ATTN_FAST_EXP=$(FLASH_ATTN_FAST_EXP) \
+		CK_FLASH_ATTN_OMP_THREADS=$(FLASH_ATTN_OMP_THREADS) \
+		CK_FLASH_ATTN_LLAMA_PERF=$(FLASH_ATTN_LLAMA_PERF) \
+		CK_FLASH_ATTN_LLAMA_PERF_MAX_TK=$(FLASH_ATTN_LLAMA_PERF_MAX_TK) \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_flash_attention.py
+
+test_flash_attention: test-flash-attention
 
 # GEMM benchmark comparing CKernel (Native + MKL if available) vs PyTorch
 bench_gemm:
@@ -1122,6 +1148,13 @@ test-stress: $(LIB)
 # Profiling targets
 PROFILE_CFLAGS := -O0 -g
 PROFILE_PERF_CFLAGS := -O3 -fno-omit-frame-pointer -g
+FLASH_ATTN_TK ?= 8192
+FLASH_ATTN_H ?= 4
+FLASH_ATTN_HKV ?= 4
+FLASH_ATTN_DH ?= 64
+FLASH_ATTN_ITERS ?= 200
+FLASH_ATTN_WARMUP ?= 20
+FLASH_ATTN_THREADS ?= $(shell nproc 2>/dev/null || echo 1)
 
 profile-memory: $(BUILD_DIR)
 	@echo "Building with debug symbols..."
@@ -1154,6 +1187,21 @@ profile-cpu: $(BUILD_DIR)
 		--tokens build/tiny_tokens.bin --out-logits build/tiny_logits.bin
 	@echo "Profile saved to $(BUILD_DIR)/perf.data"
 	perf report -i $(BUILD_DIR)/perf.data --stdio --sort=overhead | head -30
+
+profile-flash-attn: $(BUILD_DIR)
+	@echo "Building with frame pointers..."
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_PERF_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	@echo "Building flash attention microbenchmark..."
+	$(CC) $(PROFILE_PERF_CFLAGS) -march=native -fopenmp $(AVX_FLAGS) $(SSSE3_FLAGS) -Iinclude \
+		benchmarks/perf_flash_attn_micro.c -L$(BUILD_DIR) -lckernel_engine -lm \
+		-o $(BUILD_DIR)/perf_flash_attn_micro
+	@echo "Recording with perf..."
+	OMP_NUM_THREADS=$(FLASH_ATTN_THREADS) LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		perf record -g -F 99 -o $(BUILD_DIR)/perf_flash_attn.perf \
+		$(BUILD_DIR)/perf_flash_attn_micro $(FLASH_ATTN_TK) $(FLASH_ATTN_H) $(FLASH_ATTN_HKV) \
+		$(FLASH_ATTN_DH) $(FLASH_ATTN_ITERS) $(FLASH_ATTN_WARMUP)
+	@echo "Profile saved to $(BUILD_DIR)/perf_flash_attn.perf"
+	perf report -i $(BUILD_DIR)/perf_flash_attn.perf --stdio --sort=overhead | head -30
 
 FLAMEGRAPH_DIR ?= $(HOME)/Programs/FlameGraph
 
@@ -1300,6 +1348,7 @@ help:
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make profile-memory   Valgrind memcheck"
 	@echo "  make profile-cpu      perf CPU profiler"
+	@echo "  make profile-flash-attn  perf flash-attn microbench"
 	@echo "  make profile-cache    Valgrind cachegrind"
 	@echo "  make flamegraph       Generate SVG flamegraph"
 	@echo "  make bench_gemm       GEMM benchmarks (Native/MKL/PyTorch)"
@@ -1915,4 +1964,4 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant unittest unittest-show help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history

@@ -2,6 +2,7 @@ var files_dup =
 [
     [ "add_kernels_bf16.c", "add__kernels__bf16_8c.html", "add__kernels__bf16_8c" ],
     [ "attention_decode_fused.c", "attention__decode__fused_8c.html", "attention__decode__fused_8c" ],
+    [ "attention_flash_true.c", "attention__flash__true_8c.html", "attention__flash__true_8c" ],
     [ "attention_kernels.c", "attention__kernels_8c.html", "attention__kernels_8c" ],
     [ "backend_native.c", "backend__native_8c.html", "backend__native_8c" ],
     [ "bf16_utils.h", "bf16__utils_8h.html", "bf16__utils_8h" ],

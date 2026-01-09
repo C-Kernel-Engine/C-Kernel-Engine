@@ -1,6 +1,7 @@
 var ckernel__orchestration_8c =
 [
     [ "ck_add_inplace", "ckernel__orchestration_8c.html#a0020aef4ce512b3840b824a46e206dca", null ],
+    [ "ck_attention_flash_decode_wrapper", "ckernel__orchestration_8c.html#aac849c8be1c936169d2f525ac0f3d87e", null ],
     [ "ck_attention_project_head_major", "ckernel__orchestration_8c.html#a2afc01d06448f40b94c48a51a6951dc5", null ],
     [ "ck_attention_project_head_major_backward", "ckernel__orchestration_8c.html#add4c3ac196a25f481496bf69f32a9ac6", null ],
     [ "ck_attention_project_head_major_q4_k", "ckernel__orchestration_8c.html#a4369f2c106b80c1888b99fe709b07f6c", null ],

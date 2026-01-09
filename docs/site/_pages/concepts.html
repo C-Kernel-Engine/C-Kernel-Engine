@@ -262,7 +262,14 @@ Online (Flash):
         3. Add new block contribution: sum += sum(exp(block - m_new))
         4. Update running output with correction factor
     </pre>
-    <p><strong>Note:</strong> Flash Attention is primarily a GPU optimization. On CPU, the memory hierarchy is different, so standard tiled attention often suffices.</p>
+    <p><strong>Key Insight:</strong> Flash Attention reduces memory traffic from O(N²) to O(N), making it valuable for any hardware where memory bandwidth is a bottleneck. The algorithmic improvement (online softmax + tiling) applies to both CPU and GPU.</p>
+</div>
+
+<div class="card card-blue">
+    <h3>📊 Performance Analysis: CPU Flash Attention</h3>
+    <p>For a detailed comparison of CPU attention implementations (including benchmarks vs llama.cpp's ggml), see:</p>
+    <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
+    <p><small>Covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads (small vs large models, different context lengths).</small></p>
 </div>
 
 <hr>

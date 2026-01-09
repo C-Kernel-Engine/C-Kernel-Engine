@@ -846,6 +846,7 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -1120,16 +1121,25 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-08 13:20</span>
+        <span class="folder-updated">Updated: 2026-01-09 12:00</span>
     </div>
     <pre class="tree-output">
 .
+|-- analysis
+|   |-- comprehensive_implementation_plan.md
+|   |-- CORRECTED_performance_analysis.md
+|   |-- flash_attention_and_quantization.md
+|   |-- flash_attention_implementation_plan.md
+|   |-- fused_kernels_comparison.md
+|   |-- implementation_status.md
+|   `-- performance_analysis_detailed.md
 |-- assets
 |   `-- cover_image.png
 |-- benchmarks
 |   |-- bench_gemm_vs_onednn.c
 |   |-- bench_gemm_vs_pytorch.py
 |   |-- compare_gemm.py
+|   |-- perf_flash_attn_micro.c
 |   |-- perf_gemm_micro.c
 |   |-- perf_q4k
 |   `-- perf_q4k.c
@@ -1159,6 +1169,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- decisions.html
 |   |   |-- deterministic-memory.html
 |   |   |-- developer-guide.html
+|   |   |-- flash_attention.html
 |   |   |-- gemm-optimization.html
 |   |   |-- gguf-bump.html
 |   |   |-- gguf-conversion.html
@@ -1222,7 +1233,9 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- tokenizer-hash-vs-trie.svg
 |   |-- tokenizer.md
 |   |-- tokenizer-performance-comparison.svg
-|   `-- v4-design.md
+|   |-- v4-design.md
+|   |-- v6_plan_inkscape.svg
+|   `-- v6_plan.svg
 |-- errata
 |   `-- smolm.md
 |-- examples
@@ -1742,7 +1755,10 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- Screenshot 2026-01-02 at 05-45-04 Upate ci fix · antshiv_C-Kernel-Engine@81d8a45.png
 |   |-- Screenshot 2026-01-02 at 07-08-43 TestReport C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-03 at 06-49-51 SYS-751A-I Tower_5U SuperWorkstation Products Supermicro.png
-|   `-- Screenshot 2026-01-08 at 07-01-03 Tokenizer C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-08 at 07-01-03 Tokenizer C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-09 at 10-44-11 .png
+|   |-- Screenshot 2026-01-09 at 11-43-04 .png
+|   `-- Screenshot 2026-01-09 at 11-43-12 .png
 |-- scripts
 |   |-- analyze_parity.py
 |   |-- build_ir_v2.py
@@ -1784,12 +1800,17 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- nightly_runner.py
 |   |-- optimization_status.py
 |   |-- parallel_planner.py
+|   |-- perf_decode_simple.c
+|   |-- perf_loop.sh
+|   |-- profile_decode.py
+|   |-- profile_perf.py
 |   |-- q4_k_quantize.py
 |   |-- quant_types.py
 |   |-- run_all_tests.sh
 |   |-- run_full_validation.sh
 |   |-- run_litmus_demo.sh
 |   |-- run_parity_smoketest.sh
+|   |-- run_perf.sh
 |   |-- smollm_forward_parity.py
 |   |-- smollm_layer_stack_diff.py
 |   |-- smollm_layer_stage_diff.py
@@ -1821,6 +1842,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- kernels
 |   |   |-- add_kernels_bf16.c
 |   |   |-- attention_decode_fused.c
+|   |   |-- attention_flash_true.c
 |   |   |-- attention_kernels.c
 |   |   |-- dequant_kernels.c
 |   |   |-- embedding_kernels_bf16.c
@@ -1896,6 +1918,9 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   `-- ck_tokenizer_v2.c
 |   |-- v4_legacy
 |   |   `-- ckernel_model_load_v4.c
+|   |-- v6
+|   |   |-- ckernels
+|   |   `-- scripts
 |   |-- backend_native.c
 |   |-- ck_cli_v5.c
 |   |-- ckernel_alloc.c
@@ -1939,6 +1964,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- bf16_utils.py
 |   |-- build_dequant_test.sh
 |   |-- compare_outputs.py
+|   |-- flash_attention_omp_wrapper.c
 |   |-- generate_reference_data.py
 |   |-- lib_loader.py
 |   |-- REGRESSION_TESTS.md
@@ -1953,6 +1979,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_embedding_parity.py
 |   |-- test_embedding.py
 |   |-- test_embedding_runtime.py
+|   |-- test_flash_attention.py
 |   |-- test_fused_attention_decode.py
 |   |-- test_fused_swiglu_decode.py
 |   |-- test_gelu.py
@@ -1993,6 +2020,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_swiglu.py
 |   |-- test_tokenizer_full_parity.py
 |   |-- test_tokenizer_gguf_parity.py
+|   |-- test_tokenizer_llamacpp.py
 |   |-- test_tokenizer_multi_model.py
 |   |-- test_tokenizer.py
 |   |-- test_tokenizer_qwen_parity.py
@@ -2033,6 +2061,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- small10mb.config.json
 |-- smolLM-135.json
 |-- SmolLM-1.7B-Instruct.Q4_K_M.gguf
+|-- test_error.txt
 |-- TESTING.md
 |-- test_out.log
 |-- test_q4k_packing.py
@@ -2046,7 +2075,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- weights.bump
 `-- weights_manifest.json
 
-147 directories, 774 files
+151 directories, 798 files
 </pre>
 </div>
 
@@ -2298,7 +2327,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-09</p>
             </div>
         </div>
     </footer>

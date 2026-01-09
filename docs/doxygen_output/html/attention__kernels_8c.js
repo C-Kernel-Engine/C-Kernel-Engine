@@ -12,7 +12,7 @@ var attention__kernels_8c =
     [ "attention_forward_causal_head_major_gqa_bf16", "attention__kernels_8c.html#af749b0ec6a9cc8a63033fa2069759722", null ],
     [ "attention_forward_causal_head_major_gqa_exact", "attention__kernels_8c.html#a04febaa686747fdfad9e915b627a0915", null ],
     [ "attention_forward_causal_head_major_gqa_flash", "attention__kernels_8c.html#aac305a28084fe73b2264ae57613ba3ea", null ],
-    [ "attention_forward_decode_head_major_gqa_flash", "attention__kernels_8c.html#a84803f8c5509c325dd6b9feec50a0493", null ],
+    [ "attention_forward_decode_head_major_gqa_regular", "attention__kernels_8c.html#a935728e009d1712976ed3cff71f50387", null ],
     [ "convert_bf16_tensor", "attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5", null ],
     [ "qkv_index", "attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1", null ],
     [ "score_index", "attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06", null ]

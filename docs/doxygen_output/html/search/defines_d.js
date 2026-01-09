@@ -1,9 +1,9 @@
 var searchData=
 [
-  ['qk4_5f0_3537',['QK4_0',['../ckernel__quant_8h.html#a997a3f77c076f00da9fd4f6eb3d2b9da',1,'ckernel_quant.h']]],
-  ['qk4_5f1_3538',['QK4_1',['../ckernel__quant_8h.html#aad813e4bdcbac9185791f31e3558f770',1,'ckernel_quant.h']]],
-  ['qk5_5f0_3539',['QK5_0',['../ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac',1,'ckernel_quant.h']]],
-  ['qk5_5f1_3540',['QK5_1',['../ckernel__quant_8h.html#a836a94f5a50863402da0b8505992fc51',1,'ckernel_quant.h']]],
-  ['qk8_5f0_3541',['QK8_0',['../ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a',1,'ckernel_quant.h']]],
-  ['qk_5fk_3542',['QK_K',['../ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50',1,'ckernel_quant.h']]]
+  ['qk4_5f0_3565',['QK4_0',['../ckernel__quant_8h.html#a997a3f77c076f00da9fd4f6eb3d2b9da',1,'ckernel_quant.h']]],
+  ['qk4_5f1_3566',['QK4_1',['../ckernel__quant_8h.html#aad813e4bdcbac9185791f31e3558f770',1,'ckernel_quant.h']]],
+  ['qk5_5f0_3567',['QK5_0',['../ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac',1,'ckernel_quant.h']]],
+  ['qk5_5f1_3568',['QK5_1',['../ckernel__quant_8h.html#a836a94f5a50863402da0b8505992fc51',1,'ckernel_quant.h']]],
+  ['qk8_5f0_3569',['QK8_0',['../ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a',1,'ckernel_quant.h']]],
+  ['qk_5fk_3570',['QK_K',['../ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50',1,'ckernel_quant.h']]]
 ];

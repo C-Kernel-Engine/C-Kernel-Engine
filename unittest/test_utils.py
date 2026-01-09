@@ -321,8 +321,13 @@ class TestReport:
             print()
             print("  PERFORMANCE")
             print("  " + "-" * 40)
-            print(f"  {'Kernel':<{max_name_len}}  {'PyTorch (us)':<15}  {'C Kernel (us)':<15}  {'Speedup':<10}")
-            print("  " + "-" * 60)
+            header = (
+                f"  {'Kernel':<{max_name_len}}  "
+                f"{'PyTorch (us)':<15}  {'C Kernel (us)':<15}  {'Speedup':<9}  "
+                f"{'max_diff':<10}  {'tol':<6}"
+            )
+            print(header)
+            print("  " + "-" * len(header.strip()))
 
             for r in self.results:
                 pt_str = f"{r.pytorch_time.mean_us:.1f}" if r.pytorch_time else "N/A"
@@ -335,7 +340,12 @@ class TestReport:
                         sp_str = f"\033[93m{speedup:.2f}x\033[0m"
                 else:
                     sp_str = "N/A"
-                print(f"  {r.name:<{max_name_len}}  {pt_str:<15}  {ck_str:<15}  {sp_str}")
+                diff_str = f"{r.max_diff:.2e}" if r.max_diff is not None else "N/A"
+                tol_str = f"{r.tolerance:.0e}" if r.tolerance is not None else "N/A"
+                print(
+                    f"  {r.name:<{max_name_len}}  {pt_str:<15}  {ck_str:<15}  {sp_str:<9}  "
+                    f"{diff_str:<10}  {tol_str:<6}"
+                )
 
         # Summary
         print()

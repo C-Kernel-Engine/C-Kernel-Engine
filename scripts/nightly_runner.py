@@ -243,6 +243,12 @@ MAKE_TARGETS = {
         "target": "llamacpp-parity",
         "timeout_sec": 600,
     },
+    "flash_attention": {
+        "name": "Flash Attention (50K+)",
+        "category": "kernels",
+        "target": "test-flash-attention",
+        "timeout_sec": 1800,
+    },
 }
 
 # Benchmark targets with perf extraction
@@ -375,6 +381,7 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
             error_lines = [l for l in result.stderr.splitlines() if "error" in l.lower()]
             error_msg = "\n".join(error_lines[-5:]) if error_lines else f"Exit code {result.returncode}"
 
+        sub_tests = parse_sub_tests(result.stdout)
         return TestResult(
             name=target_info["name"],
             category=target_info["category"],
@@ -385,6 +392,7 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
             error_msg=error_msg,
             perf_metric=perf_metric,
             perf_unit=perf_unit,
+            sub_tests=sub_tests,
         )
 
     except subprocess.TimeoutExpired:

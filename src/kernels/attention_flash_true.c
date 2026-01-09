@@ -264,6 +264,33 @@ static inline __m512 ck_fast_exp512_ps(__m512 x) {
 }
 #endif
 
+static inline float ck_dot_f32_avx512(const float *q, const float *k, int D_h) {
+    __m512 sum0 = _mm512_setzero_ps();
+    __m512 sum1 = _mm512_setzero_ps();
+
+    int d = 0;
+    for (; d + 32 <= D_h; d += 32) {
+        __m512 q0 = _mm512_loadu_ps(q + d);
+        __m512 k0 = _mm512_loadu_ps(k + d);
+        __m512 q1 = _mm512_loadu_ps(q + d + 16);
+        __m512 k1 = _mm512_loadu_ps(k + d + 16);
+        sum0 = _mm512_fmadd_ps(q0, k0, sum0);
+        sum1 = _mm512_fmadd_ps(q1, k1, sum1);
+    }
+    for (; d + 16 <= D_h; d += 16) {
+        __m512 q0 = _mm512_loadu_ps(q + d);
+        __m512 k0 = _mm512_loadu_ps(k + d);
+        sum0 = _mm512_fmadd_ps(q0, k0, sum0);
+    }
+
+    sum0 = _mm512_add_ps(sum0, sum1);
+    float dot = _mm512_reduce_add_ps(sum0);
+    for (; d < D_h; ++d) {
+        dot += q[d] * k[d];
+    }
+    return dot;
+}
+
 /**
  * @brief AVX-512 optimized flash attention decode
  */
@@ -316,17 +343,7 @@ static void attention_flash_decode_avx512(
                 const int t_k = t_k0 + bi;
                 const float *k_head = k_base + (size_t)t_k * stride;
 
-                __m512 dot_acc = _mm512_setzero_ps();
-                d = 0;
-                for (; d + 16 <= D_h; d += 16) {
-                    __m512 q_v = _mm512_loadu_ps(q_head + d);
-                    __m512 k_v = _mm512_loadu_ps(k_head + d);
-                    dot_acc = _mm512_fmadd_ps(q_v, k_v, dot_acc);
-                }
-                float dot = _mm512_reduce_add_ps(dot_acc);
-                for (; d < D_h; ++d) {
-                    dot += q_head[d] * k_head[d];
-                }
+                float dot = ck_dot_f32_avx512(q_head, k_head, D_h);
 
                 float score = dot * scale;
                 scores[bi] = score;
@@ -478,6 +495,42 @@ static inline float hsum256_ps(__m256 v) {
     return _mm_cvtss_f32(sums);
 }
 
+static inline float ck_dot_f32_avx(const float *q, const float *k, int D_h) {
+    __m256 sum0 = _mm256_setzero_ps();
+    __m256 sum1 = _mm256_setzero_ps();
+
+    int d = 0;
+    for (; d + 16 <= D_h; d += 16) {
+        __m256 q0 = _mm256_loadu_ps(q + d);
+        __m256 k0 = _mm256_loadu_ps(k + d);
+        __m256 q1 = _mm256_loadu_ps(q + d + 8);
+        __m256 k1 = _mm256_loadu_ps(k + d + 8);
+    #if defined(__FMA__)
+        sum0 = _mm256_fmadd_ps(q0, k0, sum0);
+        sum1 = _mm256_fmadd_ps(q1, k1, sum1);
+    #else
+        sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(q0, k0));
+        sum1 = _mm256_add_ps(sum1, _mm256_mul_ps(q1, k1));
+    #endif
+    }
+    for (; d + 8 <= D_h; d += 8) {
+        __m256 q0 = _mm256_loadu_ps(q + d);
+        __m256 k0 = _mm256_loadu_ps(k + d);
+    #if defined(__FMA__)
+        sum0 = _mm256_fmadd_ps(q0, k0, sum0);
+    #else
+        sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(q0, k0));
+    #endif
+    }
+
+    __m256 sum = _mm256_add_ps(sum0, sum1);
+    float dot = hsum256_ps(sum);
+    for (; d < D_h; ++d) {
+        dot += q[d] * k[d];
+    }
+    return dot;
+}
+
 static void attention_flash_decode_avx(
     float *out,
     const float *q,
@@ -527,21 +580,7 @@ static void attention_flash_decode_avx(
                 const int t_k = t_k0 + bi;
                 const float *k_head = k_base + (size_t)t_k * stride;
 
-                __m256 dot_acc = _mm256_setzero_ps();
-                d = 0;
-                for (; d + 8 <= D_h; d += 8) {
-                    __m256 q_v = _mm256_loadu_ps(q_head + d);
-                    __m256 k_v = _mm256_loadu_ps(k_head + d);
-                #if defined(__FMA__)
-                    dot_acc = _mm256_fmadd_ps(q_v, k_v, dot_acc);
-                #else
-                    dot_acc = _mm256_add_ps(dot_acc, _mm256_mul_ps(q_v, k_v));
-                #endif
-                }
-                float dot = hsum256_ps(dot_acc);
-                for (; d < D_h; ++d) {
-                    dot += q_head[d] * k_head[d];
-                }
+                float dot = ck_dot_f32_avx(q_head, k_head, D_h);
 
                 float score = dot * scale;
                 scores[bi] = score;

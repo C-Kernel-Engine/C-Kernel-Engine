@@ -1041,6 +1041,20 @@
     <member refid="attention__decode__fused_8c_1a50899fc552648f5d1cadd0e4c5671dc1" kind="function"><name>ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</name></member>
     <member refid="attention__decode__fused_8c_1ab6c6524b0f30733a077e3783bb55a592" kind="function"><name>ck_qkv_project_head_major_token</name></member>
   </compound>
+  <compound refid="attention__flash__true_8c" kind="file"><name>attention_flash_true.c</name>
+    <member refid="attention__flash__true_8c_1a3450e83fc9805b9317566f2f6ce664f1" kind="define"><name>CK_FLASH_ATTN_FAST_EXP</name></member>
+    <member refid="attention__flash__true_8c_1afd961a2dd9d9e58d8e746d1164f71e79" kind="define"><name>CK_FLASH_ATTN_TILE_K</name></member>
+    <member refid="attention__flash__true_8c_1a14d143c1096a9c4a36a888d799cee620" kind="function"><name>attention_flash_cleanup</name></member>
+    <member refid="attention__flash__true_8c_1a2d29666212a174c892343d3589bcd737" kind="function"><name>attention_flash_decode</name></member>
+    <member refid="attention__flash__true_8c_1a2760bf1f7501f320fef261e81553243e" kind="function"><name>attention_flash_decode_scalar</name></member>
+    <member refid="attention__flash__true_8c_1a7a3b6a32f6c7d4183cbf9994da0dd1a2" kind="function"><name>attention_flash_init</name></member>
+    <member refid="attention__flash__true_8c_1af56f122920eee56211dbca42cff86ade" kind="function"><name>ck_expf</name></member>
+    <member refid="attention__flash__true_8c_1a4b45db4bcf9ec6acc672616c3d3e7d99" kind="function"><name>ck_fast_expf</name></member>
+    <member refid="attention__flash__true_8c_1a0a172ab2e2319c20408ffdc9e98b3b42" kind="function"><name>ck_flash_attn_choose_tile_k</name></member>
+    <member refid="attention__flash__true_8c_1ad2a838269326bb70a8ced00de62d69b8" kind="function"><name>ck_flash_attn_fast_exp_kind</name></member>
+    <member refid="attention__flash__true_8c_1aa6c8bbe541ab9c826f19e667b94a757c" kind="function"><name>ck_flash_attn_tile_k</name></member>
+    <member refid="attention__flash__true_8c_1a5e3e567c8d4fc6572fa9ec65ce852409" kind="function"><name>max_k_for_query</name></member>
+  </compound>
   <compound refid="attention__kernels_8c" kind="file"><name>attention_kernels.c</name>
     <member refid="attention__kernels_8c_1a686599872afcb86c5fc7ad5e5e5b4773" kind="define"><name>FLASH_QUERY_IMPL</name></member>
     <member refid="attention__kernels_8c_1aba8a26d95a9c96411b5fea006f2097e4" kind="define"><name>FLASH_QUERY_IMPL_DECODE</name></member>
@@ -1054,7 +1068,7 @@
     <member refid="attention__kernels_8c_1af749b0ec6a9cc8a63033fa2069759722" kind="function"><name>attention_forward_causal_head_major_gqa_bf16</name></member>
     <member refid="attention__kernels_8c_1a04febaa686747fdfad9e915b627a0915" kind="function"><name>attention_forward_causal_head_major_gqa_exact</name></member>
     <member refid="attention__kernels_8c_1aac305a28084fe73b2264ae57613ba3ea" kind="function"><name>attention_forward_causal_head_major_gqa_flash</name></member>
-    <member refid="attention__kernels_8c_1a84803f8c5509c325dd6b9feec50a0493" kind="function"><name>attention_forward_decode_head_major_gqa_flash</name></member>
+    <member refid="attention__kernels_8c_1a935728e009d1712976ed3cff71f50387" kind="function"><name>attention_forward_decode_head_major_gqa_regular</name></member>
     <member refid="attention__kernels_8c_1a4113194a0a57126146cb4d5471c05bd5" kind="function"><name>convert_bf16_tensor</name></member>
     <member refid="attention__kernels_8c_1a0102833b3c8a1d4114e65c0638ddbfb1" kind="function"><name>qkv_index</name></member>
     <member refid="attention__kernels_8c_1a730fa391639fb17027ee898e26e5db06" kind="function"><name>score_index</name></member>
@@ -1357,18 +1371,22 @@
     <member refid="ckernel__engine_8h_1ad611fd5e8dba3e906482d6e68f919788" kind="function"><name>attention_backward_causal_head_major</name></member>
     <member refid="ckernel__engine_8h_1adbd2b55fbc53b6e288c98813b61cd6e3" kind="function"><name>attention_backward_causal_head_major_gqa</name></member>
     <member refid="ckernel__engine_8h_1a1a95c2e93bfbe603df487d0c0eb5ea2b" kind="function"><name>attention_backward_causal_head_major_gqa_bf16</name></member>
+    <member refid="ckernel__engine_8h_1a2d29666212a174c892343d3589bcd737" kind="function"><name>attention_flash_decode</name></member>
     <member refid="ckernel__engine_8h_1a3d8664b9e0808546484af9ec7d4ddfe1" kind="function"><name>attention_forward_causal_head_major</name></member>
     <member refid="ckernel__engine_8h_1a57b7a6f6f08b030fd8d5fbf87fa31ac7" kind="function"><name>attention_forward_causal_head_major_exact</name></member>
     <member refid="ckernel__engine_8h_1a3e1aa7c55e515fd996318da27c2c5ade" kind="function"><name>attention_forward_causal_head_major_gqa</name></member>
     <member refid="ckernel__engine_8h_1af749b0ec6a9cc8a63033fa2069759722" kind="function"><name>attention_forward_causal_head_major_gqa_bf16</name></member>
     <member refid="ckernel__engine_8h_1a04febaa686747fdfad9e915b627a0915" kind="function"><name>attention_forward_causal_head_major_gqa_exact</name></member>
     <member refid="ckernel__engine_8h_1aac305a28084fe73b2264ae57613ba3ea" kind="function"><name>attention_forward_causal_head_major_gqa_flash</name></member>
-    <member refid="ckernel__engine_8h_1a84803f8c5509c325dd6b9feec50a0493" kind="function"><name>attention_forward_decode_head_major_gqa_flash</name></member>
+    <member refid="ckernel__engine_8h_1a935728e009d1712976ed3cff71f50387" kind="function"><name>attention_forward_decode_head_major_gqa_regular</name></member>
     <member refid="ckernel__engine_8h_1a3d0ffc191c77d983b953984f8012589d" kind="function"><name>backward_causal_softmax_head_major</name></member>
     <member refid="ckernel__engine_8h_1afe83b7a562f3b21fef1993782ff3792b" kind="function"><name>backward_causal_softmax_head_major_bf16</name></member>
     <member refid="ckernel__engine_8h_1a920868f80137fe3e0c9cd11acb7ba567" kind="function"><name>causal_softmax_head_major</name></member>
     <member refid="ckernel__engine_8h_1a1cc637a888846ddbcf1a58ac72b4aaf6" kind="function"><name>causal_softmax_head_major_bf16</name></member>
     <member refid="ckernel__engine_8h_1a6ea7267298ef550524a6277b817a8ffb" kind="function"><name>causal_softmax_head_major_exact</name></member>
+    <member refid="ckernel__engine_8h_1aac849c8be1c936169d2f525ac0f3d87e" kind="function"><name>ck_attention_flash_decode_wrapper</name></member>
+    <member refid="ckernel__engine_8h_1a0a172ab2e2319c20408ffdc9e98b3b42" kind="function"><name>ck_flash_attn_choose_tile_k</name></member>
+    <member refid="ckernel__engine_8h_1ad2a838269326bb70a8ced00de62d69b8" kind="function"><name>ck_flash_attn_fast_exp_kind</name></member>
     <member refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" kind="function"><name>ck_get_num_threads</name></member>
     <member refid="ckernel__engine_8h_1a7ff78bf68a9657c2d6858b64df79f7ae" kind="function"><name>ck_get_physical_cores</name></member>
     <member refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" kind="function"><name>ck_set_num_threads</name></member>
@@ -1795,6 +1813,7 @@
   </compound>
   <compound refid="ckernel__orchestration_8c" kind="file"><name>ckernel_orchestration.c</name>
     <member refid="ckernel__orchestration_8c_1a0020aef4ce512b3840b824a46e206dca" kind="function"><name>ck_add_inplace</name></member>
+    <member refid="ckernel__orchestration_8c_1aac849c8be1c936169d2f525ac0f3d87e" kind="function"><name>ck_attention_flash_decode_wrapper</name></member>
     <member refid="ckernel__orchestration_8c_1a2afc01d06448f40b94c48a51a6951dc5" kind="function"><name>ck_attention_project_head_major</name></member>
     <member refid="ckernel__orchestration_8c_1add4c3ac196a25f481496bf69f32a9ac6" kind="function"><name>ck_attention_project_head_major_backward</name></member>
     <member refid="ckernel__orchestration_8c_1a4369f2c106b80c1888b99fe709b07f6c" kind="function"><name>ck_attention_project_head_major_q4_k</name></member>

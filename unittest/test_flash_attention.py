@@ -95,6 +95,110 @@ def get_extra_long_contexts():
     return contexts
 
 
+def parse_int_list(env_value):
+    if not env_value:
+        return []
+    values = []
+    for part in env_value.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            val = int(part)
+        except ValueError:
+            continue
+        if val > 0:
+            values.append(val)
+    return values
+
+
+def get_long_context_head_pairs():
+    heads = parse_int_list(os.environ.get("CK_FLASH_ATTN_LONG_HEADS"))
+    if not heads:
+        return []
+    kv_heads = parse_int_list(os.environ.get("CK_FLASH_ATTN_LONG_KV_HEADS"))
+    if not kv_heads:
+        return [(h, h) for h in heads]
+    if len(kv_heads) == 1:
+        return [(h, kv_heads[0]) for h in heads]
+    if len(kv_heads) == len(heads):
+        return list(zip(heads, kv_heads))
+    return [(h, h) for h in heads]
+
+
+def format_bytes(num_bytes):
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(num_bytes)
+    for unit in units:
+        if value < 1024.0 or unit == units[-1]:
+            return f"{value:.1f} {unit}"
+        value /= 1024.0
+
+
+def estimate_case_cost(case, dtype_bytes=4):
+    T_q = case["T_q"]
+    T_k = case["T_k"]
+    H = case["H"]
+    H_kv = case.get("H_kv", H)
+    D_h = case["D_h"]
+
+    q_elems = T_q * H * D_h
+    kv_elems = T_k * H_kv * D_h
+    score_elems = T_q * T_k * H
+
+    q_bytes = q_elems * dtype_bytes
+    kv_bytes = 2 * kv_elems * dtype_bytes
+    score_bytes = score_elems * dtype_bytes
+
+    approx_flops = 4 * T_q * T_k * H * D_h
+
+    return {
+        "q_shape": (T_q, H, D_h),
+        "kv_shape": (T_k, H_kv, D_h),
+        "score_shape": (H, T_q, T_k),
+        "q_bytes": q_bytes,
+        "kv_bytes": kv_bytes,
+        "score_bytes": score_bytes,
+        "approx_flops": approx_flops,
+    }
+
+
+def print_softmax_math(dtype="fp32"):
+    print()
+    print("  SOFTMAX MATH (decode/prefill)")
+    print("  " + "-" * 40)
+    print("  scores[h,tq,tk] = dot(q[h,tq], k[h,tk]) * scale")
+    print("  softmax over tk (causal), computed online (no score matrix stored)")
+    print("  out[h,tq] = sum_tk softmax(scores) * v[h,tk]")
+    print("  complexity: O(T_q * T_k * H * D_h) + softmax O(T_q * T_k * H)")
+    print(f"  precision: {dtype} (kernel + reference); bf16 not used in this test")
+
+
+def print_long_context_details(cases, threshold=50000, dtype_bytes=4):
+    long_cases = [case for case in cases if case["T_k"] >= threshold]
+    if not long_cases:
+        return
+    print()
+    print("  LONG CONTEXT DETAIL (score matrix not materialized)")
+    print("  " + "-" * 40)
+    for case in long_cases:
+        cost = estimate_case_cost(case, dtype_bytes=dtype_bytes)
+        label = case["label"]
+        q_shape = cost["q_shape"]
+        kv_shape = cost["kv_shape"]
+        score_shape = cost["score_shape"]
+        print(f"  {label}")
+        print(f"    Q:    [{q_shape[0]}, {q_shape[1]}, {q_shape[2]}]  {format_bytes(cost['q_bytes'])}")
+        print(f"    K/V:  [{kv_shape[0]}, {kv_shape[1]}, {kv_shape[2]}]  {format_bytes(cost['kv_bytes'])} (K+V)")
+        print(
+            f"    Score (if stored): [{score_shape[1]}, {score_shape[2]}] per head, "
+            f"{score_shape[0] * score_shape[1] * score_shape[2]} elems total "
+            f"({format_bytes(cost['score_bytes'])})"
+        )
+        gflops = cost["approx_flops"] / 1e9
+        print(f"    Approx flops: 4*T_q*T_k*H*D_h = {gflops:.2f} GFLOP")
+
+
 def llama_perf_enabled():
     env = os.environ.get("CK_FLASH_ATTN_LLAMA_PERF", "1").lower()
     return env not in ("0", "false", "no")
@@ -448,7 +552,17 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    const size_t mem_size = 64u * 1024u * 1024u;
+    size_t mem_size = q_elems * sizeof(float);
+    mem_size += k_elems * sizeof(float);
+    mem_size += k_elems * sizeof(float);
+    mem_size += (size_t) T_k * (size_t) T_q * sizeof(ggml_fp16_t);
+    mem_size += q_elems * sizeof(float);
+    const size_t overhead = 64u * 1024u * 1024u;
+    if (mem_size < overhead) {
+        mem_size = overhead;
+    } else {
+        mem_size += overhead;
+    }
     struct ggml_init_params params = { mem_size, NULL, false };
     struct ggml_context * ctx = ggml_init(params);
     if (!ctx) {
@@ -505,18 +619,47 @@ int main(int argc, char ** argv) {
     ggml_build_forward_expand(gf, out);
 
     if (mode == 1) {
+        struct ggml_threadpool_params tp = ggml_threadpool_params_default(threads);
+        tp.paused = false;
+        struct ggml_threadpool * threadpool = ggml_threadpool_new(&tp);
+
+        struct ggml_cplan plan = ggml_graph_plan(gf, threads, threadpool);
+        if (plan.work_size > 0) {
+            plan.work_data = (uint8_t *) malloc(plan.work_size);
+            if (!plan.work_data) {
+                fprintf(stderr, "plan work allocation failed\n");
+                if (threadpool) {
+                    ggml_threadpool_free(threadpool);
+                }
+                ggml_free(ctx);
+                free(q);
+                free(k);
+                free(v);
+                free(out_host);
+                return 1;
+            }
+        } else {
+            plan.work_data = NULL;
+        }
+
         const int warmup = 2;
         for (int i = 0; i < warmup; ++i) {
-            ggml_graph_compute_with_ctx(ctx, gf, threads);
+            ggml_graph_compute(gf, &plan);
         }
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < iters; ++i) {
-            ggml_graph_compute_with_ctx(ctx, gf, threads);
+            ggml_graph_compute(gf, &plan);
         }
         auto end = std::chrono::high_resolution_clock::now();
         double us = std::chrono::duration<double, std::micro>(end - start).count();
         double avg_us = us / (double) iters;
         printf("%.3f\n", avg_us);
+        if (plan.work_data) {
+            free(plan.work_data);
+        }
+        if (threadpool) {
+            ggml_threadpool_free(threadpool);
+        }
         ggml_free(ctx);
         free(q);
         free(k);
@@ -687,19 +830,48 @@ def try_llama_cpp_perf(case, threads, iterations):
             return None
 
 
-def run_flash_case(lib, case, timed=False, warmup=10, iterations=200):
+def try_llama_cpp_accuracy(case):
+    H_kv = case.get("H_kv", case["H"])
+    if H_kv != case["H"]:
+        return None, None, None
+
     dist = case.get("dist", "normal")
     q_np = make_activation_np((case["T_q"], case["H"], case["D_h"]), case["seed"], dist=dist)
-    k_np = make_activation_np((case["T_k"], case["H"], case["D_h"]), case["seed"] + 1, dist=dist)
-    v_np = make_activation_np((case["T_k"], case["H"], case["D_h"]), case["seed"] + 2, dist=dist)
-    out_np = np.zeros_like(q_np)
+    k_np = make_activation_np((case["T_k"], H_kv, case["D_h"]), case["seed"] + 1, dist=dist)
+    v_np = make_activation_np((case["T_k"], H_kv, case["D_h"]), case["seed"] + 2, dist=dist)
 
     ref_fn = make_torch_reference(q_np, k_np, v_np)
+    ref = ref_fn()
+
+    out_llama = try_llama_cpp_compare(case, q_np, k_np, v_np)
+    if out_llama is None:
+        return None, None, None
+
+    diff = max_diff(torch.from_numpy(out_llama), ref)
+    tol = case.get("tol", 1e-4)
+    passed = diff <= tol
+    return diff, tol, passed
+
+
+def run_flash_case(lib, case, timed=False, warmup=10, iterations=200):
+    dist = case.get("dist", "normal")
+    H_kv = case.get("H_kv", case["H"])
+    q_np = make_activation_np((case["T_q"], case["H"], case["D_h"]), case["seed"], dist=dist)
+    k_np = make_activation_np((case["T_k"], H_kv, case["D_h"]), case["seed"] + 1, dist=dist)
+    v_np = make_activation_np((case["T_k"], H_kv, case["D_h"]), case["seed"] + 2, dist=dist)
+
+    if H_kv != case["H"]:
+        k_use, v_use = expand_kv_for_gqa(k_np, v_np, case["H"], H_kv)
+    else:
+        k_use, v_use = k_np, v_np
+    out_np = np.zeros_like(q_np)
+
+    ref_fn = make_torch_reference(q_np, k_use, v_use)
     c_flash = make_c_flash(
         lib,
         q_np,
-        k_np,
-        v_np,
+        k_use,
+        v_use,
         out_np,
         case["T_q"],
         case["T_k"],
@@ -730,7 +902,7 @@ def run_flash_case(lib, case, timed=False, warmup=10, iterations=200):
         kernel_time=kernel_time,
     )
 
-    return result, q_np, k_np, v_np, ref
+    return result, q_np, k_use, v_use, ref
 
 
 def run_wrapper_case(lib, case, timed=False, warmup=10, iterations=200):
@@ -907,6 +1079,8 @@ def run_accuracy_tests(lib, tile_k, fast_lib=None):
         {"label": "prefill_hd128", "T_q": 4, "T_k": 4, "H": 2, "D_h": 128, "seed": 5, "tol": 3e-4},
         {"label": "decode_hd192", "T_q": 1, "T_k": 6, "H": 2, "D_h": 192, "seed": 6, "tol": 4e-4},
         {"label": "decode_ln_gelu", "T_q": 1, "T_k": 32, "H": 4, "D_h": 64, "seed": 7, "dist": "ln_gelu"},
+        {"label": "prefill_gqa_8h_2kv", "T_q": 4, "T_k": 4, "H": 8, "H_kv": 2, "D_h": 64, "seed": 8,
+         "tol": 2e-4},
     ]
 
     fast_tol = 1e-2
@@ -939,7 +1113,7 @@ def run_accuracy_tests(lib, tile_k, fast_lib=None):
             fast_result, _, _, _, _ = run_flash_case(fast_lib, fast_case, timed=False)
             report.add_result(fast_result)
 
-    wrapper_case = {"label": "decode_wrapper_omp", "T_q": 1, "T_k": 64, "H": 4, "D_h": 64, "seed": 8}
+    wrapper_case = {"label": "decode_wrapper_omp", "T_q": 1, "T_k": 64, "H": 4, "D_h": 64, "seed": 9}
     report.add_result(run_wrapper_case(lib, wrapper_case, timed=False))
 
     gqa_case = {
@@ -949,10 +1123,22 @@ def run_accuracy_tests(lib, tile_k, fast_lib=None):
         "H": 8,
         "H_kv": 2,
         "D_h": 64,
-        "seed": 9,
+        "seed": 10,
         "tol": 2e-4,
     }
     report.add_result(run_wrapper_case(lib, gqa_case, timed=False))
+
+    mqa_case = {
+        "label": "decode_mqa_16h_1kv",
+        "T_q": 1,
+        "T_k": 64,
+        "H": 16,
+        "H_kv": 1,
+        "D_h": 64,
+        "seed": 11,
+        "tol": 2e-4,
+    }
+    report.add_result(run_wrapper_case(lib, mqa_case, timed=False))
 
     fixture = load_activation_fixture()
     if fixture is not None:
@@ -1007,11 +1193,20 @@ def run_performance_tests(lib, tile_k, fast_exp, warmup=10, iterations=200):
         {"label": "decode_4h_hd128", "T_q": 1, "T_k": 256, "H": 4, "D_h": 128, "seed": 17, "tol": tol},
         {"label": "decode_gqa_16h_2kv", "T_q": 1, "T_k": 1024, "H": 16, "H_kv": 2, "D_h": 64, "seed": 18,
          "tol": tol, "warmup": 5, "iterations": 80},
+        {"label": "decode_mqa_16h_1kv", "T_q": 1, "T_k": 1024, "H": 16, "H_kv": 1, "D_h": 64, "seed": 19,
+         "tol": tol, "warmup": 5, "iterations": 80},
     ]
 
+    def case_signature(case):
+        return (case["T_q"], case["T_k"], case["H"], case.get("H_kv", case["H"]), case["D_h"])
+
+    labels = {case["label"] for case in cases}
+    signatures = {case_signature(case) for case in cases}
+
     for tk in get_extra_long_contexts():
-        cases.append({
-            "label": f"decode_4h_{tk}",
+        label = f"decode_4h_{tk}"
+        candidate = {
+            "label": label,
             "T_q": 1,
             "T_k": tk,
             "H": 4,
@@ -1020,7 +1215,43 @@ def run_performance_tests(lib, tile_k, fast_exp, warmup=10, iterations=200):
             "tol": tol,
             "warmup": 1,
             "iterations": 5,
-        })
+        }
+        sig = case_signature(candidate)
+        if sig in signatures or label in labels:
+            continue
+        cases.append(candidate)
+        labels.add(label)
+        signatures.add(sig)
+
+    long_head_pairs = get_long_context_head_pairs()
+    if long_head_pairs:
+        long_contexts = get_extra_long_contexts()
+        if not long_contexts:
+            long_contexts = [51200]
+        for tk in long_contexts:
+            for h, h_kv in long_head_pairs:
+                label = f"decode_{h}h_{tk}" if h_kv == h else f"decode_{h}h_{tk}_kv{h_kv}"
+                if label in labels:
+                    continue
+                case = {
+                    "label": label,
+                    "T_q": 1,
+                    "T_k": tk,
+                    "H": h,
+                    "D_h": 64,
+                    "seed": 30 + (tk % 1000) + (h % 97),
+                    "tol": tol,
+                    "warmup": 1,
+                    "iterations": 3,
+                }
+                if h_kv != h:
+                    case["H_kv"] = h_kv
+                sig = case_signature(case)
+                if sig in signatures:
+                    continue
+                cases.append(case)
+                labels.add(label)
+                signatures.add(sig)
 
     print()
     print("  CASE MATRIX")
@@ -1039,6 +1270,9 @@ def run_performance_tests(lib, tile_k, fast_exp, warmup=10, iterations=200):
             f"{case['T_q']:>3}  {case['T_k']:>9}  {case['H']:>5}  {kv:>3}  {case['D_h']:>4}  "
             f"{case.get('warmup', warmup):>6}  {case.get('iterations', iterations):>5}"
         )
+
+    print_softmax_math(dtype="fp32")
+    print_long_context_details(cases, threshold=50000, dtype_bytes=4)
 
     llama_rows = []
     llama_enabled = llama_perf_enabled()
@@ -1059,19 +1293,36 @@ def run_performance_tests(lib, tile_k, fast_exp, warmup=10, iterations=200):
             iters = case.get("iterations", iterations)
             llama_us = try_llama_cpp_perf(case, omp_threads, iters)
             if llama_us is not None:
-                llama_rows.append((result.name, llama_us, result.kernel_time.mean_us))
+                diff, tol_val, passed = try_llama_cpp_accuracy(case)
+                llama_rows.append((result.name, llama_us, result.kernel_time.mean_us, diff, tol_val, passed))
 
     if llama_rows:
         print()
         print("  LLAMA.CPP PERFORMANCE (ggml_flash_attn_ext)")
         print("  " + "-" * 40)
-        max_name_len = max(len(name) for name, _, _ in llama_rows)
-        print(f"  {'Kernel':<{max_name_len}}  {'llama.cpp (us)':<15}  {'C Kernel (us)':<15}  {'Speedup':<10}")
-        print("  " + "-" * 60)
-        for name, llama_us, ck_us in llama_rows:
+        max_name_len = max(len(name) for name, *_ in llama_rows)
+        header = (
+            f"  {'Kernel':<{max_name_len}}  "
+            f"{'llama.cpp (us)':<15}  {'C Kernel (us)':<15}  {'Speedup':<9}  "
+            f"{'max_diff':<10}  {'tol':<6}  {'acc':<6}"
+        )
+        print(header)
+        print("  " + "-" * len(header.strip()))
+        for name, llama_us, ck_us, diff, tol_val, passed in llama_rows:
             sp = llama_us / ck_us if ck_us > 0 else 0.0
             sp_str = f"{sp:.2f}x"
-            print(f"  {name:<{max_name_len}}  {llama_us:<15.1f}  {ck_us:<15.1f}  {sp_str}")
+            if diff is None:
+                diff_str = "N/A"
+                tol_str = "N/A"
+                acc_str = "N/A"
+            else:
+                diff_str = f"{diff:.2e}"
+                tol_str = f"{tol_val:.0e}"
+                acc_str = "\033[92mPASS\033[0m" if passed else "\033[91mFAIL\033[0m"
+            print(
+                f"  {name:<{max_name_len}}  {llama_us:<15.1f}  {ck_us:<15.1f}  {sp_str:<9}  "
+                f"{diff_str:<10}  {tol_str:<6}  {acc_str}"
+            )
 
     return report
 

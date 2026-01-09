@@ -162,6 +162,9 @@ Functions</h2></td></tr>
 <tr class="separator:adbd2b55fbc53b6e288c98813b61cd6e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1a95c2e93bfbe603df487d0c0eb5ea2b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a1a95c2e93bfbe603df487d0c0eb5ea2b">attention_backward_causal_head_major_gqa_bf16</a> (const uint16_t *d_output, float *d_x, const uint16_t *q, const uint16_t *k, const uint16_t *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</td></tr>
 <tr class="separator:a1a95c2e93bfbe603df487d0c0eb5ea2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2d29666212a174c892343d3589bcd737"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a> (float *out, const float *q, const float *k, const float *v, int T_q, int T_k, int H, int D_h, float scale)</td></tr>
+<tr class="memdesc:a2d29666212a174c892343d3589bcd737"><td class="mdescLeft">&#160;</td><td class="mdescRight">Main flash attention function with SIMD dispatch.  <a href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">More...</a><br /></td></tr>
+<tr class="separator:a2d29666212a174c892343d3589bcd737"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3d8664b9e0808546484af9ec7d4ddfe1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a3d8664b9e0808546484af9ec7d4ddfe1">attention_forward_causal_head_major</a> (const float *q, const float *k, const float *v, float *scores, float *output, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</td></tr>
 <tr class="separator:a3d8664b9e0808546484af9ec7d4ddfe1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a57b7a6f6f08b030fd8d5fbf87fa31ac7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a57b7a6f6f08b030fd8d5fbf87fa31ac7">attention_forward_causal_head_major_exact</a> (const float *q, const float *k, const float *v, float *scores, float *output, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</td></tr>
@@ -174,8 +177,9 @@ Functions</h2></td></tr>
 <tr class="separator:a04febaa686747fdfad9e915b627a0915"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aac305a28084fe73b2264ae57613ba3ea"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#aac305a28084fe73b2264ae57613ba3ea">attention_forward_causal_head_major_gqa_flash</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim)</td></tr>
 <tr class="separator:aac305a28084fe73b2264ae57613ba3ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a84803f8c5509c325dd6b9feec50a0493"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a> (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</td></tr>
-<tr class="separator:a84803f8c5509c325dd6b9feec50a0493"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a935728e009d1712976ed3cff71f50387"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a935728e009d1712976ed3cff71f50387">attention_forward_decode_head_major_gqa_regular</a> (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</td></tr>
+<tr class="memdesc:a935728e009d1712976ed3cff71f50387"><td class="mdescLeft">&#160;</td><td class="mdescRight">WARNING: This is NOT true flash attention!  <a href="ckernel__engine_8h.html#a935728e009d1712976ed3cff71f50387">More...</a><br /></td></tr>
+<tr class="separator:a935728e009d1712976ed3cff71f50387"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3d0ffc191c77d983b953984f8012589d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a3d0ffc191c77d983b953984f8012589d">backward_causal_softmax_head_major</a> (float *d_scores, const float *weights, int num_heads, int num_tokens, int aligned_context_window)</td></tr>
 <tr class="separator:a3d0ffc191c77d983b953984f8012589d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afe83b7a562f3b21fef1993782ff3792b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#afe83b7a562f3b21fef1993782ff3792b">backward_causal_softmax_head_major_bf16</a> (uint16_t *d_scores, const uint16_t *weights, int num_heads, int num_tokens, int aligned_context_window)</td></tr>
@@ -186,6 +190,13 @@ Functions</h2></td></tr>
 <tr class="separator:a1cc637a888846ddbcf1a58ac72b4aaf6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6ea7267298ef550524a6277b817a8ffb"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a6ea7267298ef550524a6277b817a8ffb">causal_softmax_head_major_exact</a> (float *scores, int num_heads, int num_tokens, int aligned_context_window)</td></tr>
 <tr class="separator:a6ea7267298ef550524a6277b817a8ffb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aac849c8be1c936169d2f525ac0f3d87e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#aac849c8be1c936169d2f525ac0f3d87e">ck_attention_flash_decode_wrapper</a> (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</td></tr>
+<tr class="memdesc:aac849c8be1c936169d2f525ac0f3d87e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper to call TRUE flash attention from orchestration layer.  <a href="ckernel__engine_8h.html#aac849c8be1c936169d2f525ac0f3d87e">More...</a><br /></td></tr>
+<tr class="separator:aac849c8be1c936169d2f525ac0f3d87e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0a172ab2e2319c20408ffdc9e98b3b42"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a0a172ab2e2319c20408ffdc9e98b3b42">ck_flash_attn_choose_tile_k</a> (int D_h)</td></tr>
+<tr class="separator:a0a172ab2e2319c20408ffdc9e98b3b42"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad2a838269326bb70a8ced00de62d69b8"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#ad2a838269326bb70a8ced00de62d69b8">ck_flash_attn_fast_exp_kind</a> (void)</td></tr>
+<tr class="separator:ad2a838269326bb70a8ced00de62d69b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aedf852ec498fe7db175f59f810886b9f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a> (void)</td></tr>
 <tr class="separator:aedf852ec498fe7db175f59f810886b9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7ff78bf68a9657c2d6858b64df79f7ae"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a> (void)</td></tr>
@@ -1111,17 +1122,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l01071">1071</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l01086"></a><span class="lineno"> 1086</span>&#160;{</div>
-<div class="line"><a name="l01087"></a><span class="lineno"> 1087</span>&#160;    <a class="code" href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a>(</div>
-<div class="line"><a name="l01088"></a><span class="lineno"> 1088</span>&#160;        d_output, q, k, v, attn_weights,</div>
-<div class="line"><a name="l01089"></a><span class="lineno"> 1089</span>&#160;        d_q, d_k, d_v, d_scores,</div>
-<div class="line"><a name="l01090"></a><span class="lineno"> 1090</span>&#160;        num_heads, num_heads,  <span class="comment">// num_kv_heads == num_heads</span></div>
-<div class="line"><a name="l01091"></a><span class="lineno"> 1091</span>&#160;        num_tokens, head_dim, aligned_head_dim, aligned_context_window);</div>
-<div class="line"><a name="l01092"></a><span class="lineno"> 1092</span>&#160;}</div>
-<div class="ttc" id="aattention__kernels_8c_html_adbd2b55fbc53b6e288c98813b61cd6e3"><div class="ttname"><a href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a></div><div class="ttdeci">void attention_backward_causal_head_major_gqa(const float *d_output, const float *q, const float *k, const float *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</div><div class="ttdef"><b>Definition:</b> <a href="attention__kernels_8c_source.html#l00942">attention_kernels.c:942</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l01079">1079</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l01094"></a><span class="lineno"> 1094</span>&#160;{</div>
+<div class="line"><a name="l01095"></a><span class="lineno"> 1095</span>&#160;    <a class="code" href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a>(</div>
+<div class="line"><a name="l01096"></a><span class="lineno"> 1096</span>&#160;        d_output, q, k, v, attn_weights,</div>
+<div class="line"><a name="l01097"></a><span class="lineno"> 1097</span>&#160;        d_q, d_k, d_v, d_scores,</div>
+<div class="line"><a name="l01098"></a><span class="lineno"> 1098</span>&#160;        num_heads, num_heads,  <span class="comment">// num_kv_heads == num_heads</span></div>
+<div class="line"><a name="l01099"></a><span class="lineno"> 1099</span>&#160;        num_tokens, head_dim, aligned_head_dim, aligned_context_window);</div>
+<div class="line"><a name="l01100"></a><span class="lineno"> 1100</span>&#160;}</div>
+<div class="ttc" id="aattention__kernels_8c_html_adbd2b55fbc53b6e288c98813b61cd6e3"><div class="ttname"><a href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a></div><div class="ttdeci">void attention_backward_causal_head_major_gqa(const float *d_output, const float *q, const float *k, const float *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</div><div class="ttdef"><b>Definition:</b> <a href="attention__kernels_8c_source.html#l00950">attention_kernels.c:950</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00942">attention_backward_causal_head_major_gqa()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00950">attention_backward_causal_head_major_gqa()</a>.</p>
 
 </div>
 </div>
@@ -1229,124 +1240,124 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00942">942</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00958"></a><span class="lineno">  958</span>&#160;{</div>
-<div class="line"><a name="l00959"></a><span class="lineno">  959</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
-<div class="line"><a name="l00960"></a><span class="lineno">  960</span>&#160;    <span class="keywordtype">int</span> T = num_tokens;</div>
-<div class="line"><a name="l00961"></a><span class="lineno">  961</span>&#160;    <span class="keywordtype">int</span> H = num_heads;</div>
-<div class="line"><a name="l00962"></a><span class="lineno">  962</span>&#160;    <span class="keywordtype">int</span> H_kv = num_kv_heads;</div>
-<div class="line"><a name="l00963"></a><span class="lineno">  963</span>&#160;    <span class="keywordtype">int</span> hd = head_dim;</div>
-<div class="line"><a name="l00964"></a><span class="lineno">  964</span>&#160;    <span class="keywordtype">int</span> ad = aligned_head_dim;</div>
-<div class="line"><a name="l00965"></a><span class="lineno">  965</span>&#160;    <span class="keywordtype">int</span> aw = aligned_context_window;</div>
-<div class="line"><a name="l00966"></a><span class="lineno">  966</span>&#160; </div>
-<div class="line"><a name="l00967"></a><span class="lineno">  967</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> d_q_elems = (size_t)H * (<span class="keywordtype">size_t</span>)T * (size_t)ad;</div>
-<div class="line"><a name="l00968"></a><span class="lineno">  968</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)H_kv * (<span class="keywordtype">size_t</span>)T * (size_t)ad;</div>
-<div class="line"><a name="l00969"></a><span class="lineno">  969</span>&#160;    <span class="comment">/* Zero the aligned outputs so padded lanes never leak garbage to downstream GEMMs. */</span></div>
-<div class="line"><a name="l00970"></a><span class="lineno">  970</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; d_q_elems; ++idx) {</div>
-<div class="line"><a name="l00971"></a><span class="lineno">  971</span>&#160;        d_q[idx] = 0.0f;</div>
-<div class="line"><a name="l00972"></a><span class="lineno">  972</span>&#160;    }</div>
-<div class="line"><a name="l00973"></a><span class="lineno">  973</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; kv_elems; ++idx) {</div>
-<div class="line"><a name="l00974"></a><span class="lineno">  974</span>&#160;        d_k[idx] = 0.0f;</div>
-<div class="line"><a name="l00975"></a><span class="lineno">  975</span>&#160;        d_v[idx] = 0.0f;</div>
-<div class="line"><a name="l00976"></a><span class="lineno">  976</span>&#160;    }</div>
-<div class="line"><a name="l00977"></a><span class="lineno">  977</span>&#160; </div>
-<div class="line"><a name="l00978"></a><span class="lineno">  978</span>&#160;    <span class="comment">// Process each query head</span></div>
-<div class="line"><a name="l00979"></a><span class="lineno">  979</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; H; ++h) {</div>
-<div class="line"><a name="l00980"></a><span class="lineno">  980</span>&#160;        <span class="comment">// Which KV head does this query head use?</span></div>
-<div class="line"><a name="l00981"></a><span class="lineno">  981</span>&#160;        <span class="keywordtype">int</span> kv_h = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)H_kv / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)H);</div>
-<div class="line"><a name="l00982"></a><span class="lineno">  982</span>&#160; </div>
-<div class="line"><a name="l00983"></a><span class="lineno">  983</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l00984"></a><span class="lineno">  984</span>&#160;        <span class="comment">// Step 1: d_weights = d_output @ V^T  and  d_v += weights^T @ d_output</span></div>
-<div class="line"><a name="l00985"></a><span class="lineno">  985</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l00986"></a><span class="lineno">  986</span>&#160;        <span class="comment">// For each query position i, compute d_weights[i, j] for j &lt;= i</span></div>
-<div class="line"><a name="l00987"></a><span class="lineno">  987</span>&#160;        <span class="comment">// and accumulate d_v[j] contributions</span></div>
-<div class="line"><a name="l00988"></a><span class="lineno">  988</span>&#160; </div>
-<div class="line"><a name="l00989"></a><span class="lineno">  989</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
-<div class="line"><a name="l00990"></a><span class="lineno">  990</span>&#160;            <span class="keywordtype">size_t</span> d_out_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
-<div class="line"><a name="l00991"></a><span class="lineno">  991</span>&#160; </div>
-<div class="line"><a name="l00992"></a><span class="lineno">  992</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
-<div class="line"><a name="l00993"></a><span class="lineno">  993</span>&#160;                <span class="keywordtype">size_t</span> v_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
-<div class="line"><a name="l00994"></a><span class="lineno">  994</span>&#160;                <span class="keywordtype">size_t</span> w_idx = <a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw);</div>
-<div class="line"><a name="l00995"></a><span class="lineno">  995</span>&#160;                <span class="keywordtype">float</span> w = attn_weights[w_idx];</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00950">950</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00966"></a><span class="lineno">  966</span>&#160;{</div>
+<div class="line"><a name="l00967"></a><span class="lineno">  967</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><a name="l00968"></a><span class="lineno">  968</span>&#160;    <span class="keywordtype">int</span> T = num_tokens;</div>
+<div class="line"><a name="l00969"></a><span class="lineno">  969</span>&#160;    <span class="keywordtype">int</span> H = num_heads;</div>
+<div class="line"><a name="l00970"></a><span class="lineno">  970</span>&#160;    <span class="keywordtype">int</span> H_kv = num_kv_heads;</div>
+<div class="line"><a name="l00971"></a><span class="lineno">  971</span>&#160;    <span class="keywordtype">int</span> hd = head_dim;</div>
+<div class="line"><a name="l00972"></a><span class="lineno">  972</span>&#160;    <span class="keywordtype">int</span> ad = aligned_head_dim;</div>
+<div class="line"><a name="l00973"></a><span class="lineno">  973</span>&#160;    <span class="keywordtype">int</span> aw = aligned_context_window;</div>
+<div class="line"><a name="l00974"></a><span class="lineno">  974</span>&#160; </div>
+<div class="line"><a name="l00975"></a><span class="lineno">  975</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> d_q_elems = (size_t)H * (<span class="keywordtype">size_t</span>)T * (size_t)ad;</div>
+<div class="line"><a name="l00976"></a><span class="lineno">  976</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)H_kv * (<span class="keywordtype">size_t</span>)T * (size_t)ad;</div>
+<div class="line"><a name="l00977"></a><span class="lineno">  977</span>&#160;    <span class="comment">/* Zero the aligned outputs so padded lanes never leak garbage to downstream GEMMs. */</span></div>
+<div class="line"><a name="l00978"></a><span class="lineno">  978</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; d_q_elems; ++idx) {</div>
+<div class="line"><a name="l00979"></a><span class="lineno">  979</span>&#160;        d_q[idx] = 0.0f;</div>
+<div class="line"><a name="l00980"></a><span class="lineno">  980</span>&#160;    }</div>
+<div class="line"><a name="l00981"></a><span class="lineno">  981</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; kv_elems; ++idx) {</div>
+<div class="line"><a name="l00982"></a><span class="lineno">  982</span>&#160;        d_k[idx] = 0.0f;</div>
+<div class="line"><a name="l00983"></a><span class="lineno">  983</span>&#160;        d_v[idx] = 0.0f;</div>
+<div class="line"><a name="l00984"></a><span class="lineno">  984</span>&#160;    }</div>
+<div class="line"><a name="l00985"></a><span class="lineno">  985</span>&#160; </div>
+<div class="line"><a name="l00986"></a><span class="lineno">  986</span>&#160;    <span class="comment">// Process each query head</span></div>
+<div class="line"><a name="l00987"></a><span class="lineno">  987</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; H; ++h) {</div>
+<div class="line"><a name="l00988"></a><span class="lineno">  988</span>&#160;        <span class="comment">// Which KV head does this query head use?</span></div>
+<div class="line"><a name="l00989"></a><span class="lineno">  989</span>&#160;        <span class="keywordtype">int</span> kv_h = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)H_kv / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)H);</div>
+<div class="line"><a name="l00990"></a><span class="lineno">  990</span>&#160; </div>
+<div class="line"><a name="l00991"></a><span class="lineno">  991</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l00992"></a><span class="lineno">  992</span>&#160;        <span class="comment">// Step 1: d_weights = d_output @ V^T  and  d_v += weights^T @ d_output</span></div>
+<div class="line"><a name="l00993"></a><span class="lineno">  993</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l00994"></a><span class="lineno">  994</span>&#160;        <span class="comment">// For each query position i, compute d_weights[i, j] for j &lt;= i</span></div>
+<div class="line"><a name="l00995"></a><span class="lineno">  995</span>&#160;        <span class="comment">// and accumulate d_v[j] contributions</span></div>
 <div class="line"><a name="l00996"></a><span class="lineno">  996</span>&#160; </div>
-<div class="line"><a name="l00997"></a><span class="lineno">  997</span>&#160;                <span class="comment">// d_weights[h, i, j] = d_output[h, i, :] @ v[kv_h, j, :]^T</span></div>
-<div class="line"><a name="l00998"></a><span class="lineno">  998</span>&#160;                <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><a name="l00999"></a><span class="lineno">  999</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
-<div class="line"><a name="l01000"></a><span class="lineno"> 1000</span>&#160;                    dot += d_output[d_out_base + dd] * v[v_base + dd];</div>
-<div class="line"><a name="l01001"></a><span class="lineno"> 1001</span>&#160;                }</div>
-<div class="line"><a name="l01002"></a><span class="lineno"> 1002</span>&#160;                d_scores[w_idx] = dot;</div>
-<div class="line"><a name="l01003"></a><span class="lineno"> 1003</span>&#160; </div>
-<div class="line"><a name="l01004"></a><span class="lineno"> 1004</span>&#160;                <span class="comment">// d_v[kv_h, j, :] += weights[h, i, j] * d_output[h, i, :]</span></div>
-<div class="line"><a name="l01005"></a><span class="lineno"> 1005</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
-<div class="line"><a name="l01006"></a><span class="lineno"> 1006</span>&#160;                    d_v[v_base + dd] += w * d_output[d_out_base + dd];</div>
-<div class="line"><a name="l01007"></a><span class="lineno"> 1007</span>&#160;                }</div>
-<div class="line"><a name="l01008"></a><span class="lineno"> 1008</span>&#160;            }</div>
-<div class="line"><a name="l01009"></a><span class="lineno"> 1009</span>&#160; </div>
-<div class="line"><a name="l01010"></a><span class="lineno"> 1010</span>&#160;            <span class="comment">// Zero out upper triangle of d_scores</span></div>
-<div class="line"><a name="l01011"></a><span class="lineno"> 1011</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; T; ++j) {</div>
-<div class="line"><a name="l01012"></a><span class="lineno"> 1012</span>&#160;                d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] = 0.0f;</div>
-<div class="line"><a name="l01013"></a><span class="lineno"> 1013</span>&#160;            }</div>
-<div class="line"><a name="l01014"></a><span class="lineno"> 1014</span>&#160;            <span class="comment">/* Scores scratch uses aligned_context_window, zero the padded columns. */</span></div>
-<div class="line"><a name="l01015"></a><span class="lineno"> 1015</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = T; j &lt; aw; ++j) {</div>
-<div class="line"><a name="l01016"></a><span class="lineno"> 1016</span>&#160;                d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] = 0.0f;</div>
-<div class="line"><a name="l01017"></a><span class="lineno"> 1017</span>&#160;            }</div>
-<div class="line"><a name="l01018"></a><span class="lineno"> 1018</span>&#160;        }</div>
-<div class="line"><a name="l01019"></a><span class="lineno"> 1019</span>&#160; </div>
-<div class="line"><a name="l01020"></a><span class="lineno"> 1020</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l01021"></a><span class="lineno"> 1021</span>&#160;        <span class="comment">// Step 2: Backward through softmax (in-place on d_scores for this head)</span></div>
-<div class="line"><a name="l01022"></a><span class="lineno"> 1022</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l01023"></a><span class="lineno"> 1023</span>&#160;        <span class="comment">// d_scores = softmax_backward(d_scores, attn_weights)</span></div>
-<div class="line"><a name="l01024"></a><span class="lineno"> 1024</span>&#160;        <span class="comment">// Formula: d_score[i,j] = w[i,j] * (d_w[i,j] - sum_k(w[i,k] * d_w[i,k]))</span></div>
-<div class="line"><a name="l01025"></a><span class="lineno"> 1025</span>&#160; </div>
-<div class="line"><a name="l01026"></a><span class="lineno"> 1026</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
-<div class="line"><a name="l01027"></a><span class="lineno"> 1027</span>&#160;            <span class="keywordtype">int</span> base = h * aw * aw + i * aw;</div>
-<div class="line"><a name="l01028"></a><span class="lineno"> 1028</span>&#160; </div>
-<div class="line"><a name="l01029"></a><span class="lineno"> 1029</span>&#160;            <span class="comment">// Compute dot product: sum_j w[i,j] * d_w[i,j]</span></div>
-<div class="line"><a name="l01030"></a><span class="lineno"> 1030</span>&#160;            <span class="keywordtype">float</span> dot_product = 0.0f;</div>
-<div class="line"><a name="l01031"></a><span class="lineno"> 1031</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
-<div class="line"><a name="l01032"></a><span class="lineno"> 1032</span>&#160;                <span class="keywordtype">float</span> wt = attn_weights[base + j];</div>
-<div class="line"><a name="l01033"></a><span class="lineno"> 1033</span>&#160;                <span class="keywordtype">float</span> dw = d_scores[base + j];</div>
-<div class="line"><a name="l01034"></a><span class="lineno"> 1034</span>&#160;                dot_product += wt * dw;</div>
-<div class="line"><a name="l01035"></a><span class="lineno"> 1035</span>&#160;            }</div>
+<div class="line"><a name="l00997"></a><span class="lineno">  997</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
+<div class="line"><a name="l00998"></a><span class="lineno">  998</span>&#160;            <span class="keywordtype">size_t</span> d_out_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
+<div class="line"><a name="l00999"></a><span class="lineno">  999</span>&#160; </div>
+<div class="line"><a name="l01000"></a><span class="lineno"> 1000</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
+<div class="line"><a name="l01001"></a><span class="lineno"> 1001</span>&#160;                <span class="keywordtype">size_t</span> v_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
+<div class="line"><a name="l01002"></a><span class="lineno"> 1002</span>&#160;                <span class="keywordtype">size_t</span> w_idx = <a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw);</div>
+<div class="line"><a name="l01003"></a><span class="lineno"> 1003</span>&#160;                <span class="keywordtype">float</span> w = attn_weights[w_idx];</div>
+<div class="line"><a name="l01004"></a><span class="lineno"> 1004</span>&#160; </div>
+<div class="line"><a name="l01005"></a><span class="lineno"> 1005</span>&#160;                <span class="comment">// d_weights[h, i, j] = d_output[h, i, :] @ v[kv_h, j, :]^T</span></div>
+<div class="line"><a name="l01006"></a><span class="lineno"> 1006</span>&#160;                <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><a name="l01007"></a><span class="lineno"> 1007</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
+<div class="line"><a name="l01008"></a><span class="lineno"> 1008</span>&#160;                    dot += d_output[d_out_base + dd] * v[v_base + dd];</div>
+<div class="line"><a name="l01009"></a><span class="lineno"> 1009</span>&#160;                }</div>
+<div class="line"><a name="l01010"></a><span class="lineno"> 1010</span>&#160;                d_scores[w_idx] = dot;</div>
+<div class="line"><a name="l01011"></a><span class="lineno"> 1011</span>&#160; </div>
+<div class="line"><a name="l01012"></a><span class="lineno"> 1012</span>&#160;                <span class="comment">// d_v[kv_h, j, :] += weights[h, i, j] * d_output[h, i, :]</span></div>
+<div class="line"><a name="l01013"></a><span class="lineno"> 1013</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
+<div class="line"><a name="l01014"></a><span class="lineno"> 1014</span>&#160;                    d_v[v_base + dd] += w * d_output[d_out_base + dd];</div>
+<div class="line"><a name="l01015"></a><span class="lineno"> 1015</span>&#160;                }</div>
+<div class="line"><a name="l01016"></a><span class="lineno"> 1016</span>&#160;            }</div>
+<div class="line"><a name="l01017"></a><span class="lineno"> 1017</span>&#160; </div>
+<div class="line"><a name="l01018"></a><span class="lineno"> 1018</span>&#160;            <span class="comment">// Zero out upper triangle of d_scores</span></div>
+<div class="line"><a name="l01019"></a><span class="lineno"> 1019</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; T; ++j) {</div>
+<div class="line"><a name="l01020"></a><span class="lineno"> 1020</span>&#160;                d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] = 0.0f;</div>
+<div class="line"><a name="l01021"></a><span class="lineno"> 1021</span>&#160;            }</div>
+<div class="line"><a name="l01022"></a><span class="lineno"> 1022</span>&#160;            <span class="comment">/* Scores scratch uses aligned_context_window, zero the padded columns. */</span></div>
+<div class="line"><a name="l01023"></a><span class="lineno"> 1023</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = T; j &lt; aw; ++j) {</div>
+<div class="line"><a name="l01024"></a><span class="lineno"> 1024</span>&#160;                d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] = 0.0f;</div>
+<div class="line"><a name="l01025"></a><span class="lineno"> 1025</span>&#160;            }</div>
+<div class="line"><a name="l01026"></a><span class="lineno"> 1026</span>&#160;        }</div>
+<div class="line"><a name="l01027"></a><span class="lineno"> 1027</span>&#160; </div>
+<div class="line"><a name="l01028"></a><span class="lineno"> 1028</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l01029"></a><span class="lineno"> 1029</span>&#160;        <span class="comment">// Step 2: Backward through softmax (in-place on d_scores for this head)</span></div>
+<div class="line"><a name="l01030"></a><span class="lineno"> 1030</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l01031"></a><span class="lineno"> 1031</span>&#160;        <span class="comment">// d_scores = softmax_backward(d_scores, attn_weights)</span></div>
+<div class="line"><a name="l01032"></a><span class="lineno"> 1032</span>&#160;        <span class="comment">// Formula: d_score[i,j] = w[i,j] * (d_w[i,j] - sum_k(w[i,k] * d_w[i,k]))</span></div>
+<div class="line"><a name="l01033"></a><span class="lineno"> 1033</span>&#160; </div>
+<div class="line"><a name="l01034"></a><span class="lineno"> 1034</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
+<div class="line"><a name="l01035"></a><span class="lineno"> 1035</span>&#160;            <span class="keywordtype">int</span> base = h * aw * aw + i * aw;</div>
 <div class="line"><a name="l01036"></a><span class="lineno"> 1036</span>&#160; </div>
-<div class="line"><a name="l01037"></a><span class="lineno"> 1037</span>&#160;            <span class="comment">// Apply softmax backward formula</span></div>
-<div class="line"><a name="l01038"></a><span class="lineno"> 1038</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
-<div class="line"><a name="l01039"></a><span class="lineno"> 1039</span>&#160;                <span class="keywordtype">float</span> wt = attn_weights[base + j];</div>
-<div class="line"><a name="l01040"></a><span class="lineno"> 1040</span>&#160;                <span class="keywordtype">float</span> dw = d_scores[base + j];</div>
-<div class="line"><a name="l01041"></a><span class="lineno"> 1041</span>&#160;                d_scores[base + j] = wt * (dw - dot_product);</div>
-<div class="line"><a name="l01042"></a><span class="lineno"> 1042</span>&#160;            }</div>
-<div class="line"><a name="l01043"></a><span class="lineno"> 1043</span>&#160;        }</div>
+<div class="line"><a name="l01037"></a><span class="lineno"> 1037</span>&#160;            <span class="comment">// Compute dot product: sum_j w[i,j] * d_w[i,j]</span></div>
+<div class="line"><a name="l01038"></a><span class="lineno"> 1038</span>&#160;            <span class="keywordtype">float</span> dot_product = 0.0f;</div>
+<div class="line"><a name="l01039"></a><span class="lineno"> 1039</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
+<div class="line"><a name="l01040"></a><span class="lineno"> 1040</span>&#160;                <span class="keywordtype">float</span> wt = attn_weights[base + j];</div>
+<div class="line"><a name="l01041"></a><span class="lineno"> 1041</span>&#160;                <span class="keywordtype">float</span> dw = d_scores[base + j];</div>
+<div class="line"><a name="l01042"></a><span class="lineno"> 1042</span>&#160;                dot_product += wt * dw;</div>
+<div class="line"><a name="l01043"></a><span class="lineno"> 1043</span>&#160;            }</div>
 <div class="line"><a name="l01044"></a><span class="lineno"> 1044</span>&#160; </div>
-<div class="line"><a name="l01045"></a><span class="lineno"> 1045</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l01046"></a><span class="lineno"> 1046</span>&#160;        <span class="comment">// Step 3: d_q = d_scores @ K * scale</span></div>
-<div class="line"><a name="l01047"></a><span class="lineno"> 1047</span>&#160;        <span class="comment">//         d_k += d_scores^T @ Q * scale</span></div>
-<div class="line"><a name="l01048"></a><span class="lineno"> 1048</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
-<div class="line"><a name="l01049"></a><span class="lineno"> 1049</span>&#160; </div>
-<div class="line"><a name="l01050"></a><span class="lineno"> 1050</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
-<div class="line"><a name="l01051"></a><span class="lineno"> 1051</span>&#160;            <span class="keywordtype">size_t</span> d_q_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
-<div class="line"><a name="l01052"></a><span class="lineno"> 1052</span>&#160;            <span class="keywordtype">size_t</span> q_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
-<div class="line"><a name="l01053"></a><span class="lineno"> 1053</span>&#160; </div>
-<div class="line"><a name="l01054"></a><span class="lineno"> 1054</span>&#160;            <span class="comment">// d_q[h, i, :] = sum_j d_scores[h, i, j] * k[kv_h, j, :] * scale</span></div>
-<div class="line"><a name="l01055"></a><span class="lineno"> 1055</span>&#160;            <span class="comment">// d_k[kv_h, j, :] += d_scores[h, i, j] * q[h, i, :] * scale</span></div>
-<div class="line"><a name="l01056"></a><span class="lineno"> 1056</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
-<div class="line"><a name="l01057"></a><span class="lineno"> 1057</span>&#160;                <span class="keywordtype">size_t</span> k_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
-<div class="line"><a name="l01058"></a><span class="lineno"> 1058</span>&#160;                <span class="keywordtype">size_t</span> d_k_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
-<div class="line"><a name="l01059"></a><span class="lineno"> 1059</span>&#160;                <span class="keywordtype">float</span> ds = d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] * scale;</div>
-<div class="line"><a name="l01060"></a><span class="lineno"> 1060</span>&#160; </div>
-<div class="line"><a name="l01061"></a><span class="lineno"> 1061</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
-<div class="line"><a name="l01062"></a><span class="lineno"> 1062</span>&#160;                    d_q[d_q_base + dd] += ds * k[k_base + dd];</div>
-<div class="line"><a name="l01063"></a><span class="lineno"> 1063</span>&#160;                    d_k[d_k_base + dd] += ds * q[q_base + dd];</div>
-<div class="line"><a name="l01064"></a><span class="lineno"> 1064</span>&#160;                }</div>
-<div class="line"><a name="l01065"></a><span class="lineno"> 1065</span>&#160;            }</div>
-<div class="line"><a name="l01066"></a><span class="lineno"> 1066</span>&#160;        }</div>
-<div class="line"><a name="l01067"></a><span class="lineno"> 1067</span>&#160;    }</div>
-<div class="line"><a name="l01068"></a><span class="lineno"> 1068</span>&#160;}</div>
+<div class="line"><a name="l01045"></a><span class="lineno"> 1045</span>&#160;            <span class="comment">// Apply softmax backward formula</span></div>
+<div class="line"><a name="l01046"></a><span class="lineno"> 1046</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
+<div class="line"><a name="l01047"></a><span class="lineno"> 1047</span>&#160;                <span class="keywordtype">float</span> wt = attn_weights[base + j];</div>
+<div class="line"><a name="l01048"></a><span class="lineno"> 1048</span>&#160;                <span class="keywordtype">float</span> dw = d_scores[base + j];</div>
+<div class="line"><a name="l01049"></a><span class="lineno"> 1049</span>&#160;                d_scores[base + j] = wt * (dw - dot_product);</div>
+<div class="line"><a name="l01050"></a><span class="lineno"> 1050</span>&#160;            }</div>
+<div class="line"><a name="l01051"></a><span class="lineno"> 1051</span>&#160;        }</div>
+<div class="line"><a name="l01052"></a><span class="lineno"> 1052</span>&#160; </div>
+<div class="line"><a name="l01053"></a><span class="lineno"> 1053</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l01054"></a><span class="lineno"> 1054</span>&#160;        <span class="comment">// Step 3: d_q = d_scores @ K * scale</span></div>
+<div class="line"><a name="l01055"></a><span class="lineno"> 1055</span>&#160;        <span class="comment">//         d_k += d_scores^T @ Q * scale</span></div>
+<div class="line"><a name="l01056"></a><span class="lineno"> 1056</span>&#160;        <span class="comment">// ----------------------------------------------------------------</span></div>
+<div class="line"><a name="l01057"></a><span class="lineno"> 1057</span>&#160; </div>
+<div class="line"><a name="l01058"></a><span class="lineno"> 1058</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
+<div class="line"><a name="l01059"></a><span class="lineno"> 1059</span>&#160;            <span class="keywordtype">size_t</span> d_q_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
+<div class="line"><a name="l01060"></a><span class="lineno"> 1060</span>&#160;            <span class="keywordtype">size_t</span> q_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, ad);</div>
+<div class="line"><a name="l01061"></a><span class="lineno"> 1061</span>&#160; </div>
+<div class="line"><a name="l01062"></a><span class="lineno"> 1062</span>&#160;            <span class="comment">// d_q[h, i, :] = sum_j d_scores[h, i, j] * k[kv_h, j, :] * scale</span></div>
+<div class="line"><a name="l01063"></a><span class="lineno"> 1063</span>&#160;            <span class="comment">// d_k[kv_h, j, :] += d_scores[h, i, j] * q[h, i, :] * scale</span></div>
+<div class="line"><a name="l01064"></a><span class="lineno"> 1064</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= i; ++j) {</div>
+<div class="line"><a name="l01065"></a><span class="lineno"> 1065</span>&#160;                <span class="keywordtype">size_t</span> k_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
+<div class="line"><a name="l01066"></a><span class="lineno"> 1066</span>&#160;                <span class="keywordtype">size_t</span> d_k_base = <a class="code" href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(kv_h, j, 0, T, ad);</div>
+<div class="line"><a name="l01067"></a><span class="lineno"> 1067</span>&#160;                <span class="keywordtype">float</span> ds = d_scores[<a class="code" href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a>(h, i, j, aw)] * scale;</div>
+<div class="line"><a name="l01068"></a><span class="lineno"> 1068</span>&#160; </div>
+<div class="line"><a name="l01069"></a><span class="lineno"> 1069</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dd = 0; dd &lt; hd; ++dd) {</div>
+<div class="line"><a name="l01070"></a><span class="lineno"> 1070</span>&#160;                    d_q[d_q_base + dd] += ds * k[k_base + dd];</div>
+<div class="line"><a name="l01071"></a><span class="lineno"> 1071</span>&#160;                    d_k[d_k_base + dd] += ds * q[q_base + dd];</div>
+<div class="line"><a name="l01072"></a><span class="lineno"> 1072</span>&#160;                }</div>
+<div class="line"><a name="l01073"></a><span class="lineno"> 1073</span>&#160;            }</div>
+<div class="line"><a name="l01074"></a><span class="lineno"> 1074</span>&#160;        }</div>
+<div class="line"><a name="l01075"></a><span class="lineno"> 1075</span>&#160;    }</div>
+<div class="line"><a name="l01076"></a><span class="lineno"> 1076</span>&#160;}</div>
 <div class="ttc" id="aattention__kernels_8c_html_a0102833b3c8a1d4114e65c0638ddbfb1"><div class="ttname"><a href="attention__kernels_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a></div><div class="ttdeci">static size_t qkv_index(int h, int t, int d, int num_tokens, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="attention__kernels_8c_source.html#l00023">attention_kernels.c:23</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_a730fa391639fb17027ee898e26e5db06"><div class="ttname"><a href="attention__kernels_8c.html#a730fa391639fb17027ee898e26e5db06">score_index</a></div><div class="ttdeci">static size_t score_index(int h, int i, int j, int aligned_context_window)</div><div class="ttdef"><b>Definition:</b> <a href="attention__kernels_8c_source.html#l00035">attention_kernels.c:35</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00035">score_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l01071">attention_backward_causal_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00884">attention_backward_causal_head_major_gqa_bf16()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l01079">attention_backward_causal_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00892">attention_backward_causal_head_major_gqa_bf16()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -1460,50 +1471,160 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00884">884</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00901"></a><span class="lineno">  901</span>&#160;{</div>
-<div class="line"><a name="l00902"></a><span class="lineno">  902</span>&#160;    (void)d_x;</div>
-<div class="line"><a name="l00903"></a><span class="lineno">  903</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_elems = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
-<div class="line"><a name="l00904"></a><span class="lineno">  904</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
-<div class="line"><a name="l00905"></a><span class="lineno">  905</span>&#160; </div>
-<div class="line"><a name="l00906"></a><span class="lineno">  906</span>&#160;    <span class="keywordtype">float</span> *d_output_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(d_output, head_elems);</div>
-<div class="line"><a name="l00907"></a><span class="lineno">  907</span>&#160;    <span class="keywordflow">if</span> (!d_output_f) {</div>
-<div class="line"><a name="l00908"></a><span class="lineno">  908</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00909"></a><span class="lineno">  909</span>&#160;    }</div>
-<div class="line"><a name="l00910"></a><span class="lineno">  910</span>&#160;    <span class="keywordtype">float</span> *q_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(q, head_elems);</div>
-<div class="line"><a name="l00911"></a><span class="lineno">  911</span>&#160;    <span class="keywordflow">if</span> (!q_f) {</div>
-<div class="line"><a name="l00912"></a><span class="lineno">  912</span>&#160;        free(d_output_f);</div>
-<div class="line"><a name="l00913"></a><span class="lineno">  913</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00914"></a><span class="lineno">  914</span>&#160;    }</div>
-<div class="line"><a name="l00915"></a><span class="lineno">  915</span>&#160;    <span class="keywordtype">float</span> *k_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(k, kv_elems);</div>
-<div class="line"><a name="l00916"></a><span class="lineno">  916</span>&#160;    <span class="keywordflow">if</span> (!k_f) {</div>
-<div class="line"><a name="l00917"></a><span class="lineno">  917</span>&#160;        free(d_output_f);</div>
-<div class="line"><a name="l00918"></a><span class="lineno">  918</span>&#160;        free(q_f);</div>
-<div class="line"><a name="l00919"></a><span class="lineno">  919</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00920"></a><span class="lineno">  920</span>&#160;    }</div>
-<div class="line"><a name="l00921"></a><span class="lineno">  921</span>&#160;    <span class="keywordtype">float</span> *v_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(v, kv_elems);</div>
-<div class="line"><a name="l00922"></a><span class="lineno">  922</span>&#160;    <span class="keywordflow">if</span> (!v_f) {</div>
-<div class="line"><a name="l00923"></a><span class="lineno">  923</span>&#160;        free(d_output_f);</div>
-<div class="line"><a name="l00924"></a><span class="lineno">  924</span>&#160;        free(q_f);</div>
-<div class="line"><a name="l00925"></a><span class="lineno">  925</span>&#160;        free(k_f);</div>
-<div class="line"><a name="l00926"></a><span class="lineno">  926</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00927"></a><span class="lineno">  927</span>&#160;    }</div>
-<div class="line"><a name="l00928"></a><span class="lineno">  928</span>&#160; </div>
-<div class="line"><a name="l00929"></a><span class="lineno">  929</span>&#160;    <a class="code" href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a>(d_output_f, q_f, k_f, v_f,</div>
-<div class="line"><a name="l00930"></a><span class="lineno">  930</span>&#160;                                             attn_weights,</div>
-<div class="line"><a name="l00931"></a><span class="lineno">  931</span>&#160;                                             d_q, d_k, d_v, d_scores,</div>
-<div class="line"><a name="l00932"></a><span class="lineno">  932</span>&#160;                                             num_heads, num_kv_heads,</div>
-<div class="line"><a name="l00933"></a><span class="lineno">  933</span>&#160;                                             num_tokens, head_dim,</div>
-<div class="line"><a name="l00934"></a><span class="lineno">  934</span>&#160;                                             aligned_head_dim, aligned_context_window);</div>
-<div class="line"><a name="l00935"></a><span class="lineno">  935</span>&#160; </div>
-<div class="line"><a name="l00936"></a><span class="lineno">  936</span>&#160;    free(d_output_f);</div>
-<div class="line"><a name="l00937"></a><span class="lineno">  937</span>&#160;    free(q_f);</div>
-<div class="line"><a name="l00938"></a><span class="lineno">  938</span>&#160;    free(k_f);</div>
-<div class="line"><a name="l00939"></a><span class="lineno">  939</span>&#160;    free(v_f);</div>
-<div class="line"><a name="l00940"></a><span class="lineno">  940</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00892">892</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00909"></a><span class="lineno">  909</span>&#160;{</div>
+<div class="line"><a name="l00910"></a><span class="lineno">  910</span>&#160;    (void)d_x;</div>
+<div class="line"><a name="l00911"></a><span class="lineno">  911</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_elems = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
+<div class="line"><a name="l00912"></a><span class="lineno">  912</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
+<div class="line"><a name="l00913"></a><span class="lineno">  913</span>&#160; </div>
+<div class="line"><a name="l00914"></a><span class="lineno">  914</span>&#160;    <span class="keywordtype">float</span> *d_output_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(d_output, head_elems);</div>
+<div class="line"><a name="l00915"></a><span class="lineno">  915</span>&#160;    <span class="keywordflow">if</span> (!d_output_f) {</div>
+<div class="line"><a name="l00916"></a><span class="lineno">  916</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00917"></a><span class="lineno">  917</span>&#160;    }</div>
+<div class="line"><a name="l00918"></a><span class="lineno">  918</span>&#160;    <span class="keywordtype">float</span> *q_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(q, head_elems);</div>
+<div class="line"><a name="l00919"></a><span class="lineno">  919</span>&#160;    <span class="keywordflow">if</span> (!q_f) {</div>
+<div class="line"><a name="l00920"></a><span class="lineno">  920</span>&#160;        free(d_output_f);</div>
+<div class="line"><a name="l00921"></a><span class="lineno">  921</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00922"></a><span class="lineno">  922</span>&#160;    }</div>
+<div class="line"><a name="l00923"></a><span class="lineno">  923</span>&#160;    <span class="keywordtype">float</span> *k_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(k, kv_elems);</div>
+<div class="line"><a name="l00924"></a><span class="lineno">  924</span>&#160;    <span class="keywordflow">if</span> (!k_f) {</div>
+<div class="line"><a name="l00925"></a><span class="lineno">  925</span>&#160;        free(d_output_f);</div>
+<div class="line"><a name="l00926"></a><span class="lineno">  926</span>&#160;        free(q_f);</div>
+<div class="line"><a name="l00927"></a><span class="lineno">  927</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00928"></a><span class="lineno">  928</span>&#160;    }</div>
+<div class="line"><a name="l00929"></a><span class="lineno">  929</span>&#160;    <span class="keywordtype">float</span> *v_f = <a class="code" href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a>(v, kv_elems);</div>
+<div class="line"><a name="l00930"></a><span class="lineno">  930</span>&#160;    <span class="keywordflow">if</span> (!v_f) {</div>
+<div class="line"><a name="l00931"></a><span class="lineno">  931</span>&#160;        free(d_output_f);</div>
+<div class="line"><a name="l00932"></a><span class="lineno">  932</span>&#160;        free(q_f);</div>
+<div class="line"><a name="l00933"></a><span class="lineno">  933</span>&#160;        free(k_f);</div>
+<div class="line"><a name="l00934"></a><span class="lineno">  934</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00935"></a><span class="lineno">  935</span>&#160;    }</div>
+<div class="line"><a name="l00936"></a><span class="lineno">  936</span>&#160; </div>
+<div class="line"><a name="l00937"></a><span class="lineno">  937</span>&#160;    <a class="code" href="attention__kernels_8c.html#adbd2b55fbc53b6e288c98813b61cd6e3">attention_backward_causal_head_major_gqa</a>(d_output_f, q_f, k_f, v_f,</div>
+<div class="line"><a name="l00938"></a><span class="lineno">  938</span>&#160;                                             attn_weights,</div>
+<div class="line"><a name="l00939"></a><span class="lineno">  939</span>&#160;                                             d_q, d_k, d_v, d_scores,</div>
+<div class="line"><a name="l00940"></a><span class="lineno">  940</span>&#160;                                             num_heads, num_kv_heads,</div>
+<div class="line"><a name="l00941"></a><span class="lineno">  941</span>&#160;                                             num_tokens, head_dim,</div>
+<div class="line"><a name="l00942"></a><span class="lineno">  942</span>&#160;                                             aligned_head_dim, aligned_context_window);</div>
+<div class="line"><a name="l00943"></a><span class="lineno">  943</span>&#160; </div>
+<div class="line"><a name="l00944"></a><span class="lineno">  944</span>&#160;    free(d_output_f);</div>
+<div class="line"><a name="l00945"></a><span class="lineno">  945</span>&#160;    free(q_f);</div>
+<div class="line"><a name="l00946"></a><span class="lineno">  946</span>&#160;    free(k_f);</div>
+<div class="line"><a name="l00947"></a><span class="lineno">  947</span>&#160;    free(v_f);</div>
+<div class="line"><a name="l00948"></a><span class="lineno">  948</span>&#160;}</div>
 <div class="ttc" id="aattention__kernels_8c_html_a4113194a0a57126146cb4d5471c05bd5"><div class="ttname"><a href="attention__kernels_8c.html#a4113194a0a57126146cb4d5471c05bd5">convert_bf16_tensor</a></div><div class="ttdeci">static float * convert_bf16_tensor(const uint16_t *src, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="attention__kernels_8c_source.html#l00010">attention_kernels.c:10</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00942">attention_backward_causal_head_major_gqa()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00010">convert_bf16_tensor()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00950">attention_backward_causal_head_major_gqa()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00010">convert_bf16_tensor()</a>.</p>
+
+</div>
+</div>
+<a id="a2d29666212a174c892343d3589bcd737"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2d29666212a174c892343d3589bcd737">&#9670;&nbsp;</a></span>attention_flash_decode()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void attention_flash_decode </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>T_q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>T_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>H</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>D_h</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>scale</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Main flash attention function with SIMD dispatch. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">out</td><td>Output [T_q, H, D_h] </td></tr>
+    <tr><td class="paramname">q</td><td>Query [T_q, H, D_h] </td></tr>
+    <tr><td class="paramname">k</td><td>Key [T_k, H, D_h] </td></tr>
+    <tr><td class="paramname">v</td><td>Value [T_k, H, D_h] </td></tr>
+    <tr><td class="paramname">T_q</td><td>Number of query tokens (1 for decode) </td></tr>
+    <tr><td class="paramname">T_k</td><td>Number of key/value tokens (context length) </td></tr>
+    <tr><td class="paramname">H</td><td>Number of heads </td></tr>
+    <tr><td class="paramname">D_h</td><td>Head dimension </td></tr>
+    <tr><td class="paramname">scale</td><td>1/sqrt(D_h) </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="attention__flash__true_8c_source.html#l00687">687</a> of file <a class="el" href="attention__flash__true_8c_source.html">attention_flash_true.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00697"></a><span class="lineno">  697</span>&#160;{</div>
+<div class="line"><a name="l00698"></a><span class="lineno">  698</span>&#160;    <span class="keywordflow">if</span> (!out || !q || !k || !v) {</div>
+<div class="line"><a name="l00699"></a><span class="lineno">  699</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00700"></a><span class="lineno">  700</span>&#160;    }</div>
+<div class="line"><a name="l00701"></a><span class="lineno">  701</span>&#160;    <span class="keywordflow">if</span> (T_q &lt;= 0 || T_k &lt;= 0 || H &lt;= 0 || D_h &lt;= 0) {</div>
+<div class="line"><a name="l00702"></a><span class="lineno">  702</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00703"></a><span class="lineno">  703</span>&#160;    }</div>
+<div class="line"><a name="l00704"></a><span class="lineno">  704</span>&#160; </div>
+<div class="line"><a name="l00705"></a><span class="lineno">  705</span>&#160;    <span class="comment">// Dispatch based on CPU features</span></div>
+<div class="line"><a name="l00706"></a><span class="lineno">  706</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00707"></a><span class="lineno">  707</span>&#160;    attention_flash_decode_avx512(out, q, k, v, T_q, T_k, H, D_h, scale);</div>
+<div class="line"><a name="l00708"></a><span class="lineno">  708</span>&#160;<span class="preprocessor">#elif defined(__AVX__) &amp;&amp; !defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00709"></a><span class="lineno">  709</span>&#160;    attention_flash_decode_avx(out, q, k, v, T_q, T_k, H, D_h, scale);</div>
+<div class="line"><a name="l00710"></a><span class="lineno">  710</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00711"></a><span class="lineno">  711</span>&#160;    <a class="code" href="attention__flash__true_8c.html#a2760bf1f7501f320fef261e81553243e">attention_flash_decode_scalar</a>(out, q, k, v, T_q, T_k, H, D_h, scale);</div>
+<div class="line"><a name="l00712"></a><span class="lineno">  712</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00713"></a><span class="lineno">  713</span>&#160;}</div>
+<div class="ttc" id="aattention__flash__true_8c_html_a2760bf1f7501f320fef261e81553243e"><div class="ttname"><a href="attention__flash__true_8c.html#a2760bf1f7501f320fef261e81553243e">attention_flash_decode_scalar</a></div><div class="ttdeci">static void attention_flash_decode_scalar(float *out, const float *q, const float *k, const float *v, int T_q, int T_k, int H, int D_h, float scale)</div><div class="ttdoc">Scalar flash-style attention (online softmax)</div><div class="ttdef"><b>Definition:</b> <a href="attention__flash__true_8c_source.html#l00133">attention_flash_true.c:133</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__flash__true_8c_source.html#l00133">attention_flash_decode_scalar()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00040">ck_attention_flash_decode_wrapper()</a>.</p>
 
 </div>
 </div>
@@ -1911,7 +2032,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="softmax__kernels_8c_source.html#l00117">causal_softmax_head_major()</a>, <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>, and <a class="el" href="attention__kernels_8c_source.html#l00035">score_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00944">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01858">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02349">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01052">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
 
 </div>
 </div>
@@ -2281,18 +2402,18 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c.html#a686599872afcb86c5fc7ad5e5e5b4773">FLASH_QUERY_IMPL</a>, and <a class="el" href="attention__kernels_8c_source.html#l00023">qkv_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00944">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01858">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02349">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01052">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
 
 </div>
 </div>
-<a id="a84803f8c5509c325dd6b9feec50a0493"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a84803f8c5509c325dd6b9feec50a0493">&#9670;&nbsp;</a></span>attention_forward_decode_head_major_gqa_flash()</h2>
+<a id="a935728e009d1712976ed3cff71f50387"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a935728e009d1712976ed3cff71f50387">&#9670;&nbsp;</a></span>attention_forward_decode_head_major_gqa_regular()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void attention_forward_decode_head_major_gqa_flash </td>
+          <td class="memname">void attention_forward_decode_head_major_gqa_regular </td>
           <td>(</td>
           <td class="paramtype">const float *&#160;</td>
           <td class="paramname"><em>q_token</em>, </td>
@@ -2359,52 +2480,56 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00798">798</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00808"></a><span class="lineno">  808</span>&#160;{</div>
-<div class="line"><a name="l00809"></a><span class="lineno">  809</span>&#160;    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
-<div class="line"><a name="l00810"></a><span class="lineno">  810</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00811"></a><span class="lineno">  811</span>&#160;    }</div>
-<div class="line"><a name="l00812"></a><span class="lineno">  812</span>&#160;    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || kv_tokens &lt;= 0 || cache_capacity &lt;= 0) {</div>
-<div class="line"><a name="l00813"></a><span class="lineno">  813</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00814"></a><span class="lineno">  814</span>&#160;    }</div>
-<div class="line"><a name="l00815"></a><span class="lineno">  815</span>&#160;    <span class="keywordflow">if</span> (kv_tokens &gt; cache_capacity) {</div>
-<div class="line"><a name="l00816"></a><span class="lineno">  816</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00817"></a><span class="lineno">  817</span>&#160;    }</div>
-<div class="line"><a name="l00818"></a><span class="lineno">  818</span>&#160; </div>
-<div class="line"><a name="l00819"></a><span class="lineno">  819</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
-<div class="line"><a name="l00820"></a><span class="lineno">  820</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><a name="l00821"></a><span class="lineno">  821</span>&#160; </div>
-<div class="line"><a name="l00822"></a><span class="lineno">  822</span>&#160;    <span class="comment">// Select SIMD implementation based on compile-time CPU features</span></div>
-<div class="line"><a name="l00823"></a><span class="lineno">  823</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a name="l00824"></a><span class="lineno">  824</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx512</span></div>
-<div class="line"><a name="l00825"></a><span class="lineno">  825</span>&#160;<span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><a name="l00826"></a><span class="lineno">  826</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx2</span></div>
-<div class="line"><a name="l00827"></a><span class="lineno">  827</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><a name="l00828"></a><span class="lineno">  828</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx</span></div>
-<div class="line"><a name="l00829"></a><span class="lineno">  829</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00830"></a><span class="lineno">  830</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal</span></div>
-<div class="line"><a name="l00831"></a><span class="lineno">  831</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00832"></a><span class="lineno">  832</span>&#160; </div>
-<div class="line"><a name="l00833"></a><span class="lineno">  833</span>&#160;<span class="preprocessor">#pragma omp parallel for schedule(static) if(num_heads &gt; 1)</span></div>
-<div class="line"><a name="l00834"></a><span class="lineno">  834</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><a name="l00835"></a><span class="lineno">  835</span>&#160;        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><a name="l00836"></a><span class="lineno">  836</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><a name="l00837"></a><span class="lineno">  837</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride;</div>
-<div class="line"><a name="l00838"></a><span class="lineno">  838</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride;</div>
-<div class="line"><a name="l00839"></a><span class="lineno">  839</span>&#160;        <span class="keywordtype">float</span> *out_vec = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<p>WARNING: This is NOT true flash attention! </p>
+<p>This function is named "flash" but implements regular attention with O(n) complexity. It's kept for reference and as a fallback.</p>
+<p>TRUE flash attention is implemented in <a class="el" href="attention__flash__true_8c.html" title="Flash-style attention (online softmax, causal, streaming).">attention_flash_true.c</a> </p>
+
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l00806">806</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00816"></a><span class="lineno">  816</span>&#160;{</div>
+<div class="line"><a name="l00817"></a><span class="lineno">  817</span>&#160;    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
+<div class="line"><a name="l00818"></a><span class="lineno">  818</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00819"></a><span class="lineno">  819</span>&#160;    }</div>
+<div class="line"><a name="l00820"></a><span class="lineno">  820</span>&#160;    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || kv_tokens &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><a name="l00821"></a><span class="lineno">  821</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00822"></a><span class="lineno">  822</span>&#160;    }</div>
+<div class="line"><a name="l00823"></a><span class="lineno">  823</span>&#160;    <span class="keywordflow">if</span> (kv_tokens &gt; cache_capacity) {</div>
+<div class="line"><a name="l00824"></a><span class="lineno">  824</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00825"></a><span class="lineno">  825</span>&#160;    }</div>
+<div class="line"><a name="l00826"></a><span class="lineno">  826</span>&#160; </div>
+<div class="line"><a name="l00827"></a><span class="lineno">  827</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><a name="l00828"></a><span class="lineno">  828</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00829"></a><span class="lineno">  829</span>&#160; </div>
+<div class="line"><a name="l00830"></a><span class="lineno">  830</span>&#160;    <span class="comment">// Select SIMD implementation based on compile-time CPU features</span></div>
+<div class="line"><a name="l00831"></a><span class="lineno">  831</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00832"></a><span class="lineno">  832</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx512</span></div>
+<div class="line"><a name="l00833"></a><span class="lineno">  833</span>&#160;<span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><a name="l00834"></a><span class="lineno">  834</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx2</span></div>
+<div class="line"><a name="l00835"></a><span class="lineno">  835</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a name="l00836"></a><span class="lineno">  836</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal_avx</span></div>
+<div class="line"><a name="l00837"></a><span class="lineno">  837</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00838"></a><span class="lineno">  838</span>&#160;<span class="preprocessor">    #define FLASH_QUERY_IMPL_DECODE attention_flash_query_causal</span></div>
+<div class="line"><a name="l00839"></a><span class="lineno">  839</span>&#160;<span class="preprocessor">#endif</span></div>
 <div class="line"><a name="l00840"></a><span class="lineno">  840</span>&#160; </div>
-<div class="line"><a name="l00841"></a><span class="lineno">  841</span>&#160;        <a class="code" href="attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4">FLASH_QUERY_IMPL_DECODE</a>(q_vec, k_head, v_head,</div>
-<div class="line"><a name="l00842"></a><span class="lineno">  842</span>&#160;                                 kv_tokens, head_dim, aligned_head_dim,</div>
-<div class="line"><a name="l00843"></a><span class="lineno">  843</span>&#160;                                 scale, out_vec);</div>
-<div class="line"><a name="l00844"></a><span class="lineno">  844</span>&#160;    }</div>
-<div class="line"><a name="l00845"></a><span class="lineno">  845</span>&#160; </div>
-<div class="line"><a name="l00846"></a><span class="lineno">  846</span>&#160;<span class="preprocessor">#undef FLASH_QUERY_IMPL_DECODE</span></div>
-<div class="line"><a name="l00847"></a><span class="lineno">  847</span>&#160;}</div>
+<div class="line"><a name="l00841"></a><span class="lineno">  841</span>&#160;<span class="preprocessor">#pragma omp parallel for schedule(static) if(num_heads &gt; 1)</span></div>
+<div class="line"><a name="l00842"></a><span class="lineno">  842</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><a name="l00843"></a><span class="lineno">  843</span>&#160;        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><a name="l00844"></a><span class="lineno">  844</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00845"></a><span class="lineno">  845</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><a name="l00846"></a><span class="lineno">  846</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><a name="l00847"></a><span class="lineno">  847</span>&#160;        <span class="keywordtype">float</span> *out_vec = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00848"></a><span class="lineno">  848</span>&#160; </div>
+<div class="line"><a name="l00849"></a><span class="lineno">  849</span>&#160;        <a class="code" href="attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4">FLASH_QUERY_IMPL_DECODE</a>(q_vec, k_head, v_head,</div>
+<div class="line"><a name="l00850"></a><span class="lineno">  850</span>&#160;                                 kv_tokens, head_dim, aligned_head_dim,</div>
+<div class="line"><a name="l00851"></a><span class="lineno">  851</span>&#160;                                 scale, out_vec);</div>
+<div class="line"><a name="l00852"></a><span class="lineno">  852</span>&#160;    }</div>
+<div class="line"><a name="l00853"></a><span class="lineno">  853</span>&#160; </div>
+<div class="line"><a name="l00854"></a><span class="lineno">  854</span>&#160;<span class="preprocessor">#undef FLASH_QUERY_IMPL_DECODE</span></div>
+<div class="line"><a name="l00855"></a><span class="lineno">  855</span>&#160;}</div>
 <div class="ttc" id="aattention__kernels_8c_html_aba8a26d95a9c96411b5fea006f2097e4"><div class="ttname"><a href="attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4">FLASH_QUERY_IMPL_DECODE</a></div><div class="ttdeci">#define FLASH_QUERY_IMPL_DECODE</div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4">FLASH_QUERY_IMPL_DECODE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01167">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01327">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02390">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>.</p>
 
 </div>
 </div>
@@ -3005,6 +3130,200 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="aac849c8be1c936169d2f525ac0f3d87e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aac849c8be1c936169d2f525ac0f3d87e">&#9670;&nbsp;</a></span>ck_attention_flash_decode_wrapper()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_attention_flash_decode_wrapper </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q_token</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_cache</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v_cache</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out_token</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>kv_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>cache_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Wrapper to call TRUE flash attention from orchestration layer. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">q_token</td><td>Query token [H, D_h] </td></tr>
+    <tr><td class="paramname">k_cache</td><td>Cached keys [T_k, H, D_h] </td></tr>
+    <tr><td class="paramname">v_cache</td><td>Cached values [T_k, H, D_h] </td></tr>
+    <tr><td class="paramname">out_token</td><td>Output [H, D_h] </td></tr>
+    <tr><td class="paramname">num_heads</td><td>Number of heads </td></tr>
+    <tr><td class="paramname">num_kv_heads</td><td>Number of KV heads (for GQA) </td></tr>
+    <tr><td class="paramname">kv_tokens</td><td>Number of tokens in KV cache </td></tr>
+    <tr><td class="paramname">cache_capacity</td><td>Cache capacity </td></tr>
+    <tr><td class="paramname">head_dim</td><td>Head dimension </td></tr>
+    <tr><td class="paramname">aligned_head_dim</td><td>Aligned head dimension </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="ckernel__orchestration_8c_source.html#l00040">40</a> of file <a class="el" href="ckernel__orchestration_8c_source.html">ckernel_orchestration.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;{</div>
+<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    }</div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || kv_tokens &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;    }</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;    <span class="keywordflow">if</span> (kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;    }</div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160; </div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;    <span class="comment">// Scale factor: 1/sqrt(head_dim)</span></div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160; </div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;<span class="preprocessor">#pragma omp parallel for schedule(static) if(num_heads &gt; 1)</span></div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160; </div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;        <span class="comment">// Use aligned_head_dim as D_h so per-token stride matches the cache layout.</span></div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;        <a class="code" href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a>(out_head,</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;                               q_head,</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;                               k_head,</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;                               v_head,</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;                               1,</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;                               kv_tokens,</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;                               1,</div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;                               aligned_head_dim,</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;                               scale);</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;    }</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;}</div>
+<div class="ttc" id="ackernel__engine_8h_html_a2d29666212a174c892343d3589bcd737"><div class="ttname"><a href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a></div><div class="ttdeci">void attention_flash_decode(float *out, const float *q, const float *k, const float *v, int T_q, int T_k, int H, int D_h, float scale)</div><div class="ttdoc">Main flash attention function with SIMD dispatch.</div><div class="ttdef"><b>Definition:</b> <a href="attention__flash__true_8c_source.html#l00687">attention_flash_true.c:687</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__flash__true_8c_source.html#l00687">attention_flash_decode()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01237">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01397">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02460">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
+
+</div>
+</div>
+<a id="a0a172ab2e2319c20408ffdc9e98b3b42"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0a172ab2e2319c20408ffdc9e98b3b42">&#9670;&nbsp;</a></span>ck_flash_attn_choose_tile_k()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_flash_attn_choose_tile_k </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>D_h</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__flash__true_8c_source.html#l00099">99</a> of file <a class="el" href="attention__flash__true_8c_source.html">attention_flash_true.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;                                         {</div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;    <span class="keywordflow">return</span> <a class="code" href="attention__flash__true_8c.html#aa6c8bbe541ab9c826f19e667b94a757c">ck_flash_attn_tile_k</a>(D_h);</div>
+<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;}</div>
+<div class="ttc" id="aattention__flash__true_8c_html_aa6c8bbe541ab9c826f19e667b94a757c"><div class="ttname"><a href="attention__flash__true_8c.html#aa6c8bbe541ab9c826f19e667b94a757c">ck_flash_attn_tile_k</a></div><div class="ttdeci">static int ck_flash_attn_tile_k(int D_h)</div><div class="ttdef"><b>Definition:</b> <a href="attention__flash__true_8c_source.html#l00079">attention_flash_true.c:79</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__flash__true_8c_source.html#l00079">ck_flash_attn_tile_k()</a>.</p>
+
+</div>
+</div>
+<a id="ad2a838269326bb70a8ced00de62d69b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad2a838269326bb70a8ced00de62d69b8">&#9670;&nbsp;</a></span>ck_flash_attn_fast_exp_kind()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_flash_attn_fast_exp_kind </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__flash__true_8c_source.html#l00103">103</a> of file <a class="el" href="attention__flash__true_8c_source.html">attention_flash_true.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;                                      {</div>
+<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;<span class="preprocessor">#if CK_FLASH_ATTN_FAST_EXP</span></div>
+<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;    <span class="keywordflow">return</span> 512;</div>
+<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;    <span class="keywordflow">return</span> 256;</div>
+<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160;}</div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="aedf852ec498fe7db175f59f810886b9f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aedf852ec498fe7db175f59f810886b9f">&#9670;&nbsp;</a></span>ck_get_num_threads()</h2>
 
@@ -3257,7 +3576,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00019">ck_strict_parity</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00192">ck_q8k_activations_enabled()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00130">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00642">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00186">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00106">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00320">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00383">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00298">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00502">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00562">gemm_tn_blocked()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00480">gemm_tn_parallel()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00262">ck_q8k_activations_enabled()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00130">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00642">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00186">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00106">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00320">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00383">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00298">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00502">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00562">gemm_tn_blocked()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00480">gemm_tn_parallel()</a>.</p>
 
 </div>
 </div>
@@ -4615,7 +4934,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00320">gemm_nn_avx512()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00502">gemm_tn_avx512()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -4726,7 +5045,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00320">gemm_nn_avx512()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00502">gemm_tn_avx512()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00678">ck_attention_project_head_major_backward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00734">ck_qkv_project_head_major_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00748">ck_attention_project_head_major_backward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00804">ck_qkv_project_head_major_backward()</a>.</p>
 
 </div>
 </div>
@@ -5306,7 +5625,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="mlp__fused__decode_8c_source.html#l00415">fused_mlp_swiglu_decode_tiled()</a>, <a class="el" href="mlp__fused__decode_8c_source.html#l00302">MAX_SWIGLU_STACK</a>, and <a class="el" href="mlp__fused__decode_8c_source.html#l00122">silu_scalar()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01125">ck_mlp_swiglu_forward_fully_fused_token()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01195">ck_mlp_swiglu_forward_fully_fused_token()</a>.</p>
 
 </div>
 </div>
@@ -6703,7 +7022,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels_8c_source.html#l00009">ck_gemm_add_bias()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00177">ck_get_num_threads()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00007">ck_min()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00032">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__microkernel_8c_source.html#l01124">gemm_microkernel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00088">gemm_naive_serial_double()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00042">gemm_nt_matvec_parallel()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00608">ck_attention_project_head_major()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00830">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01090">ck_mlp_swiglu_forward_fused_token()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00046">ck_qkv_project_head_major()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00062">ck_qkv_project_head_major_token()</a>, <a class="el" href="mlp__kernels_8c_source.html#l00022">mlp_token_parallel()</a>, and <a class="el" href="mlp__kernels_8c_source.html#l00057">mlp_token_parallel_exact()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00678">ck_attention_project_head_major()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00900">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01160">ck_mlp_swiglu_forward_fused_token()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00116">ck_qkv_project_head_major()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00062">ck_qkv_project_head_major_token()</a>, <a class="el" href="mlp__kernels_8c_source.html#l00022">mlp_token_parallel()</a>, and <a class="el" href="mlp__kernels_8c_source.html#l00057">mlp_token_parallel_exact()</a>.</p>
 
 </div>
 </div>
@@ -7396,7 +7715,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__strict_8c_source.html#l00032">ck_strict_parity_enabled()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00088">gemm_naive_serial_double()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00643">ck_attention_project_head_major_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00852">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00548">ck_qkv_project_head_major_ref()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00130">gemm_avx512_parallel()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00186">gemm_fine_grained_parallel()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00713">ck_attention_project_head_major_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00922">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00618">ck_qkv_project_head_major_ref()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00130">gemm_avx512_parallel()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00186">gemm_fine_grained_parallel()</a>.</p>
 
 </div>
 </div>
@@ -7838,7 +8157,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00038">block_q4_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00035">QK4_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00039">block_q4_0::qs</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>.</p>
 
 </div>
 </div>
@@ -7952,7 +8271,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00053">block_q4_1::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00054">block_q4_1::m</a>, <a class="el" href="ckernel__quant_8h_source.html#l00050">QK4_1</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00055">block_q4_1::qs</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>.</p>
 
 </div>
 </div>
@@ -8041,7 +8360,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q4k_8c_source.html#l00346">gemm_q4_k()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00382">ck_attention_project_head_major_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00467">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00265">ck_qkv_project_head_major_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01482">ck_qkv_project_head_major_token_q4_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00452">ck_attention_project_head_major_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00537">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00335">ck_qkv_project_head_major_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01552">ck_qkv_project_head_major_token_q4_k()</a>.</p>
 
 </div>
 </div>
@@ -8127,7 +8446,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00216">gemm_q4_k_q8_k()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01642">ck_attention_project_head_major_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00513">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01686">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01527">ck_qkv_project_head_major_token_q4_k_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01712">ck_attention_project_head_major_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00583">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01756">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01597">ck_qkv_project_head_major_token_q4_k_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -8200,7 +8519,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00316">gemm_nt_q5_0_ref()</a>, and <a class="el" href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00064">gemm_nt_q5_0_sse_v2()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>.</p>
 
 </div>
 </div>
@@ -8322,7 +8641,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00087">block_q5_1::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00088">block_q5_1::m</a>, <a class="el" href="ckernel__quant_8h_source.html#l00089">block_q5_1::qh</a>, <a class="el" href="ckernel__quant_8h_source.html#l00084">QK5_1</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00090">block_q5_1::qs</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>.</p>
 
 </div>
 </div>
@@ -8411,7 +8730,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q6k_8c_source.html#l00081">gemm_q6_k()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>, and <a class="el" href="gemm__kernels__q6k_8c_source.html#l00129">gemm_nt_q6_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>, and <a class="el" href="gemm__kernels__q6k_8c_source.html#l00129">gemm_nt_q6_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -8485,48 +8804,48 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00207">207</a> of file <a class="el" href="gemm__kernels__q8__0_8c_source.html">gemm_kernels_q8_0.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;{</div>
-<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;<span class="preprocessor">#if defined(__SSE4_1__)</span></div>
-<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;    <span class="comment">// For now use gemv unrolled as it&#39;s safer</span></div>
-<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;        gemv_q8_0_sse(&amp;<a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A[m * K], N, K);</div>
-<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;        <span class="keywordflow">if</span> (bias) {</div>
-<div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
-<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;        }</div>
-<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160;    }</div>
-<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;    <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160; </div>
-<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *blocks = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)B;</div>
-<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>;</div>
-<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160; </div>
-<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
-<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160; </div>
-<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00216">216</a> of file <a class="el" href="gemm__kernels__q8__0_8c_source.html">gemm_kernels_q8_0.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;{</div>
+<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;<span class="preprocessor">#if defined(__SSE4_1__)</span></div>
+<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;    <span class="comment">// For now use gemv unrolled as it&#39;s safer</span></div>
+<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;        gemv_q8_0_sse(&amp;<a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A[m * K], N, K);</div>
+<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;        <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
+<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;        }</div>
+<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;    }</div>
+<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;    <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;<span class="preprocessor">#endif</span></div>
 <div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160; </div>
-<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; b++) {</div>
-<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;                <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *block = &amp;blocks[n * blocks_per_row + b];</div>
-<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(block-&gt;<a class="code" href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">d</a>);</div>
-<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> *ap = &amp;a_row[b * <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>];</div>
-<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160; </div>
-<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>; i++) {</div>
-<div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;                    sum += d * (float)block-&gt;<a class="code" href="structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488">qs</a>[i] * ap[i];</div>
-<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;                }</div>
-<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;            }</div>
-<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160; </div>
-<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;            <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] = sum + (bias ? bias[n] : 0.0f);</div>
-<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;        }</div>
-<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;    }</div>
-<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;}</div>
+<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *blocks = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)B;</div>
+<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>;</div>
+<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160; </div>
+<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
+<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160; </div>
+<div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160; </div>
+<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; b++) {</div>
+<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;                <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *block = &amp;blocks[n * blocks_per_row + b];</div>
+<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(block-&gt;<a class="code" href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">d</a>);</div>
+<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> *ap = &amp;a_row[b * <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>];</div>
+<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160; </div>
+<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code" href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a>; i++) {</div>
+<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;                    sum += d * (float)block-&gt;<a class="code" href="structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488">qs</a>[i] * ap[i];</div>
+<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;                }</div>
+<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;            }</div>
+<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160; </div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;            <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] = sum + (bias ? bias[n] : 0.0f);</div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;        }</div>
+<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;    }</div>
+<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;}</div>
 <div class="ttc" id="astructblock__q8__0_html_a0bc77a0a0101bc89b05749157bf1514e"><div class="ttname"><a href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">block_q8_0::d</a></div><div class="ttdeci">ck_half d</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00104">ckernel_quant.h:104</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html_ac6f2ca6c9108456b6630b7f1bf874488"><div class="ttname"><a href="structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488">block_q8_0::qs</a></div><div class="ttdeci">int8_t qs[32]</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00105">ckernel_quant.h:105</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00104">block_q8_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00101">QK8_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00105">block_q8_0::qs</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00213">ck_gemm_nt_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00283">ck_gemm_nt_quant()</a>.</p>
 
 </div>
 </div>
@@ -8881,7 +9200,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__q8__k__fused_8c_source.html#l00010">hsum256_ps_fused()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01090">ck_mlp_swiglu_forward_fused_token()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01160">ck_mlp_swiglu_forward_fused_token()</a>.</p>
 
 </div>
 </div>
@@ -9764,7 +10083,7 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;    }</div>
 <div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01167">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01327">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02390">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01237">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01397">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l02460">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>.</p>
 
 </div>
 </div>
@@ -11256,7 +11575,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00039">quantize_row_q8_k_ref()</a>, and <a class="el" href="quantize__row__q8__k__sse_8c_source.html#l00015">quantize_row_q8_k_sse()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01642">ck_attention_project_head_major_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00513">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01686">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01572">ck_qkv_project_head_major_q4_k_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l01712">ck_attention_project_head_major_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00583">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01756">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01642">ck_qkv_project_head_major_q4_k_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -11838,7 +12157,7 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00344"></a><span class="lineno">  344</span>&#160;    }</div>
 <div class="line"><a name="l00345"></a><span class="lineno">  345</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>, <a class="el" href="rmsnorm__kernels__int4_8c_source.html#l00102">rmsnorm_backward_int4()</a>, and <a class="el" href="rmsnorm__kernels__int8_8c_source.html#l00082">rmsnorm_backward_int8()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>, <a class="el" href="rmsnorm__kernels__int4_8c_source.html#l00102">rmsnorm_backward_int4()</a>, and <a class="el" href="rmsnorm__kernels__int8_8c_source.html#l00082">rmsnorm_backward_int8()</a>.</p>
 
 </div>
 </div>
@@ -12446,7 +12765,7 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00149"></a><span class="lineno">  149</span>&#160;    }</div>
 <div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01167">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01327">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02390">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="rmsnorm__kernels__int4_8c_source.html#l00071">rmsnorm_forward_int4()</a>, and <a class="el" href="rmsnorm__kernels__int8_8c_source.html#l00051">rmsnorm_forward_int8()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00944">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01237">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01397">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02460">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01858">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02349">ck_layer_forward_rmsnorm_swiglu_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01052">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="rmsnorm__kernels__int4_8c_source.html#l00071">rmsnorm_forward_int4()</a>, and <a class="el" href="rmsnorm__kernels__int8_8c_source.html#l00051">rmsnorm_forward_int8()</a>.</p>
 
 </div>
 </div>
@@ -13280,7 +13599,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00181">rope_backward()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -13635,7 +13954,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00155">rope_forward()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00874">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01167">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01327">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01995">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02390">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01788">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02279">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00982">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00944">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01237">ck_layer_forward_rmsnorm_swiglu_decode()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01397">ck_layer_forward_rmsnorm_swiglu_decode_fused()</a>, <a class="el" href="attention__decode__fused_8c_source.html#l00165">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02065">ck_layer_forward_rmsnorm_swiglu_decode_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02460">ck_layer_forward_rmsnorm_swiglu_decode_quant()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01858">ck_layer_forward_rmsnorm_swiglu_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02349">ck_layer_forward_rmsnorm_swiglu_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l01052">ck_layer_forward_rmsnorm_swiglu_ref()</a>.</p>
 
 </div>
 </div>
@@ -14400,7 +14719,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02555">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02625">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
 </div>
 </div>
@@ -14698,7 +15017,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00011">sigmoid_scalar()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00830">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00467">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00513">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01686">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00489">ck_mlp_swiglu_forward_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00852">ck_mlp_swiglu_forward_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00900">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00537">ck_mlp_swiglu_forward_q4_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00583">ck_mlp_swiglu_forward_q4_k_q8_k()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01756">ck_mlp_swiglu_forward_q4_k_q8_k_prefill()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00559">ck_mlp_swiglu_forward_quant()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00922">ck_mlp_swiglu_forward_ref()</a>.</p>
 
 </div>
 </div>

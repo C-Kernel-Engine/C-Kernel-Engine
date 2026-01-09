@@ -846,6 +846,7 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -883,6 +884,24 @@
 
 <h1>IR v2 Format Specification</h1>
 
+<div class="alert alert-info">
+    <div class="alert-icon">🔄</div>
+    <div>
+        <strong>From the Iteration Philosophy:</strong> IR v2 represents a bold architectural iteration - keeping the core IR concept while completely redesigning the implementation based on learnings from IR v1.
+        <br><br>
+        <a href="iteration-philosophy.html" style="color: #07adf8; font-weight: 600;">📖 Read the full Iteration Philosophy →</a>
+    </div>
+</div>
+
+<div class="card" style="background: rgba(255, 180, 0, 0.1); border-left-color: #ffb400;">
+    <h3 style="margin-top: 0;">The IR v2 Story: Iteration in Action</h3>
+    <p><strong>Problem with IR v1:</strong> Tight coupling between IR and generated code, hardcoded layouts, limited portability</p>
+    <p><strong>The Iteration:</strong> Recognized the core IR concept was sound but implementation was fundamentally flawed</p>
+    <p><strong>The Redesign:</strong> Symbolic dimensions, explicit buffer layouts, model-agnostic architecture</p>
+    <p><strong>Key Innovation:</strong> <code>{vocab, embed, head_dim}</code> instead of <code>[151936, 896, 64]</code></p>
+    <p><strong>Result:</strong> Portable, performant, extensible format that enables rapid experimentation</p>
+</div>
+
 <p>IR v2 is a self-documenting JSON format that captures model architecture, buffer definitions, and computation graphs in a portable, machine-readable format.</p>
 
 <div class="card card-accent">
@@ -891,6 +910,8 @@
         <li><strong>Portable</strong> - Same IR works for different batch sizes</li>
         <li><strong>Self-documenting</strong> - Contains notes explaining the format</li>
         <li><strong>Extensible</strong> - Supports encoder, decoder, and encoder-decoder architectures</li>
+        <li><strong>Symbolic Dimensions</strong> - {vocab, embed} that resolve at compile-time</li>
+        <li><strong>Hardware-Aware</strong> - Can optimize for different CPU features</li>
     </ul>
 </div>
 
@@ -1578,7 +1599,7 @@ Page 2 (2-3GB)   → DRAM Bank 2 (Layer 12-17)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-09</p>
             </div>
         </div>
     </footer>
