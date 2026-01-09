@@ -342,15 +342,19 @@
             "status": "done",
             "opt_level": [
               "scalar",
+              "simd_avx2",
+              "simd_avx512",
               "parallel"
             ],
-            "file": "attention_kernels.c",
+            "file": "attention_kernels.c; attention_flash_true.c; ckernel_orchestration.c",
             "funcs": [
               "attention_forward_causal_head_major_gqa",
               "attention_forward_causal_head_major_gqa_flash",
-              "attention_forward_decode_head_major_gqa_flash"
+              "attention_forward_decode_head_major_gqa_flash",
+              "attention_flash_decode",
+              "ck_attention_flash_decode_wrapper"
             ],
-            "notes": "Flash attention with online softmax (O(1) memory per query). GQA support. KV cache decode path with OpenMP."
+            "notes": "Flash attention with online softmax (O(1) memory per query). GQA support. Decode uses attention_flash_decode() with AVX/AVX-512 SIMD, K/V tiling, optional fast-exp, and OpenMP head-parallel wrapper."
           },
           "backward": {
             "status": "done",
@@ -381,13 +385,22 @@
       "tests": {
         "reference": "PyTorch F.scaled_dot_product_attention",
         "test_files": [
-          "unittest/bf16/test_attention_bf16.py"
+          "unittest/bf16/test_attention_bf16.py",
+          "unittest/test_flash_attention.py"
         ]
       },
       "optimizations_done": [
         {
           "name": "flash_attention",
           "description": "Online softmax algorithm - O(1) memory per query, no T×T matrix"
+        },
+        {
+          "name": "simd_flash",
+          "description": "SIMD vectorized flash attention (AVX/AVX-512) with fast-exp option"
+        },
+        {
+          "name": "kv_tiling",
+          "description": "Block tiling over K/V to improve cache reuse"
         },
         {
           "name": "kv_cache",
@@ -399,11 +412,6 @@
         }
       ],
       "optimizations_pending": [
-        {
-          "name": "simd_flash",
-          "description": "SIMD vectorize the flash attention inner loops (dot product, output accumulation)",
-          "priority": "high"
-        },
         {
           "name": "paged_attention",
           "description": "Paged KV cache for long sequences",
@@ -1073,7 +1081,7 @@
     "flash_attention": {
       "description": "Tiled attention with fused softmax (O(N) memory)",
       "status": "done",
-      "details": "Online softmax in attention_forward_decode_head_major_gqa_flash()",
+      "details": "Online softmax in attention_flash_decode() (attention_flash_true.c) with head-parallel wrapper",
       "priority": "critical",
       "depends_on": [
         "online_softmax"
@@ -1082,7 +1090,7 @@
     "online_softmax": {
       "description": "Streaming softmax without materializing full attention matrix",
       "status": "done",
-      "details": "Integrated into flash attention decode path",
+      "details": "Integrated into flash attention decode path (attention_flash_true.c)",
       "priority": "high",
       "depends_on": []
     },
