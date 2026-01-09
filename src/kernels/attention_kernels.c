@@ -795,7 +795,15 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
 #undef FLASH_QUERY_IMPL
 }
 
-void attention_forward_decode_head_major_gqa_flash(const float *q_token,
+/**
+ * @brief WARNING: This is NOT true flash attention!
+ *
+ * This function is named "flash" but implements regular attention with O(n) complexity.
+ * It's kept for reference and as a fallback.
+ *
+ * TRUE flash attention is implemented in attention_flash_true.c
+ */
+void attention_forward_decode_head_major_gqa_regular(const float *q_token,
                                                    const float *k_cache,
                                                    const float *v_cache,
                                                    float *out_token,

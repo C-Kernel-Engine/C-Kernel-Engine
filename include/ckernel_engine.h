@@ -625,20 +625,57 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
                                                    int head_dim,
                                                    int aligned_head_dim);
 
-// Decode attention for a single token using a KV cache.
+// Decode attention for a single token using a KV cache (REGULAR - NOT flash).
 //   q_token: [num_heads, aligned_head_dim]
 //   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]
 //   out_token: [num_heads, aligned_head_dim]
-void attention_forward_decode_head_major_gqa_flash(const float *q_token,
-                                                   const float *k_cache,
-                                                   const float *v_cache,
-                                                   float *out_token,
-                                                   int num_heads,
-                                                   int num_kv_heads,
-                                                   int kv_tokens,
-                                                   int cache_capacity,
-                                                   int head_dim,
-                                                   int aligned_head_dim);
+//   WARNING: This is O(n) complexity, not true flash attention!
+void attention_forward_decode_head_major_gqa_regular(const float *q_token,
+                                                    const float *k_cache,
+                                                    const float *v_cache,
+                                                    float *out_token,
+                                                    int num_heads,
+                                                    int num_kv_heads,
+                                                    int kv_tokens,
+                                                    int cache_capacity,
+                                                    int head_dim,
+                                                    int aligned_head_dim);
+
+// TRUE Flash Attention (O(1) for decode) - Tri Dao's algorithm
+//   out: [T_q, H, D_h]
+//   q: [T_q, H, D_h]
+//   k: [T_k, H, D_h]
+//   v: [T_k, H, D_h]
+//   T_q: Query tokens (1 for decode)
+//   T_k: Context length
+//   H: Number of heads
+//   D_h: Head dimension
+//   scale: 1/sqrt(D_h)
+void attention_flash_decode(float *out,
+                           const float *q,
+                           const float *k,
+                           const float *v,
+                           int T_q,
+                           int T_k,
+                           int H,
+                           int D_h,
+                           float scale);
+
+// Diagnostics for flash attention tuning (used by unit tests).
+int ck_flash_attn_choose_tile_k(int D_h);
+int ck_flash_attn_fast_exp_kind(void);
+
+// Orchestration wrapper for TRUE flash attention
+void ck_attention_flash_decode_wrapper(const float *q_token,
+                                       const float *k_cache,
+                                       const float *v_cache,
+                                       float *out_token,
+                                       int num_heads,
+                                       int num_kv_heads,
+                                       int kv_tokens,
+                                       int cache_capacity,
+                                       int head_dim,
+                                       int aligned_head_dim);
 
 // KV cache helper (write one token for all KV heads).
 void kv_cache_write_head_major(const float *k_token,

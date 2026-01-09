@@ -258,7 +258,7 @@ static void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl(const CKLayer
                               hd,
                               ad);
 
-    attention_forward_decode_head_major_gqa_flash(q_token,
+    attention_forward_decode_head_major_gqa_regular(q_token,
                                                   p->k,
                                                   p->v,
                                                   attn_token,

@@ -14,6 +14,76 @@
 #include <immintrin.h>
 #endif
 
+/* ============================================================================
+ * TRUE FLASH ATTENTION (O(1) for decode)
+ *
+ * New implementation based on Tri Dao's Flash Attention algorithm.
+ * Provides O(1) complexity for decode instead of O(n).
+ *
+ * Reference: attention_flash_decode() in src/kernels/attention_flash_true.c
+ * ============================================================================ */
+
+/**
+ * @brief Wrapper to call TRUE flash attention from orchestration layer
+ *
+ * @param q_token Query token [H, D_h]
+ * @param k_cache Cached keys [T_k, H, D_h]
+ * @param v_cache Cached values [T_k, H, D_h]
+ * @param out_token Output [H, D_h]
+ * @param num_heads Number of heads
+ * @param num_kv_heads Number of KV heads (for GQA)
+ * @param kv_tokens Number of tokens in KV cache
+ * @param cache_capacity Cache capacity
+ * @param head_dim Head dimension
+ * @param aligned_head_dim Aligned head dimension
+ */
+void ck_attention_flash_decode_wrapper(
+    const float *q_token,
+    const float *k_cache,
+    const float *v_cache,
+    float *out_token,
+    int num_heads,
+    int num_kv_heads,
+    int kv_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim)
+{
+    if (!q_token || !k_cache || !v_cache || !out_token) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || kv_tokens <= 0 || cache_capacity <= 0) {
+        return;
+    }
+    if (kv_tokens > cache_capacity || head_dim <= 0 || aligned_head_dim <= 0) {
+        return;
+    }
+
+    // Scale factor: 1/sqrt(head_dim)
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    const size_t head_stride = (size_t)cache_capacity * (size_t)aligned_head_dim;
+
+#pragma omp parallel for schedule(static) if(num_heads > 1)
+    for (int h = 0; h < num_heads; ++h) {
+        const int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+        const float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;
+        const float *k_head = k_cache + (size_t)kv_head * head_stride;
+        const float *v_head = v_cache + (size_t)kv_head * head_stride;
+        float *out_head = out_token + (size_t)h * (size_t)aligned_head_dim;
+
+        // Use aligned_head_dim as D_h so per-token stride matches the cache layout.
+        attention_flash_decode(out_head,
+                               q_head,
+                               k_head,
+                               v_head,
+                               1,
+                               kv_tokens,
+                               1,
+                               aligned_head_dim,
+                               scale);
+    }
+}
+
 void ck_residual_add_token_major(const float *a,
                                  const float *b,
                                  float *out,
@@ -1262,16 +1332,16 @@ void ck_layer_forward_rmsnorm_swiglu_decode(const CKLayerForwardParams *p,
                               ad);
 
     // Decode attention for this token using the KV cache.
-    attention_forward_decode_head_major_gqa_flash(q_token,
-                                                  p->k,
-                                                  p->v,
-                                                  attn_token,
-                                                  H,
-                                                  H_kv,
-                                                  /*kv_tokens=*/token_index + 1,
-                                                  cache_capacity,
-                                                  hd,
-                                                  ad);
+    ck_attention_flash_decode_wrapper(q_token,
+                                   p->k,
+                                   p->v,
+                                   attn_token,
+                                   H,
+                                   H_kv,
+                                   /*kv_tokens=*/token_index + 1,
+                                   cache_capacity,
+                                   hd,
+                                   ad);
 
     // Output projection (Wo) into token-major buffer (decode-specialized).
     ck_attention_project_head_major_decode_token(attn_token,
@@ -1423,16 +1493,16 @@ void ck_layer_forward_rmsnorm_swiglu_decode_fused(const CKLayerForwardParams *p,
                               ad);
 
     // Decode attention for this token using the KV cache.
-    attention_forward_decode_head_major_gqa_flash(q_token,
-                                                  p->k,
-                                                  p->v,
-                                                  attn_token,
-                                                  H,
-                                                  H_kv,
-                                                  /*kv_tokens=*/token_index + 1,
-                                                  cache_capacity,
-                                                  hd,
-                                                  ad);
+    ck_attention_flash_decode_wrapper(q_token,
+                                   p->k,
+                                   p->v,
+                                   attn_token,
+                                   H,
+                                   H_kv,
+                                   /*kv_tokens=*/token_index + 1,
+                                   cache_capacity,
+                                   hd,
+                                   ad);
 
     // Output projection (Wo) into token-major buffer (decode-specialized).
     ck_attention_project_head_major_decode_token(attn_token,
@@ -2103,7 +2173,7 @@ void ck_layer_forward_rmsnorm_swiglu_decode_q4_k(const CKLayerForwardParamsQ4K *
                                   ad);
 
         /* Decode attention for this token using the KV cache. */
-        attention_forward_decode_head_major_gqa_flash(q_token,
+        attention_forward_decode_head_major_gqa_regular(q_token,
                                                       p->k,
                                                       p->v,
                                                       attn_token,
@@ -2211,16 +2281,16 @@ void ck_layer_forward_rmsnorm_swiglu_decode_q4_k(const CKLayerForwardParamsQ4K *
                               ad);
 
     /* Decode attention for this token using the KV cache. */
-    attention_forward_decode_head_major_gqa_flash(q_token,
-                                                  p->k,
-                                                  p->v,
-                                                  attn_token,
-                                                  H,
-                                                  H_kv,
-                                                  /*kv_tokens=*/token_index + 1,
-                                                  cache_capacity,
-                                                  hd,
-                                                  ad);
+    ck_attention_flash_decode_wrapper(q_token,
+                                   p->k,
+                                   p->v,
+                                   attn_token,
+                                   H,
+                                   H_kv,
+                                   /*kv_tokens=*/token_index + 1,
+                                   cache_capacity,
+                                   hd,
+                                   ad);
 
     /* Quantized output projection: Wo is stored as a flattened Q4_K matrix. */
     gemm_nt_q4_k(attn_token,
@@ -2477,16 +2547,16 @@ void ck_layer_forward_rmsnorm_swiglu_decode_quant(const CKLayerForwardParamsQ4K 
                               hd,
                               ad);
 
-    attention_forward_decode_head_major_gqa_flash(q_token,
-                                                  p->k,
-                                                  p->v,
-                                                  attn_token,
-                                                  H,
-                                                  H_kv,
-                                                  /*kv_tokens=*/token_index + 1,
-                                                  cache_capacity,
-                                                  hd,
-                                                  ad);
+    ck_attention_flash_decode_wrapper(q_token,
+                                   p->k,
+                                   p->v,
+                                   attn_token,
+                                   H,
+                                   H_kv,
+                                   /*kv_tokens=*/token_index + 1,
+                                   cache_capacity,
+                                   hd,
+                                   ad);
 
     if (p->wo_dtype == CK_DT_FP32) {
         ck_attention_project_head_major_decode_token(attn_token,

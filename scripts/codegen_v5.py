@@ -695,7 +695,7 @@ def emit_c_source_v5(layout: v3.ModelLayout,
 
             # Step 5: Attention
             add("    /* Step 5: Attention (decode) */")
-            add("    attention_forward_decode_head_major_gqa_flash(q_token,")
+            add("    attention_forward_decode_head_major_gqa_regular(q_token,")
             add("                                                   k_cache,")
             add("                                                   v_cache,")
             add("                                                   attn_token,")
