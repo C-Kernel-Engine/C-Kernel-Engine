@@ -863,6 +863,14 @@ static int emit_kernel_manifest(const CKIRGraph *forward, const char *runtime_pa
     emit_unique_source(f, "src/kernels/gemm_kernels_q5_0.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/gemm_kernels_q5_1.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/gemm_kernels_q8_0.c", seen, &seen_count, seen_cap);
+    /* SSE/AVX2/VNNI fallback implementations for quantized kernels. */
+    emit_unique_source(f, "src/kernels/gemm_kernels_q4k_sse.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q4k_q8k_avx2.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q4k_q8k_vnni.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q5_0_sse.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q5_0_sse_v2.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/gemm_kernels_q6k_sse.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/quantize_row_q8_k_sse.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/rope_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/loss_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/kv_cache_kernels.c", seen, &seen_count, seen_cap);
