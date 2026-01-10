@@ -327,7 +327,7 @@ def step_convert_hf(model_dir: Path, output_dir: Path, weight_dtype: str = "floa
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_hf_to_bump_v4.py"),
+        str(SCRIPTS_DIR / "v4" / "convert_hf_to_bump_v4.py"),
         f"--checkpoint={model_dir}",
         f"--output={weights_path}",
         f"--dtype={weight_dtype}",
@@ -448,7 +448,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    build_script = "build_ir_v5.py" if V5_MODE else "build_ir_v4.py"
+    build_script = "build_ir_v5.py" if V5_MODE else "v4/build_ir_v4.py"
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / build_script),
@@ -1416,7 +1416,8 @@ Examples:
   python scripts/ck_run_v5.py
 
   # Download GGUF directly (recommended for quantized models)
-  ./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+   python scripts/ck_run_v5.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+
 
   # Local GGUF file
   ./ck-v5 run ./model.gguf

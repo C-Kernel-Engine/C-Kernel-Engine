@@ -1056,7 +1056,7 @@ def main() -> None:
     if not args.output and not (args.inspect or args.list or args.extract_vocab):
         ap.error("--output is required unless --inspect/--list/--extract-vocab is set")
 
-    # Support multiple architectures (llama, qwen2, etc.)
+    # Support multiple architectures (llama, qwen2, mistral3, deepseek2, etc.)
     wanted_meta = {
         "general.architecture",
         "general.alignment",
@@ -1078,6 +1078,33 @@ def main() -> None:
         "qwen2.attention.head_count_kv",
         "qwen2.rope.freq_base",
         "qwen2.attention.layer_norm_rms_epsilon",
+        # Mistral3-style keys (Devstral, SmolLM, etc.)
+        "mistral3.block_count",
+        "mistral3.context_length",
+        "mistral3.embedding_length",
+        "mistral3.feed_forward_length",
+        "mistral3.attention.head_count",
+        "mistral3.attention.head_count_kv",
+        "mistral3.rope.freq_base",
+        "mistral3.attention.layer_norm_rms_epsilon",
+        # Mistral-style keys
+        "mistral.block_count",
+        "mistral.context_length",
+        "mistral.embedding_length",
+        "mistral.feed_forward_length",
+        "mistral.attention.head_count",
+        "mistral.attention.head_count_kv",
+        "mistral.rope.freq_base",
+        "mistral.attention.layer_norm_rms_epsilon",
+        # DeepSeek2-style keys (Kimi, etc.)
+        "deepseek2.block_count",
+        "deepseek2.context_length",
+        "deepseek2.embedding_length",
+        "deepseek2.feed_forward_length",
+        "deepseek2.attention.head_count",
+        "deepseek2.attention.head_count_kv",
+        "deepseek2.rope.freq_base",
+        "deepseek2.attention.layer_norm_rms_epsilon",
     }
 
     if args.extract_vocab:
@@ -1318,10 +1345,10 @@ def main() -> None:
         tok = tensors[tok_name]
         if len(tok.dims) != 2:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
-        embed_dim = meta_int("llama.embedding_length", "qwen2.embedding_length") or tok.ne0
+        embed_dim = meta_int("deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length", "llama.embedding_length", "qwen2.embedding_length") or tok.ne0
         vocab_size = tok.ne1
 
-        num_layers = meta_int("llama.block_count", "qwen2.block_count")
+        num_layers = meta_int("deepseek2.block_count", "mistral3.block_count", "mistral.block_count", "llama.block_count", "qwen2.block_count")
         if num_layers is None:
             # Infer from present blocks.
             layer_ids = []
@@ -1335,7 +1362,7 @@ def main() -> None:
                 raise GGUFError("Could not infer num_layers (missing block_count and no blk.* tensors found)")
             num_layers = max(layer_ids) + 1
 
-        intermediate = meta_int("llama.feed_forward_length", "qwen2.feed_forward_length")
+        intermediate = meta_int("deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length", "llama.feed_forward_length", "qwen2.feed_forward_length")
         if intermediate is None:
             gate0 = tensors.get("blk.0.ffn_gate.weight")
             if gate0 and len(gate0.dims) == 2:
@@ -1343,19 +1370,19 @@ def main() -> None:
         if intermediate is None:
             raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
-        num_heads = meta_int("llama.attention.head_count", "qwen2.attention.head_count")
+        num_heads = meta_int("deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count", "llama.attention.head_count", "qwen2.attention.head_count")
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
-        num_kv_heads = meta_int("llama.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
+        num_kv_heads = meta_int("deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv", "llama.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
 
-        context_len = meta_int("llama.context_length", "qwen2.context_length") or 0
+        context_len = meta_int("deepseek2.context_length", "mistral3.context_length", "mistral.context_length", "llama.context_length", "qwen2.context_length") or 0
         if args.context is not None:
             context_len = int(args.context)
         if context_len <= 0:
             raise GGUFError("Could not determine context length (use --context to override)")
 
-        rope_theta = meta_float("llama.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
-        rms_eps = meta_float("llama.norm_rms_eps", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
+        rope_theta = meta_float("deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base", "llama.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
+        rms_eps = meta_float("deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon", "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
 
         if embed_dim != tok.ne0:
             raise GGUFError(f"{tok_name}: embedding_length mismatch (meta={embed_dim}, tensor.ne0={tok.ne0})")
@@ -1364,6 +1391,26 @@ def main() -> None:
 
         head_dim = embed_dim // num_heads
         embed_kv = num_kv_heads * head_dim
+
+        # Infer correct dimensions from actual tensors if metadata doesn't match
+        # This handles non-standard architectures like Devstral
+        wq0 = tensors.get("blk.0.attn_q.weight")
+        wk0 = tensors.get("blk.0.attn_k.weight")
+        wo0 = tensors.get("blk.0.attn_output.weight")
+        if wq0 and wk0 and wo0:
+            # Check if actual dimensions match expected
+            q_dim1 = wq0.ne1
+            k_dim1 = wk0.ne1
+            o_dim0 = wo0.ne0
+
+            if q_dim1 != embed_dim or k_dim1 != embed_kv:
+                # Infer from actual tensor shapes
+                # Infer head dimensions
+                inferred_q_head_dim = q_dim1 // num_heads if q_dim1 % num_heads == 0 else q_dim1
+                # Update for consistency with actual tensors
+                embed_kv = k_dim1
+                head_dim = inferred_q_head_dim
+
 
         aligned_embed_dim = embed_dim
         aligned_head_dim = head_dim
@@ -1404,15 +1451,23 @@ def main() -> None:
             if not gate or not up or not down:
                 raise GGUFError(f"Layer {layer}: missing ffn tensors (gate/up/down)")
 
-            if wq.ne0 != embed_dim or wq.ne1 != embed_dim:
-                raise GGUFError(f"{wq.name}: expected dims [ne0={embed_dim}, ne1={embed_dim}], got {wq.dims}")
-            for tensor, label in ((wk, "K"), (wv, "V")):
-                if tensor.ne0 != embed_dim or tensor.ne1 != embed_kv:
-                    raise GGUFError(
-                        f"{tensor.name}: expected dims [ne0={embed_dim}, ne1={embed_kv}] for {label}, got {tensor.dims}"
-                    )
-            if wo.ne0 != embed_dim or wo.ne1 != embed_dim:
-                raise GGUFError(f"{wo.name}: expected dims [ne0={embed_dim}, ne1={embed_dim}], got {wo.dims}")
+            # Validate dimensions (flexible for non-standard architectures)
+            if wq.ne0 != embed_dim:
+                raise GGUFError(f"{wq.name}: ne0 mismatch: expected {embed_dim}, got {wq.ne0}")
+            if wk.ne0 != embed_dim or wv.ne0 != embed_dim:
+                raise GGUFError(f"K/V ne0 mismatch: expected {embed_dim}, got {wk.ne0}/{wv.ne0}")
+            if wo.ne1 != embed_dim:
+                raise GGUFError(f"{wo.name}: ne1 mismatch: expected {embed_dim}, got {wo.ne1}")
+
+            # For ne1 dimensions, check against inferred values
+            if wq.ne1 != embed_dim and wq.ne1 != head_dim * num_heads:
+                raise GGUFError(f"{wq.name}: ne1 invalid: expected {embed_dim} or {head_dim * num_heads}, got {wq.ne1}")
+            if wk.ne1 != embed_kv:
+                raise GGUFError(f"{wk.name}: ne1 invalid: expected {embed_kv}, got {wk.ne1}")
+            if wv.ne1 != embed_kv:
+                raise GGUFError(f"{wv.name}: ne1 invalid: expected {embed_kv}, got {wv.ne1}")
+            if wo.ne0 != wq.ne1:
+                raise GGUFError(f"{wo.name}: ne0 mismatch with Q ne1: expected {wq.ne1}, got {wo.ne0}")
 
             for tensor, label in ((gate, "gate"), (up, "up")):
                 if tensor.ne0 != embed_dim or tensor.ne1 != intermediate:

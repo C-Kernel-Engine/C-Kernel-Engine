@@ -8,8 +8,14 @@ import json
 import tempfile
 from pathlib import Path
 
-# Add scripts to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+# Add scripts/v4 + scripts/v3 to path (v4 codegen, v3 layout helpers)
+ROOT = Path(__file__).parent.parent
+SCRIPTS_V4 = ROOT / "scripts" / "v4"
+SCRIPTS_V3 = ROOT / "scripts" / "v3"
+for path in (SCRIPTS_V4, SCRIPTS_V3):
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 import codegen_v4
 import model_layout_v3 as v3

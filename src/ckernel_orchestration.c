@@ -59,6 +59,26 @@ void ck_attention_flash_decode_wrapper(
         return;
     }
 
+    static int use_strict = -1;
+    if (use_strict < 0) {
+        const char *env = getenv("CK_FLASH_ATTN_STRICT");
+        use_strict = (env && env[0] && env[0] != '0') ? 1 : 0;
+    }
+
+    if (use_strict) {
+        attention_forward_decode_head_major_gqa_regular(q_token,
+                                                        k_cache,
+                                                        v_cache,
+                                                        out_token,
+                                                        num_heads,
+                                                        num_kv_heads,
+                                                        kv_tokens,
+                                                        cache_capacity,
+                                                        head_dim,
+                                                        aligned_head_dim);
+        return;
+    }
+
     // Scale factor: 1/sqrt(head_dim)
     const float scale = 1.0f / sqrtf((float)head_dim);
     const size_t head_stride = (size_t)cache_capacity * (size_t)aligned_head_dim;

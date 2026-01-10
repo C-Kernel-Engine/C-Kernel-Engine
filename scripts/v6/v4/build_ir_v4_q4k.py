@@ -4,16 +4,27 @@ build_ir_v4_q4k.py
 
 Generate v4 IR + codegen for Q4_K weights (FP32 activations).
 This is a convenience wrapper around:
-  1) convert_hf_to_bump_v4.py --dtype q4_k --manifest-out
+  1) convert_hf_to_bump_v6.py --dtype q4_k --manifest-out
   2) build_ir_v4.py --dtype fp32 --weights-manifest
 
-It can also convert GGUF inputs via convert_gguf_to_bump_v4.py.
+It can also convert GGUF inputs via convert_gguf_to_bump_v6.py.
 """
 
 import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = _SCRIPT_DIR.parent
+_V3_DIR = _ROOT_DIR / "v3"
+_V4_DIR = _SCRIPT_DIR
+for path in (_V4_DIR, _ROOT_DIR, _V3_DIR):
+    if path.is_dir():
+        path_str = str(path)
+        if path_str not in sys.path:
+            sys.path.insert(0, path_str)
 
 import build_ir_v3 as v3
 import build_ir_v4 as v4
@@ -75,7 +86,7 @@ def main():
 
     if args.gguf:
         convert_cmd = [
-            sys.executable, "scripts/convert_gguf_to_bump_v4.py",
+            sys.executable, "scripts/v6/convert_gguf_to_bump_v6.py",
             "--gguf", args.gguf,
             "--output", weights_path,
             "--manifest-out", manifest_path,
@@ -92,7 +103,7 @@ def main():
         if not os.path.exists(config_path):
             raise SystemExit(f"config.json not found: {config_path}")
         convert_cmd = [
-            sys.executable, "scripts/convert_hf_to_bump_v4.py",
+            sys.executable, "scripts/v6/convert_hf_to_bump_v6.py",
             "--checkpoint", args.checkpoint,
             "--output", weights_path,
             "--dtype", "q4_k",
@@ -115,7 +126,7 @@ def main():
         )
 
     ir_cmd = [
-        sys.executable, "scripts/build_ir_v4.py",
+        sys.executable, "scripts/v4/build_ir_v4.py",
         "--config", config_path,
         "--name", model_name,
         "--prefix", output_dir,

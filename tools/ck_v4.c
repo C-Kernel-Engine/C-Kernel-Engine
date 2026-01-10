@@ -7,8 +7,8 @@
  *
  * This CLI uses the v4 pipeline:
  *   - scripts/ck_download.py (download config/tokenizer)
- *   - scripts/convert_hf_to_bump_v4.py (weights -> BUMPWGT4)
- *   - scripts/build_ir_v4.py (IR v4 + codegen)
+ *   - scripts/v4/convert_hf_to_bump_v4.py (weights -> BUMPWGT4)
+ *   - scripts/v4/build_ir_v4.py (IR v4 + codegen)
  */
 
 #include <ctype.h>
@@ -233,6 +233,9 @@ static int download_model(CKV4Config *cfg) {
 
 static int convert_weights_v4(CKV4Config *cfg) {
     const char *script_paths[] = {
+        "./scripts/v4/convert_hf_to_bump_v4.py",
+        "../scripts/v4/convert_hf_to_bump_v4.py",
+        "scripts/v4/convert_hf_to_bump_v4.py",
         "./scripts/convert_hf_to_bump_v4.py",
         "../scripts/convert_hf_to_bump_v4.py",
         "scripts/convert_hf_to_bump_v4.py",
@@ -271,6 +274,9 @@ static int convert_weights_v4(CKV4Config *cfg) {
 
 static int build_ir_v4(CKV4Config *cfg) {
     const char *script_paths[] = {
+        "./scripts/v4/build_ir_v4.py",
+        "../scripts/v4/build_ir_v4.py",
+        "scripts/v4/build_ir_v4.py",
         "./scripts/build_ir_v4.py",
         "../scripts/build_ir_v4.py",
         "scripts/build_ir_v4.py",

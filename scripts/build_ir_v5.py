@@ -17,7 +17,16 @@ import os
 import re
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_V3_DIR = _SCRIPT_DIR / "v3"
+_V4_DIR = _SCRIPT_DIR / "v4"
+if _V3_DIR.is_dir():
+    sys.path.insert(0, str(_V3_DIR))
+if _V4_DIR.is_dir():
+    sys.path.insert(0, str(_V4_DIR))
 
 import build_ir_v3 as v3
 import codegen_v4

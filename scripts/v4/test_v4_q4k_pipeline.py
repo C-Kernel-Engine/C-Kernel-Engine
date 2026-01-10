@@ -296,7 +296,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
 
     convert_cmd = [
         sys.executable,
-        str(ROOT / "scripts" / "convert_gguf_to_bump_v4.py"),
+        str(ROOT / "scripts" / "v4" / "convert_gguf_to_bump_v4.py"),
         "--gguf",
         str(gguf),
         "--output",
@@ -318,7 +318,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
 
     ir_cmd = [
         sys.executable,
-        str(ROOT / "scripts" / "build_ir_v4.py"),
+        str(ROOT / "scripts" / "v4" / "build_ir_v4.py"),
         "--config",
         str(config),
         "--name",
@@ -342,7 +342,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
 
     validate_cmd = [
         sys.executable,
-        str(ROOT / "scripts" / "validate_bump_v4.py"),
+        str(ROOT / "scripts" / "v4" / "validate_bump_v4.py"),
         "--layout",
         str(out_dir / "layout_decode.json"),
         "--manifest",
@@ -364,7 +364,7 @@ def run_case(gguf: Path, layers: int, validate: bool, verbose: bool, run_parity:
 
     smoke_cmd = [
         sys.executable,
-        str(ROOT / "scripts" / "ck_model_smoke_v4.py"),
+        str(ROOT / "scripts" / "v4" / "ck_model_smoke_v4.py"),
         "--model-dir",
         str(out_dir),
         "--weights",
@@ -419,7 +419,7 @@ def main() -> None:
 
         convert_cmd = [
             sys.executable,
-            str(ROOT / "scripts" / "convert_gguf_to_bump_v4.py"),
+            str(ROOT / "scripts" / "v4" / "convert_gguf_to_bump_v4.py"),
             "--gguf",
             str(gguf),
             "--output",
@@ -435,7 +435,7 @@ def main() -> None:
 
         ir_cmd = [
             sys.executable,
-            str(ROOT / "scripts" / "build_ir_v4.py"),
+            str(ROOT / "scripts" / "v4" / "build_ir_v4.py"),
             "--config",
             str(config),
             "--name",
@@ -457,7 +457,7 @@ def main() -> None:
         run(ir_cmd, args.verbose)
         validate_cmd = [
             sys.executable,
-            str(ROOT / "scripts" / "validate_bump_v4.py"),
+            str(ROOT / "scripts" / "v4" / "validate_bump_v4.py"),
             "--layout",
             str(out_dir / "layout_decode.json"),
             "--manifest",

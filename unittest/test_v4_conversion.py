@@ -58,7 +58,7 @@ def run_case(gguf_path: Path, layers: int, validate: bool, verbose: bool) -> Non
 
     convert_cmd = [
         sys.executable,
-        str(PROJECT_ROOT / "scripts" / "convert_gguf_to_bump_v4.py"),
+        str(PROJECT_ROOT / "scripts" / "v4" / "convert_gguf_to_bump_v4.py"),
         "--gguf",
         str(gguf_path),
         "--output",
@@ -79,7 +79,7 @@ def run_case(gguf_path: Path, layers: int, validate: bool, verbose: bool) -> Non
 
     ir_cmd = [
         sys.executable,
-        str(PROJECT_ROOT / "scripts" / "build_ir_v4.py"),
+        str(PROJECT_ROOT / "scripts" / "v4" / "build_ir_v4.py"),
         "--config",
         str(config_path),
         "--name",

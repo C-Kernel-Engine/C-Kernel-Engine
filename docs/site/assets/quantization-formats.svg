@@ -1,0 +1,839 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1400" height="3200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      .title { font-size: 32px; font-weight: 700; fill: #0071c5; }
+      .section-title { font-size: 22px; font-weight: 700; fill: #0071c5; }
+      .format-title { font-size: 18px; font-weight: 700; fill: #00c7fd; }
+      .label { font-size: 11px; fill: #a0a0a0; }
+      .value { font-size: 11px; fill: #ffffff; font-weight: 600; }
+      .math { font-size: 12px; fill: #00c7fd; font-family: 'Consolas', 'Monaco', monospace; }
+      .math-explain { font-size: 11px; fill: #a0a0a0; font-family: 'Consolas', 'Monaco', monospace; }
+      .code { font-size: 11px; fill: #b0b0b0; font-family: 'Consolas', 'Monaco', monospace; }
+      .warning { font-size: 11px; fill: #ff6b6b; font-weight: 600; }
+      .success { font-size: 11px; fill: #47b475; }
+    </style>
+
+    <!-- Intel blue gradient for data bytes -->
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00c7fd;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#0071c5;stop-opacity:0.25"/>
+    </linearGradient>
+
+    <!-- Scale header gradient (gold/orange) -->
+    <linearGradient id="scaleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffb400;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#cc8800;stop-opacity:0.3"/>
+    </linearGradient>
+
+    <!-- Min header gradient (green) -->
+    <linearGradient id="minGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#47b475;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#2d7a4c;stop-opacity:0.3"/>
+    </linearGradient>
+
+    <!-- High-bits gradient (purple) -->
+    <linearGradient id="highGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.3"/>
+    </linearGradient>
+
+    <!-- Sub-scale gradient (teal) -->
+    <linearGradient id="subScaleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#14b8a6;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#0d9488;stop-opacity:0.3"/>
+    </linearGradient>
+
+    <!-- Warning gradient (red) -->
+    <linearGradient id="warnGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#ff6b6b;stop-opacity:0.1"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="3200" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="700" y="45" class="title" text-anchor="middle">C-Kernel-Engine Quantization Formats</text>
+  <text x="700" y="75" font-size="14" fill="#707070" text-anchor="middle">Byte-level structure with explicit size calculations and dequantization math</text>
+
+  <!-- Legend -->
+  <g transform="translate(50, 95)">
+    <rect width="1300" height="55" rx="8" fill="#252525" stroke="#353535"/>
+    <text x="20" y="22" font-size="12" font-weight="600" fill="#ffffff">Legend:</text>
+
+    <rect x="100" y="10" width="50" height="18" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+    <text x="160" y="23" class="label">Scale (d)</text>
+
+    <rect x="230" y="10" width="50" height="18" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+    <text x="290" y="23" class="label">Min (m/dmin)</text>
+
+    <rect x="380" y="10" width="50" height="18" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+    <text x="440" y="23" class="label">Quant Data</text>
+
+    <rect x="530" y="10" width="50" height="18" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+    <text x="590" y="23" class="label">High Bits</text>
+
+    <rect x="680" y="10" width="50" height="18" rx="3" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+    <text x="740" y="23" class="label">Sub-scales</text>
+
+    <text x="20" y="45" font-size="10" fill="#606060">Each box = 1 byte. Calculations show: (weights × bits) / 8 = bytes</text>
+    <text x="850" y="45" font-size="10" fill="#ff6b6b">Red boxes = Common bug areas</text>
+  </g>
+
+  <!-- ==================== SIMPLE FORMATS HEADER ==================== -->
+  <g transform="translate(50, 170)">
+    <rect width="1300" height="40" rx="6" fill="#0071c5" opacity="0.2" stroke="#0071c5"/>
+    <text x="650" y="27" font-size="18" font-weight="700" fill="#0071c5" text-anchor="middle">Simple Formats (32 weights per block)</text>
+  </g>
+
+  <!-- ==================== Q4_0 ==================== -->
+  <g transform="translate(50, 230)">
+    <rect width="640" height="300" rx="10" fill="#202020" stroke="#0071c5" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="640" height="38" rx="10" fill="#0071c5" opacity="0.3"/>
+    <text x="20" y="26" class="format-title">Q4_0 - Simple 4-bit Symmetric</text>
+    <text x="620" y="26" font-size="14" fill="#00c7fd" text-anchor="end">4.5 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="600" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="22" class="math">Header:  2 bytes                    (1 × FP16 scale)</text>
+      <text x="0" y="40" class="math">Weights: 32 × 4 bits / 8 = 16 bytes (4-bit per weight)</text>
+      <line x1="0" y1="50" x2="350" y2="50" stroke="#454545"/>
+      <text x="0" y="68" class="math" font-weight="700">Total:   2 + 16 = 18 bytes</text>
+      <text x="360" y="68" class="math-explain">→ 18×8/32 = 4.5 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 140)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout:</text>
+      <g transform="translate(0, 18)">
+        <!-- Scale -->
+        <rect width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="15" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="32" width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="47" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₁</text>
+
+        <!-- Quants -->
+        <rect x="72" width="30" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="87" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₀</text>
+        <rect x="104" width="30" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="119" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₁</text>
+        <text x="145" y="17" font-size="11" fill="#505050">...</text>
+        <rect x="160" width="30" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="175" y="17" font-size="8" fill="#00c7fd" text-anchor="middle">q₁₅</text>
+
+        <text x="210" y="17" font-size="10" fill="#707070">← 16 bytes (2 weights each)</text>
+      </g>
+    </g>
+
+    <!-- Byte Detail -->
+    <g transform="translate(20, 200)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Single Byte = 2 Weights:</text>
+      <g transform="translate(0, 18)">
+        <rect width="180" height="40" rx="4" fill="#151515" stroke="#353535"/>
+        <g transform="translate(10, 8)">
+          <!-- High nibble -->
+          <rect width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5" opacity="0.6"/>
+          <text x="9" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">7</text>
+          <rect x="20" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5" opacity="0.6"/>
+          <text x="29" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">6</text>
+          <rect x="40" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5" opacity="0.6"/>
+          <text x="49" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">5</text>
+          <rect x="60" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5" opacity="0.6"/>
+          <text x="69" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">4</text>
+          <!-- Low nibble -->
+          <rect x="85" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+          <text x="94" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">3</text>
+          <rect x="105" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+          <text x="114" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">2</text>
+          <rect x="125" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+          <text x="134" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">1</text>
+          <rect x="145" width="18" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+          <text x="154" y="15" font-size="8" fill="#00c7fd" text-anchor="middle">0</text>
+        </g>
+      </g>
+      <text x="200" y="38" font-size="10" fill="#707070">weight[2i+1]  weight[2i]</text>
+    </g>
+
+    <!-- Dequant -->
+    <g transform="translate(350, 140)">
+      <rect width="270" height="100" rx="6" fill="#151515" stroke="#0071c5"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#00c7fd">Dequantization:</text>
+      <text x="15" y="45" class="code">q = qs[i] &amp; 0x0F      // 0-15</text>
+      <text x="15" y="62" class="code">weight = (q - 8) × d  // center at 0</text>
+      <text x="15" y="85" font-size="10" fill="#47b475">Symmetric: range [-8,+7] × scale</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q4_1 ==================== -->
+  <g transform="translate(710, 230)">
+    <rect width="640" height="300" rx="10" fill="#202020" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="640" height="38" rx="10" fill="#47b475" opacity="0.3"/>
+    <text x="20" y="26" class="format-title" style="fill:#47b475">Q4_1 - 4-bit Asymmetric (with Min)</text>
+    <text x="620" y="26" font-size="14" fill="#47b475" text-anchor="end">5.0 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="600" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="22" class="math">Header:  2 + 2 = 4 bytes            (FP16 d + FP16 m)</text>
+      <text x="0" y="40" class="math">Weights: 32 × 4 bits / 8 = 16 bytes</text>
+      <line x1="0" y1="50" x2="350" y2="50" stroke="#454545"/>
+      <text x="0" y="68" class="math" font-weight="700">Total:   4 + 16 = 20 bytes</text>
+      <text x="360" y="68" class="math-explain">→ 20×8/32 = 5.0 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 140)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout:</text>
+      <g transform="translate(0, 18)">
+        <rect width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="15" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="32" width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="47" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₁</text>
+
+        <rect x="72" width="30" height="26" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="87" y="17" font-size="9" fill="#47b475" text-anchor="middle">m₀</text>
+        <rect x="104" width="30" height="26" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="119" y="17" font-size="9" fill="#47b475" text-anchor="middle">m₁</text>
+
+        <rect x="150" width="30" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="165" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₀</text>
+        <text x="192" y="17" font-size="11" fill="#505050">...</text>
+        <rect x="207" width="30" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="222" y="17" font-size="8" fill="#00c7fd" text-anchor="middle">q₁₅</text>
+      </g>
+    </g>
+
+    <!-- Why Asymmetric -->
+    <g transform="translate(20, 200)">
+      <rect width="280" height="75" rx="4" fill="#151515" stroke="#47b475"/>
+      <text x="10" y="20" font-size="11" font-weight="600" fill="#47b475">Why Add Min (m)?</text>
+      <text x="10" y="38" font-size="10" fill="#a0a0a0">Some weight distributions aren't</text>
+      <text x="10" y="52" font-size="10" fill="#a0a0a0">centered at zero. Adding 'm' shifts</text>
+      <text x="10" y="66" font-size="10" fill="#a0a0a0">range: [0,15]×d → [m, m+15×d]</text>
+    </g>
+
+    <!-- Dequant -->
+    <g transform="translate(320, 140)">
+      <rect width="300" height="100" rx="6" fill="#151515" stroke="#47b475"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#47b475">Dequantization:</text>
+      <text x="15" y="45" class="code">q = qs[i] &amp; 0x0F       // 0-15</text>
+      <text x="15" y="62" class="code">weight = q × d + m     // shifted</text>
+      <text x="15" y="85" font-size="10" fill="#47b475">Asymmetric: range [m, m+15×d]</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q5_0 ==================== -->
+  <g transform="translate(50, 550)">
+    <rect width="640" height="320" rx="10" fill="#202020" stroke="#a855f7" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="640" height="38" rx="10" fill="#a855f7" opacity="0.3"/>
+    <text x="20" y="26" class="format-title" style="fill:#a855f7">Q5_0 - 5-bit Symmetric (Split Storage)</text>
+    <text x="620" y="26" font-size="14" fill="#a855f7" text-anchor="end">5.5 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="600" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="22" class="math">Header:    2 bytes                  (FP16 scale)</text>
+      <text x="0" y="40" class="math">High bits: 32 × 1 bit / 8 = 4 bytes (5th bit stored separately)</text>
+      <text x="0" y="58" class="math">Low bits:  32 × 4 bits / 8 = 16 bytes</text>
+      <line x1="0" y1="68" x2="380" y2="68" stroke="#454545"/>
+      <text x="0" y="86" class="math" font-weight="700">Total:     2 + 4 + 16 = 22 bytes</text>
+      <text x="390" y="86" class="math-explain">→ 22×8/32 = 5.5 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 160)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout:</text>
+      <g transform="translate(0, 18)">
+        <rect width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="15" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="32" width="30" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="47" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₁</text>
+
+        <!-- High bits -->
+        <rect x="80" width="26" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="93" y="17" font-size="8" fill="#a855f7" text-anchor="middle">qh₀</text>
+        <rect x="108" width="26" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="121" y="17" font-size="8" fill="#a855f7" text-anchor="middle">qh₁</text>
+        <rect x="136" width="26" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="149" y="17" font-size="8" fill="#a855f7" text-anchor="middle">qh₂</text>
+        <rect x="164" width="26" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="177" y="17" font-size="8" fill="#a855f7" text-anchor="middle">qh₃</text>
+
+        <!-- Low bits -->
+        <rect x="210" width="26" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="223" y="17" font-size="8" fill="#00c7fd" text-anchor="middle">qs₀</text>
+        <text x="248" y="17" font-size="11" fill="#505050">...</text>
+        <rect x="263" width="26" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="276" y="17" font-size="7" fill="#00c7fd" text-anchor="middle">qs₁₅</text>
+      </g>
+      <text x="80" y="55" font-size="9" fill="#a855f7">4 bytes (32 high bits)</text>
+      <text x="210" y="55" font-size="9" fill="#00c7fd">16 bytes (32 low nibbles)</text>
+    </g>
+
+    <!-- Dequant -->
+    <g transform="translate(350, 160)">
+      <rect width="270" height="130" rx="6" fill="#151515" stroke="#a855f7"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#a855f7">5-bit Assembly:</text>
+      <text x="15" y="45" class="code">low4 = (qs[i/2] >> (i%2×4)) &amp; 0xF</text>
+      <text x="15" y="62" class="code">high1 = (qh[i/8] >> (i%8)) &amp; 0x1</text>
+      <text x="15" y="79" class="code">q5 = low4 | (high1 &lt;&lt; 4)  // 0-31</text>
+      <text x="15" y="100" class="code">weight = (q5 - 16) × d</text>
+      <text x="15" y="120" font-size="10" fill="#47b475">Range: [-16,+15] × scale</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q5_1 ==================== -->
+  <g transform="translate(710, 550)">
+    <rect width="640" height="320" rx="10" fill="#202020" stroke="#14b8a6" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="640" height="38" rx="10" fill="#14b8a6" opacity="0.3"/>
+    <text x="20" y="26" class="format-title" style="fill:#14b8a6">Q5_1 - 5-bit Asymmetric (with Min)</text>
+    <text x="620" y="26" font-size="14" fill="#14b8a6" text-anchor="end">6.0 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="600" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="22" class="math">Header:    2 + 2 = 4 bytes          (FP16 d + FP16 m)</text>
+      <text x="0" y="40" class="math">High bits: 32 × 1 bit / 8 = 4 bytes</text>
+      <text x="0" y="58" class="math">Low bits:  32 × 4 bits / 8 = 16 bytes</text>
+      <line x1="0" y1="68" x2="380" y2="68" stroke="#454545"/>
+      <text x="0" y="86" class="math" font-weight="700">Total:     4 + 4 + 16 = 24 bytes</text>
+      <text x="390" y="86" class="math-explain">→ 24×8/32 = 6.0 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 160)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout:</text>
+      <g transform="translate(0, 18)">
+        <rect width="26" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="13" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="28" width="26" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="41" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₁</text>
+
+        <rect x="60" width="26" height="26" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="73" y="17" font-size="9" fill="#47b475" text-anchor="middle">m₀</text>
+        <rect x="88" width="26" height="26" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="101" y="17" font-size="9" fill="#47b475" text-anchor="middle">m₁</text>
+
+        <rect x="125" width="24" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="137" y="17" font-size="7" fill="#a855f7" text-anchor="middle">qh₀</text>
+        <text x="155" y="17" font-size="9" fill="#505050">...</text>
+        <rect x="165" width="24" height="26" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="177" y="17" font-size="7" fill="#a855f7" text-anchor="middle">qh₃</text>
+
+        <rect x="200" width="24" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="212" y="17" font-size="8" fill="#00c7fd" text-anchor="middle">qs₀</text>
+        <text x="235" y="17" font-size="9" fill="#505050">...</text>
+        <rect x="250" width="24" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="262" y="17" font-size="7" fill="#00c7fd" text-anchor="middle">qs₁₅</text>
+      </g>
+    </g>
+
+    <!-- Dequant -->
+    <g transform="translate(320, 160)">
+      <rect width="300" height="130" rx="6" fill="#151515" stroke="#14b8a6"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#14b8a6">Dequantization:</text>
+      <text x="15" y="45" class="code">q5 = low4 | (high1 &lt;&lt; 4)  // 0-31</text>
+      <text x="15" y="65" class="code">weight = q5 × d + m</text>
+      <text x="15" y="90" font-size="10" fill="#a0a0a0">Q5_0 vs Q5_1:</text>
+      <text x="15" y="108" font-size="10" fill="#a0a0a0">+2 bytes for min = better for</text>
+      <text x="15" y="122" font-size="10" fill="#a0a0a0">non-zero-centered distributions</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q8_0 ==================== -->
+  <g transform="translate(50, 890)">
+    <rect width="1300" height="240" rx="10" fill="#202020" stroke="#0071c5" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="1300" height="38" rx="10" fill="#0071c5" opacity="0.3"/>
+    <text x="20" y="26" class="format-title">Q8_0 - Simple 8-bit (Highest Quality Simple Format)</text>
+    <text x="1280" y="26" font-size="14" fill="#00c7fd" text-anchor="end">8.5 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="600" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="22" class="math">Header:  2 bytes                     (FP16 scale)</text>
+      <text x="0" y="40" class="math">Weights: 32 × 8 bits / 8 = 32 bytes  (1 byte per weight!)</text>
+      <line x1="0" y1="50" x2="400" y2="50" stroke="#454545"/>
+      <text x="0" y="68" class="math" font-weight="700">Total:   2 + 32 = 34 bytes</text>
+      <text x="410" y="68" class="math-explain">→ 34×8/32 = 8.5 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 140)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout:</text>
+      <g transform="translate(0, 18)">
+        <rect width="28" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="14" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="30" width="28" height="26" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="44" y="17" font-size="9" fill="#ffb400" text-anchor="middle">d₁</text>
+
+        <rect x="70" width="28" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="84" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₀</text>
+        <rect x="100" width="28" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="114" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₁</text>
+        <rect x="130" width="28" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="144" y="17" font-size="9" fill="#00c7fd" text-anchor="middle">q₂</text>
+        <text x="170" y="17" font-size="11" fill="#505050">...</text>
+        <rect x="190" width="28" height="26" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="204" y="17" font-size="8" fill="#00c7fd" text-anchor="middle">q₃₁</text>
+
+        <text x="240" y="17" font-size="10" fill="#707070">← 32 bytes (1:1 mapping, no packing)</text>
+      </g>
+    </g>
+
+    <!-- Dequant + int8 detail -->
+    <g transform="translate(550, 55)">
+      <rect width="350" height="70" rx="6" fill="#151515" stroke="#0071c5"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#00c7fd">Dequantization (simplest!):</text>
+      <text x="15" y="45" class="code">weight = (int8_t)qs[i] × d</text>
+      <text x="15" y="62" font-size="10" fill="#47b475">Range: [-128, +127] × scale (signed)</text>
+    </g>
+
+    <g transform="translate(920, 55)">
+      <rect width="360" height="70" rx="6" fill="#151515" stroke="#47b475"/>
+      <text x="15" y="22" font-size="11" font-weight="600" fill="#47b475">Use Case:</text>
+      <text x="15" y="42" font-size="10" fill="#a0a0a0">Often used as intermediate for activations</text>
+      <text x="15" y="58" font-size="10" fill="#a0a0a0">in Q4_K × Q8 mixed-precision compute (VNNI)</text>
+    </g>
+  </g>
+
+  <!-- ==================== K-QUANTS HEADER ==================== -->
+  <g transform="translate(50, 1150)">
+    <rect width="1300" height="40" rx="6" fill="#ffb400" opacity="0.2" stroke="#ffb400"/>
+    <text x="650" y="27" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">K-Quant Formats (256 weights per block) - Each Has DIFFERENT Formula!</text>
+  </g>
+
+  <!-- ==================== K-QUANT FORMULA COMPARISON ==================== -->
+  <g transform="translate(50, 1210)">
+    <rect width="1300" height="200" rx="10" fill="#202020" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+
+    <text x="20" y="28" font-size="15" font-weight="700" fill="#ffb400">K-Quant Formulas Are ALL DIFFERENT (Critical for Quantization!)</text>
+
+    <!-- Q4_K formula -->
+    <g transform="translate(20, 50)">
+      <rect width="400" height="70" rx="4" fill="#151515" stroke="#ffb400"/>
+      <text x="10" y="20" font-size="12" fill="#ffb400" font-weight="600">Q4_K: Asymmetric with SUBTRACTION</text>
+      <text x="10" y="42" class="math">weight = q×(d×scale) - (dmin×min)</text>
+      <text x="10" y="60" font-size="10" fill="#a0a0a0">Has: d, dmin (FP16) + 8 sub-scales + 8 sub-mins (6-bit)</text>
+    </g>
+
+    <!-- Q6_K formula -->
+    <g transform="translate(440, 50)">
+      <rect width="400" height="70" rx="4" fill="#151515" stroke="#a855f7"/>
+      <text x="10" y="20" font-size="12" fill="#a855f7" font-weight="600">Q6_K: Symmetric with CENTER</text>
+      <text x="10" y="42" class="math">weight = (q6 - 32) × d × scales[j]</text>
+      <text x="10" y="60" font-size="10" fill="#a0a0a0">Has: d (FP16) + 16 sub-scales (int8). NO min!</text>
+    </g>
+
+    <!-- Q8_K formula -->
+    <g transform="translate(860, 50)">
+      <rect width="420" height="70" rx="4" fill="#151515" stroke="#00c7fd"/>
+      <text x="10" y="20" font-size="12" fill="#00c7fd" font-weight="600">Q8_K: Simple Symmetric</text>
+      <text x="10" y="42" class="math">weight = q8 × d</text>
+      <text x="10" y="60" font-size="10" fill="#a0a0a0">Has: d (FP32 only!). NO sub-scales, NO min!</text>
+    </g>
+
+    <!-- Simple vs K-quant comparison -->
+    <g transform="translate(20, 135)">
+      <rect width="620" height="55" rx="4" fill="#151515" stroke="#47b475"/>
+      <text x="10" y="20" font-size="11" fill="#47b475" font-weight="600">Simple Asymmetric (Q4_1): min stored as FP16 (can be negative)</text>
+      <text x="10" y="38" class="code">weight = q × d + m    // m is added, can be negative</text>
+    </g>
+
+    <g transform="translate(660, 135)">
+      <rect width="620" height="55" rx="4" fill="#151515" stroke="#ff6b6b"/>
+      <text x="10" y="20" font-size="11" fill="#ff6b6b" font-weight="600">K-Quant (Q4_K): min stored as 6-bit UNSIGNED (0-63)</text>
+      <text x="10" y="38" class="code">weight = q×d×sc - dm×mn  // mn is SUBTRACTED (always positive)</text>
+    </g>
+  </g>
+
+  <!-- ==================== QUANTIZATION ENCODING DIFFERENCES ==================== -->
+  <g transform="translate(50, 1430)">
+    <rect width="1300" height="150" rx="10" fill="url(#warnGrad)" stroke="#ff6b6b" stroke-width="2" filter="url(#shadow)"/>
+
+    <text x="20" y="28" font-size="15" font-weight="700" fill="#ff6b6b">Quantization (Encoding) Process is DIFFERENT for Each Format!</text>
+
+    <g transform="translate(20, 50)">
+      <text font-size="11" fill="#ffffff">To quantize weights, you need format-specific logic:</text>
+    </g>
+
+    <g transform="translate(20, 75)">
+      <rect width="400" height="60" rx="4" fill="#151515" stroke="#ffb400"/>
+      <text x="10" y="18" font-size="10" fill="#ffb400" font-weight="600">Q4_K Encoding:</text>
+      <text x="10" y="34" font-size="9" fill="#a0a0a0">1. Find block [min, max], compute d, dmin</text>
+      <text x="10" y="48" font-size="9" fill="#a0a0a0">2. For each sub-block: compute scale, min (6-bit)</text>
+      <text x="10" y="62" font-size="9" fill="#ff6b6b">3. q = (weight + dmin×mn) / (d×sc)  ← ADD min to encode!</text>
+    </g>
+
+    <g transform="translate(440, 75)">
+      <rect width="400" height="60" rx="4" fill="#151515" stroke="#a855f7"/>
+      <text x="10" y="18" font-size="10" fill="#a855f7" font-weight="600">Q6_K Encoding:</text>
+      <text x="10" y="34" font-size="9" fill="#a0a0a0">1. Find block absmax, compute d</text>
+      <text x="10" y="48" font-size="9" fill="#a0a0a0">2. For each sub-block: compute int8 scale</text>
+      <text x="10" y="62" font-size="9" fill="#a855f7">3. q6 = round(weight / (d×sc)) + 32  ← ADD 32 center</text>
+    </g>
+
+    <g transform="translate(860, 75)">
+      <rect width="420" height="60" rx="4" fill="#151515" stroke="#00c7fd"/>
+      <text x="10" y="18" font-size="10" fill="#00c7fd" font-weight="600">Q8_K Encoding:</text>
+      <text x="10" y="34" font-size="9" fill="#a0a0a0">1. Find block absmax, compute d (FP32)</text>
+      <text x="10" y="48" font-size="9" fill="#a0a0a0">2. Compute bsums for each 16-weight group</text>
+      <text x="10" y="62" font-size="9" fill="#00c7fd">3. q8 = round(weight / d)  ← Simple!</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q4_K ==================== -->
+  <g transform="translate(50, 1600)">
+    <rect width="1300" height="420" rx="10" fill="#202020" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="1300" height="38" rx="10" fill="#ffb400" opacity="0.3"/>
+    <text x="20" y="26" class="format-title" style="fill:#ffb400">Q4_K - Primary K-Quant Format (Most Common in GGUF)</text>
+    <text x="1280" y="26" font-size="14" fill="#ffb400" text-anchor="end">4.5 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="700" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="24" class="math">Super-scale (d):     2 bytes   (FP16)</text>
+      <text x="0" y="44" class="math">Super-min (dmin):    2 bytes   (FP16)</text>
+      <text x="0" y="64" class="math">Sub-scales+mins:     12 bytes  (8 scales + 8 mins, 6-bit packed)</text>
+      <text x="0" y="84" class="math">Weights:             256 × 4 bits / 8 = 128 bytes</text>
+      <line x1="0" y1="96" x2="420" y2="96" stroke="#454545"/>
+      <text x="0" y="116" class="math" font-weight="700">Total: 2 + 2 + 12 + 128 = 144 bytes</text>
+      <text x="430" y="116" class="math-explain">→ 144×8/256 = 4.5 bits/weight</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 190)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout (144 bytes):</text>
+
+      <!-- Super-block header -->
+      <g transform="translate(0, 22)">
+        <text x="0" y="0" font-size="10" fill="#ffb400">Super-block header (4 bytes):</text>
+        <rect x="0" y="8" width="28" height="24" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="14" y="24" font-size="8" fill="#ffb400" text-anchor="middle">d₀</text>
+        <rect x="30" width="28" height="24" rx="3" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <text x="44" y="24" font-size="8" fill="#ffb400" text-anchor="middle">d₁</text>
+        <rect x="65" width="28" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="79" y="24" font-size="7" fill="#47b475" text-anchor="middle">dm₀</text>
+        <rect x="95" width="28" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <text x="109" y="24" font-size="7" fill="#47b475" text-anchor="middle">dm₁</text>
+      </g>
+
+      <!-- Sub-block scales -->
+      <g transform="translate(0, 70)">
+        <text x="0" y="0" font-size="10" fill="#14b8a6">Sub-block scales (12 bytes = 8 scales + 8 mins, 6-bit each):</text>
+        <rect x="0" y="8" width="24" height="24" rx="3" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="26" width="24" height="24" rx="3" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="52" width="24" height="24" rx="3" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="78" width="24" height="24" rx="3" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="110" width="24" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <rect x="136" width="24" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <rect x="162" width="24" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <rect x="188" width="24" height="24" rx="3" fill="url(#minGrad)" stroke="#47b475"/>
+        <rect x="220" width="24" height="24" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <rect x="246" width="24" height="24" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <rect x="272" width="24" height="24" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <rect x="298" width="24" height="24" rx="3" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="52" y="45" font-size="8" fill="#14b8a6">scales 0-7 (6-bit low)</text>
+        <text x="162" y="45" font-size="8" fill="#47b475">mins 0-7 (6-bit low)</text>
+        <text x="272" y="45" font-size="8" fill="#a855f7">high bits</text>
+      </g>
+
+      <!-- Weights -->
+      <g transform="translate(0, 130)">
+        <text x="0" y="0" font-size="10" fill="#00c7fd">Quantized weights (128 bytes = 256 × 4-bit):</text>
+        <rect x="0" y="8" width="24" height="24" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="26" width="24" height="24" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="52" width="24" height="24" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="88" y="24" font-size="11" fill="#505050">...</text>
+        <rect x="110" width="24" height="24" rx="3" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="122" y="24" font-size="7" fill="#00c7fd" text-anchor="middle">q₁₂₇</text>
+        <text x="160" y="24" font-size="9" fill="#707070">← 128 bytes</text>
+      </g>
+    </g>
+
+    <!-- Dequant with warning -->
+    <g transform="translate(550, 55)">
+      <rect width="450" height="160" rx="6" fill="#151515" stroke="#ffb400"/>
+      <text x="15" y="25" font-size="13" font-weight="600" fill="#ffb400">Dequantization (CORRECT formula):</text>
+
+      <text x="15" y="55" class="code">// For weight i in sub-block j (j = i/32):</text>
+      <text x="15" y="75" class="code">nibble = (qs[i/2] >> ((i%2)×4)) &amp; 0x0F</text>
+      <text x="15" y="95" class="code">scale_val = unpack_scale(j)</text>
+      <text x="15" y="115" class="code">min_val = unpack_min(j)</text>
+
+      <rect x="10" y="125" width="430" height="28" rx="4" fill="#ff6b6b" opacity="0.2" stroke="#ff6b6b"/>
+      <text x="20" y="145" class="math" style="fill:#ffffff">weight = nibble × (d × scale_val) - (dmin × min_val)</text>
+    </g>
+
+    <!-- Scale unpacking -->
+    <g transform="translate(1020, 55)">
+      <rect width="260" height="160" rx="6" fill="#151515" stroke="#14b8a6"/>
+      <text x="15" y="25" font-size="12" font-weight="600" fill="#14b8a6">6-bit Scale Unpacking:</text>
+      <text x="15" y="50" font-size="10" fill="#a0a0a0">Scales packed as:</text>
+      <text x="15" y="68" class="code" font-size="10">bits[5:0] in bytes 0-7</text>
+      <text x="15" y="86" class="code" font-size="10">bits[7:6] in bytes 8-11</text>
+      <text x="15" y="110" font-size="10" fill="#a0a0a0">Full 8-bit scale assembled</text>
+      <text x="15" y="128" font-size="10" fill="#a0a0a0">from two separate locations.</text>
+      <text x="15" y="150" font-size="10" fill="#ff6b6b">See ckernel_quant.h</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q6_K ==================== -->
+  <g transform="translate(50, 2040)">
+    <rect width="1300" height="380" rx="10" fill="#202020" stroke="#a855f7" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="1300" height="38" rx="10" fill="#a855f7" opacity="0.3"/>
+    <text x="20" y="26" class="format-title" style="fill:#a855f7">Q6_K - 6-bit K-Quant (Higher Quality)</text>
+    <text x="1280" y="26" font-size="14" fill="#a855f7" text-anchor="end">6.5625 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="700" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="24" class="math">Low 4-bits (ql):     256 × 4 bits / 8 = 128 bytes</text>
+      <text x="0" y="44" class="math">High 2-bits (qh):    256 × 2 bits / 8 = 64 bytes</text>
+      <text x="0" y="64" class="math">Sub-scales:          256 / 16 = 16 bytes (int8 per 16 weights)</text>
+      <text x="0" y="84" class="math">Super-scale (d):     2 bytes (FP16)</text>
+      <line x1="0" y1="96" x2="450" y2="96" stroke="#454545"/>
+      <text x="0" y="116" class="math" font-weight="700">Total: 128 + 64 + 16 + 2 = 210 bytes</text>
+      <text x="460" y="116" class="math-explain">→ 210×8/256 = 6.5625 bits/weight</text>
+    </g>
+
+    <!-- Alternative verification -->
+    <g transform="translate(20, 180)">
+      <rect width="420" height="50" rx="4" fill="#151515" stroke="#a855f7"/>
+      <text x="15" y="20" font-size="11" fill="#a855f7">Verification: Weight data only:</text>
+      <text x="15" y="40" class="math">256 weights × 6 bits / 8 = 192 bytes ✓ (128 + 64)</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 250)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout (210 bytes):</text>
+
+      <g transform="translate(0, 22)">
+        <text x="0" y="0" font-size="10" fill="#00c7fd">ql[128]: low 4-bits</text>
+        <rect x="0" y="8" width="22" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="24" width="22" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="48" width="22" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="80" y="22" font-size="10" fill="#505050">... (128)</text>
+
+        <text x="160" y="0" font-size="10" fill="#a855f7">qh[64]: high 2-bits</text>
+        <rect x="160" y="8" width="22" height="22" rx="2" fill="url(#highGrad)" stroke="#a855f7"/>
+        <rect x="184" y="8" width="22" height="22" rx="2" fill="url(#highGrad)" stroke="#a855f7"/>
+        <text x="220" y="22" font-size="10" fill="#505050">... (64)</text>
+
+        <text x="290" y="0" font-size="10" fill="#14b8a6">scales[16]: int8</text>
+        <rect x="290" y="8" width="22" height="22" rx="2" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="314" y="8" width="22" height="22" rx="2" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <text x="348" y="22" font-size="10" fill="#505050">... (16)</text>
+
+        <text x="420" y="0" font-size="10" fill="#ffb400">d: FP16</text>
+        <rect x="420" y="8" width="22" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ffb400"/>
+        <rect x="444" y="8" width="22" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ffb400"/>
+      </g>
+    </g>
+
+    <!-- Dequant -->
+    <g transform="translate(550, 55)">
+      <rect width="450" height="130" rx="6" fill="#151515" stroke="#a855f7"/>
+      <text x="15" y="25" font-size="13" font-weight="600" fill="#a855f7">6-bit Assembly + Dequantization:</text>
+      <text x="15" y="55" class="code">// Combine 4+2 bits:</text>
+      <text x="15" y="75" class="code">low4 = (ql[i] >> ((i%2)×4)) &amp; 0x0F</text>
+      <text x="15" y="95" class="code">high2 = (qh[i/4] >> ((i%4)×2)) &amp; 0x03</text>
+      <text x="15" y="115" class="code">q6 = low4 | (high2 &lt;&lt; 4)  // 0-63 range</text>
+    </g>
+
+    <g transform="translate(1020, 55)">
+      <rect width="260" height="130" rx="6" fill="#151515" stroke="#47b475"/>
+      <text x="15" y="25" font-size="12" font-weight="600" fill="#47b475">Final dequant:</text>
+      <text x="15" y="55" class="code">j = i / 16  // sub-block</text>
+      <text x="15" y="80" class="math">weight = (q6 - 32)</text>
+      <text x="15" y="100" class="math">       × d × scales[j]</text>
+      <text x="15" y="120" font-size="10" fill="#47b475">Symmetric: [-32,+31] range</text>
+    </g>
+  </g>
+
+  <!-- ==================== Q8_K ==================== -->
+  <g transform="translate(50, 2440)">
+    <rect width="1300" height="360" rx="10" fill="#202020" stroke="#00c7fd" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="1300" height="38" rx="10" fill="#00c7fd" opacity="0.3"/>
+    <text x="20" y="26" class="format-title">Q8_K - 8-bit K-Quant (For Activations)</text>
+    <text x="1280" y="26" font-size="14" fill="#00c7fd" text-anchor="end">9.125 bits/weight</text>
+
+    <!-- Explicit Math -->
+    <g transform="translate(20, 55)">
+      <text font-size="13" font-weight="700" fill="#ffffff">Size Calculation:</text>
+      <text x="0" y="24" class="math">Scale (d):           4 bytes   (FP32 - not FP16!)</text>
+      <text x="0" y="44" class="math">Weights (qs):        256 × 8 bits / 8 = 256 bytes</text>
+      <text x="0" y="64" class="math">Block sums (bsums):  16 × 2 bytes = 32 bytes (int16)</text>
+      <line x1="0" y1="76" x2="450" y2="76" stroke="#454545"/>
+      <text x="0" y="96" class="math" font-weight="700">Total: 4 + 256 + 32 = 292 bytes</text>
+      <text x="460" y="96" class="math-explain">→ 292×8/256 = 9.125 bits/weight</text>
+    </g>
+
+    <!-- FP32 warning -->
+    <g transform="translate(20, 160)">
+      <rect width="450" height="50" rx="4" fill="url(#warnGrad)" stroke="#ff6b6b"/>
+      <text x="15" y="20" font-size="11" fill="#ff6b6b" font-weight="600">Note: Q8_K uses FP32 scale (4 bytes), not FP16 (2 bytes)!</text>
+      <text x="15" y="38" font-size="10" fill="#a0a0a0">This is intentional for higher precision in activation quantization.</text>
+    </g>
+
+    <!-- Block Layout -->
+    <g transform="translate(20, 230)">
+      <text font-size="12" font-weight="600" fill="#a0a0a0">Block Layout (292 bytes):</text>
+
+      <g transform="translate(0, 22)">
+        <text x="0" y="0" font-size="10" fill="#ff6b6b">d: FP32 (4 bytes!)</text>
+        <rect x="0" y="8" width="20" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ff6b6b"/>
+        <rect x="22" y="8" width="20" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ff6b6b"/>
+        <rect x="44" y="8" width="20" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ff6b6b"/>
+        <rect x="66" y="8" width="20" height="22" rx="2" fill="url(#scaleGrad)" stroke="#ff6b6b"/>
+
+        <text x="110" y="0" font-size="10" fill="#00c7fd">qs[256]: int8 weights</text>
+        <rect x="110" y="8" width="20" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="132" y="8" width="20" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <rect x="154" y="8" width="20" height="22" rx="2" fill="url(#dataGrad)" stroke="#0071c5"/>
+        <text x="186" y="22" font-size="10" fill="#505050">... (256)</text>
+
+        <text x="280" y="0" font-size="10" fill="#14b8a6">bsums[16]: int16</text>
+        <rect x="280" y="8" width="30" height="22" rx="2" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <rect x="312" y="8" width="30" height="22" rx="2" fill="url(#subScaleGrad)" stroke="#14b8a6"/>
+        <text x="354" y="22" font-size="10" fill="#505050">... (16)</text>
+      </g>
+    </g>
+
+    <!-- Dequant + bsums explanation -->
+    <g transform="translate(550, 55)">
+      <rect width="350" height="100" rx="6" fill="#151515" stroke="#00c7fd"/>
+      <text x="15" y="25" font-size="13" font-weight="600" fill="#00c7fd">Dequantization:</text>
+      <text x="15" y="55" class="code">weight = (int8_t)qs[i] × d</text>
+      <text x="15" y="80" font-size="10" fill="#47b475">Simple multiply - no bit manipulation!</text>
+      <text x="15" y="95" font-size="10" fill="#a0a0a0">FP32 scale for higher precision</text>
+    </g>
+
+    <g transform="translate(920, 55)">
+      <rect width="360" height="100" rx="6" fill="#151515" stroke="#14b8a6"/>
+      <text x="15" y="25" font-size="12" font-weight="600" fill="#14b8a6">Why bsums (block sums)?</text>
+      <text x="15" y="50" font-size="10" fill="#a0a0a0">bsums[j] = sum of 16 consecutive int8s</text>
+      <text x="15" y="68" font-size="10" fill="#a0a0a0">Used in VNNI/AVX-512 dot products:</text>
+      <text x="15" y="86" font-size="10" fill="#a0a0a0">Avoids recomputing sums during GEMM</text>
+    </g>
+
+    <g transform="translate(550, 170)">
+      <rect width="730" height="60" rx="6" fill="#151515" stroke="#47b475"/>
+      <text x="15" y="22" font-size="12" font-weight="600" fill="#47b475">Primary Use Case:</text>
+      <text x="15" y="45" font-size="11" fill="#a0a0a0">Q8_K is typically used to quantize ACTIVATIONS when weights are Q4_K.</text>
+      <text x="15" y="60" font-size="11" fill="#a0a0a0">This enables Q4_K × Q8_K integer GEMM with VNNI acceleration.</text>
+    </g>
+  </g>
+
+  <!-- ==================== SUMMARY TABLE ==================== -->
+  <g transform="translate(50, 2820)">
+    <rect width="1300" height="280" rx="10" fill="#202020" stroke="#0071c5" stroke-width="2" filter="url(#shadow)"/>
+
+    <rect x="0" y="0" width="1300" height="38" rx="10" fill="#0071c5" opacity="0.3"/>
+    <text x="20" y="26" font-size="16" font-weight="700" fill="#00c7fd">Summary: All Format Sizes</text>
+
+    <!-- Table Header -->
+    <g transform="translate(20, 55)">
+      <text x="0" font-size="12" font-weight="700" fill="#ffb400">Format</text>
+      <text x="100" font-size="12" font-weight="700" fill="#ffb400">Block</text>
+      <text x="170" font-size="12" font-weight="700" fill="#ffb400">Header</text>
+      <text x="340" font-size="12" font-weight="700" fill="#ffb400">Weight Data</text>
+      <text x="600" font-size="12" font-weight="700" fill="#ffb400">Total</text>
+      <text x="700" font-size="12" font-weight="700" fill="#ffb400">Bits/Wt</text>
+      <text x="800" font-size="12" font-weight="700" fill="#ffb400">Dequant Type</text>
+
+      <line x1="0" y1="12" x2="1260" y2="12" stroke="#454545"/>
+    </g>
+
+    <!-- Table Rows -->
+    <g transform="translate(20, 85)" font-size="11">
+      <text x="0" fill="#00c7fd">Q4_0</text>
+      <text x="100" fill="#a0a0a0">32</text>
+      <text x="170" fill="#a0a0a0">2 (d)</text>
+      <text x="340" fill="#a0a0a0">32×4/8 = 16</text>
+      <text x="600" fill="#ffffff" font-weight="600">18</text>
+      <text x="700" fill="#47b475">4.5</text>
+      <text x="800" fill="#a0a0a0">Symmetric (q-8)×d</text>
+
+      <text x="0" y="25" fill="#47b475">Q4_1</text>
+      <text x="100" y="25" fill="#a0a0a0">32</text>
+      <text x="170" y="25" fill="#a0a0a0">2 (d) + 2 (m) = 4</text>
+      <text x="340" y="25" fill="#a0a0a0">32×4/8 = 16</text>
+      <text x="600" y="25" fill="#ffffff" font-weight="600">20</text>
+      <text x="700" y="25" fill="#47b475">5.0</text>
+      <text x="800" y="25" fill="#a0a0a0">Asymmetric q×d+m</text>
+
+      <text x="0" y="50" fill="#a855f7">Q5_0</text>
+      <text x="100" y="50" fill="#a0a0a0">32</text>
+      <text x="170" y="50" fill="#a0a0a0">2 (d)</text>
+      <text x="340" y="50" fill="#a0a0a0">32×4/8 + 32×1/8 = 16+4 = 20</text>
+      <text x="600" y="50" fill="#ffffff" font-weight="600">22</text>
+      <text x="700" y="50" fill="#47b475">5.5</text>
+      <text x="800" y="50" fill="#a0a0a0">Symmetric (q5-16)×d</text>
+
+      <text x="0" y="75" fill="#14b8a6">Q5_1</text>
+      <text x="100" y="75" fill="#a0a0a0">32</text>
+      <text x="170" y="75" fill="#a0a0a0">2 (d) + 2 (m) = 4</text>
+      <text x="340" y="75" fill="#a0a0a0">32×4/8 + 32×1/8 = 20</text>
+      <text x="600" y="75" fill="#ffffff" font-weight="600">24</text>
+      <text x="700" y="75" fill="#47b475">6.0</text>
+      <text x="800" y="75" fill="#a0a0a0">Asymmetric q5×d+m</text>
+
+      <text x="0" y="100" fill="#00c7fd">Q8_0</text>
+      <text x="100" y="100" fill="#a0a0a0">32</text>
+      <text x="170" y="100" fill="#a0a0a0">2 (d)</text>
+      <text x="340" y="100" fill="#a0a0a0">32×8/8 = 32</text>
+      <text x="600" y="100" fill="#ffffff" font-weight="600">34</text>
+      <text x="700" y="100" fill="#47b475">8.5</text>
+      <text x="800" y="100" fill="#a0a0a0">Symmetric q8×d</text>
+
+      <line x1="0" y1="115" x2="1260" y2="115" stroke="#454545" stroke-dasharray="4,4"/>
+
+      <text x="0" y="135" fill="#ffb400" font-weight="600">Q4_K</text>
+      <text x="100" y="135" fill="#a0a0a0">256</text>
+      <text x="170" y="135" fill="#a0a0a0">2+2 (super) + 12 (sub) = 16</text>
+      <text x="340" y="135" fill="#a0a0a0">256×4/8 = 128</text>
+      <text x="600" y="135" fill="#ffffff" font-weight="600">144</text>
+      <text x="700" y="135" fill="#47b475">4.5</text>
+      <text x="800" y="135" fill="#ff6b6b">q×(d×sc) - (dm×mn)</text>
+
+      <text x="0" y="160" fill="#a855f7">Q6_K</text>
+      <text x="100" y="160" fill="#a0a0a0">256</text>
+      <text x="170" y="160" fill="#a0a0a0">16 (scales) + 2 (d) = 18</text>
+      <text x="340" y="160" fill="#a0a0a0">256×4/8 + 256×2/8 = 128+64 = 192</text>
+      <text x="600" y="160" fill="#ffffff" font-weight="600">210</text>
+      <text x="700" y="160" fill="#47b475">6.5625</text>
+      <text x="800" y="160" fill="#a0a0a0">(q6-32)×d×sc</text>
+
+      <text x="0" y="185" fill="#00c7fd">Q8_K</text>
+      <text x="100" y="185" fill="#a0a0a0">256</text>
+      <text x="170" y="185" fill="#a0a0a0">4 (FP32 d) + 32 (bsums) = 36</text>
+      <text x="340" y="185" fill="#a0a0a0">256×8/8 = 256</text>
+      <text x="600" y="185" fill="#ffffff" font-weight="600">292</text>
+      <text x="700" y="185" fill="#47b475">9.125</text>
+      <text x="800" y="185" fill="#a0a0a0">q8×d (FP32)</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(50, 3120)">
+    <text x="650" y="0" font-size="11" fill="#505050" text-anchor="middle">C-Kernel-Engine Quantization Formats Reference | Based on ckernel_quant.h</text>
+    <text x="650" y="20" font-size="10" fill="#404040" text-anchor="middle">Each K-quant format uses a DIFFERENT formula for both dequantization and quantization encoding</text>
+  </g>
+
+</svg>

@@ -1,0 +1,419 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 2850">
+  <defs>
+    <linearGradient id="gradFolder" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a90d9"/>
+      <stop offset="100%" style="stop-color:#2c5282"/>
+    </linearGradient>
+    <linearGradient id="gradFile" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#48bb78"/>
+      <stop offset="100%" style="stop-color:#276749"/>
+    </linearGradient>
+    <linearGradient id="gradGen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ed8936"/>
+      <stop offset="100%" style="stop-color:#c05621"/>
+    </linearGradient>
+    <linearGradient id="gradBinary" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9f7aea"/>
+      <stop offset="100%" style="stop-color:#6b46c1"/>
+    </linearGradient>
+    <linearGradient id="gradStep" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="gradMissing" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e53e3e"/>
+      <stop offset="100%" style="stop-color:#c53030"/>
+    </linearGradient>
+    <linearGradient id="gradFix" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#38a169"/>
+      <stop offset="100%" style="stop-color:#276749"/>
+    </linearGradient>
+    <linearGradient id="gradMetrics" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d69e2e"/>
+      <stop offset="100%" style="stop-color:#b7791f"/>
+    </linearGradient>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a0aec0"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="2850" fill="#1a202c"/>
+
+  <!-- Title -->
+  <text x="700" y="45" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#e2e8f0" text-anchor="middle">C-KERNEL-ENGINE V6 PLAN</text>
+  <text x="700" y="75" font-family="Arial, sans-serif" font-size="16" fill="#a0aec0" text-anchor="middle">Clean Architecture: Generated Code → Direct Execution → OMP Parallelization</text>
+
+  <!-- EXECUTIVE SUMMARY -->
+  <rect x="50" y="95" width="1300" height="145" rx="10" fill="url(#gradMetrics)" filter="url(#shadow)"/>
+  <text x="700" y="128" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">EXECUTIVE SUMMARY</text>
+
+  <g transform="translate(70, 148)">
+    <rect x="0" y="0" width="390" height="75" rx="5" fill="#1a202c" opacity="0.8"/>
+    <text x="195" y="25" font-family="monospace" font-size="15" font-weight="bold" fill="#68d391" text-anchor="middle">PREFILL SPEEDUP</text>
+    <text x="195" y="52" font-family="monospace" font-size="24" font-weight="bold" fill="white" text-anchor="middle">~4x faster</text>
+    <text x="195" y="68" font-family="monospace" font-size="9" fill="#a0aec0">via OMP token-level parallelization</text>
+
+    <rect x="410" y="0" width="390" height="75" rx="5" fill="#1a202c" opacity="0.8"/>
+    <text x="605" y="25" font-family="monospace" font-size="15" font-weight="bold" fill="#68d391" text-anchor="middle">CODE REDUCTION</text>
+    <text x="605" y="52" font-family="monospace" font-size="24" font-weight="bold" fill="white" text-anchor="middle">50% less</text>
+    <text x="605" y="68" font-family="monospace" font-size="9" fill="#a0aec0">no dispatch, no dlopen overhead</text>
+
+    <rect x="820" y="0" width="390" height="75" rx="5" fill="#1a202c" opacity="0.8"/>
+    <text x="1015" y="25" font-family="monospace" font-size="15" font-weight="bold" fill="#68d391" text-anchor="middle">DECODE CHANGE</text>
+    <text x="1015" y="52" font-family="monospace" font-size="24" font-weight="bold" fill="white" text-anchor="middle">No change</text>
+    <text x="1015" y="68" font-family="monospace" font-size="9" fill="#a0aec0">M=1, too small for parallelism</text>
+  </g>
+
+  <!-- SECTION 1: Folder Structure -->
+  <rect x="50" y="255" width="1300" height="290" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="290" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">1. FOLDER STRUCTURE</text>
+
+  <g transform="translate(70, 310)">
+    <!-- src/v6/ -->
+    <rect x="0" y="0" width="150" height="38" rx="5" fill="url(#gradFolder)" filter="url(#shadow)"/>
+    <text x="75" y="26" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">src/v6/</text>
+
+    <!-- src/v6/ckernels/ -->
+    <rect x="30" y="55" width="170" height="32" rx="4" fill="url(#gradFolder)" filter="url(#shadow)"/>
+    <text x="115" y="77" font-family="monospace" font-size="13" fill="white" text-anchor="middle">ckernels/</text>
+    <text x="210" y="77" font-family="monospace" font-size="10" fill="#a0aec0">symlink to ../kernels/</text>
+
+    <!-- v6 scripts -->
+    <rect x="360" y="55" width="190" height="32" rx="4" fill="url(#gradFolder)" filter="url(#shadow)"/>
+    <text x="455" y="77" font-family="monospace" font-size="13" fill="white" text-anchor="middle">scripts/</text>
+
+    <rect x="380" y="100" width="230" height="28" rx="3" fill="url(#gradGen)" filter="url(#shadow)"/>
+    <text x="495" y="120" font-family="monospace" font-size="11" fill="white" text-anchor="middle">v6_codegen.py (MODIFIED)</text>
+
+    <rect x="380" y="133" width="230" height="28" rx="3" fill="url(#gradGen)" filter="url(#shadow)"/>
+    <text x="495" y="153" font-family="monospace" font-size="11" fill="white" text-anchor="middle">v6_build_ir.py (MODIFIED)</text>
+
+    <!-- Generated files -->
+    <rect x="30" y="185" width="250" height="35" rx="4" fill="url(#gradGen)" filter="url(#shadow)"/>
+    <text x="155" y="208" font-family="monospace" font-size="13" fill="white" text-anchor="middle">generated_v6_decode.c</text>
+
+    <rect x="300" y="185" width="250" height="35" rx="4" fill="url(#gradGen)" filter="url(#shadow)"/>
+    <text x="425" y="208" font-family="monospace" font-size="13" fill="white" text-anchor="middle">generated_v6_prefill.c</text>
+
+    <!-- v6_cli.c -->
+    <rect x="30" y="235" width="190" height="35" rx="4" fill="url(#gradFolder)" filter="url(#shadow)"/>
+    <text x="125" y="258" font-family="monospace" font-size="13" fill="white" text-anchor="middle">v6_cli.c</text>
+    <text x="230" y="258" font-family="monospace" font-size="10" fill="#a0aec0">NEW</text>
+
+    <!-- build.sh -->
+    <rect x="290" y="235" width="170" height="35" rx="4" fill="url(#gradFolder)" filter="url(#shadow)"/>
+    <text x="375" y="258" font-family="monospace" font-size="13" fill="white" text-anchor="middle">build.sh</text>
+    <text x="470" y="258" font-family="monospace" font-size="10" fill="#a0aec0">NEW</text>
+
+    <!-- Binary -->
+    <rect x="560" y="230" width="110" height="40" rx="5" fill="url(#gradBinary)" filter="url(#shadow)"/>
+    <text x="615" y="257" font-family="monospace" font-size="14" font-weight="bold" fill="white" text-anchor="middle">ck-v6</text>
+  </g>
+
+  <!-- SECTION 2: V5 Missing vs V6 -->
+  <rect x="50" y="560" width="1300" height="420" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="595" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#fc8181">2. V5 MISSING FEATURES</text>
+
+  <g transform="translate(70, 620)">
+    <!-- What's MISSING from v5 -->
+    <rect x="0" y="0" width="380" height="200" rx="8" fill="url(#gradMissing)" filter="url(#shadow)"/>
+    <text x="190" y="32" font-family="monospace" font-size="16" font-weight="bold" fill="white" text-anchor="middle">V5 MISSING</text>
+
+    <text x="15" y="60" font-family="monospace" font-size="12" fill="#fed7d7">1. PREFILL CODEGEN</text>
+    <text x="15" y="78" font-family="monospace" font-size="10" fill="#feb2b2">says &quot;not yet implemented&quot;</text>
+
+    <text x="15" y="108" font-family="monospace" font-size="12" fill="#fed7d7">2. TOKEN-LEVEL OMP</text>
+    <text x="15" y="126" font-family="monospace" font-size="10" fill="#feb2b2">no #pragma omp parallel</text>
+
+    <text x="15" y="156" font-family="monospace" font-size="12" fill="#fed7d7">3. FEATURE-LEVEL OMP</text>
+    <text x="15" y="174" font-family="monospace" font-size="10" fill="#feb2b2">GEMM loops not parallelized</text>
+
+    <!-- Arrow - moved to side to avoid overlap -->
+    <path d="M400,60 L440,60" stroke="#a0aec0" stroke-width="4" marker-end="url(#arrowhead)"/>
+    <text x="420" y="55" font-family="monospace" font-size="14" font-weight="bold" fill="#68d391" text-anchor="middle">FIX</text>
+
+    <!-- What needs to be done -->
+    <rect x="460" y="0" width="380" height="300" rx="8" fill="url(#gradFix)" filter="url(#shadow)"/>
+    <text x="650" y="32" font-family="monospace" font-size="16" font-weight="bold" fill="white" text-anchor="middle">V6 REQUIREMENTS</text>
+
+    <text x="480" y="60" font-family="monospace" font-size="12" fill="#c6f6d5">1. PREFILL CODEGEN</text>
+    <text x="480" y="78" font-family="monospace" font-size="10" fill="#9ae6b4">emit_c_source_v6_prefill()</text>
+    <text x="480" y="93" font-family="monospace" font-size="10" fill="#9ae6b4">N tokens in parallel</text>
+
+    <text x="480" y="125" font-family="monospace" font-size="12" fill="#c6f6d5">2. TOKEN-LEVEL OMP</text>
+    <text x="480" y="143" font-family="monospace" font-size="10" fill="#9ae6b4">#pragma omp parallel for</text>
+    <text x="480" y="158" font-family="monospace" font-size="10" fill="#9ae6b4">for (int t = 0; t &lt; num_tokens; t++)</text>
+
+    <text x="480" y="190" font-family="monospace" font-size="12" fill="#c6f6d5">3. FEATURE-LEVEL OMP</text>
+    <text x="480" y="208" font-family="monospace" font-size="10" fill="#9ae6b4">collapse(2) for GEMM inner</text>
+    <text x="480" y="223" font-family="monospace" font-size="10" fill="#9ae6b4">prefill only (decode M=1)</text>
+
+    <text x="480" y="255" font-family="monospace" font-size="12" fill="#c6f6d5">4. NO DISPATCH</text>
+    <text x="480" y="273" font-family="monospace" font-size="10" fill="#9ae6b4">Direct kernel calls</text>
+  </g>
+
+  <!-- SECTION 3: OMP Token-Level -->
+  <rect x="50" y="995" width="640" height="420" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="1030" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">3. TOKEN-LEVEL PARALLELIZATION</text>
+
+  <g transform="translate(70, 1055)">
+    <rect x="0" y="0" width="600" height="130" rx="5" fill="#1a202c"/>
+    <text x="300" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#68d391" text-anchor="middle">PREFILL (N tokens)</text>
+
+    <text x="10" y="50" font-family="monospace" font-size="11" fill="#a0aec0">#pragma omp parallel for schedule(dynamic, 1)</text>
+    <text x="10" y="68" font-family="monospace" font-size="10" fill="#e9d8fd">for (int t = 0; t &lt; num_tokens; t++) {</text>
+    <text x="25" y="88" font-family="monospace" font-size="10" fill="#e9d8fd">process_token(t, weights, activations);</text>
+    <text x="10" y="108" font-family="monospace" font-size="10" fill="#e9d8fd">}</text>
+
+    <text x="10" y="155" font-family="monospace" font-size="11" fill="#fc8181">WHY: Tokens are independent in prefill</text>
+    <text x="10" y="175" font-family="monospace" font-size="10" fill="#a0aec0">Each thread: 1 token = 1 GEMM + 1 attention</text>
+    <text x="10" y="193" font-family="monospace" font-size="10" fill="#a0aec0">Ideal for long prompts (32K+ tokens)</text>
+
+    <text x="10" y="228" font-family="monospace" font-size="12" fill="#68d391">SPEEDUP: ~4x on 4-core</text>
+    <text x="10" y="248" font-family="monospace" font-size="10" fill="#a0aec0">Diminishing returns on &gt;8 cores</text>
+    <text x="10" y="266" font-family="monospace" font-size="10" fill="#a0aec0">Memory bandwidth bound</text>
+
+    <text x="10" y="300" font-family="monospace" font-size="11" fill="#fc8181">DECODE: No parallelism (M=1)</text>
+    <text x="10" y="320" font-family="monospace" font-size="10" fill="#a0aec0">Single token, too little work</text>
+    <text x="10" y="338" font-family="monospace" font-size="10" fill="#a0aec0">OMP overhead &gt; compute time</text>
+  </g>
+
+  <!-- SECTION 4: OMP Feature-Level -->
+  <rect x="710" y="995" width="640" height="420" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="730" y="1030" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">4. FEATURE-LEVEL PARALLELIZATION</text>
+
+  <g transform="translate(730, 1055)">
+    <rect x="0" y="0" width="600" height="130" rx="5" fill="#1a202c"/>
+    <text x="300" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#68d391" text-anchor="middle">GEMM INNER LOOP PARALLELIZATION</text>
+
+    <text x="10" y="50" font-family="monospace" font-size="11" fill="#a0aec0">#pragma omp parallel for collapse(2)</text>
+    <text x="10" y="68" font-family="monospace" font-size="10" fill="#e9d8fd">for (int row = 0; row &lt; M; row++) {</text>
+    <text x="25" y="88" font-family="monospace" font-size="10" fill="#e9d8fd">for (int col = 0; col &lt; N; col++) {</text>
+    <text x="40" y="106" font-family="monospace" font-size="10" fill="#e9d8fd">compute sum</text>
+    <text x="10" y="126" font-family="monospace" font-size="10" fill="#e9d8fd">}</text>
+
+    <text x="10" y="165" font-family="monospace" font-size="11" fill="#fc8181">WARNING: Thread overhead</text>
+    <text x="10" y="185" font-family="monospace" font-size="10" fill="#a0aec0">Better for: large M, N (prefill)</text>
+    <text x="10" y="203" font-family="monospace" font-size="10" fill="#a0aec0">Skip for: decode (M=1, tiny work)</text>
+
+    <text x="10" y="238" font-family="monospace" font-size="12" fill="#68d391">BEST PRACTICE</text>
+    <text x="10" y="258" font-family="monospace" font-size="10" fill="#a0aec0">Token-level: prefill (4x speedup)</text>
+    <text x="10" y="276" font-family="monospace" font-size="10" fill="#a0aec0">Feature-level: prefill GEMM only</text>
+    <text x="10" y="294" font-family="monospace" font-size="10" fill="#a0aec0">None: decode (single token)</text>
+  </g>
+
+  <!-- SECTION 5: Comparison Table -->
+  <rect x="50" y="1430" width="1300" height="210" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="1465" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">5. V4 vs V6 COMPARISON</text>
+
+  <g transform="translate(70, 1490)">
+    <!-- Header -->
+    <rect x="0" y="0" width="190" height="38" rx="3" fill="#4a5568"/>
+    <text x="95" y="26" font-family="monospace" font-size="13" font-weight="bold" fill="white" text-anchor="middle">FEATURE</text>
+
+    <rect x="200" y="0" width="360" height="38" rx="3" fill="#c53030"/>
+    <text x="380" y="26" font-family="monospace" font-size="13" font-weight="bold" fill="white" text-anchor="middle">V4/V5</text>
+
+    <rect x="570" y="0" width="360" height="38" rx="3" fill="#276749"/>
+    <text x="750" y="26" font-family="monospace" font-size="13" font-weight="bold" fill="white" text-anchor="middle">V6</text>
+
+    <!-- Row 1 -->
+    <rect x="0" y="48" width="190" height="32" rx="2" fill="#2d3748"/>
+    <text x="10" y="70" font-family="monospace" font-size="12" fill="#e2e8f0">Code compiled?</text>
+    <rect x="200" y="48" width="360" height="32" rx="2" fill="#742a2a"/>
+    <text x="210" y="70" font-family="monospace" font-size="11" fill="#feb2b2">Generated, NOT compiled</text>
+    <rect x="570" y="48" width="360" height="32" rx="2" fill="#22543d"/>
+    <text x="580" y="70" font-family="monospace" font-size="11" fill="#9ae6b4">Generated, IS compiled</text>
+
+    <!-- Row 2 -->
+    <rect x="0" y="85" width="190" height="32" rx="2" fill="#2d3748"/>
+    <text x="10" y="107" font-family="monospace" font-size="12" fill="#e2e8f0">Dispatch</text>
+    <rect x="200" y="85" width="360" height="32" rx="2" fill="#742a2a"/>
+    <text x="210" y="107" font-family="monospace" font-size="11" fill="#feb2b2">switch(dtype) runtime</text>
+    <rect x="570" y="85" width="360" height="32" rx="2" fill="#22543d"/>
+    <text x="580" y="107" font-family="monospace" font-size="11" fill="#9ae6b4">Direct calls, compile-time</text>
+
+    <!-- Row 3 -->
+    <rect x="0" y="122" width="190" height="32" rx="2" fill="#2d3748"/>
+    <text x="10" y="144" font-family="monospace" font-size="12" fill="#e2e8f0">Prefill</text>
+    <rect x="200" y="122" width="360" height="32" rx="2" fill="#742a2a"/>
+    <text x="210" y="144" font-family="monospace" font-size="11" fill="#feb2b2">Not generated</text>
+    <rect x="570" y="122" width="360" height="32" rx="2" fill="#22543d"/>
+    <text x="580" y="144" font-family="monospace" font-size="11" fill="#9ae6b4">OMP token-parallel</text>
+
+    <!-- Row 4 -->
+    <rect x="0" y="159" width="190" height="32" rx="2" fill="#2d3748"/>
+    <text x="10" y="181" font-family="monospace" font-size="12" fill="#e2e8f0">Linking</text>
+    <rect x="200" y="159" width="360" height="32" rx="2" fill="#742a2a"/>
+    <text x="210" y="181" font-family="monospace" font-size="11" fill="#feb2b2">dlopen(libmodel.so)</text>
+    <rect x="570" y="159" width="360" height="32" rx="2" fill="#22543d"/>
+    <text x="580" y="181" font-family="monospace" font-size="11" fill="#9ae6b4">Static linking</text>
+  </g>
+
+  <!-- SECTION 6: Architecture Problems -->
+  <rect x="50" y="1655" width="600" height="420" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="1690" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#fc8181">6. V4/V5 PROBLEMS</text>
+
+  <g transform="translate(70, 1715)">
+    <text x="0" y="0" font-family="monospace" font-size="12" fill="#fbd38d">Generated code NOT compiled</text>
+    <text x="0" y="28" font-family="monospace" font-size="12" fill="#fbd38d">Runtime dispatch overhead</text>
+    <text x="0" y="56" font-family="monospace" font-size="12" fill="#fbd38d">Switch statements on dtype</text>
+    <text x="0" y="84" font-family="monospace" font-size="12" fill="#fbd38d">Token loops WITHOUT OMP</text>
+    <text x="0" y="112" font-family="monospace" font-size="12" fill="#fbd38d">dlopen to libmodel.so</text>
+    <text x="0" y="140" font-family="monospace" font-size="12" fill="#fbd38d">Only decode mode generated</text>
+
+    <!-- Diagram -->
+    <rect x="300" y="0" width="260" height="220" rx="5" fill="#1a202c" stroke="#e53e3e" stroke-width="2"/>
+    <text x="430" y="28" font-family="monospace" font-size="12" fill="#fc8181" text-anchor="middle">ck_cli_v5</text>
+    <path d="M430,40 L430,78" stroke="#e53e3e" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="340" y="85" width="180" height="35" rx="3" fill="#c53030"/>
+    <text x="430" y="110" font-family="monospace" font-size="11" fill="white" text-anchor="middle">dlopen(libmodel.so)</text>
+    <path d="M430,125 L430,165" stroke="#e53e3e" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="350" y="172" width="160" height="25" rx="3" fill="#742a2a"/>
+    <text x="430" y="190" font-family="monospace" font-size="10" fill="#feb2b2">orchestration.c</text>
+    <path d="M430,202 L430,240" stroke="#e53e3e" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="300" y="248" width="260" height="20" rx="3" fill="#742a2a"/>
+    <text x="430" y="262" font-family="monospace" font-size="9" fill="#feb2b2">switch(dtype) dispatch</text>
+    <path d="M430,273 L430,310" stroke="#e53e3e" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="370" y="318" width="120" height="25" rx="3" fill="#2d3748"/>
+    <text x="430" y="335" font-family="monospace" font-size="10" fill="#68d391">kernels/*.c</text>
+  </g>
+
+  <!-- SECTION 7: V6 Solution -->
+  <rect x="670" y="1655" width="680" height="420" rx="10" fill="#2d3748" stroke="#48bb78" stroke-width="2"/>
+  <text x="690" y="1690" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#68d391">7. V6 SOLUTION</text>
+
+  <g transform="translate(690, 1715)">
+    <text x="0" y="0" font-family="monospace" font-size="12" fill="#9ae6b4">Generated code IS compiled</text>
+    <text x="0" y="28" font-family="monospace" font-size="12" fill="#9ae6b4">No dispatch overhead</text>
+    <text x="0" y="56" font-family="monospace" font-size="12" fill="#9ae6b4">Direct kernel calls</text>
+    <text x="0" y="84" font-family="monospace" font-size="12" fill="#9ae6b4">Token loops WITH OMP</text>
+    <text x="0" y="112" font-family="monospace" font-size="12" fill="#9ae6b4">No dlopen - direct linking</text>
+    <text x="0" y="140" font-family="monospace" font-size="12" fill="#9ae6b4">Prefill + decode modes</text>
+
+    <!-- Diagram -->
+    <rect x="380" y="0" width="260" height="220" rx="5" fill="#1a202c" stroke="#48bb78" stroke-width="2"/>
+    <text x="510" y="28" font-family="monospace" font-size="12" fill="#68d391" text-anchor="middle">ck-v6</text>
+    <path d="M510,40 L510,78" stroke="#48bb78" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="420" y="85" width="180" height="35" rx="3" fill="#276749"/>
+    <text x="510" y="110" font-family="monospace" font-size="11" fill="white" text-anchor="middle">v6_cli.c (main)</text>
+    <path d="M510,125 L510,165" stroke="#48bb78" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="390" y="172" width="240" height="25" rx="3" fill="#22543d"/>
+    <text x="510" y="190" font-family="monospace" font-size="10" fill="#9ae6b4">generated_v6_*.c</text>
+    <path d="M510,202 L510,240" stroke="#48bb78" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="380" y="248" width="260" height="20" rx="3" fill="#22543d"/>
+    <text x="510" y="262" font-family="monospace" font-size="9" fill="#9ae6b4">gemm_nt_q5_0() direct call</text>
+    <path d="M510,273 L510,310" stroke="#48bb78" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <rect x="445" y="318" width="130" height="25" rx="3" fill="#2d3748"/>
+    <text x="510" y="335" font-family="monospace" font-size="10" fill="#68d391">kernels/*.c</text>
+  </g>
+
+  <!-- SECTION 8: Build Pipeline -->
+  <rect x="50" y="2090" width="1300" height="320" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="2125" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">8. BUILD PIPELINE</text>
+
+  <g transform="translate(70, 2150)">
+    <!-- Step boxes -->
+    <rect x="0" y="0" width="145" height="100" rx="8" fill="url(#gradStep)" filter="url(#shadow)"/>
+    <text x="72" y="28" font-family="monospace" font-size="12" fill="white" text-anchor="middle">STEP 1</text>
+    <text x="72" y="55" font-family="monospace" font-size="10" fill="#e9d8fd">v6_build_ir.py</text>
+    <text x="72" y="75" font-family="monospace" font-size="9" fill="#d6bcfa">GGUF → BUMP</text>
+
+    <path d="M150,50 L190,50" stroke="#a0aec0" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="195" y="0" width="145" height="100" rx="8" fill="url(#gradStep)" filter="url(#shadow)"/>
+    <text x="267" y="28" font-family="monospace" font-size="12" fill="white" text-anchor="middle">STEP 2</text>
+    <text x="267" y="55" font-family="monospace" font-size="10" fill="#e9d8fd">v6_codegen.py</text>
+    <text x="267" y="75" font-family="monospace" font-size="9" fill="#d6bcfa">IR → C code</text>
+
+    <path d="M345,50 L385,50" stroke="#a0aec0" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="390" y="0" width="145" height="100" rx="8" fill="url(#gradStep)" filter="url(#shadow)"/>
+    <text x="462" y="28" font-family="monospace" font-size="12" fill="white" text-anchor="middle">STEP 3</text>
+    <text x="462" y="55" font-family="monospace" font-size="10" fill="#e9d8fd">build.sh</text>
+    <text x="462" y="75" font-family="monospace" font-size="9" fill="#d6bcfa">gcc compile</text>
+
+    <path d="M540,50 L580,50" stroke="#a0aec0" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="585" y="0" width="145" height="100" rx="8" fill="url(#gradBinary)" filter="url(#shadow)"/>
+    <text x="657" y="28" font-family="monospace" font-size="12" fill="white" text-anchor="middle">STEP 4</text>
+    <text x="657" y="55" font-family="monospace" font-size="10" fill="#e9d8fd">ck-v6</text>
+    <text x="657" y="75" font-family="monospace" font-size="9" fill="#d6bcfa">run inference</text>
+
+    <!-- Commands -->
+    <rect x="0" y="125" width="360" height="75" rx="5" fill="#1a202c"/>
+    <text x="10" y="152" font-family="monospace" font-size="11" fill="#68d391">Generate code</text>
+    <text x="10" y="170" font-family="monospace" font-size="10" fill="#a0aec0">python src/v6/v6_codegen.py</text>
+    <text x="10" y="188" font-family="monospace" font-size="10" fill="#a0aec0">--mode prefill+decode -o generated_v6_*.c</text>
+
+    <rect x="380" y="125" width="360" height="75" rx="5" fill="#1a202c"/>
+    <text x="390" y="152" font-family="monospace" font-size="11" fill="#68d391">Build</text>
+    <text x="390" y="170" font-family="monospace" font-size="10" fill="#a0aec0">cd src/v6 &amp;&amp; ./build.sh</text>
+    <text x="390" y="188" font-family="monospace" font-size="10" fill="#a0aec0"># compiles: ckernels/*.c + generated</text>
+
+    <rect x="760" y="125" width="360" height="75" rx="5" fill="#1a202c"/>
+    <text x="770" y="152" font-family="monospace" font-size="11" fill="#68d391">Run</text>
+    <text x="770" y="170" font-family="monospace" font-size="10" fill="#a0aec0">./ck-v6 --model weights.bump</text>
+    <text x="770" y="188" font-family="monospace" font-size="10" fill="#a0aec0">--prompt "Hello" --max 10</text>
+  </g>
+
+  <!-- SECTION 9: Timeline - FIXED with larger boxes -->
+  <rect x="50" y="2425" width="1300" height="220" rx="10" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  <text x="70" y="2460" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#63b3ed">9. IMPLEMENTATION TIMELINE</text>
+
+  <g transform="translate(70, 2485)">
+    <!-- Week 1 -->
+    <rect x="0" y="0" width="170" height="130" rx="8" fill="#4a5568"/>
+    <text x="85" y="28" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">WEEK 1</text>
+    <text x="85" y="55" font-family="monospace" font-size="11" fill="#e2e8f0" text-anchor="middle">Setup</text>
+    <text x="10" y="80" font-family="monospace" font-size="10" fill="#a0aec0">Create src/v6 folder</text>
+    <text x="10" y="97" font-family="monospace" font-size="10" fill="#a0aec0">Copy v5 scripts</text>
+    <text x="10" y="114" font-family="monospace" font-size="10" fill="#a0aec0">Symlink kernels</text>
+
+    <!-- Week 2 -->
+    <rect x="185" y="0" width="170" height="130" rx="8" fill="#4a5568"/>
+    <text x="270" y="28" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">WEEK 2</text>
+    <text x="270" y="55" font-family="monospace" font-size="11" fill="#e2e8f0" text-anchor="middle">Prefill</text>
+    <text x="195" y="80" font-family="monospace" font-size="10" fill="#a0aec0">Add prefill emit</text>
+    <text x="195" y="97" font-family="monospace" font-size="10" fill="#a0aec0">Handle causal mask</text>
+    <text x="195" y="114" font-family="monospace" font-size="10" fill="#a0aec0">Add token OMP</text>
+
+    <!-- Week 3 -->
+    <rect x="370" y="0" width="170" height="130" rx="8" fill="#4a5568"/>
+    <text x="455" y="28" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">WEEK 3</text>
+    <text x="455" y="55" font-family="monospace" font-size="11" fill="#e2e8f0" text-anchor="middle">CLI + Build</text>
+    <text x="380" y="80" font-family="monospace" font-size="10" fill="#a0aec0">Create v6_cli.c</text>
+    <text x="380" y="97" font-family="monospace" font-size="10" fill="#a0aec0">Create build.sh</text>
+    <text x="380" y="114" font-family="monospace" font-size="10" fill="#a0aec0">Compile + fix errors</text>
+
+    <!-- Week 4 -->
+    <rect x="555" y="0" width="170" height="130" rx="8" fill="#4a5568"/>
+    <text x="640" y="28" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">WEEK 4</text>
+    <text x="640" y="55" font-family="monospace" font-size="11" fill="#e2e8f0" text-anchor="middle">Verify</text>
+    <text x="565" y="80" font-family="monospace" font-size="10" fill="#a0aec0">Token output match</text>
+    <text x="565" y="97" font-family="monospace" font-size="10" fill="#a0aec0">Performance profile</text>
+    <text x="565" y="114" font-family="monospace" font-size="10" fill="#a0aec0">Compare to v4</text>
+
+    <!-- Week 5 -->
+    <rect x="740" y="0" width="170" height="130" rx="8" fill="#276749"/>
+    <text x="825" y="28" font-family="monospace" font-size="15" font-weight="bold" fill="white" text-anchor="middle">WEEK 5</text>
+    <text x="825" y="55" font-family="monospace" font-size="11" fill="#e2e8f0" text-anchor="middle">Optimize</text>
+    <text x="750" y="80" font-family="monospace" font-size="10" fill="#9ae6b4">Feature OMP</text>
+    <text x="750" y="97" font-family="monospace" font-size="10" fill="#9ae6b4">Tune schedule</text>
+    <text x="750" y="114" font-family="monospace" font-size="10" fill="#9ae6b4">Final profile</text>
+
+    <!-- Arrow to done -->
+    <path d="M930,65 L1005,65" stroke="#68d391" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="1020" y="35" width="90" height="60" rx="8" fill="url(#gradBinary)" filter="url(#shadow)"/>
+    <text x="1065" y="65" font-family="monospace" font-size="12" font-weight="bold" fill="white" text-anchor="middle">DONE</text>
+    <text x="1065" y="85" font-family="monospace" font-size="10" fill="#e9d8fd" text-anchor="middle">~4x prefill</text>
+  </g>
+
+  <!-- Footer -->
+  <rect x="50" y="2660" width="1300" height="35" rx="5" fill="#2d3748"/>
+  <text x="700" y="2682" font-family="monospace" font-size="11" fill="#a0aec0" text-anchor="middle">Generated: 2026-01-09 | V6: Prefill + OMP Token-Level + Direct Calls | ~4x speedup target</text>
+</svg>

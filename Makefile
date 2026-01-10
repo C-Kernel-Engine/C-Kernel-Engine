@@ -240,8 +240,8 @@ LIB_TOKENIZER := $(BUILD_DIR)/libckernel_tokenizer.so
 IR_DEMO := $(BUILD_DIR)/ck_ir_demo
 IR_V2_DEMO := $(BUILD_DIR)/ck_ir_v2_demo
 IR_V2_SCRIPT := scripts/build_ir_v2.py
-IR_V4_SCRIPT := scripts/build_ir_v4.py
-IR_V4_Q4K_SCRIPT := scripts/build_ir_v4_q4k.py
+IR_V4_SCRIPT := scripts/v4/build_ir_v4.py
+IR_V4_Q4K_SCRIPT := scripts/v4/build_ir_v4_q4k.py
 DEFAULT_CONFIG := default.config.json
 CONFIG ?= $(DEFAULT_CONFIG)
 OUT ?= $(BUILD_DIR)/generated_model.c
@@ -833,7 +833,7 @@ gguf-to-bump-v4:
 	  echo "Usage: make gguf-to-bump-v4 GGUF=/path/to/model.gguf [GGUF_V4_OUT=$(GGUF_V4_OUT)] [GGUF_V4_CONFIG_OUT=$(GGUF_V4_CONFIG_OUT)] [GGUF_V4_CONTEXT=<n>]"; \
 	  exit 2; \
 	fi
-	@$(PYTHON) $(PYTHONFLAGS) scripts/convert_gguf_to_bump_v4.py \
+	@$(PYTHON) $(PYTHONFLAGS) scripts/v4/convert_gguf_to_bump_v4.py \
 	  --gguf "$(GGUF)" \
 	  --output "$(GGUF_V4_OUT)" \
 	  $(if $(GGUF_V4_CONFIG_OUT),--config-out "$(GGUF_V4_CONFIG_OUT)") \
@@ -844,7 +844,7 @@ hf-to-bump-v4:
 	  echo "Usage: make hf-to-bump-v4 HF_V4_CHECKPOINT=/path/to/hf_model [HF_V4_OUT=$(HF_V4_OUT)] [HF_V4_DTYPE=q4_k] [HF_V4_CONTEXT=<n>]"; \
 	  exit 2; \
 	fi
-	@$(PYTHON) $(PYTHONFLAGS) scripts/convert_hf_to_bump_v4.py \
+	@$(PYTHON) $(PYTHONFLAGS) scripts/v4/convert_hf_to_bump_v4.py \
 	  --checkpoint "$(HF_V4_CHECKPOINT)" \
 	  --output "$(HF_V4_OUT)" \
 	  $(if $(HF_V4_CONFIG),--config "$(HF_V4_CONFIG)") \

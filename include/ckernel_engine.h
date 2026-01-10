@@ -625,6 +625,21 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
                                                    int head_dim,
                                                    int aligned_head_dim);
 
+// Decode attention for a single token using a KV cache (flash-style).
+//   q_token: [num_heads, aligned_head_dim]
+//   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]
+//   out_token: [num_heads, aligned_head_dim]
+void attention_forward_decode_head_major_gqa_flash(const float *q_token,
+                                                  const float *k_cache,
+                                                  const float *v_cache,
+                                                  float *out_token,
+                                                  int num_heads,
+                                                  int num_kv_heads,
+                                                  int kv_tokens,
+                                                  int cache_capacity,
+                                                  int head_dim,
+                                                  int aligned_head_dim);
+
 // Decode attention for a single token using a KV cache (REGULAR - NOT flash).
 //   q_token: [num_heads, aligned_head_dim]
 //   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]

@@ -19,6 +19,9 @@ from test_utils import TestReport, TestResult, get_cpu_info, max_diff, print_sys
 
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
+SCRIPTS_V4_DIR = os.path.join(ROOT, "scripts", "v4")
+if SCRIPTS_V4_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_V4_DIR)
 BUILD_DIR = os.path.join(ROOT, "build")
 CONFIG_PATH = os.path.join(ROOT, "unittest", "fixtures", "mini_v4.config.json")
 

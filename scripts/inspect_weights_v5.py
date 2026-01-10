@@ -15,8 +15,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_V4_DIR = _SCRIPT_DIR / "v4"
+if _V4_DIR.is_dir():
+    _v4_path = str(_V4_DIR)
+    if _v4_path not in sys.path:
+        sys.path.insert(0, _v4_path)
 
 import build_ir_v4 as v4
 import convert_gguf_to_bump as gguf

@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      .title { font-size: 28px; font-weight: 700; fill: #ffb400; }
+      .subtitle { font-size: 14px; fill: #707070; }
+    </style>
+
+    <linearGradient id="spineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#cc8800"/>
+    </linearGradient>
+
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#2d7a4c"/>
+    </linearGradient>
+
+    <linearGradient id="serverGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3a8fd9"/>
+      <stop offset="100%" style="stop-color:#2a6fb0"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" class="title" text-anchor="middle">Ethernet Switch Topology for ML Clusters</text>
+  <text x="600" y="72" class="subtitle" text-anchor="middle">Leaf-Spine Architecture: The Standard for Scalable ML Training</text>
+
+  <!-- Legend -->
+  <g transform="translate(50, 100)">
+    <rect x="0" y="0" width="200" height="120" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="100" y="25" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">Legend</text>
+
+    <rect x="15" y="40" width="30" height="15" rx="3" fill="url(#spineGrad)"/>
+    <text x="55" y="52" font-size="11" fill="#a0a0a0">Spine (400GbE)</text>
+
+    <rect x="15" y="65" width="30" height="15" rx="3" fill="url(#leafGrad)"/>
+    <text x="55" y="77" font-size="11" fill="#a0a0a0">Leaf (100GbE)</text>
+
+    <rect x="15" y="90" width="30" height="15" rx="3" fill="url(#serverGrad)"/>
+    <text x="55" y="102" font-size="11" fill="#a0a0a0">Server (CPU)</text>
+  </g>
+
+  <!-- Bandwidth info -->
+  <g transform="translate(950, 100)">
+    <rect x="0" y="0" width="200" height="120" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="100" y="25" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">Bandwidth</text>
+
+    <text x="15" y="50" font-size="11" fill="#ffb400">Spine-Leaf:</text>
+    <text x="185" y="50" font-size="11" fill="#a0a0a0" text-anchor="end">400 Gbps</text>
+
+    <text x="15" y="72" font-size="11" fill="#47b475">Leaf-Server:</text>
+    <text x="185" y="72" font-size="11" fill="#a0a0a0" text-anchor="end">100 Gbps</text>
+
+    <text x="15" y="94" font-size="11" fill="#3a8fd9">Bisection BW:</text>
+    <text x="185" y="94" font-size="11" fill="#a0a0a0" text-anchor="end">25.6 Tbps</text>
+  </g>
+
+  <!-- Spine Layer -->
+  <g transform="translate(300, 160)">
+    <text x="300" y="0" font-size="14" font-weight="600" fill="#ffb400" text-anchor="middle">SPINE LAYER (Core Switches)</text>
+
+    <!-- Spine Switch 1 -->
+    <rect x="100" y="20" width="160" height="60" rx="8" fill="url(#spineGrad)" filter="url(#shadow)"/>
+    <text x="180" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Spine 1</text>
+    <text x="180" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">32× 400GbE</text>
+
+    <!-- Spine Switch 2 -->
+    <rect x="340" y="20" width="160" height="60" rx="8" fill="url(#spineGrad)" filter="url(#shadow)"/>
+    <text x="420" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Spine 2</text>
+    <text x="420" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">32× 400GbE</text>
+  </g>
+
+  <!-- Connection lines from Spine to Leaf -->
+  <g stroke="#454545" stroke-width="2">
+    <!-- Spine 1 to all Leaf switches -->
+    <line x1="480" y1="240" x2="200" y2="320"/>
+    <line x1="480" y1="240" x2="400" y2="320"/>
+    <line x1="480" y1="240" x2="600" y2="320"/>
+    <line x1="480" y1="240" x2="800" y2="320"/>
+    <line x1="480" y1="240" x2="1000" y2="320"/>
+
+    <!-- Spine 2 to all Leaf switches -->
+    <line x1="720" y1="240" x2="200" y2="320"/>
+    <line x1="720" y1="240" x2="400" y2="320"/>
+    <line x1="720" y1="240" x2="600" y2="320"/>
+    <line x1="720" y1="240" x2="800" y2="320"/>
+    <line x1="720" y1="240" x2="1000" y2="320"/>
+  </g>
+
+  <!-- Leaf Layer -->
+  <g transform="translate(0, 320)">
+    <text x="600" y="0" font-size="14" font-weight="600" fill="#47b475" text-anchor="middle">LEAF LAYER (ToR Switches)</text>
+
+    <!-- Leaf Switch 1 -->
+    <rect x="120" y="20" width="160" height="60" rx="8" fill="url(#leafGrad)" filter="url(#shadow)"/>
+    <text x="200" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Leaf 1</text>
+    <text x="200" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">48× 100GbE</text>
+
+    <!-- Leaf Switch 2 -->
+    <rect x="320" y="20" width="160" height="60" rx="8" fill="url(#leafGrad)" filter="url(#shadow)"/>
+    <text x="400" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Leaf 2</text>
+    <text x="400" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">48× 100GbE</text>
+
+    <!-- Leaf Switch 3 -->
+    <rect x="520" y="20" width="160" height="60" rx="8" fill="url(#leafGrad)" filter="url(#shadow)"/>
+    <text x="600" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Leaf 3</text>
+    <text x="600" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">48× 100GbE</text>
+
+    <!-- Leaf Switch 4 -->
+    <rect x="720" y="20" width="160" height="60" rx="8" fill="url(#leafGrad)" filter="url(#shadow)"/>
+    <text x="800" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Leaf 4</text>
+    <text x="800" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">48× 100GbE</text>
+
+    <!-- Leaf Switch 5 -->
+    <rect x="920" y="20" width="160" height="60" rx="8" fill="url(#leafGrad)" filter="url(#shadow)"/>
+    <text x="1000" y="45" font-size="12" font-weight="600" fill="#1a1a1a" text-anchor="middle">Leaf 5</text>
+    <text x="1000" y="62" font-size="10" fill="#1a1a1a" text-anchor="middle">48× 100GbE</text>
+  </g>
+
+  <!-- Connection lines from Leaf to Servers -->
+  <g stroke="#454545" stroke-width="1.5">
+    <!-- Leaf 1 to servers -->
+    <line x1="200" y1="400" x2="150" y2="470"/>
+    <line x1="200" y1="400" x2="200" y2="470"/>
+    <line x1="200" y1="400" x2="250" y2="470"/>
+
+    <!-- Leaf 2 to servers -->
+    <line x1="400" y1="400" x2="350" y2="470"/>
+    <line x1="400" y1="400" x2="400" y2="470"/>
+    <line x1="400" y1="400" x2="450" y2="470"/>
+
+    <!-- Leaf 3 to servers -->
+    <line x1="600" y1="400" x2="550" y2="470"/>
+    <line x1="600" y1="400" x2="600" y2="470"/>
+    <line x1="600" y1="400" x2="650" y2="470"/>
+
+    <!-- Leaf 4 to servers -->
+    <line x1="800" y1="400" x2="750" y2="470"/>
+    <line x1="800" y1="400" x2="800" y2="470"/>
+    <line x1="800" y1="400" x2="850" y2="470"/>
+
+    <!-- Leaf 5 to servers -->
+    <line x1="1000" y1="400" x2="950" y2="470"/>
+    <line x1="1000" y1="400" x2="1000" y2="470"/>
+    <line x1="1000" y1="400" x2="1050" y2="470"/>
+  </g>
+
+  <!-- Server Layer -->
+  <g transform="translate(0, 470)">
+    <text x="600" y="0" font-size="14" font-weight="600" fill="#3a8fd9" text-anchor="middle">SERVER LAYER (CPU Compute Nodes)</text>
+
+    <!-- Rack 1 servers -->
+    <rect x="120" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="175" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="230" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <text x="200" y="80" font-size="10" fill="#707070" text-anchor="middle">Rack 1</text>
+
+    <!-- Rack 2 servers -->
+    <rect x="320" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="375" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="430" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <text x="400" y="80" font-size="10" fill="#707070" text-anchor="middle">Rack 2</text>
+
+    <!-- Rack 3 servers -->
+    <rect x="520" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="575" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="630" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <text x="600" y="80" font-size="10" fill="#707070" text-anchor="middle">Rack 3</text>
+
+    <!-- Rack 4 servers -->
+    <rect x="720" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="775" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="830" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <text x="800" y="80" font-size="10" fill="#707070" text-anchor="middle">Rack 4</text>
+
+    <!-- Rack 5 servers -->
+    <rect x="920" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="975" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <rect x="1030" y="20" width="50" height="40" rx="4" fill="url(#serverGrad)"/>
+    <text x="1000" y="80" font-size="10" fill="#707070" text-anchor="middle">Rack 5</text>
+  </g>
+
+  <!-- Server specs -->
+  <g transform="translate(100, 590)">
+    <rect x="0" y="0" width="1000" height="80" rx="8" fill="#2a2a2a" stroke="#454545"/>
+    <text x="500" y="25" font-size="14" font-weight="600" fill="#3a8fd9" text-anchor="middle">Each Server: Dual EPYC 9654 (192 cores) | 4TB DDR5 | 100GbE NIC</text>
+    <text x="500" y="50" font-size="12" fill="#a0a0a0" text-anchor="middle">15 servers × 192 cores = 2,880 total cores | 15 × 4TB = 60TB total RAM | 15 × 12.5 GB/s = 187.5 GB/s aggregate</text>
+    <text x="500" y="70" font-size="11" fill="#47b475" text-anchor="middle">Can train models up to ~300B parameters with data parallelism</text>
+  </g>
+
+  <!-- Cost comparison -->
+  <g transform="translate(100, 690)">
+    <rect x="0" y="0" width="480" height="90" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+    <text x="240" y="25" font-size="14" font-weight="600" fill="#47b475" text-anchor="middle">CPU Cluster Cost</text>
+    <text x="20" y="50" font-size="12" fill="#a0a0a0">15× Servers @ $30K:</text>
+    <text x="460" y="50" font-size="12" fill="#47b475" text-anchor="end">$450,000</text>
+    <text x="20" y="72" font-size="12" fill="#a0a0a0">Network (switches + NICs):</text>
+    <text x="460" y="72" font-size="12" fill="#47b475" text-anchor="end">$80,000</text>
+    <text x="240" y="88" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">Total: ~$530,000</text>
+  </g>
+
+  <g transform="translate(620, 690)">
+    <rect x="0" y="0" width="480" height="90" rx="8" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="2"/>
+    <text x="240" y="25" font-size="14" font-weight="600" fill="#ff6b6b" text-anchor="middle">Equivalent GPU Cluster Cost</text>
+    <text x="20" y="50" font-size="12" fill="#a0a0a0">~24 H100 GPUs @ $40K:</text>
+    <text x="460" y="50" font-size="12" fill="#ff6b6b" text-anchor="end">$960,000</text>
+    <text x="20" y="72" font-size="12" fill="#a0a0a0">DGX + NVLink + Network:</text>
+    <text x="460" y="72" font-size="12" fill="#ff6b6b" text-anchor="end">$500,000+</text>
+    <text x="240" y="88" font-size="11" font-weight="600" fill="#ff6b6b" text-anchor="middle">Total: ~$1,500,000+</text>
+  </g>
+</svg>

@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-ck_run_v4.py - C-Kernel-Engine v4 Pipeline Runner
+download_model_v6.py - C-Kernel-Engine v6 Model Downloader
 
-Unified CLI that chains: download -> convert -> IR -> codegen -> compile -> run
+Downloads models from HuggingFace and converts to C-Kernel v6 format.
+Output goes to ~/.cache/ck-engine-v6/models/<model>/
+
+v6 features:
+  - Dynamic loading via dlopen (no hardcoded model names)
+  - Generated code stored in cache folder
+  - Model-specific shared objects (.so)
 
 Usage:
-  python scripts/ck_run_v4.py run HuggingFaceTB/SmolLM-135M
-  python scripts/ck_run_v4.py run ./model.gguf
-  python scripts/ck_run_v4.py run ./local/config.json
-  python scripts/ck_run_v4.py run Qwen/Qwen2-0.5B --weight-dtype=q4_k
+  python scripts/download_model_v6.py qwen2-0.5b-instruct
+  python scripts/download_model_v6.py --repo Qwen/Qwen2-0.5B-Instruct
 """
 
 import argparse
@@ -25,9 +29,8 @@ from typing import Optional
 # Configuration
 # ═══════════════════════════════════════════════════════════════════════════════
 
-V5_MODE = os.environ.get("CK_V5") == "1"
-_cache_root = ".cache/ck-engine-v5" if V5_MODE else ".cache/ck-engine-v4"
-CACHE_DIR = Path.home() / _cache_root / "models"
+V5_MODE = True  # Always v5 in this standalone script
+CACHE_DIR = Path.home() / ".cache/ck-engine-v5/models"
 SCRIPTS_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPTS_DIR.parent
 BUILD_DIR = PROJECT_ROOT / "build"
@@ -323,7 +326,7 @@ def step_convert_hf(model_dir: Path, output_dir: Path, weight_dtype: str = "floa
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_hf_to_bump_v4.py"),
+        str(SCRIPTS_DIR / "v4" / "convert_hf_to_bump_v4.py"),
         f"--checkpoint={model_dir}",
         f"--output={weights_path}",
         f"--dtype={weight_dtype}",
@@ -339,7 +342,7 @@ def validate_gguf_kernel_coverage(gguf_path: Path) -> bool:
     """Validate that all GGUF tensor types have kernel support. Returns True if all supported."""
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_gguf_to_bump_v4.py"),
+        str(SCRIPTS_DIR / "convert_gguf_to_bump.py"),
         f"--gguf={gguf_path}",
         "--inspect",
     ]
@@ -382,7 +385,7 @@ def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False, va
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_gguf_to_bump_v4.py"),
+        str(SCRIPTS_DIR / "convert_gguf_to_bump.py"),
         f"--gguf={gguf_path}",
         f"--output={weights_path}",
         f"--config-out={config_path}",
@@ -426,15 +429,15 @@ def step_inspect_weights_v5(input_type: str, model_dir: Optional[Path], gguf_pat
 def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = None,
                   weight_dtype: str = None, modes: list = None, force: bool = False,
                   debug: bool = False, parity: bool = False,
-                  codegen_version: str = "v4") -> Path:
+                  codegen_version: str = "v5") -> Path:
     """Build IR and generate layout JSON.
 
     Args:
         debug: If True, emit debug prints in generated C code to trace NaN/zero issues.
         parity: If True, save intermediate buffers for parity comparison with PyTorch.
-        codegen_version: "v4" for loop-based, "v5" for explicit unrolled kernels.
+        codegen_version: "v5" for explicit unrolled (default), "v4" for loop-based (legacy).
     """
-    log_step(3, f"Building IR v4 and layout (codegen={codegen_version})")
+    log_step(3, f"Building IR v5 and layout (codegen={codegen_version})")
 
     layout_path = output_dir / "layout.json"
 
@@ -444,7 +447,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    build_script = "build_ir_v5.py" if V5_MODE else "build_ir_v4.py"
+    build_script = "build_ir_v5.py" if V5_MODE else "v4/build_ir_v4.py"
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / build_script),
@@ -483,7 +486,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
 
 def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Path:
-    """Generate v4 wrapper C code that exposes the ck_model_* API."""
+    """Generate v5 wrapper C code that exposes the ck_model_* API."""
     log_step(4, "Generating C code")
 
     model_c_path = output_dir / "model.c"
@@ -494,7 +497,7 @@ def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Pa
     decode_headers = sorted(output_dir.glob("generated_*_decode.h"))
     decode_sources = sorted(output_dir.glob("generated_*_decode.c"))
     if not decode_headers or not decode_sources:
-        log_error("Missing generated decode C/H files. Run build_ir_v4.py first.")
+        log_error("Missing generated decode C/H files. Run build_ir_v5.py first.")
         sys.exit(1)
 
     decode_header = decode_headers[0].name
@@ -503,7 +506,7 @@ def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Pa
     safe_name = re.sub(r"[^A-Za-z0-9]", "_", prefix).upper()
 
     wrapper = f"""\
-// AUTO-GENERATED v4 wrapper: {prefix}
+// AUTO-GENERATED v5 wrapper: {prefix}
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -670,12 +673,50 @@ int ck_model_get_vocab_size(void) {{
     return {safe_name}_VOCAB_SIZE;
 }}
 
+int ck_model_get_num_merges(void) {{
+    return {safe_name}_NUM_MERGES;
+}}
+
+int ck_model_get_vocab_strings_size(void) {{
+    return {safe_name}_TOTAL_VOCAB_BYTES;
+}}
+
 int ck_model_get_context_window(void) {{
     return {safe_name}_MAX_SEQ_LEN;
 }}
 
 int ck_model_get_active_tokens(void) {{
     return g_active_tokens;
+}}
+
+int ck_model_sample_argmax(void) {{
+    if (!g_initialized || !g_logits) return -1;
+    int vocab_size = {safe_name}_VOCAB_SIZE;
+    float *logits = g_logits + (size_t)(g_active_tokens - 1) * vocab_size;
+    int best_token = 0;
+    float max_logit = -1e30f;
+    for (int i = 0; i < vocab_size; i++) {{
+        if (logits[i] > max_logit) {{
+            max_logit = logits[i];
+            best_token = i;
+        }}
+    }}
+    return best_token;
+}}
+
+void *ck_model_get_vocab_offsets(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_offsets);
+}}
+
+void *ck_model_get_vocab_strings(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_strings);
+}}
+
+void *ck_model_get_vocab_merges(void) {{
+    if (!g_initialized) return NULL;
+    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_merges);
 }}
 
 int ck_model_verify_canaries(void) {{
@@ -706,7 +747,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         src_dir = PROJECT_ROOT / "src" / "kernels"
         kernel_sources = [str(f) for f in src_dir.glob("*.c")]
     extra_sources = [
-        PROJECT_ROOT / "src" / "ckernel_model_load_v4.c",
+        PROJECT_ROOT / "src" / "v4_legacy" / "ckernel_model_load_v4.c",
         PROJECT_ROOT / "src" / "ckernel_orchestration.c",
         PROJECT_ROOT / "src" / "ckernel_strict.c",
         PROJECT_ROOT / "src" / "cpu_features.c",
@@ -720,7 +761,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
 
     # Build command
     cmd = [
-        "gcc", "-O3", "-fPIC", "-fopenmp", "-shared",
+        "gcc", "-O3", "-march=native", "-fPIC", "-fopenmp", "-shared",
         f"-I{PROJECT_ROOT / 'include'}",
         "-o", str(lib_path),
         str(model_c_path),
@@ -926,7 +967,7 @@ def run_parity_tests() -> None:
         sys.exit(1)
 
 
-def step_run_chat(model_dir: Path, args: argparse.Namespace):
+def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = None):
     """Run chat interface."""
     log_step(6, "Starting chat")
 
@@ -937,6 +978,8 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace):
         str(model_dir),
     ]
 
+    if gguf_path:
+        cmd.extend(["--gguf", str(gguf_path)])
     if args.temperature:
         cmd.extend(["--temperature", str(args.temperature)])
     if args.max_tokens:
@@ -955,10 +998,11 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline(args: argparse.Namespace):
-    """Run the full v4 pipeline."""
+    """Run the full v5 pipeline."""
     model_input = args.model
     weights_path = None
     manifest_input_path = None
+    gguf_path_for_tokenizer = None  # Track GGUF path for tokenizer extraction
     v5_mode = V5_MODE
 
     # Detect input type
@@ -992,6 +1036,7 @@ def run_pipeline(args: argparse.Namespace):
             if not gguf_path:
                 gguf_path = gguf_files[0]
 
+            gguf_path_for_tokenizer = gguf_path
             log(f"  Using GGUF: {gguf_path.name}", C_GREEN)
             if v5_mode:
                 manifest_input_path = step_inspect_weights_v5(
@@ -1023,6 +1068,7 @@ def run_pipeline(args: argparse.Namespace):
 
     elif input_type == 'gguf':
         gguf_path = info['path']
+        gguf_path_for_tokenizer = gguf_path
         work_dir = CACHE_DIR / gguf_path.stem
         if v5_mode:
             manifest_input_path = step_inspect_weights_v5(
@@ -1075,6 +1121,7 @@ def run_pipeline(args: argparse.Namespace):
         work_dir = CACHE_DIR / repo_id.replace('/', '--')
 
         gguf_path = step_download_gguf(repo_id, filename, CACHE_DIR, force=args.force_download)
+        gguf_path_for_tokenizer = gguf_path
         if v5_mode:
             manifest_input_path = step_inspect_weights_v5(
                 input_type, None, gguf_path, work_dir, force=args.force_inspect
@@ -1100,10 +1147,35 @@ def run_pipeline(args: argparse.Namespace):
     # If debug or parity is enabled, force recompile to ensure special code is generated
     force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
     manifest_for_dtype = None
+    
+    # Vocabulary metadata
+    num_merges = 0
+    total_vocab_bytes = 0
+
     if manifest_path and manifest_path.exists():
         manifest_for_dtype = manifest_path
+        try:
+            with open(manifest_path, "r") as f:
+                mdata = json.load(f)
+                num_merges = mdata.get("num_merges", 0)
+                total_vocab_bytes = mdata.get("total_vocab_bytes", 0)
+        except Exception:
+            pass
     elif manifest_input_path and manifest_input_path.exists():
         manifest_for_dtype = manifest_input_path
+
+    # Inject metadata into config.json for build_ir_v5
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                cfg_data = json.load(f)
+            cfg_data["num_merges"] = num_merges
+            cfg_data["total_vocab_bytes"] = total_vocab_bytes
+            with open(config_path, "w") as f:
+                json.dump(cfg_data, f, indent=2)
+        except Exception:
+            pass
+
     weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_for_dtype)
     layout_path = step_build_ir(
         config_path, work_dir,
@@ -1169,7 +1241,163 @@ def run_pipeline(args: argparse.Namespace):
         log(f"  Library: {lib_path}")
     else:
         print()
-        step_run_chat(work_dir, args)
+        step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Interactive Model Selector
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def find_available_models() -> list[dict]:
+    """Find all available GGUF models (local + cached)."""
+    models = []
+
+    # 1. Local GGUF files in project root
+    for gguf in PROJECT_ROOT.glob("*.gguf"):
+        size_mb = gguf.stat().st_size / 1e6
+        if size_mb < 50:  # Skip very small files (vocab only)
+            continue
+        models.append({
+            'type': 'local',
+            'name': gguf.stem,
+            'path': str(gguf),
+            'size_mb': size_mb,
+            'display': f"{gguf.name} ({size_mb:.1f} MB)",
+        })
+
+    # 2. Cached models
+    if CACHE_DIR.exists():
+        for model_dir in CACHE_DIR.iterdir():
+            if not model_dir.is_dir():
+                continue
+
+            # Check for GGUF files
+            gguf_files = list(model_dir.glob("*.gguf"))
+            if gguf_files:
+                gguf = gguf_files[0]
+                size_mb = gguf.stat().st_size / 1e6
+                models.append({
+                    'type': 'cached_gguf',
+                    'name': model_dir.name.replace('--', '/'),
+                    'path': str(gguf),
+                    'size_mb': size_mb,
+                    'display': f"{model_dir.name.replace('--', '/')} ({size_mb:.1f} MB)",
+                })
+            # Check for config.json (HF models)
+            elif (model_dir / "config.json").exists():
+                size_mb = sum(f.stat().st_size for f in model_dir.rglob('*') if f.is_file()) / 1e6
+                models.append({
+                    'type': 'cached_hf',
+                    'name': model_dir.name.replace('--', '/'),
+                    'path': str(model_dir),
+                    'size_mb': size_mb,
+                    'display': f"{model_dir.name.replace('--', '/')} ({size_mb:.1f} MB)",
+                })
+
+    # Sort by size (largest first)
+    models.sort(key=lambda x: -x['size_mb'])
+    return models
+
+
+def interactive_model_select() -> Optional[str]:
+    """Interactive model selection menu."""
+    print()
+    print(f"{C_ORANGE}╔══════════════════════════════════════════════════════════════════════╗{C_RESET}")
+    print(f"{C_ORANGE}║{C_RESET}  {C_BOLD}C-Kernel-Engine v5 - Interactive Model Selector{C_RESET}                     {C_ORANGE}║{C_RESET}")
+    print(f"{C_ORANGE}╚══════════════════════════════════════════════════════════════════════╝{C_RESET}")
+    print()
+
+    models = find_available_models()
+
+    if not models:
+        print(f"  {C_DIM}No models found.{C_RESET}")
+        print()
+        print(f"  {C_BOLD}Options:{C_RESET}")
+        print(f"    1. Download a model from HuggingFace:")
+        print(f"       {C_CYAN}./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf{C_RESET}")
+        print()
+        print(f"    2. Download a GGUF file manually:")
+        print(f"       {C_CYAN}huggingface-cli download Qwen/Qwen2.5-3B-Instruct-GGUF qwen2.5-3b-instruct-q4_k_m.gguf --local-dir .{C_RESET}")
+        print()
+        return None
+
+    print(f"  {C_BOLD}Available Models:{C_RESET}")
+    print()
+
+    for i, model in enumerate(models, 1):
+        type_tag = {
+            'local': f"{C_GREEN}[local]{C_RESET}",
+            'cached_gguf': f"{C_BLUE}[cached]{C_RESET}",
+            'cached_hf': f"{C_CYAN}[HF]{C_RESET}",
+        }.get(model['type'], '')
+        print(f"    {C_BOLD}[{i}]{C_RESET} {type_tag} {model['display']}")
+
+    print()
+    print(f"    {C_DIM}[h] Download from HuggingFace{C_RESET}")
+    print(f"    {C_DIM}[q] Quit{C_RESET}")
+    print()
+
+    try:
+        choice = input(f"  {C_BOLD}Select model (1-{len(models)}):{C_RESET} ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return None
+
+    if choice == 'q' or choice == '':
+        return None
+
+    if choice == 'h':
+        print()
+        print(f"  {C_BOLD}Enter HuggingFace model (examples):{C_RESET}")
+        print(f"    - hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf")
+        print(f"    - Qwen/Qwen2.5-3B-Instruct-GGUF")
+        print(f"    - HuggingFaceTB/SmolLM-135M")
+        print()
+        try:
+            hf_input = input(f"  {C_BOLD}Model:{C_RESET} ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return None
+        return hf_input if hf_input else None
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(models):
+            return models[idx]['path']
+    except ValueError:
+        pass
+
+    print(f"  {C_RED}Invalid selection{C_RESET}")
+    return None
+
+
+def run_interactive(args: argparse.Namespace):
+    """Run interactive model selection and pipeline."""
+    model_path = interactive_model_select()
+
+    if not model_path:
+        return
+
+    print()
+    log(f"Selected: {model_path}", C_GREEN)
+    print()
+
+    # Create args for run_pipeline
+    args.model = model_path
+    args.force_download = False
+    args.force_convert = False
+    args.force_compile = False
+    args.force_inspect = False
+    args.generate_only = False
+    args.test = False
+    args.test_only = False
+    args.inspect_only = False
+    args.debug = False
+    args.parity = False
+    args.codegen = 'v5'
+    args.prompt = None
+
+    run_pipeline(args)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1178,24 +1406,28 @@ def run_pipeline(args: argparse.Namespace):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="C-Kernel-Engine v4 Pipeline Runner",
+        description="C-Kernel-Engine v5 Pipeline Runner (standalone, manifest-first)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Download GGUF directly (recommended for quantized models)
-  python scripts/ck_run_v4.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf --weight-dtype=q4_k_m
+  # Interactive mode (default - just run with no args)
+  ./ck-v5
+  python scripts/ck_run_v5.py
 
-  # Full HuggingFace model (downloads all files)
-  python scripts/ck_run_v4.py run HuggingFaceTB/SmolLM-135M
+  # Download GGUF directly (recommended for quantized models)
+  ./ck-v5 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
   # Local GGUF file
-  python scripts/ck_run_v4.py run ./model.gguf --weight-dtype=q4_k
+  ./ck-v5 run ./model.gguf
+
+  # Full HuggingFace model (downloads all files)
+  ./ck-v5 run HuggingFaceTB/SmolLM-135M
 
   # Generate code only (inspect before running)
-  python scripts/ck_run_v4.py run Qwen/Qwen2-0.5B --generate-only
+  ./ck-v5 run Qwen/Qwen2-0.5B --generate-only
 
   # Single prompt mode
-  python scripts/ck_run_v4.py run ./model.gguf --prompt "What is 2+2?" --max-tokens 50
+  ./ck-v5 run ./model.gguf --prompt "What is 2+2?" --max-tokens 50
 """
     )
 
@@ -1233,8 +1465,18 @@ Examples:
                            help='Emit debug prints in generated C code to trace NaN/zero issues')
     run_parser.add_argument('--parity', action='store_true',
                            help='Save intermediate buffers for parity comparison with PyTorch')
-    run_parser.add_argument('--codegen', choices=['v4', 'v5'], default='v4',
-                           help='Codegen version: v4=loop-based, v5=explicit unrolled (default: v4)')
+    run_parser.add_argument('--codegen', choices=['v4', 'v5'], default='v5',
+                           help='Codegen version: v5=explicit unrolled (default), v4=loop-based (legacy)')
+
+    # Interactive command (also default when no command given)
+    interactive_parser = subparsers.add_parser('interactive', aliases=['i'],
+                                               help='Interactive model selector (default)')
+    interactive_parser.add_argument('--weight-dtype',
+                                   choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
+                                            'q5_0', 'q5_1', 'q6_k', 'q8_0'],
+                                   help='Weight dtype override')
+    interactive_parser.add_argument('--temperature', type=float, default=0.7)
+    interactive_parser.add_argument('--max-tokens', type=int, default=512)
 
     # List command
     list_parser = subparsers.add_parser('list', help='List cached models')
@@ -1245,8 +1487,17 @@ Examples:
 
     args = parser.parse_args()
 
-    if args.command == 'run':
+    # Default to interactive mode if no command given
+    if args.command is None:
+        # Set defaults for interactive mode
+        args.weight_dtype = None
+        args.temperature = 0.7
+        args.max_tokens = 512
+        run_interactive(args)
+    elif args.command == 'run':
         run_pipeline(args)
+    elif args.command in ('interactive', 'i'):
+        run_interactive(args)
     elif args.command == 'list':
         if CACHE_DIR.exists():
             models = list(CACHE_DIR.iterdir())

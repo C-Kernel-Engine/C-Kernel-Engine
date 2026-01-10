@@ -13,7 +13,18 @@ import os
 import re
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = _SCRIPT_DIR.parent
+_V3_DIR = _ROOT_DIR / "v3"
+_V4_DIR = _SCRIPT_DIR
+for path in (_V4_DIR, _ROOT_DIR, _V3_DIR):
+    if path.is_dir():
+        path_str = str(path)
+        if path_str not in sys.path:
+            sys.path.insert(0, path_str)
 
 import build_ir_v3 as v3
 import codegen_v4
@@ -2364,9 +2375,9 @@ def parse_args(argv: List[str]) -> Dict:
 
 def print_usage():
     print("Usage:")
-    print("  python scripts/build_ir_v4.py MODEL [OPTIONS]")
-    print("  python scripts/build_ir_v4.py --config=FILE [OPTIONS]")
-    print("  python scripts/build_ir_v4.py --preset=NAME [OPTIONS]")
+    print("  python scripts/v4/build_ir_v4.py MODEL [OPTIONS]")
+    print("  python scripts/v4/build_ir_v4.py --config=FILE [OPTIONS]")
+    print("  python scripts/v4/build_ir_v4.py --preset=NAME [OPTIONS]")
     print()
     print("Options:")
     print("  --config=FILE           Use local config.json")
@@ -2432,25 +2443,25 @@ def print_usage():
     print()
     print("Examples:")
     print("  # Generate prefill and decode schedules")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b")
     print()
     print("  # Generate training schedule (auto-detect memory, compute optimal batch)")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b --modes=training")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b --modes=training")
     print()
     print("  # Training with specific memory budget and batch size")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b --modes=training --memory=16 --batch-size=32")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b --modes=training --memory=16 --batch-size=32")
     print()
     print("  # Generate backward only (for memory-efficient training)")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b --modes=backward --fusion=on")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b --modes=backward --fusion=on")
     print()
     print("  # Use custom config file")
-    print("  python scripts/build_ir_v4.py --config=smolLM-135.json --modes=prefill,decode")
+    print("  python scripts/v4/build_ir_v4.py --config=smolLM-135.json --modes=prefill,decode")
     print()
     print("  # Quantized inference with Q4_K weights (llama.cpp compatible)")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b --weight-dtype=q4_k --dtype=f32")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b --weight-dtype=q4_k --dtype=f32")
     print()
     print("  # Verbose output for debugging")
-    print("  python scripts/build_ir_v4.py --preset=qwen2-0.5b --fusion-verbose --parallel-verbose")
+    print("  python scripts/v4/build_ir_v4.py --preset=qwen2-0.5b --fusion-verbose --parallel-verbose")
 
 
 def main(argv: List[str]) -> int:

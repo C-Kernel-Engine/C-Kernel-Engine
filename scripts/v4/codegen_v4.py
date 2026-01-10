@@ -7,7 +7,14 @@ Emits forward implementations that call real kernels (fp32 + Q4_K paths).
 
 from datetime import datetime
 import os
+import sys
+from pathlib import Path
 from typing import List
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_V3_DIR = _SCRIPT_DIR.parent / "v3"
+if _V3_DIR.is_dir():
+    sys.path.insert(0, str(_V3_DIR))
 
 import build_ir_v3 as v3
 

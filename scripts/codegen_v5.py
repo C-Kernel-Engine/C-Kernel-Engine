@@ -16,7 +16,14 @@ Generated code shows the exact quant type for each operation, e.g.:
 
 from datetime import datetime
 import os
+import sys
+from pathlib import Path
 from typing import List, Dict, Optional
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_V3_DIR = _SCRIPT_DIR / "v3"
+if _V3_DIR.is_dir():
+    sys.path.insert(0, str(_V3_DIR))
 
 import build_ir_v3 as v3
 

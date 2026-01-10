@@ -10,6 +10,9 @@ from test_utils import get_cpu_info, max_diff, print_system_info
 # Enable verbose debug output with: DEBUG=1 python test_kv_cache_layer_decode.py
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
+# Keep decode parity strict by default; allow override via env if needed.
+os.environ.setdefault("CK_FLASH_ATTN_STRICT", "1")
+
 
 lib = load_lib("libckernel_engine.so")
 
@@ -454,7 +457,7 @@ def run_decode_parity_test(seed=0):
 if __name__ == "__main__":
     print_system_info()
     diff = run_decode_parity_test(seed=0)
-    tol = 1e-5
+    tol = float(os.environ.get("CK_KV_DECODE_TOL", "1e-5"))
     print("\n================================================================================")
     print("  TEST: KV-cache Layer Decode Parity")
     print("================================================================================\n")

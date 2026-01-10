@@ -82,9 +82,13 @@ class CKModel:
             return False
 
         # Load C library
-        lib_path = self.model_dir / "libmodel.so"
+        lib_path = self.model_dir / "ck-kernel-inference.so"
         if not lib_path.exists():
-            print(f"Error: Model library not found: {lib_path}")
+            lib_path = self.model_dir / "ck-kernel-decode.so"
+        if not lib_path.exists():
+            lib_path = self.model_dir / "libmodel.so"
+        if not lib_path.exists():
+            print(f"Error: Model library not found in: {self.model_dir}")
             return False
 
         self.lib = ctypes.CDLL(str(lib_path))

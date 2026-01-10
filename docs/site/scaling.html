@@ -3,7 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScalingPhilosophy | C-Kernel-Engine</title>
+    <meta name="description" content="CPU-first scaling philosophy for ML training. Learn why CPU clusters with RDMA interconnects offer 16x cheaper, 200x more accessible infrastructure than GPU clusters for large-scale machine learning.">
+    <meta name="keywords" content="CPU ML training, RDMA, distributed computing, machine learning scaling, GPU alternatives, C-Kernel-Engine">
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Scaling Philosophy | C-Kernel-Engine">
+    <meta property="og:description" content="CPU-first ML scaling: 16x cheaper, 200x more accessible than GPU clusters. Learn about RDMA-connected CPU clusters for large-scale training.">
+    <meta property="og:image" content="assets/scale-economics.svg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Scaling Philosophy | C-Kernel-Engine">
+    <meta name="twitter:description" content="CPU-first ML scaling: 16x cheaper, 200x more accessible than GPU clusters.">
+
+    <title>Scaling Philosophy | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -100,7 +114,7 @@
         /* Navigation */
         .site-nav {
             display: flex;
-            gap: 0.25rem;
+            gap: 0.5rem;
             flex-wrap: wrap;
             align-items: center;
         }
@@ -109,7 +123,7 @@
         .nav-dropdown > .nav-trigger {
             color: var(--text-secondary);
             text-decoration: none;
-            padding: 0.6rem 1rem;
+            padding: 0.6rem 1.25rem;
             border-radius: 4px;
             font-size: 0.9rem;
             font-weight: 500;
@@ -121,6 +135,7 @@
             border: none;
             background: transparent;
             font-family: inherit;
+            white-space: nowrap;
         }
 
         .site-nav > a:hover,
@@ -469,6 +484,7 @@
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--grey);
+            table-layout: auto;
         }
 
         th {
@@ -480,12 +496,15 @@
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            white-space: nowrap;
+            vertical-align: middle;
         }
 
         td {
             padding: 0.875rem 1rem;
             border-bottom: 1px solid var(--grey);
             color: var(--text-secondary);
+            vertical-align: middle;
         }
 
         tr:hover {
@@ -494,6 +513,18 @@
 
         tr:last-child td {
             border-bottom: none;
+        }
+
+        /* Ensure table doesn't overflow on mobile */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .table-container table {
+            margin: 0;
+            min-width: 600px;
         }
 
         /* Lists */
@@ -846,7 +877,7 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
-                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                        <a href="flash_attention.html">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -889,38 +920,99 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>CPU-First, RDMA-Connected, No GPU Lock-in</strong><br>
-        We scale across CPUs using RDMA and proper networking. This is a deliberate architectural choice.
+        <strong>Two First Principles. Everything Else Follows.</strong><br>
+        Our entire scaling philosophy rests on two fundamental truths from first-principles thinking.
     </div>
 </div>
 
-<h2>The Core Insight</h2>
+<h2>The Two First Principles</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Principle 1: 0 × ∞ = 0</h3>
+        <p><strong>If your model doesn't fit in memory, compute speed is irrelevant.</strong></p>
+        <p>A GPU with 80GB VRAM running at infinite FLOPS still equals zero if your 70B model requires 140GB+ for weights alone.</p>
+        <p><strong>The cost implication:</strong> You're FORCED to buy 8+ GPUs ($320K+) just to fit the model. With CPUs and 4TB RAM per server, you need 1-2 servers ($60K).</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Principle 2: Theory of Constraints</h3>
+        <p><strong>Your system is only as fast as its slowest component.</strong></p>
+        <p>NVLink is fast (900 GB/s) <em>within a node</em>. But NVLink doesn't scale infinitely. At scale, EVERYONE hits Ethernet.</p>
+        <p><strong>The equalizer:</strong> At the Ethernet boundary, CPUs and GPUs face the same constraint. Without NVLink, GPUs are often <em>slower</em> than server-grade CPUs.</p>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Proof of Infinite CPU Scaling</strong><br>
+        The internet itself. Billions of CPUs, connected by Ethernet, scaling infinitely. No NVLink required.
+    </div>
+</div>
+
+<h2>Principle 1: The Cost of 0 × ∞ = 0</h2>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">Models Are Just Numbers</h3>
-    <p>There is no fundamental difference between training a 70M parameter model and a 600B parameter model. The code is identical. Only the numbers change:</p>
-    <pre>
-┌─────────────────┬─────────────┬─────────────┬──────────────┐
-│ Model           │ hidden_size │ layers      │ What Changes │
-├─────────────────┼─────────────┼─────────────┼──────────────┤
-│ Tiny (70M)      │ 512         │ 12          │ Numbers      │
-│ Medium (7B)     │ 4096        │ 32          │ Numbers      │
-│ Large (70B)     │ 8192        │ 80          │ Numbers      │
-│ Massive (600B)  │ 16384       │ 126         │ Numbers      │
-└─────────────────┴─────────────┴─────────────┴──────────────┘
-    </pre>
+    <h3 style="margin-top: 0;">The GPU Memory Trap</h3>
+    <p>Yes, you CAN fit a 70B model on GPUs using tensor/pipeline parallelism. That's not the point.</p>
+    <p><strong>The point is: you're now FORCED to buy 8+ GPUs.</strong></p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Model Size</th><th>GPU Requirement</th><th>GPU Cost</th><th>CPU Requirement</th><th>CPU Cost</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>7B (14GB weights)</td>
+                <td>1× 80GB GPU</td>
+                <td>$40,000</td>
+                <td>1× server, 128GB RAM</td>
+                <td>$8,000</td>
+            </tr>
+            <tr>
+                <td>70B (140GB weights)</td>
+                <td>2-4× 80GB GPUs + NVLink</td>
+                <td>$160,000+</td>
+                <td>1× server, 512GB RAM</td>
+                <td>$15,000</td>
+            </tr>
+            <tr>
+                <td>70B (with optimizer states)</td>
+                <td>8× 80GB GPUs + NVLink</td>
+                <td>$480,000+</td>
+                <td>1-2× servers, 2TB RAM each</td>
+                <td>$60,000</td>
+            </tr>
+            <tr>
+                <td>405B (Llama 3.1 scale)</td>
+                <td>32+ GPUs across nodes</td>
+                <td>$2,000,000+</td>
+                <td>4-8× servers, 4TB RAM each</td>
+                <td>$200,000</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
 <div class="card">
-    <h3 style="margin-top: 0;">Same Kernels, Different Sizes</h3>
-    <pre>// This exact same function trains a 70M model and a 600B model
-void gemm_forward(float *C, const float *A, const float *B,
-                  int M, int N, int K);
+    <h3 style="margin-top: 0;">The Math That Matters</h3>
+    <pre>
+GPU Path:
+  Model doesn't fit in 80GB → Buy 8 GPUs → $320K for GPUs alone
+  Need NVLink for fast communication → Another $50K+
+  Need DGX chassis → Another $80K+
+  Total: $450K+ just to START
 
-// 70M:  gemm_forward(out, A, B, 1024, 512, 512);
-// 600B: gemm_forward(out, A, B, 65536, 16384, 16384);
-
-// Same code. Different numbers. That's it.</pre>
+CPU Path:
+  Model fits in 4TB RAM → Buy 1-2 servers → $30K each
+  Standard Ethernet networking → $2K
+  Total: $60K and you're running
+    </pre>
+    <p><strong>The "0 × ∞ = 0" principle forces GPU users into expensive multi-GPU setups. CPUs avoid this entirely.</strong></p>
 </div>
 
 <h2>Target Platform</h2>
@@ -990,7 +1082,8 @@ void gemm_forward(float *C, const float *A, const float *B,
 
 <div class="card">
     <h3 style="margin-top: 0;">Target CPU Families</h3>
-    <table class="table">
+    <div class="table-container">
+        <table class="table">
         <thead>
             <tr><th>CPU</th><th>Cores</th><th>AVX-512</th><th>AMX</th><th>DDR5 Channels</th><th>DSA</th></tr>
         </thead>
@@ -1045,6 +1138,7 @@ void gemm_forward(float *C, const float *A, const float *B,
             </tr>
         </tbody>
     </table>
+    </div>
 </div>
 
 <h2>Why CPU-Only?</h2>
@@ -1072,6 +1166,914 @@ void gemm_forward(float *C, const float *A, const float *B,
         </ul>
         <p><strong>For inference:</strong> CPUs are often faster for batch=1</p>
         <p><strong>For training:</strong> Scale horizontally with RDMA</p>
+    </div>
+</div>
+
+<h2>The Fundamental Math: 0 × ∞ = 0</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Memory Constraint</strong><br>
+        It doesn't matter how fast your compute is if your model won't fit in memory. Being 10x faster at computing doesn't help if you're limited by 0 × ∞ = 0.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU: Memory Wins</h3>
+        <ul>
+            <li><strong>Dual Xeon:</strong> 4-6TB DDR5</li>
+            <li><strong>Can train:</strong> 1TB model in BF16</li>
+            <li><strong>Math:</strong> 4-6TB × Dual Socket = Non-zero</li>
+            <li><strong>Result:</strong> Actually trains the model!</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">GPU: Compute Fast, Memory Fails</h3>
+        <ul>
+            <li><strong>A100:</strong> 80GB VRAM</li>
+            <li><strong>Can't train:</strong> 1TB model</li>
+            <li><strong>Math:</strong> 80GB × ∞ GPUs = 0 (won't fit)</li>
+            <li><strong>Result:</strong> Fast but useless for large models</li>
+        </ul>
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="CPU vs GPU Memory Analysis">
+    <img src="assets/cpu-gpu-analysis.svg" alt="CPU vs GPU Memory Analysis">
+</div>
+
+<h2>GPU Performance Comparison: Reality Check</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">GPU Specifications and Real-World Performance</h3>
+    <p>Let's examine actual GPU capabilities and their limitations for large-scale ML training.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">RTX 3090</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
+            <div style="color: #a0a0a0;">VRAM</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 936 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 10,496</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 35</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,500</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Can't fit 70B+ models. Max practical: 13B in FP16.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">RTX 4090</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
+            <div style="color: #a0a0a0;">VRAM</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1008 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,384</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 83</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,600</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Same VRAM as 3090. Still can't fit large models.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">A100</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
+            <div style="color: #a0a0a0;">HBM2e</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1,935 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 6,912</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 312</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$15,000</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Can fit up to ~40B models. Needs 25+ GPUs for 70B+.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">H100</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
+            <div style="color: #a0a0a0;">HBM3</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 3,350 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,896</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 989</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$40,000</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Same 80GB VRAM limit. Needs 12+ GPUs for 70B+ models.
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+        <strong>The Pattern is Clear</strong><br>
+        Every GPU hits the same VRAM wall. Whether 24GB or 80GB, large models require massive GPU counts. This is the fundamental constraint that CPU-only architecture bypasses entirely.
+    </div>
+</div>
+
+<h2>Principle 2: The Ethernet Equalizer</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+    </div>
+    <div>
+        <strong>NVLink Doesn't Scale Infinitely</strong><br>
+        NVLink is 900 GB/s <em>within a single node</em>. But you can only fit 8 GPUs per node. Go beyond that? You hit Ethernet. And at the Ethernet boundary, CPUs and GPUs face the exact same constraint.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Bandwidth Reality</h3>
+    <p>Let's be precise about the numbers:</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Connection Type</th><th>Bandwidth</th><th>Where It Applies</th><th>Scales To</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NVLink 4.0</td>
+                <td>900 GB/s</td>
+                <td>GPU-to-GPU within 1 node</td>
+                <td>8 GPUs max</td>
+            </tr>
+            <tr>
+                <td>DDR5 (12-channel)</td>
+                <td>460 GB/s</td>
+                <td>CPU-to-RAM within 1 socket</td>
+                <td>Per socket</td>
+            </tr>
+            <tr>
+                <td>400GbE Ethernet</td>
+                <td>50 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Infinite nodes</td>
+            </tr>
+            <tr>
+                <td>100GbE Ethernet</td>
+                <td>12.5 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Infinite nodes</td>
+            </tr>
+            <tr>
+                <td>InfiniBand HDR</td>
+                <td>25 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Thousands of nodes</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Theory of Constraints Applied</h3>
+    <pre>
+GPU Cluster at Scale:
+  Within node:  NVLink 900 GB/s (fast!)
+  Between nodes: Ethernet 50 GB/s (constraint!)
+  System speed = 50 GB/s (bottleneck)
+
+CPU Cluster at Scale:
+  Within node:  DDR5 460 GB/s
+  Between nodes: Ethernet 50 GB/s (same constraint!)
+  System speed = 50 GB/s (same bottleneck)
+
+AT SCALE, THEY HIT THE SAME WALL.
+    </pre>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Without NVLink, GPUs Are Often Slower</strong><br>
+        If you can't afford NVLink switches ($200K+), your GPUs communicate over PCIe → Ethernet. That's 12.5-50 GB/s. A server-grade CPU with DDR5 has 460 GB/s to its own memory. For memory-bound workloads, the CPU wins.
+    </div>
+</div>
+
+<h2>Designing Your Ethernet Network</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Ethernet Switch Topology for ML Clusters</h3>
+    <p>Since Ethernet is the equalizer at scale, designing it well is critical.</p>
+</div>
+
+<h3>Leaf-Spine Architecture</h3>
+
+<div class="card">
+    <pre>
+                    ┌─────────────┐     ┌─────────────┐
+                    │  Spine 1    │     │  Spine 2    │
+                    │ 400GbE      │     │ 400GbE      │
+                    └──────┬──────┘     └──────┬──────┘
+                           │                   │
+         ┌─────────────────┼───────────────────┼─────────────────┐
+         │                 │                   │                 │
+    ┌────┴────┐       ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
+    │ Leaf 1  │       │ Leaf 2  │       │ Leaf 3  │       │ Leaf 4  │
+    │ 100GbE  │       │ 100GbE  │       │ 100GbE  │       │ 100GbE  │
+    └────┬────┘       └────┬────┘       └────┬────┘       └────┴────┘
+         │                 │                 │                 │
+    ┌────┴────┐       ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
+    │Server 1 │       │Server 3 │       │Server 5 │       │Server 7 │
+    │Server 2 │       │Server 4 │       │Server 6 │       │Server 8 │
+    └─────────┘       └─────────┘       └─────────┘       └─────────┘
+    </pre>
+</div>
+
+<h3>Switch Sizing Calculator</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Bandwidth Requirements</h3>
+    <pre>
+For distributed training with data parallelism:
+  Gradient size = Model parameters × bytes per param
+  70B model in FP16 = 70B × 2 bytes = 140 GB
+
+All-reduce bandwidth needed:
+  Per iteration: 2 × gradient size (reduce-scatter + all-gather)
+  70B model: 2 × 140 GB = 280 GB per iteration
+
+With 100GbE (12.5 GB/s):
+  All-reduce time = 280 GB ÷ 12.5 GB/s = 22.4 seconds
+
+With 400GbE (50 GB/s):
+  All-reduce time = 280 GB ÷ 50 GB/s = 5.6 seconds
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Small Cluster (8-16 servers)</h3>
+        <ul>
+            <li><strong>Topology:</strong> Single 400GbE switch</li>
+            <li><strong>Switch:</strong> Arista 7060X5 or similar</li>
+            <li><strong>Ports:</strong> 32× 400GbE</li>
+            <li><strong>Cost:</strong> ~$30,000</li>
+            <li><strong>Bisection BW:</strong> 12.8 Tbps</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Medium Cluster (32-64 servers)</h3>
+        <ul>
+            <li><strong>Topology:</strong> Leaf-spine (2 spine, 4 leaf)</li>
+            <li><strong>Spine:</strong> 2× 400GbE switches</li>
+            <li><strong>Leaf:</strong> 4× 100GbE switches</li>
+            <li><strong>Cost:</strong> ~$120,000</li>
+            <li><strong>Bisection BW:</strong> 25.6 Tbps</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Large Cluster (100+ servers)</h3>
+    <ul>
+        <li><strong>Topology:</strong> 3-tier Clos or fat-tree</li>
+        <li><strong>Consider:</strong> InfiniBand for lower latency</li>
+        <li><strong>RDMA:</strong> RoCEv2 over Ethernet or native IB</li>
+        <li><strong>Cost:</strong> $500K-2M depending on scale</li>
+    </ul>
+    <p><strong>Key insight:</strong> A GPU cluster at this scale needs the SAME network infrastructure. The Ethernet cost is equal. But CPUs don't need the $2M+ in NVLink switches.</p>
+</div>
+
+<h3>RDMA Configuration</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RoCEv2 Setup</h3>
+    <pre>
+# Enable RDMA over Converged Ethernet v2
+# On each server with Mellanox/NVIDIA ConnectX NICs:
+
+# 1. Enable PFC (Priority Flow Control) on switch
+#    Required for lossless Ethernet
+
+# 2. Configure ECN (Explicit Congestion Notification)
+mlnx_qos -i eth0 --pfc 0,0,0,1,0,0,0,0  # Enable PFC on priority 3
+mlnx_qos -i eth0 --trust=dscp
+
+# 3. Set up RDMA
+modprobe rdma_ucm
+modprobe rdma_cm
+
+# 4. Verify RDMA is working
+ibv_devinfo
+rdma link show
+    </pre>
+</div>
+
+<div class="img-container svg-viewer" data-title="Ethernet Switch Topology">
+    <img src="assets/ethernet-topology.svg" alt="Ethernet Switch Topology for ML Clusters">
+</div>
+
+<h2>Scale Economics: The Real Comparison</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Why CPU-Only Wins at Scale</h3>
+</div>
+
+<div class="img-container svg-viewer" data-title="Scale Economics Comparison">
+    <img src="assets/scale-economics.svg" alt="Scale Economics Comparison">
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">GPU Cluster at Scale</h3>
+        <ul>
+            <li><strong>For 1TB model:</strong> 100 GPUs minimum</li>
+            <li><strong>Total cost:</strong> $4 Billion</li>
+            <li><strong>Who can afford:</strong> 5 companies globally</li>
+            <li><strong>Result:</strong> Elite-only access</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU Cluster at Scale</h3>
+        <ul>
+            <li><strong>For same scale:</strong> 80 servers</li>
+            <li><strong>Total cost:</strong> $240 Million</li>
+            <li><strong>Who can afford:</strong> 1000+ companies</li>
+            <li><strong>Result:</strong> Accessible to everyone</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Economics: 16x Cheaper, 200x More Accessible</h3>
+    <p>While GPU costs stay high and GPU access remains limited, CPU clusters deliver the same scale at a fraction of the cost. This makes large-scale ML accessible to 1000+ companies instead of just 5.</p>
+</div>
+
+<h2>The Hybrid Trap: CPU+GPU = CPU-Bound</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+        <strong>Common Question:</strong><br>
+        "Why not use CPU for memory and GPU for compute? Get the best of both!"<br><br>
+        <strong>Answer:</strong> You're then AS FAST AS THE CPU anyway! You get the complexity of both with the performance of neither.
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="Hybrid CPU+GPU Bottleneck">
+    <img src="assets/hybrid-bottleneck.svg" alt="Hybrid CPU+GPU Bottleneck">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Hybrid Bottleneck</h3>
+    <p>When CPU holds weights and transfers to GPU for compute:</p>
+    <ul>
+        <li><strong>Transfer bottleneck:</strong> 100 GB/s limits throughput</li>
+        <li><strong>GPU idle time:</strong> Waits for data from CPU</li>
+        <li><strong>You get:</strong> GPU performance = CPU performance</li>
+        <li><strong>Plus:</strong> Double the code complexity, double the cost</li>
+    </ul>
+    <p><strong>Conclusion:</strong> If the GPU is limited by the CPU anyway, just use CPUs! Simpler, faster, cheaper.</p>
+</div>
+
+<h2>Why CPU-Only is the Future</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Strategic Advantage</h3>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Technical Wins</h3>
+        <ul>
+            <li><strong>Memory capacity:</strong> 4-6TB per node vs 80GB VRAM</li>
+            <li><strong>No transfer bottleneck:</strong> CPU memory + CPU compute</li>
+            <li><strong>Optimize interconnect:</strong> RDMA, core pinning, cache</li>
+            <li><strong>Get close to theoretical FLOPS</strong></li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Market Wins</h3>
+        <ul>
+            <li><strong>16x cheaper</strong> at scale</li>
+            <li><strong>200x more accessible</strong> to companies</li>
+            <li><strong>Commodity hardware</strong> - no special requirements</li>
+            <li><strong>Open ecosystem</strong> - standard Linux tools</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Commodity Economics: The CPU Trajectory</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">CPUs Follow Commodity Price Curves</h3>
+    <p>Unlike GPUs which are supply-constrained and vendor-controlled, CPUs are commodity hardware. Every improvement happens automatically, at scale, with competition driving prices down.</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Component</th><th>2023</th><th>2025</th><th>2027 (projected)</th><th>Trend</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Memory Standard</td>
+                <td>DDR5-4800</td>
+                <td>DDR5-6400</td>
+                <td>DDR6</td>
+                <td>+33% bandwidth per gen</td>
+            </tr>
+            <tr>
+                <td>Channels per Socket</td>
+                <td>8</td>
+                <td>12</td>
+                <td>16</td>
+                <td>+50% channels</td>
+            </tr>
+            <tr>
+                <td>Max RAM per Server</td>
+                <td>4TB</td>
+                <td>8TB</td>
+                <td>16TB+</td>
+                <td>2x per generation</td>
+            </tr>
+            <tr>
+                <td>Cores per Socket</td>
+                <td>64 (Genoa)</td>
+                <td>128 (Turin)</td>
+                <td>192+</td>
+                <td>+50% per gen</td>
+            </tr>
+            <tr>
+                <td>L3 Cache</td>
+                <td>256MB</td>
+                <td>384MB</td>
+                <td>512MB+</td>
+                <td>Growing</td>
+            </tr>
+            <tr>
+                <td>Ethernet Speed</td>
+                <td>100GbE</td>
+                <td>400GbE</td>
+                <td>800GbE</td>
+                <td>4x per 3 years</td>
+            </tr>
+            <tr>
+                <td>$/TFLOP (CPU)</td>
+                <td>$500</td>
+                <td>$300</td>
+                <td>$150</td>
+                <td>-50% per 2 years</td>
+            </tr>
+            <tr>
+                <td>$/TFLOP (GPU)</td>
+                <td>$50</td>
+                <td>$40</td>
+                <td>$35</td>
+                <td>-15% per 2 years</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Crossover Point</strong><br>
+        GPUs will always have higher peak FLOPS per dollar for raw compute. But for memory-bound ML inference (which is most real-world LLM usage), CPUs are already competitive. And the gap closes every year because CPU economics follow commodity curves.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Why CPU Economics Win</h3>
+        <ul>
+            <li><strong>Competition:</strong> Intel vs AMD vs ARM vs RISC-V</li>
+            <li><strong>Volume:</strong> Billions of CPUs vs millions of GPUs</li>
+            <li><strong>Supply:</strong> Multiple fabs, no bottlenecks</li>
+            <li><strong>Standards:</strong> DDR5 is an industry standard, not proprietary</li>
+            <li><strong>Software:</strong> Linux, GCC, standard tools (free)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Why GPU Economics Struggle</h3>
+        <ul>
+            <li><strong>Monopoly:</strong> NVIDIA dominates (~90% market)</li>
+            <li><strong>Supply-constrained:</strong> Artificial scarcity</li>
+            <li><strong>Proprietary:</strong> CUDA lock-in, HBM limited fabs</li>
+            <li><strong>High margins:</strong> No price competition pressure</li>
+            <li><strong>Lead times:</strong> 12-24 month waits</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Infinite CPU Scaling: The Internet Proof</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">CPUs Scale to Infinity</h3>
+    <p>Unlike GPUs, which hit cost and availability ceilings, CPUs scale infinitely through distributed computing across the internet. Your computer is part of that infinity!</p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Insight</strong><br>
+        Want more FLOPs? Add more CPUs + RDMA! Get your 100 PFLOPS while your friends on the other side keep bragging about their limited GPU clusters. FLOPs is just an accumulation problem that CPUs solve through clever distributed training.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">∞ Infinite Scaling</h3>
+        <ul>
+            <li><strong>Internet-scale distributed computing</strong></li>
+            <li><strong>No ceiling:</strong> Add 10, 100, 1000 CPUs</li>
+            <li><strong>Your computer contributes:</strong> Every device matters</li>
+            <li><strong>Result:</strong> Unlimited FLOP accumulation</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU Improvements Track</h3>
+        <ul>
+            <li><strong>Cores:</strong> Increasing year over year</li>
+            <li><strong>Cache:</strong> Growing bigger</li>
+            <li><strong>Efficiency:</strong> Getting better</li>
+            <li><strong>Cost:</strong> Decreasing over time</li>
+        </ul>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Memory Scaling</h3>
+        <ul>
+            <li><strong>DDR5 → DDR6:</strong> 2400 GB/s → higher bandwidth</li>
+            <li><strong>Memory slots:</strong> 8 → 12 → 16 slots per node</li>
+            <li><strong>Total per node:</strong> 4TB → 8TB → 16TB RAM</li>
+            <li><strong>Cost/GB:</strong> Constantly decreasing</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Model Efficiency</h3>
+        <ul>
+            <li><strong>Smaller models:</strong> Getting more efficient</li>
+            <li><strong>Better quantization:</strong> Q4, Q8, hybrid methods</li>
+            <li><strong>Architecture improvements:</strong> MoE, mixture of experts</li>
+            <li><strong>Training optimization:</strong> Better algorithms</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The C-Kernel Engine Goal</h3>
+    <p>Exploit this infinite CPU scaling on server-grade CPUs. As models get smaller and CPUs get more powerful, the combination becomes unbeatable:</p>
+    <ul>
+        <li><strong>No GPU dependency:</strong> Commodity hardware only</li>
+        <li><strong>Accessible to everyone:</strong> Your laptop contributes to the cluster</li>
+        <li><strong>Sustainable scaling:</strong> Economics favor CPU-only approach</li>
+        <li><strong>Future-proof:</strong> CPU improvements continue while GPU costs stay high</li>
+    </ul>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Multi-Model Parallelism: Enterprise Real Workload</h3>
+    <p>Unlike GPUs which are designed for single-model throughput, CPUs excel at running <strong>multiple models simultaneously</strong> on the same system.</p>
+</div>
+
+<h2>Enterprise & Government: The Multi-Model Reality</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Real Enterprise Scenario</strong><br>
+        In government ministries, large enterprises, and multi-department organizations, different teams need to run different models simultaneously. This is where GPUs become a nightmare.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Government Ministry Example</h3>
+        <ul>
+            <li><strong>Health Dept:</strong> Medical document analysis model</li>
+            <li><strong>Finance Dept:</strong> Fraud detection model</li>
+            <li><strong>Education Dept:</strong> Student assessment model</li>
+            <li><strong>Transport Dept:</strong> Traffic prediction model</li>
+            <li><strong>HR Dept:</strong> Resume screening model</li>
+            <li><strong>Legal Dept:</strong> Contract analysis model</li>
+        </ul>
+        <p><strong>Reality:</strong> 6 departments, 6 different models, all need to run simultaneously.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Enterprise Example</h3>
+        <ul>
+            <li><strong>Sales:</strong> Lead scoring + CRM assistant</li>
+            <li><strong>Support:</strong> Customer chatbot + ticket routing</li>
+            <li><strong>Engineering:</strong> Code review + documentation</li>
+            <li><strong>Marketing:</strong> Content generation + analytics</li>
+            <li><strong>Security:</strong> Threat detection + log analysis</li>
+            <li><strong>Finance:</strong> Expense analysis + forecasting</li>
+        </ul>
+        <p><strong>Reality:</strong> Each department has specialized models for their domain.</p>
+    </div>
+</div>
+
+<h3>The GPU Context-Switching Nightmare</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">GPU Model Switching: Slow and Expensive</h3>
+    <pre>
+GPU Workflow for Multi-Model Serving:
+  1. Load Model A weights into VRAM (80GB)     → 30-60 seconds
+  2. Run inference for Department A            → fast
+  3. Unload Model A from VRAM                  → 10 seconds
+  4. Load Model B weights into VRAM            → 30-60 seconds
+  5. Run inference for Department B            → fast
+  6. Repeat for each model...
+
+Problem: Each context switch = 40-70 seconds of GPU sitting idle!
+With 6 departments cycling through: most of the time is loading/unloading.
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU Multi-Model Issues</h3>
+        <ul>
+            <li><strong>VRAM limit:</strong> 80GB can only hold 1-2 large models</li>
+            <li><strong>Context switching:</strong> Load/unload weights takes 30-60s per model</li>
+            <li><strong>No sharing:</strong> GPU can't easily share between containers</li>
+            <li><strong>MIG complexity:</strong> Multi-Instance GPU splits VRAM, reduces per-model capacity</li>
+            <li><strong>Kubernetes pain:</strong> GPU scheduling requires special plugins, node affinity</li>
+            <li><strong>Cost:</strong> Need dedicated GPU per department = $40K × 6 = $240K</li>
+        </ul>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU Multi-Model Solution</h3>
+        <ul>
+            <li><strong>RAM abundance:</strong> 4TB holds ALL models simultaneously</li>
+            <li><strong>No context switching:</strong> All models resident in RAM, instant access</li>
+            <li><strong>Native sharing:</strong> Standard Linux process isolation works</li>
+            <li><strong>Docker native:</strong> Just containers, no special GPU passthrough</li>
+            <li><strong>Kubernetes native:</strong> Standard pod scheduling, no GPU plugins</li>
+            <li><strong>Cost:</strong> One $60K server runs all 6 departments</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Kubernetes & Docker: CPUs Are First-Class Citizens</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Container Orchestration Reality</h3>
+    <pre>
+GPU Kubernetes Deployment:
+  - Install NVIDIA device plugin
+  - Configure GPU node pools
+  - Set resource limits: nvidia.com/gpu: 1
+  - Deal with GPU memory fragmentation
+  - Handle driver version mismatches
+  - Manage MIG partitioning (if sharing)
+  - Debug CUDA OOM errors in production
+
+CPU Kubernetes Deployment:
+  - Just deploy your container
+  - Set resource limits: cpu: "32", memory: "64Gi"
+  - Done. Standard k8s scheduling handles the rest.
+    </pre>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">CPU Multi-Model Architecture</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                    Single CPU Server (4TB RAM)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ Container 1  │  │ Container 2  │  │ Container 3  │           │
+│  │ Health Model │  │ Finance Model│  │ Education    │           │
+│  │ 70B (140GB)  │  │ 13B (26GB)   │  │ 7B (14GB)    │           │
+│  │ 32 cores     │  │ 16 cores     │  │ 8 cores      │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ Container 4  │  │ Container 5  │  │ Container 6  │           │
+│  │ Transport    │  │ HR Model     │  │ Legal Model  │           │
+│  │ 7B (14GB)    │  │ 3B (6GB)     │  │ 13B (26GB)   │           │
+│  │ 8 cores      │  │ 4 cores      │  │ 16 cores     │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│                                                                  │
+│  Total: 226GB used / 4TB available = 5.6% RAM utilization       │
+│  All 6 models running simultaneously, no context switching      │
+└─────────────────────────────────────────────────────────────────┘
+    </pre>
+    <p><strong>Key insight:</strong> 6 models totaling 226GB fit easily in 4TB RAM. All running 24/7, no loading/unloading, instant response for any department.</p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Enterprise Reality Check</strong><br>
+        Most enterprise/government deployments need to run 5-20 different models for different use cases. CPUs handle this natively with standard containers. GPUs require expensive, complex multi-GPU setups with painful orchestration. This alone makes CPUs the practical choice for most real-world deployments.
+    </div>
+</div>
+
+<h2>CPU-Only: Complete Solution for All Model Sizes</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">One Architecture, All Scales</h3>
+    <p>CPU-only isn't just for large models. It's the complete solution for <strong>every model size</strong>, for <strong>both training and inference</strong>.</p>
+</div>
+
+<div class="grid grid-3">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Small Models (1-7B)</h3>
+        <ul>
+            <li><strong>Training:</strong> Single CPU server</li>
+            <li><strong>Inference:</strong> Laptop or edge device</li>
+            <li><strong>Latency:</strong> Sub-millisecond</li>
+            <li><strong>Cost:</strong> < $100/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Chatbots, code completion, mobile AI</p>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Medium Models (7-70B)</h3>
+        <ul>
+            <li><strong>Training:</strong> 2-8 CPU servers</li>
+            <li><strong>Inference:</strong> Single CPU server</li>
+            <li><strong>Throughput:</strong> High batch processing</li>
+            <li><strong>Cost:</strong> $500-2000/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Enterprise AI, content generation, analysis</p>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Large Models (70B+)</h3>
+        <ul>
+            <li><strong>Training:</strong> 10-100 CPU servers</li>
+            <li><strong>Inference:</strong> 2-20 CPU servers</li>
+            <li><strong>Scale:</strong> Distributed across RDMA</li>
+            <li><strong>Cost:</strong> $5000-50000/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Foundation models, research, large-scale analytics</p>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Unified Approach</strong><br>
+        Same CPU-only architecture scales from your laptop (1B model) to global clusters (1T+ parameters). No architecture changes, no GPU lock-in, no complexity multiplication.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Training at Every Scale</h3>
+        <ul>
+            <li><strong>Small:</strong> Fine-tune on laptop (1-7B)</li>
+            <li><strong>Medium:</strong> Train on workstation (7-70B)</li>
+            <li><strong>Large:</strong> Distributed training (70B+)</li>
+            <li><strong>Methodology:</strong> Same principles, same tools</li>
+        </ul>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Inference at Every Scale</h3>
+        <ul>
+            <li><strong>Small:</strong> Edge deployment (1-7B)</li>
+            <li><strong>Medium:</strong> Server deployment (7-70B)</li>
+            <li><strong>Large:</strong> Distributed inference (70B+)</li>
+            <li><strong>Performance:</strong> Optimized for each tier</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Why This Matters</h3>
+    <p>Organizations can start small and scale infinitely without ever switching architectures:</p>
+    <ol>
+        <li><strong>Start:</strong> Train small model on laptop (fine-tuning)</li>
+        <li><strong>Grow:</strong> Move to server as model size increases</li>
+        <li><strong>Scale:</strong> Add more servers when needed (distributed training)</li>
+        <li><strong>Enterprise:</strong> Run multiple models on same hardware</li>
+    </ol>
+    <p><strong>No lock-in. No architecture migrations. No GPU dependency. Just scale as you grow.</strong></p>
+</div>
+
+<h2>Training Advantages: Where CPUs Dominate</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Critical Training Scenarios</h3>
+    <p>CPU-only architecture solves training problems that GPU-only simply can't handle.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">1. Long Context Training: KV Cache Explosion</h3>
+        <p><strong>The Problem:</strong> Long context windows create quadratic KV cache growth</p>
+        <ul>
+            <li><strong>4K context:</strong> ~32GB KV cache</li>
+            <li><strong>32K context:</strong> ~256GB KV cache</li>
+            <li><strong>128K context:</strong> ~4TB KV cache</li>
+            <li><strong>1M context:</strong> ~128TB KV cache</li>
+        </ul>
+        <p><strong>CPU Advantage:</strong></p>
+        <ul>
+            <li><strong>4-16TB RAM:</strong> Fits massive KV caches</li>
+            <li><strong>No transfer bottleneck:</strong> Everything in memory</li>
+            <li><strong>GPU Reality:</strong> KV cache doesn't fit = can't train</li>
+        </ul>
+        <div class="alert alert-warning">
+            <strong>Result:</strong> GPU training hits memory wall at 32K context. CPUs handle 1M+ context natively.
+        </div>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">2. Massive Batch Training</h3>
+        <p><strong>The Need:</strong> Large batch sizes improve convergence and throughput</p>
+        <ul>
+            <li><strong>Standard batch:</strong> 32-128 samples</li>
+            <li><strong>Large batch:</strong> 512-2048 samples</li>
+            <li><strong>Massive batch:</strong> 8192+ samples</li>
+            <li><strong>Enterprise batch:</strong> 100K+ samples</li>
+        </ul>
+        <p><strong>CPU Scaling Strategy:</strong></p>
+        <ul>
+            <li><strong>32 CPUs:</strong> 32 batches in parallel</li>
+            <li><strong>Each batch:</strong> 1-10TB RAM available</li>
+            <li><strong>Total effective batch:</strong> 32x larger</li>
+            <li><strong>No communication overhead:</strong> Each CPU independent</li>
+        </ul>
+        <div class="alert alert-success">
+            <strong>Result:</strong> Scale to any batch size by adding more CPUs. No GPU memory constraints!
+        </div>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Training Reality Check</h3>
+    <div class="grid grid-2">
+        <div>
+            <h4>GPU Training Limits</h4>
+            <ul>
+                <li>❌ KV cache fits → max context ~32K</li>
+                <li>❌ Batch size limited by VRAM</li>
+                <li>❌ Large batches require model parallelism</li>
+                <li>❌ Complex coordination across GPUs</li>
+                <li>❌ Expensive hardware (NVLink required)</li>
+            </ul>
+        </div>
+        <div>
+            <h4>CPU Training Advantages</h4>
+            <ul>
+                <li>✅ KV cache fits → context up to 1M+</li>
+                <li>✅ Batch size scales with CPUs</li>
+                <li>✅ Data parallelism = simple scaling</li>
+                <li>✅ RDMA for necessary communication</li>
+                <li>✅ Commodity hardware (Ethernet)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Why This Matters</strong><br>
+        Real-world training needs long context (RAG, document analysis) and large batches (throughput, convergence). CPU-only architecture handles both naturally. GPU-only hits walls that require expensive workarounds.
     </div>
 </div>
 
@@ -1133,7 +2135,8 @@ Node 3: Model copy, Batch 3  →  gradients  ─┘</pre>
 <div class="card">
     <h3 style="margin-top: 0;">Why RDMA?</h3>
     <p><strong>Remote Direct Memory Access</strong> - Zero-copy, kernel-bypass networking.</p>
-    <table class="table">
+    <div class="table-container">
+        <table class="table">
         <thead>
             <tr><th>Metric</th><th>TCP/IP</th><th>RDMA</th></tr>
         </thead>
@@ -1144,6 +2147,7 @@ Node 3: Model copy, Batch 3  →  gradients  ─┘</pre>
             <tr><td>Memory copies</td><td>Multiple</td><td>Zero (DMA)</td></tr>
         </tbody>
     </table>
+    </div>
 </div>
 
 <div class="card">
@@ -1161,7 +2165,8 @@ rdma_barrier();                   // Synchronization</pre>
 <h2>Implementation Roadmap</h2>
 
 <div class="card">
-    <table class="table">
+    <div class="table-container">
+        <table class="table">
         <thead>
             <tr><th>Phase</th><th>Feature</th><th>Status</th></tr>
         </thead>
@@ -1203,6 +2208,7 @@ rdma_barrier();                   // Synchronization</pre>
             </tr>
         </tbody>
     </table>
+    </div>
 </div>
 
 <h2>The Math Doesn't Change</h2>
@@ -1236,7 +2242,8 @@ That's it. For any model size.
 
 <div class="card">
     <h3 style="margin-top: 0;">For Different Scales</h3>
-    <table class="table">
+    <div class="table-container">
+        <table class="table">
         <thead>
             <tr><th>Model Size</th><th>Recommended Setup</th></tr>
         </thead>
@@ -1263,6 +2270,7 @@ That's it. For any model size.
             </tr>
         </tbody>
     </table>
+    </div>
 </div>
 
 <div class="card">
@@ -1289,7 +2297,7 @@ That's it. For any model size.
 <div class="card">
     <blockquote style="border-left: 4px solid var(--orange); padding-left: 1rem; margin: 1rem 0; font-style: italic;">
         "Nvidia, f**k you."<br>
-        <small>— Linus Torvalds, 2012 (regarding their closed-source Linux drivers)</small>
+        <small>— Linus Torvalds, 2012 (<a href="https://www.youtube.com/watch?v=iYWzMvlj2RQ" target="_blank" rel="noopener" style="color: inherit;">video source</a>) regarding their closed-source Linux drivers</small>
     </blockquote>
     <p>Beyond the open-source concerns:</p>
     <ul>
