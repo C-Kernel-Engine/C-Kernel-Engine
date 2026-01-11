@@ -195,13 +195,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                      emit_main: bool = False,
                      emit_debug: bool = False,
                      emit_parity: bool = False,
-                     weights_manifest: Optional[Dict] = None) -> None:
+                     weights_manifest: Optional[Dict] = None,
+                     decode_scratch_offsets: Optional[Dict[int, Dict[str, int]]] = None) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
         emit_debug: If True, insert debug prints after each layer to detect NaN/zero outputs.
         emit_parity: If True, save intermediate buffers to files for comparison with PyTorch.
         weights_manifest: If provided, validate layout against manifest and embed validation table.
+        decode_scratch_offsets: If provided, use arena pointers for decode scratch buffers instead of
+                                stack arrays. Dict maps layer_id to buffer offsets:
+                                {layer_id: {q_token: offset, k_token: offset, ...}}
+                                This enables zero-copy operation and training support.
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v6 codegen only supports prefill/decode (got: {mode})")
@@ -1073,15 +1078,34 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"    const int H_kv = {safe_name}_NUM_KV_HEADS;")
             add(f"    const int head_dim = {safe_name}_HEAD_DIM;")
             add()
-            add("    float q_token[H * aligned_head_dim];")
-            add("    float k_token[H_kv * aligned_head_dim];")
-            add("    float v_token[H_kv * aligned_head_dim];")
-            add("    float attn_token[H * aligned_head_dim];")
-            add()
-            # Local buffers for MLP (fc1_out = 2x intermediate for gate+up, swiglu_out = intermediate)
-            add("    /* Local MLP buffers (avoid layout dependencies for intermediate values) */")
-            add("    float fc1_out[2 * aligned_intermediate_dim];")
-            add("    float swiglu_out[aligned_intermediate_dim];")
+
+            # Check if we have arena-based decode scratch buffers for this layer
+            layer_scratch = None
+            if decode_scratch_offsets and layer_id in decode_scratch_offsets:
+                layer_scratch = decode_scratch_offsets[layer_id]
+
+            if layer_scratch:
+                # Use arena pointers (zero-copy, training-compatible)
+                add("    /* Decode scratch buffers - ARENA POINTERS (zero-copy, training-compatible) */")
+                add(f"    float *q_token = (float *)((char *)model->arena + {layer_scratch['q_token']});")
+                add(f"    float *k_token = (float *)((char *)model->arena + {layer_scratch['k_token']});")
+                add(f"    float *v_token = (float *)((char *)model->arena + {layer_scratch['v_token']});")
+                add(f"    float *attn_token = (float *)((char *)model->arena + {layer_scratch['attn_out']});")
+                add()
+                add("    /* MLP scratch buffers - ARENA POINTERS */")
+                add(f"    float *fc1_out = (float *)((char *)model->arena + {layer_scratch['fc1_out']});")
+                add(f"    float *swiglu_out = (float *)((char *)model->arena + {layer_scratch['swiglu_out']});")
+            else:
+                # Fallback to stack arrays (backwards compatible, but not ideal for training)
+                add("    /* Decode scratch buffers - STACK (fallback, not ideal for training) */")
+                add("    float q_token[H * aligned_head_dim];")
+                add("    float k_token[H_kv * aligned_head_dim];")
+                add("    float v_token[H_kv * aligned_head_dim];")
+                add("    float attn_token[H * aligned_head_dim];")
+                add()
+                add("    /* MLP scratch buffers - STACK */")
+                add("    float fc1_out[2 * aligned_intermediate_dim];")
+                add("    float swiglu_out[aligned_intermediate_dim];")
             add()
 
             # Step 1: RMSNorm
