@@ -20,6 +20,7 @@
 #define GGML_COMMON_DECL_C
 #include "ggml-common.h"
 #include "ggml.h"
+#include "ggml-cpu.h"
 
 // Forward declarations of internal ggml functions we need
 extern "C" {
@@ -28,15 +29,26 @@ extern "C" {
     void dequantize_row_q6_K(const block_q6_K * x, float * y, int64_t k);
     void dequantize_row_q8_K(const block_q8_K * x, float * y, int64_t k);
     void dequantize_row_q4_0(const block_q4_0 * x, float * y, int64_t k);
+    void dequantize_row_q5_0(const block_q5_0 * x, float * y, int64_t k);
+    void dequantize_row_q8_0(const block_q8_0 * x, float * y, int64_t k);
 
-    // Quantization functions
+    // Quantization functions (ref versions from libggml-base.so)
     void quantize_row_q8_K_ref(const float * x, block_q8_K * y, int64_t k);
+    void quantize_row_q8_0_ref(const float * x, block_q8_0 * y, int64_t k);
 
-    // Vec dot functions
+    // Vec dot functions for K-quants (256-block)
     void ggml_vec_dot_q4_K_q8_K(int n, float * s, size_t bs,
                                 const void * vx, size_t bx,
                                 const void * vy, size_t by, int nrc);
     void ggml_vec_dot_q6_K_q8_K(int n, float * s, size_t bs,
+                                const void * vx, size_t bx,
+                                const void * vy, size_t by, int nrc);
+
+    // Vec dot functions for legacy quants (32-block)
+    void ggml_vec_dot_q5_0_q8_0(int n, float * s, size_t bs,
+                                const void * vx, size_t bx,
+                                const void * vy, size_t by, int nrc);
+    void ggml_vec_dot_q8_0_q8_0(int n, float * s, size_t bs,
                                 const void * vx, size_t bx,
                                 const void * vy, size_t by, int nrc);
 }
@@ -135,6 +147,62 @@ void test_gemv_q6_k(const void * weight_q6k,
     ggml_vec_dot_q6_K_q8_K(cols, output, sizeof(float),
                            weight_q6k, sizeof(block_q6_K),
                            q8_data, sizeof(block_q8_K), 1);
+
+    delete[] q8_data;
+}
+
+/**
+ * Test Q5_0 GEMV - dot product of quantized weights and fp32 input
+ *
+ * @param weight_q5_0  Q5_0 quantized weights [cols]
+ * @param input_f32    FP32 input vector [cols]
+ * @param output       Output scalar [1]
+ * @param cols         Number of columns (must be multiple of QK5_0=32)
+ */
+void test_gemv_q5_0(const void * weight_q5_0,
+                    const float * input_f32,
+                    float * output,
+                    int cols) {
+    // Allocate Q8_0 buffer for quantized activations (32-block format)
+    int n_blocks = cols / QK8_0;
+    block_q8_0 * q8_data = new block_q8_0[n_blocks];
+
+    // Quantize input to Q8_0
+    quantize_row_q8_0_ref(input_f32, q8_data, cols);
+
+    // Compute dot product
+    *output = 0.0f;
+    ggml_vec_dot_q5_0_q8_0(cols, output, sizeof(float),
+                           weight_q5_0, sizeof(block_q5_0),
+                           q8_data, sizeof(block_q8_0), 1);
+
+    delete[] q8_data;
+}
+
+/**
+ * Test Q8_0 GEMV - dot product of quantized weights and fp32 input
+ *
+ * @param weight_q8_0  Q8_0 quantized weights [cols]
+ * @param input_f32    FP32 input vector [cols]
+ * @param output       Output scalar [1]
+ * @param cols         Number of columns (must be multiple of QK8_0=32)
+ */
+void test_gemv_q8_0(const void * weight_q8_0,
+                    const float * input_f32,
+                    float * output,
+                    int cols) {
+    // Allocate Q8_0 buffer for quantized activations
+    int n_blocks = cols / QK8_0;
+    block_q8_0 * q8_data = new block_q8_0[n_blocks];
+
+    // Quantize input to Q8_0
+    quantize_row_q8_0_ref(input_f32, q8_data, cols);
+
+    // Compute dot product
+    *output = 0.0f;
+    ggml_vec_dot_q8_0_q8_0(cols, output, sizeof(float),
+                           weight_q8_0, sizeof(block_q8_0),
+                           q8_data, sizeof(block_q8_0), 1);
 
     delete[] q8_data;
 }
@@ -359,6 +427,15 @@ void test_softmax(const float * input, float * output, int n) {
 // ============================================================================
 
 /**
+ * Initialize test library (required by Python bindings)
+ * CRITICAL: Must call ggml_cpu_init() to initialize FP16-to-FP32 lookup tables
+ * Without this, all K-quant operations return 0 because the lookup table is empty!
+ */
+void test_init(void) {
+    ggml_cpu_init();
+}
+
+/**
  * Get Q4_K block size in bytes
  */
 int get_block_q4_k_size(void) {
@@ -380,10 +457,38 @@ int get_block_q8_k_size(void) {
 }
 
 /**
- * Get QK_K (elements per super-block)
+ * Get Q5_0 block size in bytes
+ */
+int get_block_q5_0_size(void) {
+    return sizeof(block_q5_0);
+}
+
+/**
+ * Get Q8_0 block size in bytes
+ */
+int get_block_q8_0_size(void) {
+    return sizeof(block_q8_0);
+}
+
+/**
+ * Get QK_K (elements per K-quant super-block = 256)
  */
 int get_qk_k(void) {
     return QK_K;
+}
+
+/**
+ * Get QK5_0 (elements per Q5_0 block = 32)
+ */
+int get_qk5_0(void) {
+    return QK5_0;
+}
+
+/**
+ * Get QK8_0 (elements per Q8_0 block = 32)
+ */
+int get_qk8_0(void) {
+    return QK8_0;
 }
 
 } // extern "C"

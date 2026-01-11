@@ -506,6 +506,38 @@ void ck_true_bpe_set_config(CKTrueBPE *bpe, const CKBPEConfig *config) {
     bpe->config = *config;
 }
 
+int ck_true_bpe_load_binary(CKTrueBPE *bpe,
+                            int vocab_size,
+                            const int32_t *offsets,
+                            const char *strings,
+                            int num_merges,
+                            const int32_t *merges) {
+    if (!bpe || !offsets || !strings || vocab_size <= 0) return -1;
+
+    for (int i = 0; i < vocab_size; i++) {
+        const char *token = strings + offsets[i];
+        if (ck_true_bpe_add_token(bpe, token, i, 0.0f) != 0) {
+            return -1;
+        }
+    }
+
+    if (merges && num_merges > 0) {
+        for (int i = 0; i < num_merges; i++) {
+            int32_t left = merges[i * 3 + 0];
+            int32_t right = merges[i * 3 + 1];
+            int32_t merged = merges[i * 3 + 2];
+            if (left < 0 || right < 0 || merged < 0) {
+                continue;
+            }
+            if (ck_true_bpe_add_merge(bpe, left, right, merged, i) != 0) {
+                return -1;
+            }
+        }
+    }
+
+    return 0;
+}
+
 int32_t ck_true_bpe_lookup(const CKTrueBPE *bpe, const char *token) {
     if (!bpe || !token) return -1;
 

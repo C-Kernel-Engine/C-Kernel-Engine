@@ -14,6 +14,7 @@ shopt -s nullglob  # Handle empty glob patterns
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Add parent scripts directory to Python path for imports
 export PYTHONPATH="$SCRIPT_DIR/../../scripts/v6:$PYTHONPATH"
@@ -148,6 +149,8 @@ done
 
 # Default cache directory
 CACHE_DIR="${CACHE_DIR:-$HOME/.cache/ck-engine-v6}"
+TOKENIZER_LIB="$PROJECT_ROOT/build/libckernel_tokenizer.so"
+TOKENIZER_LDFLAGS="-L$PROJECT_ROOT/build -lckernel_tokenizer -Wl,-rpath,$PROJECT_ROOT/build"
 
 # ============================================================================
 # Step 0: Download model if requested
@@ -419,8 +422,10 @@ log_info "Step 8: Linking final binary..."
 
 FINAL_BINARY="$SCRIPT_DIR/ck-engine-v6"
 
-# Get tokenizer object files
-TOKENIZER_OBJECTS=$(find $SCRIPT_DIR/src/tokenizer -name "*.o" 2>/dev/null | tr '\n' ' ')
+if [ ! -f "$TOKENIZER_LIB" ]; then
+    log_info "Tokenizer library missing; building libckernel_tokenizer.so..."
+    (cd "$PROJECT_ROOT" && make tokenizer)
+fi
 
 gcc $CFLAGS -fopenmp \
     "$INFER_OBJ" \
@@ -428,7 +433,7 @@ gcc $CFLAGS -fopenmp \
     "$PREFILL_OBJ" \
     $KERNEL_OBJECTS \
     $UTILITY_OBJECTS \
-    $TOKENIZER_OBJECTS \
+    $TOKENIZER_LDFLAGS \
     -lm -lpthread \
     -o "$FINAL_BINARY"
 

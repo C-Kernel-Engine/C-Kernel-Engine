@@ -65,6 +65,90 @@ def build_dtype_table(weight_names, q4k):
     return bytes(dtypes)
 
 
+def _extract_unk_token(data: dict) -> Optional[str]:
+    model = data.get("model", {})
+    unk_token = model.get("unk_token")
+    if isinstance(unk_token, dict):
+        unk_token = unk_token.get("content")
+    if not isinstance(unk_token, str) or not unk_token:
+        unk_token = data.get("unk_token")
+        if isinstance(unk_token, dict):
+            unk_token = unk_token.get("content")
+    return unk_token if isinstance(unk_token, str) and unk_token else None
+
+
+def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, list[int]]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    model = data.get("model", {})
+    vocab = model.get("vocab", {})
+    merges = model.get("merges", [])
+    if not isinstance(vocab, dict) or not vocab:
+        raise ValueError("tokenizer.json missing model.vocab")
+
+    tokens_by_id = [""] * vocab_size
+    max_id = -1
+    for token, idx in vocab.items():
+        if not isinstance(idx, int):
+            continue
+        if idx > max_id:
+            max_id = idx
+        if 0 <= idx < vocab_size:
+            tokens_by_id[idx] = token
+
+    missing_ids = [i for i, t in enumerate(tokens_by_id) if t == ""]
+    if max_id + 1 != vocab_size or missing_ids:
+        print(
+            f"[tokenizer] Warning: vocab_size={vocab_size}, "
+            f"max_id={max_id}, missing_ids={len(missing_ids)}"
+        )
+    if missing_ids:
+        unk_token = _extract_unk_token(data)
+        if unk_token:
+            for idx in missing_ids:
+                tokens_by_id[idx] = unk_token
+            fill_desc = f"'{unk_token}'"
+        else:
+            for idx in missing_ids:
+                tokens_by_id[idx] = f"<|ck_missing_{idx}|>"
+            fill_desc = "<|ck_missing_{id}|>"
+        print(f"[tokenizer] Repair: filled {len(missing_ids)} missing ids with {fill_desc}")
+
+    offsets: list[int] = []
+    strings_blob = bytearray()
+    for token in tokens_by_id:
+        offsets.append(len(strings_blob))
+        if token:
+            strings_blob.extend(token.encode("utf-8"))
+        strings_blob.append(0)
+
+    merges_data: list[int] = []
+    if isinstance(merges, list):
+        for entry in merges:
+            if isinstance(entry, str):
+                parts = entry.split()
+            elif isinstance(entry, (list, tuple)):
+                parts = list(entry)
+            else:
+                continue
+            if len(parts) != 2:
+                continue
+            left, right = parts[0], parts[1]
+            left_id = vocab.get(left)
+            right_id = vocab.get(right)
+            merged_id = vocab.get(left + right)
+            if not isinstance(left_id, int) or not isinstance(right_id, int) or not isinstance(merged_id, int):
+                continue
+            if left_id < 0 or right_id < 0 or merged_id < 0:
+                continue
+            if left_id >= vocab_size or right_id >= vocab_size or merged_id >= vocab_size:
+                continue
+            merges_data.extend([left_id, right_id, merged_id])
+
+    return offsets, bytes(strings_blob), merges_data
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert HF weights to bump v6 format")
     parser.add_argument("--checkpoint", required=True, help="HF model directory (local)")
@@ -76,6 +160,7 @@ def main():
         default="float32",
         help="Output dtype: float32 (default) or q4_k/q4_k_m (weights only; norms stay fp32)",
     )
+    parser.add_argument("--tokenizer-json", help="Tokenizer JSON (HuggingFace) to embed vocab + merges")
     parser.add_argument("--map-out", help="Optional JSON map of weight order/dtypes")
     parser.add_argument("--manifest-out", help="Optional JSON manifest with file offsets/sizes")
     args = parser.parse_args()
@@ -104,6 +189,19 @@ def main():
 
     if not all([num_layers, embed_dim, intermediate, num_heads, vocab_size, context_len]):
         raise SystemExit("Config missing required fields for conversion")
+
+    vocab_offsets = None
+    vocab_strings = None
+    vocab_merges = None
+    num_merges = 0
+    total_vocab_bytes = 0
+    if args.tokenizer_json:
+        if not os.path.exists(args.tokenizer_json):
+            raise SystemExit(f"tokenizer.json not found: {args.tokenizer_json}")
+        vocab_offsets, vocab_strings, vocab_merges = load_tokenizer_json(args.tokenizer_json, vocab_size)
+        num_merges = len(vocab_merges) // 3
+        total_vocab_bytes = len(vocab_strings)
+        print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes")
 
     head_dim = embed_dim // num_heads
     qk_align_bytes = 256 * FLOAT_SIZE
@@ -194,6 +292,24 @@ def main():
             write_matrix_padded_f32(w, tok, vocab_size, embed_dim, aligned_embed_dim)
             dtype_name = "fp32"
         record_entry("token_emb", dtype_name, start, w.bytes_written - start)
+
+        if vocab_offsets is not None and vocab_strings is not None and vocab_merges is not None:
+            offsets_bytes = struct.pack(f"<{len(vocab_offsets)}i", *vocab_offsets)
+            start = w.bytes_written
+            w.write(offsets_bytes)
+            record_entry("vocab_offsets", "i32", start, w.bytes_written - start)
+
+            start = w.bytes_written
+            w.write(vocab_strings)
+            record_entry("vocab_strings", "u8", start, w.bytes_written - start)
+
+            merges_bytes = b""
+            if vocab_merges:
+                merges_bytes = struct.pack(f"<{len(vocab_merges)}i", *vocab_merges)
+            start = w.bytes_written
+            if merges_bytes:
+                w.write(merges_bytes)
+            record_entry("vocab_merges", "i32", start, w.bytes_written - start)
 
         for layer in range(num_layers):
             prefix = f"model.layers.{layer}"
@@ -330,6 +446,8 @@ def main():
                 {
                     "format": "ck-bumpwgt4-manifest-v1",
                     "weights_path": args.output,
+                    "num_merges": num_merges,
+                    "total_vocab_bytes": total_vocab_bytes,
                     "entries": manifest_entries,
                 },
                 mf,
@@ -343,6 +461,8 @@ def main():
         )
     else:
         print(f"Wrote {args.output} ({mb:.2f} MB, fp32, ctx={context_len}, heads={num_heads}, kv={num_kv_heads})")
+    if not args.tokenizer_json:
+        print("[tokenizer] Warning: vocab/merges not embedded (pass --tokenizer-json)")
 
 
 if __name__ == "__main__":

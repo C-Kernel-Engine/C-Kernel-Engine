@@ -96,6 +96,34 @@ void ck_test_gemv_q6_k(const void *weight_q6k,
                        float *output,
                        int cols);
 
+/**
+ * @brief Q5_0 GEMV - matrix-vector multiply with Q5_0 weights
+ *
+ * @param weight_q5_0 Q5_0 quantized weights [rows * cols]
+ * @param input_f32 FP32 input vector [cols]
+ * @param output FP32 output vector [rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ */
+void ck_test_gemv_q5_0(const void *weight_q5_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols);
+
+/**
+ * @brief Q8_0 GEMV - matrix-vector multiply with Q8_0 weights
+ *
+ * @param weight_q8_0 Q8_0 quantized weights [rows * cols]
+ * @param input_f32 FP32 input vector [cols]
+ * @param output FP32 output vector [rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ */
+void ck_test_gemv_q8_0(const void *weight_q8_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols);
+
 /* ============================================================================
  * GEMM (Matrix-Matrix) Tests
  * ============================================================================ */

@@ -313,7 +313,11 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
     return gguf_path
 
 
-def step_convert_hf(model_dir: Path, output_dir: Path, weight_dtype: str = "float32", force: bool = False) -> Path:
+def step_convert_hf(model_dir: Path,
+                    output_dir: Path,
+                    weight_dtype: str = "float32",
+                    force: bool = False,
+                    tokenizer_json: Optional[Path] = None) -> Path:
     """Convert HF safetensors to bump format."""
     log_step(2, f"Converting weights to bump format ({weight_dtype})")
 
@@ -334,6 +338,8 @@ def step_convert_hf(model_dir: Path, output_dir: Path, weight_dtype: str = "floa
         f"--dtype={weight_dtype}",
         f"--manifest-out={manifest_path}",
     ]
+    if tokenizer_json and tokenizer_json.exists():
+        cmd.append(f"--tokenizer-json={tokenizer_json}")
 
     run_cmd(cmd)
     log(f"  Created {weights_path}", C_GREEN)
@@ -362,7 +368,11 @@ def validate_gguf_kernel_coverage(gguf_path: Path) -> bool:
     return True
 
 
-def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False, validate: bool = True) -> tuple[Path, Path]:
+def step_convert_gguf(gguf_path: Path,
+                      output_dir: Path,
+                      force: bool = False,
+                      validate: bool = True,
+                      tokenizer_json: Optional[Path] = None) -> tuple[Path, Path]:
     """Convert GGUF to bump format."""
     log_step(2, f"Converting GGUF to bump format")
 
@@ -393,6 +403,8 @@ def step_convert_gguf(gguf_path: Path, output_dir: Path, force: bool = False, va
         f"--config-out={config_path}",
         f"--manifest-out={manifest_path}",
     ]
+    if tokenizer_json and tokenizer_json.exists():
+        cmd.append(f"--tokenizer-json={tokenizer_json}")
 
     run_cmd(cmd)
     log(f"  Created {weights_path}", C_GREEN)
@@ -1041,6 +1053,56 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
     os.execvp(sys.executable, cmd)
 
 
+def step_run_c_cli_smoke(lib_path: Path, weights_path: Path, prompt: str, max_tokens: int):
+    """Run native v6 CLI once to validate true-BPE end-to-end."""
+    log(f"{C_ORANGE}[smoke]{C_RESET} Running native v6 CLI (true-BPE)")
+
+    cli_path = PROJECT_ROOT / "build" / "ck-cli-v6"
+    if not cli_path.exists():
+        run_cmd(["make", "ck-cli-v6"], cwd=PROJECT_ROOT)
+
+    env = os.environ.copy()
+    ld_path = str(PROJECT_ROOT / "build")
+    env["LD_LIBRARY_PATH"] = f"{ld_path}:{env.get('LD_LIBRARY_PATH', '')}"
+
+    cmd = [
+        str(cli_path),
+        str(lib_path),
+        str(weights_path),
+        "--prompt",
+        prompt,
+        "--max-tokens",
+        str(max_tokens),
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            env=env,
+            input="",
+            text=True,
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as e:
+        log_error("Native v6 CLI smoke test timed out")
+        if e.stdout:
+            print(e.stdout)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
+        sys.exit(1)
+
+    if result.returncode != 0:
+        log_error("Native v6 CLI smoke test failed")
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        sys.exit(1)
+
+    log(f"  {C_GREEN}Native v6 CLI smoke test: OK{C_RESET}", C_DIM)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1092,12 +1154,14 @@ def run_pipeline(args: argparse.Namespace):
                 )
                 if args.inspect_only:
                     return
+            ensure_tokenizer_files(model_id, work_dir)
+            tokenizer_json = work_dir / "tokenizer.json"
             weights_path, config_path = step_convert_gguf(
                 gguf_path, work_dir,
-                force=args.force_convert
+                force=args.force_convert,
+                tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
             )
             manifest_path = work_dir / "weights_manifest.json"
-            ensure_tokenizer_files(model_id, work_dir)
         else:
             # Standard HF repo with safetensors
             config_path = model_dir / "config.json"
@@ -1110,7 +1174,8 @@ def run_pipeline(args: argparse.Namespace):
             weights_path = step_convert_hf(
                 model_dir, work_dir,
                 weight_dtype=args.weight_dtype or "float32",
-                force=args.force_convert
+                force=args.force_convert,
+                tokenizer_json=(model_dir / "tokenizer.json") if (model_dir / "tokenizer.json").exists() else None
             )
             manifest_path = work_dir / "weights_manifest.json"
 
@@ -1124,9 +1189,13 @@ def run_pipeline(args: argparse.Namespace):
             )
             if args.inspect_only:
                 return
+        tokenizer_json = gguf_path.parent / "tokenizer.json"
+        if not tokenizer_json.exists():
+            tokenizer_json = work_dir / "tokenizer.json"
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
-            force=args.force_convert
+            force=args.force_convert,
+            tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
         )
         manifest_path = work_dir / "weights_manifest.json"
         # Local GGUF has no repo to fetch tokenizer; user must supply it.
@@ -1146,7 +1215,8 @@ def run_pipeline(args: argparse.Namespace):
         weights_path = step_convert_hf(
             model_dir, work_dir,
             weight_dtype=args.weight_dtype or "float32",
-            force=args.force_convert
+            force=args.force_convert,
+            tokenizer_json=(model_dir / "tokenizer.json") if (model_dir / "tokenizer.json").exists() else None
         )
         manifest_path = work_dir / "weights_manifest.json"
 
@@ -1176,12 +1246,14 @@ def run_pipeline(args: argparse.Namespace):
             )
             if args.inspect_only:
                 return
+        ensure_tokenizer_files(repo_id, work_dir)
+        tokenizer_json = work_dir / "tokenizer.json"
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
-            force=args.force_convert
+            force=args.force_convert,
+            tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
         )
         manifest_path = work_dir / "weights_manifest.json"
-        ensure_tokenizer_files(repo_id, work_dir)
 
     else:
         log_error(f"Unknown input type: {input_type}")
@@ -1196,21 +1268,43 @@ def run_pipeline(args: argparse.Namespace):
     force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
     manifest_for_dtype = None
     
-    # Vocabulary metadata
+    # Vocabulary metadata (prefer non-zero values from config/manifest)
     num_merges = 0
     total_vocab_bytes = 0
+    cfg_data = None
+
+    if config_path and config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                cfg_data = json.load(f)
+            num_merges = int(cfg_data.get("num_merges") or 0)
+            total_vocab_bytes = int(cfg_data.get("total_vocab_bytes") or 0)
+        except Exception:
+            cfg_data = None
+
+    def _maybe_update_vocab_meta(path: Optional[Path]) -> None:
+        nonlocal num_merges, total_vocab_bytes
+        if not path or not path.exists():
+            return
+        try:
+            with open(path, "r") as f:
+                mdata = json.load(f)
+            m_merges = int(mdata.get("num_merges") or 0)
+            m_bytes = int(mdata.get("total_vocab_bytes") or 0)
+            if m_merges > 0:
+                num_merges = m_merges
+            if m_bytes > 0:
+                total_vocab_bytes = m_bytes
+        except Exception:
+            return
 
     if manifest_path and manifest_path.exists():
         manifest_for_dtype = manifest_path
-        try:
-            with open(manifest_path, "r") as f:
-                mdata = json.load(f)
-                num_merges = mdata.get("num_merges", 0)
-                total_vocab_bytes = mdata.get("total_vocab_bytes", 0)
-        except Exception:
-            pass
+        _maybe_update_vocab_meta(manifest_path)
+        _maybe_update_vocab_meta(manifest_input_path)
     elif manifest_input_path and manifest_input_path.exists():
         manifest_for_dtype = manifest_input_path
+        _maybe_update_vocab_meta(manifest_input_path)
 
     # Inject metadata into config.json for build_ir_v6
     if config_path.exists():
@@ -1289,6 +1383,14 @@ def run_pipeline(args: argparse.Namespace):
         log(f"  Library: {lib_path}")
     else:
         print()
+        if getattr(args, "c_cli_smoke", False):
+            weights_bump = Path(weights_path) if weights_path else (work_dir / "weights.bump")
+            if not weights_bump.exists():
+                log_error(f"weights.bump not found at {weights_bump}")
+                sys.exit(1)
+            prompt = getattr(args, "c_cli_prompt", None) or "Hello"
+            max_tokens = int(getattr(args, "c_cli_max_tokens", 16) or 16)
+            step_run_c_cli_smoke(lib_path, weights_bump, prompt, max_tokens)
         step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
 
 
@@ -1515,6 +1617,12 @@ Examples:
                            help='Save intermediate buffers for parity comparison with PyTorch')
     run_parser.add_argument('--codegen', choices=['v4', 'v6'], default='v6',
                            help='Codegen version: v6=explicit unrolled (default), v4=loop-based (legacy)')
+    run_parser.add_argument('--c-cli-smoke', action='store_true',
+                           help='Run native v6 CLI once (true-BPE smoke test)')
+    run_parser.add_argument('--c-cli-prompt', default='Hello',
+                           help='Prompt for native v6 CLI smoke test (default: Hello)')
+    run_parser.add_argument('--c-cli-max-tokens', type=int, default=16,
+                           help='Max tokens for native v6 CLI smoke test (default: 16)')
 
     # Interactive command (also default when no command given)
     interactive_parser = subparsers.add_parser('interactive', aliases=['i'],

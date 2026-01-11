@@ -625,6 +625,17 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
                                                    int head_dim,
                                                    int aligned_head_dim);
 
+void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
+                                                           const float *k,
+                                                           const float *v,
+                                                           float *output,
+                                                           int num_heads,
+                                                           int num_kv_heads,
+                                                           int num_tokens,
+                                                           int head_dim,
+                                                           int aligned_head_dim,
+                                                           int kv_stride_tokens);
+
 // Decode attention for a single token using a KV cache (flash-style).
 //   q_token: [num_heads, aligned_head_dim]
 //   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]
@@ -1067,6 +1078,16 @@ void rope_backward_inplace(float *d_x,
                            int aligned_head_dim,
                            int pos_offset);
 
+void rope_forward_strided(float *x,
+                          const float *cos_cache,
+                          const float *sin_cache,
+                          int num_heads,
+                          int num_tokens,
+                          int head_dim,
+                          int aligned_head_dim,
+                          int pos_offset,
+                          int head_stride_tokens);
+
 // Combined RoPE for Q and K.
 	void rope_forward_qk(float *q,
 	                     float *k,
@@ -1078,6 +1099,19 @@ void rope_backward_inplace(float *d_x,
                      int head_dim,
                      int aligned_head_dim,
                      int pos_offset);
+
+	void rope_forward_qk_strided(float *q,
+	                             float *k,
+	                             const float *cos_cache,
+	                             const float *sin_cache,
+	                             int num_heads,
+	                             int num_kv_heads,
+	                             int num_tokens,
+	                             int head_dim,
+	                             int aligned_head_dim,
+	                             int pos_offset,
+	                             int q_stride_tokens,
+	                             int k_stride_tokens);
 
 	void rope_backward_qk(const float *d_q_out,
 	                      const float *d_k_out,

@@ -26,6 +26,10 @@ extern void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int
 extern void gemm_nt_q4_k_q8_k(const void *A_q8, const void *B, const float *bias,
                               float *C, int M, int N, int K);
 
+/* Q5_0 and Q8_0 GEMV kernels (from gemm_kernels_q5_0.c, gemm_kernels_q8_0.c) */
+extern void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
+extern void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
+
 /* RMSNorm kernel (from rmsnorm_kernels.c) */
 extern void rmsnorm_forward(const float *input, const float *gamma,
                             float *output, float *rstd_cache,
@@ -119,6 +123,24 @@ void ck_test_gemv_q6_k(const void *weight_q6k,
     *output = (float)sum;
 
     free(weight_f32);
+}
+
+void ck_test_gemv_q5_0(const void *weight_q5_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols)
+{
+    /* Call the Q5_0 GEMV kernel directly */
+    gemv_q5_0(output, weight_q5_0, input_f32, rows, cols);
+}
+
+void ck_test_gemv_q8_0(const void *weight_q8_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols)
+{
+    /* Call the Q8_0 GEMV kernel directly */
+    gemv_q8_0(output, weight_q8_0, input_f32, rows, cols);
 }
 
 /* ============================================================================

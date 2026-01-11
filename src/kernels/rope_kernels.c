@@ -170,6 +170,25 @@ void rope_forward(float *x,
     }
 }
 
+void rope_forward_strided(float *x,
+                          const float *cos_cache,
+                          const float *sin_cache,
+                          int num_heads,
+                          int num_tokens,
+                          int head_dim,
+                          int aligned_head_dim,
+                          int pos_offset,
+                          int head_stride_tokens)
+{
+    size_t head_stride = (size_t)head_stride_tokens * (size_t)aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        rope_apply_head(x + h * head_stride,
+                        cos_cache, sin_cache,
+                        num_tokens, head_dim, aligned_head_dim, pos_offset);
+    }
+}
+
 // RoPE backward: inverse rotation (rotate by -θ).
 // Since cos(-θ) = cos(θ) and sin(-θ) = -sin(θ), the inverse is:
 //   d_x[2i]   =  d_x'[2i] * cos(θ) + d_x'[2i+1] * sin(θ)
@@ -385,6 +404,23 @@ void rope_forward_qk(float *q,
 {
     rope_forward(q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
     rope_forward(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
+}
+
+void rope_forward_qk_strided(float *q,
+                             float *k,
+                             const float *cos_cache,
+                             const float *sin_cache,
+                             int num_heads,
+                             int num_kv_heads,
+                             int num_tokens,
+                             int head_dim,
+                             int aligned_head_dim,
+                             int pos_offset,
+                             int q_stride_tokens,
+                             int k_stride_tokens)
+{
+    rope_forward_strided(q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, q_stride_tokens);
+    rope_forward_strided(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, k_stride_tokens);
 }
 
 // Combined RoPE backward for both d_q and d_k.

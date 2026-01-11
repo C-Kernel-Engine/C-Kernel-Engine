@@ -2605,6 +2605,13 @@ def main(argv: List[str]) -> int:
                 raise FileNotFoundError(f"Config file not found: {config_path}")
         print(f"[CONFIG] Reading local: {config_path}")
         config = v3.parse_config(config_path)
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                raw_config = json.load(f)
+            config["num_merges"] = int(raw_config.get("num_merges", config.get("num_merges", 0)) or 0)
+            config["total_vocab_bytes"] = int(raw_config.get("total_vocab_bytes", config.get("total_vocab_bytes", 0)) or 0)
+        except Exception:
+            pass
         model_name = args["name"] or config.get("model_type", "model")
     else:
         model_id = v3.parse_hf_model_id(args["model"])

@@ -24,6 +24,8 @@ KERNELS_ONLY=false
 SKIP_BUILD=false
 FORCE_REBUILD=false
 VERBOSE=false
+PERF_MODE=false
+PERF_LARGE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -48,12 +50,23 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --perf)
+            PERF_MODE=true
+            shift
+            ;;
+        --perf-large)
+            PERF_MODE=true
+            PERF_LARGE=true
+            shift
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --quick         Run quick kernel tests only (~30s)"
             echo "  --kernels       Run kernel-level tests only (no full model)"
+            echo "  --perf          Run performance benchmarks (CK vs llama.cpp)"
+            echo "  --perf-large    Run performance benchmarks with 7B model dimensions"
             echo "  --skip-build    Skip llama.cpp build step"
             echo "  --force-rebuild Force rebuild of llama.cpp (clean build)"
             echo "  --verbose       Verbose output"
@@ -290,6 +303,63 @@ else
         }
     else
         log_warn "No kernel tests available"
+        incr_skipped
+    fi
+fi
+
+# Step 3b: Comprehensive GEMV kernel tests (Q4_K, Q5_0, Q8_0)
+log_step "[3b/5] Running comprehensive GEMV kernel tests..."
+GEMV_TEST="$ROOT_DIR/unittest/test_gemv_kernels_comprehensive.py"
+if [ -f "$GEMV_TEST" ]; then
+    set +e
+    if [ "$QUICK_MODE" = true ]; then
+        python3 "$GEMV_TEST" --quick
+        RET=$?
+    elif [ "$PERF_LARGE" = true ]; then
+        python3 "$GEMV_TEST" --large
+        RET=$?
+    else
+        python3 "$GEMV_TEST"
+        RET=$?
+    fi
+    set -e
+
+    if [ $RET -eq 0 ]; then
+        log_success "Comprehensive GEMV tests passed"
+        incr_passed
+    else
+        log_error "Comprehensive GEMV tests failed"
+        incr_failed
+    fi
+else
+    log_warn "Comprehensive GEMV test not found: $GEMV_TEST"
+    incr_skipped
+fi
+
+# Step 3c: Performance benchmarks (if --perf specified)
+if [ "$PERF_MODE" = true ]; then
+    log_step "[3c/5] Running performance benchmarks..."
+
+    if [ -f "$KERNEL_TEST" ]; then
+        set +e
+        if [ "$PERF_LARGE" = true ]; then
+            python3 "$KERNEL_TEST" --perf-large
+            RET=$?
+        else
+            python3 "$KERNEL_TEST" --perf
+            RET=$?
+        fi
+        set -e
+
+        if [ $RET -eq 0 ]; then
+            log_success "Performance benchmarks completed"
+            incr_passed
+        else
+            log_error "Performance benchmarks failed"
+            incr_failed
+        fi
+    else
+        log_warn "Kernel test script not found, skipping performance benchmarks"
         incr_skipped
     fi
 fi

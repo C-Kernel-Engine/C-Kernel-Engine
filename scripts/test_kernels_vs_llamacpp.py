@@ -23,6 +23,7 @@ import numpy as np
 import argparse
 import struct
 import sys
+import time
 from pathlib import Path
 
 # ANSI colors
@@ -493,9 +494,20 @@ class KernelTester:
 
     def run_all(self, quick=False):
         """Run all kernel tests."""
-        print("=" * 70)
+        print("=" * 80)
         print(f"{BOLD}KERNEL PARITY TESTS: C-Kernel-Engine vs llama.cpp/ggml{RESET}")
-        print("=" * 70)
+        print("=" * 80)
+        print(f"""
+{YELLOW}Purpose:{RESET}  Verify CK kernels produce identical outputs to llama.cpp/ggml
+{YELLOW}Method:{RESET}   Run both implementations with same inputs, compare outputs
+{YELLOW}Tolerance:{RESET} max_diff < {self.tol:.0e} for all elements
+
+{YELLOW}Kernels Tested:{RESET}
+  - Dequantization: Q4_K, Q4_0 (convert quantized weights to FP32)
+  - GEMV:          Q4_K matrix-vector multiply (decode path)
+  - GEMM:          Q4_K matrix-matrix multiply (prefill path)
+  - Activations:   RMSNorm, RoPE, SwiGLU, Softmax
+""")
 
         # Dequantization kernels
         self.test_dequant_q4k(256)
@@ -558,6 +570,194 @@ class KernelTester:
             print(f"\n{GREEN}All kernels match llama.cpp/ggml!{RESET}")
             return True
 
+    def benchmark_gemv_q4k(self, rows: int, cols: int, warmup: int = 5, iters: int = 50):
+        """Benchmark Q4_K GEMV performance for both CK and llama.cpp."""
+        if not self.libggml or not self.libck:
+            return None, None
+
+        # Generate test data
+        q4k_weights = random_q4k_weights(rows * cols)
+        input_f32 = np.random.randn(cols).astype(np.float32)
+
+        ggml_out = np.zeros(rows, dtype=np.float32)
+        ck_out = np.zeros(rows, dtype=np.float32)
+
+        # Warmup llama.cpp
+        for _ in range(warmup):
+            self.libggml.test_gemv_q4_k(q4k_weights,
+                                         input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         cols)
+
+        # Time llama.cpp
+        t0 = time.perf_counter()
+        for _ in range(iters):
+            self.libggml.test_gemv_q4_k(q4k_weights,
+                                         input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         cols)
+        t1 = time.perf_counter()
+        ggml_time_ms = (t1 - t0) / iters * 1000
+
+        # Warmup CK
+        for _ in range(warmup):
+            self.libck.ck_test_gemv_q4_k(q4k_weights,
+                                          input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          cols)
+
+        # Time CK
+        t0 = time.perf_counter()
+        for _ in range(iters):
+            self.libck.ck_test_gemv_q4_k(q4k_weights,
+                                          input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          cols)
+        t1 = time.perf_counter()
+        ck_time_ms = (t1 - t0) / iters * 1000
+
+        return ggml_time_ms, ck_time_ms
+
+    def benchmark_gemm_q4k(self, rows: int, cols: int, tokens: int, warmup: int = 5, iters: int = 50):
+        """Benchmark Q4_K GEMM performance for both CK and llama.cpp."""
+        if not self.libggml or not self.libck:
+            return None, None
+
+        q4k_weights = random_q4k_weights(rows * cols)
+        input_f32 = np.random.randn(tokens, cols).astype(np.float32)
+
+        ggml_out = np.zeros((tokens, rows), dtype=np.float32)
+        ck_out = np.zeros((tokens, rows), dtype=np.float32)
+
+        # Warmup llama.cpp
+        for _ in range(warmup):
+            self.libggml.test_gemm_q4_k(q4k_weights,
+                                         input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         rows, cols, tokens)
+
+        # Time llama.cpp
+        t0 = time.perf_counter()
+        for _ in range(iters):
+            self.libggml.test_gemm_q4_k(q4k_weights,
+                                         input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                         rows, cols, tokens)
+        t1 = time.perf_counter()
+        ggml_time_ms = (t1 - t0) / iters * 1000
+
+        # Warmup CK
+        for _ in range(warmup):
+            self.libck.ck_test_gemm_q4_k(q4k_weights,
+                                          input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          rows, cols, tokens)
+
+        # Time CK
+        t0 = time.perf_counter()
+        for _ in range(iters):
+            self.libck.ck_test_gemm_q4_k(q4k_weights,
+                                          input_f32.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                          rows, cols, tokens)
+        t1 = time.perf_counter()
+        ck_time_ms = (t1 - t0) / iters * 1000
+
+        return ggml_time_ms, ck_time_ms
+
+    def run_performance_benchmarks(self, large=False):
+        """Run performance benchmarks comparing CK vs llama.cpp."""
+        print("\n" + "=" * 80)
+        print(f"{BOLD}KERNEL PERFORMANCE BENCHMARKS: C-Kernel-Engine vs llama.cpp{RESET}")
+        print("=" * 80)
+
+        if not self.libggml or not self.libck:
+            print(f"{YELLOW}[SKIP] Libraries not available for performance testing{RESET}")
+            return
+
+        # Test configurations based on model sizes
+        # Note: Q4_K block size is QK_K=256, so dimensions must be multiples of 256
+        if large:
+            # 7B model dimensions (rounded to 256 for Q4_K alignment)
+            # Original LLaMA 7B: hidden=4096, ff=11008
+            # Rounded: ff=11264 (44x256)
+            configs = [
+                ("GEMV qkv_proj_7b", 4096, 4096, 1),
+                ("GEMV mlp_up_7b", 11264, 4096, 1),
+                ("GEMV mlp_down_7b", 4096, 11264, 1),
+                ("GEMV embed_7b", 32000, 4096, 1),
+                ("GEMM prefill_7b", 4096, 4096, 128),
+            ]
+        else:
+            # 0.5B model dimensions (rounded to 256 for Q4_K alignment)
+            # Original Qwen 0.5B: hidden=896, ff=4864
+            # Rounded for Q4_K: hidden=768 (3x256), ff=4864 (19x256)
+            configs = [
+                ("GEMV qkv_proj", 768, 768, 1),
+                ("GEMV mlp_up", 4864, 768, 1),
+                ("GEMV mlp_down", 768, 4864, 1),
+                ("GEMM prefill", 768, 768, 64),
+                ("GEMM large_prefill", 4864, 768, 64),
+            ]
+
+        print(f"\n{'Config':<25} {'M':>8} {'K':>8} {'T':>4} {'llama.cpp':>12} {'CK':>12} {'Speedup':>10} {'CK GFLOPS':>12}")
+        print("-" * 95)
+
+        perf_results = []
+        for name, rows, cols, tokens in configs:
+            if tokens == 1:
+                ggml_ms, ck_ms = self.benchmark_gemv_q4k(rows, cols)
+            else:
+                ggml_ms, ck_ms = self.benchmark_gemm_q4k(rows, cols, tokens)
+
+            if ggml_ms is None or ck_ms is None:
+                print(f"{name:<25} {'SKIP':>8}")
+                continue
+
+            # Calculate GFLOPS: 2*M*K*T FLOPs (multiply-add)
+            flops = 2.0 * rows * cols * tokens
+            ck_gflops = (flops / 1e9) / (ck_ms / 1000)
+            ggml_gflops = (flops / 1e9) / (ggml_ms / 1000)
+
+            speedup = ggml_ms / ck_ms if ck_ms > 0 else 0
+            speedup_str = f"{speedup:.2f}x" if speedup >= 1.0 else f"{speedup:.2f}x"
+            color = GREEN if speedup >= 0.9 else (YELLOW if speedup >= 0.5 else RED)
+
+            print(f"{name:<25} {rows:>8} {cols:>8} {tokens:>4} {ggml_ms:>10.3f}ms {ck_ms:>10.3f}ms {color}{speedup_str:>10}{RESET} {ck_gflops:>10.2f}")
+            perf_results.append((name, rows, cols, tokens, ggml_ms, ck_ms, speedup, ck_gflops))
+
+        print("-" * 95)
+
+        # Calculate average speedup and GFLOPS
+        if perf_results:
+            avg_speedup = sum(r[6] for r in perf_results) / len(perf_results)
+            avg_gflops = sum(r[7] for r in perf_results) / len(perf_results)
+            avg_ggml_gflops = sum((2.0 * r[1] * r[2] * r[3] / 1e9) / (r[4] / 1000) for r in perf_results) / len(perf_results)
+
+            print(f"\n{'Average Speedup (CK/llama.cpp):':<35} {avg_speedup:.2f}x")
+            print(f"{'Average CK GFLOPS:':<35} {avg_gflops:.2f}")
+            print(f"{'Average llama.cpp GFLOPS:':<35} {avg_ggml_gflops:.2f}")
+
+            # Estimate decode throughput for Qwen 0.5B
+            if not large:
+                # 324 Q5_0 GEMVs + 36 Q4_K GEMVs per token
+                # Use mlp_down (896x4864) as representative GEMV time
+                gemv_time_ms = next((r[5] for r in perf_results if "mlp_down" in r[0] and r[3] == 1), None)
+                if gemv_time_ms:
+                    gemv_per_token = 324 + 36  # approximate
+                    ms_per_token = gemv_time_ms * gemv_per_token
+                    tok_per_s = 1000.0 / ms_per_token
+
+                    print(f"\n{'='*60}")
+                    print(f"{BOLD}DECODE THROUGHPUT ESTIMATE (Qwen 0.5B){RESET}")
+                    print(f"{'='*60}")
+                    print(f"  Representative GEMV time:   {gemv_time_ms:.3f} ms")
+                    print(f"  GEMVs per token:            ~{gemv_per_token}")
+                    print(f"  Estimated CK decode:        {tok_per_s:.2f} tok/s")
+                    print(f"  llama.cpp reference:        ~35 tok/s")
+                    print(f"  Gap:                        {35.0 / tok_per_s:.1f}x")
+                    print(f"{'='*60}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Kernel-level parity tests: CK vs llama.cpp")
@@ -565,6 +765,8 @@ def main():
     parser.add_argument("--quick", action="store_true", help="Run quick tests only")
     parser.add_argument("--kernel", type=str, help="Test specific kernel")
     parser.add_argument("--tol", type=float, default=1e-3, help="Tolerance (default: 1e-3)")
+    parser.add_argument("--perf", action="store_true", help="Run performance benchmarks")
+    parser.add_argument("--perf-large", action="store_true", help="Run performance benchmarks with 7B dimensions")
     args = parser.parse_args()
 
     libggml, libck = load_libraries()
@@ -587,7 +789,11 @@ def main():
 
     tester = KernelTester(libggml, libck, tol=args.tol)
 
-    if args.kernel:
+    if args.perf or args.perf_large:
+        # Run performance benchmarks
+        tester.run_performance_benchmarks(large=args.perf_large)
+        sys.exit(0)
+    elif args.kernel:
         # Run specific test
         test_method = f"test_{args.kernel}"
         if hasattr(tester, test_method):

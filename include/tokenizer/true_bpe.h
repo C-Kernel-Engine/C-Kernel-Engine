@@ -154,6 +154,24 @@ CK_TRUE_BPE_API void ck_true_bpe_set_special_ids(CKTrueBPE *bpe,
  */
 CK_TRUE_BPE_API void ck_true_bpe_set_config(CKTrueBPE *bpe, const CKBPEConfig *config);
 
+/**
+ * Load vocabulary + merges from binary buffers.
+ *
+ * @param bpe         Tokenizer
+ * @param vocab_size  Number of tokens
+ * @param offsets     Offsets array (length vocab_size)
+ * @param strings     Null-terminated token strings blob
+ * @param num_merges  Number of merge rules
+ * @param merges      Merge triples [left_id, right_id, merged_id] (length num_merges*3)
+ * @return            0 on success, -1 on error
+ */
+CK_TRUE_BPE_API int ck_true_bpe_load_binary(CKTrueBPE *bpe,
+                                            int vocab_size,
+                                            const int32_t *offsets,
+                                            const char *strings,
+                                            int num_merges,
+                                            const int32_t *merges);
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  * Token Lookup
  * ═══════════════════════════════════════════════════════════════════════════════ */

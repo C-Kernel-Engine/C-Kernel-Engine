@@ -328,7 +328,150 @@ make test-kernels
 
 ---
 
+## Critical: ggml Initialization Requirement
+
+### The Problem
+
+When calling ggml kernel functions directly (e.g., `ggml_vec_dot_q4_K_q8_K()`) from our
+test library, they may return **0.0** even though the inputs are valid.
+
+### Root Cause: Uninitialized FP16→FP32 Lookup Table
+
+The K-quant formats (Q4_K, Q6_K, Q8_K) store scale factors as **FP16 (half-precision)**
+to save memory. To use these values, ggml must convert them to FP32.
+
+On x86 CPUs without F16C instruction support, ggml uses a **256KB lookup table** for
+fast FP16→FP32 conversion:
+
+```c
+// llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c:77
+float ggml_table_f32_f16[1 << 16];  // 65536 entries × 4 bytes = 256KB
+```
+
+The conversion function simply looks up the FP16 bit pattern:
+
+```c
+// llama.cpp/ggml/src/ggml-cpu/simd-mappings.h:123
+inline static float ggml_lookup_fp16_to_fp32(ggml_fp16_t f) {
+    uint16_t s;
+    memcpy(&s, &f, sizeof(uint16_t));
+    return ggml_table_f32_f16[s];  // Returns 0 if table not initialized!
+}
+```
+
+### The Initialization Requirement
+
+This table is populated by `ggml_cpu_init()`:
+
+```c
+// llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c:3687
+for (int i = 0; i < 65536; i++) {
+    ggml_table_f32_f16[i] = GGML_COMPUTE_FP16_TO_FP32(u.fp16);
+}
+```
+
+**When you use ggml through normal llama.cpp APIs**, this gets called automatically:
+- `ggml_backend_cpu_init()` calls `ggml_cpu_init()`
+- `ggml_graph_compute()` calls `ggml_cpu_init()`
+- Loading a model triggers initialization
+
+**But we bypass all of that** by calling the low-level kernel functions directly.
+
+### The Chain of Failure
+
+```
+test_gemv_q4_k()
+  └─> ggml_vec_dot_q4_K_q8_K()
+        └─> GGML_CPU_FP16_TO_FP32(x[i].d)  // Convert Q4_K block's 'd' scale
+              └─> ggml_lookup_fp16_to_fp32(0x3C00)  // 0x3C00 = 1.0 in FP16
+                    └─> ggml_table_f32_f16[0x3C00]  // Returns 0.0 (uninitialized!)
+                          └─> d = 0.0
+                                └─> All products scaled by 0 = 0
+```
+
+### The Fix
+
+In `test-kernel-parity.cpp`, the `test_init()` function MUST call `ggml_cpu_init()`:
+
+```cpp
+// patches/test-kernel-parity.cpp
+#include "ggml-cpu.h"  // Required for ggml_cpu_init()
+
+void test_init(void) {
+    ggml_cpu_init();   // Initialize the FP16→FP32 lookup tables!
+}
+```
+
+### Lesson Learned
+
+> **CRITICAL:** When using ggml kernel functions directly (bypassing the normal
+> graph/backend APIs), you MUST call `ggml_cpu_init()` first.
+
+This applies to:
+- Parity testing against ggml
+- Benchmarking individual kernels
+- Any direct kernel calls outside ggml's compute graph
+
+### Symptoms of Missing Initialization
+
+| Symptom | Cause |
+|---------|-------|
+| K-quant vec_dot returns 0.0 | FP16 scale factor converts to 0.0 |
+| Q4_K/Q6_K GEMV returns 0 | Block `d` values are all zero |
+| Quantization seems to work but dot products fail | Quantize uses FP32 `d`, but vec_dot reads FP16 `d` |
+
+---
+
+## Q5_0/Q8_0 Kernel Design Difference
+
+### CK vs llama.cpp Approach
+
+| Aspect | CK `gemv_q5_0` | llama.cpp `ggml_vec_dot_q5_0_q8_0` |
+|--------|----------------|-----------------------------------|
+| Input | **FP32 directly** | FP32 → **Quantize to Q8_0** |
+| Computation | `dequant(W) × input_fp32` | `W_q5_0 × input_q8_0` (quantized dot) |
+| Accuracy | Higher (FP32 input preserved) | Slightly lower (input quantized) |
+| Speed | Slower (dequant on-the-fly) | Faster (integer math) |
+
+**CK's Q5_0 kernel (gemm_kernels_q5_0.c:95-96):**
+```c
+// Dequantizes weight on-the-fly, multiplies with FP32 input
+sum += d * (float)q0 * xp[j];  // dequantized weight × FP32 input
+```
+
+**llama.cpp's approach:**
+```c
+// Quantizes input first, then does quantized dot product
+quantize_row_q8_0_ref(input_f32, q8_data, cols);  // Quantize input
+ggml_vec_dot_q5_0_q8_0(W, q8_data);               // Q5_0 × Q8_0
+```
+
+### Why This Matters for Parity Testing
+
+When comparing CK vs llama.cpp for Q5_0/Q8_0:
+- The input quantization in llama.cpp introduces ~0.4% error per element
+- This compounds through the dot product
+- **Large parity differences are expected** if comparing different approaches
+
+### Solution Options
+
+1. **Option A:** Compare CK against dequant+FP32 reference (tests CK's accuracy)
+2. **Option B:** Implement Q5_0×Q8_0 quantized kernel in CK (matches llama.cpp)
+
+For full llama.cpp compatibility, Option B is recommended since:
+- Q8_0 quantization introduces minimal error (~0.4%)
+- LLMs are robust to small numerical noise
+- If forward inference generates coherent text, the accuracy is fine
+- llama.cpp uses this approach for all quantized GEMV/GEMM
+
+---
+
 ## Troubleshooting
+
+### ggml vec_dot returns 0.0
+**Cause:** `ggml_cpu_init()` not called before using kernel functions.
+**Fix:** Add `ggml_cpu_init()` call in `test_init()` function.
+See "Critical: ggml Initialization Requirement" section above.
 
 ### "undefined symbol: dequantize_row_q4_0"
 The llama.cpp kernel test library needs to link against `-lggml-cpu` in addition to `-lggml`.
@@ -341,3 +484,8 @@ Set `LD_LIBRARY_PATH` to include the llama.cpp build directory:
 ```bash
 export LD_LIBRARY_PATH=llama.cpp/build/bin:$LD_LIBRARY_PATH
 ```
+
+### Q5_0/Q8_0 tests show large differences
+**Cause:** CK uses FP32 input directly, llama.cpp quantizes input to Q8_0 first.
+**Fix:** Either compare against FP32 reference, or implement Q5_0×Q8_0 kernel in CK.
+See "Q5_0/Q8_0 Kernel Design Difference" section above.

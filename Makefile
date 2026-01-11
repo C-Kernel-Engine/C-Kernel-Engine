@@ -342,7 +342,8 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_cross_entropy.py \
             unittest/test_orchestration_layer.py \
             unittest/test_lm_head_litmus.py \
-            unittest/test_optimizer.py
+            unittest/test_optimizer.py \
+            unittest/test_gemv_kernels_comprehensive.py
 
 PY_TESTS_BF16 := unittest/bf16/test_sigmoid_bf16.py \
                 unittest/bf16/test_rmsnorm_bf16.py \
@@ -643,7 +644,7 @@ libckernel_rope.so: $(LIB_ROPE)
 libckernel_quant.so: $(LIB_QUANT)
 	@true
 
-test-libs: $(LIB_GELU) $(LIB_RMSNORM) $(LIB_LN) $(LIB_SOFT) $(LIB_SWIGLU) $(LIB_SIGMOID) $(LIB_ATTENTION) $(LIB_ROPE) $(LIB_RELU) $(LIB_VISION) $(LIB_QUANT)
+test-libs: $(LIB_GELU) $(LIB_RMSNORM) $(LIB_LN) $(LIB_SOFT) $(LIB_SWIGLU) $(LIB_SIGMOID) $(LIB_ATTENTION) $(LIB_ROPE) $(LIB_RELU) $(LIB_VISION) $(LIB_QUANT) $(LIB_PARITY)
 
 test-quant: $(LIB_QUANT)
 	@set -e; \
@@ -859,7 +860,7 @@ test: $(LIB) test-libs
 	for t in $(PY_TESTS); do \
 	  echo "Running $$t"; \
 	  extra_args=""; \
-	  case "$$t" in *test_gemm_microkernel.py) extra_args="--quick";; esac; \
+	  case "$$t" in *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; esac; \
 	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
@@ -1132,6 +1133,59 @@ llamacpp-parity-full:
 		echo "SKIP: llama.cpp not built"; \
 	fi
 
+# Parity tests with performance benchmarks
+llamacpp-parity-perf:
+	@echo "Running llama.cpp parity + performance benchmarks..."
+	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
+		./scripts/run_parity_smoketest.sh --perf; \
+	else \
+		echo "SKIP: llama.cpp not built"; \
+	fi
+
+# Parity tests with 7B dimension performance benchmarks
+llamacpp-parity-perf-large:
+	@echo "Running llama.cpp parity + large (7B) performance benchmarks..."
+	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
+		./scripts/run_parity_smoketest.sh --perf-large; \
+	else \
+		echo "SKIP: llama.cpp not built"; \
+	fi
+
+# GEMV kernel performance benchmark
+# Links against the full library to get all kernel implementations
+benchmark-gemv: $(LIB)
+	@echo "Building GEMV performance benchmark..."
+	@mkdir -p build
+	$(CC) -O3 -mavx -march=native -fopenmp -Iinclude \
+		unittest/test_gemv_performance.c \
+		-L$(BUILD_DIR) -lckernel_engine \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o build/test_gemv_performance -lm
+	@echo ""
+	@echo "Running benchmark..."
+	@./build/test_gemv_performance
+
+benchmark-gemv-quick: $(LIB)
+	@$(MAKE) -s benchmark-gemv
+	@./build/test_gemv_performance --quick
+
+benchmark-gemv-large: $(LIB)
+	@$(MAKE) -s benchmark-gemv
+	@./build/test_gemv_performance --large
+
+# Comprehensive GEMV kernel test - accuracy and performance for all quant types
+test-gemv-comprehensive: $(LIB_PARITY)
+	@echo "Running comprehensive GEMV kernel tests..."
+	@$(PYTHON) unittest/test_gemv_kernels_comprehensive.py
+
+test-gemv-comprehensive-quick: $(LIB_PARITY)
+	@echo "Running quick GEMV kernel tests..."
+	@$(PYTHON) unittest/test_gemv_kernels_comprehensive.py --quick
+
+test-gemv-comprehensive-large: $(LIB_PARITY)
+	@echo "Running comprehensive GEMV kernel tests with 7B dimensions..."
+	@$(PYTHON) unittest/test_gemv_kernels_comprehensive.py --large
+
 all-tests: $(LIB)
 	$(MAKE) test
 	$(MAKE) layer-parity-scalar TOL=$(ALL_TEST_LAYER_TOL) ARGS="$(ALL_TEST_LAYER_ARGS)"
@@ -1383,6 +1437,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q4k_sse.c \
                src/kernels/gemm_kernels_q5_0.c \
                src/kernels/gemm_kernels_q5_0_sse_v2.c \
+               src/kernels/gemm_kernels_q8_0.c \
                src/kernels/quantize_row_q8_k_sse.c \
                src/kernels/rmsnorm_kernels.c \
                src/kernels/rope_kernels.c \
@@ -1495,6 +1550,7 @@ CK_MAIN := tools/ck_main.c
 CK_SERVER := tools/ck_server.c
 CK_CLI := tools/ck.c
 CK_CLI_V4 := tools/ck_v4.c
+CK_CLI_V6 := src/v6/ck_cli_v6.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
@@ -1528,6 +1584,12 @@ $(BUILD_DIR)/ck-cli-v5: src/ck_cli_v5.c src/ck_tokenizer_v2.c $(LIB)
 
 ck-cli-v5-native: $(BUILD_DIR)/ck-cli-v5
 	@echo "Native V5 CLI built: $<"
+
+$(BUILD_DIR)/ck-cli-v6: $(CK_CLI_V6) $(LIB_TOKENIZER)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V6) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v6: $(BUILD_DIR)/ck-cli-v6
+	@echo "Native V6 CLI built: $<"
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
 ck-cli-v4: $(LIB)

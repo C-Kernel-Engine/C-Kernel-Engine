@@ -21,6 +21,17 @@ What is also not copied are the kernel themselves. They should work acorss all v
 
 this it the goal of this repository. 
 
+Current status (v6 now)
+- v6 pipeline runs end-to-end: GGUF -> bump + manifest -> IR -> explicit codegen -> compile.
+- Tokenizer is embedded in the bump file as vocab_offsets, vocab_strings, vocab_merges.
+- Missing tokenizer IDs are repaired during conversion (unk_token if available, else <|ck_missing_id|> placeholders).
+- Codegen is explicit for both prefill and decode.
+- Prefill now uses strided RoPE + strided flash attention so K/V write directly into cache layout (no repack).
+- v6 exports ck_model_get_vocab_* and C true-BPE can load from the model memory.
+- Native v6 CLI (build/ck-cli-v6) uses true-BPE and can be run as a smoke test from ck_run_v6.py.
+- Python chat still uses the gguf/hf tokenizer; true-BPE is validated via the native CLI smoke test.
+- Still shipping a model-specific .so and dlopen in the native CLI; final goal is a single ck-engine-<model> binary.
+
 Generated code naming + build flow
 - Generated files should use fixed names: ck-kernel-prefill.c, ck-kernel-inference.c, ck-kernel-backprop.c (and matching .h/.o/.so).
 - Each model gets its own compiled binary: ck-engine-<model> (e.g., ck-engine-qwen2-0.5b)
@@ -71,3 +82,45 @@ Version bootstrap notes (for v7+)
 - Do not hardcode model names in the inference binary; generate a new binary per model with model-specific function names.
 - Keep older versions isolated: never modify v5 paths; always suffix new tools with _v6.
 - Make sure the new version can run end-to-end from cache (download -> convert -> IR -> codegen -> build -> run).
+
+
+
+plan for speed up:
+  - Step 1: Integrate C tokenizer into IR/.ck
+      - Done: converter emits vocab_offsets, vocab_strings, vocab_merges into bump/manifest.
+      - Done: true-BPE C path loads from embedded vocab (native v6 CLI + v6 inference).
+      - TODO: add tokenizer pool buffer inside arena so allocations come from bump.
+      - TODO: generate ck_model_tokenizer_init() that calls ck_true_bpe_load_binary() with arena pointers.
+      - TODO: switch ck_chat.py to use C tokenizer (ctypes) or replace with native CLI in v6.
+      - TODO: add v6 tokenizer parity tests (reuse unittest/test_tokenizer_*).
+  - Step 2: Remove heap copies for tokens/logits
+      - Add tokens buffer to the arena layout and write token IDs directly there.
+      - Use FOOTER.logits as the canonical output and expose ck_model_get_logits_ptr() instead of copying to g_logits.
+  - Step 3: Direct‑to‑cache K/V (no temp, no repack)
+      - Done (prefill): project K/V with cache stride (aligned_context_window) so repack goes away.
+      - TODO (decode): emit K/V projection directly into cache stride (no temp k_token/v_token arrays).
+      - TODO: update KV‑cache tests to cover decode direct-to-cache path.
+  - Step 4 (optional): Fused kernels for inference only
+      - Add a separate fused QKV/KNV kernel, keep unfused path for training/backprop.
+      - Full unit tests for fused vs unfused parity.
+
+Performance gap vs llama.cpp (where perf is left on the table)
+- Threading model: llama.cpp uses a threadpool + chunk scheduler per op; v6 still relies on OpenMP in kernels and
+  serial codegen loops. This can leave cores idle on small batches/short sequences.
+- Logits/tokens copies: wrapper still copies tokens/logits into heap buffers; avoid this by using arena buffers only.
+- KV decode path still likely uses temp buffers; direct-to-cache write should reduce memory bandwidth and cache misses.
+- Quant kernels: llama.cpp has highly tuned dot/axpy variants per dtype (q4_k/q6_k/q8_0, fp16); match vectorization,
+  alignment, and tail-handling in our kernels.
+- Softmax/exp: fast exp approximation and vectorized exp can reduce attention time.
+- Cache/tiling: block tiling over K/V and head-dim tuning can reduce cache thrash on long contexts.
+- Sampling/tokenization overhead: python chat path is slow and uses a different tokenizer; native CLI should be used for
+  perf measurement until C tokenizer is fully integrated in the main runtime.
+- Profiling: keep using perf + flamegraph to confirm hotspots (attention, gemm, kv-cache writes) before tuning.
+
+
+REPL CLI:
+
+make ck-cli-v6
+
+LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH ./build/ck-cli-v6 /home/antshiv/.cache/ck-engine-v6/models/qwen2-0_5b-instruct-q4_k_m/ck-kernel-inference.so /home/antshiv/.cache/ck-engine-v6/models/qwen2-0_5b-instruct-q4_k_m/weights.bump --prompt "Hello" --max-tokens 30
+

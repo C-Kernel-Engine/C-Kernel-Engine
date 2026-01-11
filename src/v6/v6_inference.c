@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 #include "ckernel_engine.h"
-#include "ck_tokenizer.h"
+#include "tokenizer/true_bpe.h"
 
 /* Version */
 #define CK_VERSION "6.0.0"
@@ -202,20 +202,13 @@ static int run_inference(const char *bump_path, const char *manifest_path,
     printf(ANSI_RESET);
     printf("\n");
 
-    /* Load tokenizer */
-    printf("[INFO] Loading tokenizer: %s\n", tokenizer_path);
-    CKTokenizer tokenizer;
-    if (ck_tokenizer_init(&tokenizer) != 0) {
+    (void)tokenizer_path;
+
+    CKTrueBPE *tokenizer = ck_true_bpe_create();
+    if (!tokenizer) {
         fprintf(stderr, "Failed to init tokenizer\n");
         return -1;
     }
-
-    if (ck_tokenizer_load(&tokenizer, tokenizer_path) != 0) {
-        fprintf(stderr, "Failed to load tokenizer: %s\n", tokenizer_path);
-        ck_tokenizer_free(&tokenizer);
-        return -1;
-    }
-    printf("[INFO] Tokenizer loaded: %d tokens\n", ck_tokenizer_vocab_size(&tokenizer));
 
     /* Allocate model */
     QWEN2_DECODEModel model;
@@ -223,7 +216,7 @@ static int run_inference(const char *bump_path, const char *manifest_path,
 
     if (qwen2_decode_model_allocate(&model) != 0) {
         fprintf(stderr, "Failed to allocate model\n");
-        ck_tokenizer_free(&tokenizer);
+        ck_true_bpe_free(tokenizer);
         return -1;
     }
     printf("[INFO] Model allocated at %p\n", model.base);
@@ -236,21 +229,46 @@ static int run_inference(const char *bump_path, const char *manifest_path,
     }
 
     /* Tokenize prompt */
+    const int vocab_size = QWEN2_DECODE_VOCAB_SIZE;
+    const int num_merges = QWEN2_DECODE_NUM_MERGES;
+    const int vocab_bytes = QWEN2_DECODE_TOTAL_VOCAB_BYTES;
+    if (vocab_size <= 0 || vocab_bytes <= 0) {
+        fprintf(stderr, "Tokenizer data missing in model\n");
+        qwen2_decode_model_free(&model);
+        ck_true_bpe_free(tokenizer);
+        return -1;
+    }
+
+    const int32_t *vocab_offsets = (const int32_t *)QWEN2_DECODE_PTR(&model, QWEN2_DECODE_HEADER.vocab_offsets);
+    const char *vocab_strings = (const char *)((char *)model.base + QWEN2_DECODE_HEADER.vocab_strings);
+    const int32_t *vocab_merges = num_merges > 0
+        ? (const int32_t *)((char *)model.base + QWEN2_DECODE_HEADER.vocab_merges)
+        : NULL;
+
+    if (ck_true_bpe_load_binary(tokenizer, vocab_size, vocab_offsets, vocab_strings, num_merges, vocab_merges) != 0) {
+        fprintf(stderr, "Failed to load tokenizer from model\n");
+        qwen2_decode_model_free(&model);
+        ck_true_bpe_free(tokenizer);
+        return -1;
+    }
+
+    printf("[INFO] Tokenizer loaded: %d tokens\n", vocab_size);
+
     int32_t tokens[512];
-    int num_tokens = ck_tokenizer_encode(&tokenizer, prompt, -1, tokens, 512);
+    int num_tokens = ck_true_bpe_encode(tokenizer, prompt, -1, tokens, 512);
     printf("[INFO] Tokenized prompt: %d tokens\n", num_tokens);
 
     if (num_tokens <= 0) {
         fprintf(stderr, "Failed to tokenize prompt\n");
         qwen2_decode_model_free(&model);
-        ck_tokenizer_free(&tokenizer);
+        ck_true_bpe_free(tokenizer);
         return -1;
     }
 
     /* Print tokenized input */
     printf("[INFO] Input tokens: ");
     for (int i = 0; i < num_tokens; i++) {
-        const char *tok_str = ck_tokenizer_id_to_token(&tokenizer, tokens[i]);
+        const char *tok_str = ck_true_bpe_id_to_token(tokenizer, tokens[i]);
         if (tok_str) {
             printf("%d(%s) ", tokens[i], tok_str);
         } else {
@@ -289,7 +307,7 @@ static int run_inference(const char *bump_path, const char *manifest_path,
         int next_token = sample_topk(logits, QWEN2_DECODE_VOCAB_SIZE, topk);
 
         /* Get token string and append to output */
-        const char *tok_str = ck_tokenizer_id_to_token(&tokenizer, next_token);
+        const char *tok_str = ck_true_bpe_id_to_token(tokenizer, next_token);
         if (tok_str) {
             printf("%s", tok_str);
             fflush(stdout);
@@ -314,7 +332,7 @@ static int run_inference(const char *bump_path, const char *manifest_path,
 
     /* Cleanup */
     qwen2_decode_model_free(&model);
-    ck_tokenizer_free(&tokenizer);
+    ck_true_bpe_free(tokenizer);
 
     return 0;
 }
@@ -351,7 +369,7 @@ int main(int argc, char **argv) {
             printf("Usage: %s <weights.bump> [options]\n", argv[0]);
             printf("\nOptions:\n");
             printf("  -m, --model <file>      Weights BUMP file\n");
-            printf("  -t, --tokenizer <file>  Tokenizer JSON file\n");
+            printf("  -t, --tokenizer <file>  (unused) tokenizer is loaded from weights\n");
             printf("  -p, --prompt <text>     Prompt (default: Hello)\n");
             printf("  -n, --tokens <n>        Max tokens (default: 100)\n");
             printf("  --temp <float>          Temperature (default: 0.7)\n");
@@ -390,17 +408,8 @@ int main(int argc, char **argv) {
     if (!manifest_path) {
         manifest_path = "generated/weights_manifest.json";
     }
-    if (!tokenizer_path) {
-        tokenizer_path = "generated/tokenizer.json";
-    }
-
     if (access(bump_path, F_OK) != 0) {
         fprintf(stderr, "Error: Weights file not found: %s\n", bump_path);
-        return 1;
-    }
-
-    if (access(tokenizer_path, F_OK) != 0) {
-        fprintf(stderr, "Error: Tokenizer not found: %s\n", tokenizer_path);
         return 1;
     }
 
