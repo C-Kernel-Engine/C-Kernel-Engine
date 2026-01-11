@@ -213,7 +213,9 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_f16.c \
 	           src/kernels/optimizer_kernels.c \
 	           src/kernels/optimizer_kernels_bf16.c \
-	           src/kernels/add_kernels_bf16.c
+	           src/kernels/add_kernels_bf16.c \
+	           src/kernels/topk_kernels.c \
+	           src/kernels/axpy_kernels.c
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so

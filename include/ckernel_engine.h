@@ -693,10 +693,10 @@ void ck_attention_flash_decode_wrapper(const float *q_token,
                                        int aligned_head_dim);
 
 // KV cache helper (write one token for all KV heads).
-void kv_cache_write_head_major(const float *k_token,
-                               const float *v_token,
-                               float *k_cache,
-                               float *v_cache,
+void kv_cache_write_head_major(const float *__restrict k_token,
+                               const float *__restrict v_token,
+                               float *__restrict k_cache,
+                               float *__restrict v_cache,
                                int num_kv_heads,
                                int token_index,
                                int cache_capacity,
@@ -882,6 +882,79 @@ void add_forward_f32(const float *a,
 void add_inplace_f32(float *a,
                      const float *b,
                      size_t n);
+
+// =============================================================================
+// AXPY kernels (for MoE expert accumulation)
+// =============================================================================
+
+// In-place AXPY: y += alpha * x
+void axpy_f32(float *y,
+              const float *x,
+              float alpha,
+              int n);
+
+// Scaled copy: y = alpha * x
+void scal_copy_f32(float *y,
+                   const float *x,
+                   float alpha,
+                   int n);
+
+// Weighted sum: y = sum_i(weights[i] * vectors[i])
+void weighted_sum_f32(float *y,
+                      const float **vectors,
+                      const float *weights,
+                      int k,
+                      int n);
+
+// Zero-then-accumulate: y = 0; y += alpha * x
+void axpy_zero_f32(float *y,
+                   const float *x,
+                   float alpha,
+                   int n);
+
+// Batched 2D AXPY: Y[t,:] += alpha * X[t,:]
+void axpy_2d_f32(float *Y,
+                 const float *X,
+                 float alpha,
+                 int num_tokens,
+                 int dim,
+                 int y_stride,
+                 int x_stride);
+
+// MoE expert accumulation: output += routing_weight * expert_output
+void moe_accumulate_expert_f32(float *output,
+                               const float *expert_output,
+                               float routing_weight,
+                               int hidden_dim);
+
+// =============================================================================
+// Top-K selection kernels (for MoE router dispatch)
+// =============================================================================
+
+// Find top-K indices and values from scores
+void topk_f32(const float *scores,
+              int n,
+              int k,
+              int *indices,
+              float *values);
+
+// Top-K with softmax-normalized weights
+void topk_softmax_f32(const float *scores,
+                      int n,
+                      int k,
+                      int *indices,
+                      float *weights);
+
+// Batched top-K for multiple tokens
+void topk_batched_f32(const float *scores,
+                      int num_tokens,
+                      int n_experts,
+                      int k,
+                      int *indices,
+                      float *weights);
+
+// Argmax (top-1)
+int argmax_f32(const float *scores, int n);
 
 // Attention backward (GQA-aware): computes d_q, d_k, d_v.
 void attention_backward_causal_head_major_gqa(

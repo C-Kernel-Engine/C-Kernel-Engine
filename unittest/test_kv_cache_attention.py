@@ -100,6 +100,10 @@ def run_flash_prefill_tests(H=8, H_kv=4, T=64, D=64, aligned_head_dim=64, warmup
     q_np = np.random.randn(H, T, aligned_head_dim).astype(np.float32)
     k_np = np.random.randn(H_kv, T, aligned_head_dim).astype(np.float32)
     v_np = np.random.randn(H_kv, T, aligned_head_dim).astype(np.float32)
+    if D < aligned_head_dim:
+        q_np[:, :, D:] = 0.0
+        k_np[:, :, D:] = 0.0
+        v_np[:, :, D:] = 0.0
 
     scores_np = np.zeros((H, T, T), dtype=np.float32)
     out_ref_np = np.zeros((H, T, aligned_head_dim), dtype=np.float32)
@@ -151,6 +155,10 @@ def run_kv_cache_decode_tests(H=8, H_kv=4, T=64, D=64, aligned_head_dim=64, warm
     q_np = np.random.randn(H, T, aligned_head_dim).astype(np.float32)
     k_np = np.random.randn(H_kv, T, aligned_head_dim).astype(np.float32)
     v_np = np.random.randn(H_kv, T, aligned_head_dim).astype(np.float32)
+    if D < aligned_head_dim:
+        q_np[:, :, D:] = 0.0
+        k_np[:, :, D:] = 0.0
+        v_np[:, :, D:] = 0.0
 
     scores_np = np.zeros((H, T, T), dtype=np.float32)
     out_ref_np = np.zeros((H, T, aligned_head_dim), dtype=np.float32)
@@ -250,6 +258,14 @@ if __name__ == "__main__":
     decode_report = run_kv_cache_decode_tests()
     decode_report.print_report()
 
-    if not flash_report.all_passed() or not decode_report.all_passed():
-        raise SystemExit(1)
+    flash_report_padded = run_flash_prefill_tests(T=32, D=40, aligned_head_dim=64)
+    flash_report_padded.print_report()
 
+    decode_report_padded = run_kv_cache_decode_tests(T=32, D=40, aligned_head_dim=64)
+    decode_report_padded.print_report()
+
+    if (not flash_report.all_passed()
+            or not decode_report.all_passed()
+            or not flash_report_padded.all_passed()
+            or not decode_report_padded.all_passed()):
+        raise SystemExit(1)

@@ -802,8 +802,15 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
             existing.add(src_str)
 
     # Build command
+    cflags = ["-O3", "-march=native", "-mtune=native", "-DNDEBUG"]
+    if os.environ.get("CK_V6_FAST_MATH") == "1":
+        cflags += ["-ffast-math", "-funroll-loops"]
+    extra_cflags = os.environ.get("CK_V6_EXTRA_CFLAGS", "").strip()
+    if extra_cflags:
+        cflags += extra_cflags.split()
+
     cmd = [
-        "gcc", "-O3", "-march=native", "-fPIC", "-fopenmp", "-shared",
+        "gcc", *cflags, "-fPIC", "-fopenmp", "-shared",
         f"-I{PROJECT_ROOT / 'include'}",
         "-o", str(lib_path),
         str(model_c_path),

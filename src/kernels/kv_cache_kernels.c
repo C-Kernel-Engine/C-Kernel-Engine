@@ -45,10 +45,10 @@ void kv_cache_repack_head_major_inplace(float *buf,
     }
 }
 
-void kv_cache_write_head_major(const float *k_token,
-                               const float *v_token,
-                               float *k_cache,
-                               float *v_cache,
+void kv_cache_write_head_major(const float *__restrict k_token,
+                               const float *__restrict v_token,
+                               float *__restrict k_cache,
+                               float *__restrict v_cache,
                                int num_kv_heads,
                                int token_index,
                                int cache_capacity,
@@ -75,18 +75,13 @@ void kv_cache_write_head_major(const float *k_token,
         float *k_dst = k_cache + (size_t)h * head_stride + (size_t)token_index * token_stride;
         float *v_dst = v_cache + (size_t)h * head_stride + (size_t)token_index * token_stride;
 
-        if (head_dim == aligned_head_dim) {
-            memcpy(k_dst, k_src, (size_t)aligned_head_dim * sizeof(float));
-            memcpy(v_dst, v_src, (size_t)aligned_head_dim * sizeof(float));
-        } else {
-            for (int d = 0; d < head_dim; ++d) {
-                k_dst[d] = k_src[d];
-                v_dst[d] = v_src[d];
-            }
-            for (int d = head_dim; d < aligned_head_dim; ++d) {
-                k_dst[d] = 0.0f;
-                v_dst[d] = 0.0f;
-            }
+        for (int d = 0; d < head_dim; ++d) {
+            k_dst[d] = k_src[d];
+            v_dst[d] = v_src[d];
+        }
+        for (int d = head_dim; d < aligned_head_dim; ++d) {
+            k_dst[d] = 0.0f;
+            v_dst[d] = 0.0f;
         }
     }
 }
