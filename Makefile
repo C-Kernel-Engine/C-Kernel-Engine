@@ -1551,6 +1551,7 @@ CK_SERVER := tools/ck_server.c
 CK_CLI := tools/ck.c
 CK_CLI_V4 := tools/ck_v4.c
 CK_CLI_V6 := src/v6/ck_cli_v6.c
+CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
@@ -1590,6 +1591,21 @@ $(BUILD_DIR)/ck-cli-v6: $(CK_CLI_V6) $(LIB_TOKENIZER)
 
 ck-cli-v6: $(BUILD_DIR)/ck-cli-v6
 	@echo "Native V6 CLI built: $<"
+
+# v6.5 Native CLI (improved REPL with model discovery, chat templates, sampling)
+$(BUILD_DIR)/ck-cli-v6.5: $(CK_CLI_V65) $(LIB_TOKENIZER)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V65) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v6.5: $(BUILD_DIR)/ck-cli-v6.5
+	@echo ""
+	@echo "  $(C_CYAN)C-Kernel-Engine v6.5 CLI$(C_RESET)"
+	@echo "  Features: Model discovery, Chat templates, Temperature sampling, REPL"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 --model qwen           # Auto-discover from cache"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 --list                 # List available models"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 <model.so> <weights.bump>"
+	@echo ""
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
 ck-cli-v4: $(LIB)
