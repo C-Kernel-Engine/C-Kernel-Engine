@@ -207,6 +207,50 @@ void test_gemv_q8_0(const void * weight_q8_0,
     delete[] q8_data;
 }
 
+/**
+ * Test Q5_0 GEMV with FP32 activations
+ * Matches CK's approach: dequantize weights to FP32, then FP32 dot product
+ */
+void test_gemv_q5_0_fp32(const void * weight_q5_0,
+                          const float * input_f32,
+                          float * output,
+                          int cols) {
+    // Dequantize single row to FP32
+    float * weight_fp32 = new float[cols];
+    dequantize_row_q5_0((const block_q5_0 *)weight_q5_0, weight_fp32, cols);
+
+    // FP32 dot product
+    float sum = 0.0f;
+    for (int i = 0; i < cols; i++) {
+        sum += weight_fp32[i] * input_f32[i];
+    }
+    *output = sum;
+
+    delete[] weight_fp32;
+}
+
+/**
+ * Test Q8_0 GEMV with FP32 activations
+ * Matches CK's approach: dequantize weights to FP32, then FP32 dot product
+ */
+void test_gemv_q8_0_fp32(const void * weight_q8_0,
+                          const float * input_f32,
+                          float * output,
+                          int cols) {
+    // Dequantize single row to FP32
+    float * weight_fp32 = new float[cols];
+    dequantize_row_q8_0((const block_q8_0 *)weight_q8_0, weight_fp32, cols);
+
+    // FP32 dot product
+    float sum = 0.0f;
+    for (int i = 0; i < cols; i++) {
+        sum += weight_fp32[i] * input_f32[i];
+    }
+    *output = sum;
+
+    delete[] weight_fp32;
+}
+
 // ============================================================================
 // GEMM (Matrix-Matrix) Tests
 // ============================================================================
