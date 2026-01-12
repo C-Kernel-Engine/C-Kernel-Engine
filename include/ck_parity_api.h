@@ -124,6 +124,40 @@ void ck_test_gemv_q8_0(const void *weight_q8_0,
                        float *output,
                        int rows, int cols);
 
+/**
+ * @brief Q5_0 x Q8_0 quantized GEMV - matches llama.cpp's approach
+ *
+ * This version quantizes the input to Q8_0 first, then uses integer
+ * dot products (like llama.cpp does). Use this for parity testing.
+ *
+ * @param weight_q5_0 Q5_0 quantized weights [rows * cols]
+ * @param input_f32 FP32 input vector [cols] - will be quantized to Q8_0
+ * @param output FP32 output vector [rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ */
+void ck_test_gemv_q5_0_q8_0(const void *weight_q5_0,
+                             const float *input_f32,
+                             float *output,
+                             int rows, int cols);
+
+/**
+ * @brief Q8_0 x Q8_0 quantized GEMV - matches llama.cpp's approach
+ *
+ * This version quantizes the input to Q8_0 first, then uses integer
+ * dot products (like llama.cpp does). Use this for parity testing.
+ *
+ * @param weight_q8_0 Q8_0 quantized weights [rows * cols]
+ * @param input_f32 FP32 input vector [cols] - will be quantized to Q8_0
+ * @param output FP32 output vector [rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ */
+void ck_test_gemv_q8_0_q8_0(const void *weight_q8_0,
+                             const float *input_f32,
+                             float *output,
+                             int rows, int cols);
+
 /* ============================================================================
  * GEMM (Matrix-Matrix) Tests
  * ============================================================================ */

@@ -30,7 +30,6 @@ for path in (_SCRIPT_DIR, _V4_DIR, _V3_DIR):
             sys.path.insert(0, path_str)
 
 import build_ir_v3 as v3
-import v6_ir_lowering as v6_low  # New v6 IR lowering with per-layer buffers
 import codegen_v4
 import codegen_v6
 import fusion_patterns as fp
@@ -2063,94 +2062,6 @@ def build_layout_from_lowered(lowered: Dict, model_name: str) -> v3.ModelLayout:
     )
 
 
-def build_layout_v6_native(config: Dict, model_name: str,
-                           include_training: bool = False,
-                           include_decode_scratch: bool = True) -> v6_low.ModelLayout:
-    """Build layout using v6_ir_lowering (per-layer buffers, training-compatible).
-
-    This is the v6 native layout builder that provides:
-    1. Per-layer activation buffers (no sharing between layers for backprop)
-    2. Per-layer decode scratch buffers in arena (not stack)
-    3. Complete training support with gradient and optimizer state buffers
-
-    Use this for training/backprop-compatible layouts. For inference-only
-    with shared buffers (smaller memory), use build_layout_from_lowered().
-
-    Args:
-        config: Model configuration dict
-        model_name: Model identifier
-        include_training: If True, include gradient and optimizer state buffers
-        include_decode_scratch: If True, include per-layer decode scratch buffers
-
-    Returns:
-        v6_low.ModelLayout with computed offsets
-    """
-    return v6_low.build_model_layout(
-        config, model_name,
-        include_training=include_training,
-        include_decode_scratch=include_decode_scratch,
-    )
-
-
-def emit_layout_v6_native(layout: v6_low.ModelLayout, output_dir: str):
-    """Emit v6 native layout files (JSON and human-readable map)."""
-    import os
-    json_path = os.path.join(output_dir, "layout_v6_native.json")
-    map_path = os.path.join(output_dir, "layout_v6_native.map")
-
-    v6_low.emit_layout_json(layout, json_path)
-    v6_low.emit_layout_map(layout, map_path)
-
-
-def get_decode_buffer_offset(layout: v6_low.ModelLayout, layer_id: int, buffer_name: str) -> Optional[int]:
-    """Get the arena offset for a per-layer decode scratch buffer.
-
-    This is used by codegen to emit arena pointers instead of stack arrays.
-
-    Args:
-        layout: v6 native ModelLayout
-        layer_id: Layer index
-        buffer_name: One of: q_token, k_token, v_token, attn_out, fc1_out, swiglu_out
-
-    Returns:
-        Offset in bytes from arena base, or None if not found
-    """
-    decode_bufs = v6_low.get_layer_decode_buffers(layout, layer_id)
-    if not decode_bufs:
-        return None
-
-    buf_map = {
-        "q_token": decode_bufs.q_token,
-        "k_token": decode_bufs.k_token,
-        "v_token": decode_bufs.v_token,
-        "attn_out": decode_bufs.attn_out,
-        "fc1_out": decode_bufs.fc1_out,
-        "swiglu_out": decode_bufs.swiglu_out,
-    }
-    buf = buf_map.get(buffer_name)
-    return buf.offset if buf else None
-
-
-def compute_decode_scratch_offsets(layout: v6_low.ModelLayout, layer_id: int) -> Dict[str, int]:
-    """Get all decode scratch buffer offsets for a layer.
-
-    Returns:
-        Dict mapping buffer names to arena offsets
-    """
-    decode_bufs = v6_low.get_layer_decode_buffers(layout, layer_id)
-    if not decode_bufs:
-        return {}
-
-    return {
-        "q_token": decode_bufs.q_token.offset,
-        "k_token": decode_bufs.k_token.offset,
-        "v_token": decode_bufs.v_token.offset,
-        "attn_out": decode_bufs.attn_out.offset,
-        "fc1_out": decode_bufs.fc1_out.offset,
-        "swiglu_out": decode_bufs.swiglu_out.offset,
-    }
-
-
 # ---------------------------------------------------------------------------
 # Emitters
 # ---------------------------------------------------------------------------
@@ -2605,13 +2516,6 @@ def main(argv: List[str]) -> int:
                 raise FileNotFoundError(f"Config file not found: {config_path}")
         print(f"[CONFIG] Reading local: {config_path}")
         config = v3.parse_config(config_path)
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                raw_config = json.load(f)
-            config["num_merges"] = int(raw_config.get("num_merges", config.get("num_merges", 0)) or 0)
-            config["total_vocab_bytes"] = int(raw_config.get("total_vocab_bytes", config.get("total_vocab_bytes", 0)) or 0)
-        except Exception:
-            pass
         model_name = args["name"] or config.get("model_type", "model")
     else:
         model_id = v3.parse_hf_model_id(args["model"])

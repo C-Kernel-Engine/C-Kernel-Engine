@@ -1,6 +1,30 @@
 var searchData=
 [
-  ['nc_3560',['NC',['../gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5',1,'gemm_microkernel.c']]],
-  ['nr_3561',['NR',['../gemm__microkernel_8c.html#af146485306ae74a2edf18636300fd107',1,'gemm_microkernel.c']]],
-  ['nr_5ffixed_3562',['NR_FIXED',['../gemm__microkernel_8c.html#af3dd4e1707c284abe511ed15be5c4f8f',1,'gemm_microkernel.c']]]
+  ['m_5fpi_3757',['M_PI',['../rope__kernels_8c.html#ae71449b1cc6e6250b91f539153a7a0d3',1,'rope_kernels.c']]],
+  ['magenta_3758',['MAGENTA',['../show__config_8c.html#a6f699060902f800f12aaae150f3a708e',1,'show_config.c']]],
+  ['manifest_5fline_5fmax_3759',['MANIFEST_LINE_MAX',['../ckernel__model__load__v4_8c.html#aff189f41b88c0561326386ce8f84c57d',1,'ckernel_model_load_v4.c']]],
+  ['max_5fcache_5flevels_3760',['MAX_CACHE_LEVELS',['../system__topology_8h.html#a5a07324805d0e6b5535ccfd66a198a43',1,'system_topology.h']]],
+  ['max_5fcpus_3761',['MAX_CPUS',['../system__topology_8h.html#a87cbc7cff225b4ad63d67d47c21f933f',1,'system_topology.h']]],
+  ['max_5fmemory_5fslots_3762',['MAX_MEMORY_SLOTS',['../system__topology_8h.html#a653d809668c0f9aed5323a47614f16b5',1,'system_topology.h']]],
+  ['max_5fnics_3763',['MAX_NICS',['../system__topology_8h.html#ab44d92c45e9155a2b343f0372630ec35',1,'system_topology.h']]],
+  ['max_5fnuma_5fnodes_3764',['MAX_NUMA_NODES',['../system__topology_8h.html#a5f98c1cce60eca018b6a3adc59298f90',1,'system_topology.h']]],
+  ['max_5fpcie_5fdevices_3765',['MAX_PCIE_DEVICES',['../system__topology_8h.html#aeb96e2b430111e055cfe76293dbf2258',1,'system_topology.h']]],
+  ['max_5frecommendations_3766',['MAX_RECOMMENDATIONS',['../system__topology_8h.html#a418478bfd80cdc978000fcd7e8ab9c28',1,'system_topology.h']]],
+  ['max_5fstr_5flen_3767',['MAX_STR_LEN',['../system__topology_8h.html#a58ce36916c399104e18d32ff090f21c6',1,'system_topology.h']]],
+  ['max_5fswiglu_5fstack_3768',['MAX_SWIGLU_STACK',['../mlp__fused__decode_8c.html#af121c16885cb3138dea592522e77e592',1,'mlp_fused_decode.c']]],
+  ['max_5ftoken_5flen_3769',['MAX_TOKEN_LEN',['../true__bpe_8c.html#a3f6d16dfdf7920e1e5f1dad5db5347f2',1,'true_bpe.c']]],
+  ['mc_3770',['MC',['../gemm__microkernel_8c.html#a71d9e511e7e302cd831e83581219e70d',1,'gemm_microkernel.c']]],
+  ['merge_5fhash_5fsize_3771',['MERGE_HASH_SIZE',['../true__bpe_8c.html#aa4cd3b9c68870f9874e953080d27b0a7',1,'true_bpe.c']]],
+  ['mlp_5ftile_5fsize_3772',['MLP_TILE_SIZE',['../mlp__fused__decode_8c.html#a6caa91a6fc1f8f0503d2bb8f0248a4f3',1,'mlp_fused_decode.c']]],
+  ['model_5fembed_5fdim_3773',['MODEL_EMBED_DIM',['../v6__simple_8c.html#a8b415b47cc8a38f24ed14391cf4f78ea',1,'v6_simple.c']]],
+  ['model_5fhead_5fdim_3774',['MODEL_HEAD_DIM',['../v6__simple_8c.html#a6af860b5f6319cc4a27e77300f7f879f',1,'v6_simple.c']]],
+  ['model_5fintermediate_3775',['MODEL_INTERMEDIATE',['../v6__simple_8c.html#a32d7fc8c50e63b117c79c133925daf0e',1,'v6_simple.c']]],
+  ['model_5fintermediate_5fsize_3776',['MODEL_INTERMEDIATE_SIZE',['../v6__simple_8c.html#a4a8a8b8c97e38029169ca0f93adb9200',1,'v6_simple.c']]],
+  ['model_5fmax_5fseq_5flen_3777',['MODEL_MAX_SEQ_LEN',['../v6__simple_8c.html#ae08a47d557352c75919fb3ddb1b30a3a',1,'v6_simple.c']]],
+  ['model_5fnum_5fheads_3778',['MODEL_NUM_HEADS',['../v6__simple_8c.html#ae77582e6556b745574c4349cd9b89982',1,'v6_simple.c']]],
+  ['model_5fnum_5fkv_5fheads_3779',['MODEL_NUM_KV_HEADS',['../v6__simple_8c.html#a73eda5593cd15b773b9fd5e2027f8c38',1,'v6_simple.c']]],
+  ['model_5fnum_5flayers_3780',['MODEL_NUM_LAYERS',['../v6__simple_8c.html#a49498e8d2a4bf1b87c15658aaafaa4ab',1,'v6_simple.c']]],
+  ['model_5fvocab_5fsize_3781',['MODEL_VOCAB_SIZE',['../v6__simple_8c.html#a1c6f619b51fb89a5803d277c8316a3a1',1,'v6_simple.c']]],
+  ['mr_3782',['MR',['../gemm__microkernel_8c.html#a9ecbd9f86f95534f1bcf71015d5ae81a',1,'gemm_microkernel.c']]],
+  ['mr_5ffixed_3783',['MR_FIXED',['../gemm__microkernel_8c.html#a6d69e1aaf7b6e0de9b1a7900c0e22a5a',1,'gemm_microkernel.c']]]
 ];

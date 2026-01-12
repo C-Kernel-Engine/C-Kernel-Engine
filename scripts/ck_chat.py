@@ -3,6 +3,10 @@
 C-Kernel-Engine Chat Interface
 
 Uses the HuggingFace tokenizer or GGUF tokenizer and calls the compiled C model library.
+
+Features:
+- Auto-validation: When gibberish is detected, automatically runs staged validation
+  to pinpoint kernel issues. Enable with --validate flag.
 """
 from __future__ import annotations  # Python 3.9 compatibility
 
@@ -11,9 +15,21 @@ import ctypes
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
+
+# Auto-validation support
+AUTO_VALIDATE_AVAILABLE = False
+try:
+    PROJECT_ROOT = Path(__file__).parent.parent
+    sys.path.insert(0, str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT / "unittest"))
+    from validation.gibberish_detector import detect_gibberish, quick_check
+    from validation.auto_validate import AutoValidator
+    AUTO_VALIDATE_AVAILABLE = True
+except ImportError:
+    pass
 
 # Try to import tokenizers (HuggingFace or our GGUF tokenizer)
 HF_TOKENIZER_AVAILABLE = False
@@ -352,11 +368,23 @@ def sample_top_k(logits: np.ndarray, k: int = 40, temperature: float = 0.7) -> i
 
 def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              temperature: float = 0.7, verbose: bool = False,
-             show_stats: bool = True) -> str:
-    """Generate text from prompt."""
+             show_stats: bool = True,
+             validator: Optional['AutoValidator'] = None,
+             check_every_n: int = 20) -> str:
+    """Generate text from prompt.
+
+    Args:
+        validator: Optional AutoValidator for gibberish detection
+        check_every_n: Check for gibberish every N tokens
+    """
     # Tokenize prompt
     token_ids = model.encode(prompt)
     prompt_tokens = len(token_ids)
+
+    # Track generated tokens for validation
+    generated_tokens: List[int] = []
+    generated_text: str = ""
+    gibberish_detected: bool = False
 
     if verbose:
         print(f"[Prompt tokens: {prompt_tokens}]")
@@ -390,9 +418,22 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             if model.is_eos_token(next_token):
                 break
             generated.append(next_token)
+            generated_tokens.append(next_token)
             token_ids.append(next_token)
             token_text = model.decode([next_token])
+            generated_text += token_text
             print(token_text, end='', flush=True)
+
+            # Periodic gibberish check
+            if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
+                if AUTO_VALIDATE_AVAILABLE and quick_check(generated_text):
+                    result = detect_gibberish(tokens=generated_tokens, text=generated_text,
+                                             vocab_size=model.vocab_size)
+                    if result.is_gibberish and result.confidence > 0.5:
+                        gibberish_detected = True
+                        print(f"\n\033[91m[GIBBERISH DETECTED at token {i+1}]\033[0m")
+                        break
+
             if len(token_ids) >= model.context_window - 1:
                 break
 
@@ -430,11 +471,23 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
                 break
 
             generated.append(next_token)
+            generated_tokens.append(next_token)
             token_ids.append(next_token)
 
             # Decode and print incrementally
             token_text = model.decode([next_token])
+            generated_text += token_text
             print(token_text, end='', flush=True)
+
+            # Periodic gibberish check
+            if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
+                if AUTO_VALIDATE_AVAILABLE and quick_check(generated_text):
+                    result = detect_gibberish(tokens=generated_tokens, text=generated_text,
+                                             vocab_size=model.vocab_size)
+                    if result.is_gibberish and result.confidence > 0.5:
+                        gibberish_detected = True
+                        print(f"\n\033[91m[GIBBERISH DETECTED at token {i+1}]\033[0m")
+                        break
 
             # Check context limit
             if len(token_ids) >= model.context_window - 1:
@@ -442,6 +495,23 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
     total_time = time.time() - start_time
     gen_count = len(generated)
+
+    # Final gibberish check and validation
+    if validator and not gibberish_detected and len(generated_tokens) >= 10:
+        if AUTO_VALIDATE_AVAILABLE:
+            result = detect_gibberish(tokens=generated_tokens, text=generated_text,
+                                     vocab_size=model.vocab_size)
+            if result.is_gibberish and result.confidence > 0.5:
+                gibberish_detected = True
+                print(f"\n\033[91m[GIBBERISH DETECTED in final output]\033[0m")
+
+    # Run validation if gibberish was detected
+    if gibberish_detected and validator and AUTO_VALIDATE_AVAILABLE:
+        print()  # newline
+        if not validator.check_output(tokens=generated_tokens, text=generated_text,
+                                     vocab_size=model.vocab_size):
+            validator.run_validation()
+            validator.print_debug_instructions()
 
     # Print statistics (llama.cpp style)
     if show_stats and gen_count > 0:
@@ -483,11 +553,14 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
 
 def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
-              show_stats: bool = True):
+              show_stats: bool = True, validator: Optional['AutoValidator'] = None):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
-    print("  Type your message and press Enter. Commands: /exit, /help, /stats")
+    commands = "/exit, /help, /stats"
+    if validator:
+        commands += ", /validate"
+    print(f"  Type your message and press Enter. Commands: {commands}")
     print("=" * 60 + "\n")
 
     conversation = []
@@ -510,12 +583,20 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
             print("  Commands:")
             print("    /exit, /quit  - Exit the chat")
             print("    /stats        - Toggle performance stats display")
+            if validator:
+                print("    /validate     - Run manual kernel validation")
             print("    /help         - Show this help")
             continue
 
         if user_input.lower() == '/stats':
             show_stats = not show_stats
             print(f"  Performance stats: {'ON' if show_stats else 'OFF'}")
+            continue
+
+        if user_input.lower() == '/validate' and validator:
+            print("\n  \033[96mRunning manual validation...\033[0m")
+            validator.run_validation()
+            validator.print_debug_instructions()
             continue
 
         # Build prompt with chat template
@@ -525,7 +606,7 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
         print("\033[94mAssistant: \033[0m", end='', flush=True)
         response = generate(model, prompt, max_tokens=max_tokens,
                           temperature=temperature, verbose=False,
-                          show_stats=show_stats)
+                          show_stats=show_stats, validator=validator)
         print()
 
 
@@ -545,6 +626,10 @@ def main():
                        help="Save intermediate buffers for comparison (requires --parity in codegen)")
     parser.add_argument("--parity-dir",
                        help="Directory for parity dumps (default: model-dir/parity)")
+    parser.add_argument("--validate", action="store_true",
+                       help="Enable auto-validation: detect gibberish and run staged validation")
+    parser.add_argument("--check-every", type=int, default=20,
+                       help="Check for gibberish every N tokens (default: 20)")
     args = parser.parse_args()
 
     # Determine parity directory
@@ -552,6 +637,25 @@ def main():
     if args.parity:
         parity_dir = args.parity_dir or str(Path(args.model_dir) / "parity")
         print(f"Parity dumps will be saved to: {parity_dir}")
+
+    # Setup validator for auto-validation
+    validator = None
+    if args.validate:
+        if AUTO_VALIDATE_AVAILABLE:
+            model_dir = Path(args.model_dir)
+            gguf_path = args.gguf or ""
+            bump_path = str(model_dir / "weights.bump")
+            manifest_path = str(model_dir / "weights_manifest.json")
+            validator = AutoValidator(
+                gguf_path=gguf_path,
+                bump_path=bump_path,
+                manifest_path=manifest_path,
+                work_dir=str(model_dir),
+                verbose=args.verbose
+            )
+            print(f"\033[96mAuto-validation enabled (checking every {args.check_every} tokens)\033[0m")
+        else:
+            print("\033[93mWarning: Auto-validation requested but validation module not available\033[0m")
 
     # Load model
     print(f"Loading model from {args.model_dir}...")
@@ -569,12 +673,13 @@ def main():
             print("Response: ", end='', flush=True)
             generate(model, args.prompt, max_tokens=args.max_tokens,
                     temperature=args.temperature, verbose=args.verbose,
-                    show_stats=args.stats)
+                    show_stats=args.stats, validator=validator,
+                    check_every_n=args.check_every)
             print()
         else:
             # Interactive chat mode
             chat_loop(model, temperature=args.temperature, max_tokens=args.max_tokens,
-                     show_stats=args.stats)
+                     show_stats=args.stats, validator=validator)
     finally:
         model.free()
 

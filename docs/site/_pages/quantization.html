@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantization Deep Dive | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --red: #e74c3c;
+            --purple: #9b59b6;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        h4 {
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin: 1rem 0 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Links */
+        a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange);
+        }
+
+        /* Table of Contents */
+        main > ul a {
+            color: #c0c0c0;
+        }
+
+        main > ul a:hover {
+            color: var(--orange);
+            text-decoration: underline;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--grey);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-accent {
+            border-left: 4px solid var(--orange);
+        }
+
+        .card-green {
+            border-left: 4px solid var(--green);
+        }
+
+        .card-blue {
+            border-left: 4px solid var(--blue);
+        }
+
+        .card-red {
+            border-left: 4px solid var(--red);
+        }
+
+        .card-purple {
+            border-left: 4px solid var(--purple);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--code-bg);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+            color: var(--orange-light);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--grey);
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: rgba(255,255,255,0.02);
+        }
+
+        tr:hover {
+            background: rgba(255,180,0,0.05);
+        }
+
+        /* Alerts */
+        .alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .alert-danger {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-blue {
+            background: var(--blue);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Bit diagram styles */
+        .bit-diagram {
+            display: flex;
+            gap: 2px;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .bit-box {
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            text-align: center;
+            min-width: 40px;
+        }
+
+        .bit-sign { background: var(--red); color: white; }
+        .bit-exp { background: var(--blue); color: white; }
+        .bit-mantissa { background: var(--green); color: white; }
+        .bit-scale { background: var(--purple); color: white; }
+        .bit-quant { background: var(--orange); color: var(--dark); }
+
+        /* Memory block styles */
+        .memory-block {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--code-bg);
+            border-radius: 8px;
+            border: 1px solid var(--grey);
+        }
+
+        .mem-cell {
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        .mem-scale { background: var(--purple); color: white; }
+        .mem-weight { background: var(--orange); color: var(--dark); }
+        .mem-min { background: var(--blue); color: white; }
+
+        /* Comparison table highlighting */
+        .highlight-good {
+            background: rgba(71, 180, 117, 0.2) !important;
+        }
+
+        .highlight-bad {
+            background: rgba(231, 76, 60, 0.2) !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: column;
+                text-align: center;
+                padding: 1rem;
+            }
+
+            .site-nav {
+                justify-content: center;
+            }
+
+            .nav-dropdown-menu {
+                position: fixed;
+                left: 1rem;
+                right: 1rem;
+                width: auto;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <nav class="site-nav">
+            <a href="index.html">Home</a>
+            <a href="quickstart.html">Getting Started</a>
+            <a href="developer-guide.html">Developer Guide</a>
+            <a href="scaling.html">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu">
+                    <a href="architecture.html">
+                        System Overview
+                        <small>IR, Codegen, Kernels</small>
+                    </a>
+                    <a href="kernels.html">
+                        Kernel Reference
+                        <small>All forward/backward kernels</small>
+                    </a>
+                    <a href="gemm-optimization.html">
+                        GEMM Optimization
+                        <small>Microkernel, packing, 1.44x faster than MKL</small>
+                    </a>
+                    <a href="codegen.html">
+                        Code Generation
+                        <small>IR to C compilation</small>
+                    </a>
+                    <a href="memory-safety.html">
+                        Memory Safety
+                        <small>Bump allocator, canaries, verification</small>
+                    </a>
+                    <a href="profiling.html">
+                        Profiling Guide
+                        <small>Valgrind, perf, flamegraphs</small>
+                    </a>
+                    <a href="concepts.html">
+                        Deep Dive Concepts
+                        <small>RoPE, Flash Attention, GQA</small>
+                    </a>
+                    <a href="quantization.html" class="active">
+                        Quantization
+                        <small>Block formats, grouping, memory</small>
+                    </a>
+                    <a href="simd-architecture.html">
+                        SIMD Architecture
+                        <small>AVX-512, VNNI, AMX deep dive</small>
+                    </a>
+                    <a href="testing.html">
+                        Testing Methodology
+                        <small>Numerical parity verification</small>
+                    </a>
+                </div>
+            </div>
+            <a href="pytorch-parity.html">PyTorch Parity</a>
+            <a href="research.html">Research</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<div class="hero">
+    <h1>Quantization Deep Dive</h1>
+    <p>Reduce model size by 4-8x while maintaining accuracy. Learn how block quantization formats work, why grouping matters, and how to integrate quantized weights with our bump allocator.</p>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>What You'll Learn</strong><br>
+        This guide covers the fundamentals of weight quantization: from the basic math behind INT4/INT8 representation to advanced grouping strategies used by modern block quantization formats.
+    </div>
+</div>
+
+<div class="card" style="background: linear-gradient(135deg, #0071c5 0%, #00c7fd 100%); border: none; margin: 1.5rem 0;">
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <h3 style="color: #ffffff; margin: 0 0 0.5rem 0;">Visual Format Reference</h3>
+            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.95rem;">See byte-level structure, bit packing, and dequantization math for all 8 supported formats: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q4_K, Q6_K, Q8_K.</p>
+        </div>
+        <a href="quant-formats.html" style="background: #ffffff; color: #0071c5; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 600; white-space: nowrap;">View Infographic</a>
+    </div>
+</div>
+
+<h2>Table of Contents</h2>
+<ul>
+    <li><a href="#why-quantize">Why Quantize?</a></li>
+    <li><a href="#floating-point">Floating Point Primer</a></li>
+    <li><a href="#basic-quantization">Basic Quantization Math</a></li>
+    <li><a href="#the-problem">The Problem with Single Scales</a></li>
+    <li><a href="#grouping">Grouping: The Solution</a></li>
+    <li><a href="#quant-formats">Quantization Formats</a></li>
+    <li><a href="#memory-layout">Memory Layout in Bump Allocator</a></li>
+    <li><a href="#kernel-dispatch">Kernel Dispatch by Type</a></li>
+    <li><a href="#cache-access">Cache Line Access Patterns</a></li>
+    <li><a href="#dequantization">Dequantization in Registers</a></li>
+    <li><a href="#amx-int8">AMX-INT8: The Hardware Reality</a></li>
+    <li><a href="#q4k-detail">Q4_K: K-Quants Deep Dive</a></li>
+    <li><a href="#blockwise-dequant">How Blockwise Dequant Works</a></li>
+    <li><a href="#bump-integration">Bump Allocator Integration</a></li>
+    <li><a href="#practical">Practical Implementation</a></li>
+</ul>
+
+<hr>
+
+<h2 id="why-quantize">Why Quantize?</h2>
+
+<p>Large language models are memory-bound, not compute-bound. A 7B parameter model in FP32 requires <strong>28 GB</strong> of memory just for weights. Quantization dramatically reduces this.</p>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">FP32 (32-bit)</h3>
+        <p><strong>28 GB</strong> for 7B params</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Full precision, no loss</p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">INT8 (8-bit)</h3>
+        <p><strong>7 GB</strong> for 7B params</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">4x reduction, ~0.1% loss</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">INT4 (4-bit)</h3>
+        <p><strong>3.5 GB</strong> for 7B params</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">8x reduction, ~0.5% loss</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Memory Bandwidth is the Bottleneck</h3>
+    <p>Modern CPUs can do billions of FLOPs/second, but memory bandwidth is limited:</p>
+    <table>
+        <tr><th>Hardware</th><th>Compute</th><th>Memory BW</th><th>Arithmetic Intensity Needed</th></tr>
+        <tr><td>Intel Xeon Gold 6542Y</td><td>~4 TFLOPS (FP32)</td><td>~300 GB/s</td><td>13 FLOPS/byte</td></tr>
+        <tr><td>NVIDIA A100</td><td>19.5 TFLOPS (FP32)</td><td>2 TB/s</td><td>10 FLOPS/byte</td></tr>
+    </table>
+    <p>Matrix-vector multiply (inference) has arithmetic intensity of ~2 FLOPS/byte. We're <strong>memory-bound</strong>, so smaller weights = faster inference.</p>
+</div>
+
+<hr>
+
+<h2 id="floating-point">Floating Point Primer</h2>
+
+<p>Before diving into quantization, let's understand what we're compressing.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">FP32 Format (32 bits)</h3>
+    <div class="bit-diagram">
+        <div class="bit-box bit-sign">S<br><small>1 bit</small></div>
+        <div class="bit-box bit-exp">Exponent<br><small>8 bits</small></div>
+        <div class="bit-box bit-mantissa" style="flex: 3;">Mantissa (Fraction)<br><small>23 bits</small></div>
+    </div>
+    <pre>Value = (-1)^S × 2^(E-127) × 1.Mantissa
+
+Example: 0.15625
+  Sign: 0 (positive)
+  Exponent: 01111100 (124 - 127 = -3)
+  Mantissa: 01000000000000000000000 (1.25)
+  = 1 × 2^(-3) × 1.25 = 0.15625</pre>
+    <p><strong>Precision:</strong> ~7 significant decimal digits (relative error ~1.2e-7)</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">BF16 Format (16 bits)</h3>
+    <div class="bit-diagram">
+        <div class="bit-box bit-sign">S<br><small>1 bit</small></div>
+        <div class="bit-box bit-exp">Exponent<br><small>8 bits</small></div>
+        <div class="bit-box bit-mantissa">Mantissa<br><small>7 bits</small></div>
+    </div>
+    <p><strong>Same exponent range as FP32</strong>, but reduced precision (7 bits = ~2 decimal digits).</p>
+    <p>Relative error: ~7.8e-3 (~0.78%). This is why our BF16 kernel tests use 1e-2 tolerance.</p>
+</div>
+
+<hr>
+
+<h2 id="basic-quantization">Basic Quantization Math</h2>
+
+<p>Quantization maps continuous floating-point values to discrete integers.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Symmetric Quantization</h3>
+    <pre>
+# Quantize: FP32 → INT
+scale = max(abs(weights)) / (2^(bits-1) - 1)
+quantized = round(weights / scale)
+
+# Dequantize: INT → FP32
+dequantized = quantized * scale
+
+Example (INT8, range [-127, 127]):
+  weights = [-0.5, 0.2, 1.0, -0.3]
+  scale = 1.0 / 127 = 0.00787
+  quantized = [-64, 25, 127, -38]
+  dequantized = [-0.504, 0.197, 1.0, -0.299]  ← small error
+    </pre>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Asymmetric Quantization</h3>
+    <pre>
+# Also stores zero-point for non-symmetric distributions
+scale = (max - min) / (2^bits - 1)
+zero_point = round(-min / scale)
+quantized = round(weights / scale) + zero_point
+
+# Useful when weights are not centered around zero
+# (e.g., after ReLU activations)
+    </pre>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">!</div>
+    <div>
+        <strong>The Catch</strong><br>
+        With a single scale for the entire weight matrix, small values get <strong>quantized to zero</strong>. This is catastrophic for neural networks where every parameter matters.
+    </div>
+</div>
+
+<hr>
+
+<h2 id="the-problem">The Problem with Single Scales</h2>
+
+<p>Consider a weight matrix with values ranging from -2.0 to +2.0, where some small but important values exist around 0.01:</p>
+
+<div class="img-container svg-viewer" data-title="Quantization Overview: Why Grouping Matters">
+    <img src="assets/quantization_infographic.svg" alt="Quantization Infographic showing FP32 to INT4 conversion">
+</div>
+
+<div class="card card-red">
+    <h3 style="margin-top: 0;">Single Scale Failure</h3>
+    <pre>
+Weight matrix: [-2.0, 0.01, 1.5, -0.005, 0.8]
+
+With single scale (INT4, range [-8, 7]):
+  scale = 2.0 / 7 = 0.286
+
+  -2.0  → round(-2.0 / 0.286) = -7  → dequant: -2.0   ✓
+   0.01 → round(0.01 / 0.286) =  0  → dequant:  0.0   ✗ LOST!
+   1.5  → round(1.5 / 0.286)  =  5  → dequant:  1.43  ~ok
+  -0.005→ round(-0.005/0.286) =  0  → dequant:  0.0   ✗ LOST!
+   0.8  → round(0.8 / 0.286)  =  3  → dequant:  0.86  ~ok
+    </pre>
+    <p>Small weights (0.01, -0.005) become <strong>exactly zero</strong>. These might be critical for model behavior!</p>
+</div>
+
+<hr>
+
+<h2 id="grouping">Grouping: The Solution</h2>
+
+<p>Instead of one scale for the entire matrix, use <strong>per-group scales</strong>. Each group gets its own scale, tailored to its local range.</p>
+
+<div class="img-container svg-viewer" data-title="Quantization Grouping: Per-Block Scales">
+    <img src="assets/quantization_grouping.svg" alt="Detailed diagram of quantization grouping and memory layout">
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Group 1: Large Values</h3>
+        <pre>
+Values: [-2.0, 1.5, 0.8, -1.2]
+Local max: 2.0
+Scale: 2.0 / 7 = 0.286
+
+Each value uses full INT4 range
+relative to THIS group's scale.
+        </pre>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Group 2: Small Values</h3>
+        <pre>
+Values: [0.01, -0.005, 0.008, 0.003]
+Local max: 0.01
+Scale: 0.01 / 7 = 0.00143
+
+Now small values use full range!
+0.01 → 7, -0.005 → -4, etc.
+        </pre>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why Group Size Matters</h3>
+    <table>
+        <tr><th>Group Size</th><th>Scale Overhead</th><th>Precision</th><th>Use Case</th></tr>
+        <tr><td>32</td><td>1 FP16 per 32 weights</td><td>Best</td><td>Q4_0, Q8_0 (common)</td></tr>
+        <tr><td>64</td><td>1 FP16 per 64 weights</td><td>Good</td><td>Some custom formats</td></tr>
+        <tr><td>128</td><td>1 FP16 per 128 weights</td><td>Medium</td><td>Aggressive compression</td></tr>
+        <tr><td>256</td><td>Nested scales</td><td>Varies</td><td>Q4_K, Q5_K "k-quants"</td></tr>
+    </table>
+    <p><strong>Trade-off:</strong> Smaller groups = better precision but more scale storage overhead.</p>
+</div>
+
+<hr>
+
+<h2 id="quant-formats">Quantization Formats</h2>
+
+<p>The block formats below are widely used for weight-only quantized inference and are common in GGUF-style model files. We implement them to make the runtime compatible with those on-disk layouts.</p>
+
+<h3>Q4_0: The Simplest 4-bit Format</h3>
+
+<div class="card card-accent">
+    <h4 style="margin-top: 0;">Structure</h4>
+    <pre>
+typedef struct {
+    ck_half d;           // 2 bytes: scale (delta)
+    uint8_t qs[16];      // 16 bytes: 32 × 4-bit weights (2 per byte)
+} block_q4_0;            // Total: 18 bytes per 32 weights
+
+Bits per weight: 18 * 8 / 32 = 4.5 bits
+    </pre>
+
+    <h4>Memory Layout</h4>
+    <div class="memory-block">
+        <div class="mem-cell mem-scale">scale<br>2B</div>
+        <div class="mem-cell mem-weight">w0,w1</div>
+        <div class="mem-cell mem-weight">w2,w3</div>
+        <div class="mem-cell mem-weight">w4,w5</div>
+        <div class="mem-cell mem-weight">...</div>
+        <div class="mem-cell mem-weight">w30,w31</div>
+    </div>
+
+    <h4>Dequantization</h4>
+    <pre>
+// Extract 4-bit values (signed, range -8 to 7)
+int8_t q0 = (qs[i] & 0xF) - 8;   // Lower nibble
+int8_t q1 = (qs[i] >> 4) - 8;    // Upper nibble
+
+// Dequantize
+float w0 = q0 * scale;
+float w1 = q1 * scale;
+    </pre>
+</div>
+
+<h3>Q4_1: 4-bit with Min Value</h3>
+
+<div class="card card-blue">
+    <h4 style="margin-top: 0;">Structure</h4>
+    <pre>
+typedef struct {
+    ck_half d;           // 2 bytes: scale
+    ck_half m;           // 2 bytes: minimum value
+    uint8_t qs[16];      // 16 bytes: 32 × 4-bit weights
+} block_q4_1;            // Total: 20 bytes per 32 weights
+
+Bits per weight: 20 * 8 / 32 = 5.0 bits
+    </pre>
+
+    <h4>Why Store Min?</h4>
+    <p>Asymmetric quantization: <code>dequant = q * scale + min</code></p>
+    <p>Better for weight distributions not centered at zero (e.g., biased layers).</p>
+</div>
+
+<h3>Q8_0: 8-bit Integer</h3>
+
+<div class="card card-green">
+    <h4 style="margin-top: 0;">Structure</h4>
+    <pre>
+typedef struct {
+    ck_half d;           // 2 bytes: scale
+    int8_t qs[32];       // 32 bytes: 32 × 8-bit signed weights
+} block_q8_0;            // Total: 34 bytes per 32 weights
+
+Bits per weight: 34 * 8 / 32 = 8.5 bits
+    </pre>
+
+    <h4>Trade-off</h4>
+    <p><strong>Higher precision</strong> (256 levels vs 16 for Q4), but <strong>2x larger</strong> than Q4_0.</p>
+    <p>Often used for activations or when accuracy is critical.</p>
+</div>
+
+<h3>Q4_K: K-Quant with Nested Scales</h3>
+
+<div class="card card-purple">
+    <h4 style="margin-top: 0;">Structure (Superblock of 256 weights)</h4>
+    <pre>
+typedef struct {
+    ck_half d;                  // 2 bytes: superblock scale
+    ck_half dmin;               // 2 bytes: superblock min
+    uint8_t scales[12];         // 12 bytes: 8 sub-block scales (6-bit each)
+    uint8_t qs[128];            // 128 bytes: 256 × 4-bit weights
+} block_q4_K;                   // Total: 144 bytes per 256 weights
+
+Bits per weight: 144 * 8 / 256 = 4.5 bits
+    </pre>
+
+    <h4>Nested Scale Hierarchy</h4>
+    <pre>
+Superblock (256 weights)
+├── d (FP16): overall scale
+├── dmin (FP16): overall minimum
+└── 8 Sub-blocks (32 weights each)
+    ├── scales[i] (6-bit): local scale adjustment
+    └── qs[...]: 4-bit quantized weights
+
+Dequant: weight = q * (d * sub_scale) - dmin * sub_min
+    </pre>
+    <p><strong>Best of both worlds:</strong> Fine-grained local scales without per-32-weight FP16 overhead.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Format Comparison</h3>
+    <table>
+        <tr>
+            <th>Format</th>
+            <th>Bits/Weight</th>
+            <th>Block Size</th>
+            <th>Quality</th>
+            <th>Speed</th>
+        </tr>
+        <tr class="highlight-bad">
+            <td>FP32</td>
+            <td>32</td>
+            <td>N/A</td>
+            <td>Perfect</td>
+            <td>Slow (memory-bound)</td>
+        </tr>
+        <tr>
+            <td>FP16</td>
+            <td>16</td>
+            <td>N/A</td>
+            <td>Excellent</td>
+            <td>2x faster</td>
+        </tr>
+        <tr>
+            <td>Q8_0</td>
+            <td>8.5</td>
+            <td>32</td>
+            <td>Very Good</td>
+            <td>~3.5x faster</td>
+        </tr>
+        <tr>
+            <td>Q4_0</td>
+            <td>4.5</td>
+            <td>32</td>
+            <td>Good</td>
+            <td>~6x faster</td>
+        </tr>
+        <tr class="highlight-good">
+            <td>Q4_K</td>
+            <td>4.5</td>
+            <td>256</td>
+            <td>Very Good</td>
+            <td>~6x faster</td>
+        </tr>
+    </table>
+</div>
+
+<hr>
+
+<h2 id="memory-layout">Memory Layout in Bump Allocator</h2>
+
+<p>Our bump allocator manages quantized weights, activations, and scratch space. Key principle: <strong>never mix types within a region</strong>.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Region Separation</h3>
+    <pre>
+// Bump allocator layout for quantized inference
+typedef struct {
+    // Region 1: Quantized weights (read-only after load)
+    uint8_t *weights_q4;      // Q4_0 or Q4_K blocks
+    size_t weights_size;
+
+    // Region 2: Activations (FP32, read-write)
+    float *activations;       // Input/output tensors
+    size_t act_size;
+
+    // Region 3: Scratch (FP32, temporary)
+    float *scratch;           // Intermediate buffers
+    size_t scratch_size;
+
+    // Region 4: Dequantized cache (optional)
+    float *dequant_cache;     // Hot weights kept dequantized
+    size_t cache_size;
+} BumpAllocator;
+    </pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Allocation Strategy</h3>
+    <pre>
+// Allocate quantized weight buffer
+size_t num_blocks = (num_weights + 31) / 32;  // Round up
+size_t q4_0_size = num_blocks * sizeof(block_q4_0);  // 18 bytes/block
+
+void* weights = bump_alloc(allocator, q4_0_size, REGION_WEIGHTS);
+
+// Allocate activation buffer (always FP32)
+size_t act_size = batch * seq_len * hidden_dim * sizeof(float);
+float* activations = bump_alloc(allocator, act_size, REGION_ACTIVATIONS);
+    </pre>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+        <strong>Why Separate Regions?</strong><br>
+        1. <strong>Cache efficiency</strong>: Homogeneous data types within cache lines<br>
+        2. <strong>Alignment</strong>: Each region can have optimal alignment for its type<br>
+        3. <strong>Prefetching</strong>: Sequential access patterns per region<br>
+        4. <strong>Safety</strong>: Type confusion bugs are impossible
+    </div>
+</div>
+
+<hr>
+
+<h2 id="kernel-dispatch">Kernel Dispatch by Type</h2>
+
+<p>Type checking happens at tensor level, <strong>never in the hot path</strong>.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Type-Tagged Tensors</h3>
+    <pre>
+typedef enum {
+    DTYPE_FP32,
+    DTYPE_FP16,
+    DTYPE_BF16,
+    DTYPE_Q4_0,
+    DTYPE_Q4_K,
+    DTYPE_Q8_0
+} DType;
+
+typedef struct {
+    void *data;
+    size_t shape[4];
+    DType dtype;
+    // ... other metadata
+} Tensor;
+    </pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Dispatch at Operation Level</h3>
+    <pre>
+void matmul(Tensor* out, const Tensor* A, const Tensor* B) {
+    // Type check ONCE at operation start
+    if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_FP32) {
+        matmul_fp32(out->data, A->data, B->data, ...);
+    }
+    else if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_Q4_0) {
+        matmul_fp32_q4_0(out->data, A->data, B->data, ...);
+    }
+    else if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_Q4_K) {
+        matmul_fp32_q4_k(out->data, A->data, B->data, ...);
+    }
+    // ... other combinations
+}
+
+// Hot path: no type checks, pure computation
+static void matmul_fp32_q4_0(float* out, const float* A,
+                              const block_q4_0* B, ...) {
+    // Direct memory access, no branches
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            float sum = 0.0f;
+            for (int k = 0; k < K; k += 32) {
+                // Dequantize block and compute
+                sum += dot_product_q4_0(&A[i*K + k], &B[j*K/32 + k/32]);
+            }
+            out[i*N + j] = sum;
+        }
+    }
+}
+    </pre>
+</div>
+
+<hr>
+
+<h2 id="cache-access">Cache Line Access Patterns</h2>
+
+<p>Understanding cache behavior is critical for quantized kernel performance.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Cache Line Basics</h3>
+    <pre>
+Cache line size: 64 bytes (typical x86)
+
+Q4_0 block: 18 bytes → ~3.5 blocks per cache line
+Q4_K block: 144 bytes → 2.25 cache lines per block
+
+Key insight: Scale and weights should be in SAME cache line
+when possible for minimal memory traffic.
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Good: Q4_0 Access</h3>
+        <pre>
+Cache line 1 (64B):
+├── Block 0: scale (2B) + qs (16B)
+├── Block 1: scale (2B) + qs (16B)
+├── Block 2: scale (2B) + qs (16B)
+└── Block 3: scale (2B) + 10B qs
+
+One fetch → 3.5 blocks → 112 weights!
+        </pre>
+    </div>
+    <div class="card card-red">
+        <h3 style="margin-top: 0;">Bad: Scattered Scales</h3>
+        <pre>
+If scales were separate from weights:
+
+Cache line 1: scales[0..31]
+Cache line 2: weights[0..127]
+Cache line 3: weights[128..255]
+
+3 fetches for same work!
+        </pre>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">SIMD-Aligned Processing</h3>
+    <pre>
+// Process 32 weights at a time (one Q4_0 block)
+// Perfectly aligned for AVX-512: 16 FP32 results at a time
+
+__m512 dequant_q4_0_avx512(const block_q4_0* block) {
+    // Load scale (broadcast to all lanes)
+    __m512 scale = _mm512_set1_ps(CK_FP16_TO_FP32(block->d));
+
+    // Load 16 bytes of quantized weights
+    __m128i qs = _mm_loadu_si128((__m128i*)block->qs);
+
+    // Unpack 4-bit to 8-bit
+    __m256i unpacked = unpack_4bit_to_8bit(qs);
+
+    // Convert to FP32 and scale
+    __m512 weights = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(unpacked));
+    return _mm512_mul_ps(weights, scale);
+}
+    </pre>
+</div>
+
+<hr>
+
+<h2 id="dequantization">Dequantization in Registers</h2>
+
+<p>Critical optimization: dequantize into CPU registers, never write back to memory.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Pattern</h3>
+    <pre>
+// WRONG: Dequantize to memory, then use
+float* temp = malloc(hidden_dim * sizeof(float));
+dequantize_q4_0(weights_q4, temp, hidden_dim);  // Write to RAM
+matmul(out, input, temp, ...);                   // Read from RAM
+free(temp);
+
+// RIGHT: Dequantize in registers during computation
+for (int block = 0; block < num_blocks; block++) {
+    // Dequantize 32 weights → 32 floats in YMM/ZMM registers
+    __m512 w = dequant_q4_0_avx512(&weights_q4[block]);
+
+    // Immediately use in FMA (still in registers!)
+    acc = _mm512_fmadd_ps(input_vec, w, acc);
+
+    // w never touches RAM after dequantization
+}
+    </pre>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">!</div>
+    <div>
+        <strong>Why This Matters</strong><br>
+        Register bandwidth: ~1 TB/s<br>
+        L1 cache bandwidth: ~200 GB/s<br>
+        RAM bandwidth: ~50 GB/s<br><br>
+        By keeping dequantized values in registers, we get <strong>20x better bandwidth</strong> than RAM.
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Complete Quantized GEMV Example</h3>
+    <pre>
+// Quantized matrix-vector multiply: y = A_q4 @ x
+void gemv_q4_0(float* y, const block_q4_0* A, const float* x,
+               int M, int K) {
+    const int blocks_per_row = K / 32;
+
+    for (int row = 0; row < M; row++) {
+        __m512 acc = _mm512_setzero_ps();
+
+        for (int b = 0; b < blocks_per_row; b++) {
+            // Load quantized block (18 bytes from RAM)
+            const block_q4_0* block = &A[row * blocks_per_row + b];
+
+            // Dequantize in registers (no memory write!)
+            __m512 w_lo = dequant_q4_0_lower(block);  // weights 0-15
+            __m512 w_hi = dequant_q4_0_upper(block);  // weights 16-31
+
+            // Load corresponding input (32 floats)
+            __m512 x_lo = _mm512_loadu_ps(&x[b * 32]);
+            __m512 x_hi = _mm512_loadu_ps(&x[b * 32 + 16]);
+
+            // FMA: accumulate dot product
+            acc = _mm512_fmadd_ps(w_lo, x_lo, acc);
+            acc = _mm512_fmadd_ps(w_hi, x_hi, acc);
+        }
+
+        // Horizontal sum and store single result
+        y[row] = _mm512_reduce_add_ps(acc);
+    }
+}
+    </pre>
+</div>
+
+<hr>
+
+<h2 id="amx-int8">AMX-INT8: The Hardware Reality</h2>
+
+<p>Intel's AMX (Advanced Matrix Extensions) offers significant speedups, but understanding its constraints is critical for correct implementation.</p>
+
+<div class="img-container svg-viewer" data-title="AMX-INT8 vs Weight-Only Quantization Pipelines">
+    <img src="assets/amx_pipeline.svg" alt="AMX Pipeline Comparison">
+</div>
+
+<div class="card card-red">
+    <h3 style="margin-top: 0;">AMX-INT8 Constraint</h3>
+    <pre>
+_tile_dpbusd:  UINT8 x INT8 → INT32
+               ─────   ────
+               tile A  tile B
+
+<strong>Both tiles must be INT8. No exceptions.</strong>
+
+There's no AMX instruction for:
+  BF16 x INT8 → ???    // Doesn't exist
+  FP32 x INT8 → ???    // Doesn't exist
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Option 1: Full INT8 Pipeline</h3>
+        <p>Quantize <strong>both</strong> weights and activations to INT8:</p>
+        <pre>
+FP32 input
+    ↓ quantize (AVX-512)
+INT8 activations
+    ↓
+AMX-INT8 (tile_dpbusd)
+    ↓
+INT32 accumulator
+    ↓ dequantize (AVX-512)
+FP32 output
+        </pre>
+        <p><strong>Requires:</strong></p>
+        <ul>
+            <li>Calibration data for activation ranges</li>
+            <li>Per-layer scales for activations</li>
+            <li>~1-2% accuracy loss (often acceptable for vision, not for LLMs)</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Option 2: Weight-Only INT8</h3>
+        <p>Keep activations in BF16/FP32, <strong>cannot use AMX-INT8</strong>:</p>
+        <pre>
+BF16 activations
+    ↓
+    └──→ AMX-BF16 ←── BF16 weights
+              ↑
+INT8 weights → Dequant (AVX-512)
+        </pre>
+        <p><strong>Advantages:</strong></p>
+        <ul>
+            <li>No calibration needed</li>
+            <li>Preserves activation precision</li>
+            <li>This is what most LLM deployments use</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">!</div>
+    <div>
+        <strong>LLM Reality</strong><br>
+        Most LLM deployments use INT4/INT8 weights with BF16/FP16 activations. AMX-INT8 is rarely used because quantizing activations hurts quality too much.
+    </div>
+</div>
+
+<h3>The Dequantization Cost</h3>
+
+<div class="card">
+    <pre>
+// Dequant INT8 → BF16 using AVX-512
+// This is "wasted" work before AMX compute
+
+__m512i w_int8 = _mm512_loadu_si512(weights);     // 64 INT8 values
+__m512 scale = _mm512_set1_ps(group_scale);
+
+// Unpack to 32-bit, convert to float, scale, convert to BF16
+__m512i w_lo = _mm512_cvtepi8_epi32(_mm512_extracti32x4_epi32(w_int8, 0));
+__m512 w_f32 = _mm512_mul_ps(_mm512_cvtepi32_ps(w_lo), scale);
+__m256i w_bf16 = _mm512_cvtneps_pbh(w_f32);  // FP32 → BF16
+
+// Now feed to AMX-BF16...
+    </pre>
+    <p>This dequant step eats cycles. The question is: <strong>does memory bandwidth savings outweigh dequant overhead?</strong></p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Math: When INT8 Wins</h3>
+        <pre>
+Memory bandwidth saved:
+  BF16 weights: 2 bytes/weight
+  INT8 weights: 1 byte/weight
+  Savings: ~50% bandwidth
+
+Dequant cost:
+  ~4-8 AVX-512 instructions per 64 weights
+  Maybe 10-20 cycles per 64 weights
+        </pre>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Break-Even Analysis</h3>
+        <pre>
+Memory-bound (batch=1, token gen):
+  → INT8 + dequant WINS
+  → Bandwidth is bottleneck
+
+Compute-bound (batch=64, prefill):
+  → BF16 direct WINS
+  → Dequant is pure overhead
+        </pre>
+    </div>
+</div>
+
+<hr>
+
+<h2 id="q4k-detail">Q4_K: K-Quants Deep Dive</h2>
+
+<p>The "K" in Q4_K refers to a family of block quantizers that use nested scales (a super-block scale plus per-sub-block adjustments). This format is popular because it achieves strong quality at ~4.5 bits/weight while keeping metadata compact.</p>
+
+<div class="img-container svg-viewer" data-title="Q4_K Block Structure: Nested Scales">
+    <img src="assets/q4k_block_structure.svg" alt="Q4_K Block Structure">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Q4_K Structure Definition</h3>
+    <pre>
+// Q4_K block: 256 weights per block
+
+typedef struct {
+    ck_half d;             // 2 bytes: super-block scale (FP16)
+    ck_half dmin;          // 2 bytes: super-block minimum (FP16)
+    uint8_t scales[12];    // 12 bytes: sub-block scales (6-bit each, packed)
+    uint8_t qs[128];       // 128 bytes: 256 INT4 weights (4 bits × 256)
+} block_q4_K;              // Total: 144 bytes for 256 weights = 4.5 bpw
+    </pre>
+</div>
+
+<div class="card card-purple">
+    <h3 style="margin-top: 0;">Two-Level Scaling Hierarchy</h3>
+    <pre>
+Super-block (256 weights)
+├── d (FP16): overall scale for the whole block
+├── dmin (FP16): overall minimum
+└── 8 Sub-blocks (32 weights each)
+    ├── scales[i] (6-bit): local scale adjustment
+    └── qs[...]: 4-bit quantized weights
+
+Dequantization:
+  w_fp32 = q * (d * sub_scale) - dmin * sub_min
+    </pre>
+    <p><strong>Why nested scales?</strong> Best of both worlds: fine-grained local adaptation without per-32-weight FP16 overhead.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">K-Quant Variants</h3>
+    <table>
+        <tr>
+            <th>Format</th>
+            <th>Description</th>
+            <th>Quality</th>
+            <th>Bits/Weight</th>
+        </tr>
+        <tr>
+            <td><code>Q4_K_S</code></td>
+            <td>Small - more aggressive quantization</td>
+            <td>Good</td>
+            <td>4.5</td>
+        </tr>
+        <tr>
+            <td><code>Q4_K_M</code></td>
+            <td>Medium - balanced (most common)</td>
+            <td>Very Good</td>
+            <td>4.5</td>
+        </tr>
+        <tr>
+            <td><code>Q5_K_M</code></td>
+            <td>5-bit with k-quant structure</td>
+            <td>Excellent</td>
+            <td>5.5</td>
+        </tr>
+        <tr>
+            <td><code>Q6_K</code></td>
+            <td>6-bit for near-FP16 quality</td>
+            <td>Near-perfect</td>
+            <td>6.5</td>
+        </tr>
+    </table>
+</div>
+
+<hr>
+
+<h2 id="blockwise-dequant">How Blockwise Dequant Works</h2>
+
+<p>For weight-only quantization, the key performance trick is to avoid a full dequantization pass. Instead, dequantize a small block in registers and immediately consume it in the dot-product/FMA loop.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Activations: Always FP32</h3>
+    <pre>
+Weight-only quantized inference (typical CPU path):
+
+Activations: FP32
+Weights:     Q4_K, Q4_0, Q8_0, etc.
+Compute:     Dequant (registers) → FMA accumulate
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Fused Dequant + Compute</h3>
+    <p><strong>Critical insight:</strong> do not dequantize the whole tensor, then matmul. Dequantize-and-compute per block:</p>
+    <pre>
+for each block (256 weights):
+  load (d, dmin, sub-scales)
+  unpack 4-bit nibbles
+  convert to fp32 and apply scales
+  fused multiply-add with fp32 activations
+  accumulate into fp32
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Q4_K Path</h3>
+        <p>Pure AVX-512 (dequant + FMA fused)</p>
+        <pre>
+Load Q4_K block
+  ↓
+Unpack nibbles (AVX-512)
+  ↓
+Apply scales (AVX-512)
+  ↓
+FMA with activations
+  ↓
+Accumulate
+        </pre>
+        <p><strong>No AMX used</strong> - all in one fused kernel.</p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">BF16 Path</h3>
+        <p>Direct AMX-BF16 (no dequant needed)</p>
+        <pre>
+Load BF16 weights
+  ↓
+Load BF16 activations
+  ↓
+AMX tile matmul
+  ↓
+FP32 accumulator
+        </pre>
+        <p>AMX only used when <strong>both</strong> operands are BF16.</p>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Why Not AVX-512 || AMX Pipelining?</strong><br>
+        The two-step AVX→AMX handoff you might imagine would actually be slower due to tile load/store overhead. Better to stay in one domain. For quantized formats, pure AVX-512 with fused dequant is the fastest path.
+    </div>
+</div>
+
+<hr>
+
+<h2 id="bump-integration">Bump Allocator Integration</h2>
+
+<p>Our bump allocator manages quantized weights, activations, and scratch space. The key principle: <strong>never mix types within a region</strong>.</p>
+
+<div class="img-container svg-viewer" data-title="Bump Allocator Memory Layout for Quantized Inference">
+    <img src="assets/bump_allocator_quant.svg" alt="Bump Allocator Memory Layout">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Tensor Structure for Quantized Types</h3>
+    <pre>
+typedef enum {
+    CK_DT_FP32,
+    CK_DT_FP16,
+    CK_DT_BF16,
+    CK_DT_Q4_0,    // Simple: 32 weights, 1 scale
+    CK_DT_Q4_K,    // K-quant: 256 weights, hierarchical scales
+    CK_DT_Q8_0,
+} CKDataType;
+
+typedef struct {
+    CKDataType dtype;
+    uint32_t ne[4];      // Dimensions
+    size_t nb[4];        // Strides in bytes
+    size_t block_size;   // Weights per block (32 for Q4_0, 256 for Q4_K)
+    size_t type_size;    // Bytes per block
+    void* data;          // Points into bump allocator
+} tensor;
+    </pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Size Calculation</h3>
+    <pre>
+size_t tensor_size_bytes(CKDataType dt, int64_t nelements) {
+    // See: include/ckernel_dtype.h (ck_dtype_row_bytes)
+    // Quantized types use "bytes per block" × "blocks per row".
+    ...
+}
+
+// Example: 4096 × 4096 weight matrix
+// Total weights: 16M
+// Q4_K: 16M / 256 × 144 = 9.4 MB (vs 64 MB for FP32!)
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Region Separation</h3>
+        <pre>
+Region 1: Tensor Headers
+  └── Metadata only (pointers to data)
+
+Region 2: Quantized Weights (Q4_K)
+  └── Read-only after load
+  └── Can be mmap'd
+
+Region 3: Dequant Cache (BF16)
+  └── Optional, for hot layers
+
+Region 4: Activations (FP32)
+  └── Always full precision
+  └── Double-buffered
+
+Region 5: Scratch (FP32)
+  └── Temporary buffers
+  └── Reused per layer
+        </pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Why Separate Regions?</h3>
+        <ul>
+            <li><strong>Cache efficiency:</strong> Homogeneous types in cache lines</li>
+            <li><strong>Alignment:</strong> Each region optimally aligned for its type</li>
+            <li><strong>Prefetching:</strong> Sequential access patterns per region</li>
+            <li><strong>Safety:</strong> Type confusion bugs are impossible</li>
+            <li><strong>Sharing:</strong> Read-only weights can be mmap'd, shared across processes</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-purple">
+    <h3 style="margin-top: 0;">Memory Savings: 7B Parameter Model</h3>
+    <table>
+        <tr>
+            <th>Format</th>
+            <th>Weight Size</th>
+            <th>Savings</th>
+        </tr>
+        <tr class="highlight-bad">
+            <td>FP32</td>
+            <td>28 GB</td>
+            <td>Baseline</td>
+        </tr>
+        <tr>
+            <td>BF16</td>
+            <td>14 GB</td>
+            <td>2×</td>
+        </tr>
+        <tr>
+            <td>Q8_0</td>
+            <td>~7.5 GB</td>
+            <td>3.7×</td>
+        </tr>
+        <tr class="highlight-good">
+            <td>Q4_K</td>
+            <td>~4 GB</td>
+            <td>7×</td>
+        </tr>
+    </table>
+    <p>+ Activations: ~500 MB per batch (always FP32)</p>
+</div>
+
+<hr>
+
+<h2 id="practical">Practical Implementation</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Realistic LLM Inference on Xeon</h3>
+    <pre>
+void matmul_q4(float* out, const float* x, const tensor* W) {
+    if (batch_size == 1 && seq_len <= 32) {
+        // Memory-bound: token generation
+        // INT4 weights + dequant + AVX-512 FP32
+        // (AMX setup overhead not worth it for small tiles)
+        matmul_q4_avx512(out, x, W);
+    }
+    else {
+        // Compute-bound: prefill or batched
+        // Dequant to BF16 + AMX-BF16
+        dequant_q4_to_bf16(W_bf16, W_q4);  // AVX-512
+        amx_matmul_bf16(out, x, W_bf16);   // AMX
+    }
+}
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Token Generation (batch=1)</h3>
+        <ul>
+            <li>Memory-bound: loading 4GB of weights</li>
+            <li>Pure AVX-512 with fused dequant</li>
+            <li>AMX setup overhead not worth it</li>
+            <li>Latency: ~50ms per token (7B model)</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Prefill (batch=64)</h3>
+        <ul>
+            <li>Compute-bound: weight reuse across batch</li>
+            <li>Dequant weights to BF16 once</li>
+            <li>AMX-BF16 for the big matmul</li>
+            <li>Throughput: ~1000 tokens/second</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+        <strong>Implementation Advice</strong><br>
+        Don't try to mix AVX-512 and AMX per operation. Two clean paths:<br>
+        1. <strong>Q4 path:</strong> Fused dequant+compute in AVX-512<br>
+        2. <strong>BF16 path:</strong> Direct AMX-BF16<br>
+        Get the simple paths working first, profile, then optimize.
+    </div>
+</div>
+
+<hr>
+
+<h2>Summary: Key Takeaways</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Grouping is Essential</h3>
+        <ul>
+            <li>Single scale loses small weights</li>
+            <li>Per-group scales preserve precision</li>
+            <li>32 elements per group is the sweet spot</li>
+            <li>K-quants use nested scales for efficiency</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Memory Layout Matters</h3>
+        <ul>
+            <li>Keep scale adjacent to weights</li>
+            <li>Separate regions by data type</li>
+            <li>Align to cache lines</li>
+            <li>Dequantize in registers, not RAM</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Format Quick Reference</h3>
+    <table>
+        <tr><th>Format</th><th>Bytes/32 Weights</th><th>Structure</th><th>Best For</th></tr>
+        <tr><td>Q4_0</td><td>18</td><td>scale + 32×4bit</td><td>General use, fastest</td></tr>
+        <tr><td>Q4_1</td><td>20</td><td>scale + min + 32×4bit</td><td>Asymmetric distributions</td></tr>
+        <tr><td>Q8_0</td><td>34</td><td>scale + 32×8bit</td><td>High quality requirements</td></tr>
+        <tr><td>Q4_K</td><td>144/256</td><td>Nested superblock</td><td>Best quality/size ratio</td></tr>
+    </table>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="memory-safety.html">Memory Safety</a> - Bump allocator details</li>
+    <li><a href="kernels.html">Kernel Reference</a> - SIMD implementations</li>
+    <li><a href="gemm-optimization.html">GEMM Optimization</a> - Microkernel, packing, 1.44x faster than MKL</li>
+    <li><a href="concepts.html">Deep Dive: LLM Concepts</a> - Transformer architecture</li>
+</ul>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+    </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2025-12-26</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -8,6 +8,7 @@
     <includedby refid="ck__tokenizer_8c" local="yes">ck_tokenizer.c</includedby>
     <includedby refid="ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
     <includedby refid="v2__legacy_2ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
+    <includedby refid="ck__tokenizer__v6_8c" local="yes">ck_tokenizer_v6.c</includedby>
     <incdepgraph>
       <node id="4">
         <label>stdbool.h</label>
@@ -39,6 +40,8 @@
         </childnode>
         <childnode refid="4" relation="include">
         </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
       </node>
       <node id="3">
         <label>ck_tokenizer_v2.c</label>
@@ -51,6 +54,10 @@
       <node id="2">
         <label>ck_tokenizer.c</label>
         <link refid="ck__tokenizer_8c"/>
+      </node>
+      <node id="5">
+        <label>ck_tokenizer_v6.c</label>
+        <link refid="ck__tokenizer__v6_8c"/>
       </node>
     </invincdepgraph>
     <innerclass refid="structCKMemPool" prot="public">CKMemPool</innerclass>
@@ -315,7 +322,7 @@
         <references refid="ck__tokenizer_8c_1a8305a4a576ed2473bccd0a5dff347aa1" compoundref="ck__tokenizer_8c" startline="219" endline="222">ck_tokenizer_id_to_token</references>
         <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
         <references refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" compoundref="tokenizer_8h" startline="399">ids</references>
-        <references refid="true__bpe_8h_1a59dd98a65ac03cdb1deea39c7580fb33" compoundref="true__bpe_8h" startline="246">max_len</references>
+        <references refid="true__bpe_8h_1a59dd98a65ac03cdb1deea39c7580fb33" compoundref="true__bpe_8h" startline="264">max_len</references>
         <references refid="tokenizer_8h_1a2f30fc798d162629916e2faa69137745" compoundref="tokenizer_8h" startline="400">num_ids</references>
         <references refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" compoundref="ck__tokenizer_8h" startline="100">CKTokenizer::pad_id</references>
         <references refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" compoundref="tokenizer_8h" startline="494">text</references>
@@ -362,14 +369,14 @@
         <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
         <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
         <references refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" compoundref="tokenizer_8h" startline="399">ids</references>
-        <references refid="true__bpe_8h_1adc7b8f0514fd7d4fefa123e27ce8922d" compoundref="true__bpe_8h" startline="230">max_ids</references>
+        <references refid="true__bpe_8h_1adc7b8f0514fd7d4fefa123e27ce8922d" compoundref="true__bpe_8h" startline="248">max_ids</references>
         <references refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" compoundref="ck__tokenizer_8h" startline="69">CKMergeRule::merged</references>
         <references refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" compoundref="ck__tokenizer_8h" startline="89">CKTokenizer::merges</references>
         <references refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" compoundref="ck__tokenizer_8h" startline="90">CKTokenizer::num_merges</references>
         <references refid="tokenizer_8h_1afcd8f560b02b3c7a2bc2b3effa325fcf" compoundref="tokenizer_8h" startline="401">out_len</references>
         <references refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" compoundref="ck__tokenizer_8h" startline="70">CKMergeRule::priority</references>
         <references refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" compoundref="tokenizer_8h" startline="494">text</references>
-        <references refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" compoundref="true__bpe_8h" startline="228">text_len</references>
+        <references refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" compoundref="true__bpe_8h" startline="246">text_len</references>
         <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
         <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
       </memberdef>
@@ -402,6 +409,7 @@
         <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
         <references refid="structCKTokenizer_1a04da4f7678ae2191f13c434960df3e66" compoundref="tokenizer_8h" startline="95">CKTokenizer::vocab_trie</references>
         <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>const char *</type>

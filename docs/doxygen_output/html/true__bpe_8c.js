@@ -20,6 +20,7 @@ var true__bpe_8c =
     [ "ck_true_bpe_encode", "true__bpe_8c.html#a2575ccc3febd74fd764ead2153ac9c11", null ],
     [ "ck_true_bpe_free", "true__bpe_8c.html#a595b35162c872e368792875138226c51", null ],
     [ "ck_true_bpe_id_to_token", "true__bpe_8c.html#ae82c7c3dbdf0bac7969abcc359888f63", null ],
+    [ "ck_true_bpe_load_binary", "true__bpe_8c.html#aa617ef3b2cc12fc877fc917e2e588d9c", null ],
     [ "ck_true_bpe_lookup", "true__bpe_8c.html#ae74dd1b70452d2e51b83fed3ae67855c", null ],
     [ "ck_true_bpe_num_merges", "true__bpe_8c.html#a950f1534938dd1a899d74146b5e86dd1", null ],
     [ "ck_true_bpe_set_config", "true__bpe_8c.html#a3611b29ff15905af00375ebc2d6b2750", null ],

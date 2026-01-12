@@ -129,6 +129,11 @@ void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, in
 void gemm_nt_q5_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 
+// GEMV versions (for decode mode - single token)
+void gemv_q4_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
+
 void dequant_q6_k_row(const void *src, float *dst, size_t n_elements);
 
 // Simple quant dequantization (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)

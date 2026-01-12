@@ -195,18 +195,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                      emit_main: bool = False,
                      emit_debug: bool = False,
                      emit_parity: bool = False,
-                     weights_manifest: Optional[Dict] = None,
-                     decode_scratch_offsets: Optional[Dict[int, Dict[str, int]]] = None) -> None:
+                     weights_manifest: Optional[Dict] = None) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
         emit_debug: If True, insert debug prints after each layer to detect NaN/zero outputs.
         emit_parity: If True, save intermediate buffers to files for comparison with PyTorch.
         weights_manifest: If provided, validate layout against manifest and embed validation table.
-        decode_scratch_offsets: If provided, use arena pointers for decode scratch buffers instead of
-                                stack arrays. Dict maps layer_id to buffer offsets:
-                                {layer_id: {q_token: offset, k_token: offset, ...}}
-                                This enables zero-copy operation and training support.
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v6 codegen only supports prefill/decode (got: {mode})")
@@ -718,7 +713,7 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"    const int head_dim = {safe_name}_HEAD_DIM;")
             add("    const size_t head_w_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
             add("    const size_t q_head_stride = (size_t)num_tokens * (size_t)aligned_head_dim;")
-            add("    const size_t kv_head_stride = (size_t)aligned_context_window * (size_t)aligned_head_dim;")
+            add("    const size_t kv_head_stride = (size_t)num_tokens * (size_t)aligned_head_dim;")
             add()
 
             add("    /* RMSNorm before attention */")
@@ -794,31 +789,28 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             if has_rope:
                 add("    /* RoPE */")
-                add("    rope_forward_qk_strided(q,")
-                add("                            k,")
-                add("                            rope_cos,")
-                add("                            rope_sin,")
-                add("                            H,")
-                add("                            H_kv,")
-                add("                            num_tokens,")
-                add("                            head_dim,")
-                add("                            aligned_head_dim,")
-                add("                            0,")
-                add("                            num_tokens,")
-                add("                            aligned_context_window);")
+                add("    rope_forward_qk(q,")
+                add("                    k,")
+                add("                    rope_cos,")
+                add("                    rope_sin,")
+                add("                    H,")
+                add("                    H_kv,")
+                add("                    num_tokens,")
+                add("                    head_dim,")
+                add("                    aligned_head_dim,")
+                add("                    0);")
                 add()
 
             add("    /* Attention (prefill, causal) */")
-            add("    attention_forward_causal_head_major_gqa_flash_strided(q,")
-            add("                                                           k,")
-            add("                                                           v,")
-            add("                                                           attn_out,")
-            add("                                                           H,")
-            add("                                                           H_kv,")
-            add("                                                           num_tokens,")
-            add("                                                           head_dim,")
-            add("                                                           aligned_head_dim,")
-            add("                                                           aligned_context_window);")
+            add("    attention_forward_causal_head_major_gqa_flash(q,")
+            add("                                                   k,")
+            add("                                                   v,")
+            add("                                                   attn_out,")
+            add("                                                   H,")
+            add("                                                   H_kv,")
+            add("                                                   num_tokens,")
+            add("                                                   head_dim,")
+            add("                                                   aligned_head_dim);")
             add()
 
             add("    /* Output projection (flatten head-major to token-major) */")
@@ -927,6 +919,19 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("        aligned_head_dim,")
             add("        aligned_intermediate_dim,")
             add("        aligned_context_window);")
+            add()
+            add("    kv_cache_repack_head_major_inplace(")
+            add(f"        {safe_name}_PTR(model, {safe_name}_LAYERS[{layer_id}].k),")
+            add(f"        {safe_name}_NUM_KV_HEADS,")
+            add("        num_tokens,")
+            add("        aligned_context_window,")
+            add("        aligned_head_dim);")
+            add("    kv_cache_repack_head_major_inplace(")
+            add(f"        {safe_name}_PTR(model, {safe_name}_LAYERS[{layer_id}].v),")
+            add(f"        {safe_name}_NUM_KV_HEADS,")
+            add("        num_tokens,")
+            add("        aligned_context_window,")
+            add("        aligned_head_dim);")
             add()
 
         add(f"    float *last_hidden = {safe_name}_PTR(model, {safe_name}_LAYERS[{safe_name}_NUM_LAYERS - 1].output);")
@@ -1068,34 +1073,15 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"    const int H_kv = {safe_name}_NUM_KV_HEADS;")
             add(f"    const int head_dim = {safe_name}_HEAD_DIM;")
             add()
-
-            # Check if we have arena-based decode scratch buffers for this layer
-            layer_scratch = None
-            if decode_scratch_offsets and layer_id in decode_scratch_offsets:
-                layer_scratch = decode_scratch_offsets[layer_id]
-
-            if layer_scratch:
-                # Use arena pointers (zero-copy, training-compatible)
-                add("    /* Decode scratch buffers - ARENA POINTERS (zero-copy, training-compatible) */")
-                add(f"    float *q_token = (float *)((char *)model->arena + {layer_scratch['q_token']});")
-                add(f"    float *k_token = (float *)((char *)model->arena + {layer_scratch['k_token']});")
-                add(f"    float *v_token = (float *)((char *)model->arena + {layer_scratch['v_token']});")
-                add(f"    float *attn_token = (float *)((char *)model->arena + {layer_scratch['attn_out']});")
-                add()
-                add("    /* MLP scratch buffers - ARENA POINTERS */")
-                add(f"    float *fc1_out = (float *)((char *)model->arena + {layer_scratch['fc1_out']});")
-                add(f"    float *swiglu_out = (float *)((char *)model->arena + {layer_scratch['swiglu_out']});")
-            else:
-                # Fallback to stack arrays (backwards compatible, but not ideal for training)
-                add("    /* Decode scratch buffers - STACK (fallback, not ideal for training) */")
-                add("    float q_token[H * aligned_head_dim];")
-                add("    float k_token[H_kv * aligned_head_dim];")
-                add("    float v_token[H_kv * aligned_head_dim];")
-                add("    float attn_token[H * aligned_head_dim];")
-                add()
-                add("    /* MLP scratch buffers - STACK */")
-                add("    float fc1_out[2 * aligned_intermediate_dim];")
-                add("    float swiglu_out[aligned_intermediate_dim];")
+            add("    float q_token[H * aligned_head_dim];")
+            add("    float k_token[H_kv * aligned_head_dim];")
+            add("    float v_token[H_kv * aligned_head_dim];")
+            add("    float attn_token[H * aligned_head_dim];")
+            add()
+            # Local buffers for MLP (fc1_out = 2x intermediate for gate+up, swiglu_out = intermediate)
+            add("    /* Local MLP buffers (avoid layout dependencies for intermediate values) */")
+            add("    float fc1_out[2 * aligned_intermediate_dim];")
+            add("    float swiglu_out[aligned_intermediate_dim];")
             add()
 
             # Step 1: RMSNorm
@@ -1114,9 +1100,6 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add(f'    parity_save_buffer("layer_{layer_id}_ln1_out", ln1_out, aligned_embed_dim);')
             add()
 
-            add("    const size_t kv_head_stride = (size_t)aligned_context_window * (size_t)aligned_head_dim;")
-            add()
-
             # Step 2: QKV projection with explicit kernel names
             add("    /* Step 2: QKV projection */")
             wq_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wq_dt, "gemm_blocked_serial")
@@ -1130,107 +1113,56 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             add(f"    /* Q projection: {wq_dt.upper()} -> {wq_kernel} */")
             add(f"    {wq_kernel}(ln1_out, WQ, {bq_arg}, q_token, 1, H * head_dim, aligned_embed_dim);")
-            add("    if (aligned_head_dim > head_dim) {")
-            add("        for (int h = 0; h < H; ++h) {")
-            add("            float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;")
-            add("            for (int d = head_dim; d < aligned_head_dim; ++d) {")
-            add("                q_head[d] = 0.0f;")
-            add("            }")
-            add("        }")
-            add("    }")
             add()
-            add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (direct-to-cache) */")
-            if wk_dt == "fp32":
-                add("    const float *WK_f = (const float *)WK;")
-                add("    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
-                add("    for (int h = 0; h < H_kv; ++h) {")
-                add("        const float *wk_h = WK_f + (size_t)h * wk_head_elems;")
-                add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
-                add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
-                add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            k_head[d] = 0.0f;")
-                add("        }")
-                add("    }")
-            else:
-                add(f"    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
-                add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, wk_head_elems);")
-                add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
-                add("    for (int h = 0; h < H_kv; ++h) {")
-                add("        const void *wk_h = (const void *)(WK_bytes + (size_t)h * wk_head_bytes);")
-                add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
-                add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
-                add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            k_head[d] = 0.0f;")
-                add("        }")
-                add("    }")
+            add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} */")
+            add(f"    {wk_kernel}(ln1_out, WK, {bk_arg}, k_token, 1, H_kv * head_dim, aligned_embed_dim);")
             add()
-            add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (direct-to-cache) */")
-            if wv_dt == "fp32":
-                add("    const float *WV_f = (const float *)WV;")
-                add("    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
-                add("    for (int h = 0; h < H_kv; ++h) {")
-                add("        const float *wv_h = WV_f + (size_t)h * wv_head_elems;")
-                add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
-                add("        float *v_head = v_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
-                add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            v_head[d] = 0.0f;")
-                add("        }")
-                add("    }")
-            else:
-                add(f"    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
-                add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, wv_head_elems);")
-                add("    const uint8_t *WV_bytes = (const uint8_t *)WV;")
-                add("    for (int h = 0; h < H_kv; ++h) {")
-                add("        const void *wv_h = (const void *)(WV_bytes + (size_t)h * wv_head_bytes);")
-                add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
-                add("        float *v_head = v_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
-                add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            v_head[d] = 0.0f;")
-                add("        }")
-                add("    }")
+            add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} */")
+            add(f"    {wv_kernel}(ln1_out, WV, {bv_arg}, v_token, 1, H_kv * head_dim, aligned_embed_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_q_token", q_token, H * aligned_head_dim);')
+                add(f'    debug_check_buffer("layer{layer_id}_k_token", k_token, H_kv * aligned_head_dim);')
+                add(f'    debug_check_buffer("layer{layer_id}_v_token", v_token, H_kv * aligned_head_dim);')
             if emit_parity:
                 add(f'    parity_save_buffer("layer_{layer_id}_q_proj", q_token, H * aligned_head_dim);')
+                add(f'    parity_save_buffer("layer_{layer_id}_k_proj", k_token, H_kv * aligned_head_dim);')
+                add(f'    parity_save_buffer("layer_{layer_id}_v_proj", v_token, H_kv * aligned_head_dim);')
             add()
 
             # Step 3: RoPE
             if has_rope:
                 add("    /* Step 3: RoPE */")
-                add("    rope_forward(q_token,")
-                add("                 rope_cos,")
-                add("                 rope_sin,")
-                add("                 H,")
-                add("                 1,")
-                add("                 head_dim,")
-                add("                 aligned_head_dim,")
-                add("                 token_index);")
-                add("    for (int h = 0; h < H_kv; ++h) {")
-                add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
-                add("        rope_forward(k_head,")
-                add("                     rope_cos,")
-                add("                     rope_sin,")
-                add("                     1,")
-                add("                     1,")
-                add("                     head_dim,")
-                add("                     aligned_head_dim,")
-                add("                     token_index);")
-                add("    }")
+                add("    rope_forward_qk(q_token,")
+                add("                    k_token,")
+                add("                    rope_cos,")
+                add("                    rope_sin,")
+                add("                    H,")
+                add("                    H_kv,")
+                add("                    1,")
+                add("                    head_dim,")
+                add("                    aligned_head_dim,")
+                add("                    token_index);")
                 if emit_parity:
                     add(f'    parity_save_buffer("layer_{layer_id}_q_rope", q_token, H * aligned_head_dim);')
+                    add(f'    parity_save_buffer("layer_{layer_id}_k_rope", k_token, H_kv * aligned_head_dim);')
                 add()
 
-            # Step 4: KV cache write (direct-to-cache in projection)
-            add("    /* Step 4: KV cache write (direct-to-cache) */")
+            # Step 4: KV cache write
+            add("    /* Step 4: KV cache write */")
+            add("    kv_cache_write_head_major(k_token,")
+            add("                              v_token,")
+            add("                              k_cache,")
+            add("                              v_cache,")
+            add("                              H_kv,")
+            add("                              token_index,")
+            add("                              aligned_context_window,")
+            add("                              head_dim,")
+            add("                              aligned_head_dim);")
             add()
 
             # Step 5: Attention
-            add("    /* Step 5: Attention (decode, flash) */")
-            add("    attention_forward_decode_head_major_gqa_flash(q_token,")
+            add("    /* Step 5: Attention (decode) */")
+            add("    attention_forward_decode_head_major_gqa_regular(q_token,")
             add("                                                   k_cache,")
             add("                                                   v_cache,")
             add("                                                   attn_token,")

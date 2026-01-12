@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SVG Viewer Test</title>
+    <style>
+        body {
+            background: #232323;
+            color: #fff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+        .svg-viewer {
+            cursor: pointer;
+            display: inline-block;
+            border: 2px solid #ffb400;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 8px;
+        }
+        .svg-viewer:hover {
+            background: #333;
+        }
+        .svg-viewer img {
+            max-width: 300px;
+            display: block;
+        }
+
+        /* Fullscreen overlay */
+        #svg-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 999999;
+        }
+        #svg-overlay .toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            background: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000000;
+        }
+        #svg-overlay .title {
+            color: #ccc;
+        }
+        #svg-overlay .controls button {
+            background: #333;
+            color: #ffb400;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-left: 10px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        #svg-overlay .controls button:hover {
+            background: #444;
+        }
+        #svg-overlay .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            padding-top: 60px;
+        }
+        #svg-overlay .image-container img {
+            max-width: 90%;
+            max-height: 85vh;
+        }
+        #svg-overlay .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #222;
+            color: #ffb400;
+            border: none;
+            font-size: 40px;
+            padding: 20px;
+            cursor: pointer;
+            z-index: 1000000;
+        }
+        #svg-overlay .nav-prev { left: 20px; }
+        #svg-overlay .nav-next { right: 20px; }
+    </style>
+</head>
+<body>
+    <h1>SVG Viewer Test</h1>
+    <p>Click any image to open fullscreen viewer:</p>
+
+    <div class="svg-viewer" data-title="Transformer Overview">
+        <img src="assets/concept-transformer-overview.svg" alt="Transformer">
+    </div>
+
+    <div class="svg-viewer" data-title="RoPE Embedding">
+        <img src="assets/concept-rope-detailed.svg" alt="RoPE">
+    </div>
+
+    <div class="svg-viewer" data-title="Flash Attention">
+        <img src="assets/concept-flash-attention.svg" alt="Flash">
+    </div>
+
+    <!-- Overlay -->
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()">-</button>
+                <button onclick="svgViewer.resetZoom()">Reset</button>
+                <button onclick="svgViewer.zoomIn()">+</button>
+                <button onclick="svgViewer.close()">Close X</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()">←</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()">→</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="Preview">
+        </div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay = document.getElementById('svg-overlay');
+        var img = document.getElementById('svg-image');
+        var titleEl = document.getElementById('svg-title');
+        var container = document.getElementById('svg-container');
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1;
+        var panX = 0, panY = 0;
+
+        // Find all images
+        document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+            var viewerImg = viewer.querySelector('img');
+            if (viewerImg) {
+                images.push({
+                    src: viewerImg.src,
+                    title: viewer.getAttribute('data-title') || 'Image ' + (index + 1)
+                });
+                viewer.onclick = function() {
+                    open(index);
+                };
+            }
+        });
+
+        console.log('Found ' + images.length + ' images');
+
+        // Wheel zoom
+        container.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            scale += e.deltaY > 0 ? -0.2 : 0.2;
+            scale = Math.max(0.5, Math.min(5, scale));
+            img.style.transform = 'scale(' + scale + ') translate(' + panX + 'px, ' + panY + 'px)';
+        });
+
+        // Keyboard
+        document.addEventListener('keydown', function(e) {
+            if (overlay.style.display !== 'block') return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft') prev();
+            if (e.key === 'ArrowRight') next();
+        });
+
+        function open(index) {
+            currentIndex = index;
+            scale = 1;
+            panX = 0;
+            panY = 0;
+            img.src = images[index].src;
+            img.style.transform = '';
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            console.log('Opened image: ' + images[index].src);
+        }
+
+        function close() {
+            overlay.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        function prev() {
+            open((currentIndex - 1 + images.length) % images.length);
+        }
+
+        function next() {
+            open((currentIndex + 1) % images.length);
+        }
+
+        function zoomIn() {
+            scale = Math.min(5, scale + 0.25);
+            img.style.transform = 'scale(' + scale + ')';
+        }
+
+        function zoomOut() {
+            scale = Math.max(0.5, scale - 0.25);
+            img.style.transform = 'scale(' + scale + ')';
+        }
+
+        function resetZoom() {
+            scale = 1;
+            img.style.transform = '';
+        }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom };
+    })();
+    </script>
+</body>
+</html>

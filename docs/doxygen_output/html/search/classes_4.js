@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['memoryinfo_1843',['MemoryInfo',['../structMemoryInfo.html',1,'']]],
-  ['memoryslot_1844',['MemorySlot',['../structMemorySlot.html',1,'']]]
+  ['memoryinfo_1955',['MemoryInfo',['../structMemoryInfo.html',1,'']]],
+  ['memoryslot_1956',['MemorySlot',['../structMemorySlot.html',1,'']]]
 ];

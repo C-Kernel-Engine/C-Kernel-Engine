@@ -171,10 +171,10 @@ $(document).ready(function(){initNavTree('kv__cache__kernels_8c_source.html','')
 <div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;    }</div>
 <div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;}</div>
 <div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160; </div>
-<div class="line"><a name="l00048"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a1b1c905b9d69fc8aadca4c714147ce45">   48</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="kv__cache__kernels_8c.html#a1b1c905b9d69fc8aadca4c714147ce45">kv_cache_write_head_major</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *k_token,</div>
-<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;                               <span class="keyword">const</span> <span class="keywordtype">float</span> *v_token,</div>
-<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;                               <span class="keywordtype">float</span> *k_cache,</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;                               <span class="keywordtype">float</span> *v_cache,</div>
+<div class="line"><a name="l00048"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a6add8eaed40b7a32a537cf4cffb39709">   48</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="kv__cache__kernels_8c.html#a6add8eaed40b7a32a537cf4cffb39709">kv_cache_write_head_major</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *__restrict k_token,</div>
+<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;                               <span class="keyword">const</span> <span class="keywordtype">float</span> *__restrict v_token,</div>
+<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;                               <span class="keywordtype">float</span> *__restrict k_cache,</div>
+<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;                               <span class="keywordtype">float</span> *__restrict v_cache,</div>
 <div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;                               <span class="keywordtype">int</span> num_kv_heads,</div>
 <div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;                               <span class="keywordtype">int</span> token_index,</div>
 <div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;                               <span class="keywordtype">int</span> cache_capacity,</div>
@@ -201,24 +201,19 @@ $(document).ready(function(){initNavTree('kv__cache__kernels_8c_source.html','')
 <div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;        <span class="keywordtype">float</span> *k_dst = k_cache + (size_t)h * head_stride + (<span class="keywordtype">size_t</span>)token_index * token_stride;</div>
 <div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;        <span class="keywordtype">float</span> *v_dst = v_cache + (size_t)h * head_stride + (<span class="keywordtype">size_t</span>)token_index * token_stride;</div>
 <div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160; </div>
-<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;        <span class="keywordflow">if</span> (head_dim == aligned_head_dim) {</div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;            memcpy(k_dst, k_src, (<span class="keywordtype">size_t</span>)aligned_head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;            memcpy(v_dst, v_src, (<span class="keywordtype">size_t</span>)aligned_head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;                k_dst[d] = k_src[d];</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;                v_dst[d] = v_src[d];</div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;            }</div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = head_dim; d &lt; aligned_head_dim; ++d) {</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;                k_dst[d] = 0.0f;</div>
-<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;                v_dst[d] = 0.0f;</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;            }</div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;        }</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;    }</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;}</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;            k_dst[d] = k_src[d];</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;            v_dst[d] = v_src[d];</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;        }</div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = head_dim; d &lt; aligned_head_dim; ++d) {</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;            k_dst[d] = 0.0f;</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;            v_dst[d] = 0.0f;</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;        }</div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;    }</div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;}</div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
-<div class="ttc" id="akv__cache__kernels_8c_html_a1b1c905b9d69fc8aadca4c714147ce45"><div class="ttname"><a href="kv__cache__kernels_8c.html#a1b1c905b9d69fc8aadca4c714147ce45">kv_cache_write_head_major</a></div><div class="ttdeci">void kv_cache_write_head_major(const float *k_token, const float *v_token, float *k_cache, float *v_cache, int num_kv_heads, int token_index, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="kv__cache__kernels_8c_source.html#l00048">kv_cache_kernels.c:48</a></div></div>
 <div class="ttc" id="akv__cache__kernels_8c_html_a377bab84fd3d4ba79cf92024615c240a"><div class="ttname"><a href="kv__cache__kernels_8c.html#a377bab84fd3d4ba79cf92024615c240a">kv_cache_repack_head_major_inplace</a></div><div class="ttdeci">void kv_cache_repack_head_major_inplace(float *buf, int num_heads, int tokens, int cache_capacity, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="kv__cache__kernels_8c_source.html#l00016">kv_cache_kernels.c:16</a></div></div>
+<div class="ttc" id="akv__cache__kernels_8c_html_a6add8eaed40b7a32a537cf4cffb39709"><div class="ttname"><a href="kv__cache__kernels_8c.html#a6add8eaed40b7a32a537cf4cffb39709">kv_cache_write_head_major</a></div><div class="ttdeci">void kv_cache_write_head_major(const float *__restrict k_token, const float *__restrict v_token, float *__restrict k_cache, float *__restrict v_cache, int num_kv_heads, int token_index, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition:</b> <a href="kv__cache__kernels_8c_source.html#l00048">kv_cache_kernels.c:48</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->

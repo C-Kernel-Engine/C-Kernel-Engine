@@ -131,11 +131,11 @@ $(document).ready(function(){initNavTree('loss__kernels_8c_source.html',''); ini
 <div class="line"><a name="l00005"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">    5</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="loss__kernels_8c.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">softmax_cross_entropy_loss</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *logits,</div>
 <div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;                                <span class="keyword">const</span> int32_t *targets,</div>
 <div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;                                <span class="keywordtype">int</span> tokens,</div>
-<div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;                                <span class="keywordtype">int</span> vocab_size,</div>
+<div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;                                <span class="keywordtype">int</span> <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
 <div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;                                <span class="keywordtype">float</span> *d_logits,</div>
 <div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160;                                <span class="keywordtype">float</span> *loss_out)</div>
 <div class="line"><a name="l00011"></a><span class="lineno">   11</span>&#160;{</div>
-<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;    <span class="keywordflow">if</span> (!logits || !targets || !d_logits || tokens &lt;= 0 || vocab_size &lt;= 0) {</div>
+<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;    <span class="keywordflow">if</span> (!logits || !targets || !d_logits || tokens &lt;= 0 || <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
 <div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;        <span class="keywordflow">if</span> (loss_out) {</div>
 <div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;            *loss_out = 0.0f;</div>
 <div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;        }</div>
@@ -145,36 +145,36 @@ $(document).ready(function(){initNavTree('loss__kernels_8c_source.html',''); ini
 <div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    <span class="keywordtype">double</span> total_loss = 0.0;</div>
 <div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160; </div>
 <div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = logits + (size_t)t * (<span class="keywordtype">size_t</span>)vocab_size;</div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;        <span class="keywordtype">float</span> *drow = d_logits + (size_t)t * (<span class="keywordtype">size_t</span>)vocab_size;</div>
+<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = logits + (size_t)t * (<span class="keywordtype">size_t</span>)<a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
+<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;        <span class="keywordtype">float</span> *drow = d_logits + (size_t)t * (<span class="keywordtype">size_t</span>)<a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
 <div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;        <span class="keywordtype">int</span> target = targets[t];</div>
 <div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160; </div>
 <div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;        <span class="keywordtype">float</span> max_logit = row[0];</div>
-<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 1; v &lt; vocab_size; ++v) {</div>
+<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 1; v &lt; <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>; ++v) {</div>
 <div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;            <span class="keywordflow">if</span> (row[v] &gt; max_logit) {</div>
 <div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;                max_logit = row[v];</div>
 <div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;            }</div>
 <div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;        }</div>
 <div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160; </div>
 <div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;        <span class="keywordtype">double</span> sum_exp = 0.0;</div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; vocab_size; ++v) {</div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>; ++v) {</div>
 <div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;            <span class="keywordtype">float</span> e = expf(row[v] - max_logit);</div>
 <div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;            drow[v] = e;</div>
 <div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;            sum_exp += e;</div>
 <div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;        }</div>
 <div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160; </div>
 <div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;        <span class="keywordtype">float</span> inv_sum = 1.0f / (float)sum_exp;</div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; vocab_size; ++v) {</div>
+<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>; ++v) {</div>
 <div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;            drow[v] *= inv_sum;</div>
 <div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;        }</div>
 <div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160; </div>
-<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;        <span class="keywordflow">if</span> (target &gt;= 0 &amp;&amp; target &lt; vocab_size) {</div>
+<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;        <span class="keywordflow">if</span> (target &gt;= 0 &amp;&amp; target &lt; <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
 <div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;            total_loss += -logf(drow[target] + 1e-10f);</div>
 <div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;            drow[target] -= 1.0f;</div>
 <div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;        }</div>
 <div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160; </div>
 <div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;        <span class="keywordtype">float</span> scale = 1.0f / (float)tokens;</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; vocab_size; ++v) {</div>
+<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> v = 0; v &lt; <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>; ++v) {</div>
 <div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;            drow[v] *= scale;</div>
 <div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;        }</div>
 <div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    }</div>
@@ -185,6 +185,7 @@ $(document).ready(function(){initNavTree('loss__kernels_8c_source.html',''); ini
 <div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;}</div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="aloss__kernels_8c_html_aed0168fe0364ab17b0d9dd02b1ac3ffa"><div class="ttname"><a href="loss__kernels_8c.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">softmax_cross_entropy_loss</a></div><div class="ttdeci">void softmax_cross_entropy_loss(const float *logits, const int32_t *targets, int tokens, int vocab_size, float *d_logits, float *loss_out)</div><div class="ttdef"><b>Definition:</b> <a href="loss__kernels_8c_source.html#l00005">loss_kernels.c:5</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition:</b> <a href="true__bpe_8h_source.html#l00169">true_bpe.h:169</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->

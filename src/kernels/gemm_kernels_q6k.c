@@ -168,6 +168,7 @@ void gemv_q6_k(float *y,
     if (M <= 0 || K <= 0) {
         return;
     }
+    // TEMPORARILY DISABLE NEW AVX KERNELS - USE REFERENCE ONLY
 
     const block_q6_K *blocks = (const block_q6_K *)W;
     const int blocks_per_row = K / QK_K;

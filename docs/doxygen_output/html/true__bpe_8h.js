@@ -21,14 +21,19 @@ var true__bpe_8h =
     [ "max_ids", "true__bpe_8h.html#adc7b8f0514fd7d4fefa123e27ce8922d", null ],
     [ "max_len", "true__bpe_8h.html#a59dd98a65ac03cdb1deea39c7580fb33", null ],
     [ "merged_id", "true__bpe_8h.html#acc4488e0b6a8a2700b10d41c0371df4a", null ],
+    [ "merges", "true__bpe_8h.html#a2b7dde9ca7f0e8b68ba08a1a72af47a0", null ],
     [ "num_ids", "true__bpe_8h.html#a2f30fc798d162629916e2faa69137745", null ],
+    [ "num_merges", "true__bpe_8h.html#a23e4d8a6c1c7c5660fd950589c26c9ca", null ],
+    [ "offsets", "true__bpe_8h.html#ab366d3078c02b7305089770c9de837b9", null ],
     [ "pad", "true__bpe_8h.html#ae478acd31a350e380062e576e1d8d61c", null ],
     [ "priority", "true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04", null ],
     [ "right", "true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9", null ],
     [ "right_id", "true__bpe_8h.html#aa50e5dfadaeded74c9ed39708c06737b", null ],
     [ "score", "true__bpe_8h.html#a396a22fb293f339694f80705521d0dfa", null ],
+    [ "strings", "true__bpe_8h.html#a24d810ef07e5196cf41374aba53c3021", null ],
     [ "text", "true__bpe_8h.html#a66c43cd207a5a3d05689fa20dd19ef66", null ],
     [ "text_len", "true__bpe_8h.html#a888f9023ee38c1b409b124b34c084f55", null ],
     [ "token", "true__bpe_8h.html#a1b07b985c8c5b1d267df858fb9d378e1", null ],
-    [ "unk", "true__bpe_8h.html#a9b857f7ce4dd3bca5a537e67f77a2b44", null ]
+    [ "unk", "true__bpe_8h.html#a9b857f7ce4dd3bca5a537e67f77a2b44", null ],
+    [ "vocab_size", "true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697", null ]
 ];

@@ -132,7 +132,7 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c_source.htm
 <div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160; </div>
 <div class="line"><a name="l00007"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a6d58689c662e670a5423eedd0291d6b5">    7</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="embedding__kernels__bf16_8c.html#a6d58689c662e670a5423eedd0291d6b5">embedding_forward_bf16</a>(<span class="keyword">const</span> int32_t *token_ids,</div>
 <div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;                            <span class="keywordtype">int</span> token_count,</div>
-<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;                            <span class="keywordtype">int</span> vocab_size,</div>
+<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;                            <span class="keywordtype">int</span> <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
 <div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160;                            <span class="keyword">const</span> uint16_t *token_embeddings,</div>
 <div class="line"><a name="l00011"></a><span class="lineno">   11</span>&#160;                            <span class="keyword">const</span> uint16_t *pos_embeddings,</div>
 <div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;                            uint16_t *output,</div>
@@ -151,7 +151,7 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c_source.htm
 <div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160; </div>
 <div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
 <div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
-<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= vocab_size) {</div>
+<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
 <div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;            <span class="keywordtype">id</span> = 0;</div>
 <div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;        }</div>
 <div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160; </div>
@@ -186,7 +186,7 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c_source.htm
 <div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;                             <span class="keyword">const</span> uint16_t *d_output,</div>
 <div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;                             uint16_t *d_token_embeddings,</div>
 <div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;                             uint16_t *d_pos_embeddings,</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;                             <span class="keywordtype">int</span> vocab_size,</div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;                             <span class="keywordtype">int</span> <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
 <div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;                             <span class="keywordtype">int</span> embed_dim,</div>
 <div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;                             <span class="keywordtype">int</span> aligned_embed_dim,</div>
 <div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;                             <span class="keywordtype">int</span> context_window,</div>
@@ -202,7 +202,7 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c_source.htm
 <div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160; </div>
 <div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
 <div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= vocab_size) {</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
 <div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;            <span class="keywordtype">id</span> = 0;</div>
 <div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;        }</div>
 <div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160; </div>
@@ -230,6 +230,7 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c_source.htm
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="aembedding__kernels__bf16_8c_html_a6d58689c662e670a5423eedd0291d6b5"><div class="ttname"><a href="embedding__kernels__bf16_8c.html#a6d58689c662e670a5423eedd0291d6b5">embedding_forward_bf16</a></div><div class="ttdeci">void embedding_forward_bf16(const int32_t *token_ids, int token_count, int vocab_size, const uint16_t *token_embeddings, const uint16_t *pos_embeddings, uint16_t *output, int embed_dim, int aligned_embed_dim, int context_window, int add_pos)</div><div class="ttdef"><b>Definition:</b> <a href="embedding__kernels__bf16_8c_source.html#l00007">embedding_kernels_bf16.c:7</a></div></div>
 <div class="ttc" id="aembedding__kernels__bf16_8c_html_a7c57b105fb88eb4165a0c649932be08d"><div class="ttname"><a href="embedding__kernels__bf16_8c.html#a7c57b105fb88eb4165a0c649932be08d">embedding_backward_bf16</a></div><div class="ttdeci">void embedding_backward_bf16(const int32_t *token_ids, int token_count, const uint16_t *d_output, uint16_t *d_token_embeddings, uint16_t *d_pos_embeddings, int vocab_size, int embed_dim, int aligned_embed_dim, int context_window, int add_pos)</div><div class="ttdef"><b>Definition:</b> <a href="embedding__kernels__bf16_8c_source.html#l00058">embedding_kernels_bf16.c:58</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition:</b> <a href="true__bpe_8h_source.html#l00169">true_bpe.h:169</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->

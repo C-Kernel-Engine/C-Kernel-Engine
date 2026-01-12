@@ -3,21 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CPU-first scaling philosophy for ML training. Learn why CPU clusters with RDMA interconnects offer 16x cheaper, 200x more accessible infrastructure than GPU clusters for large-scale machine learning.">
-    <meta name="keywords" content="CPU ML training, RDMA, distributed computing, machine learning scaling, GPU alternatives, C-Kernel-Engine">
-
-    <!-- Open Graph / Social -->
-    <meta property="og:type" content="article">
-    <meta property="og:title" content="Scaling Philosophy | C-Kernel-Engine">
-    <meta property="og:description" content="CPU-first ML scaling: 16x cheaper, 200x more accessible than GPU clusters. Learn about RDMA-connected CPU clusters for large-scale training.">
-    <meta property="og:image" content="assets/scale-economics.svg">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Scaling Philosophy | C-Kernel-Engine">
-    <meta name="twitter:description" content="CPU-first ML scaling: 16x cheaper, 200x more accessible than GPU clusters.">
-
-    <title>Scaling Philosophy | C-Kernel-Engine</title>
+    <title>ScalingPhilosophy | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -114,7 +100,7 @@
         /* Navigation */
         .site-nav {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.25rem;
             flex-wrap: wrap;
             align-items: center;
         }
@@ -123,7 +109,7 @@
         .nav-dropdown > .nav-trigger {
             color: var(--text-secondary);
             text-decoration: none;
-            padding: 0.6rem 1.25rem;
+            padding: 0.6rem 1rem;
             border-radius: 4px;
             font-size: 0.9rem;
             font-weight: 500;
@@ -135,7 +121,6 @@
             border: none;
             background: transparent;
             font-family: inherit;
-            white-space: nowrap;
         }
 
         .site-nav > a:hover,
@@ -484,7 +469,6 @@
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--grey);
-            table-layout: auto;
         }
 
         th {
@@ -496,15 +480,12 @@
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            white-space: nowrap;
-            vertical-align: middle;
         }
 
         td {
             padding: 0.875rem 1rem;
             border-bottom: 1px solid var(--grey);
             color: var(--text-secondary);
-            vertical-align: middle;
         }
 
         tr:hover {
@@ -513,18 +494,6 @@
 
         tr:last-child td {
             border-bottom: none;
-        }
-
-        /* Ensure table doesn't overflow on mobile */
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-            margin: 1rem 0;
-        }
-
-        .table-container table {
-            margin: 0;
-            min-width: 600px;
         }
 
         /* Lists */
@@ -863,7 +832,8 @@
                         <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
                         <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
                         <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
-                        <a href="ir-v2.html">IR v2 Format<small>Portable model representation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -877,7 +847,7 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
-                        <a href="flash_attention.html">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -2318,6 +2288,7 @@ That's it. For any model size.
     <li><a href="profiling.html">Profiling Guide</a> - Performance optimization</li>
 </ul>
     </main>
+    </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
     <style>
@@ -2526,7 +2497,7 @@ That's it. For any model size.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-09</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-11</p>
             </div>
         </div>
     </footer>

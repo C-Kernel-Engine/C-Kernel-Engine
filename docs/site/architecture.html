@@ -832,7 +832,8 @@
                         <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
                         <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
                         <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
-                        <a href="ir-v2.html">IR v2 Format<small>Portable model representation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -1121,7 +1122,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-09 12:00</span>
+        <span class="folder-updated">Updated: 2026-01-11 08:46</span>
     </div>
     <pre class="tree-output">
 .
@@ -1175,10 +1176,12 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- gguf-conversion.html
 |   |   |-- index.html
 |   |   |-- ir-v2.html
+|   |   |-- iteration-philosophy.html
 |   |   |-- kernels.html
 |   |   |-- memory-safety.html
 |   |   |-- profiling.html
 |   |   |-- pytorch-parity.html
+|   |   |-- quant-formats.html
 |   |   |-- quantization.html
 |   |   |-- quickstart.html
 |   |   |-- research.html
@@ -1208,26 +1211,35 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- architecture_diagram.md
 |   |-- bf16_format.svg
 |   |-- bf16_rounding.svg
+|   |-- bump-converter-multi-arch.md
 |   |-- c-kernel-engine-infographic.html
 |   |-- c-kernel-engine-overview.svg
+|   |-- cpu-gpu-analysis.svg
 |   |-- developer-guide.md
 |   |-- DEVLOG.md
 |   |-- Doxyfile
 |   |-- doxygen_header.html
 |   |-- gemm-in-transformers.md
+|   |-- gguf-conversion.md
+|   |-- hybrid-bottleneck.svg
 |   |-- index.html
 |   |-- ir-v2-format.html
 |   |-- ir_v2_pipeline.svg
+|   |-- iteration-philosophy.svg
 |   |-- kernel-catalog.md
 |   |-- kernel-design-pattern.md
 |   |-- memory_layout_demo.md
+|   |-- navigation-map.html
 |   |-- PARITY_TESTING_PLAN.md
 |   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
 |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
 |   |-- PERFORMANCE_TESTING_METHODOLOGY.md
+|   |-- preview.html
 |   |-- QUANTIZATION_GUIDE.md
 |   |-- qwen_layer_dataflow.md
 |   |-- qwen_layer_dataflow.svg
+|   |-- scale-economics.svg
+|   |-- theory-of-constraints.svg
 |   |-- threading-strategy.md
 |   |-- tokenizer-architecture.svg
 |   |-- tokenizer-hash-vs-trie.svg
@@ -1292,6 +1304,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- rmsnorm.json
 |   |   |-- rope.json
 |   |   `-- swiglu.json
+|   |-- v6
 |   |-- decoder_layer_plan_backward.json
 |   |-- decoder_layer_plan.json
 |   |-- global_buffers.json
@@ -1758,21 +1771,57 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- Screenshot 2026-01-08 at 07-01-03 Tokenizer C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-09 at 10-44-11 .png
 |   |-- Screenshot 2026-01-09 at 11-43-04 .png
-|   `-- Screenshot 2026-01-09 at 11-43-12 .png
+|   |-- Screenshot 2026-01-09 at 11-43-12 .png
+|   |-- Screenshot 2026-01-10 at 04-45-22 ScalingPhilosophy C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-10 at 04-45-56 Home C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-10 at 05-10-10 ScalingPhilosophy C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-10 at 05-10-21 ScalingPhilosophy C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-10 at 05-10-27 ScalingPhilosophy C-Kernel-Engine.png
+|   `-- Screenshot 2026-01-10 at 05-32-49 ScalingPhilosophy C-Kernel-Engine.png
 |-- scripts
+|   |-- v2
+|   |   `-- build_ir_v2.py
+|   |-- v3
+|   |   `-- build_ir_v3.py
+|   |-- v4
+|   |   |-- build_ir_v4.py
+|   |   |-- build_ir_v4_q4k.py
+|   |   |-- ck_model_smoke_v4.py
+|   |   |-- ck_run_v4.py
+|   |   |-- codegen_v4.py
+|   |   |-- convert_gguf_to_bump_v4_patched.py
+|   |   |-- convert_gguf_to_bump_v4.py
+|   |   |-- convert_hf_to_bump_v4.py
+|   |   |-- test_v4_q4k_pipeline.py
+|   |   `-- validate_bump_v4.py
+|   |-- v6
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6.py
+|   |   |-- chat_template_utils.py
+|   |   |-- ck_model_smoke_v6.py
+|   |   |-- ck_run_v6.py
+|   |   |-- codegen_v6.py
+|   |   |-- convert_any_gguf_v6.py
+|   |   |-- convert_any_gguf_v6.sh
+|   |   |-- convert_any_model_v6.sh
+|   |   |-- convert_gguf_to_bump_v6.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6.py
+|   |   |-- parallel_planner.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- training_config.py
+|   |   `-- v6_ir_lowering.py
 |   |-- analyze_parity.py
-|   |-- build_ir_v2.py
-|   |-- build_ir_v3.py
-|   |-- build_ir_v4.py
-|   |-- build_ir_v4_q4k.py
 |   |-- build_ir_v5.py
 |   |-- build_ir_v5_wrapper_backup.py
 |   |-- ck_chat.py
 |   |-- ck_download.py
-|   |-- ck_model_smoke_v4.py
-|   |-- ck_run_v4.py
 |   |-- ck_run_v5.py
-|   |-- codegen_v4.py
 |   |-- codegen_v5.py
 |   |-- compare_bump_payload.py
 |   |-- compare_bump_to_hf.py
@@ -1781,17 +1830,26 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- compare_parity_huggingface.py
 |   |-- compare_runtime_parity.py
 |   |-- compare_wq_weights.py
+|   |-- convert_any_gguf.py
+|   |-- convert_any_gguf.sh
+|   |-- convert_any_model.sh
+|   |-- convert_devstral_gguf.sh
 |   |-- convert_gguf_to_bump.py
-|   |-- convert_gguf_to_bump_v4.py
+|   |-- convert_gguf_to_bump_v6.py
+|   |-- convert_gguf_wrapper.py
 |   |-- convert_hf_to_bump.py
-|   |-- convert_hf_to_bump_v4.py
+|   |-- convert_my_gguf.sh
+|   |-- convert_to_bump_universal.py
 |   |-- debug_llama_parity.py
+|   |-- download_model_v6.py
 |   |-- extract_gguf_vocab.py
+|   |-- fix_gguf_converter.py
 |   |-- fusion_patterns.py
 |   |-- gen_kernel_specs.py
 |   |-- gen_random_bump.py
 |   |-- gen_random_tokens.py
 |   |-- gguf_tokenizer.py
+|   |-- inspect_model.py
 |   |-- inspect_weights_v5.py
 |   |-- kernel_coverage.py
 |   |-- layer_sweep_parity.py
@@ -1800,6 +1858,8 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- nightly_runner.py
 |   |-- optimization_status.py
 |   |-- parallel_planner.py
+|   |-- patch_bump_converter.py
+|   |-- patch_gguf_converter.py
 |   |-- perf_decode_simple.c
 |   |-- perf_loop.sh
 |   |-- profile_decode.py
@@ -1829,13 +1889,12 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_q_projection.py
 |   |-- test_training_fix.sh
 |   |-- test_training.py
-|   |-- test_v4_q4k_pipeline.py
 |   |-- tiny_train_parity.py
 |   |-- tokenizer_to_bump.py
 |   |-- training_config.py
-|   |-- validate_bump_v4.py
 |   |-- validate_model.py
-|   `-- version_check.py
+|   |-- version_check.py
+|   `-- vocab_to_tokenizer.py
 |-- src
 |   |-- data_structures
 |   |   `-- tries
@@ -1844,6 +1903,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- attention_decode_fused.c
 |   |   |-- attention_flash_true.c
 |   |   |-- attention_kernels.c
+|   |   |-- axpy_kernels.c
 |   |   |-- dequant_kernels.c
 |   |   |-- embedding_kernels_bf16.c
 |   |   |-- embedding_kernels.c
@@ -1894,6 +1954,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- softmax_kernels.c
 |   |   |-- swiglu_kernels_bf16.c
 |   |   |-- swiglu_kernels.c
+|   |   |-- topk_kernels.c
 |   |   |-- vision_kernels_bf16.c
 |   |   `-- vision_kernels.c
 |   |-- tokenizer
@@ -1919,8 +1980,29 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- v4_legacy
 |   |   `-- ckernel_model_load_v4.c
 |   |-- v6
-|   |   |-- ckernels
-|   |   `-- scripts
+|   |   |-- scripts
+|   |   |-- build.sh
+|   |   |-- CHAT_TEMPLATE_BUMP_PLAN.md
+|   |   |-- CHAT_TEMPLATE_PLAN.md
+|   |   |-- ck_cli_v6.c
+|   |   |-- ck-engine-v6
+|   |   |-- ckernel_alloc_v6.c
+|   |   |-- ckernel_codegen_v6.c
+|   |   |-- ckernel_ir_v6.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.c
+|   |   |-- CONTEXT_LIMIT_PLAN.md
+|   |   |-- SPECIAL_TOKENS_PLAN.md
+|   |   |-- STOP_TOKEN_TABLE_PLAN.md
+|   |   |-- UTF8_PLAN.md
+|   |   |-- v6_cli.c
+|   |   |-- v6_cli_todo.md
+|   |   |-- v6_inference.c
+|   |   |-- v6_pipeline.md
+|   |   `-- v6_simple.c
+|   |-- v7
+|   |   |-- build.sh
+|   |   `-- v7_pipeline.md
 |   |-- backend_native.c
 |   |-- ck_cli_v5.c
 |   |-- ckernel_alloc.c
@@ -1943,6 +2025,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- tools
 |   |-- cache_analysis.py
 |   |-- ck.c
+|   |-- ck_profile_v6.c
 |   |-- ck_server.c
 |   |-- ck_v4.c
 |   `-- debug_cpu_flags.c
@@ -1971,7 +2054,10 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_add.py
 |   |-- test_attention_backward.py
 |   |-- test_attention.py
+|   |-- test_axpy.py
 |   |-- test_codegen_v4_single_layer.py
+|   |-- test_codegen_v6_decode.py
+|   |-- test_codegen_v6_prefill.py
 |   |-- test_cross_entropy.py
 |   |-- test_debug_codegen.py
 |   |-- test_dequant_vs_llamacpp
@@ -1987,6 +2073,9 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_gemm_microkernel.py
 |   |-- test_gemm.py
 |   |-- test_gemm_variants.py
+|   |-- test_gemv_kernels_comprehensive.py
+|   |-- test_gemv_performance.c
+|   |-- test_gemv_q_benchmark.py
 |   |-- test_kernels_comprehensive.py
 |   |-- test_kv_cache_attention.py
 |   |-- test_kv_cache_layer_decode.py
@@ -2025,27 +2114,36 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_tokenizer.py
 |   |-- test_tokenizer_qwen_parity.py
 |   |-- test_tokenizer_unified.py
+|   |-- test_topk.py
 |   |-- test_true_bpe_parity.py
 |   |-- test_utils.py
 |   |-- test_v4_conversion.py
 |   `-- test_vision.py
 |-- bf_16_test.txt
 |-- build_errors.txt.txt
+|-- ck-engine-v6
 |-- c-kernel-engine-power-infographic.svg
 |-- ck-v1.txt
 |-- ck-v4
 |-- ck-v5
 |-- config.json
+|-- CONVERTER-SOLUTION.md
 |-- cores.txt
 |-- debug_code.c
 |-- default.config.json
 |-- default.json
 |-- devstral2.json
+|-- devstral.bump
 |-- Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
 |-- fix_q4k_packing.md
+|-- GGUF-CONVERSION-SOLUTION.md
+|-- GGUF_CONVERTER_FIX_SUMMARY.md
 |-- interactive-infographic.html
+|-- json
+|-- Kimi-VL-A3B-Thinking-2506-Q4_K_M.gguf
 |-- llama_dump_logits
 |-- Makefile
+|-- MULTI_ARCH_CONVERSION_SUMMARY.md
 |-- next_steps.txt
 |-- perf.data
 |-- perf.data.old
@@ -2054,13 +2152,16 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- quant_test_v2.txt
 |-- qwen2_0.5.json
 |-- qwen2.5-3b-instruct-q4_k_m.gguf
+|-- qwen.bump
 |-- qwen_vocab.json
+|-- README-BUMP-CONVERTER.md
 |-- README.md
 |-- requirements.txt
 |-- show_config.txt
 |-- small10mb.config.json
 |-- smolLM-135.json
 |-- SmolLM-1.7B-Instruct.Q4_K_M.gguf
+|-- smollm.bump
 |-- test_error.txt
 |-- TESTING.md
 |-- test_out.log
@@ -2075,7 +2176,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- weights.bump
 `-- weights_manifest.json
 
-151 directories, 798 files
+158 directories, 891 files
 </pre>
 </div>
 
@@ -2327,7 +2428,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-09</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-11</p>
             </div>
         </div>
     </footer>
