@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['systemtopology_1965',['SystemTopology',['../structSystemTopology.html',1,'']]]
+  ['recommendation_2226',['Recommendation',['../structRecommendation.html',1,'']]],
+  ['recommendationlist_2227',['RecommendationList',['../structRecommendationList.html',1,'']]]
 ];

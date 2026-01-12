@@ -1,0 +1,447 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 2200">
+  <defs>
+    <linearGradient id="dramGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#748ffc"/>
+      <stop offset="100%" style="stop-color:#5c7cfa"/>
+    </linearGradient>
+    <linearGradient id="l3Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#69db7c"/>
+      <stop offset="100%" style="stop-color:#51cf66"/>
+    </linearGradient>
+    <linearGradient id="l2Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd43b"/>
+      <stop offset="100%" style="stop-color:#fab005"/>
+    </linearGradient>
+    <linearGradient id="l1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffa94d"/>
+      <stop offset="100%" style="stop-color:#ff922b"/>
+    </linearGradient>
+    <linearGradient id="regGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#ee5a5a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#495057"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="2200" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="750" y="40" font-family="Arial, sans-serif" font-size="26" font-weight="bold" text-anchor="middle" fill="#212529">
+    Per-Head Fusion: Mathematical Cache Constraints
+  </text>
+  <text x="750" y="70" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#868e96">
+    Deterministic formula for maximum fusion depth based on cache hierarchy
+  </text>
+
+  <!-- Section 1: The Exact Data Flow -->
+  <rect x="30" y="95" width="1440" height="320" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="125" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">1. Exact Data Flow (Decode Mode: 1 Token)</text>
+
+  <!-- Input -->
+  <g transform="translate(50, 145)">
+    <text x="0" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Input per token:</text>
+    <rect x="150" y="0" width="180" height="35" fill="url(#dramGrad)" rx="5"/>
+    <text x="240" y="22" font-family="monospace" font-size="12" text-anchor="middle" fill="white">x[1 × embed_dim]</text>
+    <text x="350" y="22" font-family="monospace" font-size="11" fill="#495057">= [1 × 2048] = 4KB (FP16)</text>
+  </g>
+
+  <!-- QKV Projection -->
+  <g transform="translate(50, 190)">
+    <text x="0" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">QKV Projection:</text>
+    <text x="150" y="20" font-family="monospace" font-size="11" fill="#212529">x[1×H] @ W_qkv[H × 3H] → QKV[1 × 3H]</text>
+    <text x="150" y="40" font-family="monospace" font-size="10" fill="#868e96">FLOPs = 2 × 1 × H × 3H = 6H² = 25M FLOPs (H=2048)</text>
+    <text x="150" y="58" font-family="monospace" font-size="10" fill="#c92a2a">Weights: 3 × H × H × 2B = 24MB → MUST stream from DRAM</text>
+  </g>
+
+  <!-- Split into heads -->
+  <g transform="translate(50, 255)">
+    <text x="0" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Split into heads:</text>
+    <rect x="150" y="0" width="120" height="30" fill="url(#l2Grad)" rx="3"/>
+    <text x="210" y="20" font-family="monospace" font-size="10" text-anchor="middle" fill="#212529">Q[n_h × d]</text>
+    <rect x="280" y="0" width="120" height="30" fill="url(#l2Grad)" rx="3"/>
+    <text x="340" y="20" font-family="monospace" font-size="10" text-anchor="middle" fill="#212529">K[n_h × d]</text>
+    <rect x="410" y="0" width="120" height="30" fill="url(#l2Grad)" rx="3"/>
+    <text x="470" y="20" font-family="monospace" font-size="10" text-anchor="middle" fill="#212529">V[n_h × d]</text>
+    <text x="550" y="20" font-family="monospace" font-size="10" fill="#495057">n_h=32, d=64 → 32 heads × 64 dim</text>
+    <text x="150" y="50" font-family="monospace" font-size="10" fill="#2f9e44">Each head: Q_h[1×64], K_h[1×64], V_h[1×64] = 128B each = 2 cache lines!</text>
+  </g>
+
+  <!-- Per head operations -->
+  <g transform="translate(50, 320)">
+    <text x="0" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Per-head operations (INDEPENDENT - can parallelize!):</text>
+    
+    <rect x="150" y="35" width="110" height="30" fill="url(#regGrad)" rx="3"/>
+    <text x="205" y="55" font-family="monospace" font-size="9" text-anchor="middle" fill="white">RoPE(Q_h,K_h)</text>
+    <text x="265" y="55" font-family="Arial, sans-serif" font-size="12" fill="#495057">→</text>
+    
+    <rect x="280" y="35" width="180" height="30" fill="url(#regGrad)" rx="3"/>
+    <text x="370" y="55" font-family="monospace" font-size="9" text-anchor="middle" fill="white">scores = Q_h @ K_cache_h.T</text>
+    <text x="465" y="55" font-family="Arial, sans-serif" font-size="12" fill="#495057">→</text>
+    
+    <rect x="480" y="35" width="120" height="30" fill="url(#regGrad)" rx="3"/>
+    <text x="540" y="55" font-family="monospace" font-size="9" text-anchor="middle" fill="white">softmax(scores)</text>
+    <text x="605" y="55" font-family="Arial, sans-serif" font-size="12" fill="#495057">→</text>
+    
+    <rect x="620" y="35" width="140" height="30" fill="url(#regGrad)" rx="3"/>
+    <text x="690" y="55" font-family="monospace" font-size="9" text-anchor="middle" fill="white">O_h = attn @ V_h</text>
+    
+    <text x="150" y="85" font-family="monospace" font-size="10" fill="#495057">Output per head: O_h[1 × 64] = 128B = 2 cache lines (stays in registers!)</text>
+  </g>
+
+  <!-- Concat and output proj -->
+  <g transform="translate(50, 410)">
+    <text x="0" y="0" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Concat + Output Projection:</text>
+    <text x="150" y="0" font-family="monospace" font-size="11" fill="#212529">concat(O_h)[1×H] @ W_o[H×H] → out[1×H]</text>
+    <text x="150" y="18" font-family="monospace" font-size="10" fill="#868e96">FLOPs = 2 × H × H = 8M FLOPs</text>
+  </g>
+
+  <!-- Section 2: The Fusion Constraint Equations -->
+  <rect x="30" y="435" width="1440" height="340" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="465" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">2. Cache Constraint Equations (The Math)</text>
+
+  <!-- Variables -->
+  <rect x="50" y="485" width="350" height="150" fill="#f1f3f5" rx="5"/>
+  <text x="70" y="510" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#212529">Variables:</text>
+  <text x="70" y="535" font-family="monospace" font-size="11" fill="#212529">H = embed_dim (e.g., 2048)</text>
+  <text x="70" y="555" font-family="monospace" font-size="11" fill="#212529">n_h = num_heads (e.g., 32)</text>
+  <text x="70" y="575" font-family="monospace" font-size="11" fill="#212529">d = head_dim = H/n_h (e.g., 64)</text>
+  <text x="70" y="595" font-family="monospace" font-size="11" fill="#212529">S = seq_len (context length)</text>
+  <text x="70" y="615" font-family="monospace" font-size="11" fill="#212529">T = KV tile size for flash attn</text>
+  <text x="70" y="635" font-family="monospace" font-size="11" fill="#212529">B = bytes per element (2 for FP16)</text>
+
+  <!-- Cache sizes -->
+  <rect x="420" y="485" width="350" height="150" fill="#e7f5ff" rx="5"/>
+  <text x="440" y="510" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1971c2">Cache Hierarchy (Xeon):</text>
+  <text x="440" y="535" font-family="monospace" font-size="11" fill="#212529">S_reg = 32 × 64B = 2KB (ZMM regs)</text>
+  <text x="440" y="555" font-family="monospace" font-size="11" fill="#212529">S_L1 = 48KB per core</text>
+  <text x="440" y="575" font-family="monospace" font-size="11" fill="#212529">S_L2 = 1-2MB per core</text>
+  <text x="440" y="595" font-family="monospace" font-size="11" fill="#212529">S_L3 = 1.5MB × n_cores (shared)</text>
+  <text x="440" y="615" font-family="monospace" font-size="11" fill="#212529">Cache line = 64B = d×B for d=32</text>
+
+  <!-- Constraint 1: Per-head working set -->
+  <rect x="790" y="485" width="660" height="80" fill="#fff3bf" rx="5" stroke="#e67700" stroke-width="2"/>
+  <text x="810" y="510" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e67700">Constraint 1: Per-Head Flash Attention fits in L1</text>
+  <text x="810" y="535" font-family="monospace" font-size="12" fill="#212529">Q_h + K_tile + V_tile + O_accum + softmax_stats ≤ S_L1</text>
+  <text x="810" y="558" font-family="monospace" font-size="11" fill="#495057">(1×d + T×d + T×d + 1×d)×B + 8 ≤ 48KB</text>
+
+  <!-- Constraint 2: KV tile size -->
+  <rect x="790" y="575" width="660" height="80" fill="#d3f9d8" rx="5" stroke="#2f9e44" stroke-width="2"/>
+  <text x="810" y="600" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#2f9e44">Constraint 2: Solve for max KV tile size T</text>
+  <text x="810" y="625" font-family="monospace" font-size="12" fill="#212529">T ≤ (S_L1 - 2×d×B - 8) / (2×d×B)</text>
+  <text x="810" y="648" font-family="monospace" font-size="11" fill="#495057">For d=64, B=2: T ≤ (48KB - 264) / 256 ≈ 186 → use T=128 or T=64</text>
+
+  <!-- Working set breakdown -->
+  <rect x="50" y="670" width="700" height="90" fill="#f8f9fa" rx="5"/>
+  <text x="70" y="695" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#212529">Per-Head Working Set (d=64, T=64, FP16):</text>
+  <text x="70" y="720" font-family="monospace" font-size="11" fill="#212529">Q_h:       1 × 64 × 2B =   128B  (2 cache lines) → REGISTERS</text>
+  <text x="70" y="740" font-family="monospace" font-size="11" fill="#212529">K_tile:   64 × 64 × 2B = 8,192B  (128 lines)    → L1</text>
+  <text x="400" y="720" font-family="monospace" font-size="11" fill="#212529">V_tile:   64 × 64 × 2B = 8,192B  (128 lines)    → L1</text>
+  <text x="400" y="740" font-family="monospace" font-size="11" fill="#212529">O_h + m,l: 1 × 64 × 4B =   264B  (5 lines)      → REGISTERS</text>
+  <text x="70" y="758" font-family="monospace" font-size="11" fill="#2f9e44" font-weight="bold">Total: 16.8KB per head ✓ fits L1 with room for prefetch!</text>
+
+  <!-- Parallelization constraint -->
+  <rect x="770" y="670" width="680" height="90" fill="#ffe3e3" rx="5"/>
+  <text x="790" y="695" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#c92a2a">Constraint 3: False Sharing Prevention</text>
+  <text x="790" y="720" font-family="monospace" font-size="11" fill="#212529">head_dim × B ≥ cache_line (64B)</text>
+  <text x="790" y="740" font-family="monospace" font-size="11" fill="#212529">→ d=64, B=2: 128B = 2 cache lines per head ✓</text>
+  <text x="790" y="758" font-family="monospace" font-size="11" fill="#495057">Each head writes to separate cache lines → no false sharing!</text>
+
+  <!-- Section 3: The Fusion Strategy -->
+  <rect x="30" y="795" width="1440" height="420" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="825" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">3. Two-Level Fusion Strategy</text>
+
+  <!-- Strategy diagram -->
+  <g transform="translate(50, 850)">
+    <!-- Level 1: Per-head fusion -->
+    <rect x="0" y="0" width="700" height="180" fill="#e7f5ff" rx="5" stroke="#1971c2" stroke-width="2"/>
+    <text x="20" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Level 1: Per-Head Fusion (fits in L1 + Registers)</text>
+    
+    <g transform="translate(20, 40)">
+      <!-- The fused pipeline per head -->
+      <rect x="0" y="0" width="100" height="35" fill="url(#regGrad)" rx="3"/>
+      <text x="50" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="white">Q_h,K_h,V_h</text>
+      <text x="50" y="50" font-family="monospace" font-size="8" text-anchor="middle" fill="#495057">from QKV proj</text>
+      
+      <path d="M 105 17 L 125 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="130" y="0" width="80" height="35" fill="url(#regGrad)" rx="3"/>
+      <text x="170" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="white">RoPE</text>
+      <text x="170" y="50" font-family="monospace" font-size="8" text-anchor="middle" fill="#495057">in registers</text>
+      
+      <path d="M 215 17 L 235 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="240" y="0" width="200" height="35" fill="url(#l1Grad)" rx="3"/>
+      <text x="340" y="15" font-family="monospace" font-size="9" text-anchor="middle" fill="white">Flash Attention Loop</text>
+      <text x="340" y="30" font-family="monospace" font-size="8" text-anchor="middle" fill="white">tile K,V from cache</text>
+      <text x="340" y="50" font-family="monospace" font-size="8" text-anchor="middle" fill="#495057">KV tiles in L1</text>
+      
+      <path d="M 445 17 L 465 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="470" y="0" width="80" height="35" fill="url(#regGrad)" rx="3"/>
+      <text x="510" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="white">O_h</text>
+      <text x="510" y="50" font-family="monospace" font-size="8" text-anchor="middle" fill="#495057">stays in reg</text>
+      
+      <path d="M 555 17 L 575 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="580" y="0" width="90" height="35" fill="url(#l2Grad)" rx="3"/>
+      <text x="625" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">→ L2 buffer</text>
+    </g>
+    
+    <text x="20" y="115" font-family="monospace" font-size="11" fill="#212529">DRAM traffic per head: 0 (Q,K,V already in cache from QKV proj)</text>
+    <text x="20" y="135" font-family="monospace" font-size="11" fill="#212529">L2 traffic: stream KV cache tiles → L1</text>
+    <text x="20" y="155" font-family="monospace" font-size="11" fill="#2f9e44" font-weight="bold">Output: O_h written to L2 buffer (128B) only when complete</text>
+    <text x="20" y="175" font-family="monospace" font-size="10" fill="#868e96">Can run n_h heads in parallel on different cores!</text>
+
+    <!-- Level 2: Cross-head coordination -->
+    <rect x="720" y="0" width="700" height="180" fill="#fff3bf" rx="5" stroke="#e67700" stroke-width="2"/>
+    <text x="740" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e67700">Level 2: Cross-Head Coordination</text>
+    
+    <g transform="translate(740, 45)">
+      <rect x="0" y="0" width="150" height="35" fill="url(#dramGrad)" rx="3"/>
+      <text x="75" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="white">x[1×H] from DRAM</text>
+      
+      <path d="M 155 17 L 175 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="180" y="0" width="100" height="35" fill="url(#l2Grad)" rx="3"/>
+      <text x="230" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">RMSNorm</text>
+      
+      <path d="M 285 17 L 305 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="310" y="0" width="130" height="35" fill="url(#l3Grad)" rx="3"/>
+      <text x="375" y="15" font-family="monospace" font-size="9" text-anchor="middle" fill="white">QKV GEMM</text>
+      <text x="375" y="30" font-family="monospace" font-size="8" text-anchor="middle" fill="white">(stream weights)</text>
+      
+      <path d="M 445 17 L 465 17" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      
+      <rect x="470" y="0" width="180" height="35" fill="url(#l2Grad)" rx="3"/>
+      <text x="560" y="22" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">Q,K,V[n_h×d] in L2</text>
+    </g>
+    
+    <text x="740" y="100" font-family="monospace" font-size="11" fill="#212529">↓ Parallel dispatch to cores</text>
+    
+    <g transform="translate(740, 110)">
+      <rect x="0" y="0" width="100" height="25" fill="url(#regGrad)" rx="3"/>
+      <text x="50" y="17" font-family="monospace" font-size="8" text-anchor="middle" fill="white">Core 0: H0-H3</text>
+      <rect x="110" y="0" width="100" height="25" fill="url(#regGrad)" rx="3"/>
+      <text x="160" y="17" font-family="monospace" font-size="8" text-anchor="middle" fill="white">Core 1: H4-H7</text>
+      <rect x="220" y="0" width="100" height="25" fill="url(#regGrad)" rx="3"/>
+      <text x="270" y="17" font-family="monospace" font-size="8" text-anchor="middle" fill="white">Core 2: H8-H11</text>
+      <text x="330" y="17" font-family="monospace" font-size="10" fill="#495057">...</text>
+      <rect x="360" y="0" width="120" height="25" fill="url(#regGrad)" rx="3"/>
+      <text x="420" y="17" font-family="monospace" font-size="8" text-anchor="middle" fill="white">Core 7: H28-H31</text>
+    </g>
+    
+    <text x="740" y="155" font-family="monospace" font-size="11" fill="#212529">↓ Barrier sync</text>
+    
+    <g transform="translate(740, 160)">
+      <rect x="0" y="0" width="150" height="25" fill="url(#l3Grad)" rx="3"/>
+      <text x="75" y="17" font-family="monospace" font-size="9" text-anchor="middle" fill="white">Out Proj GEMM</text>
+      <path d="M 155 12 L 175 12" stroke="#495057" stroke-width="1" marker-end="url(#arrow)"/>
+      <rect x="180" y="0" width="120" height="25" fill="url(#dramGrad)" rx="3"/>
+      <text x="240" y="17" font-family="monospace" font-size="9" text-anchor="middle" fill="white">→ DRAM out</text>
+    </g>
+  </g>
+
+  <!-- The key insight -->
+  <rect x="50" y="1050" width="1400" height="60" fill="#d3f9d8" rx="5" stroke="#2f9e44" stroke-width="2"/>
+  <text x="750" y="1080" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#2f9e44">
+    KEY INSIGHT: Fuse per-head completely (RoPE→Flash→Output), parallelize across heads
+  </text>
+  <text x="750" y="1100" font-family="monospace" font-size="12" text-anchor="middle" fill="#212529">
+    Each head is independent until output projection. Each head's working set fits in L1. Zero inter-core communication until final sync!
+  </text>
+
+  <!-- Section 4: The Complete DRAM Traffic Analysis -->
+  <rect x="30" y="1130" width="1440" height="320" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="1160" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">4. DRAM Traffic: What MUST Touch Memory</text>
+
+  <!-- Traffic table -->
+  <g transform="translate(50, 1185)">
+    <!-- Headers -->
+    <rect x="0" y="0" width="250" height="30" fill="#f1f3f5"/>
+    <text x="125" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Data</text>
+    <rect x="250" y="0" width="150" height="30" fill="#f1f3f5"/>
+    <text x="325" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Size (H=2048)</text>
+    <rect x="400" y="0" width="150" height="30" fill="#f1f3f5"/>
+    <text x="475" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Direction</text>
+    <rect x="550" y="0" width="300" height="30" fill="#f1f3f5"/>
+    <text x="700" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Notes</text>
+    
+    <!-- Input -->
+    <rect x="0" y="32" width="250" height="28" fill="#ebfbee"/>
+    <text x="10" y="50" font-family="monospace" font-size="11" fill="#212529">x[1 × H] input</text>
+    <rect x="250" y="32" width="150" height="28" fill="#ebfbee"/>
+    <text x="325" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">4 KB</text>
+    <rect x="400" y="32" width="150" height="28" fill="#ebfbee"/>
+    <text x="475" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">READ</text>
+    <rect x="550" y="32" width="300" height="28" fill="#ebfbee"/>
+    <text x="560" y="50" font-family="monospace" font-size="10" fill="#495057">Once per token</text>
+    
+    <!-- QKV Weights -->
+    <rect x="0" y="62" width="250" height="28" fill="#fff5f5"/>
+    <text x="10" y="80" font-family="monospace" font-size="11" fill="#212529">W_qkv[H × 3H]</text>
+    <rect x="250" y="62" width="150" height="28" fill="#fff5f5"/>
+    <text x="325" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">24 MB</text>
+    <rect x="400" y="62" width="150" height="28" fill="#fff5f5"/>
+    <text x="475" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">STREAM</text>
+    <rect x="550" y="62" width="300" height="28" fill="#fff5f5"/>
+    <text x="560" y="80" font-family="monospace" font-size="10" fill="#495057">Unavoidable, tile through L3</text>
+    
+    <!-- KV Cache Read -->
+    <rect x="0" y="92" width="250" height="28" fill="#fff5f5"/>
+    <text x="10" y="110" font-family="monospace" font-size="11" fill="#212529">KV_cache[S × H × 2]</text>
+    <rect x="250" y="92" width="150" height="28" fill="#fff5f5"/>
+    <text x="325" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">S × 8 KB</text>
+    <rect x="400" y="92" width="150" height="28" fill="#fff5f5"/>
+    <text x="475" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">STREAM</text>
+    <rect x="550" y="92" width="300" height="28" fill="#fff5f5"/>
+    <text x="560" y="110" font-family="monospace" font-size="10" fill="#495057">Past context, tile T at a time</text>
+    
+    <!-- KV Cache Write -->
+    <rect x="0" y="122" width="250" height="28" fill="#fff9db"/>
+    <text x="10" y="140" font-family="monospace" font-size="11" fill="#212529">KV_cache update (new K,V)</text>
+    <rect x="250" y="122" width="150" height="28" fill="#fff9db"/>
+    <text x="325" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">8 KB</text>
+    <rect x="400" y="122" width="150" height="28" fill="#fff9db"/>
+    <text x="475" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#e67700">WRITE</text>
+    <rect x="550" y="122" width="300" height="28" fill="#fff9db"/>
+    <text x="560" y="140" font-family="monospace" font-size="10" fill="#495057">New K,V for this position</text>
+    
+    <!-- Output Weights -->
+    <rect x="0" y="152" width="250" height="28" fill="#fff5f5"/>
+    <text x="10" y="170" font-family="monospace" font-size="11" fill="#212529">W_o[H × H]</text>
+    <rect x="250" y="152" width="150" height="28" fill="#fff5f5"/>
+    <text x="325" y="170" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">8 MB</text>
+    <rect x="400" y="152" width="150" height="28" fill="#fff5f5"/>
+    <text x="475" y="170" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">STREAM</text>
+    <rect x="550" y="152" width="300" height="28" fill="#fff5f5"/>
+    <text x="560" y="170" font-family="monospace" font-size="10" fill="#495057">Unavoidable, tile through L3</text>
+    
+    <!-- Output -->
+    <rect x="0" y="182" width="250" height="28" fill="#ebfbee"/>
+    <text x="10" y="200" font-family="monospace" font-size="11" fill="#212529">out[1 × H]</text>
+    <rect x="250" y="182" width="150" height="28" fill="#ebfbee"/>
+    <text x="325" y="200" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">4 KB</text>
+    <rect x="400" y="182" width="150" height="28" fill="#ebfbee"/>
+    <text x="475" y="200" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">WRITE</text>
+    <rect x="550" y="182" width="300" height="28" fill="#ebfbee"/>
+    <text x="560" y="200" font-family="monospace" font-size="10" fill="#495057">Final output, once per token</text>
+  </g>
+
+  <!-- Summary box -->
+  <rect x="920" y="1185" width="530" height="210" fill="#212529" rx="5"/>
+  <text x="1185" y="1215" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="white">DRAM Traffic Summary (Decode)</text>
+  
+  <text x="940" y="1245" font-family="monospace" font-size="12" fill="#69db7c">Activations: 4KB in + 4KB out = 8KB</text>
+  <text x="940" y="1270" font-family="monospace" font-size="12" fill="#ffd43b">KV Cache:    8KB write + S×8KB read</text>
+  <text x="940" y="1295" font-family="monospace" font-size="12" fill="#ff6b6b">Weights:     32MB stream (unavoidable)</text>
+  
+  <line x1="940" y1="1310" x2="1420" y2="1310" stroke="#495057"/>
+  
+  <text x="940" y="1335" font-family="monospace" font-size="12" fill="white">Without fusion: +800KB intermediates</text>
+  <text x="940" y="1360" font-family="monospace" font-size="12" fill="#69db7c" font-weight="bold">With fusion:    0 intermediates! ✓</text>
+  
+  <text x="940" y="1390" font-family="monospace" font-size="11" fill="#868e96">Bottleneck: Weight streaming at 32MB/token</text>
+  <text x="940" y="1405" font-family="monospace" font-size="11" fill="#868e96">This is why quantization (Q4) matters!</text>
+
+  <!-- Section 5: The Deterministic Formula -->
+  <rect x="30" y="1470" width="1440" height="350" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="1500" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">5. The Deterministic Fusion Formula</text>
+
+  <!-- Main formula -->
+  <rect x="50" y="1520" width="1400" height="200" fill="#1a1a2e" rx="5"/>
+  
+  <text x="70" y="1550" font-family="monospace" font-size="13" fill="#69db7c">// Given hardware constraints:</text>
+  <text x="70" y="1575" font-family="monospace" font-size="12" fill="#abb2bf">S_L1, S_L2, S_L3, N_cores, cache_line = 64B</text>
+  
+  <text x="70" y="1605" font-family="monospace" font-size="13" fill="#69db7c">// Given model parameters:</text>
+  <text x="70" y="1630" font-family="monospace" font-size="12" fill="#abb2bf">H (embed_dim), n_h (num_heads), d = H/n_h (head_dim), S (seq_len)</text>
+  
+  <text x="70" y="1660" font-family="monospace" font-size="13" fill="#ffd43b">// Compute optimal tile sizes:</text>
+  <text x="70" y="1685" font-family="monospace" font-size="12" fill="white">T_kv = floor((S_L1 × 0.8 - 2×d×B) / (2×d×B))  // KV tile for flash attention</text>
+  <text x="70" y="1705" font-family="monospace" font-size="12" fill="white">T_kv = min(T_kv, 64)                           // Cap at cache line multiple</text>
+
+  <text x="700" y="1550" font-family="monospace" font-size="13" fill="#69db7c">// Parallelization:</text>
+  <text x="700" y="1575" font-family="monospace" font-size="12" fill="#abb2bf">heads_per_core = ceil(n_h / N_cores)</text>
+  <text x="700" y="1600" font-family="monospace" font-size="12" fill="#abb2bf">require: heads_per_core × working_set_per_head ≤ S_L2</text>
+  
+  <text x="700" y="1635" font-family="monospace" font-size="13" fill="#ff6b6b">// False sharing prevention:</text>
+  <text x="700" y="1660" font-family="monospace" font-size="12" fill="white">require: d × B ≥ cache_line  // Each head on own cache line</text>
+  <text x="700" y="1685" font-family="monospace" font-size="12" fill="white">// For d=64, B=2: 128B = 2 lines ✓</text>
+  <text x="700" y="1705" font-family="monospace" font-size="12" fill="white">output_offset[core] = core × heads_per_core × d × B</text>
+
+  <!-- Verification checklist -->
+  <rect x="50" y="1730" width="680" height="80" fill="#d3f9d8" rx="5"/>
+  <text x="70" y="1755" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#2f9e44">Fusion Verification Checklist:</text>
+  <text x="70" y="1778" font-family="monospace" font-size="11" fill="#212529">✓ Per-head working set (Q+K_tile+V_tile+O) fits L1</text>
+  <text x="70" y="1796" font-family="monospace" font-size="11" fill="#212529">✓ All heads' outputs fit L2 before output projection</text>
+  <text x="350" y="1778" font-family="monospace" font-size="11" fill="#212529">✓ Head boundaries align to cache lines</text>
+  <text x="350" y="1796" font-family="monospace" font-size="11" fill="#212529">✓ RoPE cos/sin for position fits L1</text>
+
+  <!-- Example calculation -->
+  <rect x="750" y="1730" width="680" height="80" fill="#e7f5ff" rx="5"/>
+  <text x="770" y="1755" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1971c2">Example: Llama-7B (H=4096, n_h=32, d=128)</text>
+  <text x="770" y="1778" font-family="monospace" font-size="11" fill="#212529">T_kv = (48KB×0.8 - 512B) / 512B = 74 → use T_kv=64</text>
+  <text x="770" y="1796" font-family="monospace" font-size="11" fill="#212529">Working set = 256B + 16KB + 16KB + 520B = 33KB ✓ L1</text>
+
+  <!-- Section 6: Implementation Pseudocode -->
+  <rect x="30" y="1840" width="1440" height="340" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="1870" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">6. Implementation Structure for C-Kernel-Engine</text>
+
+  <rect x="50" y="1890" width="700" height="280" fill="#282c34" rx="5"/>
+  <text x="70" y="1915" font-family="monospace" font-size="11" fill="#7f848e">// Outer loop: minimize DRAM writes</text>
+  <text x="70" y="1935" font-family="monospace" font-size="11" fill="#c678dd">void</text>
+  <text x="105" y="1935" font-family="monospace" font-size="11" fill="#61afef"> fused_attention_block</text>
+  <text x="265" y="1935" font-family="monospace" font-size="11" fill="#abb2bf">(float* out, float* x, ...) {</text>
+  
+  <text x="80" y="1960" font-family="monospace" font-size="11" fill="#7f848e">// Step 1: RMSNorm (L1)</text>
+  <text x="80" y="1978" font-family="monospace" font-size="11" fill="#abb2bf">rmsnorm_inplace(x, H);  </text>
+  <text x="300" y="1978" font-family="monospace" font-size="11" fill="#7f848e">// x stays in L2</text>
+  
+  <text x="80" y="2003" font-family="monospace" font-size="11" fill="#7f848e">// Step 2: QKV projection (stream weights, output to L2)</text>
+  <text x="80" y="2021" font-family="monospace" font-size="11" fill="#abb2bf">gemm_qkv_fused(Q, K, V, x, W_qkv, H);</text>
+  
+  <text x="80" y="2046" font-family="monospace" font-size="11" fill="#7f848e">// Step 3: Parallel per-head processing</text>
+  <text x="80" y="2064" font-family="monospace" font-size="11" fill="#c678dd">#pragma omp parallel for</text>
+  <text x="80" y="2082" font-family="monospace" font-size="11" fill="#c678dd">for</text>
+  <text x="110" y="2082" font-family="monospace" font-size="11" fill="#abb2bf"> (int h = 0; h &lt; n_heads; h++) {</text>
+  <text x="90" y="2100" font-family="monospace" font-size="11" fill="#abb2bf">rope_inplace(&amp;Q[h*d], &amp;K[h*d], pos, d);</text>
+  <text x="90" y="2118" font-family="monospace" font-size="11" fill="#abb2bf">flash_attention_head(&amp;O[h*d], &amp;Q[h*d],</text>
+  <text x="90" y="2136" font-family="monospace" font-size="11" fill="#abb2bf">    &amp;kv_cache[h], pos, d, T_kv);</text>
+  <text x="80" y="2154" font-family="monospace" font-size="11" fill="#abb2bf">}  </text>
+  <text x="100" y="2154" font-family="monospace" font-size="11" fill="#7f848e">// Implicit barrier here</text>
+
+  <!-- Right side: the flash attention inner loop -->
+  <rect x="770" y="1890" width="700" height="280" fill="#282c34" rx="5"/>
+  <text x="790" y="1915" font-family="monospace" font-size="11" fill="#7f848e">// Per-head flash attention (ALL in L1 + registers)</text>
+  <text x="790" y="1935" font-family="monospace" font-size="11" fill="#c678dd">void</text>
+  <text x="825" y="1935" font-family="monospace" font-size="11" fill="#61afef"> flash_attention_head</text>
+  <text x="980" y="1935" font-family="monospace" font-size="11" fill="#abb2bf">(..., int T_kv) {</text>
+  
+  <text x="800" y="1960" font-family="monospace" font-size="11" fill="#e5c07b">__m512</text>
+  <text x="850" y="1960" font-family="monospace" font-size="11" fill="#abb2bf"> O_acc = _mm512_setzero_ps();</text>
+  <text x="800" y="1978" font-family="monospace" font-size="11" fill="#e5c07b">float</text>
+  <text x="845" y="1978" font-family="monospace" font-size="11" fill="#abb2bf"> m = -INFINITY, l = 0;  </text>
+  <text x="1050" y="1978" font-family="monospace" font-size="11" fill="#7f848e">// in regs</text>
+  
+  <text x="800" y="2003" font-family="monospace" font-size="11" fill="#c678dd">for</text>
+  <text x="830" y="2003" font-family="monospace" font-size="11" fill="#abb2bf"> (int t = 0; t &lt;= pos; t += T_kv) {</text>
+  <text x="810" y="2025" font-family="monospace" font-size="11" fill="#7f848e">// Load KV tile to L1 (prefetch next)</text>
+  <text x="810" y="2043" font-family="monospace" font-size="11" fill="#abb2bf">load_kv_tile(K_tile, V_tile, kv_cache, t);</text>
+  
+  <text x="810" y="2068" font-family="monospace" font-size="11" fill="#7f848e">// All computation in registers</text>
+  <text x="810" y="2086" font-family="monospace" font-size="11" fill="#abb2bf">scores = Q @ K_tile.T;  </text>
+  <text x="1020" y="2086" font-family="monospace" font-size="11" fill="#7f848e">// 1×T_kv</text>
+  <text x="810" y="2104" font-family="monospace" font-size="11" fill="#abb2bf">m_new = max(m, max(scores));</text>
+  <text x="810" y="2122" font-family="monospace" font-size="11" fill="#abb2bf">P = exp(scores - m_new);</text>
+  <text x="810" y="2140" font-family="monospace" font-size="11" fill="#abb2bf">l = exp(m - m_new)*l + sum(P);</text>
+  <text x="810" y="2158" font-family="monospace" font-size="11" fill="#abb2bf">O_acc = exp(m-m_new)*O_acc + P @ V_tile;</text>
+  <text x="800" y="2173" font-family="monospace" font-size="11" fill="#abb2bf">}</text>
+
+</svg>

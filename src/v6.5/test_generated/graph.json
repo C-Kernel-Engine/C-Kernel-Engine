@@ -1,0 +1,2515 @@
+{
+  "version": 4,
+  "kind": "graph",
+  "generated": "2026-01-12T04:06:36.518741Z",
+  "model": "qwen2_0.5b",
+  "config": {
+    "model_type": "qwen2",
+    "embed_dim": 896,
+    "num_heads": 14,
+    "num_kv_heads": 2,
+    "head_dim": 64,
+    "intermediate_dim": 4864,
+    "num_layers": 24,
+    "vocab_size": 151936,
+    "max_seq_len": 131072,
+    "rope_theta": 1000000.0,
+    "rms_norm_eps": 1e-06,
+    "tie_word_embeddings": true,
+    "dtype": "fp32",
+    "aligned_embed": 1024,
+    "aligned_head": 64,
+    "aligned_intermediate": 4864,
+    "weight_dtype": "q4_k",
+    "aligned_context": 131072
+  },
+  "symbols": {
+    "E": {
+      "name": "embed_dim",
+      "value": 896
+    },
+    "AE": {
+      "name": "aligned_embed",
+      "value": 1024
+    },
+    "H": {
+      "name": "num_heads",
+      "value": 14
+    },
+    "KV": {
+      "name": "num_kv_heads",
+      "value": 2
+    },
+    "D": {
+      "name": "head_dim",
+      "value": 64
+    },
+    "AD": {
+      "name": "aligned_head",
+      "value": 64
+    },
+    "I": {
+      "name": "intermediate_dim",
+      "value": 4864
+    },
+    "AI": {
+      "name": "aligned_intermediate",
+      "value": 4864
+    },
+    "T": {
+      "name": "max_seq_len",
+      "value": 131072
+    },
+    "AC": {
+      "name": "aligned_context",
+      "value": 131072
+    },
+    "S": {
+      "name": "tokens",
+      "value": 131072
+    },
+    "V": {
+      "name": "vocab_size",
+      "value": 151936
+    },
+    "NUM_MERGES": {
+      "name": "num_merges",
+      "value": 0
+    },
+    "VOCAB_BYTES": {
+      "name": "total_vocab_bytes",
+      "value": 0
+    },
+    "B": {
+      "name": "batch_size",
+      "value": 1
+    },
+    "MB": {
+      "name": "micro_batch_size",
+      "value": 1
+    },
+    "ACCUM": {
+      "name": "accumulation_steps",
+      "value": 1
+    }
+  },
+  "sections": [
+    {
+      "id": 0,
+      "name": "text_decoder",
+      "inputs": [
+        {
+          "name": "tokens",
+          "dtype": "i32",
+          "shape": [
+            "S"
+          ]
+        }
+      ],
+      "globals": [
+        {
+          "name": "rope_cos_cache",
+          "role": "precomputed",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "D/2"
+          ],
+          "resolved_shape": [
+            131072,
+            32
+          ]
+        },
+        {
+          "name": "rope_sin_cache",
+          "role": "precomputed",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "D/2"
+          ],
+          "resolved_shape": [
+            131072,
+            32
+          ]
+        }
+      ],
+      "buffers": {
+        "header": [
+          {
+            "name": "token_emb",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ]
+          },
+          {
+            "name": "vocab_offsets",
+            "role": "weight",
+            "dtype": "i32",
+            "shape": [
+              "V"
+            ],
+            "resolved_shape": [
+              151936
+            ]
+          },
+          {
+            "name": "vocab_strings",
+            "role": "weight",
+            "dtype": "u8",
+            "shape": [
+              "VOCAB_BYTES"
+            ],
+            "resolved_shape": [
+              0
+            ]
+          },
+          {
+            "name": "vocab_merges",
+            "role": "weight",
+            "dtype": "i32",
+            "shape": [
+              "NUM_MERGES",
+              "3"
+            ],
+            "resolved_shape": [
+              0,
+              3
+            ]
+          },
+          {
+            "name": "embedded_input",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "d_embedded_input",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "d_token_emb",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "m_token_emb",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "v_token_emb",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ],
+        "layer": [
+          {
+            "name": "layer.{L}.input",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln1_gamma",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln1_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln1_rstd",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S"
+            ],
+            "resolved_shape": [
+              131072
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.wq",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              14,
+              64,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.bq",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.wk",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.bk",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.wv",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.bv",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.q",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              131072,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.k",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AC",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              131072,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.v",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AC",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              131072,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.scores",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AC",
+              "AC"
+            ],
+            "resolved_shape": [
+              14,
+              131072,
+              131072
+            ],
+            "when": [
+              "prefill",
+              "backward"
+            ]
+          },
+          {
+            "name": "layer.{L}.attn_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              131072,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.wo",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AE",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              1024,
+              64
+            ]
+          },
+          {
+            "name": "layer.{L}.bo",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.proj_tmp",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.proj_scratch",
+            "role": "scratch",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.residual1",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln2_gamma",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln2_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.ln2_rstd",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S"
+            ],
+            "resolved_shape": [
+              131072
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.w1",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "2*AI",
+              "AE"
+            ],
+            "resolved_shape": [
+              9728,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.b1",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "2*AI"
+            ],
+            "resolved_shape": [
+              9728
+            ]
+          },
+          {
+            "name": "layer.{L}.fc1_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "2*AI"
+            ],
+            "resolved_shape": [
+              131072,
+              9728
+            ]
+          },
+          {
+            "name": "layer.{L}.swiglu_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AI"
+            ],
+            "resolved_shape": [
+              131072,
+              4864
+            ]
+          },
+          {
+            "name": "layer.{L}.w2",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE",
+              "AI"
+            ],
+            "resolved_shape": [
+              1024,
+              4864
+            ]
+          },
+          {
+            "name": "layer.{L}.b2",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.mlp_out",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.output",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "layer.{L}.d_output",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_mlp_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_swiglu_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AI"
+            ],
+            "resolved_shape": [
+              131072,
+              4864
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_fc1_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "2*AI"
+            ],
+            "resolved_shape": [
+              131072,
+              9728
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_ln2_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_residual1",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_proj_tmp",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_attn_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              131072,
+              64
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_q",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              131072,
+              64
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_k",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              131072,
+              64
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_v",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "S",
+              "AD"
+            ],
+            "resolved_shape": [
+              2,
+              131072,
+              64
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_ln1_out",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_input",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_ln1_gamma",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_wq",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              14,
+              64,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_wk",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_wv",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_wo",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "H",
+              "AE",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              1024,
+              64
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_ln2_gamma",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_w1",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "2*AI",
+              "AE"
+            ],
+            "resolved_shape": [
+              9728,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.d_w2",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "AE",
+              "AI"
+            ],
+            "resolved_shape": [
+              1024,
+              4864
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_ln1_gamma",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_ln1_gamma",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_wq",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "H",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              14,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_wq",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "H",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              14,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_wk",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_wk",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_wv",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_wv",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "KV",
+              "AD",
+              "AE"
+            ],
+            "resolved_shape": [
+              2,
+              64,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_wo",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "H",
+              "AE",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              1024,
+              64
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_wo",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "H",
+              "AE",
+              "AD"
+            ],
+            "resolved_shape": [
+              14,
+              1024,
+              64
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_ln2_gamma",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_ln2_gamma",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_w1",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "2*AI",
+              "AE"
+            ],
+            "resolved_shape": [
+              9728,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_w1",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "2*AI",
+              "AE"
+            ],
+            "resolved_shape": [
+              9728,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.m_w2",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE",
+              "AI"
+            ],
+            "resolved_shape": [
+              1024,
+              4864
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "layer.{L}.v_w2",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE",
+              "AI"
+            ],
+            "resolved_shape": [
+              1024,
+              4864
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ],
+        "footer": [
+          {
+            "name": "final_ln_weight",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ]
+          },
+          {
+            "name": "final_output",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ]
+          },
+          {
+            "name": "final_ln_rstd",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S"
+            ],
+            "resolved_shape": [
+              131072
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "lm_head_weight",
+            "role": "weight",
+            "dtype": "fp32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "tied_to": "token_emb"
+          },
+          {
+            "name": "logits",
+            "role": "activation",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "V"
+            ],
+            "resolved_shape": [
+              131072,
+              151936
+            ]
+          },
+          {
+            "name": "labels",
+            "role": "input",
+            "dtype": "i32",
+            "shape": [
+              "S"
+            ],
+            "resolved_shape": [
+              131072
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "loss",
+            "role": "output",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "d_logits",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "V"
+            ],
+            "resolved_shape": [
+              131072,
+              151936
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "d_final_output",
+            "role": "gradient",
+            "dtype": "fp32",
+            "shape": [
+              "S",
+              "AE"
+            ],
+            "resolved_shape": [
+              131072,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "d_final_ln_weight",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "d_lm_head_weight",
+            "role": "weight_grad",
+            "dtype": "fp32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "name": "m_final_ln_weight",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "v_final_ln_weight",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "AE"
+            ],
+            "resolved_shape": [
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "m_lm_head_weight",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "v_lm_head_weight",
+            "role": "optimizer_state",
+            "dtype": "f32",
+            "shape": [
+              "V",
+              "AE"
+            ],
+            "resolved_shape": [
+              151936,
+              1024
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "learning_rate",
+            "role": "hyperparameter",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "beta1",
+            "role": "hyperparameter",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "beta2",
+            "role": "hyperparameter",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "epsilon",
+            "role": "hyperparameter",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "weight_decay",
+            "role": "hyperparameter",
+            "dtype": "f32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "name": "step_count",
+            "role": "state",
+            "dtype": "i32",
+            "shape": [
+              1
+            ],
+            "resolved_shape": [
+              1
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ]
+      },
+      "header": {
+        "ops": [
+          {
+            "op": "embedding",
+            "name": "token_embed",
+            "inputs": [
+              "tokens"
+            ],
+            "weights": [
+              "token_emb"
+            ],
+            "outputs": [
+              "embedded_input"
+            ]
+          },
+          {
+            "op": "rope_precompute",
+            "name": "rope_precompute",
+            "inputs": [],
+            "outputs": [
+              "rope_cos_cache",
+              "rope_sin_cache"
+            ],
+            "attrs": {
+              "theta": 1000000.0
+            }
+          }
+        ],
+        "backward_ops": [
+          {
+            "op": "embedding_backward",
+            "name": "embedding_backward",
+            "inputs": [
+              "d_embedded_input",
+              "tokens"
+            ],
+            "outputs": [
+              "d_token_emb"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          }
+        ],
+        "optimizer_ops": [
+          {
+            "op": "adamw_update",
+            "name": "adamw_token_emb",
+            "inputs": [
+              "d_token_emb",
+              "token_emb",
+              "m_token_emb",
+              "v_token_emb",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "token_emb",
+              "m_token_emb",
+              "v_token_emb"
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ],
+        "outputs": [
+          "embedded_input"
+        ]
+      },
+      "body": {
+        "repeat": "num_layers",
+        "layer_var": "L",
+        "bindings": {
+          "input": {
+            "first_layer": "embedded_input",
+            "next_layer": "layer.{L-1}.output"
+          },
+          "d_output": {
+            "last_layer": "d_last_layer_output",
+            "prev_layer": "layer.{L+1}.d_input"
+          }
+        },
+        "ops": [
+          {
+            "op": "rmsnorm",
+            "name": "ln1",
+            "inputs": [
+              "input"
+            ],
+            "weights": [
+              "layer.{L}.ln1_gamma"
+            ],
+            "outputs": [
+              "layer.{L}.ln1_out"
+            ]
+          },
+          {
+            "op": "qkv_project",
+            "name": "qkv_project",
+            "inputs": [
+              "layer.{L}.ln1_out"
+            ],
+            "weights": [
+              "layer.{L}.wq",
+              "layer.{L}.wk",
+              "layer.{L}.wv"
+            ],
+            "biases": [
+              "layer.{L}.bq",
+              "layer.{L}.bk",
+              "layer.{L}.bv"
+            ],
+            "outputs": [
+              "layer.{L}.q",
+              "layer.{L}.k",
+              "layer.{L}.v"
+            ]
+          },
+          {
+            "op": "rope",
+            "name": "rope",
+            "inputs": [
+              "layer.{L}.q",
+              "layer.{L}.k",
+              "rope_cos_cache",
+              "rope_sin_cache"
+            ],
+            "outputs": [
+              "layer.{L}.q",
+              "layer.{L}.k"
+            ]
+          },
+          {
+            "op": "attention",
+            "name": "attention",
+            "inputs": [
+              "layer.{L}.q",
+              "layer.{L}.k",
+              "layer.{L}.v"
+            ],
+            "outputs": [
+              "layer.{L}.attn_out"
+            ],
+            "scratch": [
+              "layer.{L}.scores"
+            ]
+          },
+          {
+            "op": "attn_proj",
+            "name": "attn_proj",
+            "inputs": [
+              "layer.{L}.attn_out"
+            ],
+            "weights": [
+              "layer.{L}.wo"
+            ],
+            "outputs": [
+              "layer.{L}.proj_tmp"
+            ],
+            "scratch": [
+              "layer.{L}.proj_scratch"
+            ]
+          },
+          {
+            "op": "residual_add",
+            "name": "residual1",
+            "inputs": [
+              "input",
+              "layer.{L}.proj_tmp"
+            ],
+            "outputs": [
+              "layer.{L}.residual1"
+            ]
+          },
+          {
+            "op": "rmsnorm",
+            "name": "ln2",
+            "inputs": [
+              "layer.{L}.residual1"
+            ],
+            "weights": [
+              "layer.{L}.ln2_gamma"
+            ],
+            "outputs": [
+              "layer.{L}.ln2_out"
+            ]
+          },
+          {
+            "op": "mlp_up",
+            "name": "mlp_up",
+            "inputs": [
+              "layer.{L}.ln2_out"
+            ],
+            "weights": [
+              "layer.{L}.w1"
+            ],
+            "outputs": [
+              "layer.{L}.fc1_out"
+            ]
+          },
+          {
+            "op": "swiglu",
+            "name": "swiglu",
+            "inputs": [
+              "layer.{L}.fc1_out"
+            ],
+            "outputs": [
+              "layer.{L}.swiglu_out"
+            ]
+          },
+          {
+            "op": "mlp_down",
+            "name": "mlp_down",
+            "inputs": [
+              "layer.{L}.swiglu_out"
+            ],
+            "weights": [
+              "layer.{L}.w2"
+            ],
+            "outputs": [
+              "layer.{L}.mlp_out"
+            ]
+          },
+          {
+            "op": "residual_add",
+            "name": "residual2",
+            "inputs": [
+              "layer.{L}.residual1",
+              "layer.{L}.mlp_out"
+            ],
+            "outputs": [
+              "layer.{L}.output"
+            ]
+          }
+        ],
+        "backward_ops": [
+          {
+            "op": "add_backward",
+            "name": "residual2_backward",
+            "inputs": [
+              "d_output"
+            ],
+            "outputs": [
+              "layer.{L}.d_residual1",
+              "layer.{L}.d_mlp_out"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "gemm_backward",
+            "name": "mlp_down_backward",
+            "inputs": [
+              "layer.{L}.d_mlp_out",
+              "layer.{L}.swiglu_out",
+              "layer.{L}.w2"
+            ],
+            "outputs": [
+              "layer.{L}.d_swiglu_out"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_w2"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "swiglu_backward",
+            "name": "swiglu_backward",
+            "inputs": [
+              "layer.{L}.d_swiglu_out",
+              "layer.{L}.fc1_out"
+            ],
+            "outputs": [
+              "layer.{L}.d_fc1_out"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "gemm_backward",
+            "name": "mlp_up_backward",
+            "inputs": [
+              "layer.{L}.d_fc1_out",
+              "layer.{L}.ln2_out",
+              "layer.{L}.w1"
+            ],
+            "outputs": [
+              "layer.{L}.d_ln2_out"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_w1"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "rmsnorm_backward",
+            "name": "ln2_backward",
+            "inputs": [
+              "layer.{L}.d_ln2_out",
+              "layer.{L}.residual1",
+              "layer.{L}.ln2_gamma",
+              "layer.{L}.ln2_rstd"
+            ],
+            "outputs": [
+              "layer.{L}.d_residual1"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_ln2_gamma"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "add_backward",
+            "name": "residual1_backward",
+            "inputs": [
+              "layer.{L}.d_residual1"
+            ],
+            "outputs": [
+              "layer.{L}.d_input",
+              "layer.{L}.d_proj_tmp"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "gemm_backward",
+            "name": "attn_proj_backward",
+            "inputs": [
+              "layer.{L}.d_proj_tmp",
+              "layer.{L}.attn_out",
+              "layer.{L}.wo"
+            ],
+            "outputs": [
+              "layer.{L}.d_attn_out"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_wo"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "attention_backward",
+            "name": "attention_backward",
+            "inputs": [
+              "layer.{L}.d_attn_out",
+              "layer.{L}.q",
+              "layer.{L}.k",
+              "layer.{L}.v",
+              "layer.{L}.scores"
+            ],
+            "outputs": [
+              "layer.{L}.d_q",
+              "layer.{L}.d_k",
+              "layer.{L}.d_v"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "rope_backward",
+            "name": "rope_backward",
+            "inputs": [
+              "layer.{L}.d_q",
+              "layer.{L}.d_k",
+              "rope_cos_cache",
+              "rope_sin_cache"
+            ],
+            "outputs": [
+              "layer.{L}.d_q",
+              "layer.{L}.d_k"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "qkv_backward",
+            "name": "qkv_backward",
+            "inputs": [
+              "layer.{L}.d_q",
+              "layer.{L}.d_k",
+              "layer.{L}.d_v",
+              "layer.{L}.ln1_out"
+            ],
+            "weights": [
+              "layer.{L}.wq",
+              "layer.{L}.wk",
+              "layer.{L}.wv"
+            ],
+            "outputs": [
+              "layer.{L}.d_ln1_out"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_wq",
+              "layer.{L}.d_wk",
+              "layer.{L}.d_wv"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "rmsnorm_backward",
+            "name": "ln1_backward",
+            "inputs": [
+              "layer.{L}.d_ln1_out",
+              "input",
+              "layer.{L}.ln1_gamma",
+              "layer.{L}.ln1_rstd"
+            ],
+            "outputs": [
+              "layer.{L}.d_input"
+            ],
+            "weight_grads": [
+              "layer.{L}.d_ln1_gamma"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          }
+        ],
+        "optimizer_ops": [
+          {
+            "op": "adamw_update",
+            "name": "adamw_ln1_gamma",
+            "inputs": [
+              "layer.{L}.d_ln1_gamma",
+              "layer.{L}.ln1_gamma",
+              "layer.{L}.m_ln1_gamma",
+              "layer.{L}.v_ln1_gamma",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.ln1_gamma",
+              "layer.{L}.m_ln1_gamma",
+              "layer.{L}.v_ln1_gamma"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_wq",
+            "inputs": [
+              "layer.{L}.d_wq",
+              "layer.{L}.wq",
+              "layer.{L}.m_wq",
+              "layer.{L}.v_wq",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.wq",
+              "layer.{L}.m_wq",
+              "layer.{L}.v_wq"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_wk",
+            "inputs": [
+              "layer.{L}.d_wk",
+              "layer.{L}.wk",
+              "layer.{L}.m_wk",
+              "layer.{L}.v_wk",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.wk",
+              "layer.{L}.m_wk",
+              "layer.{L}.v_wk"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_wv",
+            "inputs": [
+              "layer.{L}.d_wv",
+              "layer.{L}.wv",
+              "layer.{L}.m_wv",
+              "layer.{L}.v_wv",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.wv",
+              "layer.{L}.m_wv",
+              "layer.{L}.v_wv"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_wo",
+            "inputs": [
+              "layer.{L}.d_wo",
+              "layer.{L}.wo",
+              "layer.{L}.m_wo",
+              "layer.{L}.v_wo",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.wo",
+              "layer.{L}.m_wo",
+              "layer.{L}.v_wo"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_ln2_gamma",
+            "inputs": [
+              "layer.{L}.d_ln2_gamma",
+              "layer.{L}.ln2_gamma",
+              "layer.{L}.m_ln2_gamma",
+              "layer.{L}.v_ln2_gamma",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.ln2_gamma",
+              "layer.{L}.m_ln2_gamma",
+              "layer.{L}.v_ln2_gamma"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_w1",
+            "inputs": [
+              "layer.{L}.d_w1",
+              "layer.{L}.w1",
+              "layer.{L}.m_w1",
+              "layer.{L}.v_w1",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.w1",
+              "layer.{L}.m_w1",
+              "layer.{L}.v_w1"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_w2",
+            "inputs": [
+              "layer.{L}.d_w2",
+              "layer.{L}.w2",
+              "layer.{L}.m_w2",
+              "layer.{L}.v_w2",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "layer.{L}.w2",
+              "layer.{L}.m_w2",
+              "layer.{L}.v_w2"
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ],
+        "outputs": [
+          "layer.{L}.output"
+        ]
+      },
+      "footer": {
+        "bindings": {
+          "last_layer_output": "layer.{L-1}.output"
+        },
+        "ops": [
+          {
+            "op": "rmsnorm",
+            "name": "final_ln",
+            "inputs": [
+              "last_layer_output"
+            ],
+            "weights": [
+              "final_ln_weight"
+            ],
+            "outputs": [
+              "final_output"
+            ],
+            "cache": [
+              "final_ln_rstd"
+            ]
+          },
+          {
+            "op": "lm_head",
+            "name": "lm_head",
+            "inputs": [
+              "final_output"
+            ],
+            "weights": [
+              "lm_head_weight"
+            ],
+            "outputs": [
+              "logits"
+            ]
+          },
+          {
+            "op": "cross_entropy_loss",
+            "name": "cross_entropy",
+            "inputs": [
+              "logits",
+              "labels"
+            ],
+            "outputs": [
+              "loss",
+              "d_logits"
+            ],
+            "when": [
+              "training"
+            ],
+            "description": "Cross-entropy loss with fused softmax and gradient computation"
+          }
+        ],
+        "backward_ops": [
+          {
+            "op": "gemm_backward",
+            "name": "lm_head_backward",
+            "inputs": [
+              "d_logits",
+              "final_output",
+              "lm_head_weight"
+            ],
+            "outputs": [
+              "d_final_output"
+            ],
+            "weight_grads": [
+              "d_lm_head_weight"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          },
+          {
+            "op": "rmsnorm_backward",
+            "name": "final_ln_backward",
+            "inputs": [
+              "d_final_output",
+              "last_layer_output",
+              "final_ln_weight",
+              "final_ln_rstd"
+            ],
+            "outputs": [
+              "d_last_layer_output"
+            ],
+            "weight_grads": [
+              "d_final_ln_weight"
+            ],
+            "when": [
+              "backward",
+              "training"
+            ]
+          }
+        ],
+        "optimizer_ops": [
+          {
+            "op": "adamw_update",
+            "name": "adamw_final_ln_weight",
+            "inputs": [
+              "d_final_ln_weight",
+              "final_ln_weight",
+              "m_final_ln_weight",
+              "v_final_ln_weight",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "final_ln_weight",
+              "m_final_ln_weight",
+              "v_final_ln_weight"
+            ],
+            "when": [
+              "training"
+            ]
+          },
+          {
+            "op": "adamw_update",
+            "name": "adamw_lm_head_weight",
+            "inputs": [
+              "d_lm_head_weight",
+              "lm_head_weight",
+              "m_lm_head_weight",
+              "v_lm_head_weight",
+              "learning_rate",
+              "beta1",
+              "beta2",
+              "epsilon",
+              "weight_decay",
+              "step_count"
+            ],
+            "outputs": [
+              "lm_head_weight",
+              "m_lm_head_weight",
+              "v_lm_head_weight"
+            ],
+            "when": [
+              "training"
+            ],
+            "skip_if_tied": true
+          },
+          {
+            "op": "increment",
+            "name": "increment_step",
+            "inputs": [
+              "step_count"
+            ],
+            "outputs": [
+              "step_count"
+            ],
+            "when": [
+              "training"
+            ]
+          }
+        ],
+        "outputs": [
+          "logits"
+        ]
+      },
+      "gradient_reduction": [
+        {
+          "op": "allreduce",
+          "name": "allreduce_gradients",
+          "inputs": [
+            "all_weight_gradients"
+          ],
+          "outputs": [
+            "all_weight_gradients"
+          ],
+          "attrs": {
+            "reduce_op": "sum",
+            "scale": "1/data_parallel_size"
+          },
+          "when": [
+            "training"
+          ],
+          "condition": "data_parallel_size > 1"
+        }
+      ]
+    }
+  ],
+  "weight_map": [
+    {
+      "hf": "model.embed_tokens.weight",
+      "ck": "token_emb"
+    },
+    {
+      "hf": "model.layers.{layer}.input_layernorm.weight",
+      "ck": "layer.{L}.ln1_gamma"
+    },
+    {
+      "hf": "model.layers.{layer}.self_attn.q_proj.weight",
+      "ck": "layer.{L}.wq"
+    },
+    {
+      "hf": "model.layers.{layer}.self_attn.k_proj.weight",
+      "ck": "layer.{L}.wk"
+    },
+    {
+      "hf": "model.layers.{layer}.self_attn.v_proj.weight",
+      "ck": "layer.{L}.wv"
+    },
+    {
+      "hf": "model.layers.{layer}.self_attn.o_proj.weight",
+      "ck": "layer.{L}.wo"
+    },
+    {
+      "hf": "model.layers.{layer}.post_attention_layernorm.weight",
+      "ck": "layer.{L}.ln2_gamma"
+    },
+    {
+      "hf": "model.layers.{layer}.mlp.gate_proj.weight",
+      "ck": "layer.{L}.w1",
+      "pack": "concat",
+      "axis": 0,
+      "part": "gate"
+    },
+    {
+      "hf": "model.layers.{layer}.mlp.up_proj.weight",
+      "ck": "layer.{L}.w1",
+      "pack": "concat",
+      "axis": 0,
+      "part": "up"
+    },
+    {
+      "hf": "model.layers.{layer}.mlp.down_proj.weight",
+      "ck": "layer.{L}.w2"
+    },
+    {
+      "hf": "model.norm.weight",
+      "ck": "final_ln_weight"
+    },
+    {
+      "hf": "lm_head.weight",
+      "ck": "lm_head_weight",
+      "optional": true
+    }
+  ]
+}

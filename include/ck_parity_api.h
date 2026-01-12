@@ -159,6 +159,39 @@ void ck_test_gemv_q8_0_q8_0(const void *weight_q8_0,
                              int rows, int cols);
 
 /* ============================================================================
+ * Direct Vec Dot Tests (pre-quantized inputs, no FP32 conversion)
+ * ============================================================================ */
+
+/**
+ * @brief Direct Q5_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)
+ *
+ * This is a "direct" test that bypasses FP32-to-Q8_0 conversion.
+ * Useful for isolating kernel bugs from quantization bugs.
+ *
+ * @param weight_q5_0 Q5_0 quantized weights [cols]
+ * @param input_q8_0 Q8_0 quantized input [cols] (pre-quantized!)
+ * @param output Output scalar [1]
+ * @param cols Number of elements (must be multiple of 32)
+ */
+void ck_test_vec_dot_q5_0_q8_0(const void *weight_q5_0,
+                                const void *input_q8_0,
+                                float *output,
+                                int cols);
+
+/**
+ * @brief Direct Q8_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)
+ *
+ * @param weight_q8_0 Q8_0 quantized weights [cols]
+ * @param input_q8_0 Q8_0 quantized input [cols] (pre-quantized!)
+ * @param output Output scalar [1]
+ * @param cols Number of elements (must be multiple of 32)
+ */
+void ck_test_vec_dot_q8_0_q8_0(const void *weight_q8_0,
+                                const void *input_q8_0,
+                                float *output,
+                                int cols);
+
+/* ============================================================================
  * GEMM (Matrix-Matrix) Tests
  * ============================================================================ */
 

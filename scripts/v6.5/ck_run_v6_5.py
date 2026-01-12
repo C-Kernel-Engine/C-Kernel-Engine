@@ -332,7 +332,7 @@ def step_convert_hf(model_dir: Path,
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_hf_to_bump_v6.py"),
+        str(SCRIPTS_DIR / "convert_hf_to_bump_v6_5.py"),
         f"--checkpoint={model_dir}",
         f"--output={weights_path}",
         f"--dtype={weight_dtype}",
@@ -350,7 +350,7 @@ def validate_gguf_kernel_coverage(gguf_path: Path) -> bool:
     """Validate that all GGUF tensor types have kernel support. Returns True if all supported."""
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_gguf_to_bump_v6.py"),
+        str(SCRIPTS_DIR / "convert_gguf_to_bump_v6_5.py"),
         f"--gguf={gguf_path}",
         "--inspect",
     ]
@@ -397,7 +397,7 @@ def step_convert_gguf(gguf_path: Path,
 
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "convert_gguf_to_bump_v6.py"),
+        str(SCRIPTS_DIR / "convert_gguf_to_bump_v6_5.py"),
         f"--gguf={gguf_path}",
         f"--output={weights_path}",
         f"--config-out={config_path}",
@@ -422,7 +422,7 @@ def step_inspect_weights_v6(input_type: str, model_dir: Optional[Path], gguf_pat
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "inspect_weights_v6.py"),
+        str(SCRIPTS_DIR / "inspect_weights_v6_5.py"),
         f"--manifest-out={manifest_path}",
     ]
 
@@ -456,13 +456,15 @@ def _prefill_codegen_is_stub(output_dir: Path) -> bool:
 def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = None,
                   weight_dtype: str = None, modes: list = None, force: bool = False,
                   debug: bool = False, parity: bool = False,
-                  codegen_version: str = "v6") -> Path:
+                  codegen_version: str = "v6",
+                  int8_activations: bool = False) -> Path:
     """Build IR and generate layout JSON.
 
     Args:
         debug: If True, emit debug prints in generated C code to trace NaN/zero issues.
         parity: If True, save intermediate buffers for parity comparison with PyTorch.
         codegen_version: "v6" for explicit unrolled (default), "v4" for loop-based (legacy).
+        int8_activations: If True, use INT8 activation path (Q5_0×Q8_0 kernels).
     """
     log_step(3, f"Building IR v6 and layout (codegen={codegen_version})")
 
@@ -478,7 +480,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    build_script = "build_ir_v6.py" if V6_MODE else "v4/build_ir_v4.py"
+    build_script = "build_ir_v6_5.py" if V6_MODE else "v4/build_ir_v4.py"
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / build_script),
@@ -504,6 +506,9 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     if parity:
         cmd.append("--parity")
+
+    # INT8 activations are enabled by default in v6.5
+    # The --int8-activations flag is now a no-op (always on in v6.5)
 
     # v6 codegen: explicit unrolled kernels (requires --fusion=off)
     if codegen_version == "v6":
@@ -536,7 +541,7 @@ def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Pa
         kernel_header_path = decode_header_path
         kernel_source_path = decode_source_path
     else:
-        log_error("Missing ck-kernel-inference/ck-kernel-decode C/H files. Run build_ir_v6.py first.")
+        log_error("Missing ck-kernel-inference/ck-kernel-decode C/H files. Run build_ir_v6_5.py first.")
         sys.exit(1)
 
     model_name = None
@@ -940,7 +945,7 @@ def _restore_file(path: Path, backup: Optional[Path]) -> None:
 
 
 def run_smoke_test(model_dir: Path, weights_path: Path, use_valgrind: bool) -> None:
-    script = SCRIPTS_DIR / "ck_model_smoke_v6.py"
+    script = SCRIPTS_DIR / "ck_model_smoke_v6_5.py"
     cmd = [
         sys.executable,
         str(script),
@@ -1327,6 +1332,7 @@ def run_pipeline(args: argparse.Namespace):
         debug=getattr(args, 'debug', False),
         parity=getattr(args, 'parity', False),
         codegen_version=getattr(args, 'codegen', 'v6'),
+        int8_activations=getattr(args, 'int8_activations', False),
     )
 
     # Generate C code
@@ -1617,6 +1623,8 @@ Examples:
                            help='Save intermediate buffers for parity comparison with PyTorch')
     run_parser.add_argument('--codegen', choices=['v4', 'v6'], default='v6',
                            help='Codegen version: v6=explicit unrolled (default), v4=loop-based (legacy)')
+    run_parser.add_argument('--int8-activations', action='store_true',
+                           help='Use INT8 activation path (5-15x faster for Q5_0/Q8_0/Q4_K models)')
     run_parser.add_argument('--c-cli-smoke', action='store_true',
                            help='Run native v6 CLI once (true-BPE smoke test)')
     run_parser.add_argument('--c-cli-prompt', default='Hello',
@@ -1631,6 +1639,8 @@ Examples:
                                    choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
                                             'q5_0', 'q5_1', 'q6_k', 'q8_0'],
                                    help='Weight dtype override')
+    interactive_parser.add_argument('--int8-activations', action='store_true',
+                                   help='Use INT8 activation path (5-15x faster for Q5_0/Q8_0/Q4_K models)')
     interactive_parser.add_argument('--temperature', type=float, default=0.7)
     interactive_parser.add_argument('--max-tokens', type=int, default=512)
 

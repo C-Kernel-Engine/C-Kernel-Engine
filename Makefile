@@ -331,6 +331,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_swiglu.py \
             unittest/test_fused_swiglu_decode.py \
             unittest/test_fused_attention_decode.py \
+            unittest/test_mega_fused_attention.py \
             unittest/test_sigmoid.py \
             unittest/test_relu.py \
             unittest/test_attention.py \
@@ -444,6 +445,88 @@ test-tokenizer-llama: $(LIB_TOKENIZER)
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_llamacpp.py
 
 .PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEGA-FUSED ATTENTION TESTS (DRAM Pressure & Flamegraph)
+# ═══════════════════════════════════════════════════════════════════════════════
+# CRITICAL: Test order is ENFORCED - correctness first, then performance!
+#
+#   1. CORRECTNESS  →  Numerical parity vs PyTorch (MUST PASS FIRST!)
+#   2. PERFORMANCE  →  DRAM pressure reduction (perf)
+#   3. FLAMEGRAPH   →  Visual confirmation
+#
+# If correctness fails, performance/flamegraph are skipped!
+#
+# Key metrics:
+#   - cache-misses: LLC misses = DRAM access
+#   - LLC-load-misses: Requests that go to DRAM
+#   - Expected: 10-100x reduction in DRAM traffic
+#
+# Run with:
+#   make test-mega-fused-correctness    # Step 1: Numerical correctness
+#   make test-mega-fused-perf           # Step 2: DRAM pressure (requires correctness)
+#   make test-mega-fused-flamegraph     # Step 3: Visual (requires correctness)
+#   make test-mega-fused                # All 3 steps in order
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TEST_MODEL ?= Qwen2-0.5B-Instruct
+TEST_TOKENS ?= 100
+
+test-mega-fused-correctness: $(CK_CLI_V6_5)
+	@echo ""
+	@echo "========================================"
+	@echo "  STEP 1: NUMERICAL CORRECTNESS"
+	@echo "  (Must pass before performance tests!)"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --correctness
+
+test-mega-fused-perf: test-mega-fused-correctness $(CK_CLI_V6_5)
+	@echo ""
+	@echo "========================================"
+	@echo "  STEP 2: DRAM PRESSURE TEST"
+	@echo "  (THE CRITICAL TEST - fusion's whole point!)"
+	@echo "========================================"
+	@mkdir -p test_results
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --perf --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+
+test-mega-fused-flamegraph: test-mega-fused-correctness $(CK_CLI_V6_5)
+	@echo ""
+	@echo "========================================"
+	@echo "  STEP 3: FLAMEGRAPH VISUALIZATION"
+	@echo "  (Visual confirmation of reduced memory)"
+	@echo "========================================"
+	@mkdir -p test_results
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --flamegraph --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+
+test-mega-fused: $(CK_CLI_V6_5)
+	@echo ""
+	@echo "========================================"
+	@echo "  MEGA-FUSED ATTENTION: ALL TESTS"
+	@echo "  (Correctness → Performance → Flamegraph)"
+	@echo "========================================"
+	@mkdir -p test_results
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --all --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+
+# Direct perf measurement (without Python)
+test-perf-baseline:
+	@echo "Measuring baseline (unfused) DRAM pressure..."
+	@perf stat -e cycles,instructions,cache-references,cache-misses,LLC-loads \
+		-o test_results/perf_baseline.txt -- \
+		./$(CK_CLI_V6_5) --model $(TEST_MODEL) --max-tokens $(TEST_TOKENS) --prompt "Test"
+
+test-perf-megafused:
+	@echo "Measuring mega-fused DRAM pressure..."
+	@perf stat -e cycles,instructions,cache-references,cache-misses,LLC-loads \
+		-o test_results/perf_megafused.txt -- \
+		./$(CK_CLI_V6_5) --model $(TEST_MODEL) --max-tokens $(TEST_TOKENS) --mega-fused --prompt "Test"
+
+test-perf-compare: test-perf-baseline test-perf-megafused
+	@echo ""
+	@echo "Comparing results..."
+	@python3 scripts/test/compare_perf_results.py test_results/perf_baseline.txt test_results/perf_megafused.txt
+
+.PHONY: test-mega-fused-correctness test-mega-fused-perf test-mega-fused-flamegraph test-mega-fused
+.PHONY: test-perf-baseline test-perf-megafused test-perf-compare
 
 ir-v2-meta: $(IR_V2_DEMO)
 	@echo "Generating IR v2 from $(CONFIG) + $(IR_V2_META)..."

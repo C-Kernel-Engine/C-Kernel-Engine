@@ -142,6 +142,68 @@ def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, l
     return offsets, bytes(strings_blob), merges_data
 
 
+def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list[int], bytes, list[int]]]:
+    """Extract tokenizer vocabulary directly from GGUF metadata.
+
+    GGUF files contain tokenizer data in these metadata keys:
+      - tokenizer.ggml.tokens: array of token strings
+      - tokenizer.ggml.scores: array of token scores (optional)
+      - tokenizer.ggml.token_type: array of token types (optional)
+      - tokenizer.ggml.merges: BPE merge pairs (optional)
+
+    Returns:
+        (vocab_offsets, vocab_strings, merges_data) or None if not found
+    """
+    tokens = meta.get("tokenizer.ggml.tokens")
+    if not tokens or not isinstance(tokens, (list, tuple)):
+        return None
+
+    # Build vocabulary
+    offsets: list[int] = []
+    strings_blob = bytearray()
+
+    for i, token in enumerate(tokens[:vocab_size]):
+        offsets.append(len(strings_blob))
+        if isinstance(token, bytes):
+            strings_blob.extend(token)
+        elif isinstance(token, str):
+            strings_blob.extend(token.encode("utf-8", errors="replace"))
+        strings_blob.append(0)  # null terminator
+
+    # Pad if we have fewer tokens than vocab_size
+    while len(offsets) < vocab_size:
+        offsets.append(len(strings_blob))
+        strings_blob.extend(f"<|pad_{len(offsets)-1}|>".encode("utf-8"))
+        strings_blob.append(0)
+
+    # Extract BPE merges if present
+    merges_data: list[int] = []
+    merges = meta.get("tokenizer.ggml.merges")
+    if merges and isinstance(merges, (list, tuple)):
+        # Build token-to-id mapping
+        token_to_id = {}
+        for i, tok in enumerate(tokens[:vocab_size]):
+            if isinstance(tok, bytes):
+                tok = tok.decode("utf-8", errors="replace")
+            token_to_id[tok] = i
+
+        for entry in merges:
+            if isinstance(entry, bytes):
+                entry = entry.decode("utf-8", errors="replace")
+            if isinstance(entry, str):
+                parts = entry.split(" ", 1)
+                if len(parts) == 2:
+                    left, right = parts
+                    left_id = token_to_id.get(left)
+                    right_id = token_to_id.get(right)
+                    merged_id = token_to_id.get(left + right)
+                    if left_id is not None and right_id is not None and merged_id is not None:
+                        if 0 <= left_id < vocab_size and 0 <= right_id < vocab_size and 0 <= merged_id < vocab_size:
+                            merges_data.extend([left_id, right_id, merged_id])
+
+    return offsets, bytes(strings_blob), merges_data
+
+
 class HashingWriter:
     def __init__(self, f: BinaryIO) -> None:
         self._f = f
@@ -300,10 +362,11 @@ def _gguf_read_value(r: GGUFReader, vtype: int):
         elem_type = r.u32()
         n = r.u64()
         if elem_type == GGUF_TYPE_STRING:
-            # Token arrays can be huge; skip storing strings.
+            # Store string arrays (needed for tokenizer extraction)
+            strings = []
             for _ in range(n):
-                _ = r.val_str()
-            return {"type": "array", "elem_type": elem_type, "len": n}
+                strings.append(r.val_str())
+            return strings
         elem_size = _gguf_scalar_size(elem_type)
         if elem_size is None:
             raise GGUFError(f"Unsupported GGUF array elem type {elem_type}")
@@ -1190,6 +1253,11 @@ def main() -> None:
         "deepseek2.attention.head_count_kv",
         "deepseek2.rope.freq_base",
         "deepseek2.attention.layer_norm_rms_epsilon",
+        # Tokenizer keys (for automatic extraction from GGUF)
+        "tokenizer.ggml.tokens",
+        "tokenizer.ggml.merges",
+        "tokenizer.ggml.scores",
+        "tokenizer.ggml.token_type",
     }
 
     if args.extract_vocab:
@@ -1444,7 +1512,15 @@ def main() -> None:
             vocab_offsets, vocab_strings, vocab_merges = load_tokenizer_json(args.tokenizer_json, vocab_size)
             num_merges = len(vocab_merges) // 3
             total_vocab_bytes = len(vocab_strings)
-            print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes")
+            print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from tokenizer.json")
+        else:
+            # Try to extract tokenizer directly from GGUF metadata
+            gguf_tokenizer = load_tokenizer_from_gguf(meta, vocab_size)
+            if gguf_tokenizer:
+                vocab_offsets, vocab_strings, vocab_merges = gguf_tokenizer
+                num_merges = len(vocab_merges) // 3
+                total_vocab_bytes = len(vocab_strings)
+                print(f"[tokenizer] extracted {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from GGUF metadata")
 
         num_layers = meta_int("deepseek2.block_count", "mistral3.block_count", "mistral.block_count", "llama.block_count", "qwen2.block_count")
         if num_layers is None:
@@ -1832,6 +1908,9 @@ def main() -> None:
             out_f.write(struct.pack("<Q", int(aligned_head_dim)))
             out_f.write(struct.pack("<Q", int(aligned_intermediate)))
             out_f.write(struct.pack("<Q", int(aligned_context)))
+            # Tokenizer metadata (new in v4.1)
+            out_f.write(struct.pack("<I", int(num_merges)))
+            out_f.write(struct.pack("<I", int(total_vocab_bytes)))
             out_f.write(checksum)
 
     if args.config_out:
@@ -1877,8 +1956,8 @@ def main() -> None:
         gguf_tensors=tensors,
         manifest_entries=manifest_entries,
     )
-    if not args.tokenizer_json:
-        print("[tokenizer] Warning: vocab/merges not embedded (pass --tokenizer-json)")
+    if vocab_offsets is None or vocab_strings is None:
+        print("[tokenizer] Warning: vocab/merges not embedded (pass --tokenizer-json or use GGUF with tokenizer metadata)")
 
     # Write manifest JSON if requested
     if args.manifest_out:

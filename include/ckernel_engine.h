@@ -143,7 +143,20 @@ void dequant_q5_0_row(const void *src, float *dst, size_t n_elements);
 void dequant_q5_1_row(const void *src, float *dst, size_t n_elements);
 void dequant_q8_0_row(const void *src, float *dst, size_t n_elements);
 
-// Q4_K weights with Q8_K activations (inference-only)
+// ============================================================================
+// INT8 ACTIVATION KERNELS
+// ============================================================================
+
+// Q8_0 quantization (32 elements per block, 34 bytes: 2-byte scale + 32 int8)
+void quantize_row_q8_0(const float *x, void *y, int k);
+
+// Q5_0 weights x Q8_0 activations
+void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
+
+// Q8_0 weights x Q8_0 activations
+void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
+
+// Q8_K quantization (256 elements per block, super-block format)
 void quantize_row_q8_k(const float *x, void *y, int k);
 
 void gemv_q4_k_q8_k(float *y,

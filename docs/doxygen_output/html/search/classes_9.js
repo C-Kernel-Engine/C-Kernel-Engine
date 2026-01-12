@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['transformermodel_1966',['TransformerModel',['../structTransformerModel.html',1,'']]]
+  ['systemtopology_2228',['SystemTopology',['../structSystemTopology.html',1,'']]]
 ];

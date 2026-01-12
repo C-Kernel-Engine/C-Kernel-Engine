@@ -1,5 +1,25 @@
 var searchData=
 [
-  ['hash_5ftable_2ec_2051',['hash_table.c',['../hash__table_8c.html',1,'']]],
-  ['hash_5ftable_2eh_2052',['hash_table.h',['../hash__table_8h.html',1,'']]]
+  ['gelu_5fkernels_2ec_2303',['gelu_kernels.c',['../gelu__kernels_8c.html',1,'']]],
+  ['gelu_5fkernels_5fbf16_2ec_2304',['gelu_kernels_bf16.c',['../gelu__kernels__bf16_8c.html',1,'']]],
+  ['gemm_5ffused_5fkernels_2ec_2305',['gemm_fused_kernels.c',['../gemm__fused__kernels_8c.html',1,'']]],
+  ['gemm_5fkernels_2ec_2306',['gemm_kernels.c',['../gemm__kernels_8c.html',1,'']]],
+  ['gemm_5fkernels_5fbf16_2ec_2307',['gemm_kernels_bf16.c',['../gemm__kernels__bf16_8c.html',1,'']]],
+  ['gemm_5fkernels_5ff16_2ec_2308',['gemm_kernels_f16.c',['../gemm__kernels__f16_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4_5f0_2ec_2309',['gemm_kernels_q4_0.c',['../gemm__kernels__q4__0_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4_5f1_2ec_2310',['gemm_kernels_q4_1.c',['../gemm__kernels__q4__1_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4k_2ec_2311',['gemm_kernels_q4k.c',['../gemm__kernels__q4k_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4k_5fq8k_2ec_2312',['gemm_kernels_q4k_q8k.c',['../gemm__kernels__q4k__q8k_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4k_5fq8k_5favx2_2ec_2313',['gemm_kernels_q4k_q8k_avx2.c',['../gemm__kernels__q4k__q8k__avx2_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4k_5fq8k_5fvnni_2ec_2314',['gemm_kernels_q4k_q8k_vnni.c',['../gemm__kernels__q4k__q8k__vnni_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq4k_5fsse_2ec_2315',['gemm_kernels_q4k_sse.c',['../gemm__kernels__q4k__sse_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq5_5f0_2ec_2316',['gemm_kernels_q5_0.c',['../gemm__kernels__q5__0_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq5_5f0_5fsse_2ec_2317',['gemm_kernels_q5_0_sse.c',['../gemm__kernels__q5__0__sse_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq5_5f0_5fsse_5fv2_2ec_2318',['gemm_kernels_q5_0_sse_v2.c',['../gemm__kernels__q5__0__sse__v2_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq5_5f1_2ec_2319',['gemm_kernels_q5_1.c',['../gemm__kernels__q5__1_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq6k_2ec_2320',['gemm_kernels_q6k.c',['../gemm__kernels__q6k_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq6k_5fsse_2ec_2321',['gemm_kernels_q6k_sse.c',['../gemm__kernels__q6k__sse_8c.html',1,'']]],
+  ['gemm_5fkernels_5fq8_5f0_2ec_2322',['gemm_kernels_q8_0.c',['../gemm__kernels__q8__0_8c.html',1,'']]],
+  ['gemm_5fmicrokernel_2ec_2323',['gemm_microkernel.c',['../gemm__microkernel_8c.html',1,'']]],
+  ['generic_5fapi_5ftest_2ec_2324',['generic_api_test.c',['../generic__api__test_8c.html',1,'']]]
 ];

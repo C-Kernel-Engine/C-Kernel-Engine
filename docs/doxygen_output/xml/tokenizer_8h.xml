@@ -13,6 +13,7 @@
     <includedby refid="ck__cli__v5_8c" local="yes">ck_cli_v5.c</includedby>
     <includedby refid="test__tokenizer_8c" local="yes">test_tokenizer.c</includedby>
     <includedby refid="tokenizer_8c" local="yes">tokenizer.c</includedby>
+    <includedby refid="ck__cli__v6_8c" local="yes">ck_cli_v6.c</includedby>
     <incdepgraph>
       <node id="4">
         <label>stdbool.h</label>
@@ -101,10 +102,16 @@
         </childnode>
         <childnode refid="4" relation="include">
         </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
       </node>
       <node id="2">
         <label>ck_cli_v5.c</label>
         <link refid="ck__cli__v5_8c"/>
+      </node>
+      <node id="5">
+        <label>ck_cli_v6.c</label>
+        <link refid="ck__cli__v6_8c"/>
       </node>
     </invincdepgraph>
     <innerclass refid="structCKTokenizer" prot="public">CKTokenizer</innerclass>
@@ -113,7 +120,7 @@
       <sectiondef kind="define">
       <memberdef kind="define" id="tokenizer_8h_1ae3d34509ad9d854b81ca3af3ea4b2198" prot="public" static="no">
         <name>CK_TOKENIZER_API</name>
-        <initializer><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((visibility(&quot;default&quot;)))</initializer>
+        <initializer><ref refid="qwen2__int8_8c_1ab898071398b359603a35c202e9c65f3b" kindref="member">__attribute__</ref>((visibility(&quot;default&quot;)))</initializer>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
@@ -267,6 +274,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" line="213" column="43" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" bodystart="213" bodyend="-1"/>
         <referencedby refid="tokenizer_8c_1ab6aad37269a5b849a167c07a50c79ee8" compoundref="tokenizer_8c" startline="241" endline="248">ck_tokenizer_set_special_ids</referencedby>
         <referencedby refid="true__bpe_8c_1a5abdd31dde87c8f630e7a394c2cc7764" compoundref="true__bpe_8c" startline="496" endline="502">ck_true_bpe_set_special_ids</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3294ea6b6f4fa8399aaf7a0e4d68ccae" compoundref="ck__cli__v6_85_8c" startline="241" endline="295">load_eos_from_vocab_json</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1ae2ac59d55593a1262747f8e0c4b575d9" prot="public" static="no" mutable="no">
         <type>int32_t int32_t int32_t</type>
@@ -282,6 +290,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" line="214" column="43" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" bodystart="214" bodyend="-1"/>
         <referencedby refid="tokenizer_8c_1ab6aad37269a5b849a167c07a50c79ee8" compoundref="tokenizer_8c" startline="241" endline="248">ck_tokenizer_set_special_ids</referencedby>
         <referencedby refid="true__bpe_8c_1a5abdd31dde87c8f630e7a394c2cc7764" compoundref="true__bpe_8c" startline="496" endline="502">ck_true_bpe_set_special_ids</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3294ea6b6f4fa8399aaf7a0e4d68ccae" compoundref="ck__cli__v6_85_8c" startline="241" endline="295">load_eos_from_vocab_json</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" prot="public" static="no" mutable="no">
         <type>int32_t</type>
@@ -303,8 +312,7 @@
         <referencedby refid="true__bpe_8c_1ac1960ecac16a47716d98aee961070323" compoundref="true__bpe_8c" startline="393" endline="439">ck_true_bpe_add_token</referencedby>
         <referencedby refid="true__bpe_8c_1ae82c7c3dbdf0bac7969abcc359888f63" compoundref="true__bpe_8c" startline="548" endline="551">ck_true_bpe_id_to_token</referencedby>
         <referencedby refid="true__bpe_8c_1a745ee862b3e4ffa89ecc661e34abbaf2" compoundref="true__bpe_8c" startline="1116" endline="1168">encode_chunk</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1aa81641123dc4dd1b1ba1ed5ea222251b" compoundref="ck__cli__v6_8c" startline="162" endline="192">init_stop_token_table</referencedby>
-        <referencedby refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" compoundref="gemm__kernels__q8__0_8c" startline="44" endline="76">quantize_row_q8_0</referencedby>
+        <referencedby refid="ckernel__engine_8h_1aaed08819c4a21e49ca43bc3094022eaa" compoundref="gemm__kernels__q8__0_8c" startline="45" endline="77">quantize_row_q8_0</referencedby>
         <referencedby refid="true__bpe_8c_1a8686fc27c2c25e81c582041e5c335e0d" compoundref="true__bpe_8c" startline="242" endline="265">token_list_append</referencedby>
         <referencedby refid="system__topology_8h_1a4367943c7d4c62e0865d1171252a6b84" compoundref="system__topology_8c" startline="112" endline="221">topology_discover_cpu</referencedby>
       </memberdef>
@@ -326,7 +334,7 @@
         <referencedby refid="true__bpe_8c_1a2575ccc3febd74fd764ead2153ac9c11" compoundref="true__bpe_8c" startline="1170" endline="1233">ck_true_bpe_encode</referencedby>
         <referencedby refid="true__bpe_8c_1a745ee862b3e4ffa89ecc661e34abbaf2" compoundref="true__bpe_8c" startline="1116" endline="1168">encode_chunk</referencedby>
         <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1adbf779af9c4489029ab98f467589a82e" compoundref="ck__cli__v6_8c" startline="551" endline="693">run_prompt</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1ab5d98d4c89c6688b7d484153874cfa53" compoundref="ck__cli__v6_85_8c" startline="792" endline="975">run_prompt</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1a65b78014f5b24adcc90623cfa9ba6123" prot="public" static="no" mutable="no">
         <type>bool</type>
@@ -388,10 +396,12 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" line="401" column="37" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" bodystart="401" bodyend="-1"/>
         <referencedby refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" compoundref="ck__tokenizer_8c" startline="618" endline="711">ck_tokenizer_encode</referencedby>
         <referencedby refid="utf8_8h_1a2c193f8c69997dc0e0db4742fb457741" compoundref="utf8_8c" startline="104" endline="142">ck_utf8_next_char</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a8e11af01f9cfb415dbaaafbc33447dfc" compoundref="ck__cli__v6_85_8c" startline="427" endline="488">decode_bpe_token</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1aeec52a356d39d8866deebb08d75aa708" compoundref="ck__cli__v6_85_8c" startline="725" endline="771">eos_pattern_process</referencedby>
         <referencedby refid="ckernel__ir_8c_1aeef8b4a2018c1d65c02ba52d6b837523" compoundref="ckernel__ir_8c" startline="139" endline="207">find_object_range</referencedby>
         <referencedby refid="tokenizer_8c_1ae3e35fa650168d9f2b0260828c0e7938" compoundref="tokenizer_8c" startline="380" endline="411">preprocess_bpe_spaces</referencedby>
         <referencedby refid="true__bpe_8c_1a782d1c06da75ca70c98690a59eeede43" compoundref="true__bpe_8c" startline="652" endline="690">preprocess_text</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1adbf779af9c4489029ab98f467589a82e" compoundref="ck__cli__v6_8c" startline="551" endline="693">run_prompt</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1ab5d98d4c89c6688b7d484153874cfa53" compoundref="ck__cli__v6_85_8c" startline="792" endline="975">run_prompt</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1ae478acd31a350e380062e576e1d8d61c" prot="public" static="no" mutable="no">
         <type>int32_t int32_t int32_t int32_t</type>
@@ -424,7 +434,7 @@
         <referencedby refid="attention__kernels_8c_1aa09ace92ab625ae8365e61f47c3d93a5" compoundref="attention__kernels_8c" startline="691" endline="747">attention_flash_query_causal</referencedby>
         <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
         <referencedby refid="true__bpe_8c_1ac1960ecac16a47716d98aee961070323" compoundref="true__bpe_8c" startline="393" endline="439">ck_true_bpe_add_token</referencedby>
-        <referencedby refid="v6__simple_8c_1a42679f4ffff614d76548b303a8965924" compoundref="v6__simple_8c" startline="80" endline="127">simple_attention</referencedby>
+        <referencedby refid="v6_85__simple_8c_1a42679f4ffff614d76548b303a8965924" compoundref="v6_85__simple_8c" startline="80" endline="127">simple_attention</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1aebee6a319ed22559d77672c8b7663346" prot="public" static="no" mutable="no">
         <type><ref refid="tokenizer_8h_1a28ac02199cd1d8b7d24c13952b86e9e6" kindref="member">CKSpacePrefixStyle</ref></type>
@@ -467,10 +477,10 @@
         <referencedby refid="true__bpe_8c_1a75677b0ab168d7bf958f8d1b258f016a" compoundref="true__bpe_8c" startline="818" endline="1021">gpt2_pretokenize</referencedby>
         <referencedby refid="true__bpe_8c_1a658fd44fe4b1abd5a95855fdb35775bf" compoundref="true__bpe_8c" startline="1024" endline="1049">init_tokens_from_text</referencedby>
         <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a7d535c83dc3b140d09484ff68cf107d6" compoundref="ck__cli__v6_8c" startline="477" endline="489">output_append</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a7d535c83dc3b140d09484ff68cf107d6" compoundref="ck__cli__v6_85_8c" startline="496" endline="508">output_append</referencedby>
         <referencedby refid="tokenizer_8c_1ae3e35fa650168d9f2b0260828c0e7938" compoundref="tokenizer_8c" startline="380" endline="411">preprocess_bpe_spaces</referencedby>
         <referencedby refid="true__bpe_8c_1a782d1c06da75ca70c98690a59eeede43" compoundref="true__bpe_8c" startline="652" endline="690">preprocess_text</referencedby>
-        <referencedby refid="v6__cli_8c_1a05299caf4af94fbd353ddc1a35595fd4" compoundref="v6__cli_8c" startline="205" endline="212">tokenize</referencedby>
+        <referencedby refid="v6_85__cli_8c_1a05299caf4af94fbd353ddc1a35595fd4" compoundref="v6_85__cli_8c" startline="205" endline="212">tokenize</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" prot="public" static="no" mutable="no">
         <type>const char *</type>
@@ -484,6 +494,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" line="262" column="37" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/tokenizer.h" bodystart="262" bodyend="-1"/>
+        <referencedby refid="ck__model__api_8h_1a9c9c6cab7aae0613e1e4936d730e69da" compoundref="generic__api__test_8c" startline="8606" endline="8608">ck_model_decode</referencedby>
         <referencedby refid="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" compoundref="ck__tokenizer_8c" startline="176" endline="205">ck_tokenizer_add_token</referencedby>
         <referencedby refid="ck__tokenizer_8h_1a25fd8f38cf8e62b1e19e347e53225e8c" compoundref="ck__tokenizer_8c" startline="717" endline="763">ck_tokenizer_decode</referencedby>
         <referencedby refid="tokenizer_8c_1a27e99a6c67a48907701e99edec568b9d" compoundref="tokenizer_8c" startline="267" endline="311">ck_tokenizer_detect_space_prefix_style</referencedby>
@@ -496,9 +507,18 @@
         <referencedby refid="true__bpe_8c_1a43e5cb689cfbcd8b4f80920c1416d991" compoundref="true__bpe_8c" startline="557" endline="586">ck_true_bpe_detect_space_style</referencedby>
         <referencedby refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</referencedby>
         <referencedby refid="true__bpe_8c_1ae74dd1b70452d2e51b83fed3ae67855c" compoundref="true__bpe_8c" startline="541" endline="546">ck_true_bpe_lookup</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a8e11af01f9cfb415dbaaafbc33447dfc" compoundref="ck__cli__v6_85_8c" startline="427" endline="488">decode_bpe_token</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a77f6daf26e1658a1bbc412d2aa4ab26f" compoundref="ck__cli__v6_85_8c" startline="682" endline="714">eos_is_potential_prefix</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a759503db83d83dfa904e8203937528ce" compoundref="ck__cli__v6_85_8c" startline="618" endline="624">is_eos_token</referencedby>
         <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1ae8721327a1165b10c8a2e8ca65a30cf9" compoundref="ck__cli__v6_8c" startline="491" endline="507">output_token</referencedby>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="generic__api__test_8c_1a462a350626f70f9ce0046f7eda07c6a3" compoundref="generic__api__test_8c" startline="8550" endline="8552">model_decode</referencedby>
+        <referencedby refid="generic__api__test_8c_1aefe572c58f1dd2cbf3cfc0f2c5286b94" compoundref="generic__api__test_8c" startline="8462" endline="8535">model_decode_token</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1ae8721327a1165b10c8a2e8ca65a30cf9" compoundref="ck__cli__v6_85_8c" startline="510" endline="519">output_token</referencedby>
+        <referencedby refid="ck-kernel-inference_8c_1a606a63ce7973b73a0a5ccad95e710bd0" compoundref="ck-kernel-inference_8c" startline="8022" endline="8024">qwen2_0_5b_decode_decode</referencedby>
+        <referencedby refid="ck-kernel-inference_8c_1aa166790009f89187756bfa0110467dd3" compoundref="ck-kernel-inference_8c" startline="7934" endline="8007">qwen2_0_5b_decode_decode_token</referencedby>
+        <referencedby refid="test__generic__api_8c_1a8ccda62fb94e43417bf785ec2204b32e" compoundref="test__generic__api_8c" startline="105" endline="155">run_benchmark</referencedby>
+        <referencedby refid="test__generic__api_8c_1a93569877c47f31631f4c0a1f18556c4b" compoundref="test__generic__api_8c" startline="161" endline="178">run_generation_test</referencedby>
+        <referencedby refid="v6_85__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6_85__inference_8c" startline="197" endline="338">run_inference</referencedby>
         <referencedby refid="system__topology_8h_1afd3ae767003bf9070768199caa3f7ee1" compoundref="system__topology_8c" startline="303" endline="389">topology_discover_numa</referencedby>
       </memberdef>
       <memberdef kind="variable" id="tokenizer_8h_1a9b857f7ce4dd3bca5a537e67f77a2b44" prot="public" static="no" mutable="no">

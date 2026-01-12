@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['quantize_5frow_5fq8_5fk_5fsse_2ec_2068',['quantize_row_q8_k_sse.c',['../quantize__row__q8__k__sse_8c.html',1,'']]]
+  ['optimizer_5fkernels_2ec_2343',['optimizer_kernels.c',['../optimizer__kernels_8c.html',1,'']]],
+  ['optimizer_5fkernels_5fbf16_2ec_2344',['optimizer_kernels_bf16.c',['../optimizer__kernels__bf16_8c.html',1,'']]]
 ];

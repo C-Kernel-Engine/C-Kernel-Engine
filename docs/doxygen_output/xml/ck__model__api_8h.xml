@@ -1,0 +1,429 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ck__model__api_8h" kind="file" language="C++">
+    <compoundname>ck_model_api.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includedby refid="generic__api__test_8c" local="yes">generic_api_test.c</includedby>
+    <includedby refid="qwen2__int8_8c" local="yes">qwen2_int8.c</includedby>
+    <includedby refid="test__generic__api_8c" local="yes">test_generic_api.c</includedby>
+    <incdepgraph>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>ck_model_api.h</label>
+        <link refid="ck__model__api_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="2">
+        <label>generic_api_test.c</label>
+        <link refid="generic__api__test_8c"/>
+      </node>
+      <node id="1">
+        <label>ck_model_api.h</label>
+        <link refid="ck__model__api_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>test_generic_api.c</label>
+        <link refid="test__generic__api_8c"/>
+      </node>
+      <node id="3">
+        <label>qwen2_int8.c</label>
+        <link refid="qwen2__int8_8c"/>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structCKModelConfig" prot="public">CKModelConfig</innerclass>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ck__model__api_8h_1a2f39a0720a1075cc9d3c25fc322ff1b3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_model_create</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_model_create</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Create and allocate model memory. Returns opaque model pointer, or NULL on failure. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="62" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8582" bodyend="8590" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="62" declcolumn="6"/>
+        <references refid="generic__api__test_8c_1a1b52826ce89b9783c022969ba162f7ae" compoundref="generic__api__test_8c" startline="88" endline="139">model_model_allocate</references>
+        <references refid="qwen2__int8_8c_1a49f4d83446c58f6b567e6667ee468f06" compoundref="qwen2__int8_8c" startline="88" endline="139">qwen2_0_5b_decode_model_allocate</references>
+        <referencedby refid="test__generic__api_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__generic__api_8c" startline="195" endline="286">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a9c9c6cab7aae0613e1e4936d730e69da" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_model_decode</definition>
+        <argsstring>(void *model, const int *token, int token_index)</argsstring>
+        <name>ck_model_decode</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <param>
+          <type>const int *</type>
+          <declname>token</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>token_index</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Decode single token at position token_index. Used for autoregressive generation. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="91" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8606" bodyend="8608" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="91" declcolumn="6"/>
+        <references refid="generic__api__test_8c_1a462a350626f70f9ce0046f7eda07c6a3" compoundref="generic__api__test_8c" startline="8550" endline="8552">model_decode</references>
+        <references refid="qwen2__int8_8c_1a606a63ce7973b73a0a5ccad95e710bd0" compoundref="qwen2__int8_8c" startline="8841" endline="8843">qwen2_0_5b_decode_decode</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <referencedby refid="test__generic__api_8c_1a8ccda62fb94e43417bf785ec2204b32e" compoundref="test__generic__api_8c" startline="105" endline="155">run_benchmark</referencedby>
+        <referencedby refid="test__generic__api_8c_1a93569877c47f31631f4c0a1f18556c4b" compoundref="test__generic__api_8c" startline="161" endline="178">run_generation_test</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a62c991f1de005eb3a77f01fc08e6417f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_model_forward</definition>
+        <argsstring>(void *model, const int *tokens, int num_tokens)</argsstring>
+        <name>ck_model_forward</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <param>
+          <type>const int *</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Forward pass (prefill) - process multiple tokens. Used for initial prompt processing. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="85" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8602" bodyend="8604" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="85" declcolumn="6"/>
+        <references refid="generic__api__test_8c_1a6d578a4069934d085d924874782b187e" compoundref="generic__api__test_8c" startline="8541" endline="8548">model_forward</references>
+        <references refid="qwen2__int8_8c_1abb0e4272531963a8ab354a2d56e88f02" compoundref="qwen2__int8_8c" startline="8832" endline="8839">qwen2_0_5b_decode_forward</references>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a9514ad79ee79d83f0507dd74895dcf9a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_model_free</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_free</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free model memory. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="67" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8592" bodyend="8596" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="67" declcolumn="6"/>
+        <references refid="generic__api__test_8c_1aa8ca4457ed45b249070902104b81b607" compoundref="generic__api__test_8c" startline="141" endline="150">model_model_free</references>
+        <references refid="qwen2__int8_8c_1aea4ed8cac30a0aa493b05e717316b57b" compoundref="qwen2__int8_8c" startline="141" endline="150">qwen2_0_5b_decode_model_free</references>
+        <referencedby refid="test__generic__api_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__generic__api_8c" startline="195" endline="286">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a9b50a3efdadfcc8944cf273cf20dffac" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_model_get_base</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_get_base</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get model base pointer (for weight loading). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="108" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8619" bodyend="8621" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="108" declcolumn="6"/>
+        <referencedby refid="test__generic__api_8c_1a82f4142d2a0e754351c8bda8d186ba65" compoundref="test__generic__api_8c" startline="40" endline="83">load_weights_from_bump</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a0bd4f4ec8b18211ab97ff267abd0a31f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>const <ref refid="structCKModelConfig" kindref="compound">CKModelConfig</ref> *</type>
+        <definition>const CKModelConfig* ck_model_get_config</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_model_get_config</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get model configuration (dimensions, sizes, etc.) This is available before allocation. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="56" column="21" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8578" bodyend="8580" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="56" declcolumn="21"/>
+        <references refid="generic__api__test_8c_1a3b5de0b0feb44943dcf91105fbd0a645" compoundref="generic__api__test_8c" startline="8562">g_model_config</references>
+        <referencedby refid="test__generic__api_8c_1a82f4142d2a0e754351c8bda8d186ba65" compoundref="test__generic__api_8c" startline="40" endline="83">load_weights_from_bump</referencedby>
+        <referencedby refid="test__generic__api_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__generic__api_8c" startline="195" endline="286">main</referencedby>
+        <referencedby refid="test__generic__api_8c_1a8ccda62fb94e43417bf785ec2204b32e" compoundref="test__generic__api_8c" startline="105" endline="155">run_benchmark</referencedby>
+        <referencedby refid="test__generic__api_8c_1a93569877c47f31631f4c0a1f18556c4b" compoundref="test__generic__api_8c" startline="161" endline="178">run_generation_test</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1ab1ccfc0b68c82ea101f213e20ab3386a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>float *</type>
+        <definition>float* ck_model_get_logits</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_get_logits</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get pointer to output logits buffer. Size is vocab_size floats. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="97" column="7" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8610" bodyend="8613" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="97" declcolumn="7"/>
+        <references refid="structQWEN2__0__5B__DECODEFooterOffsets_1aa7f30858b9156e6490e32a352acc1e94" compoundref="ck-kernel-inference_8h" startline="658">QWEN2_0_5B_DECODEFooterOffsets::logits</references>
+        <references refid="ck-kernel-inference_8h_1a3ebd7b368696bd871314c7aa13419e5c" compoundref="ck-kernel-inference_8h" startline="661">QWEN2_0_5B_DECODE_FOOTER</references>
+        <references refid="ck-kernel-inference_8h_1a1843318e48412b6aa3a06a35d50eb8e7" compoundref="ck-kernel-inference_8h" startline="1274">QWEN2_0_5B_DECODE_PTR</references>
+        <referencedby refid="test__generic__api_8c_1a93569877c47f31631f4c0a1f18556c4b" compoundref="test__generic__api_8c" startline="161" endline="178">run_generation_test</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1ab0a1c028f6dd7923e26e453927e55f7c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_model_get_total_bytes</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_get_total_bytes</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get total model size in bytes. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="113" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8623" bodyend="8625" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="113" declcolumn="8"/>
+        <referencedby refid="test__generic__api_8c_1a82f4142d2a0e754351c8bda8d186ba65" compoundref="test__generic__api_8c" startline="40" endline="83">load_weights_from_bump</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a89b60519ac5dbead93d12094f7d0add2" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_model_load_weights</definition>
+        <argsstring>(void *model, const char *bump_path)</argsstring>
+        <name>ck_model_load_weights</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>bump_path</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Load weights from BUMP file into model. Returns 0 on success, -1 on failure. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="79" column="5" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="79" declcolumn="5"/>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a4d841e9795e67f5391504486ff3e0c93" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_model_precompute_rope</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_precompute_rope</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Precompute RoPE cos/sin caches. Call once after allocation, before inference. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="73" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8598" bodyend="8600" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="73" declcolumn="6"/>
+        <references refid="generic__api__test_8c_1a50d24a31f1b4b0ced60287c3bc8e3968" compoundref="generic__api__test_8c" startline="186" endline="202">model_precompute_rope</references>
+        <references refid="qwen2__int8_8c_1a16afbb17d8fc5d06bc746711b2c2b15e" compoundref="qwen2__int8_8c" startline="186" endline="202">qwen2_0_5b_decode_precompute_rope</references>
+        <referencedby refid="test__generic__api_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__generic__api_8c" startline="195" endline="286">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__model__api_8h_1a76b07dd39597b6760b3d5307f53aa453" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_model_verify_canaries</definition>
+        <argsstring>(void *model)</argsstring>
+        <name>ck_model_verify_canaries</name>
+        <param>
+          <type>void *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Verify memory canaries (debug). Returns number of corrupted canaries (0 = OK). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" line="103" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6.5/test_generated/generic_api_test.c" bodystart="8615" bodyend="8617" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h" declline="103" declcolumn="5"/>
+        <references refid="generic__api__test_8c_1a8cbaab9a69b91607f7356e076ff49d79" compoundref="generic__api__test_8c" startline="152" endline="170">model_verify_canaries</references>
+        <references refid="qwen2__int8_8c_1a1792d3312cd268722109e47e70cb82c0" compoundref="qwen2__int8_8c" startline="152" endline="170">qwen2_0_5b_decode_verify_canaries</references>
+        <referencedby refid="test__generic__api_8c_1a8ccda62fb94e43417bf785ec2204b32e" compoundref="test__generic__api_8c" startline="105" endline="155">run_benchmark</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Generic Model API - Model-agnostic interface for CK-Engine. </para>
+    </briefdescription>
+    <detaileddescription>
+<para>All generated models emit the same function names, making the inference engine completely model-agnostic. To use different models, compile separate binaries.</para>
+<para>Usage: void *model = <ref refid="ck__model__api_8h_1a2f39a0720a1075cc9d3c25fc322ff1b3" kindref="member">ck_model_create()</ref>; ck_model_load_weights(model, &quot;weights.bump&quot;); ck_model_forward(model, tokens, num_tokens); // prefill ck_model_decode(model, &amp;token, token_index); // decode float *logits = ck_model_get_logits(model); ck_model_free(model); </para>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>ck_model_api.h</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Generic<sp/>Model<sp/>API<sp/>-<sp/>Model-agnostic<sp/>interface<sp/>for<sp/>CK-Engine</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>All<sp/>generated<sp/>models<sp/>emit<sp/>the<sp/>same<sp/>function<sp/>names,<sp/>making<sp/>the<sp/>inference</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>engine<sp/>completely<sp/>model-agnostic.<sp/>To<sp/>use<sp/>different<sp/>models,<sp/>compile</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>separate<sp/>binaries.</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>Usage:</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/><sp/><sp/>void<sp/>*model<sp/>=<sp/>ck_model_create();</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_model_load_weights(model,<sp/>&quot;weights.bump&quot;);</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_model_forward(model,<sp/>tokens,<sp/>num_tokens);<sp/><sp/>//<sp/>prefill</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_model_decode(model,<sp/>&amp;token,<sp/>token_index);<sp/><sp/>//<sp/>decode</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/><sp/><sp/>float<sp/>*logits<sp/>=<sp/>ck_model_get_logits(model);</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_model_free(model);</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_MODEL_API_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_MODEL_API_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*<sp/>MODEL<sp/>CONFIGURATION<sp/>(read-only,<sp/>set<sp/>by<sp/>generated<sp/>code)</highlight></codeline>
+<codeline lineno="30"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight></codeline>
+<codeline lineno="32" refid="structCKModelConfig" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="33" refid="structCKModelConfig_1a47a1c1e684f06184220bc13087dda0ff" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a47a1c1e684f06184220bc13087dda0ff" kindref="member">embed_dim</ref>;</highlight></codeline>
+<codeline lineno="34" refid="structCKModelConfig_1a3e5c8e6d2da07805365ec6b4db29b9ea" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a3e5c8e6d2da07805365ec6b4db29b9ea" kindref="member">num_heads</ref>;</highlight></codeline>
+<codeline lineno="35" refid="structCKModelConfig_1a902b19335449fa61c1e532d9999aa342" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a902b19335449fa61c1e532d9999aa342" kindref="member">num_kv_heads</ref>;</highlight></codeline>
+<codeline lineno="36" refid="structCKModelConfig_1a97a73a9bfbe5b159083d6048c9cc4712" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a97a73a9bfbe5b159083d6048c9cc4712" kindref="member">head_dim</ref>;</highlight></codeline>
+<codeline lineno="37" refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" kindref="member">intermediate_size</ref>;</highlight></codeline>
+<codeline lineno="38" refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" kindref="member">num_layers</ref>;</highlight></codeline>
+<codeline lineno="39" refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="40" refid="structCKModelConfig_1a754dcfd82ab5195c2c13ba88c1b8d252" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a754dcfd82ab5195c2c13ba88c1b8d252" kindref="member">max_seq_len</ref>;</highlight></codeline>
+<codeline lineno="41" refid="structCKModelConfig_1a8260b38867febb60f03ccad62b6cd7ea" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a8260b38867febb60f03ccad62b6cd7ea" kindref="member">total_bytes</ref>;</highlight></codeline>
+<codeline lineno="42" refid="structCKModelConfig_1ab9893d601d7e6c7b03e255fe83b4dab7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1ab9893d601d7e6c7b03e255fe83b4dab7" kindref="member">weight_bytes</ref>;</highlight></codeline>
+<codeline lineno="43" refid="structCKModelConfig_1a3be18cb0e7b29fa1449ac753beeca7db" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig_1a3be18cb0e7b29fa1449ac753beeca7db" kindref="member">activation_bytes</ref>;</highlight></codeline>
+<codeline lineno="44" refid="structCKModelConfig_1a5d3ef4cd4a7f401a8f6cca7bab276869" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="structCKModelConfig_1a5d3ef4cd4a7f401a8f6cca7bab276869" kindref="member">model_name</ref>;</highlight></codeline>
+<codeline lineno="45" refid="structCKModelConfig_1a29e2840f627ec455aca6820f5f671999" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="structCKModelConfig_1a29e2840f627ec455aca6820f5f671999" kindref="member">model_family</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>&quot;qwen2&quot;,<sp/>&quot;llama&quot;,<sp/>&quot;mistral&quot;,<sp/>etc.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="46"><highlight class="normal">}<sp/><ref refid="structCKModelConfig" kindref="compound">CKModelConfig</ref>;</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="49"><highlight class="comment"><sp/>*<sp/>GENERIC<sp/>MODEL<sp/>API<sp/>-<sp/>Same<sp/>names<sp/>for<sp/>ALL<sp/>models</highlight></codeline>
+<codeline lineno="50"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="52"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>Get<sp/>model<sp/>configuration<sp/>(dimensions,<sp/>sizes,<sp/>etc.)</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>available<sp/>before<sp/>allocation.</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKModelConfig" kindref="compound">CKModelConfig</ref><sp/>*<ref refid="ck__model__api_8h_1a0bd4f4ec8b18211ab97ff267abd0a31f" kindref="member">ck_model_get_config</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="58"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="59"><highlight class="comment"><sp/>*<sp/>Create<sp/>and<sp/>allocate<sp/>model<sp/>memory.</highlight></codeline>
+<codeline lineno="60"><highlight class="comment"><sp/>*<sp/>Returns<sp/>opaque<sp/>model<sp/>pointer,<sp/>or<sp/>NULL<sp/>on<sp/>failure.</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="ck__model__api_8h_1a2f39a0720a1075cc9d3c25fc322ff1b3" kindref="member">ck_model_create</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="64"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*<sp/>Free<sp/>model<sp/>memory.</highlight></codeline>
+<codeline lineno="66"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a9514ad79ee79d83f0507dd74895dcf9a" kindref="member">ck_model_free</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="69"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*<sp/>Precompute<sp/>RoPE<sp/>cos/sin<sp/>caches.</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*<sp/>Call<sp/>once<sp/>after<sp/>allocation,<sp/>before<sp/>inference.</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a4d841e9795e67f5391504486ff3e0c93" kindref="member">ck_model_precompute_rope</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="75"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="76"><highlight class="comment"><sp/>*<sp/>Load<sp/>weights<sp/>from<sp/>BUMP<sp/>file<sp/>into<sp/>model.</highlight></codeline>
+<codeline lineno="77"><highlight class="comment"><sp/>*<sp/>Returns<sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>failure.</highlight></codeline>
+<codeline lineno="78"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="79" refid="ck__model__api_8h_1a89b60519ac5dbead93d12094f7d0add2" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a89b60519ac5dbead93d12094f7d0add2" kindref="member">ck_model_load_weights</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*bump_path);</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="81"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="82"><highlight class="comment"><sp/>*<sp/>Forward<sp/>pass<sp/>(prefill)<sp/>-<sp/>process<sp/>multiple<sp/>tokens.</highlight></codeline>
+<codeline lineno="83"><highlight class="comment"><sp/>*<sp/>Used<sp/>for<sp/>initial<sp/>prompt<sp/>processing.</highlight></codeline>
+<codeline lineno="84"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a62c991f1de005eb3a77f01fc08e6417f" kindref="member">ck_model_forward</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>*tokens,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens);</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="87"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*<sp/>Decode<sp/>single<sp/>token<sp/>at<sp/>position<sp/>token_index.</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*<sp/>Used<sp/>for<sp/>autoregressive<sp/>generation.</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a9c9c6cab7aae0613e1e4936d730e69da" kindref="member">ck_model_decode</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>token_index);</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="93"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="94"><highlight class="comment"><sp/>*<sp/>Get<sp/>pointer<sp/>to<sp/>output<sp/>logits<sp/>buffer.</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*<sp/>Size<sp/>is<sp/>vocab_size<sp/>floats.</highlight></codeline>
+<codeline lineno="96"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="97"><highlight class="normal"></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="ck__model__api_8h_1ab1ccfc0b68c82ea101f213e20ab3386a" kindref="member">ck_model_get_logits</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="99"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*<sp/>Verify<sp/>memory<sp/>canaries<sp/>(debug).</highlight></codeline>
+<codeline lineno="101"><highlight class="comment"><sp/>*<sp/>Returns<sp/>number<sp/>of<sp/>corrupted<sp/>canaries<sp/>(0<sp/>=<sp/>OK).</highlight></codeline>
+<codeline lineno="102"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="103"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1a76b07dd39597b6760b3d5307f53aa453" kindref="member">ck_model_verify_canaries</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="105"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*<sp/>Get<sp/>model<sp/>base<sp/>pointer<sp/>(for<sp/>weight<sp/>loading).</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="ck__model__api_8h_1a9b50a3efdadfcc8944cf273cf20dffac" kindref="member">ck_model_get_base</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="110"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="111"><highlight class="comment"><sp/>*<sp/>Get<sp/>total<sp/>model<sp/>size<sp/>in<sp/>bytes.</highlight></codeline>
+<codeline lineno="112"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="113"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="ck__model__api_8h_1ab0a1c028f6dd7923e26e453927e55f7c" kindref="member">ck_model_get_total_bytes</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*model);</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_MODEL_API_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_model_api.h"/>
+  </compounddef>
+</doxygen>

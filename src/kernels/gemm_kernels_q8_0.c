@@ -20,6 +20,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "ckernel_quant.h"
+#include "ck_features.h"
 
 void quantize_row_q8_k(const float *x, void *vy, int k);
 
@@ -361,15 +362,39 @@ void gemv_q8_0_sse(float *y,
 #endif
 
 /**
- * @brief Auto-dispatch GEMV
+ * @brief Auto-dispatch GEMV for Q8_0 weights based on CPU features
+ *
+ * Dispatch priority (best available):
+ *   1. AVX-512 (512-bit vectors) - Intel Skylake-X+
+ *   2. AVX2+FMA (256-bit vectors) - Intel Haswell+
+ *   3. AVX (256-bit vectors) - Intel Sandy Bridge+
+ *   4. SSE4.1 (128-bit vectors) - Intel Nehalem+
+ *   5. Reference (scalar) - Fallback
+ *
+ * Uses ck_features.h for standardized feature detection.
+ *
+ * @param y Output vector [M]
+ * @param W Weight matrix in Q8_0 format [M x K]
+ * @param x Input vector [K]
+ * @param M Number of output rows
+ * @param K Number of input columns (hidden dimension)
  */
 void gemv_q8_0(float *y,
                const void *W,
                const float *x,
                int M, int K)
 {
-    // TEMPORARILY DISABLE NEW AVX KERNELS - USE REFERENCE ONLY
+#if defined(__AVX512F__)
+    gemv_q8_0_avx512(y, W, x, M, K);
+#elif defined(__AVX2__) && defined(__FMA__)
+    gemv_q8_0_avx2(y, W, x, M, K);
+#elif defined(__AVX__)
+    gemv_q8_0_avx(y, W, x, M, K);
+#elif defined(__SSE4_1__)
+    gemv_q8_0_sse(y, W, x, M, K);
+#else
     gemv_q8_0_ref(y, W, x, M, K);
+#endif
 }
 
 /* ============================================================================

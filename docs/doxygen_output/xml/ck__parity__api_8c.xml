@@ -476,7 +476,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="135" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" bodystart="135" bodyend="142"/>
-        <references refid="ck__parity__api_8c_1a56c38c3bc4cf886b268f9e7974aa5221" compoundref="gemm__kernels__q5__0_8c" startline="357" endline="369">gemv_q5_0</references>
+        <references refid="ck__parity__api_8c_1a56c38c3bc4cf886b268f9e7974aa5221" compoundref="gemm__kernels__q5__0_8c" startline="373" endline="389">gemv_q5_0</references>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1a39be7f87179b07496459ac582b0358fc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -555,8 +555,8 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="153" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" bodystart="153" bodyend="177"/>
         <references refid="ck__parity__api_8h_1ac42bce785e077edbe8459e3b2f157d70" compoundref="ck__parity__api_8h" startline="30">CK_QK8_0</references>
-        <references refid="ck__parity__api_8c_1a4fb9cf343ac07a0868c55f25bd201ca3" compoundref="gemm__kernels__q5__0_8c" startline="793" endline="807">gemv_q5_0_q8_0</references>
-        <references refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" compoundref="gemm__kernels__q8__0_8c" startline="44" endline="76">quantize_row_q8_0</references>
+        <references refid="ck__parity__api_8c_1a4fb9cf343ac07a0868c55f25bd201ca3" compoundref="gemm__kernels__q5__0_8c" startline="813" endline="827">gemv_q5_0_q8_0</references>
+        <references refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" compoundref="gemm__kernels__q8__0_8c" startline="45" endline="77">quantize_row_q8_0</references>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1afa96b526d228d061c98b81d813c9093a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -664,7 +664,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="144" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" bodystart="144" bodyend="151"/>
-        <references refid="ck__parity__api_8c_1a3e0166eab910ca7f003602c29f428cb1" compoundref="gemm__kernels__q8__0_8c" startline="366" endline="380">gemv_q8_0</references>
+        <references refid="ck__parity__api_8c_1a3e0166eab910ca7f003602c29f428cb1" compoundref="gemm__kernels__q8__0_8c" startline="382" endline="398">gemv_q8_0</references>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1a6c5534c711d8306cf8973670bc9d3cfc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -743,8 +743,8 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="179" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" bodystart="179" bodyend="203"/>
         <references refid="ck__parity__api_8h_1ac42bce785e077edbe8459e3b2f157d70" compoundref="ck__parity__api_8h" startline="30">CK_QK8_0</references>
-        <references refid="ck__parity__api_8c_1ab56038b4e1cf73692b6be9c28ada9023" compoundref="gemm__kernels__q8__0_8c" startline="775" endline="789">gemv_q8_0_q8_0</references>
-        <references refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" compoundref="gemm__kernels__q8__0_8c" startline="44" endline="76">quantize_row_q8_0</references>
+        <references refid="ck__parity__api_8c_1ab56038b4e1cf73692b6be9c28ada9023" compoundref="gemm__kernels__q8__0_8c" startline="793" endline="807">gemv_q8_0_q8_0</references>
+        <references refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" compoundref="gemm__kernels__q8__0_8c" startline="45" endline="77">quantize_row_q8_0</references>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1a0294dd45ee3d2fd2f25f2e586b1b9311" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -1385,18 +1385,68 @@
           <declname>K</declname>
         </param>
         <briefdescription>
-<para>Auto-dispatch GEMV. </para>
+<para>Auto-dispatch GEMV for Q5_0 weights based on CPU features. </para>
         </briefdescription>
         <detaileddescription>
+<para>Dispatch priority (best available):<orderedlist>
+<listitem><para>AVX-512 (512-bit vectors) - Intel Skylake-X+</para>
+</listitem><listitem><para>AVX2+FMA (256-bit vectors) - Intel Haswell+</para>
+</listitem><listitem><para>AVX (256-bit vectors) - Intel Sandy Bridge+</para>
+</listitem><listitem><para>SSE4.1 (128-bit vectors) - Intel Nehalem+</para>
+</listitem><listitem><para>Reference (scalar) - Fallback</para>
+</listitem></orderedlist>
+</para>
+<para>Uses <ref refid="ck__features_8h" kindref="compound">ck_features.h</ref> for standardized feature detection.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>y</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output vector [M] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Weight matrix in Q5_0 format [M x K] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>x</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input vector [K] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>M</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of output rows </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>K</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of input columns (hidden dimension) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="30" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="357" bodyend="369" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="30" declcolumn="13"/>
-        <references refid="gemm__kernels__q5__0_8c_1a4c1add4b1c01915769b02ded8605c55c" compoundref="gemm__kernels__q5__0_8c" startline="54" endline="102">gemv_q5_0_ref</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="30" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="373" bodyend="389" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="30" declcolumn="13"/>
         <referencedby refid="ck__parity__api_8h_1ac5a7241c7c9e47a5259ab4100144ed15" compoundref="ck__parity__api_8c" startline="135" endline="142">ck_test_gemv_q5_0</referencedby>
-        <referencedby refid="gemm__kernels__q5__0_8c_1ac4c3c0e32b64297e71b21bde4a574999" compoundref="gemm__kernels__q5__0_8c" startline="566" endline="571">dot_q5_0</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a7016bef6b48fbf2c9cc10d9330f2b4db" compoundref="gemm__kernels__q5__0_8c" startline="527" endline="560">gemm_nt_q5_0</referencedby>
-        <referencedby refid="gemm__kernels__q5__0_8c_1a8ec5b64efa99b6e938ca90d2e5d72c47" compoundref="gemm__kernels__q5__0_8c" startline="378" endline="386">gemm_q5_0</referencedby>
+        <referencedby refid="gemm__kernels__q5__0_8c_1ac4c3c0e32b64297e71b21bde4a574999" compoundref="gemm__kernels__q5__0_8c" startline="586" endline="591">dot_q5_0</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a7016bef6b48fbf2c9cc10d9330f2b4db" compoundref="gemm__kernels__q5__0_8c" startline="547" endline="580">gemm_nt_q5_0</referencedby>
+        <referencedby refid="gemm__kernels__q5__0_8c_1a8ec5b64efa99b6e938ca90d2e5d72c47" compoundref="gemm__kernels__q5__0_8c" startline="398" endline="406">gemm_q5_0</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1a4fb9cf343ac07a0868c55f25bd201ca3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -1472,9 +1522,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="34" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="793" bodyend="807" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="34" declcolumn="13"/>
-        <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
-        <references refid="gemm__kernels__q5__0_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="766" endline="775">vec_dot_q5_0_q8_0</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="34" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="813" bodyend="827" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="34" declcolumn="13"/>
         <referencedby refid="ck__parity__api_8h_1a39be7f87179b07496459ac582b0358fc" compoundref="ck__parity__api_8c" startline="153" endline="177">ck_test_gemv_q5_0_q8_0</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1a3e0166eab910ca7f003602c29f428cb1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
@@ -1503,18 +1551,68 @@
           <declname>K</declname>
         </param>
         <briefdescription>
-<para>Auto-dispatch GEMV. </para>
+<para>Auto-dispatch GEMV for Q8_0 weights based on CPU features. </para>
         </briefdescription>
         <detaileddescription>
+<para>Dispatch priority (best available):<orderedlist>
+<listitem><para>AVX-512 (512-bit vectors) - Intel Skylake-X+</para>
+</listitem><listitem><para>AVX2+FMA (256-bit vectors) - Intel Haswell+</para>
+</listitem><listitem><para>AVX (256-bit vectors) - Intel Sandy Bridge+</para>
+</listitem><listitem><para>SSE4.1 (128-bit vectors) - Intel Nehalem+</para>
+</listitem><listitem><para>Reference (scalar) - Fallback</para>
+</listitem></orderedlist>
+</para>
+<para>Uses <ref refid="ck__features_8h" kindref="compound">ck_features.h</ref> for standardized feature detection.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>y</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output vector [M] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Weight matrix in Q8_0 format [M x K] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>x</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input vector [K] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>M</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of output rows </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>K</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of input columns (hidden dimension) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="31" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="366" bodyend="380" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="31" declcolumn="13"/>
-        <references refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" compoundref="gemm__kernels__q8__0_8c" startline="96" endline="119">gemv_q8_0_ref</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="31" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="382" bodyend="398" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="31" declcolumn="13"/>
         <referencedby refid="ck__parity__api_8h_1ae6b6e7d7848157d54ba75f661fe9ca39" compoundref="ck__parity__api_8c" startline="144" endline="151">ck_test_gemv_q8_0</referencedby>
-        <referencedby refid="gemm__kernels__q8__0_8c_1af900f8a5b4172fadbb2342b63276e7c3" compoundref="gemm__kernels__q8__0_8c" startline="567" endline="572">dot_q8_0</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a85197b983d949018f42bd43e3751478b" compoundref="gemm__kernels__q8__0_8c" startline="414" endline="451">gemm_nt_q8_0</referencedby>
-        <referencedby refid="gemm__kernels__q8__0_8c_1a8085f1506d8fadd2070f5b71fedb5554" compoundref="gemm__kernels__q8__0_8c" startline="389" endline="397">gemm_q8_0</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1af900f8a5b4172fadbb2342b63276e7c3" compoundref="gemm__kernels__q8__0_8c" startline="585" endline="590">dot_q8_0</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a85197b983d949018f42bd43e3751478b" compoundref="gemm__kernels__q8__0_8c" startline="432" endline="469">gemm_nt_q8_0</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a8085f1506d8fadd2070f5b71fedb5554" compoundref="gemm__kernels__q8__0_8c" startline="407" endline="415">gemm_q8_0</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1ab56038b4e1cf73692b6be9c28ada9023" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -1590,9 +1688,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="35" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="775" bodyend="789" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="35" declcolumn="13"/>
-        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
-        <references refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" compoundref="gemm__kernels__q8__0_8c" startline="746" endline="757">vec_dot_q8_0_q8_0</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="35" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="793" bodyend="807" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="35" declcolumn="13"/>
         <referencedby refid="ck__parity__api_8h_1a6c5534c711d8306cf8973670bc9d3cfc" compoundref="ck__parity__api_8c" startline="179" endline="203">ck_test_gemv_q8_0_q8_0</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
@@ -1645,12 +1741,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="38" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="44" bodyend="76" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="38" declcolumn="13"/>
-        <references refid="ckernel__quant_8h_1aa217c07d43400999fb76ccfcdda2a47d" compoundref="ckernel__quant_8h" startline="326">CK_FP32_TO_FP16</references>
-        <references refid="structblock__q8__0_1a0bc77a0a0101bc89b05749157bf1514e" compoundref="ckernel__quant_8h" startline="104">block_q8_0::d</references>
-        <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
-        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
-        <references refid="structblock__q8__0_1ac6f2ca6c9108456b6630b7f1bf874488" compoundref="ckernel__quant_8h" startline="105">block_q8_0::qs</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" line="38" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="45" bodyend="77" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_parity_api.c" declline="38" declcolumn="13"/>
         <referencedby refid="ck__parity__api_8h_1a39be7f87179b07496459ac582b0358fc" compoundref="ck__parity__api_8c" startline="153" endline="177">ck_test_gemv_q5_0_q8_0</referencedby>
         <referencedby refid="ck__parity__api_8h_1a6c5534c711d8306cf8973670bc9d3cfc" compoundref="ck__parity__api_8c" startline="179" endline="203">ck_test_gemv_q8_0_q8_0</referencedby>
       </memberdef>

@@ -42,7 +42,7 @@ var NAVTREE =
         [ "Typedefs", "globals_type.html", null ],
         [ "Enumerations", "globals_enum.html", null ],
         [ "Enumerator", "globals_eval.html", null ],
-        [ "Macros", "globals_defs.html", null ]
+        [ "Macros", "globals_defs.html", "globals_defs" ]
       ] ]
     ] ]
   ] ]
@@ -51,17 +51,20 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ck__tokenizer_8c.html#ac754cedfb55bf16207263841d468f710",
-"ckernel__engine_8h.html#a488697bbc4656ba8037ab3eb79314e5e",
-"ckernel__ir__v2__lower_8h.html",
-"ckernel__orchestration_8h.html#add4c3ac196a25f481496bf69f32a9ac6",
-"gemm__kernels__q4__0_8c.html",
-"kv__cache__kernels_8c_source.html",
-"structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb",
-"structCKLayerForwardParamsQ4K.html#aaaba47dd4ef07fdb1a6662a88c2014cb",
-"structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1",
-"structPCIeDevice.html#acd83cab295bf599ca7f3d1e8d6268094",
-"trie_8c.html#a40e9010120e61b5e94dd0bd1f0b6b41d"
+"ck__cli__v6_8c.html#a268b869c9b68d62c6605f97ae19e63a1",
+"ckernel__codegen_8c.html#ad3379f6a59f22753041f8ed2959573a9",
+"ckernel__engine_8h.html#a9d34029d73d757f5283f9adcfa219705",
+"ckernel__kernel__specs_8c.html#a2535d871ccbd69b756943344c285f81d",
+"ckernel__quant_8h_source.html",
+"gemm__kernels__q4k_8c.html",
+"globals_func_u.html",
+"optimizer__kernels_8c.html#ac1a9ed01c15286fc6e3be73f96371d76",
+"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519",
+"structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646",
+"structCKPlanStepV2.html#acaaa916701cbcf1e9a5d35ff79e7c5bf",
+"structPCIeDevice.html#adccc4e7aa824d93f3b046cb67e5fbf5b",
+"tokenizer_8h.html#a1316fac313501041f81122a1c326089c",
+"v6_85__simple_8c.html#a9ec602b091ff5e82d41f6af9bf0766a1"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

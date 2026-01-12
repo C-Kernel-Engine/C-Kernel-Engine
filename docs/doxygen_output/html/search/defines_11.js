@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['yellow_3798',['YELLOW',['../show__config_8c.html#abf681265909adf3d3e8116c93c0ba179',1,'show_config.c']]]
+  ['white_4309',['WHITE',['../show__config_8c.html#a87b537f5fa5c109d3c05c13d6b18f382',1,'show_config.c']]]
 ];

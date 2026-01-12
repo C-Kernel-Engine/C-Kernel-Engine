@@ -12,17 +12,14 @@
     <includes local="no">fcntl.h</includes>
     <includes local="no">unistd.h</includes>
     <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
-    <includes refid="true__bpe_8h" local="yes">tokenizer/true_bpe.h</includes>
-    <includes local="yes">ck-kernel-inference.h</includes>
+    <includes refid="ck__tokenizer_8h" local="yes">ck_tokenizer.h</includes>
+    <includes refid="ck-kernel-inference_8h" local="yes">ck-kernel-inference.h</includes>
     <includes local="yes">ck-kernel-prefill.h</includes>
     <incdepgraph>
       <node id="15">
         <label>stdbool.h</label>
       </node>
       <node id="17">
-        <label>ck-kernel-inference.h</label>
-      </node>
-      <node id="18">
         <label>ck-kernel-prefill.h</label>
       </node>
       <node id="4">
@@ -34,20 +31,16 @@
       <node id="3">
         <label>stdlib.h</label>
       </node>
-      <node id="14">
-        <label>tokenizer/true_bpe.h</label>
-        <link refid="true__bpe_8h"/>
+      <node id="9">
+        <label>fcntl.h</label>
+      </node>
+      <node id="16">
+        <label>ck-kernel-inference.h</label>
+        <link refid="ck-kernel-inference_8h"/>
         <childnode refid="12" relation="include">
         </childnode>
         <childnode refid="4" relation="include">
         </childnode>
-        <childnode refid="15" relation="include">
-        </childnode>
-        <childnode refid="16" relation="include">
-        </childnode>
-      </node>
-      <node id="9">
-        <label>fcntl.h</label>
       </node>
       <node id="11">
         <label>ckernel_engine.h</label>
@@ -57,6 +50,16 @@
         <childnode refid="4" relation="include">
         </childnode>
         <childnode refid="13" relation="include">
+        </childnode>
+      </node>
+      <node id="14">
+        <label>ck_tokenizer.h</label>
+        <link refid="ck__tokenizer_8h"/>
+        <childnode refid="12" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="15" relation="include">
         </childnode>
       </node>
       <node id="12">
@@ -87,9 +90,9 @@
         </childnode>
         <childnode refid="14" relation="include">
         </childnode>
-        <childnode refid="17" relation="include">
+        <childnode refid="16" relation="include">
         </childnode>
-        <childnode refid="18" relation="include">
+        <childnode refid="17" relation="include">
         </childnode>
       </node>
       <node id="5">
@@ -97,16 +100,6 @@
       </node>
       <node id="10">
         <label>unistd.h</label>
-      </node>
-      <node id="16">
-        <label>tokenizer/hash_table.h</label>
-        <link refid="hash__table_8h"/>
-        <childnode refid="12" relation="include">
-        </childnode>
-        <childnode refid="4" relation="include">
-        </childnode>
-        <childnode refid="15" relation="include">
-        </childnode>
       </node>
       <node id="6">
         <label>time.h</label>
@@ -270,7 +263,7 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="140" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="140" bodyend="194"/>
         <references refid="v6__inference_8c_1a53864017610873792c507648637f2475" compoundref="v6__inference_8c" startline="63" endline="137">load_manifest</references>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -291,9 +284,9 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="356" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="356" bodyend="418"/>
-        <references refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" compoundref="v6__inference_8c" startline="341" endline="354">print_banner</references>
-        <references refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="338" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="338" bodyend="409"/>
+        <references refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" compoundref="v6__inference_8c" startline="323" endline="336">print_banner</references>
+        <references refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</references>
       </memberdef>
       <memberdef kind="function" id="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -309,12 +302,12 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="341" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="341" bodyend="354"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="323" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="323" bodyend="336"/>
         <references refid="v6__inference_8c_1a8e74e295b54795a32a16ea744f6aed5e" compoundref="v6__inference_8c" startline="32">ANSI_CYAN</references>
         <references refid="v6__inference_8c_1a51fea81bd0f75dcc2fc1b341d9cc7958" compoundref="v6__inference_8c" startline="29">ANSI_DIM</references>
         <references refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" compoundref="v6__inference_8c" startline="27">ANSI_RESET</references>
         <references refid="v6__inference_8c_1acbe9fadf5b08ea95ced2b5d84827ec8c" compoundref="v6__inference_8c" startline="24">CK_VERSION</references>
-        <referencedby refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="v6__inference_8c" startline="356" endline="418">main</referencedby>
+        <referencedby refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="v6__inference_8c" startline="338" endline="409">main</referencedby>
       </memberdef>
       <memberdef kind="function" id="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -355,22 +348,20 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="197" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="197" bodyend="338"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="197" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="197" bodyend="320"/>
         <references refid="v6__inference_8c_1a8e74e295b54795a32a16ea744f6aed5e" compoundref="v6__inference_8c" startline="32">ANSI_CYAN</references>
         <references refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" compoundref="v6__inference_8c" startline="27">ANSI_RESET</references>
         <references refid="v6__inference_8c_1af6e8b5c7b35e8bff4c581efd8019c798" compoundref="v6__inference_8c" startline="31">ANSI_YELLOW</references>
+        <references refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" compoundref="ck__tokenizer_8c" startline="618" endline="711">ck_tokenizer_encode</references>
         <references refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="ck__tokenizer_8c" startline="163" endline="170">ck_tokenizer_free</references>
-        <references refid="true__bpe_8c_1a5a78bb4542b285c7f2f1fb0187444544" compoundref="true__bpe_8c" startline="301" endline="354">ck_true_bpe_create</references>
-        <references refid="true__bpe_8c_1a2575ccc3febd74fd764ead2153ac9c11" compoundref="true__bpe_8c" startline="1170" endline="1233">ck_true_bpe_encode</references>
-        <references refid="true__bpe_8c_1a595b35162c872e368792875138226c51" compoundref="true__bpe_8c" startline="356" endline="381">ck_true_bpe_free</references>
-        <references refid="true__bpe_8c_1ae82c7c3dbdf0bac7969abcc359888f63" compoundref="true__bpe_8c" startline="548" endline="551">ck_true_bpe_id_to_token</references>
-        <references refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</references>
+        <references refid="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" compoundref="ck__tokenizer_8c" startline="219" endline="222">ck_tokenizer_id_to_token</references>
+        <references refid="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" compoundref="ck__tokenizer_8c" startline="128" endline="161">ck_tokenizer_init</references>
+        <references refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</references>
+        <references refid="ck__tokenizer_8h_1aed1d9d02b4dfc4cafcea97d08c44964e" compoundref="ck__tokenizer_8h" startline="196" endline="198">ck_tokenizer_vocab_size</references>
         <references refid="v6__inference_8c_1a44bf06063dc3a1121883e7e73d432dc3" compoundref="v6__inference_8c" startline="140" endline="194">load_weights</references>
-        <references refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" compoundref="true__bpe_8h" startline="172">num_merges</references>
         <references refid="v6__inference_8c_1ada4f9b3c886bed3958edc50360437d85" compoundref="v6__inference_8c" startline="48" endline="60">sample_topk</references>
         <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
-        <references refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" compoundref="true__bpe_8h" startline="169">vocab_size</references>
-        <referencedby refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="v6__inference_8c" startline="356" endline="418">main</referencedby>
+        <referencedby refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="v6__inference_8c" startline="338" endline="409">main</referencedby>
       </memberdef>
       <memberdef kind="function" id="v6__inference_8c_1ada4f9b3c886bed3958edc50360437d85" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -398,7 +389,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" line="48" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c" bodystart="48" bodyend="60"/>
         <references refid="utf8_8c_1a61eb63d26b2fa6c2971603ceccffb14b" compoundref="utf8_8c" startline="214">start</references>
         <references refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" compoundref="true__bpe_8h" startline="169">vocab_size</references>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       </sectiondef>
     <briefdescription>
@@ -428,7 +419,7 @@
 <codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;unistd.h&gt;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="19"><highlight class="normal"></highlight></codeline>
 <codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="21"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="true__bpe_8h" kindref="compound">tokenizer/true_bpe.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ck__tokenizer_8h" kindref="compound">ck_tokenizer.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="22"><highlight class="normal"></highlight></codeline>
 <codeline lineno="23"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Version<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="24" refid="v6__inference_8c_1acbe9fadf5b08ea95ced2b5d84827ec8c" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_VERSION<sp/>&quot;6.0.0&quot;</highlight><highlight class="normal"></highlight></codeline>
@@ -442,7 +433,7 @@
 <codeline lineno="32" refid="v6__inference_8c_1a8e74e295b54795a32a16ea744f6aed5e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>ANSI_CYAN<sp/><sp/><sp/><sp/>&quot;\033[0;36m&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="33"><highlight class="normal"></highlight></codeline>
 <codeline lineno="34"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Generated<sp/>model<sp/>includes<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;ck-kernel-inference.h&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ck-kernel-inference_8h" kindref="compound">ck-kernel-inference.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="36"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;ck-kernel-prefill.h&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="37"><highlight class="normal"></highlight></codeline>
 <codeline lineno="38"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Manifest<sp/>entry<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
@@ -612,220 +603,211 @@
 <codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
 <codeline lineno="203"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
 <codeline lineno="204"><highlight class="normal"></highlight></codeline>
-<codeline lineno="205"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)tokenizer_path;</highlight></codeline>
-<codeline lineno="206"><highlight class="normal"></highlight></codeline>
-<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/>CKTrueBPE<sp/>*tokenizer<sp/>=<sp/><ref refid="true__bpe_8c_1a5a78bb4542b285c7f2f1fb0187444544" kindref="member">ck_true_bpe_create</ref>();</highlight></codeline>
-<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!tokenizer)<sp/>{</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Load<sp/>tokenizer<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Loading<sp/>tokenizer:<sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/>tokenizer_path);</highlight></codeline>
+<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>tokenizer;</highlight></codeline>
+<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" kindref="member">ck_tokenizer_init</ref>(&amp;tokenizer)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
 <codeline lineno="209"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>init<sp/>tokenizer\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
 <codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
 <codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="212"><highlight class="normal"></highlight></codeline>
-<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Allocate<sp/>model<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/>QWEN2_DECODEModel<sp/>model;</highlight></codeline>
-<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Allocating<sp/>model<sp/>(%zu<sp/>bytes)...\n&quot;</highlight><highlight class="normal">,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)QWEN2_DECODE_TOTAL_BYTES);</highlight></codeline>
-<codeline lineno="216"><highlight class="normal"></highlight></codeline>
-<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(qwen2_decode_model_allocate(&amp;model)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>allocate<sp/>model\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kindref="member">ck_true_bpe_free</ref>(tokenizer);</highlight></codeline>
-<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
-<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Model<sp/>allocated<sp/>at<sp/>%p\n&quot;</highlight><highlight class="normal">,<sp/>model.base);</highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" kindref="member">ck_tokenizer_load</ref>(&amp;tokenizer,<sp/>tokenizer_path)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>load<sp/>tokenizer:<sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/>tokenizer_path);</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Tokenizer<sp/>loaded:<sp/>%d<sp/>tokens\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="ck__tokenizer_8h_1aed1d9d02b4dfc4cafcea97d08c44964e" kindref="member">ck_tokenizer_vocab_size</ref>(&amp;tokenizer));</highlight></codeline>
+<codeline lineno="219"><highlight class="normal"></highlight></codeline>
+<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Allocate<sp/>model<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/>QWEN2_DECODEModel<sp/>model;</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Allocating<sp/>model<sp/>(%zu<sp/>bytes)...\n&quot;</highlight><highlight class="normal">,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)QWEN2_DECODE_TOTAL_BYTES);</highlight></codeline>
 <codeline lineno="223"><highlight class="normal"></highlight></codeline>
-<codeline lineno="224"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Load<sp/>weights<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="v6__inference_8c_1a44bf06063dc3a1121883e7e73d432dc3" kindref="member">load_weights</ref>(&amp;model,<sp/>bump_path,<sp/>manifest_path)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
-<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
-<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
-<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(qwen2_decode_model_allocate(&amp;model)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>allocate<sp/>model\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Model<sp/>allocated<sp/>at<sp/>%p\n&quot;</highlight><highlight class="normal">,<sp/>model.base);</highlight></codeline>
 <codeline lineno="230"><highlight class="normal"></highlight></codeline>
-<codeline lineno="231"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Tokenize<sp/>prompt<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref><sp/>=<sp/>QWEN2_DECODE_VOCAB_SIZE;</highlight></codeline>
-<codeline lineno="233"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" kindref="member">num_merges</ref><sp/>=<sp/>QWEN2_DECODE_NUM_MERGES;</highlight></codeline>
-<codeline lineno="234"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>vocab_bytes<sp/>=<sp/>QWEN2_DECODE_TOTAL_VOCAB_BYTES;</highlight></codeline>
-<codeline lineno="235"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref><sp/>&lt;=<sp/>0<sp/>||<sp/>vocab_bytes<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Tokenizer<sp/>data<sp/>missing<sp/>in<sp/>model\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
-<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kindref="member">ck_true_bpe_free</ref>(tokenizer);</highlight></codeline>
-<codeline lineno="239"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
-<codeline lineno="240"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="241"><highlight class="normal"></highlight></codeline>
-<codeline lineno="242"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*vocab_offsets<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*)QWEN2_DECODE_PTR(&amp;model,<sp/>QWEN2_DECODE_HEADER.vocab_offsets);</highlight></codeline>
-<codeline lineno="243"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*vocab_strings<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_HEADER.vocab_strings);</highlight></codeline>
-<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*vocab_merges<sp/>=<sp/><ref refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" kindref="member">num_merges</ref><sp/>&gt;<sp/>0</highlight></codeline>
-<codeline lineno="245"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>?<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_HEADER.vocab_merges)</highlight></codeline>
-<codeline lineno="246"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>:<sp/>NULL;</highlight></codeline>
-<codeline lineno="247"><highlight class="normal"></highlight></codeline>
-<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" kindref="member">ck_true_bpe_load_binary</ref>(tokenizer,<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>,<sp/>vocab_offsets,<sp/>vocab_strings,<sp/><ref refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" kindref="member">num_merges</ref>,<sp/>vocab_merges)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="249"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>load<sp/>tokenizer<sp/>from<sp/>model\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="250"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
-<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kindref="member">ck_true_bpe_free</ref>(tokenizer);</highlight></codeline>
-<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
-<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="254"><highlight class="normal"></highlight></codeline>
-<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Tokenizer<sp/>loaded:<sp/>%d<sp/>tokens\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>);</highlight></codeline>
-<codeline lineno="256"><highlight class="normal"></highlight></codeline>
-<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/>tokens[512];</highlight></codeline>
-<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens<sp/>=<sp/><ref refid="true__bpe_8c_1a2575ccc3febd74fd764ead2153ac9c11" kindref="member">ck_true_bpe_encode</ref>(tokenizer,<sp/>prompt,<sp/>-1,<sp/>tokens,<sp/>512);</highlight></codeline>
-<codeline lineno="259"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Tokenized<sp/>prompt:<sp/>%d<sp/>tokens\n&quot;</highlight><highlight class="normal">,<sp/>num_tokens);</highlight></codeline>
-<codeline lineno="260"><highlight class="normal"></highlight></codeline>
-<codeline lineno="261"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(num_tokens<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="262"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>tokenize<sp/>prompt\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="263"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
-<codeline lineno="264"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kindref="member">ck_true_bpe_free</ref>(tokenizer);</highlight></codeline>
-<codeline lineno="265"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
-<codeline lineno="266"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="267"><highlight class="normal"></highlight></codeline>
-<codeline lineno="268"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Print<sp/>tokenized<sp/>input<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Input<sp/>tokens:<sp/>&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>num_tokens;<sp/>i++)<sp/>{</highlight></codeline>
-<codeline lineno="271"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tok_str<sp/>=<sp/><ref refid="true__bpe_8c_1ae82c7c3dbdf0bac7969abcc359888f63" kindref="member">ck_true_bpe_id_to_token</ref>(tokenizer,<sp/>tokens[i]);</highlight></codeline>
-<codeline lineno="272"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(tok_str)<sp/>{</highlight></codeline>
-<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%d(%s)<sp/>&quot;</highlight><highlight class="normal">,<sp/>tokens[i],<sp/>tok_str);</highlight></codeline>
-<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
-<codeline lineno="275"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%d(?)<sp/>&quot;</highlight><highlight class="normal">,<sp/>tokens[i]);</highlight></codeline>
-<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="278"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="279"><highlight class="normal"></highlight></codeline>
-<codeline lineno="280"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Run<sp/>prefill<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="281"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Running<sp/>prefill<sp/>for<sp/>%d<sp/>tokens...\n&quot;</highlight><highlight class="normal">,<sp/>num_tokens);</highlight></codeline>
-<codeline lineno="282"><highlight class="normal"><sp/><sp/><sp/><sp/>qwen2_decode_forward(&amp;model,<sp/>tokens,<sp/>num_tokens);</highlight></codeline>
-<codeline lineno="283"><highlight class="normal"></highlight></codeline>
-<codeline lineno="284"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>logits<sp/>for<sp/>first<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*logits<sp/>=<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_FOOTER.logits);</highlight></codeline>
-<codeline lineno="286"><highlight class="normal"></highlight></codeline>
-<codeline lineno="287"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Generate<sp/>tokens<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="288"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n[INFO]<sp/>Generating<sp/>%d<sp/>tokens...\n&quot;</highlight><highlight class="normal">,<sp/>max_tokens);</highlight></codeline>
-<codeline lineno="289"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af6e8b5c7b35e8bff4c581efd8019c798" kindref="member">ANSI_YELLOW</ref>);</highlight></codeline>
+<codeline lineno="231"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Load<sp/>weights<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="v6__inference_8c_1a44bf06063dc3a1121883e7e73d432dc3" kindref="member">load_weights</ref>(&amp;model,<sp/>bump_path,<sp/>manifest_path)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="233"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
+<codeline lineno="234"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
+<codeline lineno="235"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"></highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Tokenize<sp/>prompt<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="239"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/>tokens[512];</highlight></codeline>
+<codeline lineno="240"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens<sp/>=<sp/><ref refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" kindref="member">ck_tokenizer_encode</ref>(&amp;tokenizer,<sp/>prompt,<sp/>-1,<sp/>tokens,<sp/>512);</highlight></codeline>
+<codeline lineno="241"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Tokenized<sp/>prompt:<sp/>%d<sp/>tokens\n&quot;</highlight><highlight class="normal">,<sp/>num_tokens);</highlight></codeline>
+<codeline lineno="242"><highlight class="normal"></highlight></codeline>
+<codeline lineno="243"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(num_tokens<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Failed<sp/>to<sp/>tokenize<sp/>prompt\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="245"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
+<codeline lineno="246"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="249"><highlight class="normal"></highlight></codeline>
+<codeline lineno="250"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Print<sp/>tokenized<sp/>input<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Input<sp/>tokens:<sp/>&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>num_tokens;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tok_str<sp/>=<sp/><ref refid="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" kindref="member">ck_tokenizer_id_to_token</ref>(&amp;tokenizer,<sp/>tokens[i]);</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(tok_str)<sp/>{</highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%d(%s)<sp/>&quot;</highlight><highlight class="normal">,<sp/>tokens[i],<sp/>tok_str);</highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%d(?)<sp/>&quot;</highlight><highlight class="normal">,<sp/>tokens[i]);</highlight></codeline>
+<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="259"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="260"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="261"><highlight class="normal"></highlight></codeline>
+<codeline lineno="262"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Run<sp/>prefill<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="263"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;[INFO]<sp/>Running<sp/>prefill<sp/>for<sp/>%d<sp/>tokens...\n&quot;</highlight><highlight class="normal">,<sp/>num_tokens);</highlight></codeline>
+<codeline lineno="264"><highlight class="normal"><sp/><sp/><sp/><sp/>qwen2_decode_forward(&amp;model,<sp/>tokens,<sp/>num_tokens);</highlight></codeline>
+<codeline lineno="265"><highlight class="normal"></highlight></codeline>
+<codeline lineno="266"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>logits<sp/>for<sp/>first<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="267"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*logits<sp/>=<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_FOOTER.logits);</highlight></codeline>
+<codeline lineno="268"><highlight class="normal"></highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Generate<sp/>tokens<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n[INFO]<sp/>Generating<sp/>%d<sp/>tokens...\n&quot;</highlight><highlight class="normal">,<sp/>max_tokens);</highlight></codeline>
+<codeline lineno="271"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af6e8b5c7b35e8bff4c581efd8019c798" kindref="member">ANSI_YELLOW</ref>);</highlight></codeline>
+<codeline lineno="272"><highlight class="normal"></highlight></codeline>
+<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>eos_token<sp/>=<sp/>151645;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Qwen<sp/>EOS<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref><sp/>=<sp/>tokens[num_tokens<sp/>-<sp/>1];</highlight></codeline>
+<codeline lineno="275"><highlight class="normal"></highlight></codeline>
+<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Buffer<sp/>for<sp/>decoded<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>output_buffer[4096];</highlight></codeline>
+<codeline lineno="278"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>output_pos<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="279"><highlight class="normal"><sp/><sp/><sp/><sp/>output_buffer[0]<sp/>=<sp/></highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="280"><highlight class="normal"></highlight></codeline>
+<codeline lineno="281"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>max_tokens;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="282"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Run<sp/>decode<sp/>for<sp/>this<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="283"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_decode(&amp;model,<sp/>&amp;<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>,<sp/>0);</highlight></codeline>
+<codeline lineno="284"><highlight class="normal"></highlight></codeline>
+<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>logits<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="286"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>logits<sp/>=<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_FOOTER.logits);</highlight></codeline>
+<codeline lineno="287"><highlight class="normal"></highlight></codeline>
+<codeline lineno="288"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Sample<sp/>next<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="289"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>next_token<sp/>=<sp/><ref refid="v6__inference_8c_1ada4f9b3c886bed3958edc50360437d85" kindref="member">sample_topk</ref>(logits,<sp/>QWEN2_DECODE_VOCAB_SIZE,<sp/>topk);</highlight></codeline>
 <codeline lineno="290"><highlight class="normal"></highlight></codeline>
-<codeline lineno="291"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>eos_token<sp/>=<sp/>151645;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Qwen<sp/>EOS<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="292"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref><sp/>=<sp/>tokens[num_tokens<sp/>-<sp/>1];</highlight></codeline>
-<codeline lineno="293"><highlight class="normal"></highlight></codeline>
-<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Buffer<sp/>for<sp/>decoded<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>output_buffer[4096];</highlight></codeline>
-<codeline lineno="296"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>output_pos<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/>output_buffer[0]<sp/>=<sp/></highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="298"><highlight class="normal"></highlight></codeline>
-<codeline lineno="299"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>max_tokens;<sp/>i++)<sp/>{</highlight></codeline>
-<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Run<sp/>decode<sp/>for<sp/>this<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qwen2_decode_decode(&amp;model,<sp/>&amp;<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>,<sp/>0);</highlight></codeline>
-<codeline lineno="302"><highlight class="normal"></highlight></codeline>
-<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>logits<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>logits<sp/>=<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)((</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)model.base<sp/>+<sp/>QWEN2_DECODE_FOOTER.logits);</highlight></codeline>
-<codeline lineno="305"><highlight class="normal"></highlight></codeline>
-<codeline lineno="306"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Sample<sp/>next<sp/>token<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="307"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>next_token<sp/>=<sp/><ref refid="v6__inference_8c_1ada4f9b3c886bed3958edc50360437d85" kindref="member">sample_topk</ref>(logits,<sp/>QWEN2_DECODE_VOCAB_SIZE,<sp/>topk);</highlight></codeline>
+<codeline lineno="291"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>token<sp/>string<sp/>and<sp/>append<sp/>to<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="292"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tok_str<sp/>=<sp/><ref refid="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" kindref="member">ck_tokenizer_id_to_token</ref>(&amp;tokenizer,<sp/>next_token);</highlight></codeline>
+<codeline lineno="293"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(tok_str)<sp/>{</highlight></codeline>
+<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%s&quot;</highlight><highlight class="normal">,<sp/>tok_str);</highlight></codeline>
+<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fflush(stdout);</highlight></codeline>
+<codeline lineno="296"><highlight class="normal"></highlight></codeline>
+<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Add<sp/>to<sp/>output<sp/>buffer<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="298"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len<sp/>=<sp/>strlen(tok_str);</highlight></codeline>
+<codeline lineno="299"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(output_pos<sp/>+<sp/>len<sp/>&lt;<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(output_buffer)<sp/>-<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>strcpy(output_buffer<sp/>+<sp/>output_pos,<sp/>tok_str);</highlight></codeline>
+<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>output_pos<sp/>+=<sp/>len;</highlight></codeline>
+<codeline lineno="302"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(next_token<sp/>==<sp/>eos_token)<sp/>{</highlight></codeline>
+<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
+<codeline lineno="305"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n[INFO]<sp/>EOS<sp/>token<sp/>received\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="306"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="307"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="308"><highlight class="normal"></highlight></codeline>
-<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Get<sp/>token<sp/>string<sp/>and<sp/>append<sp/>to<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="310"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tok_str<sp/>=<sp/><ref refid="true__bpe_8c_1ae82c7c3dbdf0bac7969abcc359888f63" kindref="member">ck_true_bpe_id_to_token</ref>(tokenizer,<sp/>next_token);</highlight></codeline>
-<codeline lineno="311"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(tok_str)<sp/>{</highlight></codeline>
-<codeline lineno="312"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;%s&quot;</highlight><highlight class="normal">,<sp/>tok_str);</highlight></codeline>
-<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fflush(stdout);</highlight></codeline>
+<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref><sp/>=<sp/>next_token;</highlight></codeline>
+<codeline lineno="310"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="311"><highlight class="normal"></highlight></codeline>
+<codeline lineno="312"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n\n[INFO]<sp/>Inference<sp/>complete\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
 <codeline lineno="314"><highlight class="normal"></highlight></codeline>
-<codeline lineno="315"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Add<sp/>to<sp/>output<sp/>buffer<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="316"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len<sp/>=<sp/>strlen(tok_str);</highlight></codeline>
-<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(output_pos<sp/>+<sp/>len<sp/>&lt;<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(output_buffer)<sp/>-<sp/>1)<sp/>{</highlight></codeline>
-<codeline lineno="318"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>strcpy(output_buffer<sp/>+<sp/>output_pos,<sp/>tok_str);</highlight></codeline>
-<codeline lineno="319"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>output_pos<sp/>+=<sp/>len;</highlight></codeline>
-<codeline lineno="320"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="321"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(next_token<sp/>==<sp/>eos_token)<sp/>{</highlight></codeline>
-<codeline lineno="322"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
-<codeline lineno="323"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n[INFO]<sp/>EOS<sp/>token<sp/>received\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="326"><highlight class="normal"></highlight></codeline>
-<codeline lineno="327"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref><sp/>=<sp/>next_token;</highlight></codeline>
-<codeline lineno="328"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="329"><highlight class="normal"></highlight></codeline>
-<codeline lineno="330"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
-<codeline lineno="331"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n\n[INFO]<sp/>Inference<sp/>complete\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="332"><highlight class="normal"></highlight></codeline>
-<codeline lineno="333"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Cleanup<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="334"><highlight class="normal"><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
-<codeline lineno="335"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="true__bpe_8c_1a595b35162c872e368792875138226c51" kindref="member">ck_true_bpe_free</ref>(tokenizer);</highlight></codeline>
-<codeline lineno="336"><highlight class="normal"></highlight></codeline>
-<codeline lineno="337"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
-<codeline lineno="338"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="339"><highlight class="normal"></highlight></codeline>
-<codeline lineno="340"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Print<sp/>banner<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="341" refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
-<codeline lineno="342"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1a8e74e295b54795a32a16ea744f6aed5e" kindref="member">ANSI_CYAN</ref>);</highlight></codeline>
-<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>____<sp/><sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/><sp/><sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/><sp/><sp/>_<sp/><sp/>_____<sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/>\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="345"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/><sp/>_<sp/>\\|<sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>(_)<sp/><sp/><sp/><sp/><sp/>|<sp/>|<sp/>(_)<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>|<sp/>|<sp/>|/<sp/><sp/>___|<sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="346"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/>|_)<sp/>|<sp/>|_<sp/><sp/><sp/>_<sp/><sp/>___|<sp/>|_<sp/><sp/>__<sp/>_|<sp/>|_<sp/>___<sp/><sp/><sp/>_____|<sp/>|<sp/>|<sp/>|\\<sp/>`--.|<sp/>|__<sp/><sp/><sp/>__|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="347"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/><sp/>_<sp/>&lt;|<sp/>|<sp/>|<sp/>|<sp/>|/<sp/>__|<sp/>|<sp/>|/<sp/>_`<sp/>|<sp/>__|<sp/>\\<sp/>\\<sp/>/<sp/>/<sp/>_<sp/>\\<sp/>|<sp/>|<sp/>|<sp/>|`--.<sp/>\\<sp/>&apos;_<sp/>\\<sp/>/<sp/>_`<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="348"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/>|_)<sp/>|<sp/>|<sp/>|_|<sp/>|<sp/>(__|<sp/>|<sp/>|<sp/>(_|<sp/>|<sp/>|_|<sp/>|\\<sp/>V<sp/>/<sp/><sp/>__/<sp/>|_|<sp/>|/\\__/<sp/>/<sp/>|<sp/>|<sp/>|<sp/>(_|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="349"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|____/|_|\\__,_|\\___|_|_|\\__,_|\\__|_|<sp/>\\_/<sp/>\\___|\\___|\\___/\\____/|_|<sp/>|_|\\__,_|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="350"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
-<codeline lineno="351"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1a51fea81bd0f75dcc2fc1b341d9cc7958" kindref="member">ANSI_DIM</ref>);</highlight></codeline>
-<codeline lineno="352"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>v%s<sp/>-<sp/>Native<sp/>C<sp/>Inference\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="v6__inference_8c_1acbe9fadf5b08ea95ced2b5d84827ec8c" kindref="member">CK_VERSION</ref>);</highlight></codeline>
-<codeline lineno="353"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="354"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="355"><highlight class="normal"></highlight></codeline>
-<codeline lineno="356" refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" kindref="member">main</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>argc,<sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>**argv)<sp/>{</highlight></codeline>
-<codeline lineno="357"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*bump_path<sp/>=<sp/>NULL;</highlight></codeline>
-<codeline lineno="358"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*manifest_path<sp/>=<sp/>NULL;</highlight></codeline>
-<codeline lineno="359"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tokenizer_path<sp/>=<sp/>NULL;</highlight></codeline>
-<codeline lineno="360"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*prompt<sp/>=<sp/></highlight><highlight class="stringliteral">&quot;Hello&quot;</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="361"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_tokens<sp/>=<sp/>100;</highlight></codeline>
-<codeline lineno="362"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>temperature<sp/>=<sp/>0.7f;</highlight></codeline>
-<codeline lineno="363"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>topk<sp/>=<sp/>40;</highlight></codeline>
-<codeline lineno="364"><highlight class="normal"></highlight></codeline>
-<codeline lineno="365"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Parse<sp/>arguments<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="366"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>1;<sp/>i<sp/>&lt;<sp/>argc;<sp/>i++)<sp/>{</highlight></codeline>
-<codeline lineno="367"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-h&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--help&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="368"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>();</highlight></codeline>
-<codeline lineno="369"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;Usage:<sp/>%s<sp/>&lt;weights.bump&gt;<sp/>[options]\n&quot;</highlight><highlight class="normal">,<sp/>argv[0]);</highlight></codeline>
-<codeline lineno="370"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\nOptions:\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="371"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-m,<sp/>--model<sp/>&lt;file&gt;<sp/><sp/><sp/><sp/><sp/><sp/>Weights<sp/>BUMP<sp/>file\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="372"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-t,<sp/>--tokenizer<sp/>&lt;file&gt;<sp/><sp/>(unused)<sp/>tokenizer<sp/>is<sp/>loaded<sp/>from<sp/>weights\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="373"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-p,<sp/>--prompt<sp/>&lt;text&gt;<sp/><sp/><sp/><sp/><sp/>Prompt<sp/>(default:<sp/>Hello)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="374"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-n,<sp/>--tokens<sp/>&lt;n&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Max<sp/>tokens<sp/>(default:<sp/>100)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="375"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>--temp<sp/>&lt;float&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Temperature<sp/>(default:<sp/>0.7)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="376"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>--top-k<sp/>&lt;n&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Top-k<sp/>(default:<sp/>40)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="377"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-h,<sp/>--help<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Show<sp/>help\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="378"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="315"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Cleanup<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="316"><highlight class="normal"><sp/><sp/><sp/><sp/>qwen2_decode_model_free(&amp;model);</highlight></codeline>
+<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(&amp;tokenizer);</highlight></codeline>
+<codeline lineno="318"><highlight class="normal"></highlight></codeline>
+<codeline lineno="319"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="320"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"></highlight></codeline>
+<codeline lineno="322"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Print<sp/>banner<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="323" refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1a8e74e295b54795a32a16ea744f6aed5e" kindref="member">ANSI_CYAN</ref>);</highlight></codeline>
+<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="326"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>____<sp/><sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/><sp/><sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/><sp/><sp/>_<sp/><sp/>_____<sp/>_<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_<sp/>\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="327"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/><sp/>_<sp/>\\|<sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>(_)<sp/><sp/><sp/><sp/><sp/>|<sp/>|<sp/>(_)<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>|<sp/>|<sp/>|/<sp/><sp/>___|<sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="328"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/>|_)<sp/>|<sp/>|_<sp/><sp/><sp/>_<sp/><sp/>___|<sp/>|_<sp/><sp/>__<sp/>_|<sp/>|_<sp/>___<sp/><sp/><sp/>_____|<sp/>|<sp/>|<sp/>|\\<sp/>`--.|<sp/>|__<sp/><sp/><sp/>__|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="329"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/><sp/>_<sp/>&lt;|<sp/>|<sp/>|<sp/>|<sp/>|/<sp/>__|<sp/>|<sp/>|/<sp/>_`<sp/>|<sp/>__|<sp/>\\<sp/>\\<sp/>/<sp/>/<sp/>_<sp/>\\<sp/>|<sp/>|<sp/>|<sp/>|`--.<sp/>\\<sp/>&apos;_<sp/>\\<sp/>/<sp/>_`<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="330"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|<sp/>|_)<sp/>|<sp/>|<sp/>|_|<sp/>|<sp/>(__|<sp/>|<sp/>|<sp/>(_|<sp/>|<sp/>|_|<sp/>|\\<sp/>V<sp/>/<sp/><sp/>__/<sp/>|_|<sp/>|/\\__/<sp/>/<sp/>|<sp/>|<sp/>|<sp/>(_|<sp/>|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="331"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/>|____/|_|\\__,_|\\___|_|_|\\__,_|\\__|_|<sp/>\\_/<sp/>\\___|\\___|\\___/\\____/|_|<sp/>|_|\\__,_|\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="332"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1af77a445894f2f750d43cf2182cd29e55" kindref="member">ANSI_RESET</ref>);</highlight></codeline>
+<codeline lineno="333"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(<ref refid="v6__inference_8c_1a51fea81bd0f75dcc2fc1b341d9cc7958" kindref="member">ANSI_DIM</ref>);</highlight></codeline>
+<codeline lineno="334"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>v%s<sp/>-<sp/>Native<sp/>C<sp/>Inference\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="v6__inference_8c_1acbe9fadf5b08ea95ced2b5d84827ec8c" kindref="member">CK_VERSION</ref>);</highlight></codeline>
+<codeline lineno="335"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="336"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="337"><highlight class="normal"></highlight></codeline>
+<codeline lineno="338" refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1a3c04138a5bfe5d72780bb7e82a18e627" kindref="member">main</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>argc,<sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>**argv)<sp/>{</highlight></codeline>
+<codeline lineno="339"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*bump_path<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="340"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*manifest_path<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="341"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*tokenizer_path<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="342"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*prompt<sp/>=<sp/></highlight><highlight class="stringliteral">&quot;Hello&quot;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_tokens<sp/>=<sp/>100;</highlight></codeline>
+<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>temperature<sp/>=<sp/>0.7f;</highlight></codeline>
+<codeline lineno="345"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>topk<sp/>=<sp/>40;</highlight></codeline>
+<codeline lineno="346"><highlight class="normal"></highlight></codeline>
+<codeline lineno="347"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Parse<sp/>arguments<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="348"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>1;<sp/>i<sp/>&lt;<sp/>argc;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="349"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-h&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--help&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="350"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>();</highlight></codeline>
+<codeline lineno="351"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;Usage:<sp/>%s<sp/>&lt;weights.bump&gt;<sp/>[options]\n&quot;</highlight><highlight class="normal">,<sp/>argv[0]);</highlight></codeline>
+<codeline lineno="352"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\nOptions:\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="353"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-m,<sp/>--model<sp/>&lt;file&gt;<sp/><sp/><sp/><sp/><sp/><sp/>Weights<sp/>BUMP<sp/>file\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="354"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-t,<sp/>--tokenizer<sp/>&lt;file&gt;<sp/><sp/>Tokenizer<sp/>JSON<sp/>file\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="355"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-p,<sp/>--prompt<sp/>&lt;text&gt;<sp/><sp/><sp/><sp/><sp/>Prompt<sp/>(default:<sp/>Hello)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="356"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-n,<sp/>--tokens<sp/>&lt;n&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Max<sp/>tokens<sp/>(default:<sp/>100)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="357"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>--temp<sp/>&lt;float&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Temperature<sp/>(default:<sp/>0.7)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="358"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>--top-k<sp/>&lt;n&gt;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Top-k<sp/>(default:<sp/>40)\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="359"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;<sp/><sp/>-h,<sp/>--help<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Show<sp/>help\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="360"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="361"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="362"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-m&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--model&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="363"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>bump_path<sp/>=<sp/>argv[++i];</highlight></codeline>
+<codeline lineno="364"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="365"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-t&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--tokenizer&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="366"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tokenizer_path<sp/>=<sp/>argv[++i];</highlight></codeline>
+<codeline lineno="367"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="368"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-p&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--prompt&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="369"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prompt<sp/>=<sp/>argv[++i];</highlight></codeline>
+<codeline lineno="370"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="371"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-n&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="372"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>max_tokens<sp/>=<sp/>atoi(argv[++i]);</highlight></codeline>
+<codeline lineno="373"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="374"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--temp&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="375"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>temperature<sp/>=<sp/>atof(argv[++i]);</highlight></codeline>
+<codeline lineno="376"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="377"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--top-k&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
+<codeline lineno="378"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>topk<sp/>=<sp/>atoi(argv[++i]);</highlight></codeline>
 <codeline lineno="379"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="380"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-m&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--model&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="381"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>bump_path<sp/>=<sp/>argv[++i];</highlight></codeline>
-<codeline lineno="382"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="383"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-t&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--tokenizer&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="384"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tokenizer_path<sp/>=<sp/>argv[++i];</highlight></codeline>
-<codeline lineno="385"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="386"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>((strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-p&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--prompt&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="387"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prompt<sp/>=<sp/>argv[++i];</highlight></codeline>
-<codeline lineno="388"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="389"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;-n&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="390"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>max_tokens<sp/>=<sp/>atoi(argv[++i]);</highlight></codeline>
-<codeline lineno="391"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="392"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--temp&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="393"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>temperature<sp/>=<sp/>atof(argv[++i]);</highlight></codeline>
-<codeline lineno="394"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="395"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(argv[i],<sp/></highlight><highlight class="stringliteral">&quot;--top-k&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>&amp;&amp;<sp/>i<sp/>+<sp/>1<sp/>&lt;<sp/>argc)<sp/>{</highlight></codeline>
-<codeline lineno="396"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>topk<sp/>=<sp/>atoi(argv[++i]);</highlight></codeline>
-<codeline lineno="397"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="398"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="399"><highlight class="normal"></highlight></codeline>
-<codeline lineno="400"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!bump_path)<sp/>{</highlight></codeline>
-<codeline lineno="401"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>();</highlight></codeline>
-<codeline lineno="402"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Error:<sp/>No<sp/>weights<sp/>file<sp/>specified\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="403"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Usage:<sp/>%s<sp/>&lt;weights.bump&gt;<sp/>[options]\n&quot;</highlight><highlight class="normal">,<sp/>argv[0]);</highlight></codeline>
+<codeline lineno="380"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="381"><highlight class="normal"></highlight></codeline>
+<codeline lineno="382"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!bump_path)<sp/>{</highlight></codeline>
+<codeline lineno="383"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="v6__inference_8c_1aa426a8be646bd381a914fef6ca0c9c4b" kindref="member">print_banner</ref>();</highlight></codeline>
+<codeline lineno="384"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Error:<sp/>No<sp/>weights<sp/>file<sp/>specified\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="385"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Usage:<sp/>%s<sp/>&lt;weights.bump&gt;<sp/>[options]\n&quot;</highlight><highlight class="normal">,<sp/>argv[0]);</highlight></codeline>
+<codeline lineno="386"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
+<codeline lineno="387"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="388"><highlight class="normal"></highlight></codeline>
+<codeline lineno="389"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Default<sp/>paths<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="390"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!manifest_path)<sp/>{</highlight></codeline>
+<codeline lineno="391"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>manifest_path<sp/>=<sp/></highlight><highlight class="stringliteral">&quot;generated/weights_manifest.json&quot;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="392"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="393"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!tokenizer_path)<sp/>{</highlight></codeline>
+<codeline lineno="394"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tokenizer_path<sp/>=<sp/></highlight><highlight class="stringliteral">&quot;generated/tokenizer.json&quot;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="395"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="396"><highlight class="normal"></highlight></codeline>
+<codeline lineno="397"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(access(bump_path,<sp/>F_OK)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="398"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Error:<sp/>Weights<sp/>file<sp/>not<sp/>found:<sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/>bump_path);</highlight></codeline>
+<codeline lineno="399"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
+<codeline lineno="400"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="401"><highlight class="normal"></highlight></codeline>
+<codeline lineno="402"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(access(tokenizer_path,<sp/>F_OK)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="403"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Error:<sp/>Tokenizer<sp/>not<sp/>found:<sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/>tokenizer_path);</highlight></codeline>
 <codeline lineno="404"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
 <codeline lineno="405"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="406"><highlight class="normal"></highlight></codeline>
-<codeline lineno="407"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Default<sp/>paths<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="408"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!manifest_path)<sp/>{</highlight></codeline>
-<codeline lineno="409"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>manifest_path<sp/>=<sp/></highlight><highlight class="stringliteral">&quot;generated/weights_manifest.json&quot;</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="410"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="411"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(access(bump_path,<sp/>F_OK)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="412"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;Error:<sp/>Weights<sp/>file<sp/>not<sp/>found:<sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/>bump_path);</highlight></codeline>
-<codeline lineno="413"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
-<codeline lineno="414"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="415"><highlight class="normal"></highlight></codeline>
-<codeline lineno="416"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" kindref="member">run_inference</ref>(bump_path,<sp/>manifest_path,<sp/>tokenizer_path,</highlight></codeline>
-<codeline lineno="417"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prompt,<sp/>max_tokens,<sp/>temperature,<sp/>topk);</highlight></codeline>
-<codeline lineno="418"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="407"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" kindref="member">run_inference</ref>(bump_path,<sp/>manifest_path,<sp/>tokenizer_path,</highlight></codeline>
+<codeline lineno="408"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>prompt,<sp/>max_tokens,<sp/>temperature,<sp/>topk);</highlight></codeline>
+<codeline lineno="409"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/v6_inference.c"/>
   </compounddef>

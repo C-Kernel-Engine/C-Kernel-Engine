@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['output_5ftile_5fsize_3787',['OUTPUT_TILE_SIZE',['../mlp__fused__decode_8c.html#ac530c6f483bbeb9bd8758030aa2857b4',1,'mlp_fused_decode.c']]]
+  ['nc_4268',['NC',['../gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5',1,'gemm_microkernel.c']]],
+  ['nr_4269',['NR',['../gemm__microkernel_8c.html#af146485306ae74a2edf18636300fd107',1,'gemm_microkernel.c']]],
+  ['nr_5ffixed_4270',['NR_FIXED',['../gemm__microkernel_8c.html#af3dd4e1707c284abe511ed15be5c4f8f',1,'gemm_microkernel.c']]]
 ];

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mega-Fused Attention - C-Kernel-Engine</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* SVG Viewer Styles */
+        .svg-viewer {
+            cursor: pointer;
+            display: inline-block;
+            border: 2px solid #ffb400;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .svg-viewer:hover {
+            background: #333;
+            border-color: #ffc107;
+        }
+        .svg-viewer img {
+            max-width: 400px;
+            display: block;
+        }
+        .svg-viewer .label {
+            text-align: center;
+            color: #adb5bd;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        /* Fullscreen overlay */
+        #svg-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 999999;
+        }
+        #svg-overlay .toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            background: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000000;
+        }
+        #svg-overlay .title {
+            color: #ccc;
+            font-size: 16px;
+        }
+        #svg-overlay .controls button {
+            background: #333;
+            color: #ffb400;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-left: 10px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        #svg-overlay .controls button:hover {
+            background: #444;
+        }
+        #svg-overlay .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            padding-top: 60px;
+        }
+        #svg-overlay .image-container img {
+            max-width: 90%;
+            max-height: 85vh;
+        }
+        #svg-overlay .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #222;
+            color: #ffb400;
+            border: none;
+            font-size: 40px;
+            padding: 20px;
+            cursor: pointer;
+            z-index: 1000000;
+        }
+        #svg-overlay .nav-prev { left: 20px; }
+        #svg-overlay .nav-next { right: 20px; }
+    </style>
+</head>
+<body>
+    <main>
+<!-- TITLE: Mega-Fused Attention -->
+<!-- NAV: mega-fusion -->
+
+<h1>Mega-Fused Attention</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+    </div>
+    <div>
+        <strong>The Holy Grail of Attention Optimization</strong><br>
+        Eliminate ALL intermediate DRAM traffic for the entire attention block: RMSNorm → QKV → RoPE → Flash Attention → OutProj
+    </div>
+</div>
+
+<!-- SVG Gallery -->
+<div style="background: #1a1a2e; padding: 20px; border-radius: 10px; margin: 20px 0;">
+    <h3 style="color: #ffb400; margin-top: 0;">Interactive SVG Diagrams</h3>
+    <p style="color: #adb5bd; margin-bottom: 20px;">Click any diagram to open fullscreen viewer with zoom and navigation</p>
+
+    <div class="svg-viewer" data-title="Mega-Fused Attention Architecture">
+        <img src="assets/mega_fused_attention.svg" alt="Mega-Fused Attention Architecture">
+        <div class="label">Architecture Overview</div>
+    </div>
+
+    <div class="svg-viewer" data-title="Per-Head Fusion: Mathematical Cache Constraints">
+        <img src="assets/per_head_fusion_math.svg" alt="Per-Head Fusion Math">
+        <div class="label">Cache Constraint Formulas</div>
+    </div>
+
+    <div class="svg-viewer" data-title="Bias-Corrected Fusion: Quantization Considerations">
+        <img src="assets/bias_corrected_fusion.svg" alt="Bias-Corrected Fusion">
+        <div class="label">Q4_K Bias Correction in Fusion</div>
+    </div>
+
+    <div class="svg-viewer" data-title="Hardware-Aware Blocking: Cache-Optimized Tiling">
+        <img src="assets/hardware_aware_blocking.svg" alt="Hardware-Aware Blocking">
+        <div class="label">L1/L2 Cache Blocking Strategy</div>
+    </div>
+</div>
+
+<h2>The Problem: Memory-Bound Attention</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Current v6.5 Attention (Already Fused, But Not Mega-Fused)</h3>
+    <p>Our current <code>attention_decode_fused.c</code> already fuses 10 kernels into 1, but intermediates still flow through stack/heap:</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Operation</th><th>Current Implementation</th><th>Mega-Fused Target</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>RMSNorm</td><td>ln1_row[aligned_D] on stack</td><td>In ZMM registers</td></tr>
+            <tr><td>QKV Projection</td><td>q_token, k_token, v_token on heap</td><td>Stream directly to GEMM</td></tr>
+            <tr><td>RoPE</td><td>In-place on q_token/k_token</td><td>In-place, Q/K stay in L2</td></tr>
+            <tr><td>Flash Attention</td><td>attn_token on heap</td><td>O, m, l in registers</td></tr>
+            <tr><td>Output Projection</td><td>proj_out on heap + residual</td><td>Direct to MLP, add residual in store</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Current Memory Traffic (Decode Mode)</h3>
+    <pre>
+Attention block intermediates on stack/heap per layer:
+  ln1_row:        2048 × 4B =   8KB  (RMSNorm output)
+  q_token:        2048 × 4B =   8KB  (Q projection)
+  k_token:        1024 × 4B =   4KB  (K projection)
+  v_token:        1024 × 4B =   4KB  (V projection)
+  attn_token:     2048 × 4B =   8KB  (Attention output)
+  ─────────────────────────────────────────────
+  Total per layer:               32KB unnecessary traffic
+
+For 24 layers: 768KB of intermediates per token!
+    </pre>
+</div>
+
+<h2>The Solution: Mega-Fusion</h2>
+
+<div class="grid grid-2">
+    <div class="card card-red">
+        <h3 style="margin-top: 0;">Before: Cache-Oblivious</h3>
+        <pre>
+RMSNorm → [DRAM] → QKV → [DRAM] → RoPE
+                           ↓
+Flash Attn ← [DRAM] ← KV Cache
+                           ↓
+OutProj → [DRAM] → Residual
+
+Result: ~800KB DRAM traffic per layer
+        Memory-bound (AI ~ 0.5 FLOPs/byte)
+        </pre>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">After: Mega-Fused</h3>
+        <pre>
+RMSNorm → [registers] → QKV → [L2]
+              ↓              ↓
+         [registers] ← RoPE ←┘
+              ↓
+Flash Attn → [registers] → OutProj
+              ↓
+      Residual Add (in store)
+
+Result: ~8KB DRAM traffic per layer
+        Compute-bound (AI ~ 4000 FLOPs/byte)
+        </pre>
+    </div>
+</div>
+
+<h2>Memory Traffic Comparison</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Metric</th><th>Current v6.5</th><th>Mega-Fused</th><th>Reduction</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>DRAM Reads</td><td>~40KB activations × 24</td><td>4KB (input only)</td><td><strong>240×</strong></td></tr>
+            <tr><td>DRAM Writes</td><td>~40KB activations × 24</td><td>4KB (output only)</td><td><strong>240×</strong></td></tr>
+            <tr><td>Arithmetic Intensity</td><td>~0.5 FLOPs/byte</td><td>~4000 FLOPs/byte</td><td><strong>8000×</strong></td></tr>
+            <tr><td>Memory-Bound?</td><td>Yes (bottleneck)</td><td>No (compute-bound)</td><td>-</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Expected Speedup: 5-10× for Attention</strong><br>
+        Moving from memory-bound to compute-bound is the single biggest optimization possible. Current v6.5 is 30× slower than llama.cpp partly because of this.
+    </div>
+</div>
+
+<h2>Mega-Fusion Time Calculations</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Cache Line Math</h3>
+    <pre>
+Cache line size: 64 bytes = 512 bits
+
+For FP16 (2 bytes per element):
+    Elements per cache line: 64 / 2 = 32 elements
+    Embed dim H = 4096 (LLaMA 7B)
+    Cache lines per token: H / 32 = 128 cache lines
+
+For FP32 (4 bytes per element):
+    Elements per cache line: 64 / 4 = 16 elements
+    Cache lines per token: H / 16 = 256 cache lines
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">FLOPs Per Cache Line</h3>
+    <pre>
+For ONE layer, ONE cache line (32 elements):
+═══════════════════════════════════════════
+
+Attention (Q @ Kᵀ @ V):
+    QKᵀ:  d_k FLOPs
+    (QKᵀ)V: d_k × d_v FLOPs
+    Total: ~2 × d_k × d_v FLOPs
+
+MLP (gate, up, down):
+    gate:  d × 4d FLOPs
+    up:    d × 4d FLOPs
+    down:  4d × d FLOPs
+    Total: ~6 × d × d FLOPs
+
+Per cache line, per layer (d=128):
+    Attention: ~2 × 64 × 128 = 16,384 FLOPs
+    MLP:       ~6 × 128 × 128 = 98,304 FLOPs
+    Total:     ~114,688 FLOPs
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Time Per Cache Line (CPU)</h3>
+    <pre>
+CPU (Xeon, 5 TFLOPS sustained for BF16):
+═══════════════════════════════════════════
+Time per cache line: 114,688 FLOPs / 5 TFLOPS
+                   = 22.9 nanoseconds
+
+For 32 layers:
+    Time: 32 × 22.9 ns = 733 ns = 0.73 μs
+
+For 100 layers:
+    Time: 100 × 22.9 ns = 2.29 μs
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Full Token Computation Time</h3>
+    <pre>
+For H=4096, 128 cache lines per token:
+═══════════════════════════════════════════
+
+Time per token (compute only):
+    128 cache lines × 0.73 μs/cache_line
+    = 93 μs = 0.093 ms
+
+For 32 layers:  93 μs/token
+For 100 layers: 290 μs/token
+
+At 0.093 ms/token:
+    10,000 tokens = 0.93 seconds
+    Throughput: ~10,000 tokens/second
+    </pre>
+</div>
+
+<h2>Weight Loading: The Real Cost</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Weights Are Shared Across Tokens!</h3>
+    <pre>
+Model: LLaMA 7B
+Weights: 7B × 2 bytes (FP16) = 14 GB
+
+Weights loaded ONCE, then cached:
+    Load time: 14 GB / 500 GB/s = 28 ms
+
+After weights cached:
+    Subsequent tokens: 0.093 ms/token (compute only)
+
+Time Breakdown:
+    First token: 28 ms (load) + 0.093 ms = 28.1 ms
+    Token 2-1000: 0.093 ms each
+    </pre>
+</div>
+
+<h2>With vs Without Mega-Fusion</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Metric</th><th>Without Mega-Fusion</th><th>With Mega-Fusion</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>DRAM reads (activations)</td><td>1K × 4096 × 2 × 32 = 256 MB</td><td>8 MB (once)</td></tr>
+            <tr><td>DRAM writes (activations)</td><td>1K × 4096 × 2 × 32 = 256 MB</td><td>8 MB (once)</td></tr>
+            <tr><td>DRAM traffic total</td><td>512 MB + 14 GB = 14.5 GB</td><td>14 GB + 16 MB = 14 GB</td></tr>
+            <tr><td>Time (500 GB/s)</td><td>~100-200 ms</td><td>~121 ms</td></tr>
+            <tr><td>Memory-bound?</td><td>Yes</td><td>No (compute-bound)</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<h2>MoE Fusion Boundary</h2>
+
+<div class="card card-yellow">
+    <h3 style="margin-top: 0;">Stop Mega-Fusion at Routing Decision</h3>
+    <pre>
+For MoE models (e.g., Mixtral):
+═══════════════════════════════════════════
+
+Mega-fuse UP TO the routing decision:
+
+    X → RMSNorm → QKV → RoPE → [ROUTE HERE]
+                                    ↑
+                                    Stop!
+                                    Need X for gate calculation
+
+    From X, compute gate = softmax(X @ W_gate)
+    gate selects top-k experts
+    Each expert: X @ W_expert_i
+    Merge: Σ gate_i × expert_output
+
+    Then resume mega-fusion for down layers
+
+Fusion boundary:
+    ✓ Fusable: RMSNorm, QKV, RoPE, Attention, MLP (before gate)
+    ✗ Not fusable: Gate computation, Expert selection, Expert forward
+    </pre>
+</div>
+
+<h2>The Complete Formula</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Mega Fusion Time Equation</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   T_total = T_weight_load + N_layers × T_cache_line            │
+│                                                                 │
+│   Where:                                                       │
+│                                                                 │
+│   T_weight_load = Model_size / Memory_bandwidth                 │
+│                                                                 │
+│   T_cache_line = FLOPs_per_cache_line / Compute_FLOPS           │
+│                                                                 │
+│   N_cache_lines = H / (Cache_line_size / sizeof(dtype))         │
+│                                                                 │
+│   N_layers_total = N_cache_lines × N_layers                     │
+│                                                                 │
+│   T_token = T_weight_load + T_compute                           │
+│           = Model_size/BW + (H × N_layers × FLOPs_element)/FPS  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+    </pre>
+</div>
+
+<h2>Numbers for Different Models</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Model</th><th>Params</th><th>Weights</th><th>TTFT (est)</th><th>Decode</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Qwen 0.5B</td><td>0.5B</td><td>1 GB</td><td>~2 ms</td><td>~3 μs</td></tr>
+            <tr><td>Qwen 1.5B</td><td>1.5B</td><td>3 GB</td><td>~6 ms</td><td>~9 μs</td></tr>
+            <tr><td>LLaMA 7B</td><td>7B</td><td>14 GB</td><td>~28 ms</td><td>~93 μs</td></tr>
+            <tr><td>LLaMA 13B</td><td>13B</td><td>26 GB</td><td>~52 ms</td><td>~174 μs</td></tr>
+            <tr><td>LLaMA 30B</td><td>30B</td><td>60 GB</td><td>~120 ms</td><td>~400 μs</td></tr>
+        </tbody>
+    </table>
+    <p><em>Assumptions: BF16, LLaMA architecture, 500 GB/s memory bandwidth, 5 TFLOPS sustained compute, weights loaded once, cached in L3</em></p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Verdict: Mega-Fusion is Practical!</strong><br>
+        For Qwen 0.5B-7B on CPU:<br>
+        - TTFT under 30 ms ✓<br>
+        - Decode under 100 μs/token ✓<br>
+        - No activation DRAM traffic (all in L3) ✓<br>
+        - Thousands of concurrent users (TB memory) ✓<br>
+        - Energy efficient (300W vs 700W per GPU) ✓
+    </div>
+</div>
+
+<h2>Architecture: Keep Everything in Registers</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Working Set Per Head (AVX-512)</h3>
+    <pre>
+Q_head:    64 × 64 × 2B =   8KB  (in L1, streaming from L2)
+K_head:    64 × 64 × 2B =   8KB  (stream from KV cache in L2)
+V_head:    64 × 64 × 2B =   8KB  (stream from KV cache in L2)
+O_accum:   64 × 64 × 4B =  16KB  (in ZMM registers)
+m, l:      2 × 64 × 4B = 512B   (online softmax stats in registers)
+───────────────────────────────────────────
+Total per head:              ~40KB ✓ fits in L1 + registers
+
+For 32 heads (sequential):  ~1.3MB working set
+    </pre>
+</div>
+
+<h2>Implementation Roadmap</h2>
+
+<div class="grid grid-4">
+    <div class="card">
+        <h3 style="margin-top: 0;">Phase 1</h3>
+        <h4 style="color: #69db7c;">Register Allocation</h4>
+        <ul>
+            <li>Define ZMM register layout for attention</li>
+            <li>Allocate: Q accum, K/V tiles, O accum, softmax stats</li>
+            <li>Create <code>mega_fused_attn.h</code></li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Phase 2</h3>
+        <h4 style="color: #ffd43b;">RMSNorm → QKV</h4>
+        <ul>
+            <li>Fuse rmsnorm + 3 GEMMs into one pass</li>
+            <li>Q/K/V never touch DRAM</li>
+            <li>Direct to RoPE in L2</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Phase 3</h3>
+        <h4 style="color: #ff922b;">Flash Attention</h4>
+        <ul>
+            <li>Implement tiled online softmax</li>
+            <li>O, m, l stay in registers</li>
+            <li>Stream K/V tiles from L2</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Phase 4</h3>
+        <h4 style="color: #ff6b6b;">OutProj + Residual</h4>
+        <ul>
+            <li>O → W_o GEMM in registers</li>
+            <li>Add residual in final store</li>
+            <li>Single write to DRAM</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Code Structure</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">New Kernel: mega_fused_attention.c</h3>
+    <pre>
+src/kernels/
+├── attention_decode_fused.c    # Current (good, but not mega-fused)
+├── attention_flash_true.c      # Flash attention primitives
+└── mega_fused_attention.c      # NEW: Full mega-fusion
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">API Design</h3>
+    <pre>
+/**
+ * @brief Mega-fused attention for decode (single token)
+ *
+ * Reads:  input[hidden], W_qkv[3×hidden×hidden], W_o[hidden×hidden]
+ *         KV cache, rope_cos/sin
+ * Writes: output[hidden]
+ *
+ * All intermediates stay in registers/L1/L2. Single DRAM round-trip.
+ */
+void mega_fused_attention_decode(
+    float *output,           // [hidden] - DRAM write (4KB)
+    const float *input,      // [hidden] - DRAM read (4KB)
+    const float *W_qkv,      // Weights streamed through L3
+    const float *W_o,        // Weights streamed through L3
+    float *kv_cache_k,       // [seq, hidden_kv] - in L2
+    float *kv_cache_v,       // [seq, hidden_kv] - in L2
+    const float *rope_cos,   // [max_seq] - in L1
+    const float *rope_sin,   // [max_seq] - in L1
+    int pos,                 // Current position
+    int hidden,              // Model hidden dimension
+    int num_heads,           // Number of attention heads
+    int num_kv_heads,        // Number of KV heads
+    int head_dim,            // Head dimension
+    int max_seq              // Max sequence length
+);
+    </pre>
+</div>
+
+<h2>Register Allocation Strategy (AVX-512)</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Registers</th><th>Purpose</th><th>Size</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Z0-Z11</td><td>Q accumulators (6×64 tile)</td><td>768B</td></tr>
+            <tr><td>Z12-Z17</td><td>K tile streaming</td><td>384B</td></tr>
+            <tr><td>Z18-Z23</td><td>V tile streaming</td><td>384B</td></tr>
+            <tr><td>Z24-Z27</td><td>O accumulators</td><td>256B</td></tr>
+            <tr><td>Z28-Z29</td><td>Softmax stats (m_i, l_i)</td><td>128B</td></tr>
+            <tr><td>Z30-Z31</td><td>Temps, RoPE, scaling</td><td>128B</td></tr>
+        </tbody>
+    </table>
+    <p><strong>Total:</strong> 32 ZMM registers = 1KB of register storage</p>
+</div>
+
+<h2>Online Softmax: The Flash Attention Secret</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why We Don't Materialize S = Q × K^T</h3>
+    <p>For hidden=2048, seq=2048: S would be 16MB. Too big for registers!</p>
+    <p><strong>Solution:</strong> Tile the computation and use online softmax:</p>
+    <pre>
+// For each K/V tile from KV cache:
+S_ij = Q_tile @ K_tile.T / sqrt(d)    // [64×64] in registers ← NOT S!
+
+// Online softmax update (m = max, l = sum):
+m_new = max(m, rowmax(S_ij))           // running max per row
+P_ij = exp(S_ij - m_new)               // safe softmax
+l_new = exp(m - m_new)*l + rowsum(P_ij) // running sum
+
+// Output update:
+O_new = (exp(m - m_new)*l*O + P_ij @ V_tile) / l_new
+
+// Key: O, m, l stay in registers across ALL tiles!
+    </pre>
+</div>
+
+<h2>Integration with v6.5</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Replace in layer_forward</h3>
+    <p>Current <code>attention_decode_fused.c</code> calls 5 functions with intermediates on stack:</p>
+    <pre>
+ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl():
+  rmsnorm_forward(..., ln1_row, ...)           # Writes to stack
+  ck_qkv_project_head_major_token(..., q_token, k_token, v_token)  # Writes to heap
+  rope_forward_qk(q_token, k_token, ...)       # Reads from heap
+  attention_forward_decode_head_major_gqa_regular(..., attn_token)  # Writes to heap
+  ck_attention_project_head_major_decode_token_residual(...)         # Reads from heap
+    </pre>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Mega-Fused Alternative</h3>
+    <pre>
+mega_fused_attention_decode():
+  // All intermediates in registers/L1/L2
+  rmsnorm_in_registers(x_norm)
+  qkv_fused_projection(q, k, v, x_norm)
+  rope_in_place(q, k)
+  flash_attention_online(o, q, k, v, kv_cache)
+  out_projection_with_residual(output, o, residual)
+
+  // Single write to DRAM
+  output[hidden] = ...
+    </pre>
+</div>
+
+<h2>Expected Performance Impact</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Before Mega-Fusion</h3>
+        <ul>
+            <li>DRAM bandwidth: Bottleneck</li>
+            <li>AI: ~0.5 FLOPs/byte</li>
+            <li>Memory-bound: ~1 tok/s</li>
+            <li>30× slower than llama.cpp</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">After Mega-Fusion</h3>
+        <ul>
+            <li>DRAM bandwidth: Not bottleneck</li>
+            <li>AI: ~4000 FLOPs/byte</li>
+            <li>Compute-bound: ~5-10 tok/s</li>
+            <li>Within 3-5× of llama.cpp</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+        <strong>Prerequisite: AVX-512 or AMX</strong><br>
+        Mega-fusion requires at least 32 ZMM registers (AVX-512) or AMX tiles. On AVX-only machines, we'll need a modified approach using stack buffers in L1.
+    </div>
+</div>
+
+<h2>References</h2>
+
+<ul>
+    <li><a href="MEGA_FUSED.md">Original Mega-Fusion Proposal</a></li>
+    <li><a href="https://arxiv.org/abs/2205.14135">Flash Attention (Dao et al.)</a></li>
+    <li><a href="profiling.html">Profiling Guide</a> - Verify speedup with perf</li>
+</ul>
+
+    </main>
+
+    <!-- SVG Viewer Overlay -->
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()">-</button>
+                <button onclick="svgViewer.resetZoom()">Reset</button>
+                <button onclick="svgViewer.zoomIn()">+</button>
+                <button onclick="svgViewer.close()">Close X</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()">←</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()">→</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="Preview">
+        </div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay = document.getElementById('svg-overlay');
+        var img = document.getElementById('svg-image');
+        var titleEl = document.getElementById('svg-title');
+        var container = document.getElementById('svg-container');
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1;
+        var panX = 0, panY = 0;
+
+        // Find all images
+        document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+            var viewerImg = viewer.querySelector('img');
+            if (viewerImg) {
+                images.push({
+                    src: viewerImg.src,
+                    title: viewer.getAttribute('data-title') || 'Image ' + (index + 1)
+                });
+                viewer.onclick = function() {
+                    open(index);
+                };
+            }
+        });
+
+        console.log('Found ' + images.length + ' images for viewer');
+
+        // Wheel zoom
+        container.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            scale += e.deltaY > 0 ? -0.2 : 0.2;
+            scale = Math.max(0.5, Math.min(5, scale));
+            img.style.transform = 'scale(' + scale + ') translate(' + panX + 'px, ' + panY + 'px)';
+        });
+
+        // Keyboard
+        document.addEventListener('keydown', function(e) {
+            if (overlay.style.display !== 'block') return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft') prev();
+            if (e.key === 'ArrowRight') next();
+        });
+
+        function open(index) {
+            currentIndex = index;
+            scale = 1;
+            panX = 0;
+            panY = 0;
+            img.src = images[index].src;
+            img.style.transform = '';
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            console.log('Opened image: ' + images[index].src);
+        }
+
+        function close() {
+            overlay.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        function prev() {
+            open((currentIndex - 1 + images.length) % images.length);
+        }
+
+        function next() {
+            open((currentIndex + 1) % images.length);
+        }
+
+        function zoomIn() {
+            scale = Math.min(5, scale + 0.25);
+            img.style.transform = 'scale(' + scale + ')';
+        }
+
+        function zoomOut() {
+            scale = Math.max(0.5, scale - 0.25);
+            img.style.transform = 'scale(' + scale + ')';
+        }
+
+        function resetZoom() {
+            scale = 1;
+            panX = 0;
+            panY = 0;
+            img.style.transform = '';
+        }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom };
+    })();
+    </script>
+</body>
+</html>

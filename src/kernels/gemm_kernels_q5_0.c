@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "ckernel_quant.h"
+#include "ck_features.h"
 
 /* Include SIMD headers based on available extensions */
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
@@ -352,15 +353,39 @@ void gemv_q5_0_avx(float *y,
 #endif /* __AVX__ && !__AVX512F__ */
 
 /**
- * @brief Auto-dispatch GEMV
+ * @brief Auto-dispatch GEMV for Q5_0 weights based on CPU features
+ *
+ * Dispatch priority (best available):
+ *   1. AVX-512 (512-bit vectors) - Intel Skylake-X+
+ *   2. AVX2+FMA (256-bit vectors) - Intel Haswell+
+ *   3. AVX (256-bit vectors) - Intel Sandy Bridge+
+ *   4. SSE4.1 (128-bit vectors) - Intel Nehalem+
+ *   5. Reference (scalar) - Fallback
+ *
+ * Uses ck_features.h for standardized feature detection.
+ *
+ * @param y Output vector [M]
+ * @param W Weight matrix in Q5_0 format [M x K]
+ * @param x Input vector [K]
+ * @param M Number of output rows
+ * @param K Number of input columns (hidden dimension)
  */
 void gemv_q5_0(float *y,
                const void *W,
                const float *x,
                int M, int K)
 {
-    // TEMPORARILY DISABLE NEW AVX KERNELS - USE REFERENCE ONLY
+#if defined(__AVX512F__)
+    gemv_q5_0_avx512(y, W, x, M, K);
+#elif defined(__AVX2__) && defined(__FMA__)
+    gemv_q5_0_avx2(y, W, x, M, K);
+#elif defined(__AVX__)
+    gemv_q5_0_avx(y, W, x, M, K);
+#elif defined(__SSE4_1__)
+    gemv_q5_0_sse_v2(y, W, x, M, K);
+#else
     gemv_q5_0_ref(y, W, x, M, K);
+#endif
 }
 
 /* ============================================================================
@@ -713,13 +738,68 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
 }
 #endif
 
-#if defined(__AVX__) && !defined(__AVX512F__)
+#if defined(__SSSE3__)
 /**
- * @brief Quantized dot product Q5_0 x Q8_0 (AVX + SSE)
+ * @brief Spread 32 bits to 32 bytes { 0x00, 0xFF }
+ * Adapted from llama.cpp bytes_from_bits_32 (AVX path)
+ *
+ * Uses shuffle to replicate each byte, then OR with bit_mask and compare.
+ * Result: 0xFF where bit was set, 0x00 where bit was not set.
  */
-void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
+static inline void bytes_from_bits_32_sse(__m128i *out_lo, __m128i *out_hi, const uint8_t *qh)
 {
-    const int qk = QK5_0;
+    uint32_t x32;
+    memcpy(&x32, qh, sizeof(uint32_t));
+
+    /* Shuffle masks: replicate byte j/8 of x32 to each position */
+    const __m128i shuf_maskl = _mm_set_epi64x(0x0101010101010101LL, 0x0000000000000000LL);
+    const __m128i shuf_maskh = _mm_set_epi64x(0x0303030303030303LL, 0x0202020202020202LL);
+
+    __m128i bytes_lo = _mm_shuffle_epi8(_mm_set1_epi32(x32), shuf_maskl);
+    __m128i bytes_hi = _mm_shuffle_epi8(_mm_set1_epi32(x32), shuf_maskh);
+
+    /* Bit mask: pattern tests each bit position 0-7 within each byte.
+     * 0x7fbfdfeff7fbfdfe in binary has bits 1,2,3,4,5,6,7,0 cleared per 8-byte cycle.
+     * After OR, byte will be 0xFF if the corresponding bit was set. */
+    const __m128i bit_mask = _mm_set1_epi64x(0x7fbfdfeff7fbfdfeLL);
+
+    bytes_lo = _mm_or_si128(bytes_lo, bit_mask);
+    bytes_hi = _mm_or_si128(bytes_hi, bit_mask);
+
+    /* Compare with all 1s: 0xFF if bit was set, 0x00 if not */
+    *out_lo = _mm_cmpeq_epi8(bytes_lo, _mm_set1_epi64x(-1LL));
+    *out_hi = _mm_cmpeq_epi8(bytes_hi, _mm_set1_epi64x(-1LL));
+}
+
+/**
+ * @brief Multiply signed int8 vectors using sign trick
+ * Adapted from llama.cpp mul_sum_i8_pairs
+ *
+ * Uses: abs(x) * sign(y,x) = x * y for signed multiplication with maddubs
+ */
+static inline __m128i mul_sum_i8_pairs_sse(const __m128i x, const __m128i y)
+{
+    const __m128i ax = _mm_sign_epi8(x, x);   /* abs(x) */
+    const __m128i sy = _mm_sign_epi8(y, x);   /* y * sign(x) */
+    const __m128i dot = _mm_maddubs_epi16(ax, sy);  /* unsigned*signed pairs -> int16 */
+    return _mm_madd_epi16(dot, _mm_set1_epi16(1));  /* sum pairs -> int32 */
+}
+
+/**
+ * @brief Vectorized dot product Q5_0 x Q8_0 using SSSE3
+ *
+ * Based on llama.cpp ggml_vec_dot_q5_0_q8_0 AVX implementation.
+ * Key insight: use shuffle-based bit spreading and sign trick.
+ *
+ * Q5_0 encoding: nibble | (high_bit ? 0 : 0xF0)
+ * - When high bit SET: value = nibble (0-15, positive as signed)
+ * - When high bit NOT SET: value = nibble | 0xF0 (negative as signed, -16 to -1)
+ *
+ * Sign trick handles signed*signed multiplication with unsigned*signed maddubs.
+ */
+void vec_dot_q5_0_q8_0_sse(int n, float *s, const void *vx, const void *vy)
+{
+    const int qk = QK5_0;  /* 32 */
     const int nb = n / qk;
 
     const block_q5_0 *x = (const block_q5_0 *)vx;
@@ -727,27 +807,51 @@ void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
 
     float sumf = 0.0f;
 
+    const __m128i mask_0f = _mm_set1_epi8(0x0F);
+    const __m128i mask_f0 = _mm_set1_epi8((char)0xF0);
+
     for (int ib = 0; ib < nb; ib++) {
         const float d = CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d);
 
-        /* Load high bits */
-        uint32_t qh;
-        memcpy(&qh, x[ib].qh, sizeof(qh));
+        /* Load 16 bytes of packed nibbles */
+        __m128i qs = _mm_loadu_si128((const __m128i *)x[ib].qs);
 
-        int sumi = 0;
+        /* Extract nibbles: lo for indices 0-15, hi for indices 16-31 */
+        __m128i bx_lo = _mm_and_si128(qs, mask_0f);
+        __m128i bx_hi = _mm_and_si128(_mm_srli_epi16(qs, 4), mask_0f);
 
-        /* Process in groups of 8 for better cache utilization */
-        for (int j = 0; j < qk / 2; j++) {
-            const uint8_t xh_0 = ((qh & (1u << (j + 0))) >> (j + 0)) << 4;
-            const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
+        /* Spread 32 high bits to 32 bytes (0xFF=set, 0x00=not set) */
+        __m128i bxhi_lo, bxhi_hi;
+        bytes_from_bits_32_sse(&bxhi_lo, &bxhi_hi, x[ib].qh);
 
-            const int32_t x0 = (int8_t)(((x[ib].qs[j] & 0x0F) | xh_0) - 16);
-            const int32_t x1 = (int8_t)(((x[ib].qs[j] >> 4) | xh_1) - 16);
+        /* Apply encoding: (~bxhi) & 0xF0
+         * When bit SET: bxhi=0xFF, result = 0x00 (value is positive 0-15)
+         * When bit NOT SET: bxhi=0x00, result = 0xF0 (value is negative) */
+        bxhi_lo = _mm_andnot_si128(bxhi_lo, mask_f0);
+        bxhi_hi = _mm_andnot_si128(bxhi_hi, mask_f0);
 
-            sumi += x0 * y[ib].qs[j];
-            sumi += x1 * y[ib].qs[j + qk / 2];
-        }
+        /* Combine: nibble | high_bit_contribution */
+        bx_lo = _mm_or_si128(bx_lo, bxhi_lo);
+        bx_hi = _mm_or_si128(bx_hi, bxhi_hi);
 
+        /* Load Q8_0 values (32 signed int8) */
+        __m128i by_lo = _mm_loadu_si128((const __m128i *)y[ib].qs);
+        __m128i by_hi = _mm_loadu_si128((const __m128i *)(y[ib].qs + 16));
+
+        /* Multiply using sign trick and sum to int32 */
+        __m128i p_lo = mul_sum_i8_pairs_sse(bx_lo, by_lo);
+        __m128i p_hi = mul_sum_i8_pairs_sse(bx_hi, by_hi);
+
+        /* Sum the two halves */
+        __m128i sum = _mm_add_epi32(p_lo, p_hi);
+
+        /* Horizontal sum of 4 int32 values (avoiding hadd for better perf) */
+        __m128i hi64 = _mm_unpackhi_epi64(sum, sum);
+        __m128i sum64 = _mm_add_epi32(hi64, sum);
+        __m128i hi32 = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));
+        int32_t sumi = _mm_cvtsi128_si32(_mm_add_epi32(sum64, hi32));
+
+        /* Scale and accumulate */
         sumf += d * (float)sumi;
     }
 
@@ -755,15 +859,170 @@ void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
 }
 #endif
 
+#if defined(__AVX__) && !defined(__AVX512F__)
+
+/* Combine two __m128i into __m256i (AVX without AVX2) */
+#define MM256_SET_M128I(hi, lo) _mm256_insertf128_si256(_mm256_castsi128_si256(lo), (hi), 1)
+
+/**
+ * @brief Spread 32 bits to 32 bytes using AVX
+ * Returns __m256i with 0xFF where bit was set, 0x00 where not
+ */
+static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh)
+{
+    uint32_t x32;
+    memcpy(&x32, qh, sizeof(uint32_t));
+
+    const __m128i shuf_maskl = _mm_set_epi64x(0x0101010101010101LL, 0x0000000000000000LL);
+    const __m128i shuf_maskh = _mm_set_epi64x(0x0303030303030303LL, 0x0202020202020202LL);
+
+    __m128i bytesl = _mm_shuffle_epi8(_mm_set1_epi32(x32), shuf_maskl);
+    __m128i bytesh = _mm_shuffle_epi8(_mm_set1_epi32(x32), shuf_maskh);
+
+    const __m128i bit_mask = _mm_set1_epi64x(0x7fbfdfeff7fbfdfeLL);
+
+    bytesl = _mm_or_si128(bytesl, bit_mask);
+    bytesh = _mm_or_si128(bytesh, bit_mask);
+
+    bytesl = _mm_cmpeq_epi8(bytesl, _mm_set1_epi64x(-1LL));
+    bytesh = _mm_cmpeq_epi8(bytesh, _mm_set1_epi64x(-1LL));
+
+    return MM256_SET_M128I(bytesh, bytesl);
+}
+
+/**
+ * @brief Unpack 32 4-bit nibbles to 32 bytes using AVX
+ */
+static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs)
+{
+    __m128i tmpl = _mm_loadu_si128((const __m128i *)qs);
+    __m128i tmph = _mm_srli_epi16(tmpl, 4);
+    const __m128i lowMask = _mm_set1_epi8(0x0F);
+    tmpl = _mm_and_si128(lowMask, tmpl);
+    tmph = _mm_and_si128(lowMask, tmph);
+    return MM256_SET_M128I(tmph, tmpl);
+}
+
+/**
+ * @brief Multiply signed int8 pairs and return as float vector (AVX)
+ * Uses 128-bit ops internally but returns 256-bit float result
+ */
+static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y)
+{
+    const __m128i xl = _mm256_castsi256_si128(x);
+    const __m128i xh = _mm256_extractf128_si256(x, 1);
+    const __m128i yl = _mm256_castsi256_si128(y);
+    const __m128i yh = _mm256_extractf128_si256(y, 1);
+
+    /* Get absolute values of x vectors */
+    const __m128i axl = _mm_sign_epi8(xl, xl);
+    const __m128i axh = _mm_sign_epi8(xh, xh);
+    /* Sign the values of the y vectors */
+    const __m128i syl = _mm_sign_epi8(yl, xl);
+    const __m128i syh = _mm_sign_epi8(yh, xh);
+
+    /* Perform multiplication and create 16-bit values */
+    const __m128i dotl = _mm_maddubs_epi16(axl, syl);
+    const __m128i doth = _mm_maddubs_epi16(axh, syh);
+
+    /* Sum pairs to int32 */
+    const __m128i ones = _mm_set1_epi16(1);
+    const __m128i summed_pairsl = _mm_madd_epi16(ones, dotl);
+    const __m128i summed_pairsh = _mm_madd_epi16(ones, doth);
+
+    /* Convert to float */
+    const __m256i summed_pairs = MM256_SET_M128I(summed_pairsh, summed_pairsl);
+    return _mm256_cvtepi32_ps(summed_pairs);
+}
+
+/**
+ * @brief Horizontal sum of 8 floats (AVX)
+ */
+static inline float hsum_float_8_avx(const __m256 x)
+{
+    __m128 res = _mm256_extractf128_ps(x, 1);
+    res = _mm_add_ps(res, _mm256_castps256_ps128(x));
+    res = _mm_add_ps(res, _mm_movehl_ps(res, res));
+    res = _mm_add_ss(res, _mm_movehdup_ps(res));
+    return _mm_cvtss_f32(res);
+}
+
+/**
+ * @brief Quantized dot product Q5_0 x Q8_0 (AVX)
+ *
+ * Based on llama.cpp ggml_vec_dot_q5_0_q8_0 AVX implementation.
+ * Uses 256-bit accumulation and processes 32 values per block.
+ */
+void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
+{
+    const int qk = QK5_0;  /* 32 */
+    const int nb = n / qk;
+
+    const block_q5_0 *x = (const block_q5_0 *)vx;
+    const block_q8_0 *y = (const block_q8_0 *)vy;
+
+    __m256 acc = _mm256_setzero_ps();
+    __m128i mask = _mm_set1_epi8((char)0xF0);
+
+    for (int ib = 0; ib < nb; ib++) {
+        /* Compute combined scale for the block */
+        const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+
+        /* Unpack nibbles to 32 bytes */
+        __m256i bx_0 = bytes_from_nibbles_32_avx(x[ib].qs);
+
+        /* Spread high bits */
+        const __m256i bxhi = bytes_from_bits_32_avx(x[ib].qh);
+        __m128i bxhil = _mm256_castsi256_si128(bxhi);
+        __m128i bxhih = _mm256_extractf128_si256(bxhi, 1);
+
+        /* Apply encoding: (~bxhi) & 0xF0 */
+        bxhil = _mm_andnot_si128(bxhil, mask);
+        bxhih = _mm_andnot_si128(bxhih, mask);
+
+        /* Combine with nibbles */
+        __m128i bxl = _mm256_castsi256_si128(bx_0);
+        __m128i bxh = _mm256_extractf128_si256(bx_0, 1);
+        bxl = _mm_or_si128(bxl, bxhil);
+        bxh = _mm_or_si128(bxh, bxhih);
+        bx_0 = MM256_SET_M128I(bxh, bxl);
+
+        /* Load Q8_0 values (32 signed int8) */
+        const __m256i by_0 = _mm256_loadu_si256((const __m256i *)y[ib].qs);
+
+        /* Multiply and sum to float */
+        const __m256 q = mul_sum_i8_pairs_float_avx(bx_0, by_0);
+
+        /* Multiply q with scale and accumulate */
+        acc = _mm256_add_ps(_mm256_mul_ps(d, q), acc);
+    }
+
+    *s = hsum_float_8_avx(acc);
+}
+#endif
+
 /**
  * @brief Auto-dispatch quantized dot product Q5_0 x Q8_0
+ *
+ * Dispatch priority:
+ *   1. AVX512 (best performance on modern Intel/AMD)
+ *   2. AVX2 (full 256-bit integer support)
+ *   3. SSSE3 (128-bit, most efficient on older AVX CPUs like Sandy/Ivy Bridge)
+ *   4. Reference scalar (last resort)
+ *
+ * Note: AVX without AVX2 is actually slower due to AVX-SSE transitions,
+ * so we prefer SSSE3 on those CPUs.
  */
 void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)
 {
-#ifdef __AVX512F__
+#if defined(__AVX512F__)
     vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);
-#elif defined(__AVX__)
+#elif defined(__AVX2__) && defined(__FMA__)
+    /* AVX2 with FMA for true 256-bit integer and float ops */
     vec_dot_q5_0_q8_0_avx(n, s, vx, vy);
+#elif defined(__SSSE3__)
+    /* SSSE3 - most efficient on older CPUs */
+    vec_dot_q5_0_q8_0_sse(n, s, vx, vy);
 #else
     vec_dot_q5_0_q8_0_ref(n, s, vx, vy);
 #endif

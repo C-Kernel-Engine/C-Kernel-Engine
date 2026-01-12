@@ -35,6 +35,7 @@
 #endif
 
 #include "tokenizer/true_bpe.h"
+#include "ck_features.h"
 
 #define CK_CLI_VERSION         "6.5.0"
 #define CK_CLI_DEFAULT_MAX_TOKENS  256
@@ -408,6 +409,84 @@ static int sample_top_p(float *logits, int vocab_size, float temperature, float 
  * Output Helpers
  * ============================================================================ */
 
+/**
+ * Decode GPT-2 byte-level BPE representation back to actual bytes.
+ *
+ * GPT-2's tokenizer maps certain bytes to Unicode code points:
+ * - Bytes 0x00-0x20 → U+0100-U+0120 (Ā Ć ċ ... Ġ)
+ * - Bytes 0x7F-0xA0 → U+017F-U+01A0
+ * - Printable ASCII (0x21-0x7E) stays as-is
+ *
+ * This function reverses that mapping.
+ *
+ * @param token  Input BPE token string (UTF-8)
+ * @param out    Output buffer for decoded bytes
+ * @param max    Size of output buffer
+ * @return       Number of bytes written (not including NUL)
+ */
+static int decode_bpe_token(const char *token, char *out, int max) {
+    if (!token || max <= 0) return 0;
+
+    const unsigned char *src = (const unsigned char *)token;
+    int out_len = 0;
+
+    while (*src && out_len < max - 1) {
+        unsigned int codepoint;
+        int bytes;
+
+        /* Decode UTF-8 to codepoint */
+        if ((src[0] & 0x80) == 0) {
+            /* Single byte ASCII */
+            codepoint = src[0];
+            bytes = 1;
+        } else if ((src[0] & 0xE0) == 0xC0 && (src[1] & 0xC0) == 0x80) {
+            /* Two byte sequence */
+            codepoint = ((src[0] & 0x1F) << 6) | (src[1] & 0x3F);
+            bytes = 2;
+        } else if ((src[0] & 0xF0) == 0xE0 && (src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80) {
+            /* Three byte sequence */
+            codepoint = ((src[0] & 0x0F) << 12) | ((src[1] & 0x3F) << 6) | (src[2] & 0x3F);
+            bytes = 3;
+        } else if ((src[0] & 0xF8) == 0xF0 && (src[1] & 0xC0) == 0x80 &&
+                   (src[2] & 0xC0) == 0x80 && (src[3] & 0xC0) == 0x80) {
+            /* Four byte sequence */
+            codepoint = ((src[0] & 0x07) << 18) | ((src[1] & 0x3F) << 12) |
+                        ((src[2] & 0x3F) << 6) | (src[3] & 0x3F);
+            bytes = 4;
+        } else {
+            /* Invalid UTF-8, copy byte as-is */
+            out[out_len++] = (char)*src;
+            src++;
+            continue;
+        }
+
+        /* Check if this is a GPT-2 byte-encoded character */
+        if (codepoint >= 0x100 && codepoint <= 0x120) {
+            /* Bytes 0x00-0x20: U+0100-U+0120 → byte = codepoint - 0x100 */
+            out[out_len++] = (char)(codepoint - 0x100);
+        } else if (codepoint >= 0x17F && codepoint <= 0x1A0) {
+            /* Bytes 0x7F-0xA0: U+017F-U+01A0 → byte = codepoint - 0x100 */
+            out[out_len++] = (char)(codepoint - 0x100);
+        } else if (codepoint < 0x80) {
+            /* Regular ASCII - copy as-is */
+            out[out_len++] = (char)codepoint;
+        } else if (codepoint == 0x2581) {
+            /* SentencePiece space marker ▁ (U+2581) → space */
+            out[out_len++] = ' ';
+        } else {
+            /* Other UTF-8 characters - copy original bytes */
+            for (int i = 0; i < bytes && out_len < max - 1; i++) {
+                out[out_len++] = (char)src[i];
+            }
+        }
+
+        src += bytes;
+    }
+
+    out[out_len] = '\0';
+    return out_len;
+}
+
 static void output_flush(char *buf, size_t *len) {
     if (*len == 0) return;
     fwrite(buf, 1, *len, stdout);
@@ -430,25 +509,13 @@ static void output_append(char *buf, size_t *len, const char *text) {
 
 static void output_token(char *buf, size_t *len, const char *token) {
     if (!token || !*token) return;
-    const unsigned char *b = (const unsigned char *)token;
-    /* "Ġ" prefix (0xC4 0xA0) - space in BPE */
-    if (b[0] == 0xC4 && b[1] == 0xA0) {
-        output_append(buf, len, " ");
-        output_append(buf, len, token + 2);
-        return;
+
+    /* Decode BPE byte-level encoding to actual bytes */
+    char decoded[1024];
+    int n = decode_bpe_token(token, decoded, sizeof(decoded));
+    if (n > 0) {
+        output_append(buf, len, decoded);
     }
-    /* "▁" prefix (0xE2 0x96 0x81) - SentencePiece space */
-    if (b[0] == 0xE2 && b[1] == 0x96 && b[2] == 0x81) {
-        output_append(buf, len, " ");
-        output_append(buf, len, token + 3);
-        return;
-    }
-    /* Newline tokens */
-    if (strcmp(token, "Ċ") == 0 || strcmp(token, "<0x0A>") == 0) {
-        output_append(buf, len, "\n");
-        return;
-    }
-    output_append(buf, len, token);
 }
 
 /* ============================================================================
@@ -553,6 +620,153 @@ static bool is_eos_token(const CLIOptions *opt, int token) {
     for (int i = 0; i < opt->eos_count; i++) {
         if (opt->eos_ids[i] == token) return true;
     }
+    return false;
+}
+
+/**
+ * Text-based EOS pattern detection with pending output buffering.
+ *
+ * When special tokens like <|im_end|> are tokenized as regular text
+ * (e.g., !, im, _end, !), we need to detect the pattern in the output
+ * and avoid outputting the partial pattern tokens.
+ *
+ * This is a workaround for tokenizers that don't properly encode special tokens.
+ */
+#define EOS_PATTERN_BUF_SIZE 64
+#define EOS_PENDING_MAX 8
+
+typedef struct {
+    char pattern_buf[EOS_PATTERN_BUF_SIZE];  /* Accumulated text for pattern matching */
+    int pattern_len;
+    char *pending[EOS_PENDING_MAX];          /* Pending token texts (not yet output) */
+    int pending_count;
+    const char *target_pattern;              /* Pattern to detect */
+    const char *partial_prefix;              /* Prefix that might start the pattern */
+} EOSPatternState;
+
+static EOSPatternState g_eos_state = {0};
+
+static void eos_pattern_reset(void) {
+    g_eos_state.pattern_len = 0;
+    g_eos_state.pattern_buf[0] = '\0';
+    for (int i = 0; i < g_eos_state.pending_count; i++) {
+        free(g_eos_state.pending[i]);
+        g_eos_state.pending[i] = NULL;
+    }
+    g_eos_state.pending_count = 0;
+    g_eos_state.target_pattern = NULL;
+    g_eos_state.partial_prefix = NULL;
+}
+
+static void eos_pattern_init(ChatTemplateType tmpl) {
+    eos_pattern_reset();
+    switch (tmpl) {
+        case CHAT_TEMPLATE_QWEN:
+        case CHAT_TEMPLATE_CHATML:
+            g_eos_state.target_pattern = "im_end";
+            g_eos_state.partial_prefix = "im";
+            break;
+        case CHAT_TEMPLATE_LLAMA:
+        case CHAT_TEMPLATE_MISTRAL:
+            g_eos_state.target_pattern = "</s>";
+            g_eos_state.partial_prefix = "</";
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * Check if token might be start of EOS pattern.
+ */
+static bool eos_is_potential_prefix(const char *token) {
+    if (!token || !g_eos_state.partial_prefix) return false;
+
+    /* Check if current accumulated buffer + token could start the pattern */
+    size_t tlen = strlen(token);
+    size_t plen = g_eos_state.pattern_len;
+    size_t target_len = g_eos_state.target_pattern ? strlen(g_eos_state.target_pattern) : 0;
+
+    /* If buffer + token contains partial match of target, it's a potential prefix */
+    if (target_len == 0) return false;
+
+    /* Build temp buffer */
+    char temp[EOS_PATTERN_BUF_SIZE];
+    if (plen + tlen >= EOS_PATTERN_BUF_SIZE) return false;
+    memcpy(temp, g_eos_state.pattern_buf, plen);
+    memcpy(temp + plen, token, tlen);
+    temp[plen + tlen] = '\0';
+
+    /* Check if temp is a prefix of target or contains start of target */
+    const char *target = g_eos_state.target_pattern;
+    size_t temp_len = plen + tlen;
+
+    /* Look for any suffix of temp that is a prefix of target */
+    for (size_t i = 0; i < temp_len; i++) {
+        size_t remaining = temp_len - i;
+        if (remaining > target_len) remaining = target_len;
+        if (strncmp(temp + i, target, remaining) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Process a token for EOS pattern detection.
+ *
+ * @param token_text  The token text to process
+ * @param out_buf     Output buffer for safe-to-output text
+ * @param out_len     Current length of output buffer
+ * @param tmpl        Chat template type
+ * @return            true if EOS pattern detected, false otherwise
+ */
+static bool eos_pattern_process(const char *token_text, char *out_buf, size_t *out_len,
+                                 void (*output_fn)(char*, size_t*, const char*),
+                                 ChatTemplateType tmpl) {
+    if (!token_text || !g_eos_state.target_pattern) {
+        /* No pattern to match - output directly */
+        if (token_text && output_fn) output_fn(out_buf, out_len, token_text);
+        return false;
+    }
+
+    /* Append to pattern buffer */
+    size_t tlen = strlen(token_text);
+    if (g_eos_state.pattern_len + (int)tlen < EOS_PATTERN_BUF_SIZE - 1) {
+        memcpy(g_eos_state.pattern_buf + g_eos_state.pattern_len, token_text, tlen);
+        g_eos_state.pattern_len += (int)tlen;
+        g_eos_state.pattern_buf[g_eos_state.pattern_len] = '\0';
+    }
+
+    /* Check if pattern is complete */
+    if (strstr(g_eos_state.pattern_buf, g_eos_state.target_pattern)) {
+        /* EOS detected - don't output pending tokens */
+        eos_pattern_reset();
+        return true;
+    }
+
+    /* Check if this could still be part of the pattern */
+    if (eos_is_potential_prefix(token_text)) {
+        /* Hold this token - might be part of EOS */
+        if (g_eos_state.pending_count < EOS_PENDING_MAX) {
+            g_eos_state.pending[g_eos_state.pending_count] = strdup(token_text);
+            g_eos_state.pending_count++;
+        }
+        return false;
+    }
+
+    /* Not part of pattern - flush pending tokens and this one */
+    for (int i = 0; i < g_eos_state.pending_count; i++) {
+        if (output_fn) output_fn(out_buf, out_len, g_eos_state.pending[i]);
+        free(g_eos_state.pending[i]);
+        g_eos_state.pending[i] = NULL;
+    }
+    g_eos_state.pending_count = 0;
+    g_eos_state.pattern_len = 0;
+    g_eos_state.pattern_buf[0] = '\0';
+
+    if (output_fn) output_fn(out_buf, out_len, token_text);
     return false;
 }
 
@@ -670,6 +884,9 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
     char out_buf[CK_CLI_OUTPUT_BUF_SIZE];
     size_t out_len = 0;
 
+    /* Initialize EOS pattern detection for this prompt */
+    eos_pattern_init(opt->chat_template);
+
     g_generation_active = 1;
 
     for (int generated = 0; generated < max_tokens && !g_exit_requested && g_generation_active; generated++) {
@@ -682,13 +899,21 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
 
         if (is_eos_token(opt, next_token)) {
             if (opt->verbose) {
-                fprintf(stderr, "[DEBUG] EOS detected, stopping\n");
+                fprintf(stderr, "[DEBUG] EOS detected (token ID), stopping\n");
             }
             break;
         }
 
         const char *word = ck_true_bpe_id_to_token(tokenizer, next_token);
-        output_token(out_buf, &out_len, word);
+
+        /* Process token through EOS pattern detection (buffers potential EOS tokens) */
+        if (!opt->ignore_eos &&
+            eos_pattern_process(word, out_buf, &out_len, output_token, opt->chat_template)) {
+            if (opt->verbose) {
+                fprintf(stderr, "[DEBUG] EOS detected (text pattern), stopping\n");
+            }
+            break;
+        }
 
         if (opt->stream) {
             output_flush(out_buf, &out_len);
@@ -1028,6 +1253,13 @@ int main(int argc, char **argv) {
            opt.chat_template == CHAT_TEMPLATE_QWEN ? "qwen" :
            opt.chat_template == CHAT_TEMPLATE_LLAMA ? "llama" :
            opt.chat_template == CHAT_TEMPLATE_MISTRAL ? "mistral" : "chatml");
+
+    /* Print CPU capability info */
+    ck_capability_t cap = ck_get_capabilities();
+    printf("[Hardware] %s | Vector: %d-bit | FMA: %s | AI Accel: %s | Kernel: %s\n",
+           cap.name, cap.width, cap.has_fma ? "Yes" : "No",
+           cap.has_ai_accel ? "Yes" : "No", cap.best_kernel);
+
     printf("Type /help for commands, Ctrl+C to stop generation\n\n");
 
     setvbuf(stdout, NULL, _IOFBF, 1 << 20);

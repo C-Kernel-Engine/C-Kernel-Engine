@@ -1,5 +1,31 @@
 var searchData=
 [
-  ['red_3795',['RED',['../show__config_8c.html#a8d23feea868a983c8c2b661e1e16972f',1,'show_config.c']]],
-  ['reset_3796',['RESET',['../show__config_8c.html#ab702106cf3b3e96750b6845ded4e0299',1,'show_config.c']]]
+  ['qk4_5f0_4273',['QK4_0',['../ckernel__quant_8h.html#a997a3f77c076f00da9fd4f6eb3d2b9da',1,'ckernel_quant.h']]],
+  ['qk4_5f1_4274',['QK4_1',['../ckernel__quant_8h.html#aad813e4bdcbac9185791f31e3558f770',1,'ckernel_quant.h']]],
+  ['qk5_5f0_4275',['QK5_0',['../ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac',1,'ckernel_quant.h']]],
+  ['qk5_5f1_4276',['QK5_1',['../ckernel__quant_8h.html#a836a94f5a50863402da0b8505992fc51',1,'ckernel_quant.h']]],
+  ['qk8_5f0_4277',['QK8_0',['../ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a',1,'ckernel_quant.h']]],
+  ['qk_5fk_4278',['QK_K',['../ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50',1,'ckernel_quant.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5factivation_5fbytes_4279',['QWEN2_0_5B_DECODE_ACTIVATION_BYTES',['../ck-kernel-inference_8h.html#a30748c53ae173dc9eef7f8258b029014',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fcanary_5fcount_4280',['QWEN2_0_5B_DECODE_CANARY_COUNT',['../ck-kernel-inference_8h.html#a740d86aa66a19a66306d7cbd96187864',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fcanary_5fsize_4281',['QWEN2_0_5B_DECODE_CANARY_SIZE',['../ck-kernel-inference_8h.html#ae697988a71189f7c21236c17a753ac3a',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fcanary_5fvalue_4282',['QWEN2_0_5B_DECODE_CANARY_VALUE',['../ck-kernel-inference_8h.html#a8607dc09c526513d46babd18dd82a232',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fdtype_5fbytes_4283',['QWEN2_0_5B_DECODE_DTYPE_BYTES',['../ck-kernel-inference_8h.html#a58be7c1e5da3bd086d9e8f14613da2c5',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fembed_5fdim_4284',['QWEN2_0_5B_DECODE_EMBED_DIM',['../ck-kernel-inference_8h.html#a6137369801b4f80d3257c398a9601be9',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fhead_5fdim_4285',['QWEN2_0_5B_DECODE_HEAD_DIM',['../ck-kernel-inference_8h.html#a12f076df0a5515d14d00baf7eb48cd7c',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fintermediate_4286',['QWEN2_0_5B_DECODE_INTERMEDIATE',['../ck-kernel-inference_8h.html#a431f85d6b77e3ff5dff8d2e640c44108',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5flayer_4287',['QWEN2_0_5B_DECODE_LAYER',['../ck-kernel-inference_8h.html#a14964adb190d3878216ca547bf61ac50',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5flayer_5fstride_4288',['QWEN2_0_5B_DECODE_LAYER_STRIDE',['../ck-kernel-inference_8h.html#aaea6c57b15d103ea9a3b1ac50de2ee39',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fmagic_4289',['QWEN2_0_5B_DECODE_MAGIC',['../ck-kernel-inference_8h.html#a623111f3177cba12c1602129bc226f76',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fmax_5fseq_5flen_4290',['QWEN2_0_5B_DECODE_MAX_SEQ_LEN',['../ck-kernel-inference_8h.html#a7abce391d222ca4d34086e0623cd552e',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fnum_5fheads_4291',['QWEN2_0_5B_DECODE_NUM_HEADS',['../ck-kernel-inference_8h.html#ada7d13d4447806a85b48c8bbb257e539',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fnum_5fkv_5fheads_4292',['QWEN2_0_5B_DECODE_NUM_KV_HEADS',['../ck-kernel-inference_8h.html#ac3f315b1c10ac2fa17563e3667fbc40c',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fnum_5flayers_4293',['QWEN2_0_5B_DECODE_NUM_LAYERS',['../ck-kernel-inference_8h.html#a7dde4eda5724223c106c5a5816db483c',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fnum_5fmerges_4294',['QWEN2_0_5B_DECODE_NUM_MERGES',['../ck-kernel-inference_8h.html#a6032e6abcbaf688ec03e1ffef9aa9ee7',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fptr_4295',['QWEN2_0_5B_DECODE_PTR',['../ck-kernel-inference_8h.html#a1843318e48412b6aa3a06a35d50eb8e7',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fptr_5fbf16_4296',['QWEN2_0_5B_DECODE_PTR_BF16',['../ck-kernel-inference_8h.html#aff12b46bae31528d8538b89a5633fb72',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5ftotal_5fbytes_4297',['QWEN2_0_5B_DECODE_TOTAL_BYTES',['../ck-kernel-inference_8h.html#a0f96bb4353442d8a02fac7ed80e94110',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5ftotal_5fvocab_5fbytes_4298',['QWEN2_0_5B_DECODE_TOTAL_VOCAB_BYTES',['../ck-kernel-inference_8h.html#a697a3626137456c30f6760f2c3727b1a',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fvocab_5fsize_4299',['QWEN2_0_5B_DECODE_VOCAB_SIZE',['../ck-kernel-inference_8h.html#aea3d71993111916b9b08af1fddec38d3',1,'ck-kernel-inference.h']]],
+  ['qwen2_5f0_5f5b_5fdecode_5fweight_5fbytes_4300',['QWEN2_0_5B_DECODE_WEIGHT_BYTES',['../ck-kernel-inference_8h.html#a826825ae895eaf10f127e3a478c08121',1,'ck-kernel-inference.h']]]
 ];

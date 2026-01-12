@@ -7,8 +7,8 @@
     <includes local="no">stdbool.h</includes>
     <includes refid="hash__table_8h" local="yes">tokenizer/hash_table.h</includes>
     <includedby refid="true__bpe_8c" local="yes">true_bpe.c</includedby>
-    <includedby refid="ck__cli__v6_8c" local="yes">ck_cli_v6.c</includedby>
-    <includedby refid="v6__inference_8c" local="yes">v6_inference.c</includedby>
+    <includedby refid="ck__cli__v6_85_8c" local="yes">ck_cli_v6.5.c</includedby>
+    <includedby refid="v6_85__inference_8c" local="yes">v6.5_inference.c</includedby>
     <incdepgraph>
       <node id="4">
         <label>stdbool.h</label>
@@ -43,6 +43,10 @@
       </node>
     </incdepgraph>
     <invincdepgraph>
+      <node id="4">
+        <label>v6.5_inference.c</label>
+        <link refid="v6_85__inference_8c"/>
+      </node>
       <node id="1">
         <label>true_bpe.h</label>
         <link refid="true__bpe_8h"/>
@@ -57,20 +61,16 @@
         <label>true_bpe.c</label>
         <link refid="true__bpe_8c"/>
       </node>
-      <node id="4">
-        <label>v6_inference.c</label>
-        <link refid="v6__inference_8c"/>
-      </node>
       <node id="3">
-        <label>ck_cli_v6.c</label>
-        <link refid="ck__cli__v6_8c"/>
+        <label>ck_cli_v6.5.c</label>
+        <link refid="ck__cli__v6_85_8c"/>
       </node>
     </invincdepgraph>
     <innerclass refid="structCKBPEConfig" prot="public">CKBPEConfig</innerclass>
       <sectiondef kind="define">
       <memberdef kind="define" id="true__bpe_8h_1aad53eaecf0a0944b0b9c62652972a758" prot="public" static="no">
         <name>CK_TRUE_BPE_API</name>
-        <initializer><ref refid="gemm__kernels__bf16_8c_1a36f229bbda63818246ec86181b1fdd42" kindref="member">__attribute__</ref>((visibility(&quot;default&quot;)))</initializer>
+        <initializer><ref refid="qwen2__int8_8c_1ab898071398b359603a35c202e9c65f3b" kindref="member">__attribute__</ref>((visibility(&quot;default&quot;)))</initializer>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
@@ -310,7 +310,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" line="173" column="59" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" bodystart="173" bodyend="-1"/>
         <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
         <referencedby refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_8c" startline="746" endline="846">main</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_85_8c" startline="1196" endline="1337">main</referencedby>
       </memberdef>
       <memberdef kind="variable" id="true__bpe_8h_1a2f30fc798d162629916e2faa69137745" prot="public" static="no" mutable="no">
         <type>const int32_t int</type>
@@ -339,8 +339,8 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" line="172" column="49" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" bodystart="172" bodyend="-1"/>
         <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
         <referencedby refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_8c" startline="746" endline="846">main</referencedby>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_85_8c" startline="1196" endline="1337">main</referencedby>
+        <referencedby refid="v6_85__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6_85__inference_8c" startline="197" endline="338">run_inference</referencedby>
       </memberdef>
       <memberdef kind="variable" id="true__bpe_8h_1ab366d3078c02b7305089770c9de837b9" prot="public" static="no" mutable="no">
         <type>int const int32_t *</type>
@@ -356,7 +356,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" line="170" column="59" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" bodystart="170" bodyend="-1"/>
         <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
         <referencedby refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_8c" startline="746" endline="846">main</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_85_8c" startline="1196" endline="1337">main</referencedby>
       </memberdef>
       <memberdef kind="variable" id="true__bpe_8h_1ae478acd31a350e380062e576e1d8d61c" prot="public" static="no" mutable="no">
         <type>int32_t int32_t int32_t int32_t</type>
@@ -451,7 +451,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" line="171" column="56" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/true_bpe.h" bodystart="171" bodyend="-1"/>
         <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
         <referencedby refid="true__bpe_8c_1aa617ef3b2cc12fc877fc917e2e588d9c" compoundref="true__bpe_8c" startline="509" endline="539">ck_true_bpe_load_binary</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_8c" startline="746" endline="846">main</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_85_8c" startline="1196" endline="1337">main</referencedby>
       </memberdef>
       <memberdef kind="variable" id="true__bpe_8h_1a66c43cd207a5a3d05689fa20dd19ef66" prot="public" static="no" mutable="no">
         <type>const char *</type>
@@ -537,13 +537,14 @@
         <referencedby refid="ckernel__engine_8h_1a476c5068e2670813bcd9d5fd0ae6d0b4" compoundref="embedding__kernels_8c" startline="60" endline="113">embedding_forward_q4_k</referencedby>
         <referencedby refid="ckernel__engine_8h_1a04f715861b61ca2e811fc14112f1083e" compoundref="embedding__kernels_8c" startline="170" endline="223">embedding_forward_q6_k</referencedby>
         <referencedby refid="ckernel__engine_8h_1ace8166ca41fc55267666032365c330a4" compoundref="embedding__kernels_8c" startline="115" endline="168">embedding_forward_q8_0</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1aa81641123dc4dd1b1ba1ed5ea222251b" compoundref="ck__cli__v6_8c" startline="162" endline="192">init_stop_token_table</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1ad091fa0678d7656e986593a843db3cdf" compoundref="ck__cli__v6_8c" startline="209" endline="314">load_chat_template</referencedby>
-        <referencedby refid="ck__cli__v6_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_8c" startline="746" endline="846">main</referencedby>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
-        <referencedby refid="v6__cli_8c_1a0cdc298ad136eb633697b6271887b129" compoundref="v6__cli_8c" startline="215" endline="241">sample_token</referencedby>
-        <referencedby refid="v6__inference_8c_1ada4f9b3c886bed3958edc50360437d85" compoundref="v6__inference_8c" startline="48" endline="60">sample_topk</referencedby>
-        <referencedby refid="v6__simple_8c_1a2ebc56571da94cef32e2dd0925153d62" compoundref="v6__simple_8c" startline="130" endline="142">simple_embedding</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v6_85_8c" startline="1196" endline="1337">main</referencedby>
+        <referencedby refid="v6_85__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6_85__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1ab5d98d4c89c6688b7d484153874cfa53" compoundref="ck__cli__v6_85_8c" startline="792" endline="975">run_prompt</referencedby>
+        <referencedby refid="test__generic__api_8c_1aa1f6a0e3f004629b5b129de032312c01" compoundref="test__generic__api_8c" startline="89" endline="99">sample_argmax</referencedby>
+        <referencedby refid="v6_85__cli_8c_1a0cdc298ad136eb633697b6271887b129" compoundref="v6_85__cli_8c" startline="215" endline="241">sample_token</referencedby>
+        <referencedby refid="ck__cli__v6_85_8c_1a305e4958320cfdbcb6d9c24cafd2a1d8" compoundref="ck__cli__v6_85_8c" startline="334" endline="406">sample_top_p</referencedby>
+        <referencedby refid="v6_85__inference_8c_1ada4f9b3c886bed3958edc50360437d85" compoundref="v6_85__inference_8c" startline="48" endline="60">sample_topk</referencedby>
+        <referencedby refid="v6_85__simple_8c_1a2ebc56571da94cef32e2dd0925153d62" compoundref="v6_85__simple_8c" startline="130" endline="142">simple_embedding</referencedby>
         <referencedby refid="ckernel__engine_8h_1aed0168fe0364ab17b0d9dd02b1ac3ffa" compoundref="loss__kernels_8c" startline="5" endline="59">softmax_cross_entropy_loss</referencedby>
         <referencedby refid="ckernel__engine_8h_1a5e87177162b6dd565515e53e56dcd0f5" compoundref="loss__kernels__bf16_8c" startline="8" endline="40">softmax_cross_entropy_loss_bf16</referencedby>
       </memberdef>

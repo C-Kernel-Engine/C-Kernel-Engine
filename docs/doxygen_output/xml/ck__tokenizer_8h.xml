@@ -9,6 +9,8 @@
     <includedby refid="ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
     <includedby refid="v2__legacy_2ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
     <includedby refid="ck__tokenizer__v6_8c" local="yes">ck_tokenizer_v6.c</includedby>
+    <includedby refid="v6__inference_8c" local="yes">v6_inference.c</includedby>
+    <includedby refid="ck__tokenizer__v6_85_8c" local="yes">ck_tokenizer_v6.5.c</includedby>
     <incdepgraph>
       <node id="4">
         <label>stdbool.h</label>
@@ -42,10 +44,18 @@
         </childnode>
         <childnode refid="5" relation="include">
         </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
       </node>
       <node id="3">
         <label>ck_tokenizer_v2.c</label>
         <link refid="ck__tokenizer__v2_8c"/>
+      </node>
+      <node id="6">
+        <label>v6_inference.c</label>
+        <link refid="v6__inference_8c"/>
       </node>
       <node id="4">
         <label>ck_tokenizer_v2.c</label>
@@ -54,6 +64,10 @@
       <node id="2">
         <label>ck_tokenizer.c</label>
         <link refid="ck__tokenizer_8c"/>
+      </node>
+      <node id="7">
+        <label>ck_tokenizer_v6.5.c</label>
+        <link refid="ck__tokenizer__v6_85_8c"/>
       </node>
       <node id="5">
         <label>ck_tokenizer_v6.c</label>
@@ -379,6 +393,7 @@
         <references refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" compoundref="true__bpe_8h" startline="246">text_len</references>
         <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
         <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -409,7 +424,7 @@
         <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
         <references refid="structCKTokenizer_1a04da4f7678ae2191f13c434960df3e66" compoundref="tokenizer_8h" startline="95">CKTokenizer::vocab_trie</references>
         <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
-        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="338">run_inference</referencedby>
+        <referencedby refid="v6_85__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6_85__inference_8c" startline="197" endline="338">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>const char *</type>
@@ -436,6 +451,7 @@
         <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
         <referencedby refid="ck__tokenizer_8h_1a25fd8f38cf8e62b1e19e347e53225e8c" compoundref="ck__tokenizer_8c" startline="717" endline="763">ck_tokenizer_decode</referencedby>
         <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -465,6 +481,7 @@
         <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
         <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
         <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -515,6 +532,7 @@
         <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
         <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
         <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer_8h_1a2559a1955d6dbd45babf7b294f538494" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int32_t</type>
@@ -603,6 +621,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="196" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" bodystart="196" bodyend="198"/>
         <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
         <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
       </memberdef>
       </sectiondef>
     <briefdescription>

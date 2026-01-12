@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-v6_download.py - Download models from HuggingFace
+v6.5_download.py - Download models from HuggingFace
 
 Usage:
-    python v6_download.py --repo Qwen/Qwen2-0.5B-Instruct --output ~/.cache/ck-engine-v6/models/qwen2-0.5b
-    python v6_download.py --preset qwen2-0.5b
+    python v6.5_download.py --repo Qwen/Qwen2-0.5B-Instruct --output ~/.cache/ck-engine-v6.5/models/qwen2-0.5b
+    python v6.5_download.py --preset qwen2-0.5b
 
 Supports:
     - GGUF models (direct download)
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional, Dict, List
 
 # Cache directory
-DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/ck-engine-v6")
+DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/ck-engine-v6.5")
 
 # Model presets
 PRESETS = {

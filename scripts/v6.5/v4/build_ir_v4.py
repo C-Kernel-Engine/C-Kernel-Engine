@@ -28,7 +28,7 @@ for path in (_V4_DIR, _ROOT_DIR, _V3_DIR):
 
 import build_ir_v3 as v3
 import codegen_v4
-import codegen_v6
+import codegen_v6_5 as codegen_v6  # Alias for backward compatibility
 import fusion_patterns as fp
 import parallel_planner as pp
 import quant_types as qt

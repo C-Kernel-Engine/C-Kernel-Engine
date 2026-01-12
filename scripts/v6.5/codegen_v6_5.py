@@ -16,15 +16,12 @@ Generated code shows the exact quant type for each operation, e.g.:
 
 from datetime import datetime
 import os
-import argparse
-import json
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ROOT_DIR = _SCRIPT_DIR.parents[3]
-_V3_DIR = _ROOT_DIR / "scripts" / "v3"
+_V3_DIR = _SCRIPT_DIR / "v3"
 if _V3_DIR.is_dir():
     sys.path.insert(0, str(_V3_DIR))
 
@@ -66,6 +63,15 @@ DTYPE_TO_EMBEDDING_KERNEL = {
     "q4_k": "embedding_forward_q4_k",
     "q6_k": "embedding_forward_q6_k",
     "fp32": "embedding_forward",
+}
+
+# INT8 activation path: quantize input to Q8, then use quantized GEMV
+# Format: (gemv_kernel, activation_quant_type, quantize_function)
+DTYPE_TO_GEMV_Q8_KERNEL = {
+    "q5_0": ("gemv_q5_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q5_0 weights x Q8_0 activations
+    "q8_0": ("gemv_q8_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q8_0 weights x Q8_0 activations
+    "q4_k": ("gemv_q4_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q4_K weights x Q8_K activations
+    # Q6_K: No INT8 kernel yet, falls back to FP32
 }
 
 
@@ -198,13 +204,21 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                      emit_main: bool = False,
                      emit_debug: bool = False,
                      emit_parity: bool = False,
-                     weights_manifest: Optional[Dict] = None) -> None:
+                     weights_manifest: Optional[Dict] = None,
+                     decode_scratch_offsets: Optional[Dict[int, Dict[str, int]]] = None,
+                     int8_activations: bool = False) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
         emit_debug: If True, insert debug prints after each layer to detect NaN/zero outputs.
         emit_parity: If True, save intermediate buffers to files for comparison with PyTorch.
         weights_manifest: If provided, validate layout against manifest and embed validation table.
+        decode_scratch_offsets: If provided, use arena pointers for decode scratch buffers instead of
+                                stack arrays. Dict maps layer_id to buffer offsets:
+                                {layer_id: {q_token: offset, k_token: offset, ...}}
+                                This enables zero-copy operation and training support.
+        int8_activations: If True, use INT8 activation path (quantize + gemv) for decode mode.
+                         This is 5-15x faster but requires matching INT8 kernels.
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v6 codegen only supports prefill/decode (got: {mode})")
@@ -613,6 +627,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
     add()
 
     # PREFILL helpers (shared by prefill + decode builds)
+
+
     def emit_prefill_impl() -> None:
         add("/* ============================================================================")
         add(" * EXPLICIT PER-LAYER PREFILL FUNCTIONS (v6 unrolled)")
@@ -981,6 +997,7 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add()
     emit_prefill_impl()
 
+
     # DECODE MODE - Generate explicit per-layer functions
     if mode == "decode":
         add("/* ============================================================================")
@@ -1063,15 +1080,44 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"    const int H_kv = {safe_name}_NUM_KV_HEADS;")
             add(f"    const int head_dim = {safe_name}_HEAD_DIM;")
             add()
-            add("    float q_token[H * aligned_head_dim];")
-            add("    float k_token[H_kv * aligned_head_dim];")
-            add("    float v_token[H_kv * aligned_head_dim];")
-            add("    float attn_token[H * aligned_head_dim];")
-            add()
-            # Local buffers for MLP (fc1_out = 2x intermediate for gate+up, swiglu_out = intermediate)
-            add("    /* Local MLP buffers (avoid layout dependencies for intermediate values) */")
-            add("    float fc1_out[2 * aligned_intermediate_dim];")
-            add("    float swiglu_out[aligned_intermediate_dim];")
+
+            # Check if we have arena-based decode scratch buffers for this layer
+            layer_scratch = None
+            if decode_scratch_offsets and layer_id in decode_scratch_offsets:
+                layer_scratch = decode_scratch_offsets[layer_id]
+
+            if layer_scratch:
+                # Use arena pointers (zero-copy, training-compatible)
+                add("    /* Decode scratch buffers - ARENA POINTERS (zero-copy, training-compatible) */")
+                add(f"    float *q_token = (float *)((char *)model->arena + {layer_scratch['q_token']});")
+                add(f"    float *k_token = (float *)((char *)model->arena + {layer_scratch['k_token']});")
+                add(f"    float *v_token = (float *)((char *)model->arena + {layer_scratch['v_token']});")
+                add(f"    float *attn_token = (float *)((char *)model->arena + {layer_scratch['attn_out']});")
+                add()
+                add("    /* MLP scratch buffers - ARENA POINTERS */")
+                add(f"    float *fc1_out = (float *)((char *)model->arena + {layer_scratch['fc1_out']});")
+                add(f"    float *swiglu_out = (float *)((char *)model->arena + {layer_scratch['swiglu_out']});")
+            else:
+                # Fallback to stack arrays (backwards compatible, but not ideal for training)
+                add("    /* Decode scratch buffers - STACK (fallback, not ideal for training) */")
+                add("    float q_token[H * aligned_head_dim];")
+                add("    float k_token[H_kv * aligned_head_dim];")
+                add("    float v_token[H_kv * aligned_head_dim];")
+                add("    float attn_token[H * aligned_head_dim];")
+                add()
+                add("    /* MLP scratch buffers - STACK */")
+                add("    float fc1_out[2 * aligned_intermediate_dim];")
+                add("    float swiglu_out[aligned_intermediate_dim];")
+
+            # INT8 activation buffers (if enabled)
+            if int8_activations:
+                add()
+                add("    /* INT8 activation scratch buffers */")
+                # Q8_0 has 34 bytes per 32 elements (32 int8 + 1 float16 scale)
+                # Q8_K has 256 bytes per 256 elements
+                add("    uint8_t ln1_q8[(aligned_embed_dim / 32 + 1) * 34];  /* Q8_0 quantized input */")
+                add("    uint8_t ln2_q8[(aligned_embed_dim / 32 + 1) * 34];  /* Q8_0 for MLP input */")
+                add("    uint8_t swiglu_q8[(aligned_intermediate_dim / 32 + 1) * 34];  /* Q8_0 for MLP down */")
             add()
 
             # Step 1: RMSNorm
@@ -1099,13 +1145,35 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             wk_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wk_dt, "gemm_blocked_serial")
             wv_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wv_dt, "gemm_blocked_serial")
 
+            # Check for INT8 kernels availability
+            wq_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(wq_dt) if int8_activations else None
+            wk_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(wk_dt) if int8_activations else None
+            wv_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(wv_dt) if int8_activations else None
+
             # Use actual biases if model has attention biases, otherwise NULL
             bq_arg = "BQ" if has_attention_biases else "NULL"
             bk_arg = "BK" if has_attention_biases else "NULL"
             bv_arg = "BV" if has_attention_biases else "NULL"
 
-            add(f"    /* Q projection: {wq_dt.upper()} -> {wq_kernel} */")
-            add(f"    {wq_kernel}(ln1_out, WQ, {bq_arg}, q_token, 1, H * head_dim, aligned_embed_dim);")
+            # INT8 path: quantize input once, use for all QKV projections
+            if int8_activations and (wq_int8 or wk_int8 or wv_int8):
+                add("    /* INT8 activation: quantize ln1_out once for QKV */")
+                add("    quantize_row_q8_0(ln1_out, ln1_q8, aligned_embed_dim);")
+                add()
+
+            # Q projection
+            if wq_int8:
+                gemv_kernel, _, _ = wq_int8
+                add(f"    /* Q projection: {wq_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                add(f"    {gemv_kernel}(q_token, WQ, ln1_q8, H * head_dim, aligned_embed_dim);")
+                if has_attention_biases:
+                    add("    /* Add Q bias */")
+                    add("    if (BQ) {")
+                    add("        for (int i = 0; i < H * head_dim; ++i) q_token[i] += BQ[i];")
+                    add("    }")
+            else:
+                add(f"    /* Q projection: {wq_dt.upper()} -> {wq_kernel} (FP32) */")
+                add(f"    {wq_kernel}(ln1_out, WQ, {bq_arg}, q_token, 1, H * head_dim, aligned_embed_dim);")
             add("    if (aligned_head_dim > head_dim) {")
             add("        for (int h = 0; h < H; ++h) {")
             add("            float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;")
@@ -1115,8 +1183,24 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("        }")
             add("    }")
             add()
-            add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (direct-to-cache) */")
-            if wk_dt == "fp32":
+            # K projection with INT8 support
+            if wk_int8:
+                gemv_kernel, _, _ = wk_int8
+                add(f"    /* K projection: {wk_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8, direct-to-cache) */")
+                add(f"    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
+                add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, wk_head_elems);")
+                add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
+                add("    for (int h = 0; h < H_kv; ++h) {")
+                add("        const void *wk_h = (const void *)(WK_bytes + (size_t)h * wk_head_bytes);")
+                add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
+                add(f"        {gemv_kernel}(k_head, wk_h, ln1_q8, head_dim, aligned_embed_dim);")
+                if has_attention_biases:
+                    add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
+                    add("        if (bk_h) { for (int d = 0; d < head_dim; ++d) k_head[d] += bk_h[d]; }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
+                add("    }")
+            elif wk_dt == "fp32":
+                add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (FP32, direct-to-cache) */")
                 add("    const float *WK_f = (const float *)WK;")
                 add("    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
                 add("    for (int h = 0; h < H_kv; ++h) {")
@@ -1124,11 +1208,10 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            k_head[d] = 0.0f;")
-                add("        }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
                 add("    }")
             else:
+                add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (FP32 fallback, direct-to-cache) */")
                 add(f"    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
                 add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, wk_head_elems);")
                 add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
@@ -1137,13 +1220,27 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *k_head = k_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            k_head[d] = 0.0f;")
-                add("        }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
                 add("    }")
             add()
-            add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (direct-to-cache) */")
-            if wv_dt == "fp32":
+            # V projection with INT8 support
+            if wv_int8:
+                gemv_kernel, _, _ = wv_int8
+                add(f"    /* V projection: {wv_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8, direct-to-cache) */")
+                add(f"    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
+                add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, wv_head_elems);")
+                add("    const uint8_t *WV_bytes = (const uint8_t *)WV;")
+                add("    for (int h = 0; h < H_kv; ++h) {")
+                add("        const void *wv_h = (const void *)(WV_bytes + (size_t)h * wv_head_bytes);")
+                add("        float *v_head = v_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
+                add(f"        {gemv_kernel}(v_head, wv_h, ln1_q8, head_dim, aligned_embed_dim);")
+                if has_attention_biases:
+                    add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
+                    add("        if (bv_h) { for (int d = 0; d < head_dim; ++d) v_head[d] += bv_h[d]; }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
+                add("    }")
+            elif wv_dt == "fp32":
+                add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (FP32, direct-to-cache) */")
                 add("    const float *WV_f = (const float *)WV;")
                 add("    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
                 add("    for (int h = 0; h < H_kv; ++h) {")
@@ -1151,11 +1248,10 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *v_head = v_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            v_head[d] = 0.0f;")
-                add("        }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
                 add("    }")
             else:
+                add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (FP32 fallback, direct-to-cache) */")
                 add(f"    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
                 add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, wv_head_elems);")
                 add("    const uint8_t *WV_bytes = (const uint8_t *)WV;")
@@ -1164,9 +1260,7 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *v_head = v_cache + (size_t)h * kv_head_stride + (size_t)token_index * (size_t)aligned_head_dim;")
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
-                add("        for (int d = head_dim; d < aligned_head_dim; ++d) {")
-                add("            v_head[d] = 0.0f;")
-                add("        }")
+                add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
                 add("    }")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_q_token", q_token, H * aligned_head_dim);')
@@ -1225,8 +1319,16 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             # Step 6: Output projection
             add("    /* Step 6: Output projection */")
             wo_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wo_dt, "gemm_blocked_serial")
-            add(f"    /* WO projection: {wo_dt.upper()} -> {wo_kernel} */")
-            add(f"    {wo_kernel}(attn_token, WO, NULL, proj_tmp, 1, aligned_embed_dim, H * head_dim);")
+            wo_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(wo_dt) if int8_activations else None
+            if wo_int8:
+                gemv_kernel, _, quantize_fn = wo_int8
+                add(f"    /* WO projection: {wo_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                add("    uint8_t attn_q8[(H * aligned_head_dim / 32 + 1) * 34];")
+                add(f"    {quantize_fn}(attn_token, attn_q8, H * head_dim);")
+                add(f"    {gemv_kernel}(proj_tmp, WO, attn_q8, aligned_embed_dim, H * head_dim);")
+            else:
+                add(f"    /* WO projection: {wo_dt.upper()} -> {wo_kernel} (FP32) */")
+                add(f"    {wo_kernel}(attn_token, WO, NULL, proj_tmp, 1, aligned_embed_dim, H * head_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_proj_tmp", proj_tmp, aligned_embed_dim);')
             if emit_parity:
@@ -1262,9 +1364,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("    /* Step 9: MLP (SwiGLU) */")
             w1_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(w1_dt, "gemm_blocked_serial")
             w2_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(w2_dt, "gemm_blocked_serial")
+            w1_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(w1_dt) if int8_activations else None
+            w2_int8 = DTYPE_TO_GEMV_Q8_KERNEL.get(w2_dt) if int8_activations else None
 
-            add(f"    /* Gate+Up projection: {w1_dt.upper()} -> {w1_kernel} */")
-            add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+            # W1 (gate+up) projection
+            if w1_int8:
+                gemv_kernel, _, quantize_fn = w1_int8
+                add(f"    /* Gate+Up projection: {w1_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                add(f"    {quantize_fn}(ln2_out, ln2_q8, aligned_embed_dim);")
+                add(f"    {gemv_kernel}(fc1_out, W1, ln2_q8, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+            else:
+                add(f"    /* Gate+Up projection: {w1_dt.upper()} -> {w1_kernel} (FP32) */")
+                add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_fc1_out", fc1_out, 2 * aligned_intermediate_dim);')
             if emit_parity:
@@ -1277,8 +1388,15 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             if emit_parity:
                 add(f'    parity_save_buffer("layer_{layer_id}_swiglu", swiglu_out, aligned_intermediate_dim);')
             add()
-            add(f"    /* Down projection: {w2_dt.upper()} -> {w2_kernel} */")
-            add(f"    {w2_kernel}(swiglu_out, W2, NULL, mlp_out, 1, aligned_embed_dim, aligned_intermediate_dim);")
+            # W2 (down) projection
+            if w2_int8:
+                gemv_kernel, _, quantize_fn = w2_int8
+                add(f"    /* Down projection: {w2_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                add(f"    {quantize_fn}(swiglu_out, swiglu_q8, aligned_intermediate_dim);")
+                add(f"    {gemv_kernel}(mlp_out, W2, swiglu_q8, aligned_embed_dim, aligned_intermediate_dim);")
+            else:
+                add(f"    /* Down projection: {w2_dt.upper()} -> {w2_kernel} (FP32) */")
+                add(f"    {w2_kernel}(swiglu_out, W2, NULL, mlp_out, 1, aligned_embed_dim, aligned_intermediate_dim);")
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_mlp_out", mlp_out, aligned_embed_dim);')
             if emit_parity:
@@ -1436,37 +1554,5 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="V6 C source generator (explicit unrolled + prefill)")
-    parser.add_argument("--lowered", required=True, help="Lowered IR JSON file")
-    parser.add_argument("--output", required=True, help="Output C file")
-    parser.add_argument("--header-name", required=True, help="Header file name")
-    parser.add_argument("--mode", required=True, choices=["prefill", "decode"], help="Generation mode")
-    parser.add_argument("--model-name", default="model", help="Model name for safe identifiers")
-    parser.add_argument("--manifest", help="Weights manifest JSON")
-    parser.add_argument("--debug", action="store_true", help="Emit debug prints")
-    parser.add_argument("--parity", action="store_true", help="Emit parity helpers")
-
-    args = parser.parse_args()
-
-    # Load lowered IR and build layout
-    with open(args.lowered) as f:
-        lowered = json.load(f)
-
-    layout = v3.build_layout_from_lowered(lowered, args.model_name)
-
-    # Load manifest if provided
-    manifest = None
-    if args.manifest:
-        with open(args.manifest) as f:
-            manifest = json.load(f)
-
-    # Generate code
-    emit_c_source_v6(
-        layout=layout,
-        output_path=args.output,
-        header_name=args.header_name,
-        mode=args.mode,
-        emit_debug=args.debug,
-        emit_parity=args.parity,
-        weights_manifest=manifest
-    )
+    # This module is imported by build_ir_v6.py
+    print("codegen_v6.py - Use build_ir_v6.py to generate code")

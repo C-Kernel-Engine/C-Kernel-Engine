@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# v6_build.sh - Build v6 C-Kernel-Engine
+# v6.5_build.sh - Build v6.5 C-Kernel-Engine
 #
 # Build pipeline:
 #   1. Generate IR from config + manifest
 #   2. Generate C source from IR (decode + prefill)
 #   3. Compile generated code to .o
-#   4. Link everything into ck-engine-v6
+#   4. Link everything into ck-engine-v6.5
 #
 
 set -e  # Exit on error
@@ -129,7 +129,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --debug               Debug build"
             echo "  --download <preset>   Auto-download model from HuggingFace (e.g., qwen2-0.5b)"
             echo "  --download-repo <repo> Download from HuggingFace repo (e.g., Qwen/Qwen2-0.5B-Instruct)"
-            echo "  --cache-dir <dir>     Cache directory (default: ~/.cache/ck-engine-v6)"
+            echo "  --cache-dir <dir>     Cache directory (default: ~/.cache/ck-engine-v6.5)"
             echo "  -v, --verbose         Verbose output"
             echo "  -h, --help            Show this help"
             echo ""
@@ -148,7 +148,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Default cache directory
-CACHE_DIR="${CACHE_DIR:-$HOME/.cache/ck-engine-v6}"
+CACHE_DIR="${CACHE_DIR:-$HOME/.cache/ck-engine-v6.5}"
 TOKENIZER_LIB="$PROJECT_ROOT/build/libckernel_tokenizer.so"
 TOKENIZER_LDFLAGS="-L$PROJECT_ROOT/build -lckernel_tokenizer -Wl,-rpath,$PROJECT_ROOT/build"
 
@@ -158,7 +158,7 @@ TOKENIZER_LDFLAGS="-L$PROJECT_ROOT/build -lckernel_tokenizer -Wl,-rpath,$PROJECT
 if [ -n "$DOWNLOAD_MODEL" ] || [ -n "$DOWNLOAD_REPO" ]; then
     log_info "Step 0: Downloading model from HuggingFace..."
 
-    DOWNLOAD_SCRIPT="$SCRIPT_DIR/scripts/v6_download.py"
+    DOWNLOAD_SCRIPT="$SCRIPT_DIR/scripts/v6.5_download.py"
 
     if [ ! -f "$DOWNLOAD_SCRIPT" ]; then
         log_error "Download script not found: $DOWNLOAD_SCRIPT"
@@ -204,7 +204,7 @@ if [ ! -f "$IR_GEN" ]; then
 fi
 
 # Check for codegen
-CODEGEN="$SCRIPT_DIR/scripts/v6_codegen.py"
+CODEGEN="$SCRIPT_DIR/scripts/v6.5_codegen.py"
 if [ ! -f "$CODEGEN" ]; then
     log_error "Codegen not found: $CODEGEN"
     exit 1
@@ -407,8 +407,8 @@ done
 # ============================================================================
 log_info "Step 7: Compiling inference binary..."
 
-INFER_OBJ="$OUTPUT_DIR/v6_inference.o"
-gcc $CFLAGS -fopenmp -c "$SCRIPT_DIR/v6_inference.c" -o "$INFER_OBJ" $INCLUDE_PATHS
+INFER_OBJ="$OUTPUT_DIR/v6.5_inference.o"
+gcc $CFLAGS -fopenmp -c "$SCRIPT_DIR/v6.5_inference.c" -o "$INFER_OBJ" $INCLUDE_PATHS
 if [ $? -ne 0 ]; then
     log_error "Inference compilation failed"
     exit 1
@@ -420,7 +420,7 @@ log_info "Compiled: $INFER_OBJ"
 # ============================================================================
 log_info "Step 8: Linking final binary..."
 
-FINAL_BINARY="$SCRIPT_DIR/ck-engine-v6"
+FINAL_BINARY="$SCRIPT_DIR/ck-engine-v6.5"
 
 if [ ! -f "$TOKENIZER_LIB" ]; then
     log_info "Tokenizer library missing; building libckernel_tokenizer.so..."

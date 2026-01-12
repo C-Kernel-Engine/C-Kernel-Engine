@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['kv_5fcache_5fkernels_2ec_2054',['kv_cache_kernels.c',['../kv__cache__kernels_8c.html',1,'']]]
+  ['int8_5fq4k_5ftest_2ec_2327',['int8_q4k_test.c',['../int8__q4k__test_8c.html',1,'']]],
+  ['trie_2eh_2328',['trie.h',['../include_2data__structures_2tries_2trie_8h.html',1,'']]]
 ];

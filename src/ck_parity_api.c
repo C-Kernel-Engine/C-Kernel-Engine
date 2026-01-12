@@ -34,6 +34,10 @@ extern void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
 extern void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 extern void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 
+/* Direct vec_dot kernels (single dot product, not GEMV) */
+extern void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy);
+extern void vec_dot_q8_0_q8_0(int n, float *s, const void *vx, const void *vy);
+
 /* Q8_0 quantization (for input) */
 extern void quantize_row_q8_0(const float *x, void *vy, int k);
 
@@ -200,6 +204,45 @@ void ck_test_gemv_q8_0_q8_0(const void *weight_q8_0,
     gemv_q8_0_q8_0(output, weight_q8_0, q8_data, rows, cols);
 
     free(q8_data);
+}
+
+/* ============================================================================
+ * Direct Vec Dot Tests (pre-quantized inputs, no FP32 conversion)
+ * ============================================================================ */
+
+/**
+ * @brief Direct Q5_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)
+ *
+ * This is a "direct" test that bypasses FP32-to-Q8_0 conversion.
+ * Useful for isolating kernel bugs from quantization bugs.
+ *
+ * @param weight_q5_0  Q5_0 quantized weights [cols]
+ * @param input_q8_0   Q8_0 quantized input [cols] (pre-quantized!)
+ * @param output       Output scalar [1]
+ * @param cols         Number of elements (must be multiple of 32)
+ */
+void ck_test_vec_dot_q5_0_q8_0(const void *weight_q5_0,
+                                const void *input_q8_0,
+                                float *output,
+                                int cols)
+{
+    vec_dot_q5_0_q8_0(cols, output, weight_q5_0, input_q8_0);
+}
+
+/**
+ * @brief Direct Q8_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)
+ *
+ * @param weight_q8_0  Q8_0 quantized weights [cols]
+ * @param input_q8_0   Q8_0 quantized input [cols] (pre-quantized!)
+ * @param output       Output scalar [1]
+ * @param cols         Number of elements (must be multiple of 32)
+ */
+void ck_test_vec_dot_q8_0_q8_0(const void *weight_q8_0,
+                                const void *input_q8_0,
+                                float *output,
+                                int cols)
+{
+    vec_dot_q8_0_q8_0(cols, output, weight_q8_0, input_q8_0);
 }
 
 /* ============================================================================

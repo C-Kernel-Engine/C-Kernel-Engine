@@ -1,0 +1,282 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1400">
+  <defs>
+    <linearGradient id="dramGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#748ffc"/>
+      <stop offset="100%" style="stop-color:#5c7cfa"/>
+    </linearGradient>
+    <linearGradient id="l1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffa94d"/>
+      <stop offset="100%" style="stop-color:#ff922b"/>
+    </linearGradient>
+    <linearGradient id="regGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#ee5a5a"/>
+    </linearGradient>
+    <linearGradient id="biasGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#da77f2"/>
+      <stop offset="100%" style="stop-color:#be4bdb"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="1400" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="750" y="40" font-family="Arial, sans-serif" font-size="26" font-weight="bold" text-anchor="middle" fill="#212529">
+    Corrected Fusion Math: Including Bias Terms
+  </text>
+  <text x="750" y="70" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#c92a2a">
+    You're right - bias adds DRAM pressure even when zero (must still load/check)
+  </text>
+
+  <!-- Section 1: Where Bias Appears -->
+  <rect x="30" y="95" width="1440" height="200" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="125" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">1. Where Bias Terms Appear in Transformer</text>
+
+  <g transform="translate(50, 145)">
+    <!-- Table header -->
+    <rect x="0" y="0" width="250" height="30" fill="#f1f3f5"/>
+    <text x="125" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Operation</text>
+    <rect x="250" y="0" width="200" height="30" fill="#f1f3f5"/>
+    <text x="350" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Bias Shape</text>
+    <rect x="450" y="0" width="150" height="30" fill="#f1f3f5"/>
+    <text x="525" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Size (H=2048)</text>
+    <rect x="600" y="0" width="200" height="30" fill="#f1f3f5"/>
+    <text x="700" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">Llama/Qwen?</text>
+    <rect x="800" y="0" width="200" height="30" fill="#f1f3f5"/>
+    <text x="900" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#212529" font-weight="bold">GPT-2/BERT?</text>
+    
+    <!-- QKV Projection -->
+    <rect x="0" y="32" width="250" height="28" fill="#f3d9fa"/>
+    <text x="10" y="50" font-family="monospace" font-size="11" fill="#212529">QKV Projection</text>
+    <rect x="250" y="32" width="200" height="28" fill="#f3d9fa"/>
+    <text x="350" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">b_qkv[3×H]</text>
+    <rect x="450" y="32" width="150" height="28" fill="#f3d9fa"/>
+    <text x="525" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">12 KB</text>
+    <rect x="600" y="32" width="200" height="28" fill="#ebfbee"/>
+    <text x="700" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">NO (no bias)</text>
+    <rect x="800" y="32" width="200" height="28" fill="#fff5f5"/>
+    <text x="900" y="50" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">YES</text>
+    
+    <!-- Output Projection -->
+    <rect x="0" y="62" width="250" height="28" fill="#f3d9fa"/>
+    <text x="10" y="80" font-family="monospace" font-size="11" fill="#212529">Output Projection</text>
+    <rect x="250" y="62" width="200" height="28" fill="#f3d9fa"/>
+    <text x="350" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">b_o[H]</text>
+    <rect x="450" y="62" width="150" height="28" fill="#f3d9fa"/>
+    <text x="525" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">4 KB</text>
+    <rect x="600" y="62" width="200" height="28" fill="#ebfbee"/>
+    <text x="700" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">NO</text>
+    <rect x="800" y="62" width="200" height="28" fill="#fff5f5"/>
+    <text x="900" y="80" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">YES</text>
+    
+    <!-- MLP Gate/Up -->
+    <rect x="0" y="92" width="250" height="28" fill="#f3d9fa"/>
+    <text x="10" y="110" font-family="monospace" font-size="11" fill="#212529">MLP Gate + Up Proj</text>
+    <rect x="250" y="92" width="200" height="28" fill="#f3d9fa"/>
+    <text x="350" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">b_gate[4H] + b_up[4H]</text>
+    <rect x="450" y="92" width="150" height="28" fill="#f3d9fa"/>
+    <text x="525" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">32 KB</text>
+    <rect x="600" y="92" width="200" height="28" fill="#ebfbee"/>
+    <text x="700" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">NO</text>
+    <rect x="800" y="92" width="200" height="28" fill="#fff5f5"/>
+    <text x="900" y="110" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">YES (usually)</text>
+    
+    <!-- MLP Down -->
+    <rect x="0" y="122" width="250" height="28" fill="#f3d9fa"/>
+    <text x="10" y="140" font-family="monospace" font-size="11" fill="#212529">MLP Down Proj</text>
+    <rect x="250" y="122" width="200" height="28" fill="#f3d9fa"/>
+    <text x="350" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">b_down[H]</text>
+    <rect x="450" y="122" width="150" height="28" fill="#f3d9fa"/>
+    <text x="525" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">4 KB</text>
+    <rect x="600" y="122" width="200" height="28" fill="#ebfbee"/>
+    <text x="700" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#2f9e44">NO</text>
+    <rect x="800" y="122" width="200" height="28" fill="#fff5f5"/>
+    <text x="900" y="140" font-family="monospace" font-size="11" text-anchor="middle" fill="#c92a2a">YES</text>
+    
+    <!-- Summary -->
+    <rect x="1020" y="0" width="380" height="150" fill="#ffe3e3" rx="5"/>
+    <text x="1040" y="25" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#c92a2a">Per-Layer Bias DRAM Traffic:</text>
+    <text x="1040" y="50" font-family="monospace" font-size="11" fill="#212529">Llama-style:  0 KB (no bias)</text>
+    <text x="1040" y="70" font-family="monospace" font-size="11" fill="#212529">GPT-2-style:  52 KB per layer</text>
+    <text x="1040" y="95" font-family="monospace" font-size="10" fill="#868e96">For 32-layer GPT-2:</text>
+    <text x="1040" y="115" font-family="monospace" font-size="10" fill="#c92a2a">52KB × 32 = 1.6MB bias traffic!</text>
+    <text x="1040" y="140" font-family="monospace" font-size="10" fill="#868e96">(On top of weight streaming)</text>
+  </g>
+
+  <!-- Section 2: Corrected Working Set Formula -->
+  <rect x="30" y="315" width="1440" height="280" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="345" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">2. Corrected Working Set Formula (With Bias)</text>
+
+  <!-- QKV GEMM working set -->
+  <rect x="50" y="365" width="680" height="210" fill="#f1f3f5" rx="5"/>
+  <text x="70" y="390" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#212529">QKV Projection Working Set:</text>
+  
+  <text x="70" y="420" font-family="monospace" font-size="12" fill="#212529">Without bias (Llama):</text>
+  <text x="70" y="440" font-family="monospace" font-size="11" fill="#495057">  W_set = x_tile + W_tile + QKV_out</text>
+  <text x="70" y="460" font-family="monospace" font-size="11" fill="#495057">       = (T_seq × H + H × H_tile + T_seq × 3H) × B</text>
+  
+  <text x="70" y="490" font-family="monospace" font-size="12" fill="#9c36b5" font-weight="bold">With bias (GPT-2):</text>
+  <text x="70" y="510" font-family="monospace" font-size="11" fill="#9c36b5">  W_set = x_tile + W_tile + QKV_out + b_qkv</text>
+  <text x="70" y="530" font-family="monospace" font-size="11" fill="#9c36b5">       = (T_seq × H + H × H_tile + T_seq × 3H + 3H) × B</text>
+  <text x="70" y="550" font-family="monospace" font-size="11" fill="#9c36b5">       = above + 12KB for H=2048</text>
+  
+  <text x="70" y="575" font-family="monospace" font-size="10" fill="#868e96">Bias is loaded ONCE per GEMM, added to each output row</text>
+
+  <!-- Flash Attention working set -->
+  <rect x="750" y="365" width="700" height="210" fill="#fff3bf" rx="5"/>
+  <text x="770" y="390" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e67700">Per-Head Flash Attention (Corrected):</text>
+  
+  <text x="770" y="420" font-family="monospace" font-size="12" fill="#212529">Working set per head:</text>
+  <text x="770" y="445" font-family="monospace" font-size="11" fill="#495057">Q_h[1 × d]           =     d × B  =   128B</text>
+  <text x="770" y="465" font-family="monospace" font-size="11" fill="#495057">K_tile[T × d]        =   T×d × B  = 8,192B (T=64)</text>
+  <text x="770" y="485" font-family="monospace" font-size="11" fill="#495057">V_tile[T × d]        =   T×d × B  = 8,192B</text>
+  <text x="770" y="505" font-family="monospace" font-size="11" fill="#495057">O_accum[1 × d]       =     d × 4B =   256B (FP32 accum)</text>
+  <text x="770" y="525" font-family="monospace" font-size="11" fill="#495057">m_i, l_i (softmax)   =         8B =     8B</text>
+  <text x="770" y="545" font-family="monospace" font-size="11" fill="#2f9e44" font-weight="bold">No bias in attention scores! (QK^T has no bias)</text>
+  <text x="770" y="570" font-family="monospace" font-size="11" fill="#212529" font-weight="bold">Total: 16,776B ≈ 16.4KB per head ✓</text>
+
+  <!-- Section 3: The Critical Bias Fusion Point -->
+  <rect x="30" y="615" width="1440" height="320" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="645" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">3. Bias Fusion Strategy: Where to Add, When to Load</text>
+
+  <!-- Diagram showing bias fusion -->
+  <g transform="translate(50, 670)">
+    <text x="0" y="0" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">Option A: Load bias ONCE, fuse into GEMM accumulator</text>
+    
+    <rect x="0" y="20" width="1380" height="100" fill="#e7f5ff" rx="5"/>
+    
+    <!-- The flow -->
+    <rect x="20" y="40" width="150" height="40" fill="url(#dramGrad)" rx="3"/>
+    <text x="95" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Load b_qkv[3H]</text>
+    <text x="95" y="95" font-family="monospace" font-size="9" text-anchor="middle" fill="#495057">12KB from DRAM</text>
+    
+    <text x="180" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="200" y="40" width="180" height="40" fill="url(#regGrad)" rx="3"/>
+    <text x="290" y="55" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Init C_acc = bias_tile</text>
+    <text x="290" y="70" font-family="monospace" font-size="9" text-anchor="middle" fill="white">(instead of zero)</text>
+    <text x="290" y="95" font-family="monospace" font-size="9" text-anchor="middle" fill="#495057">Bias in ZMM regs</text>
+    
+    <text x="390" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="410" y="40" width="200" height="40" fill="url(#l1Grad)" rx="3"/>
+    <text x="510" y="55" font-family="monospace" font-size="10" text-anchor="middle" fill="white">GEMM K-loop</text>
+    <text x="510" y="70" font-family="monospace" font-size="9" text-anchor="middle" fill="white">C += A_tile @ B_tile</text>
+    <text x="510" y="95" font-family="monospace" font-size="9" text-anchor="middle" fill="#495057">Bias already in C!</text>
+    
+    <text x="620" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="640" y="40" width="150" height="40" fill="url(#regGrad)" rx="3"/>
+    <text x="715" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Output has bias!</text>
+    <text x="715" y="95" font-family="monospace" font-size="9" text-anchor="middle" fill="#2f9e44">0 extra ops!</text>
+    
+    <rect x="850" y="35" width="500" height="50" fill="#d3f9d8" rx="3"/>
+    <text x="870" y="55" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#2f9e44">✓ BEST: Bias fused into accumulator init</text>
+    <text x="870" y="75" font-family="monospace" font-size="10" fill="#212529">Extra DRAM: 12KB (bias) | Extra compute: 0</text>
+  </g>
+
+  <g transform="translate(50, 800)">
+    <text x="0" y="0" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#c92a2a">Option B: Separate bias add after GEMM (wasteful!)</text>
+    
+    <rect x="0" y="20" width="1380" height="100" fill="#ffe3e3" rx="5"/>
+    
+    <rect x="20" y="40" width="150" height="40" fill="url(#l1Grad)" rx="3"/>
+    <text x="95" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">GEMM output</text>
+    
+    <text x="180" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="200" y="40" width="120" height="40" fill="url(#dramGrad)" rx="3"/>
+    <text x="260" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Store to DRAM</text>
+    
+    <text x="330" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="350" y="40" width="120" height="40" fill="url(#dramGrad)" rx="3"/>
+    <text x="410" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Load output</text>
+    
+    <text x="480" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="500" y="40" width="120" height="40" fill="url(#dramGrad)" rx="3"/>
+    <text x="560" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Load bias</text>
+    
+    <text x="630" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="650" y="40" width="100" height="40" fill="url(#regGrad)" rx="3"/>
+    <text x="700" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Add</text>
+    
+    <text x="760" y="65" font-family="Arial, sans-serif" font-size="14" fill="#495057">→</text>
+    
+    <rect x="780" y="40" width="120" height="40" fill="url(#dramGrad)" rx="3"/>
+    <text x="840" y="65" font-family="monospace" font-size="10" text-anchor="middle" fill="white">Store again</text>
+    
+    <rect x="950" y="35" width="400" height="50" fill="#ffe3e3" rx="3"/>
+    <text x="970" y="55" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#c92a2a">✗ BAD: 3 extra DRAM round trips!</text>
+    <text x="970" y="75" font-family="monospace" font-size="10" fill="#212529">Extra DRAM: 12KB + 2×output size</text>
+  </g>
+
+  <!-- Section 4: Complete Corrected Formula -->
+  <rect x="30" y="955" width="1440" height="420" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="985" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">4. Complete Corrected DRAM Traffic Formula</text>
+
+  <!-- The formulas -->
+  <rect x="50" y="1005" width="700" height="350" fill="#1a1a2e" rx="5"/>
+  
+  <text x="70" y="1035" font-family="monospace" font-size="13" fill="#69db7c">// Per-token DRAM traffic (decode mode, WITH bias)</text>
+  
+  <text x="70" y="1065" font-family="monospace" font-size="12" fill="#ffd43b">// Attention block:</text>
+  <text x="70" y="1085" font-family="monospace" font-size="11" fill="#abb2bf">input_read      = H × B                    // 4KB</text>
+  <text x="70" y="1105" font-family="monospace" font-size="11" fill="#abb2bf">W_qkv_stream    = H × 3H × B               // 24MB</text>
+  <text x="70" y="1125" font-family="monospace" font-size="11" fill="#da77f2">b_qkv_read      = 3H × B  (if has_bias)    // 12KB</text>
+  <text x="70" y="1145" font-family="monospace" font-size="11" fill="#abb2bf">kv_cache_read   = 2 × S × H × B            // S × 8KB</text>
+  <text x="70" y="1165" font-family="monospace" font-size="11" fill="#abb2bf">kv_cache_write  = 2 × H × B                // 8KB</text>
+  <text x="70" y="1185" font-family="monospace" font-size="11" fill="#abb2bf">W_o_stream      = H × H × B                // 8MB</text>
+  <text x="70" y="1205" font-family="monospace" font-size="11" fill="#da77f2">b_o_read        = H × B  (if has_bias)     // 4KB</text>
+  <text x="70" y="1225" font-family="monospace" font-size="11" fill="#abb2bf">output_write    = H × B                    // 4KB</text>
+  
+  <text x="70" y="1255" font-family="monospace" font-size="12" fill="#ffd43b">// MLP block (similar pattern):</text>
+  <text x="70" y="1275" font-family="monospace" font-size="11" fill="#abb2bf">W_gate_up       = H × 8H × B               // 64MB</text>
+  <text x="70" y="1295" font-family="monospace" font-size="11" fill="#da77f2">b_gate_up       = 8H × B  (if has_bias)    // 32KB</text>
+  <text x="70" y="1315" font-family="monospace" font-size="11" fill="#abb2bf">W_down          = 4H × H × B               // 32MB</text>
+  <text x="70" y="1335" font-family="monospace" font-size="11" fill="#da77f2">b_down          = H × B  (if has_bias)     // 4KB</text>
+
+  <!-- Summary boxes -->
+  <rect x="770" y="1005" width="340" height="160" fill="#ebfbee" rx="5"/>
+  <text x="790" y="1030" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2f9e44">Llama-style (no bias):</text>
+  <text x="790" y="1055" font-family="monospace" font-size="11" fill="#212529">Activations: 8KB + S×8KB</text>
+  <text x="790" y="1075" font-family="monospace" font-size="11" fill="#212529">Weights:     128MB stream</text>
+  <text x="790" y="1095" font-family="monospace" font-size="11" fill="#212529">Bias:        0KB</text>
+  <text x="790" y="1120" font-family="monospace" font-size="12" fill="#2f9e44" font-weight="bold">Total: 128MB + S×8KB</text>
+  <text x="790" y="1145" font-family="monospace" font-size="10" fill="#868e96">Per layer, H=2048, intermediate=8192</text>
+
+  <rect x="770" y="1175" width="340" height="160" fill="#fff5f5" rx="5"/>
+  <text x="790" y="1200" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#c92a2a">GPT-2-style (with bias):</text>
+  <text x="790" y="1225" font-family="monospace" font-size="11" fill="#212529">Activations: 8KB + S×8KB</text>
+  <text x="790" y="1245" font-family="monospace" font-size="11" fill="#212529">Weights:     128MB stream</text>
+  <text x="790" y="1265" font-family="monospace" font-size="11" fill="#9c36b5">Bias:        52KB (fused)</text>
+  <text x="790" y="1290" font-family="monospace" font-size="12" fill="#c92a2a" font-weight="bold">Total: 128MB + 52KB + S×8KB</text>
+  <text x="790" y="1315" font-family="monospace" font-size="10" fill="#868e96">Bias is ~0.04% overhead if fused!</text>
+
+  <!-- Key insight -->
+  <rect x="1120" y="1005" width="310" height="330" fill="#fff3bf" rx="5"/>
+  <text x="1140" y="1035" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e67700">Key Insight:</text>
+  
+  <text x="1140" y="1065" font-family="Arial, sans-serif" font-size="11" fill="#212529">Bias DRAM cost is small</text>
+  <text x="1140" y="1085" font-family="Arial, sans-serif" font-size="11" fill="#212529">IF fused into GEMM init.</text>
+  
+  <text x="1140" y="1115" font-family="Arial, sans-serif" font-size="11" fill="#212529">52KB bias vs 128MB weights</text>
+  <text x="1140" y="1135" font-family="Arial, sans-serif" font-size="11" fill="#212529">= 0.04% overhead</text>
+  
+  <text x="1140" y="1165" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#e67700">BUT if not fused:</text>
+  <text x="1140" y="1185" font-family="Arial, sans-serif" font-size="11" fill="#212529">Separate bias add kernel</text>
+  <text x="1140" y="1205" font-family="Arial, sans-serif" font-size="11" fill="#212529">= 2× activation traffic</text>
+  <text x="1140" y="1225" font-family="Arial, sans-serif" font-size="11" fill="#212529">= 8KB × 2 extra per op</text>
+  
+  <text x="1140" y="1260" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e67700">Your C-Kernel-Engine:</text>
+  <text x="1140" y="1285" font-family="monospace" font-size="10" fill="#212529">gemm_fused_kernels.c</text>
+  <text x="1140" y="1305" font-family="monospace" font-size="10" fill="#212529">already does this right!</text>
+  <text x="1140" y="1325" font-family="monospace" font-size="10" fill="#2f9e44">✓ bias in accumulator init</text>
+
+</svg>

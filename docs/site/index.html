@@ -1196,7 +1196,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-11 08:46</span>
+        <span class="folder-updated">Updated: 2026-01-12 05:01</span>
     </div>
     <pre class="tree-output">
 .
@@ -1252,6 +1252,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- ir-v2.html
 |   |   |-- iteration-philosophy.html
 |   |   |-- kernels.html
+|   |   |-- mega_fusion.html
 |   |   |-- memory-safety.html
 |   |   |-- profiling.html
 |   |   |-- pytorch-parity.html
@@ -1302,6 +1303,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- iteration-philosophy.svg
 |   |-- kernel-catalog.md
 |   |-- kernel-design-pattern.md
+|   |-- MEGA_FUSED.md
 |   |-- memory_layout_demo.md
 |   |-- navigation-map.html
 |   |-- PARITY_TESTING_PLAN.md
@@ -1359,10 +1361,14 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- ckernel_quant.h
 |   |-- ckernel_registry.h
 |   |-- ckernel_section_layout.h
+|   |-- ck_features.h
 |   |-- ck_metrics.h
+|   |-- ck_model_api.h
 |   |-- ck_parity_api.h
 |   |-- ck_tokenizer.h
 |   |-- cpu_features.h
+|   |-- fused_kernels.h
+|   |-- mega_fused_attention.h
 |   `-- system_topology.h
 |-- issues
 |   |-- errors.txt
@@ -1378,7 +1384,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- rmsnorm.json
 |   |   |-- rope.json
 |   |   `-- swiglu.json
-|   |-- v6
 |   |-- decoder_layer_plan_backward.json
 |   |-- decoder_layer_plan.json
 |   |-- global_buffers.json
@@ -1823,6 +1828,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- patches
 |   |-- llama.patch
 |   |-- README.md
+|   |-- single_layer_dump.cpp
 |   `-- test-kernel-parity.cpp
 |-- research
 |   `-- AI -&gt; /home/antshiv/Documents/AI/
@@ -1890,10 +1896,32 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- quant_types.py
 |   |   |-- training_config.py
 |   |   `-- v6_ir_lowering.py
+|   |-- v6.5
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6.py
+|   |   |-- ck_model_smoke_v6.py
+|   |   |-- ck_run_v6.py
+|   |   |-- codegen_v6.py
+|   |   |-- convert_any_gguf_v6.py
+|   |   |-- convert_any_gguf_v6.sh
+|   |   |-- convert_any_model_v6.sh
+|   |   |-- convert_gguf_to_bump_v6.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6.py
+|   |   |-- parallel_planner.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- training_config.py
+|   |   `-- v6_ir_lowering.py
 |   |-- analyze_parity.py
 |   |-- build_ir_v5.py
 |   |-- build_ir_v5_wrapper_backup.py
 |   |-- ck_chat.py
+|   |-- ck_chat_validated.py
 |   |-- ck_download.py
 |   |-- ck_run_v5.py
 |   |-- codegen_v5.py
@@ -2007,6 +2035,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- layernorm_kernels.c
 |   |   |-- loss_kernels_bf16.c
 |   |   |-- loss_kernels.c
+|   |   |-- mega_fused_attention_avx.c
 |   |   |-- mlp_fused_decode.c
 |   |   |-- mlp_kernels_bf16.c
 |   |   |-- mlp_kernels.c
@@ -2074,6 +2103,30 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- v6_inference.c
 |   |   |-- v6_pipeline.md
 |   |   `-- v6_simple.c
+|   |-- v6.5
+|   |   |-- scripts
+|   |   |-- test_generated
+|   |   |-- 6.5_prorgess.md
+|   |   |-- 6.5_roadmap.md
+|   |   |-- build.sh
+|   |   |-- ck_cli_v6.5.c
+|   |   |-- ck-engine-v6.5
+|   |   |-- ckernel_alloc_v6.5.c
+|   |   |-- ckernel_codegen_v6.5.c
+|   |   |-- ckernel_ir_v6.5.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.5.c
+|   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- test_generic_api.c
+|   |   |-- v6.5_cli.c
+|   |   |-- v6.5_cli_todo.md
+|   |   |-- v6.5_DEBUGGING_SUMMARY.md
+|   |   |-- v6.5_GIBBERISH_DEBUGGING_REPORT.md
+|   |   |-- v6.5_inference.c
+|   |   |-- v6.5_pipeline.md
+|   |   |-- v6.5_simple.c
+|   |   |-- V6.5_UNIFIED_CLI_PLAN.md
+|   |   `-- v7_v15_roadmap.md
 |   |-- v7
 |   |   |-- build.sh
 |   |   `-- v7_pipeline.md
@@ -2118,6 +2171,16 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   `-- test_swiglu_bf16.py
 |   |-- fixtures
 |   |   `-- mini_v4.config.json
+|   |-- validation
+|   |   |-- auto_validate.py
+|   |   |-- base.py
+|   |   |-- gibberish_detector.py
+|   |   |-- __init__.py
+|   |   |-- kernel_registry.py
+|   |   |-- stage1_weight_validation.py
+|   |   |-- stage2_dimension_validation.py
+|   |   |-- stage3_single_layer.py
+|   |   `-- utils.py
 |   |-- bf16_utils.py
 |   |-- build_dequant_test.sh
 |   |-- compare_outputs.py
@@ -2192,11 +2255,15 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_true_bpe_parity.py
 |   |-- test_utils.py
 |   |-- test_v4_conversion.py
-|   `-- test_vision.py
+|   |-- test_vision.py
+|   `-- validate_kernel.py
 |-- bf_16_test.txt
 |-- build_errors.txt.txt
 |-- ck-engine-v6
 |-- c-kernel-engine-power-infographic.svg
+|-- ck-perf.data
+|-- ck-perf.data.old
+|-- ck-perf-v2.data
 |-- ck-v1.txt
 |-- ck-v4
 |-- ck-v5
@@ -2204,6 +2271,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- CONVERTER-SOLUTION.md
 |-- cores.txt
 |-- debug_code.c
+|-- debug_v6_output.py
 |-- default.config.json
 |-- default.json
 |-- devstral2.json
@@ -2221,6 +2289,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- next_steps.txt
 |-- perf.data
 |-- perf.data.old
+|-- PERFORMANCE_OPTIMIZATION_COMPLETE_REPORT.md
 |-- PERFORMANCE_OPTIMIZATION_PLAN.md
 |-- quant_bump_error.txt
 |-- quant_test_v2.txt
@@ -2237,6 +2306,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- SmolLM-1.7B-Instruct.Q4_K_M.gguf
 |-- smollm.bump
 |-- test_error.txt
+|-- test_gemv
+|-- test_gemv.c
 |-- TESTING.md
 |-- test_out.log
 |-- test_q4k_packing.py
@@ -2250,7 +2321,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- weights.bump
 `-- weights_manifest.json
 
-158 directories, 891 files
+164 directories, 956 files
 </pre>
 </div>
 
@@ -2502,7 +2573,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-12</p>
             </div>
         </div>
     </footer>
