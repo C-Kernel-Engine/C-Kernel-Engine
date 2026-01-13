@@ -37,7 +37,7 @@ var searchData=
   ['bold_118',['BOLD',['../show__config_8c.html#a26cdbb1a00213c810caccf21cd33a631',1,'show_config.c']]],
   ['bos_119',['bos',['../tokenizer_8h.html#afbcf72e6f3f003096f1fb9ce31a13736',1,'bos():&#160;tokenizer.h'],['../true__bpe_8h.html#afbcf72e6f3f003096f1fb9ce31a13736',1,'bos():&#160;true_bpe.h']]],
   ['bos_5fid_120',['bos_id',['../structCKTokenizer.html#a0e16f753888edda5716eefba903d6001',1,'CKTokenizer']]],
-  ['bq_121',['bq',['../structQWEN2__0__5B__DECODELayerOffsets.html#af82d2dc27972b986ee4caf6f54dd16d9',1,'QWEN2_0_5B_DECODELayerOffsets::bq()'],['../structCKLayerForwardParamsQ4K.html#a5624ab23e1e9c41d5ea3b4b9e8569d03',1,'CKLayerForwardParamsQ4K::bq()'],['../structCKLayerOffsets.html#a13f7bd9b925dd8d55fb6cfa885e8b7d7',1,'CKLayerOffsets::bq()'],['../structCKLayerForwardParams.html#a1002972e750e6b75ba1151cc4de47a05',1,'CKLayerForwardParams::bq()'],['../structCKLayerBackwardParams.html#a83064b5cc6decef3782fd31cdaee55d0',1,'CKLayerBackwardParams::bq()']]],
+  ['bq_121',['bq',['../structQWEN2__0__5B__DECODELayerOffsets.html#af82d2dc27972b986ee4caf6f54dd16d9',1,'QWEN2_0_5B_DECODELayerOffsets::bq()'],['../structCKLayerBackwardParams.html#a83064b5cc6decef3782fd31cdaee55d0',1,'CKLayerBackwardParams::bq()'],['../structCKLayerForwardParamsQ4K.html#a5624ab23e1e9c41d5ea3b4b9e8569d03',1,'CKLayerForwardParamsQ4K::bq()'],['../structCKLayerOffsets.html#a13f7bd9b925dd8d55fb6cfa885e8b7d7',1,'CKLayerOffsets::bq()'],['../structCKLayerForwardParams.html#a1002972e750e6b75ba1151cc4de47a05',1,'CKLayerForwardParams::bq()']]],
   ['bridge_5fb_122',['bridge_b',['../structCKFooterOffsets.html#a6e968314ca3082225d5fdbeda2c64343',1,'CKFooterOffsets']]],
   ['bridge_5foutput_123',['bridge_output',['../structCKSection.html#a3a361b1dadf1ae460375452d6b090d84',1,'CKSection::bridge_output()'],['../structCKFooterOffsets.html#a44484b840457f80b8fa286f5167d1687',1,'CKFooterOffsets::bridge_output()']]],
   ['bridge_5fproj_5fb_124',['bridge_proj_b',['../structCKSection.html#a970402cf9743b507254e92ecdb06b224',1,'CKSection']]],
@@ -51,10 +51,11 @@ var searchData=
   ['buffers_132',['buffers',['../structCKIRV2Graph.html#ad2d61568dda8232b3252da14a53ffc03',1,'CKIRV2Graph']]],
   ['build_5fplan_133',['build_plan',['../ckernel__mem__plan_8c.html#a2ac35f81413e92025c1492d78f45a703',1,'ckernel_mem_plan.c']]],
   ['bump_5fbytes_134',['bump_bytes',['../ckernel__model__layout_8c.html#a1b626cc9eda38d35b5e64d1885783452',1,'ckernel_model_layout.c']]],
-  ['bus_135',['bus',['../structPCIeDevice.html#a3c9a5d7185811db52d5443d767c155e7',1,'PCIeDevice']]],
-  ['bv_136',['bv',['../structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6',1,'CKLayerForwardParams::bv()'],['../structQWEN2__0__5B__DECODELayerOffsets.html#abf274f36713eab1d1b45a7039dbdfe04',1,'QWEN2_0_5B_DECODELayerOffsets::bv()'],['../structCKLayerForwardParamsQ4K.html#a1c7b2b14198b4296631e7169eec94919',1,'CKLayerForwardParamsQ4K::bv()'],['../structCKLayerBackwardParams.html#a0a43398737b3990bce0677aedddd310c',1,'CKLayerBackwardParams::bv()'],['../structCKLayerOffsets.html#aed3dcb5b839829cb5f8f9dd2e7128bb8',1,'CKLayerOffsets::bv()']]],
-  ['bw_5ftest_5fnum_5fthreads_137',['bw_test_num_threads',['../structMemoryInfo.html#ac9d849331a689ebbfa4c6e65da74f990',1,'MemoryInfo']]],
-  ['bw_5ftest_5fnuma_5fnode_138',['bw_test_numa_node',['../structMemoryInfo.html#af134427563f2d7794d5cb40fe77aac7f',1,'MemoryInfo']]],
-  ['byte_5ffallback_139',['byte_fallback',['../structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5',1,'CKBPEConfig']]],
-  ['byte_5fto_5fgpt2_140',['byte_to_gpt2',['../true__bpe_8c.html#ae3fa01999c02fdd82a6745e66e5bc74e',1,'true_bpe.c']]]
+  ['bump_5fheader_5fsize_135',['BUMP_HEADER_SIZE',['../test__bump__tokenizer_8c.html#a69353ee29b61a436869e5e4ab1331285',1,'test_bump_tokenizer.c']]],
+  ['bus_136',['bus',['../structPCIeDevice.html#a3c9a5d7185811db52d5443d767c155e7',1,'PCIeDevice']]],
+  ['bv_137',['bv',['../structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6',1,'CKLayerForwardParams::bv()'],['../structQWEN2__0__5B__DECODELayerOffsets.html#abf274f36713eab1d1b45a7039dbdfe04',1,'QWEN2_0_5B_DECODELayerOffsets::bv()'],['../structCKLayerForwardParamsQ4K.html#a1c7b2b14198b4296631e7169eec94919',1,'CKLayerForwardParamsQ4K::bv()'],['../structCKLayerBackwardParams.html#a0a43398737b3990bce0677aedddd310c',1,'CKLayerBackwardParams::bv()'],['../structCKLayerOffsets.html#aed3dcb5b839829cb5f8f9dd2e7128bb8',1,'CKLayerOffsets::bv()']]],
+  ['bw_5ftest_5fnum_5fthreads_138',['bw_test_num_threads',['../structMemoryInfo.html#ac9d849331a689ebbfa4c6e65da74f990',1,'MemoryInfo']]],
+  ['bw_5ftest_5fnuma_5fnode_139',['bw_test_numa_node',['../structMemoryInfo.html#af134427563f2d7794d5cb40fe77aac7f',1,'MemoryInfo']]],
+  ['byte_5ffallback_140',['byte_fallback',['../structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5',1,'CKBPEConfig']]],
+  ['byte_5fto_5fgpt2_141',['byte_to_gpt2',['../true__bpe_8c.html#ae3fa01999c02fdd82a6745e66e5bc74e',1,'true_bpe.c']]]
 ];

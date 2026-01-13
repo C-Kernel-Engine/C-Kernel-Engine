@@ -23,7 +23,6 @@
     <includedby refid="gemm__kernels__q6k_8c" local="yes">gemm_kernels_q6k.c</includedby>
     <includedby refid="gemm__kernels__q6k__sse_8c" local="yes">gemm_kernels_q6k_sse.c</includedby>
     <includedby refid="gemm__kernels__q8__0_8c" local="yes">gemm_kernels_q8_0.c</includedby>
-    <includedby refid="mega__fused__attention__avx_8c" local="yes">mega_fused_attention_avx.c</includedby>
     <includedby refid="quantize__row__q8__k__sse_8c" local="yes">quantize_row_q8_k_sse.c</includedby>
     <includedby refid="rmsnorm__q8__k__fused_8c" local="yes">rmsnorm_q8_k_fused.c</includedby>
     <incdepgraph>
@@ -96,8 +95,6 @@
         </childnode>
         <childnode refid="21" relation="include">
         </childnode>
-        <childnode refid="22" relation="include">
-        </childnode>
       </node>
       <node id="15">
         <label>gemm_kernels_q5_0_sse_v2.c</label>
@@ -135,7 +132,7 @@
         <label>gemm_kernels_q5_0.c</label>
         <link refid="gemm__kernels__q5__0_8c"/>
       </node>
-      <node id="21">
+      <node id="20">
         <label>quantize_row_q8_k_sse.c</label>
         <link refid="quantize__row__q8__k__sse_8c"/>
       </node>
@@ -143,11 +140,7 @@
         <label>gemm_kernels_q6k_sse.c</label>
         <link refid="gemm__kernels__q6k__sse_8c"/>
       </node>
-      <node id="20">
-        <label>mega_fused_attention_avx.c</label>
-        <link refid="mega__fused__attention__avx_8c"/>
-      </node>
-      <node id="22">
+      <node id="21">
         <label>rmsnorm_q8_k_fused.c</label>
         <link refid="rmsnorm__q8__k__fused_8c"/>
       </node>
@@ -480,6 +473,111 @@
         <references refid="ckernel__dtype_8h_1a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5" compoundref="ckernel__dtype_8h" startline="41">CK_DT_Q6_K</references>
         <referencedby refid="ckernel__quant_8h_1ae33428ceaccaaf2ceeeb52f77401b382" compoundref="ckernel__quant_8h" startline="200" endline="204">ck_quant_row_size</referencedby>
       </memberdef>
+      <memberdef kind="function" id="ckernel__quant_8h_1ab58c945a0911101ac318f093dfce1770" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemm_nt_q5_0_q8_0</definition>
+        <argsstring>(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K)</argsstring>
+        <name>gemm_nt_q5_0_q8_0</name>
+        <param>
+          <type>const void *</type>
+          <declname>A_q8</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>B_q5</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+<para>Batch GEMM with Q5_0 weights and Q8_0 activations for prefill. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Computes C = A @ B^T + bias where: A: [M x K] Q8_0 quantized activations (M tokens, K features) B: [N x K] Q5_0 quantized weights (N outputs, K features) C: [M x N] FP32 output</para>
+<para>This is the INT8 batch kernel for prefill, using pre-quantized activations to avoid FP32-&gt;Q8_0 conversion overhead per operation.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>A_q8</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input activations in Q8_0 format [M rows of K/32 blocks each] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>B_q5</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Weights in Q5_0 format [N rows of K/32 blocks each] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>bias</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Optional bias vector [N], NULL if not used </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>C</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output matrix [M x N], row-major FP32 </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>M</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Batch size (number of tokens) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>N</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output dimension (number of output features) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>K</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input dimension (must be multiple of 32) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="347" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1083" bodyend="1111" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="347" declcolumn="6"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
+        <references refid="gemm__kernels__q5__0_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="1017" endline="1030">vec_dot_q5_0_q8_0</references>
+      </memberdef>
       <memberdef kind="function" id="ckernel__quant_8h_1a00a143b1495811557d83661c637ba3a6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
         <definition>void gemm_nt_q5_0_sse_v2</definition>
@@ -522,7 +620,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="339" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0_sse_v2.c" bodystart="64" bodyend="97" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="339" declcolumn="6"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
         <references refid="gemm__kernels__q5__0__sse__v2_8c_1afb621aff9a12017b33347eb42473baf7" compoundref="gemm__kernels__q5__0__sse__v2_8c" startline="12" endline="62">dot_q5_0_q8_k_32_sse</references>
-        <references refid="gemm__kernels__q5__0__sse__v2_8c_1aa25694bd7b677f5b945be6f5dbdaa9c9" compoundref="gemm__kernels__q5__0_8c" startline="504" endline="545">gemm_nt_q5_0_ref</references>
+        <references refid="gemm__kernels__q5__0__sse__v2_8c_1aa25694bd7b677f5b945be6f5dbdaa9c9" compoundref="gemm__kernels__q5__0_8c" startline="505" endline="546">gemm_nt_q5_0_ref</references>
         <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
         <references refid="gemm__kernels__q5__0__sse__v2_8c_1a64b28ca8a25883986a0d22e39a574a32" compoundref="gemm__kernels__q4k__q8k_8c" startline="93" endline="99">quantize_row_q8_k</references>
       </memberdef>
@@ -659,6 +757,58 @@
         <references refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" compoundref="ckernel__quant_8h" startline="154">block_q8_K::qs</references>
         <references refid="structblock__q4__K_1a3a603ea5f9ee6a3732d96a244cb6a3b5" compoundref="ckernel__quant_8h" startline="126">block_q4_K::scales</references>
         <references refid="ckernel__quant_8h_1adc037213865781c5c1ea63708ef94307" compoundref="ckernel__quant_8h" startline="226" endline="250">unpack_q4_k_scales</references>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__quant_8h_1adf8ea140a408f51698d95718f1d8db49" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void quantize_row_q8_0</definition>
+        <argsstring>(const float *x, void *vy, int k)</argsstring>
+        <name>quantize_row_q8_0</name>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>vy</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>k</declname>
+        </param>
+        <briefdescription>
+<para>Quantize FP32 to Q8_0 format (scalar reference) </para>
+        </briefdescription>
+        <detaileddescription>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>x</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input FP32 values </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>vy</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output Q8_0 blocks </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>k</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of elements (must be multiple of 32) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="349" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="45" bodyend="77" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="349" declcolumn="6"/>
       </memberdef>
       <memberdef kind="function" id="ckernel__quant_8h_1ad7fa7d735b58b52c90cbd6160676e86f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -803,6 +953,45 @@ This matches llama.cpp&apos;s get_scale_min_k4() function exactly. The 12-byte s
         <referencedby refid="gemm__kernels__q4k_8c_1a5932901345563fd991c906b9bd5afcdb" compoundref="gemm__kernels__q4k_8c" startline="502" endline="552">gemv_q4_k_backward_ref</referencedby>
         <referencedby refid="ckernel__quant_8h_1afae7b0ff0904761e59897e996ddd862f" compoundref="gemm__kernels__q4k__sse_8c" startline="18" endline="117">gemv_q4_k_q8_k_sse</referencedby>
         <referencedby refid="gemm__kernels__q4k_8c_1a55c547c2be59d44bfaadc80d08858117" compoundref="gemm__kernels__q4k_8c" startline="44" endline="92">gemv_q4_k_ref</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__quant_8h_1a8744a3b1e4d1dc928fce050f111414a6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void vec_dot_q5_0_q8_0</definition>
+        <argsstring>(int n, float *s, const void *vx, const void *vy)</argsstring>
+        <name>vec_dot_q5_0_q8_0</name>
+        <param>
+          <type>int</type>
+          <declname>n</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vx</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vy</declname>
+        </param>
+        <briefdescription>
+<para>Auto-dispatch quantized dot product Q5_0 x Q8_0. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Dispatch priority:<orderedlist>
+<listitem><para>AVX512 (best performance on modern Intel/AMD)</para>
+</listitem><listitem><para>AVX2 (full 256-bit integer support)</para>
+</listitem><listitem><para>SSSE3 (128-bit, most efficient on older AVX CPUs like Sandy/Ivy Bridge)</para>
+</listitem><listitem><para>Reference scalar (last resort)</para>
+</listitem></orderedlist>
+</para>
+<para>Note: AVX without AVX2 is actually slower due to AVX-SSE transitions, so we prefer SSSE3 on those CPUs. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="348" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1017" bodyend="1030" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="348" declcolumn="6"/>
+        <references refid="gemm__kernels__q5__0_8c_1a5703f283c14a34f7546cd236acd4ef80" compoundref="gemm__kernels__q5__0_8c" startline="616" endline="653">vec_dot_q5_0_q8_0_ref</references>
       </memberdef>
       </sectiondef>
     <briefdescription>
@@ -1158,11 +1347,16 @@ This matches llama.cpp&apos;s get_scale_min_k4() function exactly. The 12-byte s
 <codeline lineno="343"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__quant_8h_1ad7fa7d735b58b52c90cbd6160676e86f" kindref="member">quantize_row_q8_k_sse</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k);</highlight></codeline>
 <codeline lineno="344"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__quant_8h_1a92b59a0fe356901c8aaabfe548a4add6" kindref="member">rmsnorm_q8_k_fused</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*gamma,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d_model,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_embed_dim,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps);</highlight></codeline>
 <codeline lineno="345"><highlight class="normal"></highlight></codeline>
-<codeline lineno="346"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="347"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="348"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="349"><highlight class="normal"></highlight></codeline>
-<codeline lineno="350"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_QUANT_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+<codeline lineno="346"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>INT8<sp/>activation<sp/>batch<sp/>GEMM<sp/>kernels<sp/>(Q5_0<sp/>weights<sp/>x<sp/>Q8_0<sp/>activations)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="347"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__quant_8h_1ab58c945a0911101ac318f093dfce1770" kindref="member">gemm_nt_q5_0_q8_0</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*A_q8,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*B_q5,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K);</highlight></codeline>
+<codeline lineno="348"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__quant_8h_1a8744a3b1e4d1dc928fce050f111414a6" kindref="member">vec_dot_q5_0_q8_0</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*s,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vx,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy);</highlight></codeline>
+<codeline lineno="349"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__quant_8h_1adf8ea140a408f51698d95718f1d8db49" kindref="member">quantize_row_q8_0</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k);</highlight></codeline>
+<codeline lineno="350"><highlight class="normal"></highlight></codeline>
+<codeline lineno="351"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="352"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="353"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="354"><highlight class="normal"></highlight></codeline>
+<codeline lineno="355"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_QUANT_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h"/>
   </compounddef>

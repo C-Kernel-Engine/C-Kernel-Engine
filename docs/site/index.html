@@ -845,6 +845,7 @@
                     <!-- Right Column -->
                     <div class="menu-section">
                         <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
@@ -1196,7 +1197,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-12 05:01</span>
+        <span class="folder-updated">Updated: 2026-01-12 19:19</span>
     </div>
     <pre class="tree-output">
 .
@@ -1245,6 +1246,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- deterministic-memory.html
 |   |   |-- developer-guide.html
 |   |   |-- flash_attention.html
+|   |   |-- gemm-memory-layout.html
 |   |   |-- gemm-optimization.html
 |   |   |-- gguf-bump.html
 |   |   |-- gguf-conversion.html
@@ -1304,6 +1306,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- kernel-catalog.md
 |   |-- kernel-design-pattern.md
 |   |-- MEGA_FUSED.md
+|   |-- mega_fused_test_plan.md
+|   |-- MEGA_FUSION_CALCULATIONS.md
 |   |-- memory_layout_demo.md
 |   |-- navigation-map.html
 |   |-- PARITY_TESTING_PLAN.md
@@ -1311,6 +1315,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
 |   |-- PERFORMANCE_TESTING_METHODOLOGY.md
 |   |-- preview.html
+|   |-- Q5_Q8_KERNEL_ANALYSIS.md
 |   |-- QUANTIZATION_GUIDE.md
 |   |-- qwen_layer_dataflow.md
 |   |-- qwen_layer_dataflow.svg
@@ -1332,6 +1337,94 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- generated_qwen_0.5b.h
 |   |-- generated_qwen_0.5b.map
 |   `-- generated_with_kernels_example.c
+|-- FlameGraph
+|   |-- demos
+|   |   |-- brkbytes-mysql.svg
+|   |   |-- cpu-grep.svg
+|   |   |-- cpu-illumos-ipdce.svg
+|   |   |-- cpu-illumos-syscalls.svg
+|   |   |-- cpu-illumos-tcpfuse.svg
+|   |   |-- cpu-iozone.svg
+|   |   |-- cpu-ipnet-diff.svg
+|   |   |-- cpu-linux-tar.svg
+|   |   |-- cpu-linux-tcpsend.svg
+|   |   |-- cpu-mixedmode-flamegraph-java.svg
+|   |   |-- cpu-mysql-filt.svg
+|   |   |-- cpu-mysql.svg
+|   |   |-- cpu-qemu-both.svg
+|   |   |-- cpu-zoomable.html
+|   |   |-- hotcold-kernelthread.svg
+|   |   |-- io-gzip.svg
+|   |   |-- io-mysql.svg
+|   |   |-- mallocbytes-bash.svg
+|   |   |-- off-bash.svg
+|   |   |-- off-mysql-busy.svg
+|   |   |-- off-mysql-idle.svg
+|   |   |-- palette-example-broken.svg
+|   |   |-- palette-example-working.svg
+|   |   `-- README
+|   |-- dev
+|   |   |-- gatherhc-kern.d
+|   |   |-- gatherthc-kern.d
+|   |   |-- hcstackcollapse.pl
+|   |   |-- hotcoldgraph.pl
+|   |   |-- README
+|   |   `-- thcstackcollapse.pl
+|   |-- docs
+|   |   `-- cddl1.txt
+|   |-- test
+|   |   |-- results
+|   |   |-- perf-cycles-instructions-01.txt
+|   |   |-- perf-dd-stacks-01.txt
+|   |   |-- perf-funcab-cmd-01.txt
+|   |   |-- perf-funcab-pid-01.txt
+|   |   |-- perf-iperf-stacks-pidtid-01.txt
+|   |   |-- perf-java-faults-01.txt
+|   |   |-- perf-java-stacks-01.txt
+|   |   |-- perf-java-stacks-02.txt
+|   |   |-- perf-js-stacks-01.txt
+|   |   |-- perf-mirageos-stacks-01.txt
+|   |   |-- perf-numa-stacks-01.txt
+|   |   |-- perf-rust-Yamakaky-dcpu.txt
+|   |   `-- perf-vertx-stacks-01.txt
+|   |-- aix-perf.pl
+|   |-- difffolded.pl
+|   |-- example-dtrace-stacks.txt
+|   |-- example-dtrace.svg
+|   |-- example-perf-stacks.txt.gz
+|   |-- example-perf.svg
+|   |-- files.pl
+|   |-- flamegraph.pl
+|   |-- jmaps
+|   |-- pkgsplit-perf.pl
+|   |-- range-perf.pl
+|   |-- README.md
+|   |-- record-test.sh
+|   |-- stackcollapse-aix.pl
+|   |-- stackcollapse-bpftrace.pl
+|   |-- stackcollapse-chrome-tracing.py
+|   |-- stackcollapse-elfutils.pl
+|   |-- stackcollapse-faulthandler.pl
+|   |-- stackcollapse-gdb.pl
+|   |-- stackcollapse-go.pl
+|   |-- stackcollapse-ibmjava.pl
+|   |-- stackcollapse-instruments.pl
+|   |-- stackcollapse-java-exceptions.pl
+|   |-- stackcollapse-jstack.pl
+|   |-- stackcollapse-ljp.awk
+|   |-- stackcollapse-perf.pl
+|   |-- stackcollapse-perf-sched.awk
+|   |-- stackcollapse.pl
+|   |-- stackcollapse-pmc.pl
+|   |-- stackcollapse-recursive.pl
+|   |-- stackcollapse-sample.awk
+|   |-- stackcollapse-stap.pl
+|   |-- stackcollapse-vsprof.pl
+|   |-- stackcollapse-vtune-mc.pl
+|   |-- stackcollapse-vtune.pl
+|   |-- stackcollapse-wcp.pl
+|   |-- stackcollapse-xdebug.php
+|   `-- test.sh
 |-- HPCEmbedding -&gt; /home/antshiv/Workspace/BCGov/citz-imb-ai/HPC/HPC_Embeddings/
 |-- include
 |   |-- data_structures
@@ -1859,6 +1952,13 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- Screenshot 2026-01-10 at 05-10-27 ScalingPhilosophy C-Kernel-Engine.png
 |   `-- Screenshot 2026-01-10 at 05-32-49 ScalingPhilosophy C-Kernel-Engine.png
 |-- scripts
+|   |-- test
+|   |   |-- compare_perf_results.py
+|   |   |-- fair_perf_comparison.py
+|   |   |-- mega_fusion_test_runner.py
+|   |   |-- test_direct_vec_dot.py
+|   |   |-- test_dram_pressure.sh
+|   |   `-- verify_q5_0_parity.py
 |   |-- v2
 |   |   `-- build_ir_v2.py
 |   |-- v3
@@ -1899,24 +1999,28 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- v6.5
 |   |   |-- v3
 |   |   |-- v4
-|   |   |-- build_ir_v6.py
-|   |   |-- ck_model_smoke_v6.py
-|   |   |-- ck_run_v6.py
-|   |   |-- codegen_v6.py
-|   |   |-- convert_any_gguf_v6.py
-|   |   |-- convert_any_gguf_v6.sh
-|   |   |-- convert_any_model_v6.sh
-|   |   |-- convert_gguf_to_bump_v6.py
+|   |   |-- build_ir_v6_5.py
+|   |   |-- ck_model_smoke_v6_5.py
+|   |   |-- ck_run_v6_5.py
+|   |   |-- codegen_v6_5.py
+|   |   |-- codegen_v6_5.py.old_fp32_only
+|   |   |-- convert_any_gguf_v6_5.py
+|   |   |-- convert_any_gguf_v6_5.sh
+|   |   |-- convert_any_model_v6_5.sh
+|   |   |-- convert_gguf_to_bump_v6_5.py
 |   |   |-- convert_hf_to_bump.py
-|   |   |-- convert_hf_to_bump_v6.py
+|   |   |-- convert_hf_to_bump_v6_5.py
 |   |   |-- fusion_patterns.py
-|   |   |-- inspect_weights_v6.py
+|   |   |-- inspect_weights_v6_5.py
 |   |   |-- parallel_planner.py
+|   |   |-- profile_inference.py
 |   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- q4_k_quantize.py
 |   |   |-- quant_types.py
+|   |   |-- test_kernel_direct.py
 |   |   |-- training_config.py
-|   |   `-- v6_ir_lowering.py
+|   |   |-- v6_5_ir_lowering.py
+|   |   `-- verify_test_bug.py
 |   |-- analyze_parity.py
 |   |-- build_ir_v5.py
 |   |-- build_ir_v5_wrapper_backup.py
@@ -2041,6 +2145,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- mlp_kernels.c
 |   |   |-- optimizer_kernels_bf16.c
 |   |   |-- optimizer_kernels.c
+|   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
 |   |   |-- quantize_row_q8_k_sse.c
 |   |   |-- relu_kernels_bf16.c
 |   |   |-- relu_kernels.c
@@ -2104,6 +2209,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- v6_pipeline.md
 |   |   `-- v6_simple.c
 |   |-- v6.5
+|   |   |-- generated
 |   |   |-- scripts
 |   |   |-- test_generated
 |   |   |-- 6.5_prorgess.md
@@ -2117,7 +2223,9 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- ck_format.md
 |   |   |-- ck_tokenizer_v6.5.c
 |   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- test_bump_tokenizer.c
 |   |   |-- test_generic_api.c
+|   |   |-- test_inference_with_bump_tokenizer.c
 |   |   |-- v6.5_cli.c
 |   |   |-- v6.5_cli_todo.md
 |   |   |-- v6.5_DEBUGGING_SUMMARY.md
@@ -2149,6 +2257,17 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- cpu_features.c
 |   |-- show_config.c
 |   `-- system_topology.c
+|-- test_results
+|   |-- baseline_output1.txt
+|   |-- baseline_output2.txt
+|   |-- megafused_output1.txt
+|   |-- megafused_output2.txt
+|   |-- mega_fused_test_report.json
+|   |-- memory_flamegraph.data
+|   |-- perf_baseline_run1.txt
+|   |-- perf_baseline.txt
+|   |-- perf_megafused_run1.txt
+|   `-- perf_megafused.txt
 |-- tools
 |   |-- cache_analysis.py
 |   |-- ck.c
@@ -2220,6 +2339,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_layernorm.py
 |   |-- test_layer_weights_parity.py
 |   |-- test_lm_head_litmus.py
+|   |-- test_mega_fused_attention.py
 |   |-- test_mlp.py
 |   |-- test_multi_layer_parity.py
 |   |-- test_optimizer.py
@@ -2257,13 +2377,20 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_v4_conversion.py
 |   |-- test_vision.py
 |   `-- validate_kernel.py
+|-- ADD_INT8_KERNEL.md
+|-- add_int8_kernel.sh
+|-- avx-512_issues.txt
+|-- avx-512-llamatest.txt
+|-- benchmark_v65.py
 |-- bf_16_test.txt
 |-- build_errors.txt.txt
 |-- ck-engine-v6
 |-- c-kernel-engine-power-infographic.svg
+|-- ck-kernel-inference-int8.c
 |-- ck-perf.data
 |-- ck-perf.data.old
 |-- ck-perf-v2.data
+|-- ck-perf-v65-20260112-105225.svg
 |-- ck-v1.txt
 |-- ck-v4
 |-- ck-v5
@@ -2276,35 +2403,42 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- default.json
 |-- devstral2.json
 |-- devstral.bump
-|-- Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
+|-- FILES_CREATED.md
 |-- fix_q4k_packing.md
+|-- FOCUS_INT8_ONLY.md
 |-- GGUF-CONVERSION-SOLUTION.md
 |-- GGUF_CONVERTER_FIX_SUMMARY.md
+|-- IMMEDIATE_ACTION_PLAN.md
+|-- IMPLEMENTATION_READY.md
+|-- IMPLEMENT_NOW.md
 |-- interactive-infographic.html
 |-- json
-|-- Kimi-VL-A3B-Thinking-2506-Q4_K_M.gguf
 |-- llama_dump_logits
 |-- Makefile
 |-- MULTI_ARCH_CONVERSION_SUMMARY.md
+|-- NEXT_STEPS.md
 |-- next_steps.txt
 |-- perf.data
 |-- perf.data.old
 |-- PERFORMANCE_OPTIMIZATION_COMPLETE_REPORT.md
 |-- PERFORMANCE_OPTIMIZATION_PLAN.md
+|-- perf_v65.data
+|-- PREFILL_ACTION_PLAN.md
+|-- PREFILL_ANALYSIS.md
 |-- quant_bump_error.txt
 |-- quant_test_v2.txt
+|-- QUICK_SUMMARY.md
 |-- qwen2_0.5.json
-|-- qwen2.5-3b-instruct-q4_k_m.gguf
-|-- qwen.bump
 |-- qwen_vocab.json
 |-- README-BUMP-CONVERTER.md
 |-- README.md
 |-- requirements.txt
+|-- run_flamegraph_v6.sh
 |-- show_config.txt
 |-- small10mb.config.json
 |-- smolLM-135.json
-|-- SmolLM-1.7B-Instruct.Q4_K_M.gguf
-|-- smollm.bump
+|-- START_HERE.md
+|-- SUMMARY.md
 |-- test_error.txt
 |-- test_gemv
 |-- test_gemv.c
@@ -2314,14 +2448,16 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- test_quant_testcase.txt
 |-- test_quant.txt
 |-- tiny.config.json
+|-- v6.5-perf.data
+|-- V6.5_PERFORMANCE_ANALYSIS_REPORT.md
+|-- v6.5-profile.svg
 |-- valgrind.supp
 |-- vibe_docs.md
 |-- VIBE_GENERATED_CONTENT.md
 |-- vocab.json
-|-- weights.bump
 `-- weights_manifest.json
 
-164 directories, 956 files
+173 directories, 1082 files
 </pre>
 </div>
 

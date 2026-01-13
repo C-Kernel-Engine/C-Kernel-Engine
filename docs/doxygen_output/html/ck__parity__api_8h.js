@@ -26,5 +26,7 @@ var ck__parity__api_8h =
     [ "ck_test_rope", "ck__parity__api_8h.html#a15e78c3b254565f6061c47cc878b9209", null ],
     [ "ck_test_rope_interleaved", "ck__parity__api_8h.html#ae31291ab83dc161f500032b197e8e6a2", null ],
     [ "ck_test_softmax", "ck__parity__api_8h.html#a49012f3a7b923281e0632ba4ece386f7", null ],
-    [ "ck_test_swiglu", "ck__parity__api_8h.html#a70dc56b85050454040a47b2dc4e0f37f", null ]
+    [ "ck_test_swiglu", "ck__parity__api_8h.html#a70dc56b85050454040a47b2dc4e0f37f", null ],
+    [ "ck_test_vec_dot_q5_0_q8_0", "ck__parity__api_8h.html#a74e6f14b267d70440de389eae4620bae", null ],
+    [ "ck_test_vec_dot_q8_0_q8_0", "ck__parity__api_8h.html#a6dd447ca849e7c7924ee76fa71144fcb", null ]
 ];

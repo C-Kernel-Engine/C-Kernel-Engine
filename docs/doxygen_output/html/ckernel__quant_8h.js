@@ -28,11 +28,14 @@ var ckernel__quant_8h =
     [ "ck_quant_block_size", "ckernel__quant_8h.html#ad8834a1bb3edfa7fb47a2e47ab9e189a", null ],
     [ "ck_quant_row_size", "ckernel__quant_8h.html#ae33428ceaccaaf2ceeeb52f77401b382", null ],
     [ "ck_quant_type_size", "ckernel__quant_8h.html#a90f4be4e8bd0d3f55a0ad32c30659a41", null ],
+    [ "gemm_nt_q5_0_q8_0", "ckernel__quant_8h.html#ab58c945a0911101ac318f093dfce1770", null ],
     [ "gemm_nt_q5_0_sse_v2", "ckernel__quant_8h.html#a00a143b1495811557d83661c637ba3a6", null ],
     [ "gemm_nt_q6_k_ref", "ckernel__quant_8h.html#a69a759de291fac064cd027839afb4bce", null ],
     [ "gemm_nt_q6_k_sse", "ckernel__quant_8h.html#a85298cbfbb7e45cb2df10251ea4bb487", null ],
     [ "gemv_q4_k_q8_k_sse", "ckernel__quant_8h.html#afae7b0ff0904761e59897e996ddd862f", null ],
+    [ "quantize_row_q8_0", "ckernel__quant_8h.html#adf8ea140a408f51698d95718f1d8db49", null ],
     [ "quantize_row_q8_k_sse", "ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f", null ],
     [ "rmsnorm_q8_k_fused", "ckernel__quant_8h.html#a92b59a0fe356901c8aaabfe548a4add6", null ],
-    [ "unpack_q4_k_scales", "ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307", null ]
+    [ "unpack_q4_k_scales", "ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307", null ],
+    [ "vec_dot_q5_0_q8_0", "ckernel__quant_8h.html#a8744a3b1e4d1dc928fce050f111414a6", null ]
 ];

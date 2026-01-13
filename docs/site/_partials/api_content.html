@@ -1,6 +1,6 @@
 
 <details open>
-    <summary>GEMM (Matrix Multiplication) (69)</summary>
+    <summary>GEMM (Matrix Multiplication) (70)</summary>
     <div class="accordion-content">
 
 
@@ -381,6 +381,16 @@
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_q5_0(const float * A, const void * B, const float * bias, float * C, int M, int N, int K)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_q5_0_q8_0</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_q5_0_q8_0(const void * A_q8, const void * B_q5, const float * bias, float * C, int M, int N, int K)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.</p>
         </div>
 
 
@@ -806,7 +816,7 @@
 
 
 <details open>
-    <summary>RMS Normalization (28)</summary>
+    <summary>RMS Normalization (27)</summary>
     <div class="accordion-content">
 
 
@@ -967,16 +977,6 @@
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fuse_rmsnorm_qkv(float * q_out, float * k_out, float * v_out, const float * input, const float * gamma, const float * W_qkv, const float * b_qkv, int hidden, int num_heads, int num_kv_heads, int head_dim, float eps)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Phase 1: Fused RMSNorm + QKV (intermediates in registers)</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fuse_rmsnorm_qkv_avx</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fuse_rmsnorm_qkv_avx(float * q_out, float * k_out, float * v_out, const float * input, const float * gamma, const float * W_qkv, const float * b_qkv, int hidden, int num_heads, int num_kv_heads, int head_dim, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused RMSNorm + QKV for decode (single token)</p>
         </div>
 
 
@@ -1310,7 +1310,7 @@
 
 
 <details open>
-    <summary>Attention (34)</summary>
+    <summary>Attention (32)</summary>
     <div class="accordion-content">
 
 
@@ -1596,16 +1596,6 @@
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fuse_flash_attention_avx</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fuse_flash_attention_avx(float * o_out, const float * q, const float * kv_cache_k, const float * kv_cache_v, int num_heads, int num_kv_heads, int seq_len, int head_dim)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Flash attention with online softmax (AVX version)</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -1621,16 +1611,6 @@
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode(float * output, const float * input, const float * residual, const float * W_qkv, const float * b_qkv, const float * W_o, const float * b_o, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int hidden, int num_heads, int num_kv_heads, int head_dim, int max_seq, float eps)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Mega-fused attention for decode mode (single token)</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_decode_avx</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode_avx(float * output, const float * input, const float * residual, const float * W_qkv, const float * b_qkv, const float * W_o, const float * b_o, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int hidden, int num_heads, int num_kv_heads, int head_dim, int max_seq, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Full mega-fused attention for decode.</p>
         </div>
 
 
@@ -2011,8 +1991,8 @@
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fuse_rope_inplace_avx</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fuse_rope_inplace_avx(float * q, float * k, const float * rope_cos, const float * rope_sin, int pos, int num_heads, int num_kv_heads, int head_dim)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Apply RoPE to Q and K (in-place, from L1)</p>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fuse_rope_inplace_avx(void * q, void * k, void * cos_cache, void * sin_cache, int batch_tokens, int num_heads, int num_kv_heads, int head_dim, int token_offset)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -2198,7 +2178,7 @@
 
 
 <details open>
-    <summary>Other Functions (746)</summary>
+    <summary>Other Functions (751)</summary>
     <div class="accordion-content">
 
 
@@ -4468,6 +4448,26 @@ hugepage_mode
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_quantize_q8_k(const float * src, void * dst, int n)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Quantize FP32 to Q8_K (for activations)</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_test_vec_dot_q5_0_q8_0</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q5_0_q8_0(const void * weight_q5_0, const void * input_q8_0, float * output, int cols)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q5_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_test_vec_dot_q8_0_q8_0</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q8_0_q8_0(const void * weight_q8_0, const void * input_q8_0, float * output, int cols)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q8_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
         </div>
 
 
@@ -8075,6 +8075,26 @@ The IR graph structure (number of layers, op types)</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">parse_manifest_entry</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">bool parse_manifest_entry(const char * json, const char * name, size_t * offset, size_t * size)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">parse_manifest_int</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int parse_manifest_int(const char * json, const char * key)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">parse_op</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -8939,6 +8959,16 @@ The IR graph structure (number of layers, op types)</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int read_floats(FILE * f, float * dst, size_t count)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">read_manifest_entry</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">bool read_manifest_entry(const char * json_path, const char * entry_name, size_t * out_offset, size_t * out_size)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

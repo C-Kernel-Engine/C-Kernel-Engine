@@ -845,6 +845,7 @@
                     <!-- Right Column -->
                     <div class="menu-section">
                         <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
@@ -1010,6 +1011,16 @@
         <img src="assets/per_head_fusion_math.svg" alt="Per-Head Fusion Math">
         <div class="label">Cache Constraint Formulas</div>
     </div>
+
+    <div class="svg-viewer" data-title="Bias-Corrected Fusion: Quantization Considerations">
+        <img src="assets/bias_corrected_fusion.svg" alt="Bias-Corrected Fusion">
+        <div class="label">Q4_K Bias Correction in Fusion</div>
+    </div>
+
+    <div class="svg-viewer" data-title="Hardware-Aware Blocking: Cache-Optimized Tiling">
+        <img src="assets/hardware_aware_blocking.svg" alt="Hardware-Aware Blocking">
+        <div class="label">L1/L2 Cache Blocking Strategy</div>
+    </div>
 </div>
 
 <h2>The Problem: Memory-Bound Attention</h2>
@@ -1106,6 +1117,207 @@ Result: ~8KB DRAM traffic per layer
     <div>
         <strong>Expected Speedup: 5-10× for Attention</strong><br>
         Moving from memory-bound to compute-bound is the single biggest optimization possible. Current v6.5 is 30× slower than llama.cpp partly because of this.
+    </div>
+</div>
+
+<h2>Mega-Fusion Time Calculations</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Cache Line Math</h3>
+    <pre>
+Cache line size: 64 bytes = 512 bits
+
+For FP16 (2 bytes per element):
+    Elements per cache line: 64 / 2 = 32 elements
+    Embed dim H = 4096 (LLaMA 7B)
+    Cache lines per token: H / 32 = 128 cache lines
+
+For FP32 (4 bytes per element):
+    Elements per cache line: 64 / 4 = 16 elements
+    Cache lines per token: H / 16 = 256 cache lines
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">FLOPs Per Cache Line</h3>
+    <pre>
+For ONE layer, ONE cache line (32 elements):
+═══════════════════════════════════════════
+
+Attention (Q @ Kᵀ @ V):
+    QKᵀ:  d_k FLOPs
+    (QKᵀ)V: d_k × d_v FLOPs
+    Total: ~2 × d_k × d_v FLOPs
+
+MLP (gate, up, down):
+    gate:  d × 4d FLOPs
+    up:    d × 4d FLOPs
+    down:  4d × d FLOPs
+    Total: ~6 × d × d FLOPs
+
+Per cache line, per layer (d=128):
+    Attention: ~2 × 64 × 128 = 16,384 FLOPs
+    MLP:       ~6 × 128 × 128 = 98,304 FLOPs
+    Total:     ~114,688 FLOPs
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Time Per Cache Line (CPU)</h3>
+    <pre>
+CPU (Xeon, 5 TFLOPS sustained for BF16):
+═══════════════════════════════════════════
+Time per cache line: 114,688 FLOPs / 5 TFLOPS
+                   = 22.9 nanoseconds
+
+For 32 layers:
+    Time: 32 × 22.9 ns = 733 ns = 0.73 μs
+
+For 100 layers:
+    Time: 100 × 22.9 ns = 2.29 μs
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Full Token Computation Time</h3>
+    <pre>
+For H=4096, 128 cache lines per token:
+═══════════════════════════════════════════
+
+Time per token (compute only):
+    128 cache lines × 0.73 μs/cache_line
+    = 93 μs = 0.093 ms
+
+For 32 layers:  93 μs/token
+For 100 layers: 290 μs/token
+
+At 0.093 ms/token:
+    10,000 tokens = 0.93 seconds
+    Throughput: ~10,000 tokens/second
+    </pre>
+</div>
+
+<h2>Weight Loading: The Real Cost</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Weights Are Shared Across Tokens!</h3>
+    <pre>
+Model: LLaMA 7B
+Weights: 7B × 2 bytes (FP16) = 14 GB
+
+Weights loaded ONCE, then cached:
+    Load time: 14 GB / 500 GB/s = 28 ms
+
+After weights cached:
+    Subsequent tokens: 0.093 ms/token (compute only)
+
+Time Breakdown:
+    First token: 28 ms (load) + 0.093 ms = 28.1 ms
+    Token 2-1000: 0.093 ms each
+    </pre>
+</div>
+
+<h2>With vs Without Mega-Fusion</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Metric</th><th>Without Mega-Fusion</th><th>With Mega-Fusion</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>DRAM reads (activations)</td><td>1K × 4096 × 2 × 32 = 256 MB</td><td>8 MB (once)</td></tr>
+            <tr><td>DRAM writes (activations)</td><td>1K × 4096 × 2 × 32 = 256 MB</td><td>8 MB (once)</td></tr>
+            <tr><td>DRAM traffic total</td><td>512 MB + 14 GB = 14.5 GB</td><td>14 GB + 16 MB = 14 GB</td></tr>
+            <tr><td>Time (500 GB/s)</td><td>~100-200 ms</td><td>~121 ms</td></tr>
+            <tr><td>Memory-bound?</td><td>Yes</td><td>No (compute-bound)</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<h2>MoE Fusion Boundary</h2>
+
+<div class="card card-yellow">
+    <h3 style="margin-top: 0;">Stop Mega-Fusion at Routing Decision</h3>
+    <pre>
+For MoE models (e.g., Mixtral):
+═══════════════════════════════════════════
+
+Mega-fuse UP TO the routing decision:
+
+    X → RMSNorm → QKV → RoPE → [ROUTE HERE]
+                                    ↑
+                                    Stop!
+                                    Need X for gate calculation
+
+    From X, compute gate = softmax(X @ W_gate)
+    gate selects top-k experts
+    Each expert: X @ W_expert_i
+    Merge: Σ gate_i × expert_output
+
+    Then resume mega-fusion for down layers
+
+Fusion boundary:
+    ✓ Fusable: RMSNorm, QKV, RoPE, Attention, MLP (before gate)
+    ✗ Not fusable: Gate computation, Expert selection, Expert forward
+    </pre>
+</div>
+
+<h2>The Complete Formula</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Mega Fusion Time Equation</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   T_total = T_weight_load + N_layers × T_cache_line            │
+│                                                                 │
+│   Where:                                                       │
+│                                                                 │
+│   T_weight_load = Model_size / Memory_bandwidth                 │
+│                                                                 │
+│   T_cache_line = FLOPs_per_cache_line / Compute_FLOPS           │
+│                                                                 │
+│   N_cache_lines = H / (Cache_line_size / sizeof(dtype))         │
+│                                                                 │
+│   N_layers_total = N_cache_lines × N_layers                     │
+│                                                                 │
+│   T_token = T_weight_load + T_compute                           │
+│           = Model_size/BW + (H × N_layers × FLOPs_element)/FPS  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+    </pre>
+</div>
+
+<h2>Numbers for Different Models</h2>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Model</th><th>Params</th><th>Weights</th><th>TTFT (est)</th><th>Decode</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Qwen 0.5B</td><td>0.5B</td><td>1 GB</td><td>~2 ms</td><td>~3 μs</td></tr>
+            <tr><td>Qwen 1.5B</td><td>1.5B</td><td>3 GB</td><td>~6 ms</td><td>~9 μs</td></tr>
+            <tr><td>LLaMA 7B</td><td>7B</td><td>14 GB</td><td>~28 ms</td><td>~93 μs</td></tr>
+            <tr><td>LLaMA 13B</td><td>13B</td><td>26 GB</td><td>~52 ms</td><td>~174 μs</td></tr>
+            <tr><td>LLaMA 30B</td><td>30B</td><td>60 GB</td><td>~120 ms</td><td>~400 μs</td></tr>
+        </tbody>
+    </table>
+    <p><em>Assumptions: BF16, LLaMA architecture, 500 GB/s memory bandwidth, 5 TFLOPS sustained compute, weights loaded once, cached in L3</em></p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Verdict: Mega-Fusion is Practical!</strong><br>
+        For Qwen 0.5B-7B on CPU:<br>
+        - TTFT under 30 ms ✓<br>
+        - Decode under 100 μs/token ✓<br>
+        - No activation DRAM traffic (all in L3) ✓<br>
+        - Thousands of concurrent users (TB memory) ✓<br>
+        - Energy efficient (300W vs 700W per GPU) ✓
     </div>
 </div>
 

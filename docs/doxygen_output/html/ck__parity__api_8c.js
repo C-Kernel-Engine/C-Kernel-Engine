@@ -20,6 +20,8 @@ var ck__parity__api_8c =
     [ "ck_test_rope_interleaved", "ck__parity__api_8c.html#ae31291ab83dc161f500032b197e8e6a2", null ],
     [ "ck_test_softmax", "ck__parity__api_8c.html#a49012f3a7b923281e0632ba4ece386f7", null ],
     [ "ck_test_swiglu", "ck__parity__api_8c.html#a70dc56b85050454040a47b2dc4e0f37f", null ],
+    [ "ck_test_vec_dot_q5_0_q8_0", "ck__parity__api_8c.html#a74e6f14b267d70440de389eae4620bae", null ],
+    [ "ck_test_vec_dot_q8_0_q8_0", "ck__parity__api_8c.html#a6dd447ca849e7c7924ee76fa71144fcb", null ],
     [ "dequant_q4_0_row", "ck__parity__api_8c.html#a03dfd2a1c4ee71909e61cd5fd22ed259", null ],
     [ "dequant_q4_k_row", "ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030", null ],
     [ "dequant_q6_k_row", "ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6", null ],
@@ -34,5 +36,7 @@ var ck__parity__api_8c =
     [ "rmsnorm_forward", "ck__parity__api_8c.html#a9a068ed02d809a81a23f09e61b820baf", null ],
     [ "rope_forward_qk", "ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179", null ],
     [ "rope_precompute_cache", "ck__parity__api_8c.html#a3c55e1a13ca92346f9cf41bc4453f3df", null ],
-    [ "swiglu_forward", "ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650", null ]
+    [ "swiglu_forward", "ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650", null ],
+    [ "vec_dot_q5_0_q8_0", "ck__parity__api_8c.html#a8744a3b1e4d1dc928fce050f111414a6", null ],
+    [ "vec_dot_q8_0_q8_0", "ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751", null ]
 ];

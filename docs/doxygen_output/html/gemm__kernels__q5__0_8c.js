@@ -4,6 +4,7 @@ var gemm__kernels__q5__0_8c =
     [ "dequant_q5_0_row", "gemm__kernels__q5__0_8c.html#a4b1482bd60f21521ba08b497c5289770", null ],
     [ "dot_q5_0", "gemm__kernels__q5__0_8c.html#ac4c3c0e32b64297e71b21bde4a574999", null ],
     [ "gemm_nt_q5_0", "gemm__kernels__q5__0_8c.html#a7016bef6b48fbf2c9cc10d9330f2b4db", null ],
+    [ "gemm_nt_q5_0_q8_0", "gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770", null ],
     [ "gemm_nt_q5_0_ref", "gemm__kernels__q5__0_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9", null ],
     [ "gemm_nt_q5_0_sse_v2", "gemm__kernels__q5__0_8c.html#a00a143b1495811557d83661c637ba3a6", null ],
     [ "gemm_q5_0", "gemm__kernels__q5__0_8c.html#a8ec5b64efa99b6e938ca90d2e5d72c47", null ],

@@ -1,8 +1,5 @@
 var NAVTREEINDEX10 =
 {
-"structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646":[0,0,29,11],
-"structCKLayerForwardParamsQ4K.html#ada91d4c0f5e6040aca475655f7f1bcab":[0,0,29,2],
-"structCKLayerForwardParamsQ4K.html#af0407fc50e027301417628d774a41ff3":[0,0,29,22],
 "structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e":[0,0,29,16],
 "structCKLayerForwardParamsQ4K.html#afae06ea5bb1f1d1aed99a1bfd54dd6bf":[0,0,29,18],
 "structCKLayerGradOffsets.html":[0,0,30],
@@ -249,5 +246,8 @@ var NAVTREEINDEX10 =
 "structCKPlanStepV2.html":[0,0,45],
 "structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1":[0,0,45,2],
 "structCKPlanStepV2.html#a22d5d759ab81944a97689a1a80456664":[0,0,45,1],
-"structCKPlanStepV2.html#a99fd1a750634dd8160937d173e7acf31":[0,0,45,3]
+"structCKPlanStepV2.html#a99fd1a750634dd8160937d173e7acf31":[0,0,45,3],
+"structCKPlanStepV2.html#acaaa916701cbcf1e9a5d35ff79e7c5bf":[0,0,45,0],
+"structCKPoolBlock.html":[0,0,46],
+"structCKPoolBlock.html#a28b34d622ad98214bd709675b430f459":[0,0,46,1]
 };

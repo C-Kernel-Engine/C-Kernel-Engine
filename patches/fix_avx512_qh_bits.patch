@@ -1,0 +1,52 @@
+diff --git a/src/kernels/gemm_kernels_q5_0.c b/src/kernels/gemm_kernels_q5_0.c
+--- a/src/kernels/gemm_kernels_q5_0.c
++++ b/src/kernels/gemm_kernels_q5_0.c
+@@ -156,18 +156,20 @@ void gemv_q5_0_avx512(float *y,
+
+-            /* Build high bit contribution for second 16 weights (indices 16-31) */
++            /* Build high bit contribution for second 16 weights (indices 16-31)
++             * Scalar code: xh_1 = ((qh >> (j + 12))) & 0x10 extracts bit (j+12)
++             * So weights 16-31 use qh bits 12-27, NOT 16-31 */
+             __m512i qh_hi = _mm512_set_epi32(
+-                ((qh >> 31) & 1) << 4, ((qh >> 30) & 1) << 4,
+-                ((qh >> 29) & 1) << 4, ((qh >> 28) & 1) << 4,
+-                ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
+-                ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
+-                ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
+-                ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
+-                ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
+-                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4
++                ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
++                ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
++                ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
++                ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
++                ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
++                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
++                ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
++                ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
+             );
+
+--- Similarly fix vec_dot_q5_0_q8_0_avx512 around line 710 ---
+
+@@ -710,18 +712,18 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
+
+-        /* Build high bit contribution for second 16 weights */
++        /* Build high bit contribution for second 16 weights (uses bits 12-27) */
+         __m512i qh_hi = _mm512_set_epi32(
+-            ((qh >> 31) & 1) << 4, ((qh >> 30) & 1) << 4,
+-            ((qh >> 29) & 1) << 4, ((qh >> 28) & 1) << 4,
+-            ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
+-            ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
+-            ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
+-            ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
+-            ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
+-            ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4
++            ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
++            ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
++            ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
++            ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
++            ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
++            ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
++            ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
++            ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
+         );
