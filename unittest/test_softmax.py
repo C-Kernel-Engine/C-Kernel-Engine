@@ -136,7 +136,7 @@ def run_forward_tests(H=8, T=64, warmup=10, iterations=1000):
     # Fast version: trades accuracy for speedup on AVX-512
     report.add_result(TestResult(
         name="Fast (SIMD approx)",
-        passed=diff_fast <= 2e-2,
+        passed=diff_fast <= 3e-2,
         max_diff=diff_fast,
         tolerance=3e-2,  # Relaxed for SIMD exp approximation
         pytorch_time=pytorch_time,
