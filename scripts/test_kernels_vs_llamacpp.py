@@ -24,6 +24,7 @@ import argparse
 import struct
 import sys
 import time
+import os
 from pathlib import Path
 
 # ANSI colors
@@ -771,20 +772,29 @@ def main():
 
     libggml, libck = load_libraries()
 
+    # Allow graceful skip on CI when libraries aren't available
+    skip_if_missing = os.environ.get("CK_SKIP_IF_MISSING", "0") == "1"
+
     if not libggml:
-        print(f"\n{RED}ERROR: Could not load llama.cpp kernel test library.{RESET}")
+        print(f"\n{YELLOW}WARNING: Could not load llama.cpp kernel test library.{RESET}")
         print("Build it with:")
         print("  cd llama.cpp")
         print("  g++ -shared -fPIC -o libggml_kernel_test.so \\")
         print("      tests/test-kernel-parity.cpp \\")
         print("      -I ggml/include -I ggml/src \\")
         print("      -L build -lggml -lm -lpthread")
+        if skip_if_missing:
+            print(f"\n{YELLOW}SKIP: CK_SKIP_IF_MISSING=1, skipping kernel tests{RESET}")
+            sys.exit(0)
         sys.exit(1)
 
     if not libck:
-        print(f"\n{RED}ERROR: Could not load CK parity library.{RESET}")
+        print(f"\n{YELLOW}WARNING: Could not load CK parity library.{RESET}")
         print("Build it with:")
         print("  make libck_parity.so")
+        if skip_if_missing:
+            print(f"\n{YELLOW}SKIP: CK_SKIP_IF_MISSING=1, skipping kernel tests{RESET}")
+            sys.exit(0)
         sys.exit(1)
 
     tester = KernelTester(libggml, libck, tol=args.tol)

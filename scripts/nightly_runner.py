@@ -383,8 +383,19 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
         status = "pass" if result.returncode == 0 else "fail"
         error_msg = ""
         if status == "fail":
-            error_lines = [l for l in result.stderr.splitlines() if "error" in l.lower()]
-            error_msg = "\n".join(error_lines[-5:]) if error_lines else f"Exit code {result.returncode}"
+            # Look for error indicators in both stdout and stderr
+            # Match: [ERROR], [FAIL], error, Error, failed, FAILED
+            combined = result.stdout + "\n" + result.stderr
+            error_patterns = ["error", "[fail]", "[error]", "failed", "failure"]
+            error_lines = []
+            for line in combined.splitlines():
+                line_lower = line.lower()
+                if any(pat in line_lower for pat in error_patterns):
+                    # Strip ANSI codes for cleaner output
+                    clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
+                    if clean_line and clean_line not in error_lines:
+                        error_lines.append(clean_line)
+            error_msg = "\n".join(error_lines[-10:]) if error_lines else f"Exit code {result.returncode}"
 
         sub_tests = parse_sub_tests(result.stdout)
         return TestResult(
@@ -506,8 +517,20 @@ def print_summary(results: list[TestResult], start_time: datetime):
             print(f"\n  {status_icon} {r.name} [{r.category}]")
             print(f"    Duration: {r.duration_sec:.1f}s")
             if r.error_msg:
-                for line in r.error_msg.splitlines()[:5]:
-                    print(f"    {line[:80]}")
+                print("    Error details:")
+                for line in r.error_msg.splitlines()[:10]:
+                    print(f"      {line[:100]}")
+            # For make targets, show summary section from stdout if available
+            if r.stdout and "SUMMARY" in r.stdout:
+                lines = r.stdout.splitlines()
+                for i, line in enumerate(lines):
+                    if "SUMMARY" in line:
+                        # Print summary section (up to 15 lines)
+                        print("    Test summary:")
+                        for j in range(i, min(i + 15, len(lines))):
+                            clean = re.sub(r'\x1b\[[0-9;]*m', '', lines[j]).strip()
+                            if clean:
+                                print(f"      {clean[:100]}")
 
     # Print performance regressions
     regressions = [r for r in results if r.perf_delta_pct is not None and r.perf_delta_pct < -10]

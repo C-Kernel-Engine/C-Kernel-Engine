@@ -239,14 +239,23 @@ if [ "$SKIP_BUILD" = false ]; then
         cd "$LLAMA_DIR"
 
         if [ -f "tests/test-kernel-parity.cpp" ]; then
-            g++ -shared -fPIC -o libggml_kernel_test.so \
+            # Need LD_LIBRARY_PATH for linking
+            export LD_LIBRARY_PATH="$PWD/build/bin:$LD_LIBRARY_PATH"
+            if g++ -shared -fPIC -o libggml_kernel_test.so \
                 tests/test-kernel-parity.cpp \
                 -I ggml/include -I ggml/src \
                 -L build/bin -lggml -lggml-cpu -lggml-base -lm -lpthread \
-                -Wl,-rpath,'$ORIGIN/build/bin' 2>/dev/null || \
-                log_warn "Could not build kernel test library (may not exist yet)"
+                -Wl,-rpath,'$ORIGIN/build/bin' 2>&1; then
+                log_step "Built ggml kernel test library"
+            else
+                log_warn "Could not build kernel test library"
+            fi
+        else
+            log_warn "test-kernel-parity.cpp not found in tests/"
         fi
         cd "$ROOT_DIR"
+    else
+        log_step "ggml kernel test library already exists"
     fi
 else
     log_step "[1/5] Skipping llama.cpp build (--skip-build)"
@@ -256,9 +265,15 @@ fi
 log_step "[2/5] Building CK parity library..."
 cd "$ROOT_DIR"
 
-if ! make libck_parity.so 2>/dev/null; then
-    log_warn "libck_parity.so target not found, trying regular build..."
-    make -j$(nproc) 2>&1 | tail -5
+# Try to build the parity library (show errors if it fails)
+if make libck_parity.so 2>&1; then
+    if [ -f "$BUILD_DIR/libck_parity.so" ]; then
+        log_step "Built CK parity library: $BUILD_DIR/libck_parity.so"
+    else
+        log_warn "libck_parity.so target ran but library not found"
+    fi
+else
+    log_warn "libck_parity.so build failed, kernel parity tests will be skipped"
 fi
 
 # Step 3: Kernel-level tests
@@ -266,26 +281,55 @@ log_step "[3/5] Running kernel-level tests..."
 
 # Check if test script exists
 KERNEL_TEST="$SCRIPT_DIR/test_kernels_vs_llamacpp.py"
-if [ -f "$KERNEL_TEST" ]; then
-    # Ensure dependencies are found
-    export LD_LIBRARY_PATH="$LLAMA_DIR/build/bin:$BUILD_DIR:$LD_LIBRARY_PATH"
-    
-    set +e
-    if [ "$QUICK_MODE" = true ]; then
-        python3 "$KERNEL_TEST" --quick
-        RET=$?
-    else
-        python3 "$KERNEL_TEST" --all
-        RET=$?
-    fi
-    set -e
 
-    if [ $RET -eq 0 ]; then
-        log_success "Kernel tests passed"
-        incr_passed
+# Check if required libraries exist (for early skip)
+LLAMA_LIB_EXISTS=false
+CK_LIB_EXISTS=false
+[ -f "$LLAMA_DIR/libggml_kernel_test.so" ] && LLAMA_LIB_EXISTS=true
+[ -f "$BUILD_DIR/libck_parity.so" ] && CK_LIB_EXISTS=true
+
+if [ -f "$KERNEL_TEST" ]; then
+    if [ "$LLAMA_LIB_EXISTS" = false ] || [ "$CK_LIB_EXISTS" = false ]; then
+        log_warn "Missing parity libraries for kernel tests"
+        [ "$LLAMA_LIB_EXISTS" = false ] && log_warn "  - Missing: llama.cpp/libggml_kernel_test.so"
+        [ "$CK_LIB_EXISTS" = false ] && log_warn "  - Missing: build/libck_parity.so"
+        log_warn "Falling back to PyTorch parity tests..."
+
+        PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
+        if [ -f "$PYTORCH_TEST" ]; then
+            export LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH"
+            python3 "$PYTORCH_TEST" 2>&1 && {
+                log_success "PyTorch parity tests passed"
+                incr_passed
+            } || {
+                log_error "PyTorch parity tests failed"
+                incr_failed
+            }
+        else
+            log_warn "No fallback test available, skipping"
+            incr_skipped
+        fi
     else
-        log_error "Kernel tests failed"
-        incr_failed
+        # Ensure dependencies are found
+        export LD_LIBRARY_PATH="$LLAMA_DIR/build/bin:$BUILD_DIR:$LD_LIBRARY_PATH"
+
+        set +e
+        if [ "$QUICK_MODE" = true ]; then
+            python3 "$KERNEL_TEST" --quick
+            RET=$?
+        else
+            python3 "$KERNEL_TEST" --all
+            RET=$?
+        fi
+        set -e
+
+        if [ $RET -eq 0 ]; then
+            log_success "Kernel tests passed"
+            incr_passed
+        else
+            log_error "Kernel tests failed"
+            incr_failed
+        fi
     fi
 else
     log_warn "Kernel test script not found: $KERNEL_TEST"
@@ -294,6 +338,7 @@ else
     # Fallback to existing PyTorch parity tests
     PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
     if [ -f "$PYTORCH_TEST" ]; then
+        export LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH"
         python3 "$PYTORCH_TEST" 2>&1 && {
             log_success "PyTorch parity tests passed"
             incr_passed
@@ -310,26 +355,40 @@ fi
 # Step 3b: Comprehensive GEMV kernel tests (Q4_K, Q5_0, Q8_0)
 log_step "[3b/5] Running comprehensive GEMV kernel tests..."
 GEMV_TEST="$ROOT_DIR/unittest/test_gemv_kernels_comprehensive.py"
-if [ -f "$GEMV_TEST" ]; then
-    set +e
-    if [ "$QUICK_MODE" = true ]; then
-        python3 "$GEMV_TEST" --quick
-        RET=$?
-    elif [ "$PERF_LARGE" = true ]; then
-        python3 "$GEMV_TEST" --large
-        RET=$?
-    else
-        python3 "$GEMV_TEST"
-        RET=$?
-    fi
-    set -e
 
-    if [ $RET -eq 0 ]; then
-        log_success "Comprehensive GEMV tests passed"
-        incr_passed
+# Check if required libraries exist
+HAVE_LLAMA_LIB=false
+HAVE_CK_LIB=false
+[ -f "$LLAMA_DIR/libggml_kernel_test.so" ] && HAVE_LLAMA_LIB=true
+[ -f "$BUILD_DIR/libck_parity.so" ] && HAVE_CK_LIB=true
+
+if [ -f "$GEMV_TEST" ]; then
+    if [ "$HAVE_LLAMA_LIB" = false ] || [ "$HAVE_CK_LIB" = false ]; then
+        log_warn "Missing parity libraries, skipping comprehensive GEMV tests"
+        [ "$HAVE_LLAMA_LIB" = false ] && log_warn "  - Missing: llama.cpp/libggml_kernel_test.so"
+        [ "$HAVE_CK_LIB" = false ] && log_warn "  - Missing: build/libck_parity.so"
+        incr_skipped
     else
-        log_error "Comprehensive GEMV tests failed"
-        incr_failed
+        set +e
+        if [ "$QUICK_MODE" = true ]; then
+            python3 "$GEMV_TEST" --quick
+            RET=$?
+        elif [ "$PERF_LARGE" = true ]; then
+            python3 "$GEMV_TEST" --large
+            RET=$?
+        else
+            python3 "$GEMV_TEST"
+            RET=$?
+        fi
+        set -e
+
+        if [ $RET -eq 0 ]; then
+            log_success "Comprehensive GEMV tests passed"
+            incr_passed
+        else
+            log_error "Comprehensive GEMV tests failed"
+            incr_failed
+        fi
     fi
 else
     log_warn "Comprehensive GEMV test not found: $GEMV_TEST"

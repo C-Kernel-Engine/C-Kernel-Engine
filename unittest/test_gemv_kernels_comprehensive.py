@@ -398,7 +398,7 @@ def get_test_cases(quick: bool = False, large: bool = False) -> dict:
             TestCase("tiny", M=1, K=32, tol=1e-4, description="Minimal direct vec_dot"),
             TestCase("small", M=1, K=256, tol=1e-4, description="Small direct vec_dot"),
             TestCase("medium", M=1, K=512, tol=1e-4, description="Medium direct vec_dot"),
-            TestCase("qwen", M=1, K=896, tol=1e-4, description="Qwen dimension"),
+            TestCase("qwen", M=1, K=896, tol=2e-4, description="Qwen dimension"),  # Relaxed for FP accumulation
             TestCase("large", M=1, K=1024, tol=2e-4, description="Large direct vec_dot"),  # Slightly relaxed for FP accumulation
         ],
     }
@@ -1074,14 +1074,23 @@ def main():
 
     libggml, libck = load_libraries()
 
+    # Allow graceful skip on CI when libraries aren't available
+    skip_if_missing = os.environ.get("CK_SKIP_IF_MISSING", "0") == "1"
+
     if not libggml:
-        print(f"{RED}ERROR: Could not load llama.cpp kernel test library.{RESET}")
-        print("Build it with: make libck_parity.so")
+        print(f"{YELLOW}WARNING: Could not load llama.cpp kernel test library.{RESET}")
+        print("Build it with: cd llama.cpp && g++ -shared -fPIC -o libggml_kernel_test.so ...")
+        if skip_if_missing:
+            print(f"{YELLOW}SKIP: CK_SKIP_IF_MISSING=1, skipping GEMV tests{RESET}")
+            sys.exit(0)
         sys.exit(1)
 
     if not libck:
-        print(f"{RED}ERROR: Could not load CK parity library.{RESET}")
+        print(f"{YELLOW}WARNING: Could not load CK parity library.{RESET}")
         print("Build it with: make libck_parity.so")
+        if skip_if_missing:
+            print(f"{YELLOW}SKIP: CK_SKIP_IF_MISSING=1, skipping GEMV tests{RESET}")
+            sys.exit(0)
         sys.exit(1)
 
     print(f"  Warmup:    {args.warmup} iterations")

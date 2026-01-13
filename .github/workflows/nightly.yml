@@ -91,6 +91,8 @@ jobs:
           make clean || true
           make -j$(nproc)
           make test-libs
+          # Build parity library for kernel testing
+          make libck_parity.so || echo "libck_parity.so build failed (will fall back to PyTorch tests)"
           echo ""
           echo "=== Built libraries ==="
           ls -la build/*.so 2>/dev/null || echo "No .so files in build/"
@@ -138,19 +140,26 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
-          # Build kernel test library
+          # Build kernel test library for parity testing
           if [ -f "tests/test-kernel-parity.cpp" ]; then
             echo "Building ggml kernel test library..."
+            # Need LD_LIBRARY_PATH for linking
+            export LD_LIBRARY_PATH="$PWD/build/bin:$LD_LIBRARY_PATH"
             g++ -shared -fPIC -o libggml_kernel_test.so \
               tests/test-kernel-parity.cpp \
               -I ggml/include -I ggml/src \
               -L build/bin -lggml -lggml-cpu -lggml-base -lm -lpthread \
-              -Wl,-rpath,'$ORIGIN/build/bin' 2>/dev/null || echo "Kernel test lib build failed (optional)"
+              -Wl,-rpath,'$ORIGIN/build/bin' && \
+              echo "Successfully built libggml_kernel_test.so" || \
+              echo "WARNING: Kernel test lib build failed (parity tests will skip)"
+          else
+            echo "WARNING: test-kernel-parity.cpp not found in tests/"
           fi
 
           cd ..
           echo "=== llama.cpp setup complete ==="
           ls -la llama.cpp/build/bin/llama-cli 2>/dev/null || echo "llama-cli not found"
+          ls -la llama.cpp/libggml_kernel_test.so 2>/dev/null || echo "libggml_kernel_test.so not built"
 
       - name: Download Q4_K GGUF for parity testing
         if: github.event_name != 'pull_request'
