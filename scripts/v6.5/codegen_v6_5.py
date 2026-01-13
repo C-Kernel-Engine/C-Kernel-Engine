@@ -83,6 +83,302 @@ DTYPE_TO_GEMM_NT_Q8_KERNEL = {
 }
 
 
+# =============================================================================
+# QUANT FORMAT REGISTRY - Central definition for all quantization formats
+# =============================================================================
+# To add a new format (e.g., "chicakca_59"):
+#   1. Add entry to QUANT_FORMAT_REGISTRY with block_size and bytes_per_block
+#   2. Add kernel mappings to DTYPE_TO_* dicts above
+#   3. Implement the kernel in src/kernels/
+#   4. Codegen will automatically validate dimensions
+# =============================================================================
+
+QUANT_FORMAT_REGISTRY = {
+    # Format: { block_size, bytes_per_block, description }
+    "q4_0": {
+        "block_size": 32,
+        "bytes_per_block": 18,  # 16 packed nibbles + 2 byte FP16 scale
+        "description": "4-bit quantization, 32 weights/block",
+    },
+    "q4_1": {
+        "block_size": 32,
+        "bytes_per_block": 20,  # 16 packed + 2 scale + 2 min
+        "description": "4-bit quantization with min, 32 weights/block",
+    },
+    "q5_0": {
+        "block_size": 32,
+        "bytes_per_block": 22,  # 16 packed + 4 high bits + 2 scale
+        "description": "5-bit quantization, 32 weights/block",
+    },
+    "q5_1": {
+        "block_size": 32,
+        "bytes_per_block": 24,  # 16 packed + 4 high bits + 2 scale + 2 min
+        "description": "5-bit quantization with min, 32 weights/block",
+    },
+    "q8_0": {
+        "block_size": 32,
+        "bytes_per_block": 34,  # 32 int8 + 2 byte FP16 scale
+        "description": "8-bit quantization, 32 weights/block",
+    },
+    "q4_k": {
+        "block_size": 256,
+        "bytes_per_block": 144,  # K-quant 4-bit with nested scales
+        "description": "K-quant 4-bit, 256 weights/super-block",
+    },
+    "q6_k": {
+        "block_size": 256,
+        "bytes_per_block": 210,  # K-quant 6-bit
+        "description": "K-quant 6-bit, 256 weights/super-block",
+    },
+    "q8_k": {
+        "block_size": 256,
+        "bytes_per_block": 292,  # 256 int8 + 4 byte FP32 scale + 32 byte bsums
+        "description": "K-quant 8-bit (activations), 256 weights/super-block",
+    },
+    "fp32": {
+        "block_size": 1,
+        "bytes_per_block": 4,
+        "description": "32-bit floating point",
+    },
+    "fp16": {
+        "block_size": 1,
+        "bytes_per_block": 2,
+        "description": "16-bit floating point",
+    },
+    # === ADD NEW FORMATS HERE ===
+    # "chicakca_59": {
+    #     "block_size": 59,
+    #     "bytes_per_block": ???,
+    #     "description": "Hypothetical new format",
+    # },
+}
+
+# Valid kernel combinations: (weight_dtype, activation_dtype) -> kernel_info
+# This defines what input types each kernel accepts
+VALID_KERNEL_COMBINATIONS = {
+    # GEMV (single token decode)
+    ("q5_0", "fp32"): {"kernel": "gemv_q5_0", "mode": "decode"},
+    ("q5_0", "q8_0"): {"kernel": "gemv_q5_0_q8_0", "mode": "decode", "int8": True},
+    ("q8_0", "fp32"): {"kernel": "gemv_q8_0", "mode": "decode"},
+    ("q8_0", "q8_0"): {"kernel": "gemv_q8_0_q8_0", "mode": "decode", "int8": True},
+    ("q4_k", "fp32"): {"kernel": "gemv_q4_k", "mode": "decode"},
+    ("q4_k", "q8_k"): {"kernel": "gemv_q4_k_q8_k", "mode": "decode", "int8": True},
+    ("q6_k", "fp32"): {"kernel": "gemv_q6_k", "mode": "decode"},
+    ("q4_0", "fp32"): {"kernel": "gemv_q4_0", "mode": "decode"},
+    ("q4_1", "fp32"): {"kernel": "gemv_q4_1", "mode": "decode"},
+    ("q5_1", "fp32"): {"kernel": "gemv_q5_1", "mode": "decode"},
+    ("fp32", "fp32"): {"kernel": "gemv_fp32", "mode": "decode"},
+
+    # GEMM NT (batch prefill)
+    ("q5_0", "fp32", "batch"): {"kernel": "gemm_nt_q5_0", "mode": "prefill"},
+    ("q5_0", "q8_0", "batch"): {"kernel": "gemm_nt_q5_0_q8_0", "mode": "prefill", "int8": True},
+    ("q8_0", "fp32", "batch"): {"kernel": "gemm_nt_q8_0", "mode": "prefill"},
+    ("q4_k", "fp32", "batch"): {"kernel": "gemm_nt_q4_k", "mode": "prefill"},
+    ("q6_k", "fp32", "batch"): {"kernel": "gemm_nt_q6_k", "mode": "prefill"},
+    ("q4_0", "fp32", "batch"): {"kernel": "gemm_nt_q4_0", "mode": "prefill"},
+    ("q4_1", "fp32", "batch"): {"kernel": "gemm_nt_q4_1", "mode": "prefill"},
+    ("q5_1", "fp32", "batch"): {"kernel": "gemm_nt_q5_1", "mode": "prefill"},
+    ("fp32", "fp32", "batch"): {"kernel": "gemm_blocked_serial", "mode": "prefill"},
+
+    # === ADD NEW COMBINATIONS HERE ===
+    # ("q5_0", "q4_0"): {"kernel": "gemv_q5_0_q4_0", "mode": "decode", "int8": True},
+    # ("q5_0", "q5_0"): {"kernel": "gemv_q5_0_q5_0", "mode": "decode", "int8": True},
+}
+
+
+class KernelValidator:
+    """Validates kernel dimensions and buffer sizes during codegen."""
+
+    def __init__(self, model_name: str = "unknown"):
+        self.model_name = model_name
+        self.errors = []
+        self.warnings = []
+        self.validations = []
+
+    def get_format_info(self, dtype: str) -> dict:
+        """Get format info, with fallback for unknown types."""
+        dtype = dtype.lower()
+        if dtype in QUANT_FORMAT_REGISTRY:
+            return QUANT_FORMAT_REGISTRY[dtype]
+        # Warn about unknown format
+        self.warnings.append(f"Unknown quant format '{dtype}', assuming fp32")
+        return QUANT_FORMAT_REGISTRY["fp32"]
+
+    def calc_weight_bytes(self, dtype: str, num_elements: int) -> int:
+        """Calculate actual byte size for quantized weights."""
+        info = self.get_format_info(dtype)
+        block_size = info["block_size"]
+        bytes_per_block = info["bytes_per_block"]
+        num_blocks = num_elements // block_size
+        return num_blocks * bytes_per_block
+
+    def calc_activation_bytes(self, dtype: str, num_elements: int) -> int:
+        """Calculate byte size for quantized activations (scratch buffer)."""
+        return self.calc_weight_bytes(dtype, num_elements)
+
+    def validate_alignment(self, name: str, dtype: str, dim: int, dim_name: str = "K") -> bool:
+        """Validate dimension is aligned to block size."""
+        info = self.get_format_info(dtype)
+        block_size = info["block_size"]
+
+        if dim % block_size != 0:
+            self.errors.append(
+                f"{name}: {dim_name}={dim} not aligned to {dtype.upper()} block_size={block_size}"
+            )
+            return False
+
+        self.validations.append(
+            f"{name}: {dim_name}={dim} aligned to {dtype.upper()} block={block_size} ✓"
+        )
+        return True
+
+    def validate_kernel_call(
+        self,
+        kernel_name: str,
+        weight_dtype: str,
+        activation_dtype: str,
+        M: int,  # batch/tokens
+        N: int,  # output dim
+        K: int,  # input dim (must align to weight block)
+        layer_id: int = -1,
+        is_batch: bool = False,
+    ) -> bool:
+        """Validate a kernel call has correct dimensions."""
+
+        prefix = f"Layer {layer_id}" if layer_id >= 0 else "Global"
+        valid = True
+
+        # 1. Check weight dimension alignment
+        if not self.validate_alignment(f"{prefix} {kernel_name}", weight_dtype, K, "K"):
+            valid = False
+
+        # 2. Check N alignment for output weights
+        weight_info = self.get_format_info(weight_dtype)
+        if N % weight_info["block_size"] != 0:
+            # N doesn't need to align for all formats, just warn
+            self.warnings.append(
+                f"{prefix} {kernel_name}: N={N} not aligned to {weight_dtype.upper()} block={weight_info['block_size']}"
+            )
+
+        # 3. Check activation format compatibility
+        if activation_dtype != "fp32":
+            act_info = self.get_format_info(activation_dtype)
+            if K % act_info["block_size"] != 0:
+                self.errors.append(
+                    f"{prefix} {kernel_name}: K={K} not aligned to activation {activation_dtype.upper()} block={act_info['block_size']}"
+                )
+                valid = False
+
+        # 4. Check kernel combination is valid
+        combo_key = (weight_dtype, activation_dtype, "batch") if is_batch else (weight_dtype, activation_dtype)
+        if combo_key not in VALID_KERNEL_COMBINATIONS:
+            # Try without batch flag
+            combo_key_simple = (weight_dtype, activation_dtype)
+            if combo_key_simple not in VALID_KERNEL_COMBINATIONS:
+                self.warnings.append(
+                    f"{prefix}: Kernel combo ({weight_dtype} x {activation_dtype}) not in registry"
+                )
+
+        # 5. Calculate and log expected byte sizes
+        weight_bytes = self.calc_weight_bytes(weight_dtype, N * K)
+        self.validations.append(
+            f"{prefix} {kernel_name}: weights {N}x{K} {weight_dtype.upper()} = {weight_bytes:,} bytes"
+        )
+
+        if activation_dtype != "fp32" and is_batch:
+            act_bytes_per_row = self.calc_activation_bytes(activation_dtype, K)
+            total_act_bytes = M * act_bytes_per_row if M > 0 else act_bytes_per_row
+            self.validations.append(
+                f"{prefix} {kernel_name}: activation scratch {M}x{K} {activation_dtype.upper()} = {total_act_bytes:,} bytes"
+            )
+
+        return valid
+
+    def validate_scratch_buffer(
+        self,
+        buffer_name: str,
+        dtype: str,
+        num_tokens: int,
+        embed_dim: int,
+    ) -> bool:
+        """Validate scratch buffer size calculation."""
+
+        info = self.get_format_info(dtype)
+        block_size = info["block_size"]
+        bytes_per_block = info["bytes_per_block"]
+
+        # Correct calculation: (embed_dim / block_size) * bytes_per_block
+        blocks_per_row = embed_dim // block_size
+        row_bytes = blocks_per_row * bytes_per_block
+        total_bytes = num_tokens * row_bytes if num_tokens > 0 else row_bytes
+
+        self.validations.append(
+            f"{buffer_name}: {num_tokens}x{embed_dim} {dtype.upper()} = "
+            f"{blocks_per_row} blocks/row × {bytes_per_block} bytes = {row_bytes} bytes/row"
+        )
+
+        # Validate alignment
+        if embed_dim % block_size != 0:
+            self.errors.append(
+                f"{buffer_name}: embed_dim={embed_dim} not aligned to {dtype.upper()} block={block_size}"
+            )
+            return False
+
+        return True
+
+    def print_report(self, verbose: bool = True):
+        """Print validation report."""
+        print(f"\n[CODEGEN VALIDATION] {self.model_name}")
+        print("=" * 70)
+
+        if verbose and self.validations:
+            print(f"  Checks performed: {len(self.validations)}")
+            for v in self.validations[:10]:  # First 10
+                print(f"    ✓ {v}")
+            if len(self.validations) > 10:
+                print(f"    ... and {len(self.validations) - 10} more")
+
+        if self.warnings:
+            print(f"\n  Warnings: {len(self.warnings)}")
+            for w in self.warnings:
+                print(f"    ⚠ {w}")
+
+        if self.errors:
+            print(f"\n  ERRORS: {len(self.errors)}")
+            for e in self.errors:
+                print(f"    ✗ {e}")
+            print("=" * 70)
+            return False
+
+        print(f"\n  ✓ All {len(self.validations)} validations passed")
+        print("=" * 70)
+        return True
+
+    def assert_valid(self):
+        """Raise exception if validation errors exist."""
+        if self.errors:
+            self.print_report(verbose=True)
+            raise ValueError(f"Codegen validation failed with {len(self.errors)} errors")
+
+
+# Global validator instance (set during codegen)
+_VALIDATOR: Optional[KernelValidator] = None
+
+
+def get_validator() -> KernelValidator:
+    """Get or create global validator."""
+    global _VALIDATOR
+    if _VALIDATOR is None:
+        _VALIDATOR = KernelValidator()
+    return _VALIDATOR
+
+
+def set_validator(validator: KernelValidator):
+    """Set global validator."""
+    global _VALIDATOR
+    _VALIDATOR = validator
+
+
 def get_quant_type(dtype: str) -> str:
     """Return normalized quant type string (e.g., 'q5_0', 'q4_k', 'fp32')."""
     dtype = dtype.lower()
@@ -244,6 +540,12 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             raise ValueError(f"Layout/manifest dtype mismatch: {len(validation_errors)} errors. Fix conversion or regenerate IR.")
         print(f"[CODEGEN] ✓ Layout matches manifest ({len(weights_manifest.get('entries', []))} entries)")
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Kernel dimension validation - catch alignment/size bugs before runtime
+    # ═══════════════════════════════════════════════════════════════════════════
+    validator = KernelValidator(model_name=layout.name)
+    set_validator(validator)
+
     config = layout.config
     section = layout.sections[0]
 
@@ -317,6 +619,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
     aligned_head = int(config.get("aligned_head") or 0)
     aligned_intermediate = int(config.get("aligned_intermediate") or 0)
     aligned_context = int(config.get("aligned_context") or 0)
+
+    # Get raw dimensions for validation
+    embed_dim = config.get("hidden_size", 0)
+    head_dim = config.get("head_dim", 64)
+    intermediate_dim = config.get("intermediate_size", 0)
+    num_heads = config.get("num_attention_heads", 1)
+    num_kv_heads = config.get("num_key_value_heads", num_heads)
+
+    # Use aligned dimensions for kernel validation (kernels receive aligned dims)
+    val_embed = aligned_embed if aligned_embed > 0 else embed_dim
+    val_head = aligned_head if aligned_head > 0 else head_dim
+    val_intermediate = aligned_intermediate if aligned_intermediate > 0 else intermediate_dim
 
     def aligned_expr(value: int, fallback: str) -> str:
         return str(value) if value > 0 else fallback
@@ -666,6 +980,68 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             wo_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(wo_dt)
             w1_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(w1_dt)
             w2_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(w2_dt)
+
+            # ═══════════════════════════════════════════════════════════════════
+            # KERNEL DIMENSION VALIDATION - Catch bugs at codegen time
+            # ═══════════════════════════════════════════════════════════════════
+            if val_embed > 0:
+                # QKV projections: [num_heads * head_dim, embed_dim] weights
+                qkv_N = num_heads * val_head  # output dim
+                qkv_K = val_embed             # input dim (must align to weight block)
+
+                # Validate WQ kernel
+                act_dtype = "q8_0" if wq_int8_batch else "fp32"
+                validator.validate_kernel_call(
+                    wq_kernel, wq_dt, act_dtype,
+                    M=0, N=qkv_N, K=qkv_K,
+                    layer_id=layer_id, is_batch=True
+                )
+
+                # Validate WK kernel (may have different number of heads)
+                kv_N = num_kv_heads * val_head
+                act_dtype = "q8_0" if wk_int8_batch else "fp32"
+                validator.validate_kernel_call(
+                    wk_kernel, wk_dt, act_dtype,
+                    M=0, N=kv_N, K=qkv_K,
+                    layer_id=layer_id, is_batch=True
+                )
+
+                # Validate WV kernel
+                act_dtype = "q8_0" if wv_int8_batch else "fp32"
+                validator.validate_kernel_call(
+                    wv_kernel, wv_dt, act_dtype,
+                    M=0, N=kv_N, K=qkv_K,
+                    layer_id=layer_id, is_batch=True
+                )
+
+                # Validate WO kernel: [embed_dim, num_heads * head_dim]
+                validator.validate_kernel_call(
+                    wo_kernel, wo_dt, "fp32",
+                    M=0, N=val_embed, K=qkv_N,
+                    layer_id=layer_id, is_batch=True
+                )
+
+                # Validate INT8 scratch buffer if used
+                if wq_int8_batch or wk_int8_batch or wv_int8_batch:
+                    validator.validate_scratch_buffer(
+                        f"Layer {layer_id} ln1_q8", "q8_0",
+                        num_tokens=0, embed_dim=val_embed
+                    )
+
+            if val_intermediate > 0 and val_embed > 0:
+                # MLP W1: [2 * intermediate, embed_dim] (gate + up fused)
+                validator.validate_kernel_call(
+                    w1_kernel, w1_dt, "fp32",
+                    M=0, N=2 * val_intermediate, K=val_embed,
+                    layer_id=layer_id, is_batch=True
+                )
+
+                # MLP W2: [embed_dim, intermediate]
+                validator.validate_kernel_call(
+                    w2_kernel, w2_dt, "fp32",
+                    M=0, N=val_embed, K=val_intermediate,
+                    layer_id=layer_id, is_batch=True
+                )
 
             add("/*")
             add(f" * Layer {layer_id}: wq={wq_dt} wk={wk_dt} wv={wv_dt} wo={wo_dt} w1={w1_dt} w2={w2_dt}")
@@ -1631,6 +2007,12 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
     print(f"[v6.c] Written: {output_path}")
     print(f"[v6.c] Mode: {mode}, Layers: {num_layers} (explicit unrolled)")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Kernel validation report - fail fast if dimension bugs detected
+    # ═══════════════════════════════════════════════════════════════════════════
+    validator.print_report(verbose=False)
+    validator.assert_valid()
 
 
 if __name__ == "__main__":
