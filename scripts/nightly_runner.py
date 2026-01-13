@@ -187,7 +187,9 @@ TEST_SUITES = {
     "optimizer": TestSuite("Optimizer (AdamW/SGD)", "training", UNITTEST_DIR / "test_optimizer.py"),
     "lm_head_litmus": TestSuite("LM Head Litmus", "kernels", UNITTEST_DIR / "test_lm_head_litmus.py"),
     "vision": TestSuite("Vision", "kernels", UNITTEST_DIR / "test_vision.py"),
-    "orchestration": TestSuite("Orchestration", "kernels", UNITTEST_DIR / "test_orchestration_layer.py"),
+    # NOTE: Orchestration test disabled - v6.5 uses generated code with local helpers,
+    # not orchestration layer. Use llamacpp-parity-full for quantized kernel validation.
+    # "orchestration": TestSuite("Orchestration", "kernels", UNITTEST_DIR / "test_orchestration_layer.py"),
 
     # BF16 tests
     "relu_bf16": TestSuite("ReLU BF16", "bf16", BF16_DIR / "test_relu_bf16.py"),
@@ -225,12 +227,14 @@ MAKE_TARGETS = {
         "target": "litmus",
         "timeout_sec": 180,
     },
-    "layer_parity": {
-        "name": "Layer Parity",
-        "category": "parity",
-        "target": "layer-parity",
-        "timeout_sec": 300,
-    },
+    # NOTE: Layer parity disabled - v6.5 uses generated code, not orchestration layer.
+    # Use llamacpp-parity-full for quantized kernel validation.
+    # "layer_parity": {
+    #     "name": "Layer Parity",
+    #     "category": "parity",
+    #     "target": "layer-parity",
+    #     "timeout_sec": 300,
+    # },
     # TODO: Re-enable in v7 when training pipeline is updated
     # "smollm_parity": {
     #     "name": "SmolLM Train Parity",
