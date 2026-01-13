@@ -141,8 +141,27 @@ void ck_test_gemv_q5_0(const void *weight_q5_0,
                        float *output,
                        int rows, int cols)
 {
-    /* Call the Q5_0 GEMV kernel directly */
-    gemv_q5_0(output, weight_q5_0, input_f32, rows, cols);
+    /* Match llama.cpp's test_gemv_q5_0:
+     * 1. Quantize input to Q8_0 format
+     * 2. Use quantized dot product (vec_dot_q5_0_q8_0)
+     *
+     * This ensures parity with llama.cpp which always uses the
+     * quantized path, NOT the FP32 dequantization path.
+     */
+    int n_blocks = cols / CK_QK8_0;
+    block_q8_0 *q8_data = (block_q8_0 *)malloc(n_blocks * sizeof(block_q8_0));
+    if (!q8_data) {
+        for (int r = 0; r < rows; r++) output[r] = 0.0f;
+        return;
+    }
+
+    /* Quantize input to Q8_0 */
+    quantize_row_q8_0(input_f32, q8_data, cols);
+
+    /* Call the quantized GEMV kernel (same as ck_test_gemv_q5_0_q8_0) */
+    gemv_q5_0_q8_0(output, weight_q5_0, q8_data, rows, cols);
+
+    free(q8_data);
 }
 
 void ck_test_gemv_q8_0(const void *weight_q8_0,
@@ -150,8 +169,27 @@ void ck_test_gemv_q8_0(const void *weight_q8_0,
                        float *output,
                        int rows, int cols)
 {
-    /* Call the Q8_0 GEMV kernel directly */
-    gemv_q8_0(output, weight_q8_0, input_f32, rows, cols);
+    /* Match llama.cpp's test_gemv_q8_0:
+     * 1. Quantize input to Q8_0 format
+     * 2. Use quantized dot product (vec_dot_q8_0_q8_0)
+     *
+     * This ensures parity with llama.cpp which always uses the
+     * quantized path, NOT the FP32 dequantization path.
+     */
+    int n_blocks = cols / CK_QK8_0;
+    block_q8_0 *q8_data = (block_q8_0 *)malloc(n_blocks * sizeof(block_q8_0));
+    if (!q8_data) {
+        for (int r = 0; r < rows; r++) output[r] = 0.0f;
+        return;
+    }
+
+    /* Quantize input to Q8_0 */
+    quantize_row_q8_0(input_f32, q8_data, cols);
+
+    /* Call the quantized GEMV kernel (same as ck_test_gemv_q8_0_q8_0) */
+    gemv_q8_0_q8_0(output, weight_q8_0, q8_data, rows, cols);
+
+    free(q8_data);
 }
 
 void ck_test_gemv_q5_0_q8_0(const void *weight_q5_0,

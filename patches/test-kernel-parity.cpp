@@ -252,6 +252,48 @@ void test_gemv_q8_0_fp32(const void * weight_q8_0,
 }
 
 // ============================================================================
+// Direct Vec Dot Tests (Pre-quantized Q8_0 inputs)
+// These test pure kernel accuracy by using the same pre-quantized input
+// for both CK and llama.cpp, bypassing quantization differences.
+// ============================================================================
+
+/**
+ * Test Q5_0 x Q8_0 vec_dot with pre-quantized Q8_0 input
+ *
+ * @param weight_q5_0  Q5_0 quantized weights [cols]
+ * @param input_q8_0   Q8_0 quantized input [cols] (pre-quantized)
+ * @param output       Output scalar [1]
+ * @param cols         Number of columns (must be multiple of QK8_0=32)
+ */
+void test_vec_dot_q5_0_q8_0(const void * weight_q5_0,
+                             const void * input_q8_0,
+                             float * output,
+                             int cols) {
+    *output = 0.0f;
+    ggml_vec_dot_q5_0_q8_0(cols, output, sizeof(float),
+                           weight_q5_0, sizeof(block_q5_0),
+                           input_q8_0, sizeof(block_q8_0), 1);
+}
+
+/**
+ * Test Q8_0 x Q8_0 vec_dot with pre-quantized Q8_0 input
+ *
+ * @param weight_q8_0  Q8_0 quantized weights [cols]
+ * @param input_q8_0   Q8_0 quantized input [cols] (pre-quantized)
+ * @param output       Output scalar [1]
+ * @param cols         Number of columns (must be multiple of QK8_0=32)
+ */
+void test_vec_dot_q8_0_q8_0(const void * weight_q8_0,
+                             const void * input_q8_0,
+                             float * output,
+                             int cols) {
+    *output = 0.0f;
+    ggml_vec_dot_q8_0_q8_0(cols, output, sizeof(float),
+                           weight_q8_0, sizeof(block_q8_0),
+                           input_q8_0, sizeof(block_q8_0), 1);
+}
+
+// ============================================================================
 // GEMM (Matrix-Matrix) Tests
 // ============================================================================
 
