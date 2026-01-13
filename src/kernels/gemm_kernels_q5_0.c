@@ -664,7 +664,7 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
     const block_q5_0 *x = (const block_q5_0 *)vx;
     const block_q8_0 *y = (const block_q8_0 *)vy;
 
-    __m512 acc = _mm512_setzero_ps();
+    float sumf = 0.0f;
 
     for (int ib = 0; ib < nb; ib++) {
         const float d = CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d);
@@ -731,11 +731,11 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
         /* Sum all products */
         int sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));
 
-        /* Scale and accumulate */
-        acc = _mm512_add_ps(acc, _mm512_set1_ps(d * (float)sumi));
+        /* Scale and accumulate - use scalar to avoid 16x broadcast bug */
+        sumf += d * (float)sumi;
     }
 
-    *s = _mm512_reduce_add_ps(acc);
+    *s = sumf;
 }
 #endif
 
