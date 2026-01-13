@@ -154,17 +154,18 @@ void gemv_q5_0_avx512(float *y,
             );
 
             /* Build high bit contribution for second 16 weights (indices 16-31)
-             * Scalar code: xh_1 = ((qh >> (j + 12))) & 0x10 extracts bit (j+12)
-             * So weights 16-31 use qh bits 12-27, NOT 16-31 */
+             * Scalar code: xh_1 = ((qh >> (j + 12))) & 0x10 extracts bit (j+16)
+             * (since 0x10 = bit 4, position is j+12+4 = j+16)
+             * So weights 16-31 use qh bits 16-31 */
             __m512i qh_hi = _mm512_set_epi32(
+                ((qh >> 31) & 1) << 4, ((qh >> 30) & 1) << 4,
+                ((qh >> 29) & 1) << 4, ((qh >> 28) & 1) << 4,
                 ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
                 ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
                 ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
                 ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
                 ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
-                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
-                ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
-                ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
+                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4
             );
 
             /* Combine low + high bits and subtract offset */
@@ -707,16 +708,16 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
         __m512i hi_nibbles = _mm512_cvtepu8_epi32(qs);
         hi_nibbles = _mm512_srli_epi32(hi_nibbles, 4);
 
-        /* Build high bit contribution for second 16 weights (uses bits 12-27) */
+        /* Build high bit contribution for second 16 weights (bits 16-31) */
         __m512i qh_hi = _mm512_set_epi32(
+            ((qh >> 31) & 1) << 4, ((qh >> 30) & 1) << 4,
+            ((qh >> 29) & 1) << 4, ((qh >> 28) & 1) << 4,
             ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
             ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
             ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
             ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
             ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
-            ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
-            ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
-            ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
+            ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4
         );
 
         __m512i q5_hi = _mm512_sub_epi32(_mm512_or_epi32(hi_nibbles, qh_hi),
