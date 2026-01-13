@@ -79,7 +79,9 @@ DTYPE_TO_GEMV_Q8_KERNEL = {
 # Uses proj_scratch buffer (pre-allocated, unused during QKV projection) as Q8 scratch
 DTYPE_TO_GEMM_NT_Q8_KERNEL = {
     "q5_0": ("gemm_nt_q5_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q5_0 weights x Q8_0 activations (batch)
-    # Add more as kernels become available
+    "q8_0": ("gemm_nt_q8_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q8_0 weights x Q8_0 activations (batch)
+    "q4_k": ("gemm_nt_q4_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q4_K weights x Q8_K activations (batch)
+    # Q6_K: No INT8 batch kernel yet - falls back to FP32
 }
 
 
@@ -1308,7 +1310,25 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("        proj_in = proj_scratch;")
             add("    }")
 
-            add(f"    {wo_kernel}(proj_in, WO, BO, proj_tmp, num_tokens, aligned_embed_dim, K);")
+            # Output projection: WO - use INT8 if available
+            if wo_int8_batch:
+                wo_gemm, wo_act_dt, wo_quant_fn = wo_int8_batch
+                add(f"    /* Output projection: {wo_dt.upper()} x {wo_act_dt.upper()} -> {wo_gemm} (INT8 batch) */")
+                add("    {")
+                if wo_act_dt == "q8_0":
+                    add("        const size_t wo_q8_row_bytes = (K / 32) * sizeof(block_q8_0);")
+                else:  # q8_k
+                    add("        const size_t wo_q8_row_bytes = (K / 256) * sizeof(block_q8_K);")
+                # Use fc1_out as scratch - it's not used until after WO completes
+                add("        uint8_t *proj_q8 = (uint8_t *)fc1_out;")
+                add("        for (int t = 0; t < num_tokens; ++t) {")
+                add(f"            {wo_quant_fn}(proj_in + (size_t)t * (size_t)K, proj_q8 + (size_t)t * wo_q8_row_bytes, K);")
+                add("        }")
+                add(f"        {wo_gemm}(proj_q8, WO, BO, proj_tmp, num_tokens, aligned_embed_dim, K);")
+                add("    }")
+            else:
+                add(f"    /* Output projection: {wo_dt.upper()} (FP32) */")
+                add(f"    {wo_kernel}(proj_in, WO, BO, proj_tmp, num_tokens, aligned_embed_dim, K);")
             add()
 
             add("    /* Residual add */")

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "cpu_features.h"
+#include "ckernel_quant.h"  /* INT8 block types (block_q8_0, block_q8_K, etc.) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,6 +171,12 @@ void gemm_q4_k_q8_k(float *Y,
                     int M, int N, int K);
 
 void gemm_nt_q4_k_q8_k(const void *A_q8,
+                       const void *B,
+                       const float *bias,
+                       float *C,
+                       int M, int N, int K);
+
+void gemm_nt_q8_0_q8_0(const void *A_q8,
                        const void *B,
                        const float *bias,
                        float *C,
