@@ -845,32 +845,32 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01083">1083</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l01091"></a><span class="lineno"> 1091</span>&#160;{</div>
-<div class="line"><a name="l01092"></a><span class="lineno"> 1092</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *weights = (<span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *)B_q5;</div>
-<div class="line"><a name="l01093"></a><span class="lineno"> 1093</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *inputs = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)A_q8;</div>
-<div class="line"><a name="l01094"></a><span class="lineno"> 1094</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;  <span class="comment">/* QK5_0 == QK8_0 == 32 */</span></div>
-<div class="line"><a name="l01095"></a><span class="lineno"> 1095</span>&#160; </div>
-<div class="line"><a name="l01096"></a><span class="lineno"> 1096</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><a name="l01097"></a><span class="lineno"> 1097</span>&#160;        <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *input_row = &amp;inputs[m * blocks_per_row];</div>
-<div class="line"><a name="l01098"></a><span class="lineno"> 1098</span>&#160; </div>
-<div class="line"><a name="l01099"></a><span class="lineno"> 1099</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a name="l01100"></a><span class="lineno"> 1100</span>&#160;            <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *weight_row = &amp;weights[n * blocks_per_row];</div>
-<div class="line"><a name="l01101"></a><span class="lineno"> 1101</span>&#160;            <span class="keywordtype">float</span> *out = &amp;<a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n];</div>
-<div class="line"><a name="l01102"></a><span class="lineno"> 1102</span>&#160; </div>
-<div class="line"><a name="l01103"></a><span class="lineno"> 1103</span>&#160;            <span class="comment">/* Use portable dispatch (selects AVX512/AVX/SSE/scalar) */</span></div>
-<div class="line"><a name="l01104"></a><span class="lineno"> 1104</span>&#160;            <a class="code" href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, out, weight_row, input_row);</div>
-<div class="line"><a name="l01105"></a><span class="lineno"> 1105</span>&#160; </div>
-<div class="line"><a name="l01106"></a><span class="lineno"> 1106</span>&#160;            <span class="keywordflow">if</span> (bias) {</div>
-<div class="line"><a name="l01107"></a><span class="lineno"> 1107</span>&#160;                *out += bias[n];</div>
-<div class="line"><a name="l01108"></a><span class="lineno"> 1108</span>&#160;            }</div>
-<div class="line"><a name="l01109"></a><span class="lineno"> 1109</span>&#160;        }</div>
-<div class="line"><a name="l01110"></a><span class="lineno"> 1110</span>&#160;    }</div>
-<div class="line"><a name="l01111"></a><span class="lineno"> 1111</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__q5__0_8c_html_a8744a3b1e4d1dc928fce050f111414a6"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a></div><div class="ttdeci">void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Auto-dispatch quantized dot product Q5_0 x Q8_0.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l01017">gemm_kernels_q5_0.c:1017</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01084">1084</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l01092"></a><span class="lineno"> 1092</span>&#160;{</div>
+<div class="line"><a name="l01093"></a><span class="lineno"> 1093</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *weights = (<span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *)B_q5;</div>
+<div class="line"><a name="l01094"></a><span class="lineno"> 1094</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *inputs = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)A_q8;</div>
+<div class="line"><a name="l01095"></a><span class="lineno"> 1095</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;  <span class="comment">/* QK5_0 == QK8_0 == 32 */</span></div>
+<div class="line"><a name="l01096"></a><span class="lineno"> 1096</span>&#160; </div>
+<div class="line"><a name="l01097"></a><span class="lineno"> 1097</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><a name="l01098"></a><span class="lineno"> 1098</span>&#160;        <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *input_row = &amp;inputs[m * blocks_per_row];</div>
+<div class="line"><a name="l01099"></a><span class="lineno"> 1099</span>&#160; </div>
+<div class="line"><a name="l01100"></a><span class="lineno"> 1100</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a name="l01101"></a><span class="lineno"> 1101</span>&#160;            <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *weight_row = &amp;weights[n * blocks_per_row];</div>
+<div class="line"><a name="l01102"></a><span class="lineno"> 1102</span>&#160;            <span class="keywordtype">float</span> *out = &amp;<a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n];</div>
+<div class="line"><a name="l01103"></a><span class="lineno"> 1103</span>&#160; </div>
+<div class="line"><a name="l01104"></a><span class="lineno"> 1104</span>&#160;            <span class="comment">/* Use portable dispatch (selects AVX512/AVX/SSE/scalar) */</span></div>
+<div class="line"><a name="l01105"></a><span class="lineno"> 1105</span>&#160;            <a class="code" href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, out, weight_row, input_row);</div>
+<div class="line"><a name="l01106"></a><span class="lineno"> 1106</span>&#160; </div>
+<div class="line"><a name="l01107"></a><span class="lineno"> 1107</span>&#160;            <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><a name="l01108"></a><span class="lineno"> 1108</span>&#160;                *out += bias[n];</div>
+<div class="line"><a name="l01109"></a><span class="lineno"> 1109</span>&#160;            }</div>
+<div class="line"><a name="l01110"></a><span class="lineno"> 1110</span>&#160;        }</div>
+<div class="line"><a name="l01111"></a><span class="lineno"> 1111</span>&#160;    }</div>
+<div class="line"><a name="l01112"></a><span class="lineno"> 1112</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__q5__0_8c_html_a8744a3b1e4d1dc928fce050f111414a6"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a></div><div class="ttdeci">void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Auto-dispatch quantized dot product Q5_0 x Q8_0.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l01018">gemm_kernels_q5_0.c:1018</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition:</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00067">QK5_0</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01017">vec_dot_q5_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00067">QK5_0</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01018">vec_dot_q5_0_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -961,10 +961,10 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;    }</div>
 <div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;}</div>
 <div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_a64b28ca8a25883986a0d22e39a574a32"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a></div><div class="ttdeci">void quantize_row_q8_k(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00093">gemm_kernels_q4k_q8k.c:93</a></div></div>
-<div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_aa25694bd7b677f5b945be6f5dbdaa9c9"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9">gemm_nt_q5_0_ref</a></div><div class="ttdeci">void gemm_nt_q5_0_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">GEMM with transposed Q5_0 weights: C = A @ B^T.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00505">gemm_kernels_q5_0.c:505</a></div></div>
+<div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_aa25694bd7b677f5b945be6f5dbdaa9c9"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9">gemm_nt_q5_0_ref</a></div><div class="ttdeci">void gemm_nt_q5_0_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">GEMM with transposed Q5_0 weights: C = A @ B^T.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00506">gemm_kernels_q5_0.c:506</a></div></div>
 <div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_afb621aff9a12017b33347eb42473baf7"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#afb621aff9a12017b33347eb42473baf7">dot_q5_0_q8_k_32_sse</a></div><div class="ttdeci">static float dot_q5_0_q8_k_32_sse(const block_q5_0 *bw, const block_q8_K *ba, int q8_offset)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00012">gemm_kernels_q5_0_sse_v2.c:12</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00012">dot_q5_0_q8_k_32_sse()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00505">gemm_nt_q5_0_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00093">quantize_row_q8_k()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00012">dot_q5_0_q8_k_32_sse()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00506">gemm_nt_q5_0_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00093">quantize_row_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -1755,23 +1755,23 @@ Functions</h2></td></tr>
 </ol>
 <p>Note: AVX without AVX2 is actually slower due to AVX-SSE transitions, so we prefer SSSE3 on those CPUs. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01017">1017</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l01018"></a><span class="lineno"> 1018</span>&#160;{</div>
-<div class="line"><a name="l01019"></a><span class="lineno"> 1019</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a name="l01020"></a><span class="lineno"> 1020</span>&#160;    vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);</div>
-<div class="line"><a name="l01021"></a><span class="lineno"> 1021</span>&#160;<span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><a name="l01022"></a><span class="lineno"> 1022</span>&#160;    <span class="comment">/* AVX2 with FMA for true 256-bit integer and float ops */</span></div>
-<div class="line"><a name="l01023"></a><span class="lineno"> 1023</span>&#160;    vec_dot_q5_0_q8_0_avx(n, s, vx, vy);</div>
-<div class="line"><a name="l01024"></a><span class="lineno"> 1024</span>&#160;<span class="preprocessor">#elif defined(__SSSE3__)</span></div>
-<div class="line"><a name="l01025"></a><span class="lineno"> 1025</span>&#160;    <span class="comment">/* SSSE3 - most efficient on older CPUs */</span></div>
-<div class="line"><a name="l01026"></a><span class="lineno"> 1026</span>&#160;    vec_dot_q5_0_q8_0_sse(n, s, vx, vy);</div>
-<div class="line"><a name="l01027"></a><span class="lineno"> 1027</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l01028"></a><span class="lineno"> 1028</span>&#160;    <a class="code" href="gemm__kernels__q5__0_8c.html#a5703f283c14a34f7546cd236acd4ef80">vec_dot_q5_0_q8_0_ref</a>(n, s, vx, vy);</div>
-<div class="line"><a name="l01029"></a><span class="lineno"> 1029</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l01030"></a><span class="lineno"> 1030</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__q5__0_8c_html_a5703f283c14a34f7546cd236acd4ef80"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#a5703f283c14a34f7546cd236acd4ef80">vec_dot_q5_0_q8_0_ref</a></div><div class="ttdeci">void vec_dot_q5_0_q8_0_ref(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Quantized dot product: Q5_0 weights x Q8_0 input (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00616">gemm_kernels_q5_0.c:616</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01018">1018</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l01019"></a><span class="lineno"> 1019</span>&#160;{</div>
+<div class="line"><a name="l01020"></a><span class="lineno"> 1020</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l01021"></a><span class="lineno"> 1021</span>&#160;    vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);</div>
+<div class="line"><a name="l01022"></a><span class="lineno"> 1022</span>&#160;<span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><a name="l01023"></a><span class="lineno"> 1023</span>&#160;    <span class="comment">/* AVX2 with FMA for true 256-bit integer and float ops */</span></div>
+<div class="line"><a name="l01024"></a><span class="lineno"> 1024</span>&#160;    vec_dot_q5_0_q8_0_avx(n, s, vx, vy);</div>
+<div class="line"><a name="l01025"></a><span class="lineno"> 1025</span>&#160;<span class="preprocessor">#elif defined(__SSSE3__)</span></div>
+<div class="line"><a name="l01026"></a><span class="lineno"> 1026</span>&#160;    <span class="comment">/* SSSE3 - most efficient on older CPUs */</span></div>
+<div class="line"><a name="l01027"></a><span class="lineno"> 1027</span>&#160;    vec_dot_q5_0_q8_0_sse(n, s, vx, vy);</div>
+<div class="line"><a name="l01028"></a><span class="lineno"> 1028</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l01029"></a><span class="lineno"> 1029</span>&#160;    <a class="code" href="gemm__kernels__q5__0_8c.html#a5703f283c14a34f7546cd236acd4ef80">vec_dot_q5_0_q8_0_ref</a>(n, s, vx, vy);</div>
+<div class="line"><a name="l01030"></a><span class="lineno"> 1030</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l01031"></a><span class="lineno"> 1031</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__q5__0_8c_html_a5703f283c14a34f7546cd236acd4ef80"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#a5703f283c14a34f7546cd236acd4ef80">vec_dot_q5_0_q8_0_ref</a></div><div class="ttdeci">void vec_dot_q5_0_q8_0_ref(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Quantized dot product: Q5_0 weights x Q8_0 input (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00617">gemm_kernels_q5_0.c:617</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00616">vec_dot_q5_0_q8_0_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00617">vec_dot_q5_0_q8_0_ref()</a>.</p>
 
 </div>
 </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> | C-Kernel-Engine</title>
+    <title>QuantizationFormatsVisualGuide | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -825,6 +825,13 @@
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
                     <!-- Left Column -->
                     <div class="menu-section">
                         <div class="menu-heading">Core</div>
@@ -883,581 +890,280 @@
         </nav>
     </header>
     <main>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantization Formats Visual Guide | C-Kernel-Engine</title>
-    <meta name="description" content="Byte-level visualization of all quantization formats supported by C-Kernel-Engine: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q4_K, Q6_K, Q8_K with header structures and dequantization math.">
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-    <style>
-        :root {
-            --orange: #ffb400;
-            --orange-dark: #e5a200;
-            --dark: #2a2a2a;
-            --dark-lighter: #363636;
-            --dark-card: #323232;
-            --grey: #454545;
-            --text-primary: #f5f5f5;
-            --text-secondary: #b0b0b0;
-            --text-muted: #808080;
-            --bg-dark: #1a1a1a;
-            --white: #ffffff;
-            --code-bg: #151515;
-            --green: #47b475;
-            --blue: #0071c5;
-            --blue-light: #00c7fd;
-            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-            --transition: all 0.3s ease;
-        }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+<style>
+    .format-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: var(--text-primary);
-            background: var(--bg-dark);
-            min-height: 100vh;
-        }
+    .format-card {
+        background: var(--dark-card);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        border-left: 4px solid var(--blue);
+    }
 
-        .site-header {
-            background: var(--gradient-header);
-            border-bottom: 3px solid var(--orange);
-            padding: 0.5rem 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: var(--shadow-md);
-        }
+    .format-card h3 {
+        color: #00c7fd;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
 
-        .header-brand {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            text-decoration: none;
-        }
+    .format-card .bits {
+        color: var(--orange);
+        font-weight: 600;
+        font-size: 1.5rem;
+    }
 
-        .header-logo {
-            width: 40px;
-            height: 40px;
-            background: var(--orange);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: var(--dark);
-            font-size: 1.1rem;
-        }
+    .format-card .details {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
 
-        .header-title {
-            color: var(--white);
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
+    .simple-formats .format-card { border-left-color: var(--blue); }
+    .k-quant-formats .format-card { border-left-color: var(--orange); }
 
-        .header-subtitle {
-            color: var(--orange);
-            font-size: 0.8rem;
-        }
+    .section-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+    }
 
-        .site-nav {
-            display: flex;
-            gap: 0.25rem;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+    .infographic-container {
+        background: var(--bg-dark);
+        border-radius: 12px;
+        border: 1px solid var(--grey);
+        overflow: hidden;
+        margin: 2rem 0;
+    }
 
-        .site-nav > a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            padding: 0.6rem 1rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: var(--transition);
-        }
+    .infographic-header {
+        background: var(--dark-card);
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--grey);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
 
-        .site-nav > a:hover {
-            color: var(--white);
-            background: var(--grey);
-        }
+    .infographic-header h2 {
+        color: var(--white);
+        font-size: 1.2rem;
+        margin: 0;
+    }
 
-        .site-nav > a.active {
-            background: var(--orange);
-            color: var(--dark);
-            font-weight: 600;
-        }
+    .infographic-header h2::before {
+        display: none;
+    }
 
-        main {
-            max-width: 1500px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
+    .infographic-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
 
-        h1 {
-            color: var(--blue-light);
-            font-size: 2.2rem;
-            margin-bottom: 0.5rem;
-        }
+    .infographic-actions button {
+        background: var(--grey);
+        border: none;
+        color: var(--text-primary);
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: var(--transition);
+    }
 
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            margin-bottom: 2rem;
-        }
+    .infographic-actions button:hover {
+        background: var(--orange);
+        color: var(--dark);
+    }
 
-        .format-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
+    .infographic-preview {
+        background: var(--bg-dark);
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+    }
 
-        .format-card {
-            background: var(--dark-card);
-            border-radius: 8px;
-            padding: 1rem 1.25rem;
-            border-left: 4px solid var(--blue);
-        }
+    .infographic-preview p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 1rem;
+    }
 
-        .format-card h3 {
-            color: var(--blue-light);
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
+    .key-concepts {
+        background: var(--dark-card);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
 
-        .format-card .bits {
-            color: var(--orange);
-            font-weight: 600;
-            font-size: 1.5rem;
-        }
+    .key-concepts h2 {
+        color: var(--orange);
+        margin-bottom: 1rem;
+    }
 
-        .format-card .details {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            margin-top: 0.25rem;
-        }
+    .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
 
-        .simple-formats .format-card { border-left-color: var(--blue); }
-        .k-quant-formats .format-card { border-left-color: var(--orange); }
+    .concept {
+        background: var(--code-bg);
+        border-radius: 6px;
+        padding: 1rem;
+        border: 1px solid var(--grey);
+    }
 
-        .section-label {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.75rem;
-            font-weight: 600;
-        }
+    .concept h3 {
+        color: #00c7fd;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
 
-        .infographic-container {
-            background: var(--bg-dark);
-            border-radius: 12px;
-            border: 1px solid var(--grey);
-            overflow: hidden;
-            margin: 2rem 0;
-        }
+    .concept p {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
 
-        .infographic-header {
-            background: var(--dark-card);
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--grey);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+        text-decoration: none;
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
 
-        .infographic-header h2 {
-            color: var(--white);
-            font-size: 1.2rem;
-        }
+    .back-link:hover {
+        color: var(--orange);
+    }
+</style>
 
-        .infographic-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
+<a href="quantization.html" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Quantization Deep Dive
+</a>
 
-        .infographic-actions button {
-            background: var(--grey);
-            border: none;
-            color: var(--text-primary);
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: var(--transition);
-        }
+<h1>Quantization Formats Visual Guide</h1>
+<p class="lead">Byte-level structure, headers, and dequantization math for all 8 supported formats</p>
 
-        .infographic-actions button:hover {
-            background: var(--orange);
-            color: var(--dark);
-        }
-
-        /* Large preview that opens in fullscreen viewer on click */
-        .infographic-preview {
-            background: var(--bg-dark);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        .infographic-preview p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-top: 1rem;
-        }
-
-        .key-concepts {
-            background: var(--dark-card);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .key-concepts h2 {
-            color: var(--orange);
-            margin-bottom: 1rem;
-        }
-
-        .concept-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .concept {
-            background: var(--code-bg);
-            border-radius: 6px;
-            padding: 1rem;
-            border: 1px solid var(--grey);
-        }
-
-        .concept h3 {
-            color: var(--blue-light);
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .concept p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        code {
-            background: var(--code-bg);
-            padding: 0.15rem 0.4rem;
-            border-radius: 3px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9em;
-            color: var(--blue-light);
-        }
-
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            transition: var(--transition);
-        }
-
-        .back-link:hover {
-            color: var(--orange);
-        }
-
-        @media (max-width: 768px) {
-            main { padding: 1rem; }
-            h1 { font-size: 1.75rem; }
-            .format-summary { grid-template-columns: 1fr 1fr; }
-        }
-    </style>
-</head>
-<body>
-    <header class="site-header">
-        <a href="index.html" class="header-brand">
-            <div class="header-logo">CK</div>
-            <div>
-                <div class="header-title">C-Kernel-Engine</div>
-                <div class="header-subtitle">High-Performance ML Kernels</div>
-            </div>
-        </a>
-        <nav class="site-nav">
-            <a href="index.html">Home</a>
-            <a href="quickstart.html">Getting Started</a>
-            <a href="quantization.html">Quantization</a>
-            <a href="quant-formats.html" class="active">Formats Visual</a>
-            <a href="kernels.html">Kernels</a>
-            <a href="architecture.html">Architecture</a>
-        </nav>
-    </header>
-
-    <main>
-        <a href="quantization.html" class="back-link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Back to Quantization Deep Dive
-        </a>
-
-        <h1>Quantization Formats Visual Guide</h1>
-        <p class="subtitle">Byte-level structure, headers, and dequantization math for all 8 supported formats</p>
-
-        <!-- Quick Reference Cards -->
-        <div class="section-label">Simple Formats (32 weights/block)</div>
-        <div class="format-summary simple-formats">
-            <div class="format-card">
-                <h3>Q4_0</h3>
-                <div class="bits">4.5 bits/weight</div>
-                <div class="details">18 bytes = 2 (d) + 32×4/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q4_1</h3>
-                <div class="bits">5.0 bits/weight</div>
-                <div class="details">20 bytes = 2+2 (d,m) + 32×4/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q5_0</h3>
-                <div class="bits">5.5 bits/weight</div>
-                <div class="details">22 bytes = 2 (d) + 32×1/8 + 32×4/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q5_1</h3>
-                <div class="bits">6.0 bits/weight</div>
-                <div class="details">24 bytes = 4 (d,m) + 32×1/8 + 32×4/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q8_0</h3>
-                <div class="bits">8.5 bits/weight</div>
-                <div class="details">34 bytes = 2 (d) + 32×8/8</div>
-            </div>
-        </div>
-
-        <div class="section-label">K-Quant Formats (256 weights/block)</div>
-        <div class="format-summary k-quant-formats">
-            <div class="format-card">
-                <h3>Q4_K (Primary)</h3>
-                <div class="bits">4.5 bits/weight</div>
-                <div class="details">144 bytes = 4+12 (header) + 256×4/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q6_K</h3>
-                <div class="bits">6.5625 bits/weight</div>
-                <div class="details">210 bytes = 18 (header) + 256×6/8</div>
-            </div>
-            <div class="format-card">
-                <h3>Q8_K (Activations)</h3>
-                <div class="bits">9.125 bits/weight</div>
-                <div class="details">292 bytes = 36 (header) + 256×8/8</div>
-            </div>
-        </div>
-
-        <!-- Main Infographic - Click to open in fullscreen viewer -->
-        <div class="infographic-container">
-            <div class="infographic-header">
-                <h2>Complete Format Reference</h2>
-                <div class="infographic-actions">
-                    <button onclick="svgViewer.open(0)">Open Viewer</button>
-                    <button onclick="svgViewer.open(0); setTimeout(function(){svgViewer.fitWidth();}, 100);">Fit Width</button>
-                </div>
-            </div>
-            <div class="infographic-preview">
-                <div class="svg-viewer" data-title="Quantization Formats - Complete Reference">
-                    <img src="assets/quantization-formats.svg" alt="C-Kernel-Engine Quantization Formats - Complete byte-level visualization" style="width: 100%; cursor: pointer;">
-                </div>
-                <p>Click image to open in fullscreen viewer with zoom and pan controls</p>
-            </div>
-        </div>
-
-        <!-- Key Concepts -->
-        <div class="key-concepts">
-            <h2>Key Concepts</h2>
-            <div class="concept-grid">
-                <div class="concept">
-                    <h3>Block Quantization</h3>
-                    <p>Weights are grouped into blocks (32 or 256). Each block has a shared scale factor, reducing overhead while maintaining accuracy. Larger blocks = better compression, smaller blocks = better accuracy.</p>
-                </div>
-                <div class="concept">
-                    <h3>Symmetric vs Asymmetric</h3>
-                    <p><strong>Symmetric</strong> (Q4_0, Q5_0, Q8_0): Values centered at 0. Formula: <code>weight = (q - center) × d</code><br>
-                    <strong>Asymmetric</strong> (Q4_1, Q5_1): Adds min offset. Formula: <code>weight = q × d + m</code></p>
-                </div>
-                <div class="concept" style="border-color: #ff6b6b;">
-                    <h3 style="color: #ff6b6b;">Q4_K dmin: SUBTRACT not ADD!</h3>
-                    <p><strong>Common Bug:</strong> Q4_K uses <code>weight = q×(d×sc) - (dmin×mn)</code><br>
-                    The minus sign is critical! dmin encodes a positive offset that gets subtracted to shift the range down. Using + instead of - produces wrong outputs.</p>
-                </div>
-                <div class="concept">
-                    <h3>K-Quant Nested Scales</h3>
-                    <p>K-quant formats use 2-level scaling: a super-block FP16 scale multiplied by per-sub-block 6-bit or int8 scales. This gives fine-grained control with minimal overhead.</p>
-                </div>
-                <div class="concept">
-                    <h3>5-bit and 6-bit Packing</h3>
-                    <p>Q5 and Q6 formats split bits across multiple byte arrays. Q5: 4 low bits in <code>qs</code>, 1 high bit in <code>qh</code>. Q6: 4 low bits in <code>ql</code>, 2 high bits in <code>qh</code>.</p>
-                </div>
-                <div class="concept">
-                    <h3>Q8_K: FP32 Scale + bsums</h3>
-                    <p>Q8_K uses FP32 scale (not FP16!) for higher precision. The <code>bsums</code> field contains precomputed sums of 16 consecutive int8s for VNNI/AVX-512 dot product optimization.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Links -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--dark-card); border-radius: 8px;">
-            <h3 style="color: var(--orange); margin-bottom: 1rem;">Related Documentation</h3>
-            <ul style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;">
-                <li><a href="quantization.html" style="color: var(--blue-light); text-decoration: none;">Quantization Deep Dive</a> - Theory and implementation</li>
-                <li><a href="kernels.html" style="color: var(--blue-light); text-decoration: none;">Kernel Reference</a> - All GEMM kernels</li>
-                <li><a href="gguf-bump.html" style="color: var(--blue-light); text-decoration: none;">GGUF to Bump</a> - Weight conversion</li>
-                <li><a href="simd-architecture.html" style="color: var(--blue-light); text-decoration: none;">SIMD Architecture</a> - AVX-512, VNNI, AMX</li>
-            </ul>
-        </div>
-    </main>
-
-    <!-- SVG Viewer Overlay (shared component) -->
-    <style>
-    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
-    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
-    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
-    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
-    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
-    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
-    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
-    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
-    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
-    #svg-overlay .toolbar .separator { color: #444; }
-    #svg-overlay .image-container { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; overflow: auto; }
-    #svg-overlay .image-container:active { cursor: grabbing; }
-    #svg-overlay .image-container img { transform-origin: center top; }
-    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
-    </style>
-
-    <div id="svg-overlay">
-        <div class="toolbar">
-            <span class="title" id="svg-title">Image</span>
-            <div class="controls">
-                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
-                <span class="zoom-display" id="zoom-display">100%</span>
-                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
-                <span class="separator">|</span>
-                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
-                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
-                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
-                <span class="separator">|</span>
-                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
-            </div>
-        </div>
-        <div class="image-container" id="svg-container">
-            <img id="svg-image" src="" alt="">
-        </div>
-        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+<div class="section-label">Simple Formats (32 weights/block)</div>
+<div class="format-summary simple-formats">
+    <div class="format-card">
+        <h3>Q4_0</h3>
+        <div class="bits">4.5 bits/weight</div>
+        <div class="details">18 bytes = 2 (d) + 32x4/8</div>
     </div>
+    <div class="format-card">
+        <h3>Q4_1</h3>
+        <div class="bits">5.0 bits/weight</div>
+        <div class="details">20 bytes = 2+2 (d,m) + 32x4/8</div>
+    </div>
+    <div class="format-card">
+        <h3>Q5_0</h3>
+        <div class="bits">5.5 bits/weight</div>
+        <div class="details">22 bytes = 2 (d) + 32x1/8 + 32x4/8</div>
+    </div>
+    <div class="format-card">
+        <h3>Q5_1</h3>
+        <div class="bits">6.0 bits/weight</div>
+        <div class="details">24 bytes = 4 (d,m) + 32x1/8 + 32x4/8</div>
+    </div>
+    <div class="format-card">
+        <h3>Q8_0</h3>
+        <div class="bits">8.5 bits/weight</div>
+        <div class="details">34 bytes = 2 (d) + 32x8/8</div>
+    </div>
+</div>
 
-    <script>
-    var svgViewer = (function() {
-        var overlay, img, titleEl, container;
-        var images = [];
-        var currentIndex = 0;
-        var scale = 1, panX = 0, panY = 0;
-        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+<div class="section-label">K-Quant Formats (256 weights/block)</div>
+<div class="format-summary k-quant-formats">
+    <div class="format-card">
+        <h3>Q4_K (Primary)</h3>
+        <div class="bits">4.5 bits/weight</div>
+        <div class="details">144 bytes = 4+12 (header) + 256x4/8</div>
+    </div>
+    <div class="format-card">
+        <h3>Q6_K</h3>
+        <div class="bits">6.5625 bits/weight</div>
+        <div class="details">210 bytes = 18 (header) + 256x6/8</div>
+    </div>
+    <div class="format-card">
+        <h3>Q8_K (Activations)</h3>
+        <div class="bits">9.125 bits/weight</div>
+        <div class="details">292 bytes = 36 (header) + 256x8/8</div>
+    </div>
+</div>
 
-        function init() {
-            overlay = document.getElementById('svg-overlay');
-            img = document.getElementById('svg-image');
-            titleEl = document.getElementById('svg-title');
-            container = document.getElementById('svg-container');
-            if (!overlay || !img) return;
+<div class="infographic-container">
+    <div class="infographic-header">
+        <h2>Complete Format Reference</h2>
+        <div class="infographic-actions">
+            <button onclick="svgViewer.open(0)">Open Viewer</button>
+            <button onclick="svgViewer.open(0); setTimeout(function(){svgViewer.fitWidth();}, 100);">Fit Width</button>
+        </div>
+    </div>
+    <div class="infographic-preview">
+        <div class="svg-viewer" data-title="Quantization Formats - Complete Reference">
+            <img src="assets/quantization-formats.svg" alt="C-Kernel-Engine Quantization Formats - Complete byte-level visualization" style="width: 100%; cursor: pointer;">
+        </div>
+        <p>Click image to open in fullscreen viewer with zoom and pan controls</p>
+    </div>
+</div>
 
-            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
-                var viewerImg = viewer.querySelector('img');
-                if (viewerImg) {
-                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
-                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
-                }
-            });
+<div class="key-concepts">
+    <h2>Key Concepts</h2>
+    <div class="concept-grid">
+        <div class="concept">
+            <h3>Block Quantization</h3>
+            <p>Weights are grouped into blocks (32 or 256). Each block has a shared scale factor, reducing overhead while maintaining accuracy. Larger blocks = better compression, smaller blocks = better accuracy.</p>
+        </div>
+        <div class="concept">
+            <h3>Symmetric vs Asymmetric</h3>
+            <p><strong>Symmetric</strong> (Q4_0, Q5_0, Q8_0): Values centered at 0. Formula: <code>weight = (q - center) x d</code><br>
+            <strong>Asymmetric</strong> (Q4_1, Q5_1): Adds min offset. Formula: <code>weight = q x d + m</code></p>
+        </div>
+        <div class="concept" style="border-color: #ff6b6b;">
+            <h3 style="color: #ff6b6b;">Q4_K dmin: SUBTRACT not ADD!</h3>
+            <p><strong>Common Bug:</strong> Q4_K uses <code>weight = q x (d x sc) - (dmin x mn)</code><br>
+            The minus sign is critical! dmin encodes a positive offset that gets subtracted to shift the range down. Using + instead of - produces wrong outputs.</p>
+        </div>
+        <div class="concept">
+            <h3>K-Quant Nested Scales</h3>
+            <p>K-quant formats use 2-level scaling: a super-block FP16 scale multiplied by per-sub-block 6-bit or int8 scales. This gives fine-grained control with minimal overhead.</p>
+        </div>
+        <div class="concept">
+            <h3>5-bit and 6-bit Packing</h3>
+            <p>Q5 and Q6 formats split bits across multiple byte arrays. Q5: 4 low bits in <code>qs</code>, 1 high bit in <code>qh</code>. Q6: 4 low bits in <code>ql</code>, 2 high bits in <code>qh</code>.</p>
+        </div>
+        <div class="concept">
+            <h3>Q8_K: FP32 Scale + bsums</h3>
+            <p>Q8_K uses FP32 scale (not FP16!) for higher precision. The <code>bsums</code> field contains precomputed sums of 16 consecutive int8s for VNNI/AVX-512 dot product optimization.</p>
+        </div>
+    </div>
+</div>
 
-            container.addEventListener('wheel', function(e) {
-                e.preventDefault();
-                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
-                updateTransform();
-            });
-
-            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
-            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
-            document.addEventListener('mouseup', function() { isDragging = false; });
-
-            document.addEventListener('keydown', function(e) {
-                if (overlay.style.display !== 'block') return;
-                if (e.key === 'Escape') close();
-                if (e.key === '+' || e.key === '=') zoomIn();
-                if (e.key === '-') zoomOut();
-                if (e.key === '0') resetZoom();
-                if (e.key === 'w' || e.key === 'W') fitWidth();
-                if (e.key === 'h' || e.key === 'H') fitHeight();
-            });
-
-            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
-
-            // Auto-open viewer on page load and fit to width
-            setTimeout(function() {
-                if (images.length > 0) {
-                    open(0);
-                    setTimeout(fitWidth, 100);
-                }
-            }, 200);
-        }
-
-        function updateTransform() {
-            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
-            var zd = document.getElementById('zoom-display');
-            if (zd) zd.textContent = Math.round(scale * 100) + '%';
-        }
-
-        function open(index) {
-            if (!images[index]) return;
-            currentIndex = index; scale = 1; panX = 0; panY = 0;
-            img.src = images[index].src;
-            titleEl.textContent = images[index].title;
-            updateTransform();
-            overlay.style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
-        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
-        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
-        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
-
-        function fitWidth() {
-            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
-            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 60) / img.naturalWidth));
-            panX = 0; panY = 0; updateTransform();
-        }
-
-        function fitHeight() {
-            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
-            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
-            panX = 0; panY = 0; updateTransform();
-        }
-
-        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
-
-        return { open: open, close: close, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
-    })();
-    </script>
-</body>
-</html>
+<div style="margin-top: 2rem; padding: 1.5rem; background: var(--dark-card); border-radius: 8px;">
+    <h3 style="color: var(--orange); margin-bottom: 1rem;">Related Documentation</h3>
+    <ul style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; padding: 0;">
+        <li><a href="quantization.html" style="color: #00c7fd; text-decoration: none;">Quantization Deep Dive</a> - Theory and implementation</li>
+        <li><a href="quantization-visuals.html" style="color: #00c7fd; text-decoration: none;">Bit Manipulation Visuals</a> - Interactive SVG diagrams</li>
+        <li><a href="kernels.html" style="color: #00c7fd; text-decoration: none;">Kernel Reference</a> - All GEMM kernels</li>
+        <li><a href="simd-architecture.html" style="color: #00c7fd; text-decoration: none;">SIMD Architecture</a> - AVX-512, VNNI, AMX</li>
+    </ul>
+</div>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1667,7 +1373,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-13</p>
             </div>
         </div>
     </footer>

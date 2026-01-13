@@ -772,7 +772,7 @@ $(document).ready(function(){initNavTree('gemm__kernels__q8__0_8c_source.html','
 <div class="line"><a name="l00646"></a><span class="lineno">  646</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *x = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)vx;</div>
 <div class="line"><a name="l00647"></a><span class="lineno">  647</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *y = (<span class="keyword">const</span> <a class="code" href="structblock__q8__0.html">block_q8_0</a> *)vy;</div>
 <div class="line"><a name="l00648"></a><span class="lineno">  648</span>&#160; </div>
-<div class="line"><a name="l00649"></a><span class="lineno">  649</span>&#160;    __m512 acc = _mm512_setzero_ps();</div>
+<div class="line"><a name="l00649"></a><span class="lineno">  649</span>&#160;    <span class="keywordtype">float</span> sumf = 0.0f;</div>
 <div class="line"><a name="l00650"></a><span class="lineno">  650</span>&#160; </div>
 <div class="line"><a name="l00651"></a><span class="lineno">  651</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ib = 0; ib &lt; nb; ib++) {</div>
 <div class="line"><a name="l00652"></a><span class="lineno">  652</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(x[ib].d) * <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(y[ib].d);</div>
@@ -796,11 +796,11 @@ $(document).ready(function(){initNavTree('gemm__kernels__q8__0_8c_source.html','
 <div class="line"><a name="l00670"></a><span class="lineno">  670</span>&#160;        <span class="comment">/* Sum all products */</span></div>
 <div class="line"><a name="l00671"></a><span class="lineno">  671</span>&#160;        <span class="keywordtype">int</span> sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));</div>
 <div class="line"><a name="l00672"></a><span class="lineno">  672</span>&#160; </div>
-<div class="line"><a name="l00673"></a><span class="lineno">  673</span>&#160;        <span class="comment">/* Scale and accumulate */</span></div>
-<div class="line"><a name="l00674"></a><span class="lineno">  674</span>&#160;        acc = _mm512_add_ps(acc, _mm512_set1_ps(d * (<span class="keywordtype">float</span>)sumi));</div>
+<div class="line"><a name="l00673"></a><span class="lineno">  673</span>&#160;        <span class="comment">/* Scale and accumulate - use scalar to avoid 16x broadcast bug */</span></div>
+<div class="line"><a name="l00674"></a><span class="lineno">  674</span>&#160;        sumf += d * (float)sumi;</div>
 <div class="line"><a name="l00675"></a><span class="lineno">  675</span>&#160;    }</div>
 <div class="line"><a name="l00676"></a><span class="lineno">  676</span>&#160; </div>
-<div class="line"><a name="l00677"></a><span class="lineno">  677</span>&#160;    *s = _mm512_reduce_add_ps(acc);</div>
+<div class="line"><a name="l00677"></a><span class="lineno">  677</span>&#160;    *s = sumf;</div>
 <div class="line"><a name="l00678"></a><span class="lineno">  678</span>&#160;}</div>
 <div class="line"><a name="l00679"></a><span class="lineno">  679</span>&#160;<span class="preprocessor">#endif</span></div>
 <div class="line"><a name="l00680"></a><span class="lineno">  680</span>&#160; </div>

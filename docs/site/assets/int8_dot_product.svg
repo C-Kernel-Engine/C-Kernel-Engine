@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850" font-family="Consolas, Monaco, monospace">
+  <defs>
+    <linearGradient id="actGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="weightGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f093fb"/>
+      <stop offset="100%" style="stop-color:#f5576c"/>
+    </linearGradient>
+    <linearGradient id="resultGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#43e97b"/>
+      <stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="850" fill="#0d1117"/>
+
+  <!-- Title -->
+  <text x="600" y="45" fill="url(#resultGrad)" font-size="32" font-weight="bold" text-anchor="middle">
+    INT8 Dot Product: The Speed Secret
+  </text>
+  <text x="600" y="75" fill="#8b949e" font-size="16" text-anchor="middle">
+    Why quantized × quantized is 4-5x faster than FP32 × dequantized
+  </text>
+
+  <!-- KEY INSIGHT -->
+  <rect x="50" y="95" width="1100" height="55" rx="8" fill="#1c2128" stroke="#f0883e" stroke-width="2"/>
+  <text x="600" y="130" fill="#f0883e" font-size="18" font-weight="bold" text-anchor="middle">
+    Integer arithmetic is FAST. Scale factors multiply ONCE at the end, not 32× per block.
+  </text>
+
+  <!-- FP32 PATH (SLOW) -->
+  <text x="50" y="185" fill="#ff7b72" font-size="20" font-weight="bold">FP32 PATH (Slow) - Dequantize First</text>
+
+  <g transform="translate(50, 205)">
+    <rect x="0" y="0" width="1100" height="140" rx="8" fill="#161b22" stroke="#ff7b72" stroke-dasharray="5,3"/>
+
+    <!-- Step 1: Dequantize weights -->
+    <rect x="20" y="20" width="200" height="50" rx="5" fill="#3d1a1a" stroke="#f5576c"/>
+    <text x="120" y="40" fill="#f5576c" font-size="12" text-anchor="middle" font-weight="bold">Q5_0 Weights</text>
+    <text x="120" y="58" fill="#8b949e" font-size="10" text-anchor="middle">32 × (nibble + high_bit)</text>
+
+    <path d="M 225 45 L 270 45" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="247" y="35" fill="#8b949e" font-size="9" text-anchor="middle">dequant</text>
+
+    <rect x="280" y="20" width="150" height="50" rx="5" fill="#2a2a1a" stroke="#ffd700"/>
+    <text x="355" y="40" fill="#ffd700" font-size="12" text-anchor="middle" font-weight="bold">FP32 Weights</text>
+    <text x="355" y="58" fill="#8b949e" font-size="10" text-anchor="middle">32 × float</text>
+
+    <!-- Step 2: FP32 dot product -->
+    <path d="M 435 45 L 480 45" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="490" y="10" width="220" height="70" rx="5" fill="#1a2a3d" stroke="#4facfe"/>
+    <text x="600" y="35" fill="#4facfe" font-size="12" text-anchor="middle" font-weight="bold">FP32 Dot Product</text>
+    <text x="600" y="55" fill="#c9d1d9" font-size="11" text-anchor="middle">for j: sum += w[j] * x[j]</text>
+    <text x="600" y="72" fill="#ff7b72" font-size="10" text-anchor="middle">32 FP multiplies + 32 FP adds</text>
+
+    <path d="M 715 45 L 760 45" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="770" y="20" width="120" height="50" rx="5" fill="#1a3d2a" stroke="#43e97b"/>
+    <text x="830" y="50" fill="#43e97b" font-size="12" text-anchor="middle" font-weight="bold">Result</text>
+
+    <!-- Cost annotation -->
+    <text x="20" y="110" fill="#ff7b72" font-size="13" font-weight="bold">Cost per block:</text>
+    <text x="20" y="128" fill="#c9d1d9" font-size="11">32× FP16→FP32 conversions + 32× FP32 multiplies + 32× FP32 adds</text>
+  </g>
+
+  <!-- INT8 PATH (FAST) -->
+  <text x="50" y="380" fill="#7ee787" font-size="20" font-weight="bold">INT8 PATH (Fast) - Integer Math + Scale at End</text>
+
+  <g transform="translate(50, 400)">
+    <rect x="0" y="0" width="1100" height="180" rx="8" fill="#161b22" stroke="#7ee787"/>
+
+    <!-- Q5_0 weights -->
+    <rect x="20" y="20" width="140" height="60" rx="5" fill="#3d1a1a" stroke="#f5576c"/>
+    <text x="90" y="42" fill="#f5576c" font-size="11" text-anchor="middle" font-weight="bold">Q5_0 Weights</text>
+    <text x="90" y="58" fill="#8b949e" font-size="9" text-anchor="middle">scale_w + int8[32]</text>
+    <text x="90" y="72" fill="#f5576c" font-size="9" text-anchor="middle">d_w</text>
+
+    <!-- Q8_0 activations -->
+    <rect x="20" y="95" width="140" height="60" rx="5" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="90" y="117" fill="#667eea" font-size="11" text-anchor="middle" font-weight="bold">Q8_0 Activations</text>
+    <text x="90" y="133" fill="#8b949e" font-size="9" text-anchor="middle">scale_x + int8[32]</text>
+    <text x="90" y="147" fill="#667eea" font-size="9" text-anchor="middle">d_x</text>
+
+    <!-- Integer dot product -->
+    <path d="M 165 50 L 220 75" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <path d="M 165 125 L 220 100" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="230" y="55" width="250" height="70" rx="5" fill="#1a3d1a" stroke="#7ee787" stroke-width="2"/>
+    <text x="355" y="80" fill="#7ee787" font-size="13" text-anchor="middle" font-weight="bold">Integer Dot Product</text>
+    <text x="355" y="100" fill="#c9d1d9" font-size="11" text-anchor="middle">sumi += (int32)w_int8[j] × (int32)x_int8[j]</text>
+    <text x="355" y="118" fill="#7ee787" font-size="10" text-anchor="middle">32 INT8 multiplies → INT32 accumulate</text>
+
+    <!-- Scale multiply -->
+    <path d="M 485 90 L 540 90" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="550" y="55" width="200" height="70" rx="5" fill="#2a2a1a" stroke="#ffd700"/>
+    <text x="650" y="80" fill="#ffd700" font-size="12" text-anchor="middle" font-weight="bold">Scale Multiply (ONCE)</text>
+    <text x="650" y="100" fill="#c9d1d9" font-size="11" text-anchor="middle">result = d_w × d_x × sumi</text>
+    <text x="650" y="118" fill="#ffd700" font-size="10" text-anchor="middle">2 FP multiplies total!</text>
+
+    <path d="M 755 90 L 810 90" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <rect x="820" y="65" width="120" height="50" rx="5" fill="#1a3d2a" stroke="#43e97b"/>
+    <text x="880" y="95" fill="#43e97b" font-size="12" text-anchor="middle" font-weight="bold">Result</text>
+
+    <!-- Cost annotation -->
+    <text x="20" y="170" fill="#7ee787" font-size="13" font-weight="bold">Cost per block:</text>
+    <text x="200" y="170" fill="#c9d1d9" font-size="11">32× INT8 multiplies + 32× INT32 adds + 2× FP32 multiplies</text>
+  </g>
+
+  <!-- SIMD VISUALIZATION -->
+  <text x="50" y="615" fill="#58a6ff" font-size="20" font-weight="bold">AVX-512: Process 32 INT8s in ONE Instruction</text>
+
+  <g transform="translate(50, 635)">
+    <rect x="0" y="0" width="1100" height="90" rx="8" fill="#161b22" stroke="#30363d"/>
+
+    <!-- 32 int8 values in one register -->
+    <text x="20" y="25" fill="#c9d1d9" font-size="12">__m256i (256 bits) holds 32 × int8:</text>
+
+    <g transform="translate(20, 35)">
+      <!-- Draw 32 small boxes -->
+      <rect x="0" y="0" width="30" height="25" fill="#1a1a3d" stroke="#667eea" rx="2"/>
+      <text x="15" y="17" fill="#667eea" font-size="8" text-anchor="middle">w₀</text>
+      <rect x="32" y="0" width="30" height="25" fill="#1a1a3d" stroke="#667eea" rx="2"/>
+      <text x="47" y="17" fill="#667eea" font-size="8" text-anchor="middle">w₁</text>
+      <rect x="64" y="0" width="30" height="25" fill="#1a1a3d" stroke="#667eea" rx="2"/>
+      <text x="79" y="17" fill="#667eea" font-size="8" text-anchor="middle">w₂</text>
+      <text x="110" y="17" fill="#8b949e" font-size="10">...</text>
+      <rect x="130" y="0" width="30" height="25" fill="#1a1a3d" stroke="#667eea" rx="2"/>
+      <text x="145" y="17" fill="#667eea" font-size="8" text-anchor="middle">w₃₁</text>
+
+      <text x="180" y="17" fill="#c9d1d9" font-size="14">×</text>
+
+      <rect x="200" y="0" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="2"/>
+      <text x="215" y="17" fill="#f5576c" font-size="8" text-anchor="middle">x₀</text>
+      <rect x="232" y="0" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="2"/>
+      <text x="247" y="17" fill="#f5576c" font-size="8" text-anchor="middle">x₁</text>
+      <rect x="264" y="0" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="2"/>
+      <text x="279" y="17" fill="#f5576c" font-size="8" text-anchor="middle">x₂</text>
+      <text x="310" y="17" fill="#8b949e" font-size="10">...</text>
+      <rect x="330" y="0" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="2"/>
+      <text x="345" y="17" fill="#f5576c" font-size="8" text-anchor="middle">x₃₁</text>
+
+      <text x="380" y="17" fill="#c9d1d9" font-size="14">=</text>
+
+      <rect x="400" y="0" width="80" height="25" fill="#1a3d1a" stroke="#7ee787" rx="2"/>
+      <text x="440" y="17" fill="#7ee787" font-size="10" text-anchor="middle">Σ products</text>
+
+      <text x="520" y="17" fill="#ffd700" font-size="12" font-weight="bold">← 1 instruction!</text>
+    </g>
+
+    <text x="700" y="50" fill="#79c0ff" font-size="12">_mm256_maddubs_epi16() + _mm256_madd_epi16()</text>
+    <text x="700" y="70" fill="#8b949e" font-size="11">Multiply 32 pairs and sum to int32 in ~3 cycles</text>
+  </g>
+
+  <!-- SPEEDUP COMPARISON -->
+  <rect x="50" y="745" width="1100" height="90" rx="8" fill="#1c2128" stroke="#58a6ff"/>
+  <text x="600" y="775" fill="#58a6ff" font-size="18" font-weight="bold" text-anchor="middle">Why 4-5x Speedup?</text>
+
+  <g transform="translate(100, 790)">
+    <text x="0" y="0" fill="#ff7b72" font-size="13">FP32 path: 32 dequants + 32 FP muls + 32 FP adds = ~100 cycles</text>
+    <text x="0" y="25" fill="#7ee787" font-size="13">INT8 path: 1 SIMD mul + 1 SIMD add + 2 FP muls = ~10-20 cycles</text>
+    <text x="600" y="12" fill="#ffd700" font-size="16" font-weight="bold">Integer math + SIMD = massive win</text>
+  </g>
+</svg>

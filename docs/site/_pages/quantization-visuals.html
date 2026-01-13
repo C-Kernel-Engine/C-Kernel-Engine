@@ -1,0 +1,344 @@
+<!-- TITLE: Quantization Bit Manipulation Visuals -->
+<!-- NAV: quantization -->
+
+<style>
+    .intro-box {
+        background: linear-gradient(135deg, #1a2a1a 0%, #2a3a2a 100%);
+        border: 2px solid var(--green);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .intro-box h3 {
+        color: var(--green);
+        margin-bottom: 0.5rem;
+    }
+
+    .svg-nav {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: var(--dark-card);
+        border-radius: 8px;
+    }
+
+    .svg-nav button {
+        padding: 0.75rem 1.5rem;
+        background: var(--grey);
+        border: none;
+        border-radius: 6px;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: var(--transition);
+    }
+
+    .svg-nav button:hover {
+        background: var(--orange-dark);
+        color: var(--dark);
+    }
+
+    .svg-nav button.active {
+        background: var(--orange);
+        color: var(--dark);
+    }
+
+    .svg-viewer {
+        background: var(--dark-card);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        min-height: 500px;
+        position: relative;
+    }
+
+    .svg-container {
+        width: 100%;
+        overflow: auto;
+        background: #0d1117;
+        border-radius: 8px;
+        display: none;
+    }
+
+    .svg-container.active {
+        display: block;
+    }
+
+    .svg-container img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .svg-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .svg-controls button {
+        padding: 0.5rem 1rem;
+        background: var(--grey);
+        border: none;
+        border-radius: 4px;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
+
+    .svg-controls button:hover {
+        background: var(--orange);
+        color: var(--dark);
+    }
+
+    .zoom-level {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .description-panel {
+        background: var(--code-bg);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .description-panel h3 {
+        color: var(--orange);
+        margin-bottom: 1rem;
+    }
+
+    .description-panel ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .description-panel li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--grey);
+        color: var(--text-secondary);
+    }
+
+    .description-panel li:last-child {
+        border-bottom: none;
+    }
+
+    .key-insight {
+        background: linear-gradient(135deg, #2a2a1a 0%, #3a3a2a 100%);
+        border-left: 4px solid var(--orange);
+        padding: 1rem 1.5rem;
+        margin: 1rem 0;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .key-insight code {
+        background: var(--code-bg);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-family: 'Fira Code', monospace;
+        color: var(--green);
+    }
+
+    .keyboard-hint {
+        background: var(--code-bg);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .keyboard-hint kbd {
+        background: var(--grey);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-family: monospace;
+    }
+</style>
+
+<h1>Quantization Bit Manipulation Visuals</h1>
+<p class="lead">Interactive guide to internalize the math behind Q5_0, Q4_K, and INT8 kernels</p>
+
+<div class="intro-box">
+    <h3>Goal: Make Bit Manipulation Visceral</h3>
+    <p>These visuals explain <em>why</em> the code does <code>qh >> (j + 12)</code> instead of <code>qh >> (j + 16)</code>.
+    Step through each diagram to understand exactly how bits are packed and extracted in quantized formats.</p>
+</div>
+
+<div class="svg-nav">
+    <button class="active" onclick="showSvg('overview')">1. Overview</button>
+    <button onclick="showSvg('q5_0')">2. Q5_0 Bits</button>
+    <button onclick="showSvg('q4_k')">3. Q4_K Superblock</button>
+    <button onclick="showSvg('int8')">4. INT8 Dot Product</button>
+</div>
+
+<div class="svg-viewer">
+    <div class="svg-controls">
+        <button onclick="zoomIn()">Zoom In (+)</button>
+        <button onclick="zoomOut()">Zoom Out (-)</button>
+        <button onclick="resetZoom()">Reset (0)</button>
+        <span class="zoom-level" id="zoom-display">100%</span>
+        <button onclick="openFullscreen()" style="margin-left: auto;">Full Screen (F)</button>
+    </div>
+
+    <div class="svg-container active" id="svg-overview">
+        <img src="assets/quantization_overview.svg" alt="Quantization Overview" id="img-overview">
+    </div>
+    <div class="svg-container" id="svg-q5_0">
+        <img src="assets/q5_0_bit_layout.svg" alt="Q5_0 Bit Layout" id="img-q5_0">
+    </div>
+    <div class="svg-container" id="svg-q4_k">
+        <img src="assets/q4_k_superblock.svg" alt="Q4_K Superblock" id="img-q4_k">
+    </div>
+    <div class="svg-container" id="svg-int8">
+        <img src="assets/int8_dot_product.svg" alt="INT8 Dot Product" id="img-int8">
+    </div>
+
+    <div class="description-panel" id="desc-overview">
+        <h3>Quantization Overview</h3>
+        <ul>
+            <li><strong>Where quantization happens</strong> in a transformer layer</li>
+            <li><strong>Bits per weight:</strong> FP32 (32) → Q8_0 (8.5) → Q5_0 (5.5) → Q4_K (4.5)</li>
+            <li><strong>Kernel selection:</strong> Which kernel to use for each weight type</li>
+            <li><strong>INT8 vs FP32:</strong> Why quantized activations are 4x faster</li>
+        </ul>
+    </div>
+
+    <div class="description-panel" id="desc-q5_0" style="display:none;">
+        <h3>Q5_0 Bit Layout</h3>
+        <div class="key-insight">
+            <strong>The Mystery Solved:</strong> <code>qh >> (j + 12)</code><br><br>
+            We want bit <code>j+16</code> in position 4 of the result.<br>
+            <code>j + 12 + 4 = j + 16</code> — Same bit, fewer operations!
+        </div>
+        <ul>
+            <li><strong>Memory layout:</strong> 22 bytes = 2 (scale) + 4 (high bits) + 16 (nibbles)</li>
+            <li><strong>Weights 0-15:</strong> Low nibble + qh bit j</li>
+            <li><strong>Weights 16-31:</strong> High nibble + qh bit (j+16)</li>
+            <li><strong>Reconstruction:</strong> weight = d × ((nibble | high_bit) - 16)</li>
+        </ul>
+    </div>
+
+    <div class="description-panel" id="desc-q4_k" style="display:none;">
+        <h3>Q4_K Superblock</h3>
+        <div class="key-insight">
+            <strong>Nested Scales:</strong> Why K-quants are better at same bits/weight<br><br>
+            <code>weight = d × sc[sub_block] × qs[i] - dmin × m[sub_block]</code>
+        </div>
+        <ul>
+            <li><strong>Super-block:</strong> 256 weights in 144 bytes (4.5 bits/weight)</li>
+            <li><strong>Sub-blocks:</strong> 8 × 32 weights, each with 6-bit scale/min</li>
+            <li><strong>scales[12]:</strong> Packs 16 values (8 scales + 8 mins) using 6-bit encoding</li>
+            <li><strong>Why better:</strong> Local variation captured without wasting global bits</li>
+        </ul>
+    </div>
+
+    <div class="description-panel" id="desc-int8" style="display:none;">
+        <h3>INT8 Dot Product</h3>
+        <div class="key-insight">
+            <strong>The Speed Secret:</strong> Scale factors multiply ONCE at the end<br><br>
+            <code>result = d_w × d_x × Σ(w_int8[j] × x_int8[j])</code>
+        </div>
+        <ul>
+            <li><strong>FP32 path:</strong> 32× dequant + 32× FP mul + 32× FP add (~100 cycles)</li>
+            <li><strong>INT8 path:</strong> 32× INT mul + 32× INT add + 2× FP mul (~15 cycles)</li>
+            <li><strong>SIMD magic:</strong> _mm256_maddubs_epi16 processes 32 pairs in ~3 cycles</li>
+            <li><strong>Result:</strong> 4-5x speedup from integer math + SIMD parallelism</li>
+        </ul>
+    </div>
+</div>
+
+<div class="keyboard-hint">
+    <strong>Keyboard shortcuts:</strong>
+    <kbd>1</kbd>-<kbd>4</kbd> switch diagrams |
+    <kbd>+</kbd>/<kbd>-</kbd> zoom |
+    <kbd>0</kbd> reset |
+    <kbd>F</kbd> fullscreen
+</div>
+
+<h2>Related Quantization Documentation</h2>
+<div class="grid grid-2">
+    <a href="quantization.html" class="card card-link">
+        <h3>Quantization Deep Dive</h3>
+        <p>BF16 vs FP16, block grouping, kernel dispatch strategy</p>
+    </a>
+    <a href="quant-formats.html" class="card card-link">
+        <h3>Format Reference</h3>
+        <p>Byte-level layout of Q4_0, Q5_0, Q8_0, K-quants</p>
+    </a>
+    <a href="simd-architecture.html" class="card card-link">
+        <h3>SIMD Architecture</h3>
+        <p>AVX-512, VNNI, AMX for quantized inference</p>
+    </a>
+    <a href="kernels.html" class="card card-link">
+        <h3>Kernel Catalog</h3>
+        <p>All available GEMM and quantized kernels</p>
+    </a>
+</div>
+
+<script>
+    let currentZoom = 100;
+    let currentSvg = 'overview';
+
+    function showSvg(name) {
+        document.querySelectorAll('.svg-container').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.description-panel').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.svg-nav button').forEach(btn => btn.classList.remove('active'));
+
+        document.getElementById('svg-' + name).classList.add('active');
+        document.getElementById('desc-' + name).style.display = 'block';
+        event.target.classList.add('active');
+
+        currentSvg = name;
+        resetZoom();
+    }
+
+    function zoomIn() {
+        currentZoom = Math.min(200, currentZoom + 25);
+        applyZoom();
+    }
+
+    function zoomOut() {
+        currentZoom = Math.max(50, currentZoom - 25);
+        applyZoom();
+    }
+
+    function resetZoom() {
+        currentZoom = 100;
+        applyZoom();
+    }
+
+    function applyZoom() {
+        const img = document.querySelector('.svg-container.active img');
+        img.style.width = currentZoom + '%';
+        document.getElementById('zoom-display').textContent = currentZoom + '%';
+    }
+
+    function openFullscreen() {
+        const img = document.querySelector('.svg-container.active img');
+        if (img.requestFullscreen) {
+            img.requestFullscreen();
+        } else if (img.webkitRequestFullscreen) {
+            img.webkitRequestFullscreen();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === '+' || e.key === '=') zoomIn();
+        if (e.key === '-') zoomOut();
+        if (e.key === '0') resetZoom();
+        if (e.key === 'f' || e.key === 'F') openFullscreen();
+        if (e.key === '1') { document.querySelector('.svg-nav button:nth-child(1)').click(); }
+        if (e.key === '2') { document.querySelector('.svg-nav button:nth-child(2)').click(); }
+        if (e.key === '3') { document.querySelector('.svg-nav button:nth-child(3)').click(); }
+        if (e.key === '4') { document.querySelector('.svg-nav button:nth-child(4)').click(); }
+    });
+</script>

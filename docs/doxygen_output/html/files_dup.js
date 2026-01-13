@@ -76,6 +76,7 @@ var files_dup =
     [ "fused_kernels.h", "fused__kernels_8h.html", "fused__kernels_8h" ],
     [ "gelu_kernels.c", "gelu__kernels_8c.html", "gelu__kernels_8c" ],
     [ "gelu_kernels_bf16.c", "gelu__kernels__bf16_8c.html", "gelu__kernels__bf16_8c" ],
+    [ "gemm_batch_int8.c", "gemm__batch__int8_8c.html", "gemm__batch__int8_8c" ],
     [ "gemm_fused_kernels.c", "gemm__fused__kernels_8c.html", "gemm__fused__kernels_8c" ],
     [ "gemm_kernels.c", "gemm__kernels_8c.html", "gemm__kernels_8c" ],
     [ "gemm_kernels_bf16.c", "gemm__kernels__bf16_8c.html", "gemm__kernels__bf16_8c" ],

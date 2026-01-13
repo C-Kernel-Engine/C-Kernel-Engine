@@ -825,6 +825,13 @@
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
                     <!-- Left Column -->
                     <div class="menu-section">
                         <div class="menu-heading">Core</div>
@@ -1197,10 +1204,11 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-12 19:19</span>
+        <span class="folder-updated">Updated: 2026-01-13 10:51</span>
     </div>
     <pre class="tree-output">
 .
+|-- ~
 |-- analysis
 |   |-- comprehensive_implementation_plan.md
 |   |-- CORRECTED_performance_analysis.md
@@ -1237,6 +1245,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- scripts
 |   |   |-- api.html
 |   |   |-- architecture.html
+|   |   |-- architecture-links.html
 |   |   |-- build.sh
 |   |   |-- codegen.html
 |   |   |-- concepts.html
@@ -1247,6 +1256,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- developer-guide.html
 |   |   |-- flash_attention.html
 |   |   |-- gemm-memory-layout.html
+|   |   |-- gemm-memory-layout-temp.html
 |   |   |-- gemm-optimization.html
 |   |   |-- gguf-bump.html
 |   |   |-- gguf-conversion.html
@@ -1260,6 +1270,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- pytorch-parity.html
 |   |   |-- quant-formats.html
 |   |   |-- quantization.html
+|   |   |-- quantization-math-temp.html
+|   |   |-- quantization-visuals.html
 |   |   |-- quickstart.html
 |   |   |-- research.html
 |   |   |-- scaling.html
@@ -1919,6 +1931,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- notebooks
 |   `-- kernel_testing_workflow.ipynb
 |-- patches
+|   |-- fix_avx512_qh_bits.patch
 |   |-- llama.patch
 |   |-- README.md
 |   |-- single_layer_dump.cpp
@@ -2003,6 +2016,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- ck_model_smoke_v6_5.py
 |   |   |-- ck_run_v6_5.py
 |   |   |-- codegen_v6_5.py
+|   |   |-- codegen_v6_5.py.backup_int8
+|   |   |-- codegen_v6_5.py.int8_backup
 |   |   |-- codegen_v6_5.py.old_fp32_only
 |   |   |-- convert_any_gguf_v6_5.py
 |   |   |-- convert_any_gguf_v6_5.sh
@@ -2115,6 +2130,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- embedding_kernels.c
 |   |   |-- gelu_kernels_bf16.c
 |   |   |-- gelu_kernels.c
+|   |   |-- gemm_batch_int8.c
 |   |   |-- gemm_fused_kernels.c
 |   |   |-- gemm_kernels_bf16.c
 |   |   |-- gemm_kernels.c
@@ -2325,6 +2341,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_fused_attention_decode.py
 |   |-- test_fused_swiglu_decode.py
 |   |-- test_gelu.py
+|   |-- test_gemm_batch_int8.py
 |   |-- test_gemm_fused.py
 |   |-- test_gemm_microkernel.py
 |   |-- test_gemm.py
@@ -2381,6 +2398,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- add_int8_kernel.sh
 |-- avx-512_issues.txt
 |-- avx-512-llamatest.txt
+|-- benchmark_gemm_vs_fp32.py
 |-- benchmark_v65.py
 |-- bf_16_test.txt
 |-- build_errors.txt.txt
@@ -2440,6 +2458,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- START_HERE.md
 |-- SUMMARY.md
 |-- test_error.txt
+|-- test_gemm_vs_gemv
+|-- test_gemm_vs_gemv.c
 |-- test_gemv
 |-- test_gemv.c
 |-- TESTING.md
@@ -2449,6 +2469,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- test_quant.txt
 |-- tiny.config.json
 |-- v6.5-perf.data
+|-- v6.5-perf.data.old
 |-- V6.5_PERFORMANCE_ANALYSIS_REPORT.md
 |-- v6.5-profile.svg
 |-- valgrind.supp
@@ -2457,7 +2478,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- vocab.json
 `-- weights_manifest.json
 
-173 directories, 1082 files
+174 directories, 1095 files
 </pre>
 </div>
 
@@ -2709,7 +2730,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-13</p>
             </div>
         </div>
     </footer>
