@@ -95,17 +95,62 @@ jobs:
           echo "=== Built libraries ==="
           ls -la build/*.so 2>/dev/null || echo "No .so files in build/"
 
-      # NOTE: Don't build llama.cpp here - let run_parity_smoketest.sh handle it
-      # The parity script needs to: checkout pinned commit, apply patches, build kernel test lib
-      - name: Setup llama.cpp for parity testing
+      # Build llama.cpp with patches for parity testing
+      - name: Setup and build llama.cpp for parity testing
         run: |
-          if [ -d "llama.cpp" ] || [ -f ".gitmodules" ]; then
-            echo "llama.cpp will be built by parity smoketest script with proper patches"
-            # Initialize submodule if needed (script will checkout pinned commit)
-            git submodule update --init llama.cpp 2>/dev/null || true
-          else
-            echo "llama.cpp submodule not configured, parity tests will be skipped"
+          LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
+          LLAMA_CPP_REPO="https://github.com/ggerganov/llama.cpp.git"
+
+          echo "=== Setting up llama.cpp for parity testing ==="
+
+          # Clone if not present
+          if [ ! -d "llama.cpp" ]; then
+            echo "Cloning llama.cpp..."
+            git clone --depth 100 "$LLAMA_CPP_REPO" llama.cpp
           fi
+
+          cd llama.cpp
+
+          # Checkout pinned commit for reproducibility
+          echo "Checking out commit $LLAMA_CPP_COMMIT..."
+          git fetch --depth 100 origin "$LLAMA_CPP_COMMIT" 2>/dev/null || git fetch origin 2>/dev/null || true
+          git checkout "$LLAMA_CPP_COMMIT" 2>/dev/null || echo "Using current HEAD"
+          echo "llama.cpp at: $(git rev-parse --short HEAD)"
+
+          # Apply patches
+          if [ -d "../patches" ]; then
+            echo "Applying patches..."
+            if [ -f "../patches/llama.patch" ]; then
+              git apply ../patches/llama.patch 2>/dev/null || echo "Patch already applied or N/A"
+            fi
+            if [ -f "../patches/test-kernel-parity.cpp" ]; then
+              mkdir -p tests
+              cp ../patches/test-kernel-parity.cpp tests/
+            fi
+          fi
+
+          # Build llama.cpp
+          echo "Building llama.cpp..."
+          cmake -B build \
+            -DGGML_CPU=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_CURL=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+
+          # Build kernel test library
+          if [ -f "tests/test-kernel-parity.cpp" ]; then
+            echo "Building ggml kernel test library..."
+            g++ -shared -fPIC -o libggml_kernel_test.so \
+              tests/test-kernel-parity.cpp \
+              -I ggml/include -I ggml/src \
+              -L build/bin -lggml -lggml-cpu -lggml-base -lm -lpthread \
+              -Wl,-rpath,'$ORIGIN/build/bin' 2>/dev/null || echo "Kernel test lib build failed (optional)"
+          fi
+
+          cd ..
+          echo "=== llama.cpp setup complete ==="
+          ls -la llama.cpp/build/bin/llama-cli 2>/dev/null || echo "llama-cli not found"
 
       - name: Download Q4_K GGUF for parity testing
         if: github.event_name != 'pull_request'
