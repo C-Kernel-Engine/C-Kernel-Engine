@@ -2113,11 +2113,11 @@ Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00375">375</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
 <div class="fragment"><div class="line"><a name="l00379"></a><span class="lineno">  379</span>&#160;{</div>
-<div class="line"><a name="l00380"></a><span class="lineno">  380</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;    gemv_q5_0_avx512(y, W, x, M, K);</div>
-<div class="line"><a name="l00382"></a><span class="lineno">  382</span>&#160;<span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><a name="l00383"></a><span class="lineno">  383</span>&#160;    gemv_q5_0_avx2(y, W, x, M, K);</div>
-<div class="line"><a name="l00384"></a><span class="lineno">  384</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a name="l00380"></a><span class="lineno">  380</span>&#160;<span class="comment">// TODO: Implement gemv_q5_0_avx2 for better AVX2 performance</span></div>
+<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;<span class="comment">// For now, AVX2 falls back to AVX (backward compatible)</span></div>
+<div class="line"><a name="l00382"></a><span class="lineno">  382</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00383"></a><span class="lineno">  383</span>&#160;    gemv_q5_0_avx512(y, W, x, M, K);</div>
+<div class="line"><a name="l00384"></a><span class="lineno">  384</span>&#160;<span class="preprocessor">#elif defined(__AVX__) || defined(__AVX2__)</span></div>
 <div class="line"><a name="l00385"></a><span class="lineno">  385</span>&#160;    gemv_q5_0_avx(y, W, x, M, K);</div>
 <div class="line"><a name="l00386"></a><span class="lineno">  386</span>&#160;<span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
 <div class="line"><a name="l00387"></a><span class="lineno">  387</span>&#160;    gemv_q5_0_sse_v2(y, W, x, M, K);</div>
@@ -2273,11 +2273,11 @@ Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00382">382</a> of file <a class="el" href="gemm__kernels__q8__0_8c_source.html">gemm_kernels_q8_0.c</a>.</p>
 <div class="fragment"><div class="line"><a name="l00386"></a><span class="lineno">  386</span>&#160;{</div>
-<div class="line"><a name="l00387"></a><span class="lineno">  387</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a name="l00388"></a><span class="lineno">  388</span>&#160;    gemv_q8_0_avx512(y, W, x, M, K);</div>
-<div class="line"><a name="l00389"></a><span class="lineno">  389</span>&#160;<span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><a name="l00390"></a><span class="lineno">  390</span>&#160;    gemv_q8_0_avx2(y, W, x, M, K);</div>
-<div class="line"><a name="l00391"></a><span class="lineno">  391</span>&#160;<span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a name="l00387"></a><span class="lineno">  387</span>&#160;<span class="comment">// TODO: Implement gemv_q8_0_avx2 for better AVX2 performance</span></div>
+<div class="line"><a name="l00388"></a><span class="lineno">  388</span>&#160;<span class="comment">// For now, AVX2 falls back to AVX (backward compatible)</span></div>
+<div class="line"><a name="l00389"></a><span class="lineno">  389</span>&#160;<span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a name="l00390"></a><span class="lineno">  390</span>&#160;    gemv_q8_0_avx512(y, W, x, M, K);</div>
+<div class="line"><a name="l00391"></a><span class="lineno">  391</span>&#160;<span class="preprocessor">#elif defined(__AVX__) || defined(__AVX2__)</span></div>
 <div class="line"><a name="l00392"></a><span class="lineno">  392</span>&#160;    gemv_q8_0_avx(y, W, x, M, K);</div>
 <div class="line"><a name="l00393"></a><span class="lineno">  393</span>&#160;<span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
 <div class="line"><a name="l00394"></a><span class="lineno">  394</span>&#160;    gemv_q8_0_sse(y, W, x, M, K);</div>

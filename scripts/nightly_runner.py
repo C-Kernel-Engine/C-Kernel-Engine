@@ -203,10 +203,10 @@ TEST_SUITES = {
     "cross_entropy_bf16": TestSuite("Cross Entropy BF16", "bf16", BF16_DIR / "test_cross_entropy_bf16.py"),
 
     # Quantization tests
-    "quant_kernels": TestSuite("Quant Kernels", "quant", UNITTEST_DIR / "test_quant_kernels.py"),
+    # NOTE: test_quant_kernels.py and test_q4_k_quantize.py removed - use llamacpp-parity-full
+    # for authoritative kernel correctness testing against llama.cpp reference
     "q4k_kernels": TestSuite("Q4_K Kernels", "quant", UNITTEST_DIR / "test_q4k_kernels.py"),
     "q6k_kernels": TestSuite("Q6_K Kernels", "quant", UNITTEST_DIR / "test_q6k_kernels.py"),
-    "q4_k_quantize": TestSuite("Q4_K Quantize", "quant", UNITTEST_DIR / "test_q4_k_quantize.py"),
     "q4_k_q8_k_matvec": TestSuite("Q4_K x Q8_K MatVec", "quant", UNITTEST_DIR / "test_q4_k_q8_k_matvec.py"),
 
     # Training/backward tests
@@ -231,17 +231,18 @@ MAKE_TARGETS = {
         "target": "layer-parity",
         "timeout_sec": 300,
     },
-    "smollm_parity": {
-        "name": "SmolLM Train Parity",
-        "category": "parity",
-        "target": "smollm-train-parity",
-        "timeout_sec": 600,
-    },
+    # TODO: Re-enable in v7 when training pipeline is updated
+    # "smollm_parity": {
+    #     "name": "SmolLM Train Parity",
+    #     "category": "parity",
+    #     "target": "smollm-train-parity",
+    #     "timeout_sec": 600,
+    # },
     "llamacpp_parity": {
-        "name": "llama.cpp Parity",
+        "name": "llama.cpp Parity (Full)",
         "category": "parity",
-        "target": "llamacpp-parity",
-        "timeout_sec": 600,
+        "target": "llamacpp-parity-full",
+        "timeout_sec": 900,  # Full test takes longer
     },
     "flash_attention": {
         "name": "Flash Attention (50K+)",

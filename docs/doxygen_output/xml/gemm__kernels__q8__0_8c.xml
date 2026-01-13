@@ -1224,11 +1224,11 @@
 <codeline lineno="384"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
 <codeline lineno="385"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
 <codeline lineno="386"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="387"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="388"><highlight class="normal"><sp/><sp/><sp/><sp/>gemv_q8_0_avx512(y,<sp/>W,<sp/>x,<sp/>M,<sp/>K);</highlight></codeline>
-<codeline lineno="389"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX2__)<sp/>&amp;&amp;<sp/>defined(__FMA__)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="390"><highlight class="normal"><sp/><sp/><sp/><sp/>gemv_q8_0_avx2(y,<sp/>W,<sp/>x,<sp/>M,<sp/>K);</highlight></codeline>
-<codeline lineno="391"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="387"><highlight class="normal"></highlight><highlight class="comment">//<sp/>TODO:<sp/>Implement<sp/>gemv_q8_0_avx2<sp/>for<sp/>better<sp/>AVX2<sp/>performance</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="388"><highlight class="normal"></highlight><highlight class="comment">//<sp/>For<sp/>now,<sp/>AVX2<sp/>falls<sp/>back<sp/>to<sp/>AVX<sp/>(backward<sp/>compatible)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="389"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="390"><highlight class="normal"><sp/><sp/><sp/><sp/>gemv_q8_0_avx512(y,<sp/>W,<sp/>x,<sp/>M,<sp/>K);</highlight></codeline>
+<codeline lineno="391"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)<sp/>||<sp/>defined(__AVX2__)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="392"><highlight class="normal"><sp/><sp/><sp/><sp/>gemv_q8_0_avx(y,<sp/>W,<sp/>x,<sp/>M,<sp/>K);</highlight></codeline>
 <codeline lineno="393"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__SSE4_1__)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="394"><highlight class="normal"><sp/><sp/><sp/><sp/>gemv_q8_0_sse(y,<sp/>W,<sp/>x,<sp/>M,<sp/>K);</highlight></codeline>

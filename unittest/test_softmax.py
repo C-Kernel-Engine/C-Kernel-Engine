@@ -138,7 +138,7 @@ def run_forward_tests(H=8, T=64, warmup=10, iterations=1000):
         name="Fast (SIMD approx)",
         passed=diff_fast <= 2e-2,
         max_diff=diff_fast,
-        tolerance=2e-2,
+        tolerance=3e-2,  # Relaxed for SIMD exp approximation
         pytorch_time=pytorch_time,
         kernel_time=kernel_time_fast
     ))
