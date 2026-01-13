@@ -33,7 +33,8 @@ endif
 # Detect AVX level
 DEFAULT_AVX_FLAGS :=
 ifneq (,$(findstring avx512f,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS := -mavx512f $(FMA_FLAGS)
+# Full AVX-512 requires F, BW, DQ for all kernels (including _mm512_extractf32x8_ps)
+DEFAULT_AVX_FLAGS := -mavx512f -mavx512bw -mavx512dq $(FMA_FLAGS)
 ifneq (,$(findstring avx512vnni,$(CPU_FLAGS)))
 DEFAULT_AVX_FLAGS += -mavx512vnni
 endif

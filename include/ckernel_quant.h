@@ -343,6 +343,11 @@ void gemv_q4_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K)
 void quantize_row_q8_k_sse(const float *x, void *vy, int k);
 void rmsnorm_q8_k_fused(const float *input, const float *gamma, void *vy, int tokens, int d_model, int aligned_embed_dim, float eps);
 
+/* INT8 activation batch GEMM kernels (Q5_0 weights x Q8_0 activations) */
+void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K);
+void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy);
+void quantize_row_q8_0(const float *x, void *vy, int k);
+
 #ifdef __cplusplus
 }
 #endif

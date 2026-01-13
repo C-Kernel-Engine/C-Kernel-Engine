@@ -154,16 +154,17 @@ void gemv_q5_0_avx512(float *y,
             );
 
             /* Build high bit contribution for second 16 weights (indices 16-31)
-             * Uses bits 12-27 (j+12 where j=0..15), NOT bits 16-31 */
+             * Scalar code: xh_1 = ((qh >> (j+12))) & 0x10 extracts bit (j+16)
+             * So weights 16-31 use qh bits 16-31 */
             __m512i qh_hi = _mm512_set_epi32(
+                ((qh >> 31) & 1) << 4, ((qh >> 30) & 1) << 4,
+                ((qh >> 29) & 1) << 4, ((qh >> 28) & 1) << 4,
                 ((qh >> 27) & 1) << 4, ((qh >> 26) & 1) << 4,
                 ((qh >> 25) & 1) << 4, ((qh >> 24) & 1) << 4,
                 ((qh >> 23) & 1) << 4, ((qh >> 22) & 1) << 4,
                 ((qh >> 21) & 1) << 4, ((qh >> 20) & 1) << 4,
                 ((qh >> 19) & 1) << 4, ((qh >> 18) & 1) << 4,
-                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4,
-                ((qh >> 15) & 1) << 4, ((qh >> 14) & 1) << 4,
-                ((qh >> 13) & 1) << 4, ((qh >> 12) & 1) << 4
+                ((qh >> 17) & 1) << 4, ((qh >> 16) & 1) << 4
             );
 
             /* Combine low + high bits and subtract offset */
@@ -1057,5 +1058,54 @@ void gemv_q5_0_q8_0(float *y,
         vec_dot_q5_0_q8_0(K, &y[row],
                           &w_blocks[row * blocks_per_row],
                           x_blocks);
+    }
+}
+
+/**
+ * @brief Batch GEMM with Q5_0 weights and Q8_0 activations for prefill
+ *
+ * Computes C = A @ B^T + bias where:
+ *   A: [M x K] Q8_0 quantized activations (M tokens, K features)
+ *   B: [N x K] Q5_0 quantized weights (N outputs, K features)
+ *   C: [M x N] FP32 output
+ *
+ * This is the INT8 batch kernel for prefill, using pre-quantized activations
+ * to avoid FP32->Q8_0 conversion overhead per operation.
+ *
+ * @param A_q8   Input activations in Q8_0 format [M rows of K/32 blocks each]
+ * @param B_q5   Weights in Q5_0 format [N rows of K/32 blocks each]
+ * @param bias   Optional bias vector [N], NULL if not used
+ * @param C      Output matrix [M x N], row-major FP32
+ * @param M      Batch size (number of tokens)
+ * @param N      Output dimension (number of output features)
+ * @param K      Input dimension (must be multiple of 32)
+ */
+void gemm_nt_q5_0_q8_0(
+    const void *A_q8,
+    const void *B_q5,
+    const float *bias,
+    float *C,
+    int M,
+    int N,
+    int K)
+{
+    const block_q5_0 *weights = (const block_q5_0 *)B_q5;
+    const block_q8_0 *inputs = (const block_q8_0 *)A_q8;
+    const int blocks_per_row = K / QK5_0;  /* QK5_0 == QK8_0 == 32 */
+
+    for (int m = 0; m < M; m++) {
+        const block_q8_0 *input_row = &inputs[m * blocks_per_row];
+
+        for (int n = 0; n < N; n++) {
+            const block_q5_0 *weight_row = &weights[n * blocks_per_row];
+            float *out = &C[m * N + n];
+
+            /* Use portable dispatch (selects AVX512/AVX/SSE/scalar) */
+            vec_dot_q5_0_q8_0(K, out, weight_row, input_row);
+
+            if (bias) {
+                *out += bias[n];
+            }
+        }
     }
 }

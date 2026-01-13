@@ -28,7 +28,7 @@ for path in (_SCRIPT_DIR, _V4_DIR):
             sys.path.insert(0, path_str)
 
 import build_ir_v4 as v4
-import convert_gguf_to_bump_v6 as gguf
+import convert_gguf_to_bump_v6_5 as gguf
 
 
 def pick(cfg: Dict, keys: List[str], default=None):

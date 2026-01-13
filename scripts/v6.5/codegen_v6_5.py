@@ -10,7 +10,7 @@ Key differences from v4:
 
 Generated code shows the exact quant type for each operation, e.g.:
     // Layer 0: wq=Q5_0, wv=Q8_0, w2=Q6_K
-    gemm_nt_q5_0(L0_input, L0_WQ, NULL, L0_q, ...);
+    gemm_nt_q5_0_q8_0(L0_input, L0_WQ, NULL, L0_q, ...);
     gemm_nt_q8_0(L0_input, L0_WV, NULL, L0_v, ...);
 """
 
@@ -46,7 +46,7 @@ def _layer_has_field(layer_names: List[str], field: str) -> bool:
 DTYPE_TO_GEMM_NT_KERNEL = {
     "q4_0": "gemm_nt_q4_0",
     "q4_1": "gemm_nt_q4_1",
-    "q5_0": "gemm_nt_q5_0",
+    "q5_0": "gemm_nt_q5_0",  # FP32 input for default path
     "q5_1": "gemm_nt_q5_1",
     "q8_0": "gemm_nt_q8_0",
     "q4_k": "gemm_nt_q4_k",
@@ -72,6 +72,14 @@ DTYPE_TO_GEMV_Q8_KERNEL = {
     "q8_0": ("gemv_q8_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q8_0 weights x Q8_0 activations
     "q4_k": ("gemv_q4_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q4_K weights x Q8_K activations
     # Q6_K: No INT8 kernel yet, falls back to FP32
+}
+
+# INT8 activation path for batch GEMM (prefill): quantize input to Q8, use quantized GEMM
+# Format: (gemm_kernel, activation_quant_type, quantize_function)
+# Uses proj_scratch buffer (pre-allocated, unused during QKV projection) as Q8 scratch
+DTYPE_TO_GEMM_NT_Q8_KERNEL = {
+    "q5_0": ("gemm_nt_q5_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q5_0 weights x Q8_0 activations (batch)
+    # Add more as kernels become available
 }
 
 
@@ -651,6 +659,14 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             w1_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(w1_dt, "gemm_blocked_serial")
             w2_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(w2_dt, "gemm_blocked_serial")
 
+            # Check for INT8 batch kernels (prefill optimization)
+            wq_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(wq_dt)
+            wk_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(wk_dt)
+            wv_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(wv_dt)
+            wo_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(wo_dt)
+            w1_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(w1_dt)
+            w2_int8_batch = DTYPE_TO_GEMM_NT_Q8_KERNEL.get(w2_dt)
+
             add("/*")
             add(f" * Layer {layer_id}: wq={wq_dt} wk={wk_dt} wv={wv_dt} wo={wo_dt} w1={w1_dt} w2={w2_dt}")
             add(" */")
@@ -733,6 +749,21 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("    const size_t kv_head_stride = (size_t)aligned_context_window * (size_t)aligned_head_dim;")
             add()
 
+            # Add Q8_0 scratch buffer if any INT8 batch kernels are used for QKV
+            # Reuse proj_scratch as Q8 scratch (proj_scratch is unused during QKV projection)
+            # proj_scratch size: num_tokens * aligned_embed_dim * 4 bytes (float)
+            # Q8_0 needs: num_tokens * (aligned_embed_dim/32 + 1) * 34 bytes
+            # Since 4*embed_dim > 34*(embed_dim/32+1), proj_scratch is always large enough
+            # Only use INT8 batch if proj_scratch is available (needed as scratch buffer)
+            use_int8_batch = has_proj_scratch and (wq_int8_batch or wk_int8_batch or wv_int8_batch)
+            if use_int8_batch:
+                add("    /* INT8 batch activation scratch buffer (Q8_0 format) */")
+                add("    /* Reuse proj_scratch as Q8 scratch (unused during QKV) */")
+                add("    /* Q8_0: 34 bytes per 32 elements, proj_scratch: 4 bytes per element */")
+                add("    const size_t q8_row_bytes = ((size_t)aligned_embed_dim / 32) * 34;  /* Must match kernel stride */")
+                add("    uint8_t *ln1_q8 = (uint8_t *)proj_scratch;")
+                add()
+
             add("    /* RMSNorm before attention */")
             add("    rmsnorm_forward(input,")
             add("                    ln1_gamma,")
@@ -744,6 +775,16 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
             add()
 
+            # Quantize ln1_out to Q8_0 once for all QKV projections
+            if use_int8_batch:
+                add("    /* Quantize ln1_out to Q8_0 for INT8 batch kernels */")
+                add("    for (int t = 0; t < num_tokens; ++t) {")
+                add("        quantize_row_q8_0(ln1_out + (size_t)t * (size_t)aligned_embed_dim,")
+                add("                          ln1_q8 + (size_t)t * q8_row_bytes,")
+                add("                          aligned_embed_dim);")
+                add("    }")
+                add()
+
             add("    /* Q projection (head-major) */")
             if wq_dt == "fp32":
                 add("    const float *WQ_f = (const float *)WQ;")
@@ -752,6 +793,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bq_h = BQ ? (BQ + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *q_h = q + (size_t)h * q_head_stride;")
                 add(f"        {wq_kernel}(ln1_out, wq_h, bq_h, q_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
+                add("    }")
+            elif wq_int8_batch:
+                # INT8 batch path: use pre-quantized Q8_0 input
+                gemm_kernel, _, _ = wq_int8_batch
+                add(f"    /* Q projection: {wq_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
+                add(f"    const size_t wq_head_bytes = ck_dtype_row_bytes({dtype_const(wq_dt)}, head_w_elems);")
+                add("    const uint8_t *WQ_bytes = (const uint8_t *)WQ;")
+                add("    for (int h = 0; h < H; ++h) {")
+                add("        const void *wq_h = (const void *)(WQ_bytes + (size_t)h * wq_head_bytes);")
+                add("        const float *bq_h = BQ ? (BQ + (size_t)h * (size_t)aligned_head_dim) : NULL;")
+                add("        float *q_h = q + (size_t)h * q_head_stride;")
+                add(f"        {gemm_kernel}(ln1_q8, wq_h, bq_h, q_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
             else:
                 add(f"    const size_t wq_head_bytes = ck_dtype_row_bytes({dtype_const(wq_dt)}, head_w_elems);")
@@ -773,6 +826,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *k_h = k + (size_t)h * kv_head_stride;")
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+            elif wk_int8_batch:
+                # INT8 batch path: use pre-quantized Q8_0 input
+                gemm_kernel, _, _ = wk_int8_batch
+                add(f"    /* K projection: {wk_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
+                add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, head_w_elems);")
+                add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
+                add("    for (int h = 0; h < H_kv; ++h) {")
+                add("        const void *wk_h = (const void *)(WK_bytes + (size_t)h * wk_head_bytes);")
+                add("        const float *bk_h = BK ? (BK + (size_t)h * (size_t)aligned_head_dim) : NULL;")
+                add("        float *k_h = k + (size_t)h * kv_head_stride;")
+                add(f"        {gemm_kernel}(ln1_q8, wk_h, bk_h, k_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
+                add("    }")
             else:
                 add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, head_w_elems);")
                 add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
@@ -792,6 +857,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
                 add("        float *v_h = v + (size_t)h * kv_head_stride;")
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
+                add("    }")
+            elif wv_int8_batch:
+                # INT8 batch path: use pre-quantized Q8_0 input
+                gemm_kernel, _, _ = wv_int8_batch
+                add(f"    /* V projection: {wv_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
+                add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, head_w_elems);")
+                add("    const uint8_t *WV_bytes = (const uint8_t *)WV;")
+                add("    for (int h = 0; h < H_kv; ++h) {")
+                add("        const void *wv_h = (const void *)(WV_bytes + (size_t)h * wv_head_bytes);")
+                add("        const float *bv_h = BV ? (BV + (size_t)h * (size_t)aligned_head_dim) : NULL;")
+                add("        float *v_h = v + (size_t)h * kv_head_stride;")
+                add(f"        {gemm_kernel}(ln1_q8, wv_h, bv_h, v_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
             else:
                 add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, head_w_elems);")
@@ -881,6 +958,9 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             add("    /* Final residual add */")
             add(f"    {safe_name_lower}_residual_add_token_major(residual1, mlp_out, output, num_tokens, aligned_embed_dim);")
+
+            # No free needed - using pre-allocated proj_scratch buffer
+
             add("}")
             add()
 
