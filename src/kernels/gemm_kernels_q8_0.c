@@ -384,11 +384,11 @@ void gemv_q8_0(float *y,
                const float *x,
                int M, int K)
 {
+// TODO: Implement gemv_q8_0_avx2 for better AVX2 performance
+// For now, AVX2 falls back to AVX (backward compatible)
 #if defined(__AVX512F__)
     gemv_q8_0_avx512(y, W, x, M, K);
-#elif defined(__AVX2__) && defined(__FMA__)
-    gemv_q8_0_avx2(y, W, x, M, K);
-#elif defined(__AVX__)
+#elif defined(__AVX__) || defined(__AVX2__)
     gemv_q8_0_avx(y, W, x, M, K);
 #elif defined(__SSE4_1__)
     gemv_q8_0_sse(y, W, x, M, K);
