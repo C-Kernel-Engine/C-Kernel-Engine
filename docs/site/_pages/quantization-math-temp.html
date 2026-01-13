@@ -1,0 +1,212 @@
+<!-- TITLE: Quantization Math Deep Dive -->
+<!-- NAV: concepts -->
+
+<h1>Quantization Math Deep Dive</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Understanding Q5_0 and Q8_0 Formats</strong><br>
+        This page explains how 5-bit and 8-bit quantization works, the AVX-512 vectorization strategy, and the bugs we fixed during development.
+    </div>
+</div>
+
+<h2>Memory Layout: Block Structures</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Q8_0 Block (34 bytes)</h3>
+        <pre><code>struct block_q8_0 {
+    ggml_fp16_t d;      // 2 bytes: FP16 scale
+    int8_t qs[32];      // 32 bytes: 32 weights
+};  // Total: 34 bytes / 32 weights
+
+// Dequantization:
+weight[i] = qs[i] * d</code></pre>
+        <p><strong>Compression:</strong> 8.5 bits/weight (vs 32 for FP32)</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Q5_0 Block (22 bytes)</h3>
+        <pre><code>struct block_q5_0 {
+    ggml_fp16_t d;      // 2 bytes: FP16 scale
+    uint32_t qh[4];     // 4 bytes: 32 high bits
+    uint8_t qs[16];     // 16 bytes: packed nibbles
+};  // Total: 22 bytes / 32 weights
+
+// Each 5-bit weight = 4 bits from qs + 1 bit from qh</code></pre>
+        <p><strong>Compression:</strong> 5.5 bits/weight</p>
+    </div>
+</div>
+
+<h2>Q8_0 Dequantization (Simple)</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Straightforward FP16 Scale</h3>
+    <p>Q8_0 is simple: each weight is just <code>qs[i] * d</code> where d is the FP16 scale.</p>
+    <pre><code>// Q8_0 dequantization
+for (int j = 0; j < 32; j++) {
+    float weight = d * (float)block->qs[j];
+}</code></pre>
+</div>
+
+<h2>Q5_0 Dequantization (Complex)</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>The 5-Bit Challenge</strong><br>
+        Q5_0 stores each weight in two pieces: 4 bits in <code>qs[]</code> (packed) and 1 high bit in <code>qh[]</code>. These must be combined before use.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Q5_0 Bit Mapping</h3>
+    <table>
+        <tr>
+            <th>Weight Index</th>
+            <th>qs Source</th>
+            <th>qh Bit</th>
+        </tr>
+        <tr>
+            <td>0-15 (first half)</td>
+            <td><code>qs[j] & 0x0F</code> (low nibble)</td>
+            <td>bit j (0-15)</td>
+        </tr>
+        <tr>
+            <td>16-31 (second half)</td>
+            <td><code>qs[j] >> 4</code> (high nibble)</td>
+            <td>bit j+16 (16-31)</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Q5_0 Scalar Reference</h3>
+    <pre><code>// Q5_0 dequantization - scalar reference
+for (int j = 0; j < 16; j++) {
+    // First 16 weights: low nibbles + qh bits 0-15
+    uint8_t xh_0 = ((qh >> j) & 1) << 4;
+    int32_t x0 = ((qs[j] & 0x0F) | xh_0) - 16;
+
+    // Second 16 weights: high nibbles + qh bits 16-31
+    uint8_t xh_1 = ((qh >> (j + 16)) & 1) << 4;
+    int32_t x1 = ((qs[j] >> 4) | xh_1) - 16;
+
+    weight[j] = d * x0;
+    weight[j + 16] = d * x1;
+}</code></pre>
+</div>
+
+<h2>AVX-512 Bugs We Found & Fixed</h2>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #e74c3c;">
+        <h3 style="margin-top: 0; color: #e74c3c;">Bug #1: 16x Multiplier</h3>
+        <p>Result was exactly 16x too large!</p>
+        <pre><code>// BUGGY:
+acc = _mm512_add_ps(acc, _mm512_set1_ps(d * sumi));
+*s = _mm512_reduce_add_ps(acc);
+// _mm512_set1_ps broadcasts to 16 lanes, then sum = 16x!</code></pre>
+        <p><strong>Fix:</strong> Use scalar accumulator instead of vector broadcast.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid #e74c3c;">
+        <h3 style="margin-top: 0; color: #e74c3c;">Bug #2: Wrong qh Bits</h3>
+        <p>Used bits 12-27 instead of bits 16-31!</p>
+        <pre><code>// BUGGY - used wrong bit range
+__m512i qh_hi = _mm512_set_epi32(
+    ((qh >> 27) & 1) << 4, ...,  // Wrong!
+    ((qh >> 12) & 1) << 4       // Wrong!
+);
+
+// FIXED - correct bit range 16-31
+__m512i qh_hi = _mm512_set_epi32(
+    ((qh >> 31) & 1) << 4, ...,  // Correct!
+    ((qh >> 16) & 1) << 4        // Correct!
+);</code></pre>
+    </div>
+</div>
+
+<h2>AVX-512 Vectorization Strategy</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Processing 32 Weights in 2 Batches of 16</h3>
+    <pre><code>// AVX-512 vec_dot_q5_0_q8_0
+for (int ib = 0; ib < nb; ib++) {
+    // Load 16 packed bytes (32 nibbles)
+    __m128i qs = _mm_loadu_si128(x[ib].qs);
+
+    // First 16 weights
+    __m512i lo_nibbles = _mm512_cvtepu8_epi32(qs);
+    lo_nibbles = _mm512_and_epi32(lo_nibbles, mask_0f);
+    __m512i qh_lo = /* bits 0-15 of qh, shifted to bit 4 */;
+    __m512i q5_lo = _mm512_sub_epi32(_mm512_or_epi32(lo_nibbles, qh_lo), sixteen);
+
+    __m512i y32_lo = _mm512_cvtepi8_epi32(y[ib].qs[0:16]);
+    __m512i prod_lo = _mm512_mullo_epi32(q5_lo, y32_lo);
+
+    // Second 16 weights (similar, using high nibbles + qh bits 16-31)
+
+    int sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));
+    sumf += d * (float)sumi;
+}</code></pre>
+</div>
+
+<h2>Key AVX-512 Intrinsics Used</h2>
+
+<table>
+    <tr>
+        <th>Intrinsic</th>
+        <th>Operation</th>
+    </tr>
+    <tr>
+        <td><code>_mm512_cvtepu8_epi32</code></td>
+        <td>Expand 16 bytes → 16 int32s (zero extension)</td>
+    </tr>
+    <tr>
+        <td><code>_mm512_cvtepi8_epi32</code></td>
+        <td>Expand 16 int8 → 16 int32s (sign extension)</td>
+    </tr>
+    <tr>
+        <td><code>_mm512_mullo_epi32</code></td>
+        <td>Multiply 16 pairs of int32s (saturating)</td>
+    </tr>
+    <tr>
+        <td><code>_mm512_reduce_add_epi32</code></td>
+        <td>Horizontal sum of all 16 lanes</td>
+    </tr>
+    <tr>
+        <td><code>_mm512_set_epi32</code></td>
+        <td>Build vector from 16 scalar values</td>
+    </tr>
+</table>
+
+<h2>Quick Reference</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Q8_0 Formula</h3>
+        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
+            weight[i] = d × qs[i]
+        </p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Q5_0 Formula</h3>
+        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
+            weight[j] = d × ((nibble | (qh_bit &lt;&lt; 4)) - 16)
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">vec_dot Computation</h3>
+    <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
+        result = Σ (d_x × d_y × Σ (dequant_x[i] × y[i]))
+    </p>
+    <p style="text-align: center; margin-top: 1rem;">
+        Sum over all blocks, where each block contributes: scale × integer_dot_product
+    </p>
+</div>
