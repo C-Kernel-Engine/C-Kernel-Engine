@@ -208,6 +208,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
 	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
 	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	           src/kernels/gemm_kernels_q6k_q8k.c \
+	           src/kernels/gemm_batch_int8.c \
 	           src/kernels/gemm_kernels_q8_0.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/rmsnorm_q8_k_fused.c \
@@ -1518,6 +1520,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q4k_q8k.c \
                src/kernels/gemm_kernels_q4k_q8k_avx2.c \
                src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+               src/kernels/gemm_kernels_q6k_q8k.c \
                src/kernels/gemm_kernels_q4k_sse.c \
                src/kernels/gemm_kernels_q5_0.c \
                src/kernels/gemm_kernels_q5_0_sse_v2.c \
