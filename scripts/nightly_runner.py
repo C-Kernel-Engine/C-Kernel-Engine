@@ -64,6 +64,30 @@ def parse_sub_tests(stdout: str) -> list:
         re.MULTILINE
     )
 
+    # Pattern for tabular accuracy results (comprehensive GEMV tests):
+    # name     MxK     max_diff    mean_diff    tol    [PASS/FAIL]
+    # Example: Q4_K_tiny     1x256     1.14e-05     1.14e-05      1e-03  [PASS]
+    tabular_accuracy_pattern = re.compile(
+        r'^\s*(\S+)\s+'  # test name
+        r'(\d+x\d+)\s+'  # dimensions MxK
+        r'(\d+\.?\d*e?[+-]?\d*)\s+'  # max_diff
+        r'(\d+\.?\d*e?[+-]?\d*)\s+'  # mean_diff
+        r'(\d+\.?\d*e?[+-]?\d*)\s+'  # tolerance
+        r'\[?(?:\x1b\[\d+m)?(PASS|FAIL)(?:\x1b\[\d+m)?\]?',  # status
+        re.MULTILINE
+    )
+
+    # Pattern for "Test N: name" followed by "[PASS] max_diff = X" format
+    # Example:
+    #   Test 1: Q4_K Dequantization
+    #     [PASS] max_diff = 0.00e+00
+    test_n_pattern = re.compile(
+        r'Test\s+\d+:\s+(.+?)[\n\r]+\s*'  # "Test N: name" line
+        r'\[(?:\x1b\[\d+m)?(PASS|FAIL)(?:\x1b\[\d+m)?\]\s+'  # [PASS/FAIL]
+        r'max_diff\s*=\s*(\d+\.?\d*e?[+-]?\d*)',  # max_diff = X
+        re.MULTILINE
+    )
+
     # Pattern for performance results: name  pytorch_time  c_time  speedup
     perf_pattern = re.compile(
         r'^\s*(\S+(?:\s+\([^)]+\))?)\s+'  # test name
@@ -73,7 +97,7 @@ def parse_sub_tests(stdout: str) -> list:
         re.MULTILINE
     )
 
-    # Extract accuracy results
+    # Extract accuracy results from standard format
     accuracy_results = {}
     for match in accuracy_pattern.finditer(stdout):
         name = match.group(1).strip()
@@ -85,6 +109,34 @@ def parse_sub_tests(stdout: str) -> list:
             'tolerance': tolerance,
             'status': status
         }
+
+    # Also extract from tabular format (comprehensive GEMV tests)
+    for match in tabular_accuracy_pattern.finditer(stdout):
+        name = match.group(1).strip()
+        # dimensions = match.group(2)  # MxK, not stored for now
+        max_diff = float(match.group(3))
+        # mean_diff = float(match.group(4))  # not stored for now
+        tolerance = float(match.group(5))
+        status = match.group(6).lower()
+        # Don't overwrite if already found
+        if name not in accuracy_results:
+            accuracy_results[name] = {
+                'max_diff': max_diff,
+                'tolerance': tolerance,
+                'status': status
+            }
+
+    # Extract from "Test N: name" format (Q4_K/Q6_K kernel tests)
+    for match in test_n_pattern.finditer(stdout):
+        name = match.group(1).strip()
+        status = match.group(2).lower()
+        max_diff = float(match.group(3))
+        if name not in accuracy_results:
+            accuracy_results[name] = {
+                'max_diff': max_diff,
+                'tolerance': None,  # Not provided in this format
+                'status': status
+            }
 
     # Extract performance results
     perf_results = {}
