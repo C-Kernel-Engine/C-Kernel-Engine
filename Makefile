@@ -1246,6 +1246,87 @@ llamacpp-parity-avx512:
 		echo "SKIP: AVX-512 not available on this machine"; \
 	fi
 
+# =============================================================================
+# Profiling: Flamegraph and Performance Analysis
+# =============================================================================
+# Generate flamegraphs comparing CK-Engine vs llama.cpp
+# Prerequisites: perf, FlameGraph (auto-cloned)
+# Results saved to: profile_results/<timestamp>/
+
+# Profile both CK-Engine and llama.cpp (100 tokens)
+profile:
+	@./scripts/profile_comparison.sh
+
+# Profile with more tokens for better sampling
+profile-extended:
+	@./scripts/profile_comparison.sh --tokens 200
+
+# Profile CK-Engine only
+profile-ck:
+	@./scripts/profile_comparison.sh --ck-only --tokens 200
+
+# Profile llama.cpp only
+profile-llama:
+	@./scripts/profile_comparison.sh --llama-only --tokens 200
+
+# Quick profile (50 tokens, faster)
+profile-quick:
+	@./scripts/profile_comparison.sh --tokens 50
+
+# View latest flamegraphs (opens in browser)
+profile-view:
+	@LATEST=$$(ls -td profile_results/*/ 2>/dev/null | head -1); \
+	if [ -n "$$LATEST" ]; then \
+		echo "Opening flamegraphs from $$LATEST"; \
+		[ -f "$$LATEST/ck_flamegraph.svg" ] && xdg-open "$$LATEST/ck_flamegraph.svg" 2>/dev/null || firefox "$$LATEST/ck_flamegraph.svg" &; \
+		[ -f "$$LATEST/llama_flamegraph.svg" ] && xdg-open "$$LATEST/llama_flamegraph.svg" 2>/dev/null || firefox "$$LATEST/llama_flamegraph.svg" &; \
+	else \
+		echo "No profile results found. Run 'make profile' first."; \
+	fi
+
+# Show profiling guide
+profile-help:
+	@echo ""
+	@echo "==================================================================="
+	@echo "  Profiling Guide: CK-Engine vs llama.cpp"
+	@echo "==================================================================="
+	@echo ""
+	@echo "QUICK START:"
+	@echo "  make profile          # Profile both (100 tokens)"
+	@echo "  make profile-view     # Open flamegraphs in browser"
+	@echo ""
+	@echo "TARGETS:"
+	@echo "  make profile          Profile both engines (100 tokens)"
+	@echo "  make profile-extended Profile both engines (200 tokens)"
+	@echo "  make profile-ck       Profile CK-Engine only"
+	@echo "  make profile-llama    Profile llama.cpp only"
+	@echo "  make profile-quick    Quick profile (50 tokens)"
+	@echo "  make profile-view     Open latest flamegraphs"
+	@echo ""
+	@echo "READING FLAMEGRAPHS:"
+	@echo "  - X-axis: % of total CPU time (wider = slower)"
+	@echo "  - Y-axis: Call stack depth (bottom = entry point)"
+	@echo "  - Click to zoom into a function"
+	@echo "  - Search box to find specific functions"
+	@echo ""
+	@echo "WHAT TO LOOK FOR:"
+	@echo "  [Good] gemv_*, gemm_*, vec_dot_* (GEMM kernels)"
+	@echo "  [Bad]  malloc, free, mmap (memory allocation)"
+	@echo "  [Bad]  memcpy, memmove (unnecessary copies)"
+	@echo "  [Bad]  __intel_*, mkl_* very wide (MKL overhead)"
+	@echo ""
+	@echo "COMPARING CK vs LLAMA.CPP:"
+	@echo "  1. Open both flamegraphs side by side"
+	@echo "  2. Compare width of equivalent kernels:"
+	@echo "     - CK: gemv_q6_k_q8_k, gemm_nt_q4_k_q8_k"
+	@echo "     - llama: ggml_vec_dot_q6_K_q8_K, ggml_vec_dot_q4_K_q8_K"
+	@echo "  3. Look for overhead not present in llama.cpp"
+	@echo ""
+	@echo "See docs/PROFILING_GUIDE.md for detailed analysis instructions."
+	@echo ""
+
+.PHONY: profile profile-extended profile-ck profile-llama profile-quick profile-view profile-help
+
 # GEMV kernel performance benchmark
 # Links against the full library to get all kernel implementations
 benchmark-gemv: $(LIB)

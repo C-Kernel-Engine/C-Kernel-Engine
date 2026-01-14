@@ -233,12 +233,23 @@ if [ "$SKIP_BUILD" = false ]; then
         log_step "Building llama.cpp..."
         cd "$LLAMA_DIR"
 
-        # Configure and build (use defaults, -march=native handles CPU features)
-        cmake -B build \
-            -DGGML_CPU=ON \
-            -DLLAMA_BUILD_TESTS=OFF \
-            -DLLAMA_CURL=OFF \
-            -DCMAKE_BUILD_TYPE=Release
+        # Configure and build with Intel oneAPI if available
+        CMAKE_ARGS="-DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release"
+
+        # Use Intel oneAPI compilers if available
+        if command -v icpx &> /dev/null; then
+            log_step "Building with Intel oneAPI (icpx/icx)..."
+            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx"
+            CMAKE_ARGS="$CMAKE_ARGS -DLLAMA_NATIVE=OFF -DGGML_NATIVE=OFF"
+        elif command -v icx &> /dev/null; then
+            log_step "Building with Intel oneAPI (icx)..."
+            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx"
+            CMAKE_ARGS="$CMAKE_ARGS -DLLAMA_NATIVE=OFF -DGGML_NATIVE=OFF"
+        else
+            log_step "Building with system compiler..."
+        fi
+
+        cmake -B build $CMAKE_ARGS
         cmake --build build -j$(nproc)
 
         cd "$ROOT_DIR"
