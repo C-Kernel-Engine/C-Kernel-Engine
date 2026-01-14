@@ -457,6 +457,7 @@ $(BUILD_STAMP): | $(BUILD_DIR)
 	@if [ ! -f $@ ] || ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm $@.tmp; fi
 
 $(LIB): $(BUILD_STAMP) $(SRCS)
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -shared -o $@ $(SRCS) $(LDFLAGS) -lm
 
 $(IR_DEMO): $(BUILD_DIR) src/ckernel_ir.c src/ckernel_ir_demo.c src/ckernel_codegen.c src/ckernel_kernel_specs.c src/ckernel_registry.c include/ckernel_ir.h include/ckernel_codegen.h include/ckernel_registry.h include/ckernel_kernel_specs.h
@@ -477,6 +478,7 @@ ck_V2: ck-v2
 
 # Tokenizer library
 $(LIB_TOKENIZER): $(SRCS_TOKENIZER)
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -shared -o $@ $(SRCS_TOKENIZER) -lm
 
 tokenizer: $(LIB_TOKENIZER)
@@ -1861,6 +1863,7 @@ ck-cli-v6: $(BUILD_DIR)/ck-cli-v6
 
 # v6.5 Native CLI (improved REPL with model discovery, chat templates, sampling)
 $(BUILD_DIR)/ck-cli-v6.5: $(CK_CLI_V65) $(LIB_TOKENIZER)
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V65) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
 
 ck-cli-v6.5: $(BUILD_DIR)/ck-cli-v6.5
