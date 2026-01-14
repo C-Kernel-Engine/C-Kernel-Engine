@@ -200,120 +200,7 @@ void gemv_q4_k_q8_k_amx(float *y,
 #endif
 }
 
-/**
- * @brief AMX GEMM for Q8_0 x Q8_0: C[M,N] = A[M,K] @ B[N,K]^T
- *
- * This is the ideal case for AMX - uniform INT8 data on both sides.
- * AMX can directly compute INT8 x INT8 -> INT32 accumulation.
- *
- * @param A         Input activations in Q8_0 format [M, K]
- * @param B         Weight matrix in Q8_0 format [N, K]
- * @param C         Output in FP32 [M, N]
- * @param M         Number of tokens (batch size)
- * @param N         Number of output features
- * @param K         Number of input features (must be multiple of 32)
- */
-void gemm_nt_q8_0_q8_0_amx(
-    const void *A,
-    const void *B,
-    float *C,
-    int M, int N, int K)
-{
-    const int nb = K / QK8_0;
-    const block_q8_0 *a_blocks = (const block_q8_0 *)A;
-    const block_q8_0 *b_blocks = (const block_q8_0 *)B;
-
-    /* For small M (decode), AMX overhead > benefit - use ref fallback */
-    if (M < AMX_TILE_M) {
-        extern void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K);
-        gemm_nt_q8_0_q8_0_ref(A, B, C, M, N, K);
-        return;
-    }
-
-    configure_tiles_gemm(M, N, K);
-
-    /* Process output in tiles */
-    for (int m = 0; m < M; m += AMX_TILE_M) {
-        int tile_m = (m + AMX_TILE_M <= M) ? AMX_TILE_M : (M - m);
-
-        for (int n = 0; n < N; n += AMX_TILE_N) {
-            int tile_n = (n + AMX_TILE_N <= N) ? AMX_TILE_N : (N - n);
-
-            /* Accumulator for this tile (in INT32) */
-            int32_t acc[AMX_TILE_M * AMX_TILE_N] = {0};
-
-            /* Scale accumulator (for FP32 output) */
-            float scale_acc[AMX_TILE_M * AMX_TILE_N] = {0};
-
-            /* Process blocks */
-            for (int ib = 0; ib < nb; ib++) {
-                /* Extract scales for this block */
-                float d_a[AMX_TILE_M];
-                float d_b[AMX_TILE_N];
-
-                for (int i = 0; i < tile_m && (m + i) < M; i++) {
-                    const block_q8_0 *a_row = a_blocks + (size_t)(m + i) * nb;
-                    d_a[i] = CK_FP16_TO_FP32(a_row[ib].d);
-                }
-
-                for (int j = 0; j < tile_n && (n + j) < N; j++) {
-                    const block_q8_0 *b_row = b_blocks + (size_t)(n + j) * nb;
-                    d_b[j] = CK_FP16_TO_FP32(b_row[ib].d);
-                }
-
-                /* Prepare INT8 tiles for AMX
-                 * A_tile[i,k] = a_blocks[m+i].qs[k]
-                 * B_tile[k,j] = b_blocks[n+j].qs[k]
-                 */
-                int8_t A_tile[AMX_TILE_M * QK8_0] __attribute__((aligned(64)));
-                int8_t B_tile[QK8_0 * AMX_TILE_N] __attribute__((aligned(64)));
-
-                /* Fill A tile */
-                for (int i = 0; i < tile_m && (m + i) < M; i++) {
-                    const block_q8_0 *a_row = a_blocks + (size_t)(m + i) * nb;
-                    memcpy(&A_tile[i * QK8_0], a_row[ib].qs, QK8_0);
-                }
-
-                /* Fill B tile (transposed for column-major access) */
-                for (int j = 0; j < tile_n && (n + j) < N; j++) {
-                    const block_q8_0 *b_row = b_blocks + (size_t)(n + j) * nb;
-                    for (int k = 0; k < QK8_0; k++) {
-                        B_tile[k * AMX_TILE_N + j] = b_row[ib].qs[k];
-                    }
-                }
-
-                /* Zero accumulator tile */
-                _tile_zero(TILE_C);
-
-                /* Load tiles and compute */
-                _tile_loadd(TILE_A, A_tile, QK8_0);
-                _tile_loadd(TILE_B, B_tile, AMX_TILE_N);
-                _tile_dpbssd(TILE_C, TILE_A, TILE_B);
-
-                /* Store and accumulate with scales */
-                int32_t C_tile[AMX_TILE_M * AMX_TILE_N] __attribute__((aligned(64)));
-                _tile_stored(TILE_C, C_tile, AMX_TILE_N * 4);
-
-                /* Apply scales and accumulate to FP32 */
-                for (int i = 0; i < tile_m && (m + i) < M; i++) {
-                    for (int j = 0; j < tile_n && (n + j) < N; j++) {
-                        float d = d_a[i] * d_b[j];
-                        scale_acc[i * AMX_TILE_N + j] += d * (float)C_tile[i * AMX_TILE_N + j];
-                    }
-                }
-            }
-
-            /* Write final output */
-            for (int i = 0; i < tile_m && (m + i) < M; i++) {
-                for (int j = 0; j < tile_n && (n + j) < N; j++) {
-                    C[(m + i) * N + (n + j)] = scale_acc[i * AMX_TILE_N + j];
-                }
-            }
-        }
-    }
-
-    release_tiles();
-}
+/* NOTE: gemm_nt_q8_0_q8_0_amx is defined in gemm_batch_int8.c */
 
 /**
  * @brief Check if AMX is available at runtime
@@ -361,11 +248,7 @@ void gemv_q4_k_q8_k_amx(float *y, const void *W, const void *x_q8, int M, int K)
 #endif
 }
 
-void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K);
-
-void gemm_nt_q8_0_q8_0_amx(const void *A, const void *B, float *C, int M, int N, int K) {
-    gemm_nt_q8_0_q8_0_ref(A, B, C, M, N, K);
-}
+/* NOTE: gemm_nt_q8_0_q8_0_amx is defined in gemm_batch_int8.c */
 
 bool amx_available(void) {
     return false;
