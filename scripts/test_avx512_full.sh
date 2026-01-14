@@ -37,6 +37,10 @@ echo
 
 # Check CPU features
 echo -e "${CYAN}Checking CPU features...${RESET}"
+echo -e "${CYAN}CPU: $(grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)${RESET}"
+echo
+
+echo -e "${CYAN}AVX-512 Features:${RESET}"
 if grep -q avx512f /proc/cpuinfo; then
     echo -e "  ${GREEN}AVX-512F: YES${RESET}"
 else
@@ -46,8 +50,47 @@ fi
 if grep -q avx512bw /proc/cpuinfo; then
     echo -e "  ${GREEN}AVX-512BW: YES${RESET}"
 fi
+if grep -q avx512vl /proc/cpuinfo; then
+    echo -e "  ${GREEN}AVX-512VL: YES${RESET}"
+fi
 if grep -q avx512vbmi /proc/cpuinfo; then
     echo -e "  ${GREEN}AVX-512VBMI: YES (Ice Lake+)${RESET}"
+fi
+if grep -qE "avx512_vnni|avx512vnni" /proc/cpuinfo; then
+    echo -e "  ${GREEN}AVX-512VNNI: YES (INT8 dot product acceleration)${RESET}"
+    HAS_VNNI=1
+else
+    echo -e "  ${YELLOW}AVX-512VNNI: NO${RESET}"
+    HAS_VNNI=0
+fi
+if grep -q avx512_bf16 /proc/cpuinfo; then
+    echo -e "  ${GREEN}AVX-512BF16: YES (BFloat16 support)${RESET}"
+fi
+echo
+
+echo -e "${CYAN}AMX Features:${RESET}"
+HAS_AMX=0
+if grep -q amx_tile /proc/cpuinfo; then
+    echo -e "  ${GREEN}AMX-TILE: YES${RESET}"
+    HAS_AMX=1
+else
+    echo -e "  ${YELLOW}AMX-TILE: NO${RESET}"
+fi
+if grep -q amx_int8 /proc/cpuinfo; then
+    echo -e "  ${GREEN}AMX-INT8: YES (Sapphire Rapids+)${RESET}"
+fi
+if grep -q amx_bf16 /proc/cpuinfo; then
+    echo -e "  ${GREEN}AMX-BF16: YES${RESET}"
+fi
+echo
+
+echo -e "${CYAN}Kernel Dispatch:${RESET}"
+if [ "$HAS_AMX" = "1" ]; then
+    echo -e "  ${GREEN}Q4_K x Q8_K → AMX (tile-based, 8-16x speedup potential)${RESET}"
+elif [ "$HAS_VNNI" = "1" ]; then
+    echo -e "  ${GREEN}Q4_K x Q8_K → VNNI (INT8 dot product)${RESET}"
+else
+    echo -e "  ${YELLOW}Q4_K x Q8_K → AVX2 fallback${RESET}"
 fi
 echo
 
