@@ -184,12 +184,18 @@ void gemv_q4_k_q8_k_ref(float *y,
     }
 }
 
+void gemv_q4_k_q8_k_amx(float *y, const void *W, const void *x_q8, int M, int K);
+
 void gemv_q4_k_q8_k(float *y,
                     const void *W,
                     const void *x_q8,
                     int M, int K)
 {
-#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    /* AMX: Highest performance for large M (prefill) */
+    gemv_q4_k_q8_k_amx(y, W, x_q8, M, K);
+#elif defined(__AVX512VNNI__) && defined(__AVX512VL__)
+    /* VNNI: Best for decode (single token) */
     gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);

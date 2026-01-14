@@ -258,8 +258,10 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
 	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
 	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	           src/kernels/gemm_kernels_amx.c \
 	           src/kernels/gemm_kernels_q6k_q8k.c \
 	           src/kernels/gemm_batch_int8.c \
+	           src/kernels/fused_rmsnorm_linear.c \
 	           src/kernels/gemm_kernels_q8_0.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/rmsnorm_q8_k_fused.c \
@@ -1484,6 +1486,40 @@ profile-flash-attn: $(BUILD_DIR)
 		$(FLASH_ATTN_DH) $(FLASH_ATTN_ITERS) $(FLASH_ATTN_WARMUP)
 	@echo "Profile saved to $(BUILD_DIR)/perf_flash_attn.perf"
 	perf report -i $(BUILD_DIR)/perf_flash_attn.perf --stdio --sort=overhead | head -30
+
+# =============================================================================
+# VTune Profiling (Intel Performance Analysis)
+# =============================================================================
+# Requires: Intel oneAPI VTune (source /opt/intel/oneapi/setvars.sh)
+
+vtune-hotspots:
+	@./scripts/vtune_profile.sh hotspots
+
+vtune-memory:
+	@./scripts/vtune_profile.sh memory-access
+
+vtune-uarch:
+	@./scripts/vtune_profile.sh uarch
+
+vtune-compare:
+	@./scripts/vtune_profile.sh compare
+
+vtune-full:
+	@./scripts/vtune_profile.sh full
+
+# =============================================================================
+# DRAM/Cache Measurement (Fusion Validation)
+# =============================================================================
+# Measures LLC misses to validate fusion reduces DRAM access
+
+measure-dram:
+	@./scripts/measure_dram.sh baseline
+
+measure-dram-fused:
+	@./scripts/measure_dram.sh fused
+
+measure-dram-compare:
+	@./scripts/measure_dram.sh compare
 
 FLAMEGRAPH_DIR ?= $(HOME)/Programs/FlameGraph
 
