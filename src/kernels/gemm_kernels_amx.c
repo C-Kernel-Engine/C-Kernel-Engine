@@ -172,42 +172,32 @@ void gemm_amx_int8_core(
  * @param M         Output dimension
  * @param K         Input dimension (must be multiple of 256)
  */
+/* Forward declarations for fallback chain: VNNI → AVX2 → AVX → ref */
+void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_avx(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K);
+
 void gemv_q4_k_q8_k_amx(float *y,
                          const void *W,
                          const void *x_q8,
                          int M, int K)
 {
-    /* For single-token decode, AMX overhead may not be worth it.
-     * Use AMX only if M >= 16 (can fill a tile row).
+    /* AMX is best for Q8_0 x Q8_0 (uniform INT8).
+     * For Q4_K x Q8_K, the per-block scales make AMX less efficient.
+     * Fall back through: VNNI → AVX2 → AVX → ref
      *
-     * For M < 16, fall back to VNNI which has lower setup overhead.
+     * TODO: Implement true AMX path by dequantizing Q4_K to INT8 first
      */
-    if (M < AMX_TILE_M) {
-        /* Fall back to VNNI for small M */
-        extern void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K);
-        gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
-        return;
-    }
-
-    /* For larger M (prefill), use AMX */
-    const block_q4_K *blocks = (const block_q4_K *)W;
-    const block_q8_K *bx = (const block_q8_K *)x_q8;
-    const int nb = K / QK_K;
-
-    /* TODO: Implement full AMX path for Q4_K x Q8_K
-     *
-     * The challenge: Q4_K uses 4-bit quantization with per-block scales,
-     * while AMX works best with uniform INT8 data.
-     *
-     * Options:
-     * 1. Dequantize Q4_K to INT8 first, then use AMX
-     * 2. Use AMX for partial computation, scale adjustment outside
-     * 3. Keep Q4_K in VNNI, use AMX only for Q8_0 x Q8_0
-     *
-     * For now, fall back to VNNI for Q4_K.
-     */
-    extern void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K);
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
     gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
+#elif defined(__AVX2__)
+    gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__AVX__)
+    gemv_q4_k_q8_k_avx(y, W, x_q8, M, K);
+#else
+    gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
+#endif
 }
 
 /**
@@ -233,10 +223,10 @@ void gemm_nt_q8_0_q8_0_amx(
     const block_q8_0 *a_blocks = (const block_q8_0 *)A;
     const block_q8_0 *b_blocks = (const block_q8_0 *)B;
 
-    /* For small M (decode), AMX overhead > benefit */
+    /* For small M (decode), AMX overhead > benefit - use ref fallback */
     if (M < AMX_TILE_M) {
-        extern void gemm_nt_q8_0_q8_0_avx512(const void *A, const void *B, float *C, int M, int N, int K);
-        gemm_nt_q8_0_q8_0_avx512(A, B, C, M, N, K);
+        extern void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K);
+        gemm_nt_q8_0_q8_0_ref(A, B, C, M, N, K);
         return;
     }
 
@@ -352,22 +342,28 @@ bool amx_available(void) {
 
 #include <stdbool.h>
 
+/* Fallback declarations - use weak symbols to avoid link errors */
+void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_avx(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K);
+
 void gemv_q4_k_q8_k_amx(float *y, const void *W, const void *x_q8, int M, int K) {
-    /* Fall back to VNNI or AVX-512 */
+    /* No AMX support - cascade through fallbacks: AVX-512 VNNI → AVX2 → AVX → ref */
 #if defined(__AVX512VNNI__) && defined(__AVX512VL__)
-    extern void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K);
     gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
-#elif defined(__AVX512F__)
-    extern void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K);
+#elif defined(__AVX2__)
     gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__AVX__)
+    gemv_q4_k_q8_k_avx(y, W, x_q8, M, K);
 #else
-    extern void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K);
     gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
 #endif
 }
 
+void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K);
+
 void gemm_nt_q8_0_q8_0_amx(const void *A, const void *B, float *C, int M, int N, int K) {
-    extern void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K);
     gemm_nt_q8_0_q8_0_ref(A, B, C, M, N, K);
 }
 
