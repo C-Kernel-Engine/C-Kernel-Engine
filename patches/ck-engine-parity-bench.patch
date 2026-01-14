@@ -1,0 +1,422 @@
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -1,3 +1,10 @@
++# CK-Engine parity and performance testing
++add_library(ggml_kernel_test SHARED test-kernel-parity.cpp)
++target_include_directories(ggml_kernel_test PRIVATE ${CMAKE_SOURCE_DIR}/ggml/include ${CMAKE_SOURCE_DIR}/ggml/src)
++target_link_libraries(ggml_kernel_test PRIVATE ggml)
++
++add_executable(ck-perf-compare ck-perf-compare.cpp)
++target_link_libraries(ck-perf-compare PRIVATE llama ggml common ${CMAKE_DL_LIBS})
+
+ function(llama_test target)
+     add_test(NAME ${target} COMMAND $<TARGET_FILE:${target}> ${ARGN})
+diff --git a/tests/ck-perf-compare.cpp b/tests/ck-perf-compare.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/ck-perf-compare.cpp
+@@ -0,0 +1,389 @@
++/**
++ * ck-perf-compare.cpp
++ *
++ * Performance comparison: llama.cpp vs CK-Engine
++ *
++ * Build:
++ *   cd llama.cpp/build
++ *   cmake .. -DGGML_AVX512=ON
++ *   make ck-perf-compare
++ *
++ * Usage:
++ *   ./ck-perf-compare -m <model.gguf> -l <libck.so> -w <weights.bump> [-n 50]
++ */
++
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <chrono>
++#include <dlfcn.h>
++#include <vector>
++#include <string>
++
++#include "llama.h"
++#include "common.h"
++
++// ANSI colors
++#define GREEN "\033[92m"
++#define RED   "\033[91m"
++#define CYAN  "\033[96m"
++#define YELLOW "\033[93m"
++#define RESET "\033[0m"
++#define BOLD  "\033[1m"
++
++struct BenchResult {
++    std::string name;
++    int prefill_tokens;
++    double prefill_ms;
++    int decode_tokens;
++    double decode_ms;
++
++    double prefill_tps() const {
++        return prefill_ms > 0 ? (prefill_tokens * 1000.0 / prefill_ms) : 0;
++    }
++    double decode_tps() const {
++        return decode_ms > 0 ? (decode_tokens * 1000.0 / decode_ms) : 0;
++    }
++    double total_ms() const {
++        return prefill_ms + decode_ms;
++    }
++};
++
++// CK-Engine function types
++typedef int (*ck_model_init_t)(const char *);
++typedef void (*ck_model_free_t)(void);
++typedef int (*ck_model_forward_t)(float *);
++typedef int (*ck_model_decode_t)(int, float *);
++typedef int (*ck_model_embed_tokens_t)(int *, int);
++typedef int (*ck_model_kv_cache_enable_t)(int);
++typedef void (*ck_model_kv_cache_reset_t)(void);
++typedef int (*ck_model_sample_argmax_t)(void);
++
++struct CKEngine {
++    void *handle = nullptr;
++    ck_model_init_t init = nullptr;
++    ck_model_free_t free = nullptr;
++    ck_model_forward_t forward = nullptr;
++    ck_model_decode_t decode = nullptr;
++    ck_model_embed_tokens_t embed_tokens = nullptr;
++    ck_model_kv_cache_enable_t kv_cache_enable = nullptr;
++    ck_model_kv_cache_reset_t kv_cache_reset = nullptr;
++    ck_model_sample_argmax_t sample_argmax = nullptr;
++
++    bool load(const char *lib_path) {
++        handle = dlopen(lib_path, RTLD_NOW);
++        if (!handle) {
++            fprintf(stderr, RED "Failed to load CK-Engine: %s\n" RESET, dlerror());
++            return false;
++        }
++
++        init = (ck_model_init_t)dlsym(handle, "ck_model_init");
++        free = (ck_model_free_t)dlsym(handle, "ck_model_free");
++        forward = (ck_model_forward_t)dlsym(handle, "ck_model_forward");
++        decode = (ck_model_decode_t)dlsym(handle, "ck_model_decode");
++        embed_tokens = (ck_model_embed_tokens_t)dlsym(handle, "ck_model_embed_tokens");
++        kv_cache_enable = (ck_model_kv_cache_enable_t)dlsym(handle, "ck_model_kv_cache_enable");
++        kv_cache_reset = (ck_model_kv_cache_reset_t)dlsym(handle, "ck_model_kv_cache_reset");
++        sample_argmax = (ck_model_sample_argmax_t)dlsym(handle, "ck_model_sample_argmax");
++
++        if (!init || !free || !forward || !decode || !embed_tokens ||
++            !kv_cache_enable || !kv_cache_reset || !sample_argmax) {
++            fprintf(stderr, RED "Missing CK-Engine symbols\n" RESET);
++            dlclose(handle);
++            handle = nullptr;
++            return false;
++        }
++
++        return true;
++    }
++
++    void unload() {
++        if (handle) {
++            dlclose(handle);
++            handle = nullptr;
++        }
++    }
++};
++
++BenchResult bench_llamacpp(const char *model_path,
++                           const std::vector<int> &tokens,
++                           int n_gen,
++                           int n_runs = 3) {
++    BenchResult result;
++    result.name = "llama.cpp";
++    result.prefill_tokens = tokens.size();
++    result.decode_tokens = n_gen;
++
++    llama_model_params model_params = llama_model_default_params();
++    model_params.n_gpu_layers = 0;  // CPU only
++
++    llama_model *model = llama_model_load_from_file(model_path, model_params);
++    if (!model) {
++        fprintf(stderr, RED "Failed to load llama.cpp model\n" RESET);
++        return result;
++    }
++
++    llama_context_params ctx_params = llama_context_default_params();
++    ctx_params.n_ctx = 4096;
++    ctx_params.n_batch = 512;
++    ctx_params.n_threads = 1;  // Single thread for fair comparison
++
++    llama_context *ctx = llama_init_from_model(model, ctx_params);
++    if (!ctx) {
++        fprintf(stderr, RED "Failed to create llama.cpp context\n" RESET);
++        llama_model_free(model);
++        return result;
++    }
++
++    std::vector<double> prefill_times;
++    std::vector<double> decode_times;
++
++    for (int run = 0; run < n_runs; run++) {
++        llama_kv_cache_clear(ctx);
++
++        // Prefill
++        llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
++        for (size_t i = 0; i < tokens.size(); i++) {
++            llama_batch_add(batch, tokens[i], i, {0}, false);
++        }
++        batch.logits[batch.n_tokens - 1] = true;
++
++        auto t0 = std::chrono::high_resolution_clock::now();
++        llama_decode(ctx, batch);
++        auto t1 = std::chrono::high_resolution_clock::now();
++
++        double prefill_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
++        prefill_times.push_back(prefill_ms);
++
++        llama_batch_free(batch);
++
++        // Decode
++        t0 = std::chrono::high_resolution_clock::now();
++        int n_cur = tokens.size();
++        for (int i = 0; i < n_gen; i++) {
++            // Get logits and sample
++            float *logits = llama_get_logits_ith(ctx, -1);
++            int n_vocab = llama_vocab_n_tokens(llama_model_get_vocab(model));
++
++            int next_token = 0;
++            float max_logit = logits[0];
++            for (int j = 1; j < n_vocab; j++) {
++                if (logits[j] > max_logit) {
++                    max_logit = logits[j];
++                    next_token = j;
++                }
++            }
++
++            // Decode next token
++            llama_batch single = llama_batch_init(1, 0, 1);
++            llama_batch_add(single, next_token, n_cur, {0}, true);
++            llama_decode(ctx, single);
++            llama_batch_free(single);
++            n_cur++;
++        }
++        t1 = std::chrono::high_resolution_clock::now();
++
++        double decode_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
++        decode_times.push_back(decode_ms);
++    }
++
++    llama_free(ctx);
++    llama_model_free(model);
++
++    // Average (skip first run for warmup)
++    double prefill_sum = 0, decode_sum = 0;
++    int count = n_runs > 1 ? n_runs - 1 : n_runs;
++    for (int i = (n_runs > 1 ? 1 : 0); i < n_runs; i++) {
++        prefill_sum += prefill_times[i];
++        decode_sum += decode_times[i];
++    }
++    result.prefill_ms = prefill_sum / count;
++    result.decode_ms = decode_sum / count;
++
++    return result;
++}
++
++BenchResult bench_ck_engine(CKEngine &ck,
++                            const char *weights_path,
++                            const std::vector<int> &tokens,
++                            int n_gen,
++                            int n_runs = 3) {
++    BenchResult result;
++    result.name = "CK-Engine";
++    result.prefill_tokens = tokens.size();
++    result.decode_tokens = n_gen;
++
++    if (ck.init(weights_path) != 0) {
++        fprintf(stderr, RED "Failed to init CK-Engine\n" RESET);
++        return result;
++    }
++
++    std::vector<double> prefill_times;
++    std::vector<double> decode_times;
++
++    std::vector<int> tokens_copy = tokens;
++
++    for (int run = 0; run < n_runs; run++) {
++        ck.kv_cache_enable(32768);
++        ck.kv_cache_reset();
++        ck.embed_tokens(tokens_copy.data(), tokens_copy.size());
++
++        // Prefill
++        auto t0 = std::chrono::high_resolution_clock::now();
++        ck.forward(nullptr);
++        auto t1 = std::chrono::high_resolution_clock::now();
++
++        double prefill_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
++        prefill_times.push_back(prefill_ms);
++
++        // Decode
++        t0 = std::chrono::high_resolution_clock::now();
++        for (int i = 0; i < n_gen; i++) {
++            int next_token = ck.sample_argmax();
++            if (ck.decode(next_token, nullptr) != 0) {
++                break;
++            }
++        }
++        t1 = std::chrono::high_resolution_clock::now();
++
++        double decode_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
++        decode_times.push_back(decode_ms);
++    }
++
++    ck.free();
++
++    // Average (skip first run for warmup)
++    double prefill_sum = 0, decode_sum = 0;
++    int count = n_runs > 1 ? n_runs - 1 : n_runs;
++    for (int i = (n_runs > 1 ? 1 : 0); i < n_runs; i++) {
++        prefill_sum += prefill_times[i];
++        decode_sum += decode_times[i];
++    }
++    result.prefill_ms = prefill_sum / count;
++    result.decode_ms = decode_sum / count;
++
++    return result;
++}
++
++void print_comparison(const BenchResult &ck, const BenchResult &llama) {
++    printf("\n" CYAN "=" RESET);
++    for (int i = 0; i < 69; i++) printf(CYAN "=" RESET);
++    printf("\n" CYAN BOLD "Performance Comparison: CK-Engine vs llama.cpp" RESET "\n");
++    printf(CYAN "=" RESET);
++    for (int i = 0; i < 69; i++) printf(CYAN "=" RESET);
++    printf("\n\n");
++
++    printf("%-25s %15s %15s %12s\n", "Metric", "CK-Engine", "llama.cpp", "Speedup");
++    printf("----------------------------------------------------------------------\n");
++
++    // Prefill time
++    double speedup = llama.prefill_ms / ck.prefill_ms;
++    const char *color = speedup > 1.0 ? GREEN : RED;
++    printf("%-25s %15.1f %15.1f %s%11.2fx" RESET "\n",
++           "Prefill Time (ms)", ck.prefill_ms, llama.prefill_ms, color, speedup);
++
++    // Prefill throughput
++    speedup = ck.prefill_tps() / llama.prefill_tps();
++    color = speedup > 1.0 ? GREEN : RED;
++    printf("%-25s %15.1f %15.1f %s%11.2fx" RESET "\n",
++           "Prefill (tok/s)", ck.prefill_tps(), llama.prefill_tps(), color, speedup);
++
++    // Decode time
++    speedup = llama.decode_ms / ck.decode_ms;
++    color = speedup > 1.0 ? GREEN : RED;
++    printf("%-25s %15.1f %15.1f %s%11.2fx" RESET "\n",
++           "Decode Time (ms)", ck.decode_ms, llama.decode_ms, color, speedup);
++
++    // Decode throughput
++    speedup = ck.decode_tps() / llama.decode_tps();
++    color = speedup > 1.0 ? GREEN : RED;
++    printf("%-25s %15.1f %15.1f %s%11.2fx" RESET "\n",
++           "Decode (tok/s)", ck.decode_tps(), llama.decode_tps(), color, speedup);
++
++    printf("----------------------------------------------------------------------\n");
++
++    // Total
++    speedup = llama.total_ms() / ck.total_ms();
++    color = speedup > 1.0 ? GREEN : RED;
++    printf("%-25s %15.1f %15.1f %s%11.2fx" RESET "\n",
++           "Total Time (ms)", ck.total_ms(), llama.total_ms(), color, speedup);
++
++    printf("\n");
++    if (speedup > 1.0) {
++        printf(GREEN "CK-Engine is %.2fx faster overall\n" RESET, speedup);
++    } else {
++        printf(YELLOW "llama.cpp is %.2fx faster overall\n" RESET, 1.0 / speedup);
++    }
++}
++
++void print_usage(const char *prog) {
++    printf("Usage: %s -m <model.gguf> -l <libck.so> -w <weights.bump> [-n tokens] [-r runs]\n", prog);
++    printf("\nOptions:\n");
++    printf("  -m <path>   Path to GGUF model file\n");
++    printf("  -l <path>   Path to CK-Engine shared library\n");
++    printf("  -w <path>   Path to CK-Engine weights file\n");
++    printf("  -n <num>    Number of tokens to generate (default: 50)\n");
++    printf("  -r <num>    Number of benchmark runs (default: 3)\n");
++}
++
++int main(int argc, char **argv) {
++    const char *model_path = nullptr;
++    const char *ck_lib_path = nullptr;
++    const char *ck_weights_path = nullptr;
++    int n_gen = 50;
++    int n_runs = 3;
++
++    for (int i = 1; i < argc; i++) {
++        if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
++            model_path = argv[++i];
++        } else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc) {
++            ck_lib_path = argv[++i];
++        } else if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
++            ck_weights_path = argv[++i];
++        } else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc) {
++            n_gen = atoi(argv[++i]);
++        } else if (strcmp(argv[i], "-r") == 0 && i + 1 < argc) {
++            n_runs = atoi(argv[++i]);
++        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
++            print_usage(argv[0]);
++            return 0;
++        }
++    }
++
++    if (!model_path || !ck_lib_path || !ck_weights_path) {
++        print_usage(argv[0]);
++        return 1;
++    }
++
++    printf(CYAN "=" RESET);
++    for (int i = 0; i < 69; i++) printf(CYAN "=" RESET);
++    printf("\n" CYAN BOLD "CK-Engine vs llama.cpp Performance Benchmark" RESET "\n");
++    printf(CYAN "=" RESET);
++    for (int i = 0; i < 69; i++) printf(CYAN "=" RESET);
++    printf("\n\n");
++
++    printf("Model:          %s\n", model_path);
++    printf("CK-Engine lib:  %s\n", ck_lib_path);
++    printf("CK weights:     %s\n", ck_weights_path);
++    printf("Generate:       %d tokens\n", n_gen);
++    printf("Runs:           %d\n", n_runs);
++
++    // Standard Qwen prompt tokens
++    std::vector<int> prompt_tokens = {
++        151644, 8948, 198, 2610, 525, 264, 10950, 17847, 13, 151645, 198,
++        151644, 872, 198, 3838, 374, 279, 6864, 315, 9625, 30, 151645, 198,
++        151644, 77091, 198
++    };
++
++    // Load CK-Engine
++    CKEngine ck;
++    if (!ck.load(ck_lib_path)) {
++        return 1;
++    }
++
++    // Benchmark llama.cpp
++    printf("\n" CYAN "Benchmarking llama.cpp..." RESET "\n");
++    BenchResult llama_result = bench_llamacpp(model_path, prompt_tokens, n_gen, n_runs);
++    printf("  Prefill: %.1f ms (%.1f tok/s)\n", llama_result.prefill_ms, llama_result.prefill_tps());
++    printf("  Decode:  %.1f ms (%.1f tok/s)\n", llama_result.decode_ms, llama_result.decode_tps());
++
++    // Benchmark CK-Engine
++    printf("\n" CYAN "Benchmarking CK-Engine..." RESET "\n");
++    BenchResult ck_result = bench_ck_engine(ck, ck_weights_path, prompt_tokens, n_gen, n_runs);
++    printf("  Prefill: %.1f ms (%.1f tok/s)\n", ck_result.prefill_ms, ck_result.prefill_tps());
++    printf("  Decode:  %.1f ms (%.1f tok/s)\n", ck_result.decode_ms, ck_result.decode_tps());
++
++    ck.unload();
++
++    // Print comparison
++    print_comparison(ck_result, llama_result);
++
++    return 0;
++}
