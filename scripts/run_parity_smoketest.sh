@@ -22,6 +22,7 @@ BUILD_DIR="$ROOT_DIR/build"
 QUICK_MODE=false
 KERNELS_ONLY=false
 SKIP_BUILD=false
+SKIP_TESTS=false
 FORCE_REBUILD=false
 VERBOSE=false
 PERF_MODE=false
@@ -40,6 +41,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-build)
             SKIP_BUILD=true
+            shift
+            ;;
+        --skip-tests)
+            SKIP_TESTS=true
             shift
             ;;
         --force-rebuild)
@@ -67,7 +72,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --kernels       Run kernel-level tests only (no full model)"
             echo "  --perf          Run performance benchmarks (CK vs llama.cpp)"
             echo "  --perf-large    Run performance benchmarks with 7B model dimensions"
-            echo "  --skip-build    Skip llama.cpp build step"
+            echo "  --skip-build    Skip llama.cpp build step (assume already built)"
+            echo "  --skip-tests    Build only, don't run tests"
             echo "  --force-rebuild Force rebuild of llama.cpp (clean build)"
             echo "  --verbose       Verbose output"
             echo "  --help          Show this help"
@@ -222,22 +228,14 @@ if [ "$SKIP_BUILD" = false ]; then
         cd "$ROOT_DIR"
     fi
 
-    # Detect AVX-512 support
-    AVX512_FLAGS=""
-    if grep -q avx512f /proc/cpuinfo 2>/dev/null; then
-        log_step "AVX-512 detected, enabling in build..."
-        AVX512_FLAGS="-DGGML_AVX512=ON"
-    fi
-
     # Build llama.cpp if needed
     if [ ! -f "$LLAMA_DIR/build/bin/llama-cli" ]; then
         log_step "Building llama.cpp..."
         cd "$LLAMA_DIR"
 
-        # Configure and build with AVX-512 if available
+        # Configure and build (use defaults, -march=native handles CPU features)
         cmake -B build \
             -DGGML_CPU=ON \
-            $AVX512_FLAGS \
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_CURL=OFF \
             -DCMAKE_BUILD_TYPE=Release
@@ -298,6 +296,18 @@ if make libck_parity.so 2>&1; then
     fi
 else
     log_warn "libck_parity.so build failed, kernel parity tests will be skipped"
+fi
+
+# Exit early if --skip-tests was specified (build only)
+if [ "$SKIP_TESTS" = true ]; then
+    log_success "Build complete (--skip-tests specified)"
+    echo ""
+    echo "Libraries built:"
+    [ -f "$LLAMA_DIR/libggml_kernel_test.so" ] && echo "  llama.cpp: $LLAMA_DIR/libggml_kernel_test.so"
+    [ -f "$BUILD_DIR/libck_parity.so" ] && echo "  CK-Engine: $BUILD_DIR/libck_parity.so"
+    echo ""
+    echo "Run tests with: make llamacpp-parity-full"
+    exit 0
 fi
 
 # Step 3: Kernel-level tests

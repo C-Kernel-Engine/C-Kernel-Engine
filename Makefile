@@ -1202,22 +1202,30 @@ smollm-train-parity: $(LIB)
 	  --lr 1e-4
 
 # llama.cpp parity test (compares CK kernels against llama.cpp/ggml)
-# These targets auto-clone, patch, and build llama.cpp if needed
 # Patches applied: llama.patch, test-kernel-parity.cpp, ck-engine-parity-bench.patch
 # AVX-512 is auto-detected and enabled if available
+#
+# RECOMMENDED: Run 'make llamacpp-parity-rebuild' first time or when patches change
 
+# First time / fix everything: clean rebuild with all patches
+llamacpp-parity-rebuild:
+	@echo "Force rebuilding llama.cpp with latest patches..."
+	@./scripts/run_parity_smoketest.sh --force-rebuild
+
+# Build only - clone, patch, and compile llama.cpp (no tests)
+llamacpp-parity-build:
+	@echo "Building llama.cpp for parity testing..."
+	@./scripts/run_parity_smoketest.sh --skip-tests
+
+# Quick parity test
 llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
 	@./scripts/run_parity_smoketest.sh --quick
 
+# Full parity test (assumes already built)
 llamacpp-parity-full:
-	@echo "Running full llama.cpp parity test (auto-patches & builds llama.cpp)..."
-	@./scripts/run_parity_smoketest.sh
-
-# Force rebuild llama.cpp with latest patches (use when patches change)
-llamacpp-parity-rebuild:
-	@echo "Force rebuilding llama.cpp with latest patches..."
-	@./scripts/run_parity_smoketest.sh --force-rebuild
+	@echo "Running full llama.cpp parity test..."
+	@./scripts/run_parity_smoketest.sh --skip-build
 
 # Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
@@ -1526,6 +1534,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q5_0.c \
                src/kernels/gemm_kernels_q5_0_sse_v2.c \
                src/kernels/gemm_kernels_q8_0.c \
+               src/kernels/gemm_batch_int8.c \
                src/kernels/quantize_row_q8_k_sse.c \
                src/kernels/rmsnorm_kernels.c \
                src/kernels/rope_kernels.c \
