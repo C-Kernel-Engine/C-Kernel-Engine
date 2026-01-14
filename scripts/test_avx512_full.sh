@@ -117,7 +117,7 @@ MODEL="Qwen/Qwen2-0.5B-Instruct-GGUF"
 echo -e "  Testing with $MODEL..."
 
 # Force recompile to pick up AVX-512 optimizations
-python3 "$SCRIPT_DIR/v6.5/ck_run_v6_5.py" run "$MODEL" --force-compile --max-tokens 20 2>&1 | head -30
+python3 "$SCRIPT_DIR/v6.5/ck_run_v6_5.py" run "$MODEL" --force-compile --max-tokens 20 2>&1
 
 # Check for garbage output
 OUTPUT=$(python3 "$SCRIPT_DIR/v6.5/ck_run_v6_5.py" run "$MODEL" --max-tokens 10 2>&1 | tail -5)
