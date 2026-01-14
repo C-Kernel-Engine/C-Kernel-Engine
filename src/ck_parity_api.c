@@ -26,6 +26,19 @@ extern void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int
 extern void gemm_nt_q4_k_q8_k(const void *A_q8, const void *B, const float *bias,
                               float *C, int M, int N, int K);
 
+/* Q6_K x Q8_K kernels (from gemm_kernels_q6k_q8k.c) */
+extern void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
+extern void gemm_nt_q6_k_q8_k(const void *A_q8, const void *B, const float *bias,
+                              float *C, int M, int N, int K);
+
+/* Q8_0 x Q8_0 batch GEMM (from gemm_batch_int8.c) */
+extern void gemm_nt_q8_0_q8_0(const void *A_q8, const void *B_q8, const float *bias,
+                              float *C, int M, int N, int K);
+
+/* Q5_0 x Q8_0 batch GEMM (from gemm_kernels_q5_0.c) */
+extern void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias,
+                              float *C, int M, int N, int K);
+
 /* Q5_0 and Q8_0 GEMV kernels (from gemm_kernels_q5_0.c, gemm_kernels_q8_0.c) */
 extern void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
 extern void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
@@ -311,6 +324,105 @@ void ck_test_gemm_q4_k(const void *weight_q4k,
      * So: M = n_tokens, N = rows, K = cols
      */
     gemm_nt_q4_k_q8_k(q8_data, weight_q4k, NULL, output, n_tokens, rows, cols);
+
+    free(q8_data);
+}
+
+/**
+ * @brief Test Q6_K x Q8_K GEMM (batch matrix multiply)
+ *
+ * Used for MLP W2 (down projection) with Q6_K weights.
+ */
+void ck_test_gemm_q6_k(const void *weight_q6k,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens)
+{
+    /* Allocate Q8_K buffer for quantized activations */
+    int n_blocks_per_row = cols / CK_QK_K;
+    block_q8_K *q8_data = (block_q8_K *)malloc(n_tokens * n_blocks_per_row * sizeof(block_q8_K));
+    if (!q8_data) {
+        memset(output, 0, n_tokens * rows * sizeof(float));
+        return;
+    }
+
+    /* Quantize all input tokens */
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_k(input_f32 + t * cols,
+                          q8_data + t * n_blocks_per_row, cols);
+    }
+
+    /* Use gemm_nt_q6_k_q8_k: C[M,N] = A[M,K] * B[N,K]^T
+     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T
+     * So: M = n_tokens, N = rows, K = cols
+     */
+    gemm_nt_q6_k_q8_k(q8_data, weight_q6k, NULL, output, n_tokens, rows, cols);
+
+    free(q8_data);
+}
+
+/**
+ * @brief Test Q8_0 x Q8_0 GEMM (batch matrix multiply)
+ *
+ * Used for attention V projection with Q8_0 weights.
+ */
+void ck_test_gemm_q8_0(const void *weight_q8_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens)
+{
+    /* Allocate Q8_0 buffer for quantized activations */
+    int n_blocks_per_row = cols / CK_QK8_0;
+    block_q8_0 *q8_data = (block_q8_0 *)malloc(n_tokens * n_blocks_per_row * sizeof(block_q8_0));
+    if (!q8_data) {
+        memset(output, 0, n_tokens * rows * sizeof(float));
+        return;
+    }
+
+    /* Quantize all input tokens */
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_0(input_f32 + t * cols,
+                          q8_data + t * n_blocks_per_row, cols);
+    }
+
+    /* Use gemm_nt_q8_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T
+     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T
+     * So: M = n_tokens, N = rows, K = cols
+     */
+    gemm_nt_q8_0_q8_0(q8_data, weight_q8_0, NULL, output, n_tokens, rows, cols);
+
+    free(q8_data);
+}
+
+/**
+ * @brief Test Q5_0 x Q8_0 GEMM (batch matrix multiply)
+ *
+ * Used for MLP W1 (gate/up projection) and attention Q/K with Q5_0 weights.
+ */
+void ck_test_gemm_q5_0(const void *weight_q5_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens)
+{
+    /* Allocate Q8_0 buffer for quantized activations */
+    int n_blocks_per_row = cols / CK_QK8_0;
+    block_q8_0 *q8_data = (block_q8_0 *)malloc(n_tokens * n_blocks_per_row * sizeof(block_q8_0));
+    if (!q8_data) {
+        memset(output, 0, n_tokens * rows * sizeof(float));
+        return;
+    }
+
+    /* Quantize all input tokens */
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_0(input_f32 + t * cols,
+                          q8_data + t * n_blocks_per_row, cols);
+    }
+
+    /* Use gemm_nt_q5_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T
+     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T
+     * So: M = n_tokens, N = rows, K = cols
+     */
+    gemm_nt_q5_0_q8_0(q8_data, weight_q5_0, NULL, output, n_tokens, rows, cols);
 
     free(q8_data);
 }

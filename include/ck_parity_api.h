@@ -212,6 +212,57 @@ void ck_test_gemm_q4_k(const void *weight_q4k,
                        float *output,
                        int rows, int cols, int n_tokens);
 
+/**
+ * @brief Q6_K GEMM - batched matrix multiply with Q6_K weights
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q6k Q6_K quantized weights [rows, cols]
+ * @param input_f32 FP32 input [n_tokens, cols]
+ * @param output FP32 output [n_tokens, rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 256)
+ * @param n_tokens Batch size
+ */
+void ck_test_gemm_q6_k(const void *weight_q6k,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens);
+
+/**
+ * @brief Q5_0 GEMM - batched matrix multiply with Q5_0 weights (32-element blocks)
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q5_0 Q5_0 quantized weights [rows, cols]
+ * @param input_f32 FP32 input [n_tokens, cols]
+ * @param output FP32 output [n_tokens, rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ * @param n_tokens Batch size
+ */
+void ck_test_gemm_q5_0(const void *weight_q5_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens);
+
+/**
+ * @brief Q8_0 GEMM - batched matrix multiply with Q8_0 weights (32-element blocks)
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q8_0 Q8_0 quantized weights [rows, cols]
+ * @param input_f32 FP32 input [n_tokens, cols]
+ * @param output FP32 output [n_tokens, rows]
+ * @param rows Number of output rows
+ * @param cols Number of columns (must be multiple of 32)
+ * @param n_tokens Batch size
+ */
+void ck_test_gemm_q8_0(const void *weight_q8_0,
+                       const float *input_f32,
+                       float *output,
+                       int rows, int cols, int n_tokens);
+
 /* ============================================================================
  * Activation Kernels
  * ============================================================================ */

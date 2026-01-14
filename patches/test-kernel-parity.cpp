@@ -341,6 +341,138 @@ void test_gemm_q4_k(const void * weight_q4k,
     delete[] q8_data;
 }
 
+/**
+ * Test Q6_K GEMM - batched matrix multiply with quantized weights
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q6k  Q6_K quantized weights [rows, cols]
+ * @param input_f32   FP32 input [n_tokens, cols]
+ * @param output      FP32 output [n_tokens, rows]
+ * @param rows        Number of output rows
+ * @param cols        Number of columns (must be multiple of QK_K=256)
+ * @param n_tokens    Batch size (number of tokens)
+ */
+void test_gemm_q6_k(const void * weight_q6k,
+                    const float * input_f32,
+                    float * output,
+                    int rows, int cols, int n_tokens) {
+    int n_blocks_per_row = cols / QK_K;
+    int weight_row_bytes = n_blocks_per_row * sizeof(block_q6_K);
+
+    // Quantize all input tokens to Q8_K
+    block_q8_K * q8_data = new block_q8_K[n_tokens * n_blocks_per_row];
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_K_ref(input_f32 + t * cols,
+                              q8_data + t * n_blocks_per_row, cols);
+    }
+
+    // Compute output[t,r] for each token and row
+    for (int t = 0; t < n_tokens; t++) {
+        for (int r = 0; r < rows; r++) {
+            float sum = 0.0f;
+            const void * w_row = (const char *)weight_q6k + r * weight_row_bytes;
+            const block_q8_K * a_row = q8_data + t * n_blocks_per_row;
+
+            ggml_vec_dot_q6_K_q8_K(cols, &sum, sizeof(float),
+                                   w_row, sizeof(block_q6_K),
+                                   a_row, sizeof(block_q8_K), 1);
+
+            output[t * rows + r] = sum;
+        }
+    }
+
+    delete[] q8_data;
+}
+
+/**
+ * Test Q5_0 GEMM - batched matrix multiply with quantized weights (32-element blocks)
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q5_0  Q5_0 quantized weights [rows, cols]
+ * @param input_f32    FP32 input [n_tokens, cols]
+ * @param output       FP32 output [n_tokens, rows]
+ * @param rows         Number of output rows
+ * @param cols         Number of columns (must be multiple of QK5_0=32)
+ * @param n_tokens     Batch size (number of tokens)
+ */
+void test_gemm_q5_0(const void * weight_q5_0,
+                    const float * input_f32,
+                    float * output,
+                    int rows, int cols, int n_tokens) {
+    int n_blocks_per_row = cols / QK8_0;  // QK5_0 == QK8_0 == 32
+    int weight_row_bytes = n_blocks_per_row * sizeof(block_q5_0);
+
+    // Quantize all input tokens to Q8_0
+    block_q8_0 * q8_data = new block_q8_0[n_tokens * n_blocks_per_row];
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_0_ref(input_f32 + t * cols,
+                              q8_data + t * n_blocks_per_row, cols);
+    }
+
+    // Compute output[t,r] for each token and row
+    for (int t = 0; t < n_tokens; t++) {
+        for (int r = 0; r < rows; r++) {
+            float sum = 0.0f;
+            const void * w_row = (const char *)weight_q5_0 + r * weight_row_bytes;
+            const block_q8_0 * a_row = q8_data + t * n_blocks_per_row;
+
+            ggml_vec_dot_q5_0_q8_0(cols, &sum, sizeof(float),
+                                   w_row, sizeof(block_q5_0),
+                                   a_row, sizeof(block_q8_0), 1);
+
+            output[t * rows + r] = sum;
+        }
+    }
+
+    delete[] q8_data;
+}
+
+/**
+ * Test Q8_0 GEMM - batched matrix multiply with quantized weights (32-element blocks)
+ *
+ * Computes: output[t,r] = sum_k(weight[r,k] * input[t,k])
+ *
+ * @param weight_q8_0  Q8_0 quantized weights [rows, cols]
+ * @param input_f32    FP32 input [n_tokens, cols]
+ * @param output       FP32 output [n_tokens, rows]
+ * @param rows         Number of output rows
+ * @param cols         Number of columns (must be multiple of QK8_0=32)
+ * @param n_tokens     Batch size (number of tokens)
+ */
+void test_gemm_q8_0(const void * weight_q8_0,
+                    const float * input_f32,
+                    float * output,
+                    int rows, int cols, int n_tokens) {
+    int n_blocks_per_row = cols / QK8_0;
+    int weight_row_bytes = n_blocks_per_row * sizeof(block_q8_0);
+
+    // Quantize all input tokens to Q8_0
+    block_q8_0 * q8_data = new block_q8_0[n_tokens * n_blocks_per_row];
+    for (int t = 0; t < n_tokens; t++) {
+        quantize_row_q8_0_ref(input_f32 + t * cols,
+                              q8_data + t * n_blocks_per_row, cols);
+    }
+
+    // Compute output[t,r] for each token and row
+    for (int t = 0; t < n_tokens; t++) {
+        for (int r = 0; r < rows; r++) {
+            float sum = 0.0f;
+            const void * w_row = (const char *)weight_q8_0 + r * weight_row_bytes;
+            const block_q8_0 * a_row = q8_data + t * n_blocks_per_row;
+
+            ggml_vec_dot_q8_0_q8_0(cols, &sum, sizeof(float),
+                                   w_row, sizeof(block_q8_0),
+                                   a_row, sizeof(block_q8_0), 1);
+
+            output[t * rows + r] = sum;
+        }
+    }
+
+    delete[] q8_data;
+}
+
 // ============================================================================
 // Activation Kernels
 // ============================================================================
