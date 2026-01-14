@@ -176,6 +176,25 @@ void gemm_nt_q4_k_q8_k(const void *A_q8,
                        float *C,
                        int M, int N, int K);
 
+// Q6_K x Q8_K quantized kernels
+void vec_dot_q6_k_q8_k(int n, float *s, const void *vx, const void *vy);
+
+void gemv_q6_k_q8_k(float *y,
+                    const void *W,
+                    const void *x_q8,
+                    int M, int K);
+
+void gemm_q6_k_q8_k(float *Y,
+                    const void *W,
+                    const void *X_q8,
+                    int M, int N, int K);
+
+void gemm_nt_q6_k_q8_k(const void *A_q8,
+                       const void *B,
+                       const float *bias,
+                       float *C,
+                       int M, int N, int K);
+
 void gemm_nt_q8_0_q8_0(const void *A_q8,
                        const void *B,
                        const float *bias,

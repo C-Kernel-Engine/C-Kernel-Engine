@@ -71,7 +71,7 @@ DTYPE_TO_GEMV_Q8_KERNEL = {
     "q5_0": ("gemv_q5_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q5_0 weights x Q8_0 activations
     "q8_0": ("gemv_q8_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q8_0 weights x Q8_0 activations
     "q4_k": ("gemv_q4_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q4_K weights x Q8_K activations
-    # Q6_K: No INT8 kernel yet, falls back to FP32
+    "q6_k": ("gemv_q6_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q6_K weights x Q8_K activations
 }
 
 # INT8 activation path for batch GEMM (prefill): quantize input to Q8, use quantized GEMM
@@ -81,7 +81,7 @@ DTYPE_TO_GEMM_NT_Q8_KERNEL = {
     "q5_0": ("gemm_nt_q5_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q5_0 weights x Q8_0 activations (batch)
     "q8_0": ("gemm_nt_q8_0_q8_0", "q8_0", "quantize_row_q8_0"),  # Q8_0 weights x Q8_0 activations (batch)
     "q4_k": ("gemm_nt_q4_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q4_K weights x Q8_K activations (batch)
-    # Q6_K: No INT8 batch kernel yet - falls back to FP32
+    "q6_k": ("gemm_nt_q6_k_q8_k", "q8_k", "quantize_row_q8_k"),  # Q6_K weights x Q8_K activations (batch)
 }
 
 
@@ -166,6 +166,7 @@ VALID_KERNEL_COMBINATIONS = {
     ("q4_k", "fp32"): {"kernel": "gemv_q4_k", "mode": "decode"},
     ("q4_k", "q8_k"): {"kernel": "gemv_q4_k_q8_k", "mode": "decode", "int8": True},
     ("q6_k", "fp32"): {"kernel": "gemv_q6_k", "mode": "decode"},
+    ("q6_k", "q8_k"): {"kernel": "gemv_q6_k_q8_k", "mode": "decode", "int8": True},
     ("q4_0", "fp32"): {"kernel": "gemv_q4_0", "mode": "decode"},
     ("q4_1", "fp32"): {"kernel": "gemv_q4_1", "mode": "decode"},
     ("q5_1", "fp32"): {"kernel": "gemv_q5_1", "mode": "decode"},
@@ -177,6 +178,7 @@ VALID_KERNEL_COMBINATIONS = {
     ("q8_0", "fp32", "batch"): {"kernel": "gemm_nt_q8_0", "mode": "prefill"},
     ("q4_k", "fp32", "batch"): {"kernel": "gemm_nt_q4_k", "mode": "prefill"},
     ("q6_k", "fp32", "batch"): {"kernel": "gemm_nt_q6_k", "mode": "prefill"},
+    ("q6_k", "q8_k", "batch"): {"kernel": "gemm_nt_q6_k_q8_k", "mode": "prefill", "int8": True},
     ("q4_0", "fp32", "batch"): {"kernel": "gemm_nt_q4_0", "mode": "prefill"},
     ("q4_1", "fp32", "batch"): {"kernel": "gemm_nt_q4_1", "mode": "prefill"},
     ("q5_1", "fp32", "batch"): {"kernel": "gemm_nt_q5_1", "mode": "prefill"},
@@ -1347,9 +1349,48 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add()
 
             add("    /* MLP (SwiGLU) */")
-            add(f"    {w1_kernel}(ln2_out, W1, B1, fc1_out, num_tokens, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+
+            # W1 (gate+up) projection: use INT8 batch if available
+            if w1_int8_batch:
+                w1_gemm, w1_act_dt, w1_quant_fn = w1_int8_batch
+                add(f"    /* W1 (gate+up): {w1_dt.upper()} x {w1_act_dt.upper()} -> {w1_gemm} (INT8 batch) */")
+                add("    {")
+                if w1_act_dt == "q8_0":
+                    add("        const size_t w1_q8_row_bytes = (aligned_embed_dim / 32) * sizeof(block_q8_0);")
+                else:  # q8_k
+                    add("        const size_t w1_q8_row_bytes = (aligned_embed_dim / 256) * sizeof(block_q8_K);")
+                # Use proj_scratch as scratch - not used during MLP
+                add("        uint8_t *ln2_q8 = (uint8_t *)proj_scratch;")
+                add("        for (int t = 0; t < num_tokens; ++t) {")
+                add(f"            {w1_quant_fn}(ln2_out + (size_t)t * (size_t)aligned_embed_dim, ln2_q8 + (size_t)t * w1_q8_row_bytes, aligned_embed_dim);")
+                add("        }")
+                add(f"        {w1_gemm}(ln2_q8, W1, B1, fc1_out, num_tokens, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+                add("    }")
+            else:
+                add(f"    /* W1 (gate+up): {w1_dt.upper()} (FP32) */")
+                add(f"    {w1_kernel}(ln2_out, W1, B1, fc1_out, num_tokens, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+
             add("    swiglu_forward(fc1_out, swiglu_out, num_tokens, aligned_intermediate_dim);")
-            add(f"    {w2_kernel}(swiglu_out, W2, B2, mlp_out, num_tokens, aligned_embed_dim, aligned_intermediate_dim);")
+
+            # W2 (down) projection: use INT8 batch if available
+            if w2_int8_batch:
+                w2_gemm, w2_act_dt, w2_quant_fn = w2_int8_batch
+                add(f"    /* W2 (down): {w2_dt.upper()} x {w2_act_dt.upper()} -> {w2_gemm} (INT8 batch) */")
+                add("    {")
+                if w2_act_dt == "q8_0":
+                    add("        const size_t w2_q8_row_bytes = (aligned_intermediate_dim / 32) * sizeof(block_q8_0);")
+                else:  # q8_k
+                    add("        const size_t w2_q8_row_bytes = (aligned_intermediate_dim / 256) * sizeof(block_q8_K);")
+                # Reuse proj_scratch for swiglu quantization
+                add("        uint8_t *swiglu_q8 = (uint8_t *)proj_scratch;")
+                add("        for (int t = 0; t < num_tokens; ++t) {")
+                add(f"            {w2_quant_fn}(swiglu_out + (size_t)t * (size_t)aligned_intermediate_dim, swiglu_q8 + (size_t)t * w2_q8_row_bytes, aligned_intermediate_dim);")
+                add("        }")
+                add(f"        {w2_gemm}(swiglu_q8, W2, B2, mlp_out, num_tokens, aligned_embed_dim, aligned_intermediate_dim);")
+                add("    }")
+            else:
+                add(f"    /* W2 (down): {w2_dt.upper()} (FP32) */")
+                add(f"    {w2_kernel}(swiglu_out, W2, B2, mlp_out, num_tokens, aligned_embed_dim, aligned_intermediate_dim);")
             add()
 
             add("    /* Final residual add */")

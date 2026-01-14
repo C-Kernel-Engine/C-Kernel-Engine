@@ -1008,19 +1008,16 @@ void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
  *
  * Dispatch priority:
  *   1. AVX512 (best performance on modern Intel/AMD)
- *   2. AVX2 (full 256-bit integer support)
- *   3. SSSE3 (128-bit, most efficient on older AVX CPUs like Sandy/Ivy Bridge)
+ *   2. AVX (256-bit float ops, works on Sandy/Ivy Bridge and newer)
+ *   3. SSSE3 (128-bit fallback)
  *   4. Reference scalar (last resort)
- *
- * Note: AVX without AVX2 is actually slower due to AVX-SSE transitions,
- * so we prefer SSSE3 on those CPUs.
  */
 void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)
 {
 #if defined(__AVX512F__)
     vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);
-#elif defined(__AVX2__) && defined(__FMA__)
-    /* AVX2 with FMA for true 256-bit integer and float ops */
+#elif defined(__AVX__)
+    /* AVX for 256-bit float ops (works on Ivy Bridge and newer) */
     vec_dot_q5_0_q8_0_avx(n, s, vx, vy);
 #elif defined(__SSSE3__)
     /* SSSE3 - most efficient on older CPUs */
