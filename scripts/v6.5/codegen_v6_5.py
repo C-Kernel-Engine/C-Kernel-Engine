@@ -413,6 +413,9 @@ def validate_layout_vs_manifest(layout: v3.ModelLayout, manifest: Dict) -> List[
 
     Returns list of error messages (empty if all OK).
     """
+    import sys
+    from time import time
+
     errors = []
     warnings = []
 
@@ -420,12 +423,16 @@ def validate_layout_vs_manifest(layout: v3.ModelLayout, manifest: Dict) -> List[
         return ["No manifest entries found"]
 
     # Build manifest lookup
+    print(f"[CODEGEN]   Building manifest lookup from {len(manifest['entries'])} entries...", file=sys.stderr)
+    start_time = time()
     manifest_lookup = {e["name"]: e for e in manifest["entries"]}
+    print(f"[CODEGEN]   Manifest lookup built in {time() - start_time:.3f}s", file=sys.stderr)
 
     section = layout.sections[0]
     config = layout.config
     num_layers = config.get("num_hidden_layers", len(section.layers))
 
+    print(f"[CODEGEN]   Validating {len(section.header_buffers)} header buffers...", file=sys.stderr)
     # Check token_emb
     for buf in section.header_buffers:
         if buf.name == "token_emb":
@@ -436,8 +443,11 @@ def validate_layout_vs_manifest(layout: v3.ModelLayout, manifest: Dict) -> List[
                 if layout_dtype != manifest_dtype:
                     errors.append(f"token_emb: layout={layout_dtype} vs manifest={manifest_dtype}")
 
+    print(f"[CODEGEN]   Validating {len(section.layers)} layers...", file=sys.stderr)
     # Check per-layer weights
     for layer_id, layer in enumerate(section.layers):
+        if layer_id % 4 == 0:  # Progress indicator every 4 layers
+            print(f"[CODEGEN]   Checking layer {layer_id}/{len(section.layers)}...", file=sys.stderr)
         for buf in layer.buffers:
             parts = buf.name.split(".", 2)
             if len(parts) == 3 and parts[0] == "layer":
@@ -450,6 +460,7 @@ def validate_layout_vs_manifest(layout: v3.ModelLayout, manifest: Dict) -> List[
                     if layout_dtype != manifest_dtype:
                         errors.append(f"{manifest_name}: layout={layout_dtype} vs manifest={manifest_dtype}")
 
+    print(f"[CODEGEN]   Validation complete in {time() - start_time:.3f}s", file=sys.stderr)
     return errors
 
 
@@ -536,13 +547,18 @@ def emit_c_source_v6(layout: v3.ModelLayout,
     # ═══════════════════════════════════════════════════════════════════════════
     if weights_manifest:
         print(f"[CODEGEN] Validating layout against manifest...")
+        # Quick sanity check before expensive validation
+        num_entries = len(weights_manifest.get("entries", []))
+        print(f"[CODEGEN]   Manifest has {num_entries} entries", file=sys.stderr)
+        if num_entries > 10000:
+            print(f"[CODEGEN]   ⚠ Large manifest detected ({num_entries} entries) - this may take a while", file=sys.stderr)
         validation_errors = validate_layout_vs_manifest(layout, weights_manifest)
         if validation_errors:
             print(f"[CODEGEN] ⚠ VALIDATION ERRORS:")
             for err in validation_errors:
                 print(f"[CODEGEN]   - {err}")
             raise ValueError(f"Layout/manifest dtype mismatch: {len(validation_errors)} errors. Fix conversion or regenerate IR.")
-        print(f"[CODEGEN] ✓ Layout matches manifest ({len(weights_manifest.get('entries', []))} entries)")
+        print(f"[CODEGEN] ✓ Layout matches manifest ({num_entries} entries)")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Kernel dimension validation - catch alignment/size bugs before runtime

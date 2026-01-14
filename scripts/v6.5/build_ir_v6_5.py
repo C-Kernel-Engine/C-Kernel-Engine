@@ -2368,6 +2368,7 @@ def parse_args(argv: List[str]) -> Dict:
         "int8": True,  # Use INT8 activations for faster decode (5-15x speedup)
         "codegen": "v6",  # Codegen version: v6 (explicit unrolled, default) or v4 (loop-based)
         "decode_layout": "prefill",  # Use prefill or decode layout for decode codegen
+        "skip_manifest_validation": False,  # Skip manifest validation (debug/testing)
         # Training options
         "memory": None,  # Available memory in GB (auto-detect if None)
         "batch_size": None,  # Target batch size
@@ -2456,6 +2457,8 @@ def parse_args(argv: List[str]) -> Dict:
             if codegen_val not in ("v4", "v6"):
                 raise ValueError(f"--codegen must be v4/v6, got: {codegen_val}")
             args["codegen"] = codegen_val
+        elif arg == "--skip-manifest-validation":
+            args["skip_manifest_validation"] = True
         # Training options
         elif arg.startswith("--memory="):
             args["memory"] = float(arg.split("=", 1)[1])
@@ -3004,7 +3007,7 @@ def main(argv: List[str]) -> int:
                         emit_main=(args.get("emit") == "exe"),
                         emit_debug=args.get("debug", False),
                         emit_parity=args.get("parity", False),
-                        weights_manifest=weights_manifest,
+                        weights_manifest=weights_manifest if not args.get("skip_manifest_validation") else None,
                         int8_activations=int8_activations,
                     )
                 else:
