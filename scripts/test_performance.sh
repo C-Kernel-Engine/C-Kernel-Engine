@@ -17,7 +17,13 @@ echo ""
 
 # Check if CLI exists
 if [ ! -f "$CLI" ]; then
-    echo "ERROR: CLI not found. Build first with: make ck-cli-v6.5"
+    echo "ERROR: CLI not found at $CLI"
+    echo ""
+    echo "Build first with:"
+    echo "  git pull origin main"
+    echo "  make clean"
+    echo "  make ck-cli-v6.5"
+    echo ""
     exit 1
 fi
 
