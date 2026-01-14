@@ -35,6 +35,7 @@
 void gemv_q6_k_q8_k_avx512(float *y, const void *W, const void *x_q8, int M, int K);
 void gemv_q6_k_q8_k_avx512_vbmi(float *y, const void *W, const void *x_q8, int M, int K);
 void gemv_q6_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q6_k_q8_k_avx(float *y, const void *W, const void *x_q8, int M, int K);
 void gemv_q6_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K);
 
 /* ============================================================================
@@ -305,6 +306,182 @@ void gemv_q6_k_q8_k_sse(float *y,
     }
 }
 #endif /* __SSSE3__ */
+
+/* ============================================================================
+ * AVX Implementation (for Sandy/Ivy Bridge - AVX without AVX2)
+ *
+ * Same as SSE but with prefetching for next block.
+ * Uses 128-bit integer ops (AVX doesn't add 256-bit int ops).
+ * ============================================================================ */
+
+#if defined(__AVX__) && !defined(__AVX2__)
+
+static float dot_q6_k_q8_k_avx(const block_q6_K *w,
+                                const block_q8_K *x,
+                                int K)
+{
+    const int nb = K / QK_K;
+    const __m128i m3 = _mm_set1_epi8(3);
+    const __m128i m15 = _mm_set1_epi8(15);
+
+    __m128 acc = _mm_setzero_ps();
+
+    for (int i = 0; i < nb; ++i) {
+        const float d = GGML_FP16_TO_FP32(w[i].d) * x[i].d;
+
+        const uint8_t *ql = w[i].ql;
+        const uint8_t *qh = w[i].qh;
+        const int8_t *q8 = x[i].qs;
+
+        /* Prefetch next block */
+        if (i + 1 < nb) {
+            _mm_prefetch((const char *)&w[i + 1], _MM_HINT_T0);
+            _mm_prefetch((const char *)&x[i + 1], _MM_HINT_T0);
+        }
+
+        /* Load scales and precompute the -32 offset contribution using bsums */
+        const __m128i scales = _mm_loadu_si128((const __m128i *)w[i].scales);
+        const __m128i q8sums_0 = _mm_loadu_si128((const __m128i *)x[i].bsums);
+        const __m128i q8sums_1 = _mm_loadu_si128((const __m128i *)x[i].bsums + 1);
+
+        /* Compute: sum(scale * bsum) * 32 for the -32 offset */
+        const __m128i scales_16_0 = _mm_cvtepi8_epi16(scales);
+        const __m128i scales_16_1 = _mm_cvtepi8_epi16(_mm_bsrli_si128(scales, 8));
+        const __m128i q8sclsub_0 = _mm_slli_epi32(_mm_madd_epi16(q8sums_0, scales_16_0), 5);
+        const __m128i q8sclsub_1 = _mm_slli_epi32(_mm_madd_epi16(q8sums_1, scales_16_1), 5);
+
+        __m128i sumi_0 = _mm_setzero_si128();
+        __m128i sumi_1 = _mm_setzero_si128();
+
+        int is = 0;
+
+        /* Process 256 weights in 2 iterations of 128 */
+        for (int j = 0; j < QK_K / 128; ++j) {
+            /* Load high bits */
+            const __m128i q4bitsH_0 = _mm_loadu_si128((const __m128i *)qh);
+            qh += 16;
+            const __m128i q4bitsH_1 = _mm_loadu_si128((const __m128i *)qh);
+            qh += 16;
+
+            /* Extract and shift high bits into position */
+            const __m128i q4h_0 = _mm_slli_epi16(_mm_and_si128(q4bitsH_0, m3), 4);
+            const __m128i q4h_1 = _mm_slli_epi16(_mm_and_si128(q4bitsH_1, m3), 4);
+            const __m128i q4h_2 = _mm_slli_epi16(_mm_and_si128(q4bitsH_0, _mm_set1_epi8(12)), 2);
+            const __m128i q4h_3 = _mm_slli_epi16(_mm_and_si128(q4bitsH_1, _mm_set1_epi8(12)), 2);
+            const __m128i q4h_4 = _mm_and_si128(q4bitsH_0, _mm_set1_epi8(48));
+            const __m128i q4h_5 = _mm_and_si128(q4bitsH_1, _mm_set1_epi8(48));
+            const __m128i q4h_6 = _mm_srli_epi16(_mm_and_si128(q4bitsH_0, _mm_set1_epi8(-64)), 2);
+            const __m128i q4h_7 = _mm_srli_epi16(_mm_and_si128(q4bitsH_1, _mm_set1_epi8(-64)), 2);
+
+            /* Load low bits */
+            const __m128i q4bits1_0 = _mm_loadu_si128((const __m128i *)ql);
+            ql += 16;
+            const __m128i q4bits1_1 = _mm_loadu_si128((const __m128i *)ql);
+            ql += 16;
+            const __m128i q4bits2_0 = _mm_loadu_si128((const __m128i *)ql);
+            ql += 16;
+            const __m128i q4bits2_1 = _mm_loadu_si128((const __m128i *)ql);
+            ql += 16;
+
+            /* Combine low and high bits to get 6-bit values (unsigned 0..63) */
+            const __m128i q4_0 = _mm_or_si128(_mm_and_si128(q4bits1_0, m15), q4h_0);
+            const __m128i q4_1 = _mm_or_si128(_mm_and_si128(q4bits1_1, m15), q4h_1);
+            const __m128i q4_2 = _mm_or_si128(_mm_and_si128(q4bits2_0, m15), q4h_2);
+            const __m128i q4_3 = _mm_or_si128(_mm_and_si128(q4bits2_1, m15), q4h_3);
+            const __m128i q4_4 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(q4bits1_0, 4), m15), q4h_4);
+            const __m128i q4_5 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(q4bits1_1, 4), m15), q4h_5);
+            const __m128i q4_6 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(q4bits2_0, 4), m15), q4h_6);
+            const __m128i q4_7 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(q4bits2_1, 4), m15), q4h_7);
+
+            /* Load Q8_K values */
+            const __m128i q8_0 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_1 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_2 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_3 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_4 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_5 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_6 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+            const __m128i q8_7 = _mm_loadu_si128((const __m128i *)q8);
+            q8 += 16;
+
+            /* Multiply: maddubs treats first arg as unsigned, second as signed */
+            __m128i p16_0 = _mm_maddubs_epi16(q4_0, q8_0);
+            __m128i p16_1 = _mm_maddubs_epi16(q4_1, q8_1);
+            __m128i p16_2 = _mm_maddubs_epi16(q4_2, q8_2);
+            __m128i p16_3 = _mm_maddubs_epi16(q4_3, q8_3);
+            __m128i p16_4 = _mm_maddubs_epi16(q4_4, q8_4);
+            __m128i p16_5 = _mm_maddubs_epi16(q4_5, q8_5);
+            __m128i p16_6 = _mm_maddubs_epi16(q4_6, q8_6);
+            __m128i p16_7 = _mm_maddubs_epi16(q4_7, q8_7);
+
+            /* Get scales for this iteration */
+            const __m128i scale_0 = _mm_shuffle_epi8(scales, _mm_loadu_si128((const __m128i *)q6k_scale_shuffle[is + 0]));
+            const __m128i scale_1 = _mm_shuffle_epi8(scales, _mm_loadu_si128((const __m128i *)q6k_scale_shuffle[is + 1]));
+            const __m128i scale_2 = _mm_shuffle_epi8(scales, _mm_loadu_si128((const __m128i *)q6k_scale_shuffle[is + 2]));
+            const __m128i scale_3 = _mm_shuffle_epi8(scales, _mm_loadu_si128((const __m128i *)q6k_scale_shuffle[is + 3]));
+            is += 4;
+
+            /* Scale the products and widen to 32-bit */
+            p16_0 = _mm_madd_epi16(_mm_cvtepi8_epi16(scale_0), p16_0);
+            p16_1 = _mm_madd_epi16(_mm_cvtepi8_epi16(_mm_bsrli_si128(scale_0, 8)), p16_1);
+            p16_2 = _mm_madd_epi16(_mm_cvtepi8_epi16(scale_1), p16_2);
+            p16_3 = _mm_madd_epi16(_mm_cvtepi8_epi16(_mm_bsrli_si128(scale_1, 8)), p16_3);
+            p16_4 = _mm_madd_epi16(_mm_cvtepi8_epi16(scale_2), p16_4);
+            p16_5 = _mm_madd_epi16(_mm_cvtepi8_epi16(_mm_bsrli_si128(scale_2, 8)), p16_5);
+            p16_6 = _mm_madd_epi16(_mm_cvtepi8_epi16(scale_3), p16_6);
+            p16_7 = _mm_madd_epi16(_mm_cvtepi8_epi16(_mm_bsrli_si128(scale_3, 8)), p16_7);
+
+            /* Accumulate */
+            sumi_0 = _mm_add_epi32(sumi_0, _mm_add_epi32(p16_0, p16_2));
+            sumi_1 = _mm_add_epi32(sumi_1, _mm_add_epi32(p16_1, p16_3));
+            sumi_0 = _mm_add_epi32(sumi_0, _mm_add_epi32(p16_4, p16_6));
+            sumi_1 = _mm_add_epi32(sumi_1, _mm_add_epi32(p16_5, p16_7));
+        }
+
+        /* Subtract the -32 offset contribution */
+        sumi_0 = _mm_sub_epi32(sumi_0, q8sclsub_0);
+        sumi_1 = _mm_sub_epi32(sumi_1, q8sclsub_1);
+
+        /* Combine and convert to float */
+        __m128i sumi = _mm_add_epi32(sumi_0, sumi_1);
+        __m128 sumf_vec = _mm_mul_ps(_mm_set1_ps(d), _mm_cvtepi32_ps(sumi));
+
+        /* Horizontal sum */
+        sumf_vec = _mm_hadd_ps(sumf_vec, sumf_vec);
+        sumf_vec = _mm_hadd_ps(sumf_vec, sumf_vec);
+        acc = _mm_add_ss(acc, sumf_vec);
+    }
+
+    return _mm_cvtss_f32(acc);
+}
+
+void gemv_q6_k_q8_k_avx(float *y,
+                         const void *W,
+                         const void *x_q8,
+                         int M, int K)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) {
+        return;
+    }
+
+    const block_q6_K *blocks = (const block_q6_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+
+    for (int row = 0; row < M; ++row) {
+        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        y[row] = dot_q6_k_q8_k_avx(w_row, x, K);
+    }
+}
+
+#endif /* __AVX__ && !__AVX2__ */
 
 /* ============================================================================
  * AVX2 Implementation (for modern CPUs with AVX2)
@@ -774,11 +951,13 @@ void vec_dot_q6_k_q8_k(int n, float *s, const void *vx, const void *vy)
     const block_q6_K *x = (const block_q6_K *)vx;
     const block_q8_K *y = (const block_q8_K *)vy;
 
-    /* AVX-512 uses same algorithm as AVX2 (matches llama.cpp) */
+    /* Dispatch based on available SIMD */
 #if defined(__AVX512F__) && defined(__AVX512BW__)
     *s = dot_q6_k_q8_k_avx512(x, y, n);
 #elif defined(__AVX2__)
     *s = dot_q6_k_q8_k_avx2(x, y, n);
+#elif defined(__AVX__) && !defined(__AVX2__)
+    *s = dot_q6_k_q8_k_avx(x, y, n);
 #elif defined(__SSSE3__)
     *s = dot_q6_k_q8_k_sse(x, y, n);
 #else
@@ -799,6 +978,8 @@ void gemv_q6_k_q8_k(float *y,
     gemv_q6_k_q8_k_avx512(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q6_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__AVX__)
+    gemv_q6_k_q8_k_avx(y, W, x_q8, M, K);
 #elif defined(__SSSE3__)
     gemv_q6_k_q8_k_sse(y, W, x_q8, M, K);
 #else

@@ -23,6 +23,11 @@ void gemv_q4_k_q8_k_vnni(float *y,
                          const void *x_q8,
                          int M, int K);
 
+void gemv_q4_k_q8_k_avx(float *y,
+                        const void *W,
+                        const void *x_q8,
+                        int M, int K);
+
 void gemv_q4_k_q8_k_sse(float *y,
                         const void *W,
                         const void *x_q8,
@@ -188,6 +193,9 @@ void gemv_q4_k_q8_k(float *y,
     gemv_q4_k_q8_k_vnni(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q4_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__AVX__)
+    /* AVX version uses maddubs_epi16 (more efficient than SSE) */
+    gemv_q4_k_q8_k_avx(y, W, x_q8, M, K);
 #elif defined(__SSE4_1__)
     gemv_q4_k_q8_k_sse(y, W, x_q8, M, K);
 #else

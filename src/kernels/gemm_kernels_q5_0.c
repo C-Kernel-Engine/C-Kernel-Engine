@@ -950,10 +950,15 @@ static inline float hsum_float_8_avx(const __m256 x)
 }
 
 /**
- * @brief Quantized dot product Q5_0 x Q8_0 (AVX)
+ * @brief Quantized dot product Q5_0 x Q8_0 (AVX) - Optimized with 2x unroll
  *
  * Based on llama.cpp ggml_vec_dot_q5_0_q8_0 AVX implementation.
  * Uses 256-bit accumulation and processes 32 values per block.
+ *
+ * Optimizations:
+ *   - 2x loop unrolling to reduce loop overhead
+ *   - Prefetching next blocks to hide memory latency
+ *   - Interleaved operations for better instruction-level parallelism
  */
 void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
 {
@@ -963,43 +968,91 @@ void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
     const block_q5_0 *x = (const block_q5_0 *)vx;
     const block_q8_0 *y = (const block_q8_0 *)vy;
 
-    __m256 acc = _mm256_setzero_ps();
-    __m128i mask = _mm_set1_epi8((char)0xF0);
+    __m256 acc0 = _mm256_setzero_ps();
+    __m256 acc1 = _mm256_setzero_ps();
+    const __m128i mask = _mm_set1_epi8((char)0xF0);
 
-    for (int ib = 0; ib < nb; ib++) {
-        /* Compute combined scale for the block */
-        const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+    /* Process 2 blocks per iteration */
+    int ib = 0;
+    for (; ib + 1 < nb; ib += 2) {
+        /* Prefetch next blocks (2 cache lines ahead) */
+        _mm_prefetch((const char *)&x[ib + 4], _MM_HINT_T0);
+        _mm_prefetch((const char *)&y[ib + 4], _MM_HINT_T0);
+
+        /* === Block 0 === */
+        const __m256 d0 = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
 
         /* Unpack nibbles to 32 bytes */
-        __m256i bx_0 = bytes_from_nibbles_32_avx(x[ib].qs);
+        __m256i bx0 = bytes_from_nibbles_32_avx(x[ib].qs);
 
         /* Spread high bits */
+        const __m256i bxhi0 = bytes_from_bits_32_avx(x[ib].qh);
+        __m128i bxhil0 = _mm256_castsi256_si128(bxhi0);
+        __m128i bxhih0 = _mm256_extractf128_si256(bxhi0, 1);
+
+        /* === Block 1 === (start while block 0 is in flight) */
+        const __m256 d1 = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib+1].d) * CK_FP16_TO_FP32(y[ib+1].d));
+
+        __m256i bx1 = bytes_from_nibbles_32_avx(x[ib+1].qs);
+        const __m256i bxhi1 = bytes_from_bits_32_avx(x[ib+1].qh);
+        __m128i bxhil1 = _mm256_castsi256_si128(bxhi1);
+        __m128i bxhih1 = _mm256_extractf128_si256(bxhi1, 1);
+
+        /* === Finish Block 0 === */
+        bxhil0 = _mm_andnot_si128(bxhil0, mask);
+        bxhih0 = _mm_andnot_si128(bxhih0, mask);
+
+        __m128i bxl0 = _mm256_castsi256_si128(bx0);
+        __m128i bxh0 = _mm256_extractf128_si256(bx0, 1);
+        bxl0 = _mm_or_si128(bxl0, bxhil0);
+        bxh0 = _mm_or_si128(bxh0, bxhih0);
+        bx0 = MM256_SET_M128I(bxh0, bxl0);
+
+        const __m256i by0 = _mm256_loadu_si256((const __m256i *)y[ib].qs);
+        const __m256 q0 = mul_sum_i8_pairs_float_avx(bx0, by0);
+        acc0 = _mm256_add_ps(_mm256_mul_ps(d0, q0), acc0);
+
+        /* === Finish Block 1 === */
+        bxhil1 = _mm_andnot_si128(bxhil1, mask);
+        bxhih1 = _mm_andnot_si128(bxhih1, mask);
+
+        __m128i bxl1 = _mm256_castsi256_si128(bx1);
+        __m128i bxh1 = _mm256_extractf128_si256(bx1, 1);
+        bxl1 = _mm_or_si128(bxl1, bxhil1);
+        bxh1 = _mm_or_si128(bxh1, bxhih1);
+        bx1 = MM256_SET_M128I(bxh1, bxl1);
+
+        const __m256i by1 = _mm256_loadu_si256((const __m256i *)y[ib+1].qs);
+        const __m256 q1 = mul_sum_i8_pairs_float_avx(bx1, by1);
+        acc1 = _mm256_add_ps(_mm256_mul_ps(d1, q1), acc1);
+    }
+
+    /* Handle remaining block if nb is odd */
+    for (; ib < nb; ib++) {
+        const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+
+        __m256i bx_0 = bytes_from_nibbles_32_avx(x[ib].qs);
         const __m256i bxhi = bytes_from_bits_32_avx(x[ib].qh);
         __m128i bxhil = _mm256_castsi256_si128(bxhi);
         __m128i bxhih = _mm256_extractf128_si256(bxhi, 1);
 
-        /* Apply encoding: (~bxhi) & 0xF0 */
         bxhil = _mm_andnot_si128(bxhil, mask);
         bxhih = _mm_andnot_si128(bxhih, mask);
 
-        /* Combine with nibbles */
         __m128i bxl = _mm256_castsi256_si128(bx_0);
         __m128i bxh = _mm256_extractf128_si256(bx_0, 1);
         bxl = _mm_or_si128(bxl, bxhil);
         bxh = _mm_or_si128(bxh, bxhih);
         bx_0 = MM256_SET_M128I(bxh, bxl);
 
-        /* Load Q8_0 values (32 signed int8) */
         const __m256i by_0 = _mm256_loadu_si256((const __m256i *)y[ib].qs);
-
-        /* Multiply and sum to float */
         const __m256 q = mul_sum_i8_pairs_float_avx(bx_0, by_0);
-
-        /* Multiply q with scale and accumulate */
-        acc = _mm256_add_ps(_mm256_mul_ps(d, q), acc);
+        acc0 = _mm256_add_ps(_mm256_mul_ps(d, q), acc0);
     }
 
-    *s = hsum_float_8_avx(acc);
+    /* Combine accumulators and sum */
+    acc0 = _mm256_add_ps(acc0, acc1);
+    *s = hsum_float_8_avx(acc0);
 }
 #endif
 

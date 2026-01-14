@@ -1,16 +1,35 @@
-# Default to gcc for portability.
-# (icx-built binaries typically depend on the Intel runtime, e.g. `libimf.so`.)
+# Auto-detect Intel oneAPI compilers if available (preferred for performance).
+# Intel compilers (icx/icpx) typically produce faster code for INT8/AVX-512 workloads.
+# (icx-built binaries depend on the Intel runtime, e.g. `libimf.so`.)
+#
+# To force gcc even with Intel compilers available:
+#   make CC=gcc
+# To explicitly use Intel oneAPI when auto-detection fails:
+#   make CC=icx CXX=icpx
+
+# Auto-detect Intel oneAPI compilers
+ICX_CXX := $(shell command -v icpx 2>/dev/null)
+ICX_CC := $(shell command -v icx 2>/dev/null)
+
+# Default to gcc for portability, but prefer Intel if available
 ifeq ($(origin CC),default)
-CC := gcc
+    ifneq ($(ICX_CC),)
+        CC := icx
+        CXX := icpx
+    else
+        CC := gcc
+    endif
 endif
-# Some environments export CC=cc; treat that like "unset".
+
+# Handle CC=cc (some environments export this - reset to gcc)
 ifeq ($(CC),cc)
-CC := gcc
+    CC := gcc
+    CXX := g++
 endif
-# Opt-in to icx selection if desired:
-#   make CK_USE_ICX=1
-ifeq ($(CK_USE_ICX),1)
-CC := $(if $(shell command -v icx 2>/dev/null),icx,$(CC))
+
+# If user explicitly set CC=icx, also set CXX
+ifneq ($(findstring icx,$(CC)),)
+    CXX ?= icpx
 endif
 # OpenMP flag varies by compiler (icx/icc prefer -qopenmp; gcc/clang use -fopenmp).
 OPENMP_FLAG ?= -fopenmp
@@ -30,23 +49,53 @@ FMA_FLAGS := -mfma
 else
 FMA_FLAGS :=
 endif
-# Detect AVX level
-DEFAULT_AVX_FLAGS :=
-ifneq (,$(findstring avx512f,$(CPU_FLAGS)))
+
+# Detect AVX level and set appropriate flags for the compiler
+# Intel icx uses -x<target> or -xHost, GCC uses -mavx*
+DEFAULT_AVX_FLAGS_GCC :=
+DEFAULT_AVX_FLAGS_INTEL :=
+
+# Check CPU capabilities
+AVX512_SUPPORT := $(findstring avx512f,$(CPU_FLAGS))
+AVX2_SUPPORT := $(findstring avx2,$(CPU_FLAGS))
+AVX_SUPPORT := $(findstring avx,$(CPU_FLAGS))
+
+# GCC flags (used when CC=gcc/clang)
+ifneq (,$(AVX512_SUPPORT))
 # Full AVX-512 requires F, BW, DQ for all kernels (including _mm512_extractf32x8_ps)
-DEFAULT_AVX_FLAGS := -mavx512f -mavx512bw -mavx512dq $(FMA_FLAGS)
+DEFAULT_AVX_FLAGS_GCC := -mavx512f -mavx512bw -mavx512dq $(FMA_FLAGS)
 ifneq (,$(findstring avx512vnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS += -mavx512vnni
+DEFAULT_AVX_FLAGS_GCC += -mavx512vnni
 endif
 ifneq (,$(findstring avx512_vnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS += -mavx512vnni
+DEFAULT_AVX_FLAGS_GCC += -mavx512vnni
 endif
-else ifneq (,$(findstring avx2,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS := -mavx2 $(FMA_FLAGS)
-else ifneq (,$(findstring avx,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS := -mavx $(FMA_FLAGS)
+else ifneq (,$(AVX2_SUPPORT))
+DEFAULT_AVX_FLAGS_GCC := -mavx2 $(FMA_FLAGS)
+else ifneq (,$(AVX_SUPPORT))
+DEFAULT_AVX_FLAGS_GCC := -mavx $(FMA_FLAGS)
 endif
-AVX_FLAGS ?= $(DEFAULT_AVX_FLAGS)
+
+# Intel icx flags - use -xHost to auto-detect CPU, or -xAVX2 for Ivy Bridge
+# -xHost auto-detects but generates code for the BUILD machine's CPU
+# Since we might build on a different machine, use explicit targeting
+ifneq (,$(AVX512_SUPPORT))
+# Haswell/Broadwell or newer - use AVX-512
+DEFAULT_AVX_FLAGS_INTEL := -xcore-avx512
+else ifneq (,$(AVX2_SUPPORT))
+# Ivy Bridge/Skylake or newer - use AVX2
+DEFAULT_AVX_FLAGS_INTEL := -xAVX2
+else
+# Older CPUs
+DEFAULT_AVX_FLAGS_INTEL := -xAVX
+endif
+
+# Use appropriate flags based on compiler
+ifneq (,$(findstring icx,$(CC)))
+AVX_FLAGS ?= $(DEFAULT_AVX_FLAGS_INTEL)
+else
+AVX_FLAGS ?= $(DEFAULT_AVX_FLAGS_GCC)
+endif
 
 # Detect SSSE3 support (needed for _mm_maddubs_epi16 etc.)
 ifneq (,$(findstring ssse3,$(CPU_FLAGS)))
@@ -203,6 +252,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q5_1.c \
 	           src/kernels/gemm_kernels_q4k.c \
 	           src/kernels/gemm_kernels_q4k_sse.c \
+	           src/kernels/gemm_kernels_q4k_avx.c \
 	           src/kernels/gemm_kernels_q6k.c \
 	           src/kernels/gemm_kernels_q6k_sse.c \
 	           src/kernels/gemm_kernels_q4k_q8k.c \
@@ -1612,6 +1662,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q4k_q8k_vnni.c \
                src/kernels/gemm_kernels_q6k_q8k.c \
                src/kernels/gemm_kernels_q4k_sse.c \
+               src/kernels/gemm_kernels_q4k_avx.c \
                src/kernels/gemm_kernels_q5_0.c \
                src/kernels/gemm_kernels_q5_0_sse_v2.c \
                src/kernels/gemm_kernels_q8_0.c \

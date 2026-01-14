@@ -142,6 +142,58 @@ incr_skipped() { TESTS_SKIPPED=$((TESTS_SKIPPED + 1)); }
 LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
 LLAMA_CPP_REPO="https://github.com/ggerganov/llama.cpp.git"
 
+# Auto-detect CPU capabilities (needed for compiler flags)
+HAS_AVX512=$(grep -q avx512f /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_AVX2=$(grep -q avx2 /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_AVX=$(grep -q " avx " /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_FMA=$(grep -q " fma " /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_F16C=$(grep -q f16c /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_SSE42=$(grep -q sse4_2 /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_SSE41=$(grep -q sse4_1 /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_SSSE3=$(grep -q ssse3 /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+HAS_SSE3=$(grep -q " pni " /proc/cpuinfo 2>/dev/null && echo "yes" || echo "no")
+
+# Set architecture flags based on detected CPU capabilities
+# Priority: AVX512 > AVX2 > AVX > SSE4.2 > SSE4.1 > SSSE3 > SSE3 > SSE2
+if [ "$HAS_AVX512" = "yes" ]; then
+    INTEL_ARCH="-xCORE-AVX512"
+    GCC_ARCH="-march=skylake-avx512"
+    CPU_LEVEL="AVX512"
+elif [ "$HAS_AVX2" = "yes" ]; then
+    INTEL_ARCH="-xCORE-AVX2"
+    GCC_ARCH="-march=haswell"
+    CPU_LEVEL="AVX2"
+elif [ "$HAS_AVX" = "yes" ]; then
+    INTEL_ARCH="-xAVX"
+    if [ "$HAS_FMA" = "yes" ]; then
+        GCC_ARCH="-march=bdver1"  # AMD Bulldozer has AVX+FMA
+    else
+        GCC_ARCH="-march=sandybridge"
+    fi
+    CPU_LEVEL="AVX"
+elif [ "$HAS_SSE42" = "yes" ]; then
+    INTEL_ARCH="-xSSE4.2"
+    GCC_ARCH="-march=nehalem"
+    CPU_LEVEL="SSE4.2"
+elif [ "$HAS_SSE41" = "yes" ]; then
+    INTEL_ARCH="-xSSE4.1"
+    GCC_ARCH="-march=penryn"
+    CPU_LEVEL="SSE4.1"
+elif [ "$HAS_SSSE3" = "yes" ]; then
+    INTEL_ARCH="-xSSSE3"
+    GCC_ARCH="-march=core2"
+    CPU_LEVEL="SSSE3"
+elif [ "$HAS_SSE3" = "yes" ]; then
+    INTEL_ARCH="-xSSE3"
+    GCC_ARCH="-march=prescott"
+    CPU_LEVEL="SSE3"
+else
+    # Baseline x86-64 (SSE2 is guaranteed)
+    INTEL_ARCH="-xSSE2"
+    GCC_ARCH="-march=x86-64"
+    CPU_LEVEL="SSE2"
+fi
+
 # Step 1: Check/build llama.cpp
 if [ "$SKIP_BUILD" = false ]; then
     log_step "[1/5] Checking llama.cpp..."
@@ -233,20 +285,40 @@ if [ "$SKIP_BUILD" = false ]; then
         log_step "Building llama.cpp..."
         cd "$LLAMA_DIR"
 
-        # Configure and build with Intel oneAPI if available
-        CMAKE_ARGS="-DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release"
+        log_step "CPU level: $CPU_LEVEL (AVX512=$HAS_AVX512 AVX2=$HAS_AVX2 AVX=$HAS_AVX FMA=$HAS_FMA F16C=$HAS_F16C)"
 
-        # Use Intel oneAPI compilers if available
+        # Configure and build - disable native to control features explicitly
+        CMAKE_ARGS="-DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release"
+        CMAKE_ARGS="$CMAKE_ARGS -DLLAMA_NATIVE=OFF -DGGML_NATIVE=OFF"
+
+        # Set GGML feature flags based on detected CPU capabilities
+        # Start with all features disabled, then enable what's available
+        CMAKE_ARGS="$CMAKE_ARGS -DGGML_AVX512=OFF -DGGML_AVX2=OFF -DGGML_AVX=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"
+
+        if [ "$HAS_AVX512" = "yes" ]; then
+            CMAKE_ARGS="$CMAKE_ARGS -DGGML_AVX512=ON -DGGML_AVX2=ON -DGGML_AVX=ON -DGGML_FMA=ON -DGGML_F16C=ON"
+        elif [ "$HAS_AVX2" = "yes" ]; then
+            CMAKE_ARGS="$CMAKE_ARGS -DGGML_AVX2=ON -DGGML_AVX=ON -DGGML_FMA=ON -DGGML_F16C=ON"
+        elif [ "$HAS_AVX" = "yes" ]; then
+            # AVX without AVX2 (Sandy Bridge / Ivy Bridge)
+            CMAKE_ARGS="$CMAKE_ARGS -DGGML_AVX=ON"
+            [ "$HAS_FMA" = "yes" ] && CMAKE_ARGS="$CMAKE_ARGS -DGGML_FMA=ON"
+            [ "$HAS_F16C" = "yes" ] && CMAKE_ARGS="$CMAKE_ARGS -DGGML_F16C=ON"
+        fi
+        # For SSE-only CPUs, all flags remain OFF (using baseline SSE2/SSE3/SSE4)
+
+        # Use Intel oneAPI compilers if available, otherwise GCC
         if command -v icpx &> /dev/null; then
-            log_step "Building with Intel oneAPI (icpx/icx)..."
+            log_step "Building with Intel oneAPI (icpx/icx) arch=$INTEL_ARCH..."
             CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx"
-            CMAKE_ARGS="$CMAKE_ARGS -DLLAMA_NATIVE=OFF -DGGML_NATIVE=OFF"
+            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_FLAGS=$INTEL_ARCH -DCMAKE_CXX_FLAGS=$INTEL_ARCH"
         elif command -v icx &> /dev/null; then
-            log_step "Building with Intel oneAPI (icx)..."
+            log_step "Building with Intel oneAPI (icx) arch=$INTEL_ARCH..."
             CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx"
-            CMAKE_ARGS="$CMAKE_ARGS -DLLAMA_NATIVE=OFF -DGGML_NATIVE=OFF"
+            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_FLAGS=$INTEL_ARCH -DCMAKE_CXX_FLAGS=$INTEL_ARCH"
         else
-            log_step "Building with system compiler..."
+            log_step "Building with GCC arch=$GCC_ARCH..."
+            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_C_FLAGS=$GCC_ARCH -DCMAKE_CXX_FLAGS=$GCC_ARCH"
         fi
 
         cmake -B build $CMAKE_ARGS
@@ -274,7 +346,21 @@ if [ "$SKIP_BUILD" = false ]; then
         if [ -f "tests/test-kernel-parity.cpp" ]; then
             # Need LD_LIBRARY_PATH for linking
             export LD_LIBRARY_PATH="$PWD/build/bin:$LD_LIBRARY_PATH"
-            if g++ -shared -fPIC -o libggml_kernel_test.so \
+
+            # Use same compiler as llama.cpp build
+            if command -v icpx &> /dev/null; then
+                CXX_COMPILER="icpx"
+                CXX_FLAGS="$INTEL_ARCH"
+            elif command -v icx &> /dev/null; then
+                CXX_COMPILER="icx"
+                CXX_FLAGS="$INTEL_ARCH"
+            else
+                CXX_COMPILER="g++"
+                CXX_FLAGS="${GCC_ARCH:--march=native}"
+            fi
+
+            log_step "Using $CXX_COMPILER with flags: $CXX_FLAGS"
+            if $CXX_COMPILER -shared -fPIC $CXX_FLAGS -o libggml_kernel_test.so \
                 tests/test-kernel-parity.cpp \
                 -I ggml/include -I ggml/src \
                 -L build/bin -lggml -lggml-cpu -lggml-base -lm -lpthread \
