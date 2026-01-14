@@ -42,7 +42,8 @@ endif
 # You can override AVX/arch flags from the environment if needed, e.g.:
 #   make AVX_FLAGS="-mavx2"
 #   make AVX_FLAGS=""            # scalar build
-CPU_FLAGS := $(shell grep -m1 '^flags' /proc/cpuinfo 2>/dev/null)
+# Get ALL flags lines (AVX-512/AMX might be on subsequent lines)
+CPU_FLAGS := $(shell grep '^flags' /proc/cpuinfo | tr '\n' ' ' 2>/dev/null)
 # Detect FMA support
 ifneq (,$(findstring fma,$(CPU_FLAGS)))
 FMA_FLAGS := -mfma
@@ -59,6 +60,7 @@ DEFAULT_AVX_FLAGS_INTEL :=
 AVX512_SUPPORT := $(findstring avx512f,$(CPU_FLAGS))
 AVX2_SUPPORT := $(findstring avx2,$(CPU_FLAGS))
 AVX_SUPPORT := $(findstring avx,$(CPU_FLAGS))
+AMX_SUPPORT := $(findstring amx_tile,$(CPU_FLAGS))
 
 # GCC flags (used when CC=gcc/clang)
 ifneq (,$(AVX512_SUPPORT))
