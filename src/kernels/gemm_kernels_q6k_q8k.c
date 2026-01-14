@@ -617,11 +617,8 @@ void gemv_q6_k_q8_k_avx512_vbmi(float *y,
  * @brief AVX-512 dot product for Q6_K x Q8_K
  *
  * Works on all AVX-512 CPUs (Skylake-X and newer).
- * Processes 256 weights per block using 512-bit registers.
- *
- * Strategy: Process in the same pattern as AVX2 but with wider registers.
- * Each iteration handles 32 weights (same as AVX2) but we can do more work
- * in parallel with AVX-512's wider datapaths.
+ * Uses same algorithm as AVX2, but benefits from AVX-512's wider FMA
+ * and efficient horizontal reduction.
  */
 static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
                                    const block_q8_K *x,
@@ -632,7 +629,8 @@ static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
     const __m256i m2 = _mm256_set1_epi8(3);
     const __m256i m32s = _mm256_set1_epi8(32);
 
-    __m512 acc = _mm512_setzero_ps();
+    /* Use 256-bit float accumulator, same as AVX2 */
+    __m256 acc = _mm256_setzero_ps();
 
     for (int i = 0; i < nb; ++i) {
         const float d = GGML_FP16_TO_FP32(w[i].d) * x[i].d;
@@ -643,12 +641,13 @@ static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
 
         const __m128i scales = _mm_loadu_si128((const __m128i *)w[i].scales);
 
-        __m512i sumi = _mm512_setzero_si512();
+        /* Use 256-bit integer accumulator, same as AVX2 */
+        __m256i sumi = _mm256_setzero_si256();
         int is = 0;
 
         /* Process 256 weights in 2 iterations of 128 (same structure as AVX2) */
         for (int j = 0; j < QK_K / 128; ++j) {
-            /* Get scale shuffle patterns */
+            /* Get scale shuffle patterns - identical to AVX2 */
             static const uint8_t patterns[8][16] = {
                 { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1 },
                 { 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3 },
@@ -666,7 +665,7 @@ static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
             const __m128i scale_3 = _mm_shuffle_epi8(scales, _mm_loadu_si128((const __m128i *)patterns[is + 3]));
             is += 4;
 
-            /* Load low bits (32 bytes at a time, using AVX2 within AVX-512) */
+            /* Load low bits */
             const __m256i q4bits1 = _mm256_loadu_si256((const __m256i *)q4);
             q4 += 32;
             const __m256i q4bits2 = _mm256_loadu_si256((const __m256i *)q4);
@@ -674,7 +673,7 @@ static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
             const __m256i q4bitsH = _mm256_loadu_si256((const __m256i *)qh);
             qh += 32;
 
-            /* Extract high 2-bit contributions (same as AVX2) */
+            /* Extract high 2-bit contributions */
             const __m256i q4h_0 = _mm256_slli_epi16(_mm256_and_si256(q4bitsH, m2), 4);
             const __m256i q4h_1 = _mm256_slli_epi16(_mm256_and_si256(_mm256_srli_epi16(q4bitsH, 2), m2), 4);
             const __m256i q4h_2 = _mm256_slli_epi16(_mm256_and_si256(_mm256_srli_epi16(q4bitsH, 4), m2), 4);
@@ -714,26 +713,28 @@ static float dot_q6_k_q8_k_avx512(const block_q6_K *w,
             p16_2 = _mm256_sub_epi16(p16_2, q8s_2);
             p16_3 = _mm256_sub_epi16(p16_3, q8s_3);
 
-            /* Apply scales and accumulate to 32-bit using AVX-512 for wider accumulation */
-            __m256i p32_0 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_0), p16_0);
-            __m256i p32_1 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_1), p16_1);
-            __m256i p32_2 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_2), p16_2);
-            __m256i p32_3 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_3), p16_3);
+            /* Apply scales - produces 8 int32 each */
+            p16_0 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_0), p16_0);
+            p16_1 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_1), p16_1);
+            p16_2 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_2), p16_2);
+            p16_3 = _mm256_madd_epi16(_mm256_cvtepi8_epi16(scale_3), p16_3);
 
-            /* Combine pairs into 512-bit and accumulate */
-            __m512i p32_01 = _mm512_inserti64x4(_mm512_castsi256_si512(p32_0), p32_1, 1);
-            __m512i p32_23 = _mm512_inserti64x4(_mm512_castsi256_si512(p32_2), p32_3, 1);
-
-            sumi = _mm512_add_epi32(sumi, p32_01);
-            sumi = _mm512_add_epi32(sumi, p32_23);
+            /* Accumulate all 4 into sumi (same as AVX2) */
+            sumi = _mm256_add_epi32(sumi, _mm256_add_epi32(p16_0, p16_1));
+            sumi = _mm256_add_epi32(sumi, _mm256_add_epi32(p16_2, p16_3));
         }
 
-        /* Scale by d and accumulate using AVX-512 FMA */
-        acc = _mm512_fmadd_ps(_mm512_set1_ps(d), _mm512_cvtepi32_ps(sumi), acc);
+        /* Scale by d and accumulate */
+        acc = _mm256_fmadd_ps(_mm256_set1_ps(d), _mm256_cvtepi32_ps(sumi), acc);
     }
 
-    /* Horizontal sum using AVX-512 reduce */
-    return _mm512_reduce_add_ps(acc);
+    /* Horizontal sum - use AVX-512 reduce for efficiency */
+    __m128 hi = _mm256_extractf128_ps(acc, 1);
+    __m128 lo = _mm256_castps256_ps128(acc);
+    __m128 sum128 = _mm_add_ps(hi, lo);
+    sum128 = _mm_hadd_ps(sum128, sum128);
+    sum128 = _mm_hadd_ps(sum128, sum128);
+    return _mm_cvtss_f32(sum128);
 }
 
 void gemv_q6_k_q8_k_avx512(float *y,
@@ -773,9 +774,8 @@ void vec_dot_q6_k_q8_k(int n, float *s, const void *vx, const void *vy)
     const block_q6_K *x = (const block_q6_K *)vx;
     const block_q8_K *y = (const block_q8_K *)vy;
 
-#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512VBMI__)
-    *s = dot_q6_k_q8_k_avx512_vbmi(x, y, n);
-#elif defined(__AVX512F__) && defined(__AVX512BW__)
+    /* AVX-512 uses same algorithm as AVX2 (matches llama.cpp) */
+#if defined(__AVX512F__) && defined(__AVX512BW__)
     *s = dot_q6_k_q8_k_avx512(x, y, n);
 #elif defined(__AVX2__)
     *s = dot_q6_k_q8_k_avx2(x, y, n);
@@ -794,9 +794,8 @@ void gemv_q6_k_q8_k(float *y,
                      const void *x_q8,
                      int M, int K)
 {
-#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512VBMI__)
-    gemv_q6_k_q8_k_avx512_vbmi(y, W, x_q8, M, K);
-#elif defined(__AVX512F__) && defined(__AVX512BW__)
+    /* AVX-512 uses same algorithm as AVX2 (matches llama.cpp) */
+#if defined(__AVX512F__) && defined(__AVX512BW__)
     gemv_q6_k_q8_k_avx512(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q6_k_q8_k_avx2(y, W, x_q8, M, K);

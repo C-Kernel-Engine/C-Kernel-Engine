@@ -212,7 +212,21 @@ if [ "$SKIP_BUILD" = false ]; then
             cp "$PATCHES_DIR/test-kernel-parity.cpp" tests/
         fi
 
+        # Copy performance comparison tool
+        if [ -f "$PATCHES_DIR/ck-engine-parity-bench.patch" ]; then
+            log_step "Applying CK-Engine parity/perf bench patch..."
+            git apply "$PATCHES_DIR/ck-engine-parity-bench.patch" 2>/dev/null || \
+                log_warn "Patch already applied or failed to apply"
+        fi
+
         cd "$ROOT_DIR"
+    fi
+
+    # Detect AVX-512 support
+    AVX512_FLAGS=""
+    if grep -q avx512f /proc/cpuinfo 2>/dev/null; then
+        log_step "AVX-512 detected, enabling in build..."
+        AVX512_FLAGS="-DGGML_AVX512=ON"
     fi
 
     # Build llama.cpp if needed
@@ -220,9 +234,10 @@ if [ "$SKIP_BUILD" = false ]; then
         log_step "Building llama.cpp..."
         cd "$LLAMA_DIR"
 
-        # Configure and build
+        # Configure and build with AVX-512 if available
         cmake -B build \
             -DGGML_CPU=ON \
+            $AVX512_FLAGS \
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_CURL=OFF \
             -DCMAKE_BUILD_TYPE=Release
@@ -231,6 +246,15 @@ if [ "$SKIP_BUILD" = false ]; then
         cd "$ROOT_DIR"
     else
         log_step "llama.cpp already built"
+    fi
+
+    # Build ck-perf-compare if patch was applied and it exists
+    if [ -f "$LLAMA_DIR/tests/ck-perf-compare.cpp" ] && [ ! -f "$LLAMA_DIR/build/bin/ck-perf-compare" ]; then
+        log_step "Building ck-perf-compare tool..."
+        cd "$LLAMA_DIR"
+        cmake --build build --target ck-perf-compare -j$(nproc) 2>/dev/null || \
+            log_warn "Could not build ck-perf-compare (may need manual cmake reconfig)"
+        cd "$ROOT_DIR"
     fi
 
     # Build kernel test library
@@ -399,6 +423,37 @@ fi
 if [ "$PERF_MODE" = true ]; then
     log_step "[3c/5] Running performance benchmarks..."
 
+    # Try native C++ perf comparison first (most accurate)
+    PERF_COMPARE="$LLAMA_DIR/build/bin/ck-perf-compare"
+    MODEL_DIR="$HOME/.cache/ck-engine-v6.5/models/Qwen--Qwen2-0.5B-Instruct-GGUF"
+
+    if [ -f "$PERF_COMPARE" ] && [ -d "$MODEL_DIR" ]; then
+        GGUF_FILE=$(find "$MODEL_DIR" -name "*.gguf" -type f | head -1)
+        CK_LIB="$MODEL_DIR/ck-kernel-inference.so"
+        CK_WEIGHTS="$MODEL_DIR/weights.bump"
+
+        if [ -f "$GGUF_FILE" ] && [ -f "$CK_LIB" ] && [ -f "$CK_WEIGHTS" ]; then
+            log_step "Running native C++ performance comparison..."
+            set +e
+            N_TOKENS=50
+            [ "$PERF_LARGE" = true ] && N_TOKENS=200
+            "$PERF_COMPARE" -m "$GGUF_FILE" -l "$CK_LIB" -w "$CK_WEIGHTS" -n $N_TOKENS -r 3
+            RET=$?
+            set -e
+
+            if [ $RET -eq 0 ]; then
+                log_success "Native performance comparison completed"
+                incr_passed
+            else
+                log_error "Native performance comparison failed"
+                incr_failed
+            fi
+        else
+            log_warn "Model files not found for native perf compare, falling back to Python"
+        fi
+    fi
+
+    # Fall back to Python benchmark if native not available
     if [ -f "$KERNEL_TEST" ]; then
         set +e
         if [ "$PERF_LARGE" = true ]; then

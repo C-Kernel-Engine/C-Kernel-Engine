@@ -1202,39 +1202,40 @@ smollm-train-parity: $(LIB)
 	  --lr 1e-4
 
 # llama.cpp parity test (compares CK kernels against llama.cpp/ggml)
-# Requires llama.cpp submodule: git submodule add https://github.com/ggerganov/llama.cpp.git
+# These targets auto-clone, patch, and build llama.cpp if needed
+# Patches applied: llama.patch, test-kernel-parity.cpp, ck-engine-parity-bench.patch
+# AVX-512 is auto-detected and enabled if available
+
 llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
-	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
-		./scripts/run_parity_smoketest.sh --quick; \
-	else \
-		echo "SKIP: llama.cpp not built (run 'git submodule update --init' and build llama.cpp first)"; \
-	fi
+	@./scripts/run_parity_smoketest.sh --quick
 
 llamacpp-parity-full:
-	@echo "Running full llama.cpp parity test..."
-	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
-		./scripts/run_parity_smoketest.sh; \
-	else \
-		echo "SKIP: llama.cpp not built"; \
-	fi
+	@echo "Running full llama.cpp parity test (auto-patches & builds llama.cpp)..."
+	@./scripts/run_parity_smoketest.sh
 
-# Parity tests with performance benchmarks
+# Force rebuild llama.cpp with latest patches (use when patches change)
+llamacpp-parity-rebuild:
+	@echo "Force rebuilding llama.cpp with latest patches..."
+	@./scripts/run_parity_smoketest.sh --force-rebuild
+
+# Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
 	@echo "Running llama.cpp parity + performance benchmarks..."
-	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
-		./scripts/run_parity_smoketest.sh --perf; \
-	else \
-		echo "SKIP: llama.cpp not built"; \
-	fi
+	@./scripts/run_parity_smoketest.sh --perf
 
 # Parity tests with 7B dimension performance benchmarks
 llamacpp-parity-perf-large:
 	@echo "Running llama.cpp parity + large (7B) performance benchmarks..."
-	@if [ -d "llama.cpp" ] && [ -f "llama.cpp/build/bin/llama-cli" ]; then \
-		./scripts/run_parity_smoketest.sh --perf-large; \
+	@./scripts/run_parity_smoketest.sh --perf-large
+
+# AVX-512 specific parity test
+llamacpp-parity-avx512:
+	@echo "Running AVX-512 parity tests..."
+	@if grep -q avx512f /proc/cpuinfo 2>/dev/null; then \
+		python3 scripts/test_avx512_parity.py --cross --full; \
 	else \
-		echo "SKIP: llama.cpp not built"; \
+		echo "SKIP: AVX-512 not available on this machine"; \
 	fi
 
 # GEMV kernel performance benchmark
