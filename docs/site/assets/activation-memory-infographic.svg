@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1400">
+  <defs>
+    <linearGradient id="cpuGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22c55e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gpuGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f87171;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="headerGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e1e2e" />
+      <stop offset="100%" style="stop-color:#2d2d3d" />
+    </linearGradient>
+    <linearGradient id="accentGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fbbf24" />
+      <stop offset="100%" style="stop-color:#f59e0b" />
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa" />
+      <stop offset="100%" style="stop-color:#3b82f6" />
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a78bfa" />
+      <stop offset="100%" style="stop-color:#8b5cf6" />
+    </linearGradient>
+    <filter id="shadow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="1400" fill="#0f0f1a"/>
+
+  <!-- Grid pattern -->
+  <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a1a2e" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1200" height="1400" fill="url(#grid2)" opacity="0.5"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1200" height="100" fill="url(#headerGrad2)"/>
+  <text x="600" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="bold" fill="#ffffff" text-anchor="middle">Activation Memory Per Token</text>
+  <text x="600" y="75" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#a0a0b0" text-anchor="middle">Qwen2-0.5B (hidden=896, intermediate=4864, 24 layers)</text>
+
+  <!-- Section 1: Traditional Decode -->
+  <g transform="translate(50, 130)">
+    <rect width="530" height="480" rx="16" fill="#1a1a2e" filter="url(#shadow2)"/>
+    <rect x="0" y="0" width="530" height="60" rx="16" fill="#2d1a1a"/>
+    <rect x="0" y="30" width="530" height="30" fill="#2d1a1a"/>
+    <text x="265" y="40" font-family="system-ui, sans-serif" font-size="20" font-weight="bold" fill="#f87171" text-anchor="middle">Traditional (Unfused)</text>
+
+    <!-- Table Header -->
+    <rect x="20" y="80" width="490" height="40" rx="6" fill="#2d2d3d"/>
+    <text x="150" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Operation</text>
+    <text x="320" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Per Layer</text>
+    <text x="435" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">24 Layers</text>
+
+    <!-- Rows -->
+    <g transform="translate(20, 125)">
+      <!-- RMSNorm -->
+      <rect x="0" y="0" width="490" height="35" rx="4" fill="#252535"/>
+      <text x="150" y="24" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">RMSNorm output</text>
+      <text x="320" y="24" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">3.5 KB</text>
+      <text x="435" y="24" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">84 KB</text>
+
+      <!-- Q, K, V -->
+      <rect x="0" y="40" width="490" height="35" rx="4" fill="#1e1e2e"/>
+      <text x="150" y="64" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">Q, K, V projections</text>
+      <text x="320" y="64" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">10.5 KB</text>
+      <text x="435" y="64" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">252 KB</text>
+
+      <!-- Attention -->
+      <rect x="0" y="80" width="490" height="35" rx="4" fill="#252535"/>
+      <text x="150" y="104" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">Attention output</text>
+      <text x="320" y="104" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">3.5 KB</text>
+      <text x="435" y="104" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">84 KB</text>
+
+      <!-- O Projection -->
+      <rect x="0" y="120" width="490" height="35" rx="4" fill="#1e1e2e"/>
+      <text x="150" y="144" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">O projection</text>
+      <text x="320" y="144" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">3.5 KB</text>
+      <text x="435" y="144" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">84 KB</text>
+
+      <!-- MLP gate+up (highlighted as largest) -->
+      <rect x="0" y="160" width="490" height="35" rx="4" fill="#3d2d1a" stroke="#fbbf24" stroke-width="1"/>
+      <text x="150" y="184" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#fbbf24" text-anchor="middle">MLP gate + up</text>
+      <text x="320" y="184" font-family="monospace" font-size="13" font-weight="bold" fill="#fbbf24" text-anchor="middle">38 KB</text>
+      <text x="435" y="184" font-family="monospace" font-size="13" font-weight="bold" fill="#fbbf24" text-anchor="middle">912 KB</text>
+
+      <!-- MLP down -->
+      <rect x="0" y="200" width="490" height="35" rx="4" fill="#1e1e2e"/>
+      <text x="150" y="224" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">MLP down</text>
+      <text x="320" y="224" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">3.5 KB</text>
+      <text x="435" y="224" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">84 KB</text>
+
+      <!-- Total -->
+      <rect x="0" y="245" width="490" height="45" rx="6" fill="#3d1a1a" stroke="#f87171" stroke-width="2"/>
+      <text x="150" y="275" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#f87171" text-anchor="middle">TOTAL</text>
+      <text x="320" y="275" font-family="monospace" font-size="16" font-weight="bold" fill="#f87171" text-anchor="middle">~62 KB</text>
+      <text x="435" y="275" font-family="monospace" font-size="18" font-weight="bold" fill="#f87171" text-anchor="middle">~1.5 MB</text>
+    </g>
+
+    <!-- Note -->
+    <text x="265" y="455" font-family="system-ui, sans-serif" font-size="12" fill="#a0a0b0" text-anchor="middle">Every operation writes intermediate results to memory</text>
+  </g>
+
+  <!-- Section 2: Mega-Fused Decode -->
+  <g transform="translate(620, 130)">
+    <rect width="530" height="480" rx="16" fill="#1a1a2e" filter="url(#shadow2)"/>
+    <rect x="0" y="0" width="530" height="60" rx="16" fill="#1a2d1a"/>
+    <rect x="0" y="30" width="530" height="30" fill="#1a2d1a"/>
+    <text x="265" y="40" font-family="system-ui, sans-serif" font-size="20" font-weight="bold" fill="#4ade80" text-anchor="middle">Mega-Fused</text>
+
+    <!-- Table Header -->
+    <rect x="20" y="80" width="490" height="40" rx="6" fill="#2d2d3d"/>
+    <text x="150" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Operation</text>
+    <text x="320" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Per Layer</text>
+    <text x="435" y="107" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">24 Layers</text>
+
+    <!-- Rows -->
+    <g transform="translate(20, 125)">
+      <!-- K cache -->
+      <rect x="0" y="0" width="490" height="35" rx="4" fill="#252535"/>
+      <text x="150" y="24" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">K cache (new token)</text>
+      <text x="320" y="24" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">512 B</text>
+      <text x="435" y="24" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">12 KB</text>
+
+      <!-- V cache -->
+      <rect x="0" y="40" width="490" height="35" rx="4" fill="#1e1e2e"/>
+      <text x="150" y="64" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">V cache (new token)</text>
+      <text x="320" y="64" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">512 B</text>
+      <text x="435" y="64" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">12 KB</text>
+
+      <!-- Hidden (zero!) -->
+      <rect x="0" y="80" width="490" height="35" rx="4" fill="#1a3d1a" stroke="#4ade80" stroke-width="1"/>
+      <text x="150" y="104" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#4ade80" text-anchor="middle">Hidden (between layers)</text>
+      <text x="320" y="104" font-family="monospace" font-size="13" font-weight="bold" fill="#4ade80" text-anchor="middle">0 B</text>
+      <text x="435" y="104" font-family="monospace" font-size="13" font-weight="bold" fill="#4ade80" text-anchor="middle">0 B</text>
+
+      <!-- Why zero explanation -->
+      <rect x="0" y="120" width="490" height="70" rx="4" fill="#1e1e2e"/>
+      <text x="245" y="145" font-family="system-ui, sans-serif" font-size="11" fill="#a0a0b0" text-anchor="middle">Hidden stays in CPU registers</text>
+      <text x="245" y="162" font-family="system-ui, sans-serif" font-size="11" fill="#a0a0b0" text-anchor="middle">through all 24 layers!</text>
+      <text x="245" y="179" font-family="monospace" font-size="10" fill="#606070" text-anchor="middle">(896 floats = 3.5KB fits in ZMM registers)</text>
+
+      <!-- Final logits -->
+      <rect x="0" y="195" width="490" height="35" rx="4" fill="#252535"/>
+      <text x="150" y="219" font-family="system-ui, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">Final logits (once)</text>
+      <text x="320" y="219" font-family="monospace" font-size="13" fill="#a0a0b0" text-anchor="middle">-</text>
+      <text x="435" y="219" font-family="monospace" font-size="13" fill="#ffffff" text-anchor="middle">600 KB</text>
+
+      <!-- Total -->
+      <rect x="0" y="245" width="490" height="45" rx="6" fill="#1a3d1a" stroke="#4ade80" stroke-width="2"/>
+      <text x="150" y="275" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#4ade80" text-anchor="middle">TOTAL</text>
+      <text x="320" y="275" font-family="monospace" font-size="16" font-weight="bold" fill="#4ade80" text-anchor="middle">~1 KB</text>
+      <text x="435" y="275" font-family="monospace" font-size="18" font-weight="bold" fill="#4ade80" text-anchor="middle">~624 KB</text>
+    </g>
+
+    <!-- Note -->
+    <text x="265" y="455" font-family="system-ui, sans-serif" font-size="12" fill="#a0a0b0" text-anchor="middle">Only KV cache and final output touch memory</text>
+  </g>
+
+  <!-- Savings Arrow -->
+  <g transform="translate(500, 640)">
+    <rect width="200" height="60" rx="30" fill="url(#accentGrad2)" filter="url(#shadow2)"/>
+    <text x="100" y="28" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f0f1a" text-anchor="middle">SAVINGS</text>
+    <text x="100" y="48" font-family="monospace" font-size="18" font-weight="bold" fill="#0f0f1a" text-anchor="middle">~900 KB/token</text>
+  </g>
+
+  <!-- Section 3: Prefill Scaling -->
+  <g transform="translate(50, 730)">
+    <rect width="1100" height="300" rx="16" fill="#1a1a2e" filter="url(#shadow2)"/>
+    <text x="40" y="45" font-family="system-ui, sans-serif" font-size="24" font-weight="bold" fill="#ffffff">Prefill: Memory Scales with Context Length</text>
+
+    <!-- Visual bars for prefill -->
+    <g transform="translate(40, 80)">
+      <!-- 256 tokens -->
+      <text x="0" y="20" font-family="monospace" font-size="14" fill="#ffffff">256 tokens</text>
+      <rect x="120" y="5" width="400" height="25" rx="4" fill="#f87171" opacity="0.8"/>
+      <text x="125" y="23" font-family="monospace" font-size="12" fill="#ffffff">Traditional: 400 MB</text>
+      <rect x="120" y="35" width="160" height="25" rx="4" fill="#4ade80"/>
+      <text x="125" y="53" font-family="monospace" font-size="12" fill="#0f0f1a">Fused: 160 MB</text>
+
+      <!-- 1K tokens -->
+      <text x="0" y="90" font-family="monospace" font-size="14" fill="#ffffff">1K tokens</text>
+      <rect x="120" y="75" width="600" height="25" rx="4" fill="#f87171" opacity="0.8"/>
+      <text x="125" y="93" font-family="monospace" font-size="12" fill="#ffffff">Traditional: 1.5 GB</text>
+      <rect x="120" y="105" width="250" height="25" rx="4" fill="#4ade80"/>
+      <text x="125" y="123" font-family="monospace" font-size="12" fill="#0f0f1a">Fused: 625 MB</text>
+
+      <!-- 4K tokens -->
+      <text x="0" y="160" font-family="monospace" font-size="14" fill="#ffffff">4K tokens</text>
+      <rect x="120" y="145" width="800" height="25" rx="4" fill="#f87171" opacity="0.8"/>
+      <text x="125" y="163" font-family="monospace" font-size="12" fill="#ffffff">Traditional: 6 GB</text>
+      <rect x="120" y="175" width="333" height="25" rx="4" fill="#4ade80"/>
+      <text x="125" y="193" font-family="monospace" font-size="12" fill="#0f0f1a">Fused: 2.5 GB</text>
+    </g>
+
+    <text x="900" y="180" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#fbbf24" text-anchor="middle">~60% Less</text>
+    <text x="900" y="205" font-family="system-ui, sans-serif" font-size="14" fill="#a0a0b0" text-anchor="middle">at every scale</text>
+  </g>
+
+  <!-- Section 4: KV Cache Formula -->
+  <g transform="translate(50, 1060)">
+    <rect width="1100" height="180" rx="16" fill="#1a1a2e" filter="url(#shadow2)"/>
+    <rect x="0" y="0" width="8" height="180" rx="4" fill="url(#blueGrad)"/>
+
+    <text x="40" y="45" font-family="system-ui, sans-serif" font-size="24" font-weight="bold" fill="#60a5fa">KV Cache: The Context Multiplier</text>
+
+    <text x="40" y="90" font-family="monospace" font-size="16" fill="#ffffff">KV_Cache = 2 × layers × kv_heads × head_dim × context × bytes_per_element</text>
+
+    <g transform="translate(40, 110)">
+      <rect width="250" height="50" rx="8" fill="#2d2d3d"/>
+      <text x="125" y="22" font-family="system-ui, sans-serif" font-size="12" fill="#a0a0b0" text-anchor="middle">FP32 KV Cache</text>
+      <text x="125" y="42" font-family="monospace" font-size="14" fill="#ffffff" text-anchor="middle">24 KB per token</text>
+    </g>
+
+    <g transform="translate(320, 110)">
+      <rect width="250" height="50" rx="8" fill="#1a3d1a"/>
+      <text x="125" y="22" font-family="system-ui, sans-serif" font-size="12" fill="#4ade80" text-anchor="middle">FP16 KV Cache</text>
+      <text x="125" y="42" font-family="monospace" font-size="14" fill="#4ade80" text-anchor="middle">12 KB per token</text>
+    </g>
+
+    <g transform="translate(600, 110)">
+      <rect width="460" height="50" rx="8" fill="#3d3d1a"/>
+      <text x="230" y="22" font-family="system-ui, sans-serif" font-size="12" fill="#fbbf24" text-anchor="middle">FP16 doubles context that fits in L3 cache!</text>
+      <text x="230" y="42" font-family="monospace" font-size="14" fill="#fbbf24" text-anchor="middle">6K → 12K tokens in 6MB L3</text>
+    </g>
+  </g>
+
+  <!-- Section 5: The Insight -->
+  <g transform="translate(50, 1270)">
+    <rect width="1100" height="100" rx="16" fill="#1a2d1a" filter="url(#shadow2)"/>
+
+    <text x="550" y="45" font-family="system-ui, sans-serif" font-size="22" font-weight="bold" fill="#4ade80" text-anchor="middle">The CPU Advantage</text>
+    <text x="550" y="75" font-family="system-ui, sans-serif" font-size="16" fill="#a0a0b0" text-anchor="middle">More memory = longer context = more capability. No artificial VRAM limits.</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="600" y="1390" font-family="system-ui, sans-serif" font-size="14" fill="#606070" text-anchor="middle">C-Kernel-Engine | Mega-Fusion Architecture</text>
+</svg>

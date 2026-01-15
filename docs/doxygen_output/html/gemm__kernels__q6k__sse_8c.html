@@ -312,12 +312,12 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;}</div>
 <div class="ttc" id="ackernel__quant_8h_html_a69a759de291fac064cd027839afb4bce"><div class="ttname"><a href="ckernel__quant_8h.html#a69a759de291fac064cd027839afb4bce">gemm_nt_q6_k_ref</a></div><div class="ttdeci">void gemm_nt_q6_k_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q6k_8c_source.html#l00234">gemm_kernels_q6k.c:234</a></div></div>
 <div class="ttc" id="agemm__kernels__q6k__sse_8c_html_a1e388b3b2a1595ca6abbc8e922e1be67"><div class="ttname"><a href="gemm__kernels__q6k__sse_8c.html#a1e388b3b2a1595ca6abbc8e922e1be67">dot_q6_k_q8_k_256_sse</a></div><div class="ttdeci">static float dot_q6_k_q8_k_256_sse(const block_q6_K *bw, const block_q8_K *ba)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q6k__sse_8c_source.html#l00020">gemm_kernels_q6k_sse.c:20</a></div></div>
-<div class="ttc" id="agemm__kernels__q6k__sse_8c_html_a64b28ca8a25883986a0d22e39a574a32"><div class="ttname"><a href="gemm__kernels__q6k__sse_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a></div><div class="ttdeci">void quantize_row_q8_k(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00093">gemm_kernels_q4k_q8k.c:93</a></div></div>
+<div class="ttc" id="agemm__kernels__q6k__sse_8c_html_a64b28ca8a25883986a0d22e39a574a32"><div class="ttname"><a href="gemm__kernels__q6k__sse_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a></div><div class="ttdeci">void quantize_row_q8_k(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00098">gemm_kernels_q4k_q8k.c:98</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition:</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 <div class="ttc" id="astructblock__q6__K_html"><div class="ttname"><a href="structblock__q6__K.html">block_q6_K</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00138">ckernel_quant.h:138</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00152">ckernel_quant.h:152</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__sse_8c_source.html#l00020">dot_q6_k_q8_k_256_sse()</a>, <a class="el" href="gemm__kernels__q6k_8c_source.html#l00234">gemm_nt_q6_k_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00093">quantize_row_q8_k()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__sse_8c_source.html#l00020">dot_q6_k_q8_k_256_sse()</a>, <a class="el" href="gemm__kernels__q6k_8c_source.html#l00234">gemm_nt_q6_k_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00098">quantize_row_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -353,16 +353,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00093">93</a> of file <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html">gemm_kernels_q4k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;                                                        {</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;<span class="preprocessor">#if defined(__SSE4_1__)</span></div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;    <a class="code" href="gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(x, vy, k);</div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;    <a class="code" href="gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00098">98</a> of file <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html">gemm_kernels_q4k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;                                                        {</div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;<span class="preprocessor">#if defined(__SSE4_1__)</span></div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;    <a class="code" href="gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(x, vy, k);</div>
+<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;    <a class="code" href="gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
+<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;}</div>
 <div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ad7fa7d735b58b52c90cbd6160676e86f"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a></div><div class="ttdeci">void quantize_row_q8_k_sse(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00015">quantize_row_q8_k_sse.c:15</a></div></div>
-<div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00039">gemm_kernels_q4k_q8k.c:39</a></div></div>
+<div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00044">gemm_kernels_q4k_q8k.c:44</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__sse_8c_source.html#l00053">gemm_nt_q6_k_sse()</a>.</p>
 

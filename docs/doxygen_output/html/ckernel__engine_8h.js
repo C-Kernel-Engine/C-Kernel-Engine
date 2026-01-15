@@ -89,11 +89,13 @@ var ckernel__engine_8h =
     [ "gemm_nt_q5_0", "ckernel__engine_8h.html#a7016bef6b48fbf2c9cc10d9330f2b4db", null ],
     [ "gemm_nt_q5_1", "ckernel__engine_8h.html#aa72fdf836a4143ecacb702ad12a883bb", null ],
     [ "gemm_nt_q6_k", "ckernel__engine_8h.html#a7568db3d490c7a7372a5236d8b2fe207", null ],
+    [ "gemm_nt_q6_k_q8_k", "ckernel__engine_8h.html#ac912d4edc9cd1c7de9f1697ae510fbff", null ],
     [ "gemm_nt_q8_0", "ckernel__engine_8h.html#a85197b983d949018f42bd43e3751478b", null ],
     [ "gemm_nt_q8_0_q8_0", "ckernel__engine_8h.html#ab6bbe55b0fdb7a984ea9020ca18f76cc", null ],
     [ "gemm_q4_k", "ckernel__engine_8h.html#ac277a5257dc44a48af4ebaa8691806cf", null ],
     [ "gemm_q4_k_q8_k", "ckernel__engine_8h.html#ac52baba628268303f41c01413c445024", null ],
     [ "gemm_q6_k", "ckernel__engine_8h.html#a07fcd594f867f5c6afb487ab989213e1", null ],
+    [ "gemm_q6_k_q8_k", "ckernel__engine_8h.html#a6f8eb04ad56d34cf1d38d49ea19a7639", null ],
     [ "gemm_swiglu_fused", "ckernel__engine_8h.html#a2ae3bbf03cebc529c1e7962a7dba2568", null ],
     [ "gemm_tn_avx512", "ckernel__engine_8h.html#afe5bf17f909def227c3e25b0c4338f93", null ],
     [ "gemm_tn_blocked", "ckernel__engine_8h.html#ae3bc36ea7b8562f9121e527f0f408b43", null ],
@@ -104,6 +106,7 @@ var ckernel__engine_8h =
     [ "gemv_q5_0", "ckernel__engine_8h.html#a56c38c3bc4cf886b268f9e7974aa5221", null ],
     [ "gemv_q5_0_q8_0", "ckernel__engine_8h.html#a4fb9cf343ac07a0868c55f25bd201ca3", null ],
     [ "gemv_q6_k", "ckernel__engine_8h.html#a3c98619f74662804d8551efbd4d02b52", null ],
+    [ "gemv_q6_k_q8_k", "ckernel__engine_8h.html#a7b78875a957c11b30c9f7170b6c87c45", null ],
     [ "gemv_q8_0", "ckernel__engine_8h.html#a3e0166eab910ca7f003602c29f428cb1", null ],
     [ "gemv_q8_0_q8_0", "ckernel__engine_8h.html#ab56038b4e1cf73692b6be9c28ada9023", null ],
     [ "im2patch", "ckernel__engine_8h.html#a86aec042bcceb0bd8955f0daf0d986c4", null ],
@@ -169,5 +172,6 @@ var ckernel__engine_8h =
     [ "topk_batched_f32", "ckernel__engine_8h.html#a3ced6292072f7fb17630a298120e04d2", null ],
     [ "topk_f32", "ckernel__engine_8h.html#adcd797bc726d0f95fd659787fad1db52", null ],
     [ "topk_softmax_f32", "ckernel__engine_8h.html#ae80a999dd7d7242eda4ef1e50e1aa09c", null ],
+    [ "vec_dot_q6_k_q8_k", "ckernel__engine_8h.html#a892b783bece286ef3d51dfef42017ac5", null ],
     [ "weighted_sum_f32", "ckernel__engine_8h.html#a6923864d9edb216c4938436cd74a4823", null ]
 ];

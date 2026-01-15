@@ -9,11 +9,14 @@
     <includedby refid="ck__parity__api_8c" local="yes">ck_parity_api.c</includedby>
     <includedby refid="ckernel__orchestration_8c" local="yes">ckernel_orchestration.c</includedby>
     <includedby refid="dequant__kernels_8c" local="yes">dequant_kernels.c</includedby>
+    <includedby refid="fused__rmsnorm__linear_8c" local="yes">fused_rmsnorm_linear.c</includedby>
     <includedby refid="gemm__batch__int8_8c" local="yes">gemm_batch_int8.c</includedby>
+    <includedby refid="gemm__kernels__amx_8c" local="yes">gemm_kernels_amx.c</includedby>
     <includedby refid="gemm__kernels__f16_8c" local="yes">gemm_kernels_f16.c</includedby>
     <includedby refid="gemm__kernels__q4__0_8c" local="yes">gemm_kernels_q4_0.c</includedby>
     <includedby refid="gemm__kernels__q4__1_8c" local="yes">gemm_kernels_q4_1.c</includedby>
     <includedby refid="gemm__kernels__q4k_8c" local="yes">gemm_kernels_q4k.c</includedby>
+    <includedby refid="gemm__kernels__q4k__avx_8c" local="yes">gemm_kernels_q4k_avx.c</includedby>
     <includedby refid="gemm__kernels__q4k__q8k_8c" local="yes">gemm_kernels_q4k_q8k.c</includedby>
     <includedby refid="gemm__kernels__q4k__q8k__avx2_8c" local="yes">gemm_kernels_q4k_q8k_avx2.c</includedby>
     <includedby refid="gemm__kernels__q4k__q8k__vnni_8c" local="yes">gemm_kernels_q4k_q8k_vnni.c</includedby>
@@ -23,6 +26,7 @@
     <includedby refid="gemm__kernels__q5__0__sse__v2_8c" local="yes">gemm_kernels_q5_0_sse_v2.c</includedby>
     <includedby refid="gemm__kernels__q5__1_8c" local="yes">gemm_kernels_q5_1.c</includedby>
     <includedby refid="gemm__kernels__q6k_8c" local="yes">gemm_kernels_q6k.c</includedby>
+    <includedby refid="gemm__kernels__q6k__q8k_8c" local="yes">gemm_kernels_q6k_q8k.c</includedby>
     <includedby refid="gemm__kernels__q6k__sse_8c" local="yes">gemm_kernels_q6k_sse.c</includedby>
     <includedby refid="gemm__kernels__q8__0_8c" local="yes">gemm_kernels_q8_0.c</includedby>
     <includedby refid="quantize__row__q8__k__sse_8c" local="yes">quantize_row_q8_k_sse.c</includedby>
@@ -109,10 +113,22 @@
         </childnode>
         <childnode refid="62" relation="include">
         </childnode>
+        <childnode refid="63" relation="include">
+        </childnode>
+        <childnode refid="64" relation="include">
+        </childnode>
+        <childnode refid="65" relation="include">
+        </childnode>
+        <childnode refid="66" relation="include">
+        </childnode>
       </node>
       <node id="23">
         <label>relu_kernels_bf16.c</label>
         <link refid="relu__kernels__bf16_8c"/>
+      </node>
+      <node id="45">
+        <label>fused_rmsnorm_linear.c</label>
+        <link refid="fused__rmsnorm__linear_8c"/>
       </node>
       <node id="37">
         <label>generic_api_test.c</label>
@@ -130,7 +146,7 @@
         <label>v6.5_simple.c</label>
         <link refid="v6_85__simple_8c"/>
       </node>
-      <node id="56">
+      <node id="59">
         <label>gemm_kernels_q5_0_sse_v2.c</label>
         <link refid="gemm__kernels__q5__0__sse__v2_8c"/>
       </node>
@@ -162,7 +178,11 @@
         <label>ck-kernel-inference.c</label>
         <link refid="ck-kernel-inference_8c"/>
       </node>
-      <node id="55">
+      <node id="52">
+        <label>gemm_kernels_q4k_avx.c</label>
+        <link refid="gemm__kernels__q4k__avx_8c"/>
+      </node>
+      <node id="58">
         <label>gemm_kernels_q5_0_sse.c</label>
         <link refid="gemm__kernels__q5__0__sse_8c"/>
       </node>
@@ -274,7 +294,7 @@
         <label>gemm_fused_kernels.c</label>
         <link refid="gemm__fused__kernels_8c"/>
       </node>
-      <node id="52">
+      <node id="55">
         <label>gemm_kernels_q4k_q8k_vnni.c</label>
         <link refid="gemm__kernels__q4k__q8k__vnni_8c"/>
       </node>
@@ -294,13 +314,17 @@
         <label>ckernel_orchestration.c</label>
         <link refid="ckernel__orchestration_8c"/>
       </node>
-      <node id="60">
+      <node id="64">
         <label>gemm_kernels_q8_0.c</label>
         <link refid="gemm__kernels__q8__0_8c"/>
       </node>
       <node id="17">
         <label>layernorm_kernels_bf16.c</label>
         <link refid="layernorm__kernels__bf16_8c"/>
+      </node>
+      <node id="47">
+        <label>gemm_kernels_amx.c</label>
+        <link refid="gemm__kernels__amx_8c"/>
       </node>
       <node id="44">
         <label>dequant_kernels.c</label>
@@ -310,11 +334,11 @@
         <label>mlp_fused_decode.c</label>
         <link refid="mlp__fused__decode_8c"/>
       </node>
-      <node id="53">
+      <node id="56">
         <label>gemm_kernels_q4k_sse.c</label>
         <link refid="gemm__kernels__q4k__sse_8c"/>
       </node>
-      <node id="54">
+      <node id="57">
         <label>gemm_kernels_q5_0.c</label>
         <link refid="gemm__kernels__q5__0_8c"/>
       </node>
@@ -322,15 +346,15 @@
         <label>embedding_kernels_bf16.c</label>
         <link refid="embedding__kernels__bf16_8c"/>
       </node>
-      <node id="61">
+      <node id="65">
         <label>quantize_row_q8_k_sse.c</label>
         <link refid="quantize__row__q8__k__sse_8c"/>
       </node>
-      <node id="59">
+      <node id="63">
         <label>gemm_kernels_q6k_sse.c</label>
         <link refid="gemm__kernels__q6k__sse_8c"/>
       </node>
-      <node id="62">
+      <node id="66">
         <label>rmsnorm_q8_k_fused.c</label>
         <link refid="rmsnorm__q8__k__fused_8c"/>
       </node>
@@ -342,7 +366,7 @@
         <label>gemm_microkernel.c</label>
         <link refid="gemm__microkernel_8c"/>
       </node>
-      <node id="47">
+      <node id="49">
         <label>gemm_kernels_q4_0.c</label>
         <link refid="gemm__kernels__q4__0_8c"/>
       </node>
@@ -358,15 +382,15 @@
         <label>loss_kernels.c</label>
         <link refid="loss__kernels_8c"/>
       </node>
-      <node id="49">
+      <node id="51">
         <label>gemm_kernels_q4k.c</label>
         <link refid="gemm__kernels__q4k_8c"/>
       </node>
-      <node id="46">
+      <node id="48">
         <label>gemm_kernels_f16.c</label>
         <link refid="gemm__kernels__f16_8c"/>
       </node>
-      <node id="57">
+      <node id="60">
         <label>gemm_kernels_q5_1.c</label>
         <link refid="gemm__kernels__q5__1_8c"/>
       </node>
@@ -378,7 +402,7 @@
         <label>kv_cache_kernels.c</label>
         <link refid="kv__cache__kernels_8c"/>
       </node>
-      <node id="58">
+      <node id="61">
         <label>gemm_kernels_q6k.c</label>
         <link refid="gemm__kernels__q6k_8c"/>
       </node>
@@ -386,7 +410,7 @@
         <label>v6.5_cli.c</label>
         <link refid="v6_85__cli_8c"/>
       </node>
-      <node id="50">
+      <node id="53">
         <label>gemm_kernels_q4k_q8k.c</label>
         <link refid="gemm__kernels__q4k__q8k_8c"/>
       </node>
@@ -394,11 +418,15 @@
         <label>rmsnorm_kernels_bf16.c</label>
         <link refid="rmsnorm__kernels__bf16_8c"/>
       </node>
+      <node id="62">
+        <label>gemm_kernels_q6k_q8k.c</label>
+        <link refid="gemm__kernels__q6k__q8k_8c"/>
+      </node>
       <node id="35">
         <label>v6_simple.c</label>
         <link refid="v6__simple_8c"/>
       </node>
-      <node id="45">
+      <node id="46">
         <label>gemm_batch_int8.c</label>
         <link refid="gemm__batch__int8_8c"/>
       </node>
@@ -406,11 +434,11 @@
         <label>vision_kernels_bf16.c</label>
         <link refid="vision__kernels__bf16_8c"/>
       </node>
-      <node id="51">
+      <node id="54">
         <label>gemm_kernels_q4k_q8k_avx2.c</label>
         <link refid="gemm__kernels__q4k__q8k__avx2_8c"/>
       </node>
-      <node id="48">
+      <node id="50">
         <label>gemm_kernels_q4_1.c</label>
         <link refid="gemm__kernels__q4__1_8c"/>
       </node>
@@ -823,10 +851,10 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="347" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1084" bodyend="1112" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="347" declcolumn="6"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="347" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1134" bodyend="1162" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="347" declcolumn="6"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
         <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
-        <references refid="gemm__kernels__q5__0_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="1018" endline="1031">vec_dot_q5_0_q8_0</references>
+        <references refid="gemm__kernels__q5__0_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="1068" endline="1081">vec_dot_q5_0_q8_0</references>
       </memberdef>
       <memberdef kind="function" id="ckernel__quant_8h_1a00a143b1495811557d83661c637ba3a6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -872,7 +900,7 @@
         <references refid="gemm__kernels__q5__0__sse__v2_8c_1afb621aff9a12017b33347eb42473baf7" compoundref="gemm__kernels__q5__0__sse__v2_8c" startline="12" endline="62">dot_q5_0_q8_k_32_sse</references>
         <references refid="gemm__kernels__q5__0__sse__v2_8c_1aa25694bd7b677f5b945be6f5dbdaa9c9" compoundref="gemm__kernels__q5__0_8c" startline="506" endline="547">gemm_nt_q5_0_ref</references>
         <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
-        <references refid="gemm__kernels__q5__0__sse__v2_8c_1a64b28ca8a25883986a0d22e39a574a32" compoundref="gemm__kernels__q4k__q8k_8c" startline="93" endline="99">quantize_row_q8_k</references>
+        <references refid="gemm__kernels__q5__0__sse__v2_8c_1a64b28ca8a25883986a0d22e39a574a32" compoundref="gemm__kernels__q4k__q8k_8c" startline="98" endline="104">quantize_row_q8_k</references>
       </memberdef>
       <memberdef kind="function" id="ckernel__quant_8h_1a69a759de291fac064cd027839afb4bce" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -962,7 +990,7 @@
         <references refid="gemm__kernels__q6k__sse_8c_1a1e388b3b2a1595ca6abbc8e922e1be67" compoundref="gemm__kernels__q6k__sse_8c" startline="20" endline="50">dot_q6_k_q8_k_256_sse</references>
         <references refid="ckernel__quant_8h_1a69a759de291fac064cd027839afb4bce" compoundref="gemm__kernels__q6k_8c" startline="234" endline="241">gemm_nt_q6_k_ref</references>
         <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
-        <references refid="gemm__kernels__q6k__sse_8c_1a64b28ca8a25883986a0d22e39a574a32" compoundref="gemm__kernels__q4k__q8k_8c" startline="93" endline="99">quantize_row_q8_k</references>
+        <references refid="gemm__kernels__q6k__sse_8c_1a64b28ca8a25883986a0d22e39a574a32" compoundref="gemm__kernels__q4k__q8k_8c" startline="98" endline="104">quantize_row_q8_k</references>
       </memberdef>
       <memberdef kind="function" id="ckernel__quant_8h_1afae7b0ff0904761e59897e996ddd862f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -1199,7 +1227,7 @@ This matches llama.cpp&apos;s get_scale_min_k4() function exactly. The 12-byte s
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="226" column="20" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" bodystart="226" bodyend="250"/>
         <referencedby refid="dequant__kernels_8c_1a79c5cea176a2a885717a0c5b42f13551" compoundref="dequant__kernels_8c" startline="325" endline="356">dequant_q4_k_block</referencedby>
-        <referencedby refid="gemm__kernels__q4k__q8k_8c_1adfa872f261f44f596eaf4e25599b0e3c" compoundref="gemm__kernels__q4k__q8k_8c" startline="101" endline="161">dot_q4_k_q8_k_ref</referencedby>
+        <referencedby refid="gemm__kernels__q4k__q8k_8c_1adfa872f261f44f596eaf4e25599b0e3c" compoundref="gemm__kernels__q4k__q8k_8c" startline="106" endline="166">dot_q4_k_q8_k_ref</referencedby>
         <referencedby refid="gemm__kernels__q4k_8c_1a5932901345563fd991c906b9bd5afcdb" compoundref="gemm__kernels__q4k_8c" startline="502" endline="552">gemv_q4_k_backward_ref</referencedby>
         <referencedby refid="ckernel__quant_8h_1afae7b0ff0904761e59897e996ddd862f" compoundref="gemm__kernels__q4k__sse_8c" startline="18" endline="117">gemv_q4_k_q8_k_sse</referencedby>
         <referencedby refid="gemm__kernels__q4k_8c_1a55c547c2be59d44bfaadc80d08858117" compoundref="gemm__kernels__q4k_8c" startline="44" endline="92">gemv_q4_k_ref</referencedby>
@@ -1231,16 +1259,15 @@ This matches llama.cpp&apos;s get_scale_min_k4() function exactly. The 12-byte s
         <detaileddescription>
 <para>Dispatch priority:<orderedlist>
 <listitem><para>AVX512 (best performance on modern Intel/AMD)</para>
-</listitem><listitem><para>AVX2 (full 256-bit integer support)</para>
-</listitem><listitem><para>SSSE3 (128-bit, most efficient on older AVX CPUs like Sandy/Ivy Bridge)</para>
-</listitem><listitem><para>Reference scalar (last resort)</para>
+</listitem><listitem><para>AVX (256-bit float ops, works on Sandy/Ivy Bridge and newer)</para>
+</listitem><listitem><para>SSSE3 (128-bit fallback)</para>
+</listitem><listitem><para>Reference scalar (last resort) </para>
 </listitem></orderedlist>
 </para>
-<para>Note: AVX without AVX2 is actually slower due to AVX-SSE transitions, so we prefer SSSE3 on those CPUs. </para>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="348" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1018" bodyend="1031" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="348" declcolumn="6"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" line="348" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1068" bodyend="1081" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_quant.h" declline="348" declcolumn="6"/>
         <references refid="gemm__kernels__q5__0_8c_1a5703f283c14a34f7546cd236acd4ef80" compoundref="gemm__kernels__q5__0_8c" startline="617" endline="654">vec_dot_q5_0_q8_0_ref</references>
       </memberdef>
       </sectiondef>
