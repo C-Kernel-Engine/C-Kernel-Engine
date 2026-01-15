@@ -38,9 +38,11 @@ if not cpu.avx512bf16:
 # Load the library that contains the GELU BF16 wrappers.
 lib = load_lib("libckernel_gelu.so", "libckernel_engine.so")
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.gelu_fast_inplace_bf16.argtypes = [
-    ctypes.POINTER(ctypes.c_uint16),
-    ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_uint16),  # data
+    ctypes.c_size_t,                   # n
+    ctypes.POINTER(ctypes.c_float),   # scratch [n]
 ]
 lib.gelu_fast_inplace_bf16.restype = None
 
@@ -49,6 +51,9 @@ lib.gelu_backward_exact_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # d_output
     ctypes.POINTER(ctypes.c_uint16),  # d_input
     ctypes.c_size_t,                   # n
+    ctypes.POINTER(ctypes.c_float),   # scratch_input [n]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_output [n]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_input [n]
 ]
 lib.gelu_backward_exact_bf16.restype = None
 
@@ -58,6 +63,10 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
     x_np = np.random.randn(N).astype(np.float32)
     data = float32_to_bf16(x_np.copy())
     data_ptr = numpy_to_uint16_ptr(data)
+
+    # Allocate scratch buffer (caller-provided, no malloc in kernel)
+    scratch = np.zeros(N, dtype=np.float32)
+    scratch_ptr = scratch.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     report = TestReport(
         test_name="GELU Forward",
@@ -72,7 +81,7 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
         return torch.nn.functional.gelu(x.to(dtype=torch.float32), approximate="tanh").to(dtype=torch.bfloat16)
 
     def c_gelu():
-        lib.gelu_fast_inplace_bf16(data_ptr, ctypes.c_size_t(N))
+        lib.gelu_fast_inplace_bf16(data_ptr, ctypes.c_size_t(N), scratch_ptr)
 
     c_gelu()
     out_fp32 = torch.from_numpy(bf16_to_float32(data.copy()))
@@ -102,6 +111,14 @@ def run_backward_tests(N=4096, warmup=10, iterations=1000):
     upstream_ptr = numpy_to_uint16_ptr(upstream_bf16)
     dx_ptr = numpy_to_uint16_ptr(dx_bf16)
 
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_input = np.zeros(N, dtype=np.float32)
+    scratch_d_output = np.zeros(N, dtype=np.float32)
+    scratch_d_input = np.zeros(N, dtype=np.float32)
+    scratch_input_ptr = scratch_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_output_ptr = scratch_d_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_input_ptr = scratch_d_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     x_q = torch.from_numpy(bf16_to_float32(x_bf16.copy())).to(dtype=torch.float32)
     upstream_q = torch.from_numpy(bf16_to_float32(upstream_bf16.copy())).to(dtype=torch.float32)
 
@@ -126,7 +143,8 @@ def run_backward_tests(N=4096, warmup=10, iterations=1000):
     dx_ref = pytorch_fwd_bwd()
 
     def c_backward():
-        lib.gelu_backward_exact_bf16(x_ptr, upstream_ptr, dx_ptr, ctypes.c_size_t(N))
+        lib.gelu_backward_exact_bf16(x_ptr, upstream_ptr, dx_ptr, ctypes.c_size_t(N),
+                                     scratch_input_ptr, scratch_d_output_ptr, scratch_d_input_ptr)
 
     c_backward()
     dx_c = torch.from_numpy(bf16_to_float32(dx_bf16.copy()))

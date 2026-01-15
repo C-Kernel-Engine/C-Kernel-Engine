@@ -34,6 +34,7 @@ if not cpu.avx512bf16:
 
 lib = load_lib("libckernel_layernorm.so", "libckernel_engine.so")
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.layernorm_forward_unrolled_slice_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # input
     ctypes.POINTER(ctypes.c_float),   # gamma
@@ -44,6 +45,8 @@ lib.layernorm_forward_unrolled_slice_bf16.argtypes = [
     ctypes.c_int,                      # tokens
     ctypes.c_int,                      # d_model
     ctypes.c_float,                    # eps
+    ctypes.POINTER(ctypes.c_float),   # scratch_input [tokens * d_model]
+    ctypes.POINTER(ctypes.c_float),   # scratch_output [tokens * d_model]
 ]
 lib.layernorm_forward_unrolled_slice_bf16.restype = None
 
@@ -59,6 +62,9 @@ lib.layernorm_backward_kernel_bf16.argtypes = [
     ctypes.c_int,                      # tokens
     ctypes.c_int,                      # d_model
     ctypes.c_int,                      # aligned_embed_dim
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_output [tokens * aligned_embed_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_input [tokens * aligned_embed_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_input [tokens * aligned_embed_dim]
 ]
 lib.layernorm_backward_kernel_bf16.restype = None
 
@@ -68,6 +74,12 @@ def run_forward_tests(tokens=4, dim=16, eps=1e-5):
     x_np = np.random.randn(tokens, dim).astype(np.float32)
     gamma_np = np.random.randn(dim).astype(np.float32)
     beta_np = np.random.randn(dim).astype(np.float32)
+
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_input = np.zeros(tokens * dim, dtype=np.float32)
+    scratch_output = np.zeros(tokens * dim, dtype=np.float32)
+    scratch_input_ptr = scratch_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_output_ptr = scratch_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     def c_layernorm_forward():
         data = float32_to_bf16(x_np.copy().reshape(-1))
@@ -84,6 +96,8 @@ def run_forward_tests(tokens=4, dim=16, eps=1e-5):
             ctypes.c_int(tokens),
             ctypes.c_int(dim),
             ctypes.c_float(eps),
+            scratch_input_ptr,
+            scratch_output_ptr,
         )
         return out_bf16, mean_cache, rstd_cache
 
@@ -129,6 +143,14 @@ def run_backward_tests(tokens=4, dim=16, eps=1e-5):
     d_gamma = np.zeros(dim, dtype=np.float32)
     d_beta = np.zeros(dim, dtype=np.float32)
 
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_d_output = np.zeros(tokens * dim, dtype=np.float32)
+    scratch_input = np.zeros(tokens * dim, dtype=np.float32)
+    scratch_d_input = np.zeros(tokens * dim, dtype=np.float32)
+    scratch_d_output_ptr = scratch_d_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_input_ptr = scratch_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_input_ptr = scratch_d_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     lib.layernorm_backward_kernel_bf16(
         numpy_to_uint16_ptr(d_output_bf16),
         numpy_to_uint16_ptr(float32_to_bf16(x_np.copy().reshape(-1))),
@@ -141,6 +163,9 @@ def run_backward_tests(tokens=4, dim=16, eps=1e-5):
         ctypes.c_int(tokens),
         ctypes.c_int(dim),
         ctypes.c_int(dim),
+        scratch_d_output_ptr,
+        scratch_input_ptr,
+        scratch_d_input_ptr,
     )
 
     report = TestReport(

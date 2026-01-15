@@ -32,6 +32,7 @@ if not cpu.avx512bf16:
 
 lib = load_lib("libckernel_engine.so")
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.mlp_token_parallel_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # input
     ctypes.POINTER(ctypes.c_uint16),  # W_fc1
@@ -43,6 +44,9 @@ lib.mlp_token_parallel_bf16.argtypes = [
     ctypes.c_int,                     # T
     ctypes.c_int,                     # aligned_dim
     ctypes.c_int,                     # num_threads
+    ctypes.POINTER(ctypes.c_float),   # scratch_bias1_f [4*D]
+    ctypes.POINTER(ctypes.c_float),   # scratch_bias2_f [D]
+    ctypes.POINTER(ctypes.c_uint16),  # scratch_fc1_bf16 [T * 4*D]
 ]
 lib.mlp_token_parallel_bf16.restype = None
 
@@ -64,6 +68,14 @@ def run_forward_tests(T=64, D=128, warmup=10, iterations=500):
     b1_bf = float32_to_bf16(b1_np)
     W2_bf = float32_to_bf16(W2_np)
     b2_bf = float32_to_bf16(b2_np)
+
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_bias1 = np.zeros(fourD, dtype=np.float32)
+    scratch_bias2 = np.zeros(D, dtype=np.float32)
+    scratch_fc1_bf16 = np.zeros(T * fourD, dtype=np.uint16)
+    scratch_bias1_ptr = scratch_bias1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_bias2_ptr = scratch_bias2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_fc1_bf16_ptr = scratch_fc1_bf16.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
 
     x = torch.from_numpy(x_np.copy()).to(dtype=torch.bfloat16)
     W1 = torch.from_numpy(W1_np.copy()).to(dtype=torch.bfloat16)
@@ -94,7 +106,8 @@ def run_forward_tests(T=64, D=128, warmup=10, iterations=500):
             numpy_to_uint16_ptr(b2_bf),
             fc1_out_np.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             out_np.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_int(1)
+            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_int(1),
+            scratch_bias1_ptr, scratch_bias2_ptr, scratch_fc1_bf16_ptr
         )
 
     c_mlp()

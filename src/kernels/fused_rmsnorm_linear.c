@@ -262,19 +262,15 @@ void unfused_rmsnorm_linear_q4k_ref(float *y,
     }
 
     assert(K % QK_K == 0);
-    const int nb = K / QK_K;
 
-    /* Allocate intermediate buffer (this hits DRAM!) */
-    float *norm_out = (float *)malloc(K * sizeof(float));
-    block_q8_K *q8_buffer = (block_q8_K *)malloc(nb * sizeof(block_q8_K));
+    /* Stack-allocated buffers (no malloc!) - stays in L1/L2 cache */
+    /* Max supported: K=4096 (16KB), 16 blocks (~5KB) */
+    if (K > 4096) return;
 
-    if (!norm_out || !q8_buffer) {
-        free(norm_out);
-        free(q8_buffer);
-        return;
-    }
+    float norm_out[4096];
+    block_q8_K q8_buffer[16];  /* 16 blocks for K=4096, K/QK_K */
 
-    /* Step 1: RMSNorm (writes to DRAM) */
+    /* Step 1: RMSNorm (stays in cache via stack buffer) */
     double sum_sq = 0.0;
     for (int d = 0; d < K; ++d) {
         sum_sq += (double)x[d] * (double)x[d];
@@ -289,11 +285,10 @@ void unfused_rmsnorm_linear_q4k_ref(float *y,
     extern void quantize_row_q8_k(const float *x, void *vy, int k);
     quantize_row_q8_k(norm_out, q8_buffer, K);  /* DRAM READ + WRITE */
 
-    /* Step 3: GEMV (reads Q8_K from DRAM) */
-    gemv_q4_k_q8_k(y, W_q4k, q8_buffer, M, K);  /* DRAM READ */
+    /* Step 3: GEMV (reads Q8_K from cache) */
+    gemv_q4_k_q8_k(y, W_q4k, q8_buffer, M, K);
 
-    free(norm_out);
-    free(q8_buffer);
+    /* No free needed - stack buffers auto-deallocate */
 }
 
 #ifdef FUSED_KERNEL_TEST

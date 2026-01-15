@@ -1,24 +1,16 @@
-#include <stdlib.h>
 #include <stdint.h>
 
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
 
 // Suppress false positive warnings about uninitialized variables
-// GCC can't trace through bf16_tensor_to_float initialization
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 
-static float *alloc_float_buffer(size_t count)
-{
-    return (float *)malloc(count * sizeof(float));
-}
-
-static void free_float_buffer(float *buf)
-{
-    free(buf);
-}
-
+/*
+ * BF16 LayerNorm forward (rolled) with caller-provided scratch buffers.
+ * scratch_input, scratch_output: each [num_tokens_in_slice * aligned_embed_dim] floats
+ */
 void layernorm_forward_rolled_slice_bf16(const uint16_t *__restrict input_slice_base,
                                          const float *__restrict gamma,
                                          const float *__restrict beta,
@@ -28,28 +20,24 @@ void layernorm_forward_rolled_slice_bf16(const uint16_t *__restrict input_slice_
                                          int num_tokens_in_slice,
                                          int d_model,
                                          int aligned_embed_dim,
-                                         float eps)
+                                         float eps,
+                                         float *scratch_input,
+                                         float *scratch_output)
 {
+    if (!scratch_input || !scratch_output) return;
+
     size_t total = (size_t)num_tokens_in_slice * (size_t)aligned_embed_dim;
-    float *input_f = alloc_float_buffer(total);
-    float *output_f = alloc_float_buffer(total);
-    if (!input_f || !output_f) {
-        free_float_buffer(input_f);
-        free_float_buffer(output_f);
-        return;
-    }
 
-    bf16_tensor_to_float(input_slice_base, input_f, total);
-    layernorm_forward_rolled_slice(input_f, gamma, beta,
-                                   output_f, mean_cache_slice, rstd_cache_slice,
+    bf16_tensor_to_float(input_slice_base, scratch_input, total);
+    layernorm_forward_rolled_slice(scratch_input, gamma, beta,
+                                   scratch_output, mean_cache_slice, rstd_cache_slice,
                                    num_tokens_in_slice, d_model, aligned_embed_dim, eps);
-
-    float_tensor_to_bf16(output_f, output_slice_base, total);
-
-    free_float_buffer(input_f);
-    free_float_buffer(output_f);
+    float_tensor_to_bf16(scratch_output, output_slice_base, total);
 }
 
+/*
+ * BF16 LayerNorm forward (unrolled) with caller-provided scratch buffers.
+ */
 void layernorm_forward_unrolled_slice_bf16(const uint16_t *__restrict input_slice_base,
                                            const float *__restrict gamma,
                                            const float *__restrict beta,
@@ -58,28 +46,25 @@ void layernorm_forward_unrolled_slice_bf16(const uint16_t *__restrict input_slic
                                            float *__restrict rstd_cache_slice,
                                            int num_tokens_in_slice,
                                            int d_model,
-                                           float eps)
+                                           float eps,
+                                           float *scratch_input,
+                                           float *scratch_output)
 {
+    if (!scratch_input || !scratch_output) return;
+
     size_t total = (size_t)num_tokens_in_slice * (size_t)d_model;
-    float *input_f = alloc_float_buffer(total);
-    float *output_f = alloc_float_buffer(total);
-    if (!input_f || !output_f) {
-        free_float_buffer(input_f);
-        free_float_buffer(output_f);
-        return;
-    }
 
-    bf16_tensor_to_float(input_slice_base, input_f, total);
-    layernorm_forward_unrolled_slice(input_f, gamma, beta,
-                                     output_f, mean_cache_slice, rstd_cache_slice,
+    bf16_tensor_to_float(input_slice_base, scratch_input, total);
+    layernorm_forward_unrolled_slice(scratch_input, gamma, beta,
+                                     scratch_output, mean_cache_slice, rstd_cache_slice,
                                      num_tokens_in_slice, d_model, eps);
-
-    float_tensor_to_bf16(output_f, output_slice_base, total);
-
-    free_float_buffer(input_f);
-    free_float_buffer(output_f);
+    float_tensor_to_bf16(scratch_output, output_slice_base, total);
 }
 
+/*
+ * BF16 LayerNorm backward with caller-provided scratch buffers.
+ * scratch_d_output, scratch_input, scratch_d_input: each [tokens * aligned_embed_dim] floats
+ */
 void layernorm_backward_kernel_bf16(const uint16_t *d_output,
                                     const uint16_t *input,
                                     const float *gamma,
@@ -88,29 +73,23 @@ void layernorm_backward_kernel_bf16(const uint16_t *d_output,
                                     uint16_t *d_input,
                                     float *d_gamma,
                                     float *d_beta,
-                                    int tokens, int d_model, int aligned_embed_dim)
+                                    int tokens, int d_model, int aligned_embed_dim,
+                                    float *scratch_d_output,
+                                    float *scratch_input,
+                                    float *scratch_d_input)
 {
+    if (!scratch_d_output || !scratch_input || !scratch_d_input) return;
+
     size_t total = (size_t)tokens * (size_t)aligned_embed_dim;
-    float *d_output_f = alloc_float_buffer(total);
-    float *input_f = alloc_float_buffer(total);
-    float *d_input_f = alloc_float_buffer(total);
-    if (!d_output_f || !input_f || !d_input_f) {
-        free_float_buffer(d_output_f);
-        free_float_buffer(input_f);
-        free_float_buffer(d_input_f);
-        return;
-    }
 
-    bf16_tensor_to_float(d_output, d_output_f, total);
-    bf16_tensor_to_float(input, input_f, total);
+    bf16_tensor_to_float(d_output, scratch_d_output, total);
+    bf16_tensor_to_float(input, scratch_input, total);
 
-    layernorm_backward_kernel(d_output_f, input_f, gamma, mean, rstd,
-                              d_input_f, d_gamma, d_beta,
+    layernorm_backward_kernel(scratch_d_output, scratch_input, gamma, mean, rstd,
+                              scratch_d_input, d_gamma, d_beta,
                               tokens, d_model, aligned_embed_dim);
 
-    float_tensor_to_bf16(d_input_f, d_input, total);
-
-    free_float_buffer(d_output_f);
-    free_float_buffer(input_f);
-    free_float_buffer(d_input_f);
+    float_tensor_to_bf16(scratch_d_input, d_input, total);
 }
+
+#pragma GCC diagnostic pop

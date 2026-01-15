@@ -1,65 +1,44 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
 
-static float *alloc_float_buffer(size_t count)
-{
-    return (float *)malloc(count * sizeof(float));
-}
-
+/*
+ * BF16 sigmoid forward with caller-provided scratch buffers.
+ * scratch_input, scratch_output: each [n] floats
+ */
 void sigmoid_forward_bf16(const uint16_t *input,
                           uint16_t *output,
-                          size_t n)
+                          size_t n,
+                          float *scratch_input,
+                          float *scratch_output)
 {
-    if (!input || !output || n == 0) {
-        return;
-    }
+    if (!input || !output || n == 0) return;
+    if (!scratch_input || !scratch_output) return;
 
-    float *input_f = alloc_float_buffer(n);
-    float *output_f = alloc_float_buffer(n);
-    if (!input_f || !output_f) {
-        free(input_f);
-        free(output_f);
-        return;
-    }
-
-    bf16_tensor_to_float(input, input_f, n);
-    sigmoid_forward(input_f, output_f, n);
-    float_tensor_to_bf16(output_f, output, n);
-
-    free(input_f);
-    free(output_f);
+    bf16_tensor_to_float(input, scratch_input, n);
+    sigmoid_forward(scratch_input, scratch_output, n);
+    float_tensor_to_bf16(scratch_output, output, n);
 }
 
+/*
+ * BF16 sigmoid backward with caller-provided scratch buffers.
+ * scratch_input, scratch_d_output, scratch_d_input: each [n] floats
+ */
 void sigmoid_backward_bf16(const uint16_t *input,
                            const uint16_t *d_output,
                            uint16_t *d_input,
-                           size_t n)
+                           size_t n,
+                           float *scratch_input,
+                           float *scratch_d_output,
+                           float *scratch_d_input)
 {
-    if (!input || !d_output || !d_input || n == 0) {
-        return;
-    }
+    if (!input || !d_output || !d_input || n == 0) return;
+    if (!scratch_input || !scratch_d_output || !scratch_d_input) return;
 
-    float *input_f = alloc_float_buffer(n);
-    float *d_output_f = alloc_float_buffer(n);
-    float *d_input_f = alloc_float_buffer(n);
-    if (!input_f || !d_output_f || !d_input_f) {
-        free(input_f);
-        free(d_output_f);
-        free(d_input_f);
-        return;
-    }
-
-    bf16_tensor_to_float(input, input_f, n);
-    bf16_tensor_to_float(d_output, d_output_f, n);
-    sigmoid_backward(input_f, d_output_f, d_input_f, n);
-    float_tensor_to_bf16(d_input_f, d_input, n);
-
-    free(input_f);
-    free(d_output_f);
-    free(d_input_f);
+    bf16_tensor_to_float(input, scratch_input, n);
+    bf16_tensor_to_float(d_output, scratch_d_output, n);
+    sigmoid_backward(scratch_input, scratch_d_output, scratch_d_input, n);
+    float_tensor_to_bf16(scratch_d_input, d_input, n);
 }
-

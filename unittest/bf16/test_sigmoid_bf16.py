@@ -36,11 +36,13 @@ if not cpu.avx512bf16:
 # Load the BF16-enabled shared library
 lib = load_lib("libckernel_sigmoid.so", "libckernel_engine.so")
 
-# Function signatures
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.sigmoid_forward_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # input
     ctypes.POINTER(ctypes.c_uint16),  # output
     ctypes.c_size_t,                   # n
+    ctypes.POINTER(ctypes.c_float),   # scratch_input [n]
+    ctypes.POINTER(ctypes.c_float),   # scratch_output [n]
 ]
 lib.sigmoid_forward_bf16.restype = None
 
@@ -49,6 +51,9 @@ lib.sigmoid_backward_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # d_output
     ctypes.POINTER(ctypes.c_uint16),  # d_input
     ctypes.c_size_t,                   # n
+    ctypes.POINTER(ctypes.c_float),   # scratch_input [n]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_output [n]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_input [n]
 ]
 lib.sigmoid_backward_bf16.restype = None
 
@@ -62,6 +67,12 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
     x_bf16 = float32_to_bf16(x_np)
     x_ptr = numpy_to_uint16_ptr(x_bf16)
     out_ptr = numpy_to_uint16_ptr(out_bf16)
+
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_input = np.zeros(N, dtype=np.float32)
+    scratch_output = np.zeros(N, dtype=np.float32)
+    scratch_input_ptr = scratch_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_output_ptr = scratch_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     x = torch.from_numpy(x_np.copy()).to(dtype=torch.bfloat16)
     report = TestReport(
@@ -77,7 +88,8 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
     pytorch_ref = pytorch_sigmoid().to(dtype=torch.bfloat16)
 
     def c_sigmoid():
-        lib.sigmoid_forward_bf16(x_ptr, out_ptr, ctypes.c_size_t(N))
+        lib.sigmoid_forward_bf16(x_ptr, out_ptr, ctypes.c_size_t(N),
+                                 scratch_input_ptr, scratch_output_ptr)
 
     c_sigmoid()
     out_fp32 = torch.from_numpy(bf16_to_float32(out_bf16.copy()))
@@ -109,6 +121,14 @@ def run_backward_tests(N=4096, warmup=10, iterations=1000):
     upstream_ptr = numpy_to_uint16_ptr(upstream_bf16)
     dx_ptr = numpy_to_uint16_ptr(dx_bf16)
 
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_input = np.zeros(N, dtype=np.float32)
+    scratch_d_output = np.zeros(N, dtype=np.float32)
+    scratch_d_input = np.zeros(N, dtype=np.float32)
+    scratch_input_ptr = scratch_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_output_ptr = scratch_d_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_input_ptr = scratch_d_input.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     x = torch.from_numpy(x_np.copy()).to(dtype=torch.bfloat16)
     upstream = torch.from_numpy(upstream_np.copy()).to(dtype=torch.bfloat16)
 
@@ -131,7 +151,8 @@ def run_backward_tests(N=4096, warmup=10, iterations=1000):
     dx_ref = pytorch_fwd_bwd()
 
     def c_backward():
-        lib.sigmoid_backward_bf16(x_ptr, upstream_ptr, dx_ptr, ctypes.c_size_t(N))
+        lib.sigmoid_backward_bf16(x_ptr, upstream_ptr, dx_ptr, ctypes.c_size_t(N),
+                                  scratch_input_ptr, scratch_d_output_ptr, scratch_d_input_ptr)
 
     c_backward()
     dx_c = torch.from_numpy(bf16_to_float32(dx_bf16.copy()))

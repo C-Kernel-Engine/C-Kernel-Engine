@@ -163,10 +163,13 @@ void fused_mlp_swiglu_decode(
     // Each tile computes MLP_TILE_SIZE swiglu values and immediately
     // accumulates them into the output
 
+    /* Bounds check for stack allocation */
+    if (D > 4096) return;
+
     #pragma omp parallel
     {
-        // Thread-local accumulator for output
-        float *local_output = (float *)aligned_alloc(64, D * sizeof(float));
+        /* Thread-local accumulator on stack (no malloc!) */
+        float local_output[4096] __attribute__((aligned(64)));
         memset(local_output, 0, D * sizeof(float));
 
         #pragma omp for schedule(static)
@@ -241,8 +244,7 @@ void fused_mlp_swiglu_decode(
                 output[i] += local_output[i];
             }
         }
-
-        free(local_output);
+        /* No free - stack buffer auto-deallocates */
     }
 
 #else

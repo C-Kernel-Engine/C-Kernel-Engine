@@ -49,6 +49,7 @@ lib.rope_forward.argtypes = [
 ]
 lib.rope_forward.restype = None
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.rope_forward_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),
     ctypes.POINTER(ctypes.c_float),
@@ -58,6 +59,7 @@ lib.rope_forward_bf16.argtypes = [
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_int,
+    ctypes.POINTER(ctypes.c_float),  # scratch [num_heads * num_tokens * aligned_head_dim]
 ]
 lib.rope_forward_bf16.restype = None
 
@@ -84,6 +86,8 @@ lib.rope_backward_bf16.argtypes = [
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_int,
+    ctypes.POINTER(ctypes.c_float),  # scratch_d_out [num_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),  # scratch_d_x [num_heads * num_tokens * aligned_head_dim]
 ]
 lib.rope_backward_bf16.restype = None
 
@@ -123,6 +127,10 @@ def run_forward_tests(num_heads=2, tokens=4, head_dim=16, pos_offset=0):
         ctypes.c_int(pos_offset),
     )
 
+    # Allocate scratch buffer (caller-provided, no malloc in kernel)
+    scratch = np.zeros(num_heads * tokens * aligned, dtype=np.float32)
+    scratch_ptr = scratch.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     q_ref_bf16 = float32_to_bf16(q_ref.reshape(-1))
     lib.rope_forward_bf16(
         numpy_to_uint16_ptr(x_bf16),
@@ -133,6 +141,7 @@ def run_forward_tests(num_heads=2, tokens=4, head_dim=16, pos_offset=0):
         ctypes.c_int(head_dim),
         ctypes.c_int(aligned),
         ctypes.c_int(pos_offset),
+        scratch_ptr,
     )
 
     out_bf16 = bf16_to_float32(x_bf16.reshape(num_heads, tokens, aligned))
@@ -176,6 +185,12 @@ def run_backward_tests(num_heads=2, tokens=4, head_dim=16, pos_offset=0):
         ctypes.c_int(pos_offset),
     )
 
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_d_out = np.zeros(num_heads * tokens * aligned, dtype=np.float32)
+    scratch_d_x = np.zeros(num_heads * tokens * aligned, dtype=np.float32)
+    scratch_d_out_ptr = scratch_d_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_x_ptr = scratch_d_x.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     dx_ref_bf16 = float32_to_bf16(dx_ref.reshape(-1))
     dx_bf16 = np.zeros_like(d_out_bf16)
 
@@ -189,6 +204,8 @@ def run_backward_tests(num_heads=2, tokens=4, head_dim=16, pos_offset=0):
         ctypes.c_int(head_dim),
         ctypes.c_int(aligned),
         ctypes.c_int(pos_offset),
+        scratch_d_out_ptr,
+        scratch_d_x_ptr,
     )
 
     dx_c = bf16_to_float32(dx_bf16.reshape(num_heads, tokens, aligned))

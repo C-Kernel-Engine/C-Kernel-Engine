@@ -372,6 +372,7 @@ void layernorm_forward_rolled_slice(const float *__restrict input_slice_base,
                                     int aligned_embed_dim,
                                     float eps);
 
+/* BF16 LayerNorm forward (rolled) - caller provides scratch buffers */
 void layernorm_forward_rolled_slice_bf16(const uint16_t *__restrict input_slice_base,
                                          const float *__restrict gamma,
                                          const float *__restrict beta,
@@ -381,7 +382,9 @@ void layernorm_forward_rolled_slice_bf16(const uint16_t *__restrict input_slice_
                                          int num_tokens_in_slice,
                                          int d_model,
                                          int aligned_embed_dim,
-                                         float eps);
+                                         float eps,
+                                         float *scratch_input,   /* [num_tokens * aligned_embed_dim] */
+                                         float *scratch_output); /* [num_tokens * aligned_embed_dim] */
 
 void layernorm_forward_unrolled_slice(const float *__restrict input_slice_base,
                                       const float *__restrict gamma,
@@ -393,6 +396,7 @@ void layernorm_forward_unrolled_slice(const float *__restrict input_slice_base,
                                       int d_model,
                                       float eps);
 
+/* BF16 LayerNorm forward (unrolled) - caller provides scratch buffers */
 void layernorm_forward_unrolled_slice_bf16(const uint16_t *__restrict input_slice_base,
                                            const float *__restrict gamma,
                                            const float *__restrict beta,
@@ -401,7 +405,9 @@ void layernorm_forward_unrolled_slice_bf16(const uint16_t *__restrict input_slic
                                            float *__restrict rstd_cache_slice,
                                            int num_tokens_in_slice,
                                            int d_model,
-                                           float eps);
+                                           float eps,
+                                           float *scratch_input,   /* [num_tokens * d_model] */
+                                           float *scratch_output); /* [num_tokens * d_model] */
 
 void layernorm_naive_serial_matched_precision(const float *input,
                                               const float *gamma,
@@ -421,6 +427,7 @@ void layernorm_backward_kernel(const float *d_output,
                                float *d_beta,
                                int tokens, int d_model, int aligned_embed_dim);
 
+/* BF16 LayerNorm backward - caller provides scratch buffers */
 void layernorm_backward_kernel_bf16(const uint16_t *d_output,
                                     const uint16_t *input,
                                     const float *gamma,
@@ -429,7 +436,10 @@ void layernorm_backward_kernel_bf16(const uint16_t *d_output,
                                     uint16_t *d_input,
                                     float *d_gamma,
                                     float *d_beta,
-                                    int tokens, int d_model, int aligned_embed_dim);
+                                    int tokens, int d_model, int aligned_embed_dim,
+                                    float *scratch_d_output, /* [tokens * aligned_embed_dim] */
+                                    float *scratch_input,    /* [tokens * aligned_embed_dim] */
+                                    float *scratch_d_input); /* [tokens * aligned_embed_dim] */
 
 // RMSNorm forward/backward kernels.
 void rmsnorm_forward(const float *input,
@@ -470,6 +480,7 @@ void rmsnorm_backward_bf16(const uint16_t *d_output,
                            int d_model,
                            int aligned_embed_dim);
 
+/* INT8 RMSNorm forward - caller provides scratch buffers */
 void rmsnorm_forward_int8(const int8_t *input,
                           const float *gamma,
                           int8_t *output,
@@ -477,8 +488,11 @@ void rmsnorm_forward_int8(const int8_t *input,
                           int tokens,
                           int d_model,
                           int aligned_embed_dim,
-                          float eps);
+                          float eps,
+                          float *scratch_input,   /* [tokens * aligned_embed_dim] */
+                          float *scratch_output); /* [tokens * aligned_embed_dim] */
 
+/* INT8 RMSNorm backward - caller provides scratch buffers */
 void rmsnorm_backward_int8(const int8_t *d_output,
                            const int8_t *input,
                            const float *gamma,
@@ -487,8 +501,12 @@ void rmsnorm_backward_int8(const int8_t *d_output,
                            float *d_gamma,
                            int tokens,
                            int d_model,
-                           int aligned_embed_dim);
+                           int aligned_embed_dim,
+                           float *scratch_d_output, /* [tokens * aligned_embed_dim] */
+                           float *scratch_input,    /* [tokens * aligned_embed_dim] */
+                           float *scratch_d_input); /* [tokens * aligned_embed_dim] */
 
+/* INT4 RMSNorm forward - caller provides scratch buffers */
 void rmsnorm_forward_int4(const uint8_t *input,
                           const float *gamma,
                           uint8_t *output,
@@ -496,8 +514,11 @@ void rmsnorm_forward_int4(const uint8_t *input,
                           int tokens,
                           int d_model,
                           int aligned_embed_dim,
-                          float eps);
+                          float eps,
+                          float *scratch_input,   /* [tokens * aligned_embed_dim] */
+                          float *scratch_output); /* [tokens * aligned_embed_dim] */
 
+/* INT4 RMSNorm backward - caller provides scratch buffers */
 void rmsnorm_backward_int4(const uint8_t *d_output,
                            const uint8_t *input,
                            const float *gamma,
@@ -506,7 +527,10 @@ void rmsnorm_backward_int4(const uint8_t *d_output,
                            float *d_gamma,
                            int tokens,
                            int d_model,
-                           int aligned_embed_dim);
+                           int aligned_embed_dim,
+                           float *scratch_d_output, /* [tokens * aligned_embed_dim] */
+                           float *scratch_input,    /* [tokens * aligned_embed_dim] */
+                           float *scratch_d_input); /* [tokens * aligned_embed_dim] */
 
 // GELU forward kernel (fast approximation), copied from C-Transformer.
 void gelu_fast_inplace(float *data, size_t n);
@@ -534,15 +558,22 @@ void gelu_backward_fast(const float *input,
                         size_t n);
 
 // BF16 variants relying on the same floating-point logic.
-void gelu_fast_inplace_bf16(uint16_t *data, size_t n);
+/* BF16 GELU - caller provides scratch buffer [n] floats */
+void gelu_fast_inplace_bf16(uint16_t *data, size_t n, float *scratch);
 void gelu_backward_exact_bf16(const uint16_t *input,
                               const uint16_t *d_output,
                               uint16_t *d_input,
-                              size_t n);
+                              size_t n,
+                              float *scratch_input,
+                              float *scratch_d_output,
+                              float *scratch_d_input);
 void gelu_backward_fast_bf16(const uint16_t *input,
                              const uint16_t *d_output,
                              uint16_t *d_input,
-                             size_t n);
+                             size_t n,
+                             float *scratch_input,
+                             float *scratch_d_output,
+                             float *scratch_d_input);
 
 	// ReLU kernels.
 	void relu_forward(const float *input, float *output, size_t n);
@@ -578,16 +609,21 @@ void gelu_backward_fast_bf16(const uint16_t *input,
 	                                        int num_tokens,
 	                                        int aligned_context_window);
 
+	/* BF16 causal softmax - caller provides scratch buffer */
 	void causal_softmax_head_major_bf16(uint16_t *scores,
 	                                   int num_heads,
 	                                   int num_tokens,
-	                                   int aligned_context_window);
+	                                   int aligned_context_window,
+	                                   float *scratch); /* [num_heads * aligned_context_window * aligned_context_window] */
 
+	/* BF16 backward causal softmax - caller provides scratch buffers */
 	void backward_causal_softmax_head_major_bf16(uint16_t *d_scores,
 	                                            const uint16_t *weights,
 	                                            int num_heads,
 	                                            int num_tokens,
-	                                            int aligned_context_window);
+	                                            int aligned_context_window,
+	                                            float *scratch_d_scores,  /* [num_heads * aligned_context_window * aligned_context_window] */
+	                                            float *scratch_weights);  /* [num_heads * aligned_context_window * aligned_context_window] */
 
 // Scaled dot-product attention (causal) in head-major layout.
 // Q/K/V layout: [head][token][head_dim] with stride aligned_head_dim.
@@ -642,6 +678,7 @@ void attention_forward_causal_head_major_gqa_exact(const float *q,
                                                     int aligned_head_dim,
                                                     int aligned_context_window);
 
+/* BF16 attention forward - caller provides scratch buffers (no internal malloc) */
 void attention_forward_causal_head_major_gqa_bf16(const uint16_t *q,
                                                   const uint16_t *k,
                                                   const uint16_t *v,
@@ -652,7 +689,10 @@ void attention_forward_causal_head_major_gqa_bf16(const uint16_t *q,
                                                   int num_tokens,
                                                   int head_dim,
                                                   int aligned_head_dim,
-                                                  int aligned_context_window);
+                                                  int aligned_context_window,
+                                                  float *scratch_q,   /* [num_heads * num_tokens * aligned_head_dim] */
+                                                  float *scratch_k,   /* [num_kv_heads * num_tokens * aligned_head_dim] */
+                                                  float *scratch_v);  /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
 // Flash-style causal attention forward (no score/weight matrix materialization).
 // Head-major layout:
@@ -794,6 +834,7 @@ void mlp_token_parallel_exact(const float *input,
                                int aligned_dim,
                                int num_threads);
 
+/* BF16 MLP forward - caller provides scratch buffers */
 void mlp_token_parallel_bf16(const uint16_t *input,
                              const uint16_t *W_fc1,
                              const uint16_t *b_fc1,
@@ -803,7 +844,26 @@ void mlp_token_parallel_bf16(const uint16_t *input,
                              float *output,
                              int T,
                              int aligned_dim,
-                             int num_threads);
+                             int num_threads,
+                             float *scratch_bias1_f,     /* [4*D] */
+                             float *scratch_bias2_f,     /* [D] */
+                             uint16_t *scratch_fc1_bf16); /* [T * 4*D] */
+
+/* BF16 MLP forward with FP32 activations - caller provides scratch buffers */
+void mlp_token_parallel_bf16_fp32act(const uint16_t *input,
+                                      const uint16_t *W_fc1,
+                                      const uint16_t *b_fc1,
+                                      const uint16_t *W_fc2,
+                                      const uint16_t *b_fc2,
+                                      float *fc1_output,
+                                      float *output,
+                                      int T,
+                                      int aligned_dim,
+                                      int num_threads,
+                                      float *scratch_input_f,    /* [T * D] */
+                                      float *scratch_bias1_f,    /* [4*D] */
+                                      float *scratch_bias2_f,    /* [D] */
+                                      uint16_t *scratch_fc1_bf16); /* [T * 4*D] */
 
 // MLP FC1/FC2 backward kernels (generic), adapted from C-Transformer.
 void fc2_backward_kernel(const float *d_output,
@@ -840,14 +900,20 @@ void sigmoid_backward(const float *input,
                       float *d_input,
                       size_t n);
 
+/* BF16 sigmoid - caller provides scratch buffers [n] floats each */
 void sigmoid_forward_bf16(const uint16_t *input,
                           uint16_t *output,
-                          size_t n);
+                          size_t n,
+                          float *scratch_input,
+                          float *scratch_output);
 
 void sigmoid_backward_bf16(const uint16_t *input,
                            const uint16_t *d_output,
                            uint16_t *d_input,
-                           size_t n);
+                           size_t n,
+                           float *scratch_input,
+                           float *scratch_d_output,
+                           float *scratch_d_input);
 
 // SwiGLU activation kernels (forward + backward).
 // Input layout per token: [gate[0..D-1], value[0..D-1]], size 2*D.
@@ -1046,6 +1112,7 @@ void attention_backward_causal_head_major(
     int aligned_head_dim,
     int aligned_context_window);
 
+/* BF16 attention backward - caller provides scratch buffers (no internal malloc) */
 void attention_backward_causal_head_major_gqa_bf16(
     const uint16_t *d_output,
     float *d_x,
@@ -1062,7 +1129,11 @@ void attention_backward_causal_head_major_gqa_bf16(
     int num_tokens,
     int head_dim,
     int aligned_head_dim,
-    int aligned_context_window);
+    int aligned_context_window,
+    float *scratch_d_output,  /* [num_heads * num_tokens * aligned_head_dim] */
+    float *scratch_q,         /* [num_heads * num_tokens * aligned_head_dim] */
+    float *scratch_k,         /* [num_kv_heads * num_tokens * aligned_head_dim] */
+    float *scratch_v);        /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
 // RoPE (Rotary Position Embedding) kernels.
 // Precompute cos/sin cache: [max_seq_len, head_dim/2].
@@ -1093,6 +1164,7 @@ void rope_backward(const float *d_out,
                    int aligned_head_dim,
                    int pos_offset);
 
+/* BF16 RoPE forward - caller provides scratch buffer */
 void rope_forward_bf16(uint16_t *x,
                        const float *cos_cache,
                        const float *sin_cache,
@@ -1100,8 +1172,10 @@ void rope_forward_bf16(uint16_t *x,
                        int num_tokens,
                        int head_dim,
                        int aligned_head_dim,
-                       int pos_offset);
+                       int pos_offset,
+                       float *scratch); /* [num_heads * num_tokens * aligned_head_dim] */
 
+/* BF16 RoPE backward - caller provides scratch buffers */
 void rope_backward_bf16(const uint16_t *d_out,
                         uint16_t *d_x,
                         const float *cos_cache,
@@ -1110,7 +1184,9 @@ void rope_backward_bf16(const uint16_t *d_out,
                         int num_tokens,
                         int head_dim,
                         int aligned_head_dim,
-                        int pos_offset);
+                        int pos_offset,
+                        float *scratch_d_out, /* [num_heads * num_tokens * aligned_head_dim] */
+                        float *scratch_d_x);  /* [num_heads * num_tokens * aligned_head_dim] */
 
 // RoPE backward in-place.
 void rope_backward_inplace(float *d_x,
@@ -1170,6 +1246,7 @@ void rope_forward_strided(float *x,
 	                      int aligned_head_dim,
 	                      int pos_offset);
 
+	/* BF16 RoPE forward for Q and K - caller provides scratch buffers */
 	void rope_forward_qk_bf16(uint16_t *q,
 	                          uint16_t *k,
 	                          const float *cos_cache,
@@ -1179,8 +1256,11 @@ void rope_forward_strided(float *x,
 	                          int num_tokens,
 	                          int head_dim,
 	                          int aligned_head_dim,
-	                          int pos_offset);
+	                          int pos_offset,
+	                          float *scratch_q,  /* [num_heads * num_tokens * aligned_head_dim] */
+	                          float *scratch_k); /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
+	/* BF16 RoPE backward for Q and K - caller provides scratch buffers */
 	void rope_backward_qk_bf16(const uint16_t *d_q_out,
 	                           const uint16_t *d_k_out,
 	                           uint16_t *d_q,
@@ -1192,7 +1272,11 @@ void rope_forward_strided(float *x,
 	                           int num_tokens,
 	                           int head_dim,
 	                           int aligned_head_dim,
-	                           int pos_offset);
+	                           int pos_offset,
+	                           float *scratch_dq_out, /* [num_heads * num_tokens * aligned_head_dim] */
+	                           float *scratch_dq,     /* [num_heads * num_tokens * aligned_head_dim] */
+	                           float *scratch_dk_out, /* [num_kv_heads * num_tokens * aligned_head_dim] */
+	                           float *scratch_dk);    /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
 // Token embedding lookup (optionally adds positional embeddings).
 // token_embeddings: [vocab_size x aligned_embed_dim]
@@ -1288,12 +1372,15 @@ void embedding_forward_q8_0(const int32_t *token_ids,
 	                                float *d_logits,
 	                                float *loss_out);
 
+	/* BF16 softmax cross-entropy loss - caller provides scratch buffers */
 	void softmax_cross_entropy_loss_bf16(const uint16_t *logits,
 	                                     const int32_t *targets,
 	                                     int tokens,
 	                                     int vocab_size,
 	                                     uint16_t *d_logits,
-	                                     float *loss_out);
+	                                     float *loss_out,
+	                                     float *scratch_logits,   /* [tokens * vocab_size] */
+	                                     float *scratch_d_logits); /* [tokens * vocab_size] */
 
 	// Vision helpers (patchify/unpatchify).
 	void im2patch(const float *image,

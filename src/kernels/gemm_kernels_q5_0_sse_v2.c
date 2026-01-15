@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include <malloc.h>
 
 #include "ckernel_quant.h"
 

@@ -7,15 +7,11 @@
 #include <immintrin.h>
 #endif
 
-static float *convert_bf16_tensor(const uint16_t *src, size_t count)
+/* Convert BF16 tensor to FP32 using caller-provided buffer (no malloc!) */
+static void convert_bf16_tensor_to_buf(const uint16_t *src, float *dst, size_t count)
 {
-    float *dst = (float *)malloc(count * sizeof(float));
-    if (!dst) {
-        return NULL;
-    }
-    // Use vectorized conversion when available (AVX-512)
+    if (!dst || !src) return;
     bf16_tensor_to_float(src, dst, count);
-    return dst;
 }
 
 // Helpers for head-major layouts used in attention.
@@ -316,6 +312,15 @@ void attention_forward_causal_head_major_gqa_exact(const float *q,
     }
 }
 
+/*
+ * BF16 attention forward with caller-provided scratch buffers.
+ *
+ * scratch_q: [num_heads * num_tokens * aligned_head_dim] floats
+ * scratch_k: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ * scratch_v: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ *
+ * Caller allocates scratch once and reuses across calls (no per-call malloc).
+ */
 void attention_forward_causal_head_major_gqa_bf16(const uint16_t *q,
                                                   const uint16_t *k,
                                                   const uint16_t *v,
@@ -326,36 +331,28 @@ void attention_forward_causal_head_major_gqa_bf16(const uint16_t *q,
                                                   int num_tokens,
                                                   int head_dim,
                                                   int aligned_head_dim,
-                                                  int aligned_context_window)
+                                                  int aligned_context_window,
+                                                  float *scratch_q,
+                                                  float *scratch_k,
+                                                  float *scratch_v)
 {
     const size_t q_elems = (size_t)num_heads * (size_t)num_tokens * (size_t)aligned_head_dim;
     const size_t kv_elems = (size_t)num_kv_heads * (size_t)num_tokens * (size_t)aligned_head_dim;
 
-    float *q_float = convert_bf16_tensor(q, q_elems);
-    if (!q_float) return;
-    float *k_float = convert_bf16_tensor(k, kv_elems);
-    if (!k_float) {
-        free(q_float);
-        return;
-    }
-    float *v_float = convert_bf16_tensor(v, kv_elems);
-    if (!v_float) {
-        free(q_float);
-        free(k_float);
-        return;
-    }
+    if (!scratch_q || !scratch_k || !scratch_v) return;
+
+    convert_bf16_tensor_to_buf(q, scratch_q, q_elems);
+    convert_bf16_tensor_to_buf(k, scratch_k, kv_elems);
+    convert_bf16_tensor_to_buf(v, scratch_v, kv_elems);
 
     // Use exact version to avoid fast exp approximation error accumulating
     // with BF16 precision loss.
-    attention_forward_causal_head_major_gqa_exact(q_float, k_float, v_float,
+    attention_forward_causal_head_major_gqa_exact(scratch_q, scratch_k, scratch_v,
                                                    scores, output,
                                                    num_heads, num_kv_heads,
                                                    num_tokens, head_dim,
                                                    aligned_head_dim, aligned_context_window);
-
-    free(q_float);
-    free(k_float);
-    free(v_float);
+    /* No free - caller owns scratch buffers */
 }
 
 // ============================================================================
@@ -987,6 +984,14 @@ void attention_forward_decode_head_major_gqa_regular(const float *q_token,
 // For GQA: multiple query heads share the same KV head, so we accumulate
 // gradients from all query heads that map to each KV head.
 //
+/*
+ * BF16 attention backward with caller-provided scratch buffers.
+ *
+ * scratch_d_output: [num_heads * num_tokens * aligned_head_dim] floats
+ * scratch_q: [num_heads * num_tokens * aligned_head_dim] floats
+ * scratch_k: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ * scratch_v: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ */
 void attention_backward_causal_head_major_gqa_bf16(
     const uint16_t *d_output,      // [num_heads, T, aligned_head_dim]
     float *d_x,                    // [num_heads, T, aligned_head_dim]
@@ -1003,46 +1008,30 @@ void attention_backward_causal_head_major_gqa_bf16(
     int num_tokens,
     int head_dim,
     int aligned_head_dim,
-    int aligned_context_window)
+    int aligned_context_window,
+    float *scratch_d_output,
+    float *scratch_q,
+    float *scratch_k,
+    float *scratch_v)
 {
     (void)d_x;
     const size_t head_elems = (size_t)num_heads * (size_t)num_tokens * (size_t)aligned_head_dim;
     const size_t kv_elems = (size_t)num_kv_heads * (size_t)num_tokens * (size_t)aligned_head_dim;
 
-    float *d_output_f = convert_bf16_tensor(d_output, head_elems);
-    if (!d_output_f) {
-        return;
-    }
-    float *q_f = convert_bf16_tensor(q, head_elems);
-    if (!q_f) {
-        free(d_output_f);
-        return;
-    }
-    float *k_f = convert_bf16_tensor(k, kv_elems);
-    if (!k_f) {
-        free(d_output_f);
-        free(q_f);
-        return;
-    }
-    float *v_f = convert_bf16_tensor(v, kv_elems);
-    if (!v_f) {
-        free(d_output_f);
-        free(q_f);
-        free(k_f);
-        return;
-    }
+    if (!scratch_d_output || !scratch_q || !scratch_k || !scratch_v) return;
 
-    attention_backward_causal_head_major_gqa(d_output_f, q_f, k_f, v_f,
+    convert_bf16_tensor_to_buf(d_output, scratch_d_output, head_elems);
+    convert_bf16_tensor_to_buf(q, scratch_q, head_elems);
+    convert_bf16_tensor_to_buf(k, scratch_k, kv_elems);
+    convert_bf16_tensor_to_buf(v, scratch_v, kv_elems);
+
+    attention_backward_causal_head_major_gqa(scratch_d_output, scratch_q, scratch_k, scratch_v,
                                              attn_weights,
                                              d_q, d_k, d_v, d_scores,
                                              num_heads, num_kv_heads,
                                              num_tokens, head_dim,
                                              aligned_head_dim, aligned_context_window);
-
-    free(d_output_f);
-    free(q_f);
-    free(k_f);
-    free(v_f);
+    /* No free - caller owns scratch buffers */
 }
 
 void attention_backward_causal_head_major_gqa(

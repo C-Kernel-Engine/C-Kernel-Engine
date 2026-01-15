@@ -272,7 +272,9 @@ SRCS    := src/backend_native.c \
 	           src/kernels/optimizer_kernels_bf16.c \
 	           src/kernels/add_kernels_bf16.c \
 	           src/kernels/topk_kernels.c \
-	           src/kernels/axpy_kernels.c
+	           src/kernels/axpy_kernels.c \
+	           src/kernels/fused/rmsnorm_qkv.c \
+	           src/kernels/fused/attention_mlp_fused.c
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so
@@ -401,7 +403,9 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_orchestration_layer.py \
             unittest/test_lm_head_litmus.py \
             unittest/test_optimizer.py \
-            unittest/test_gemv_kernels_comprehensive.py
+            unittest/test_gemv_kernels_comprehensive.py \
+            unittest/test_fused_rmsnorm_qkv.py \
+            unittest/test_fused_attention_mlp.py
 
 PY_TESTS_BF16 := unittest/bf16/test_sigmoid_bf16.py \
                 unittest/bf16/test_rmsnorm_bf16.py \
@@ -586,6 +590,128 @@ test-perf-compare: test-perf-baseline test-perf-megafused
 
 .PHONY: test-mega-fused-correctness test-mega-fused-perf test-mega-fused-flamegraph test-mega-fused
 .PHONY: test-perf-baseline test-perf-megafused test-perf-compare
+
+# ============================================================================
+# FUSED KERNEL TESTS (v6.6 Fusion Suite)
+# ============================================================================
+# Run all fused kernel tests with unified output showing:
+#   1. Individual kernel benchmarks (rmsnorm, gemv)
+#   2. Non-fused pipeline (baseline)
+#   3. Fused kernel (optimized)
+#   4. Speedup summary with DRAM analysis
+
+test-fused: $(LIB)
+	@echo ""
+	@echo "========================================"
+	@echo "  FUSED KERNEL TESTS (v6.6 Suite)"
+	@echo "========================================"
+	@echo ""
+	@mkdir -p test_results
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_rmsnorm_qkv.py
+
+# Quick accuracy-only fused test (no benchmarks)
+test-fused-quick: $(LIB)
+	@echo "Running fused kernel accuracy tests..."
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_rmsnorm_qkv.py --quick
+
+# All fused kernel tests including perf analysis
+test-fused-all: $(LIB)
+	@echo ""
+	@echo "========================================"
+	@echo "  FUSED KERNEL TESTS (Full Suite)"
+	@echo "========================================"
+	@mkdir -p test_results
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_rmsnorm_qkv.py --all
+
+.PHONY: test-fused test-fused-quick test-fused-all
+
+# Fused kernel parity: Test with different model sizes
+test-fused-small: $(LIB)
+	@echo ""
+	@echo "========================================"
+	@echo "  FUSED KERNEL TEST: Small Model (Qwen2-0.5B)"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_rmsnorm_qkv.py \
+		--embed 896 --q-dim 896 --kv-dim 128 --iter 100
+
+test-fused-7b: $(LIB)
+	@echo ""
+	@echo "========================================"
+	@echo "  FUSED KERNEL TEST: Llama 7B Scale"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_rmsnorm_qkv.py \
+		--embed 4096 --q-dim 4096 --kv-dim 4096 --iter 50
+
+test-fused-13b: $(LIB)
+	@echo ""
+	@echo "========================================"
+	@echo "  FUSED KERNEL TEST: Llama 13B Scale"
+	@echo "  (embed_dim > 4096 not yet supported)"
+	@echo "========================================"
+	@echo "TODO: Increase stack buffer size or use heap allocation"
+
+# Full fused parity suite: all model sizes
+test-fused-parity-full: $(LIB)
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║         FUSED KERNEL PARITY SUITE (Q4_K Weights)                     ║"
+	@echo "╠══════════════════════════════════════════════════════════════════════╣"
+	@echo "║  Tests fused vs separate kernels with quantized weights              ║"
+	@echo "║  Fusion benefit: normed[] stays in L1 cache                          ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@$(MAKE) --no-print-directory test-fused-small
+	@echo ""
+	@$(MAKE) --no-print-directory test-fused-7b
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║                    FUSED PARITY SUITE COMPLETE                       ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+
+.PHONY: test-fused-small test-fused-7b test-fused-13b test-fused-parity-full
+
+# Mega-fused Attention + MLP test
+test-mega-fused-block: $(LIB)
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║  MEGA-FUSED TEST: Attention + MLP Block                              ║"
+	@echo "║  Fuses entire block from attention output to next layer input        ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_attention_mlp.py
+
+test-mega-fused-block-7b: $(LIB)
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║  MEGA-FUSED TEST: Attention + MLP (Llama 7B Scale)                   ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_attention_mlp.py \
+		--embed 4096 --intermediate 11008 --heads 32 --kv-heads 32 --head-dim 128 --seq-len 512
+
+# All fusion tests combined
+test-fusion-all: $(LIB)
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║         COMPLETE FUSION TEST SUITE (v6.6)                            ║"
+	@echo "╠══════════════════════════════════════════════════════════════════════╣"
+	@echo "║  1. RMSNorm + QKV fusion                                             ║"
+	@echo "║  2. Mega-fused Attention + MLP block                                 ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@$(MAKE) --no-print-directory test-fused
+	@echo ""
+	@$(MAKE) --no-print-directory test-mega-fused-block
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║                    ALL FUSION TESTS COMPLETE                         ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+
+.PHONY: test-mega-fused-block test-mega-fused-block-7b test-fusion-all
 
 ir-v2-meta: $(IR_V2_DEMO)
 	@echo "Generating IR v2 from $(CONFIG) + $(IR_V2_META)..."

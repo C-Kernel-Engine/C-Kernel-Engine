@@ -405,13 +405,17 @@ void mega_fused_attention_decode_avx(
     int max_seq,
     float eps)
 {
-    /* Allocate output buffers in L1 - not DRAM! */
+    /* Stack-allocated buffers - stay in L1 (no malloc!) */
+    /* Max: 64 heads * 128 dim = 8192 floats = 32KB per buffer */
     size_t q_elems = (size_t)num_heads * head_dim;
     size_t kv_elems = (size_t)num_kv_heads * head_dim;
-    float *q = (float *)malloc(q_elems * sizeof(float));
-    float *k = (float *)malloc(kv_elems * sizeof(float));
-    float *v = (float *)malloc(kv_elems * sizeof(float));
-    float *o = (float *)malloc(q_elems * sizeof(float));
+
+    if (q_elems > 8192 || kv_elems > 8192) return;
+
+    float q[8192];
+    float k[8192];
+    float v[8192];
+    float o[8192];
 
     /* Phase 1: RMSNorm + QKV (ln1_row in L1 stack) */
     mega_fuse_rmsnorm_qkv_avx(q, k, v, input, NULL, W_qkv, b_qkv,
@@ -447,11 +451,7 @@ void mega_fused_attention_decode_avx(
         output[j] = proj + residual[j];  /* Residual add in store! */
     }
 
-    free(q);
-    free(k);
-    free(v);
-    free(o);
-
+    /* No free needed - stack buffers auto-deallocate */
     /* Total DRAM traffic: 4KB input + 4KB output = 8KB */
 }
 

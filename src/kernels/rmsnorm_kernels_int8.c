@@ -1,7 +1,6 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "ckernel_engine.h"
 
@@ -38,16 +37,10 @@ static void convert_float_to_int8(const float *src,
     }
 }
 
-static float *alloc_float_buffer(size_t count)
-{
-    return (float *)malloc(count * sizeof(float));
-}
-
-static void free_float_buffer(float *buf)
-{
-    free(buf);
-}
-
+/*
+ * INT8 RMSNorm forward with caller-provided scratch buffers.
+ * scratch_input, scratch_output: each [tokens * aligned_embed_dim] floats
+ */
 void rmsnorm_forward_int8(const int8_t *input,
                           const float *gamma,
                           int8_t *output,
@@ -55,30 +48,25 @@ void rmsnorm_forward_int8(const int8_t *input,
                           int tokens,
                           int d_model,
                           int aligned_embed_dim,
-                          float eps)
+                          float eps,
+                          float *scratch_input,
+                          float *scratch_output)
 {
-    if (!input || !gamma || !output) {
-        return;
-    }
+    if (!input || !gamma || !output) return;
+    if (!scratch_input || !scratch_output) return;
 
     size_t total = (size_t)tokens * (size_t)aligned_embed_dim;
-    float *input_f = alloc_float_buffer(total);
-    float *output_f = alloc_float_buffer(total);
-    if (!input_f || !output_f) {
-        free_float_buffer(input_f);
-        free_float_buffer(output_f);
-        return;
-    }
 
-    convert_int8_to_float(input, input_f, total);
-    rmsnorm_forward(input_f, gamma, output_f, rstd_cache,
+    convert_int8_to_float(input, scratch_input, total);
+    rmsnorm_forward(scratch_input, gamma, scratch_output, rstd_cache,
                     tokens, d_model, aligned_embed_dim, eps);
-    convert_float_to_int8(output_f, output, total);
-
-    free_float_buffer(input_f);
-    free_float_buffer(output_f);
+    convert_float_to_int8(scratch_output, output, total);
 }
 
+/*
+ * INT8 RMSNorm backward with caller-provided scratch buffers.
+ * scratch_d_output, scratch_input, scratch_d_input: each [tokens * aligned_embed_dim] floats
+ */
 void rmsnorm_backward_int8(const int8_t *d_output,
                            const int8_t *input,
                            const float *gamma,
@@ -87,44 +75,35 @@ void rmsnorm_backward_int8(const int8_t *d_output,
                            float *d_gamma,
                            int tokens,
                            int d_model,
-                           int aligned_embed_dim)
+                           int aligned_embed_dim,
+                           float *scratch_d_output,
+                           float *scratch_input,
+                           float *scratch_d_input)
 {
-    if (!d_output || !input || !gamma || !rstd_cache || !d_input || !d_gamma) {
-        return;
-    }
+    if (!d_output || !input || !gamma || !rstd_cache || !d_input || !d_gamma) return;
+    if (!scratch_d_output || !scratch_input || !scratch_d_input) return;
 
     size_t total = (size_t)tokens * (size_t)aligned_embed_dim;
-    float *d_output_f = alloc_float_buffer(total);
-    float *input_f = alloc_float_buffer(total);
-    float *d_input_f = alloc_float_buffer(total);
-    if (!d_output_f || !input_f || !d_input_f) {
-        free_float_buffer(d_output_f);
-        free_float_buffer(input_f);
-        free_float_buffer(d_input_f);
-        return;
-    }
 
-    convert_int8_to_float(d_output, d_output_f, total);
-    convert_int8_to_float(input, input_f, total);
+    convert_int8_to_float(d_output, scratch_d_output, total);
+    convert_int8_to_float(input, scratch_input, total);
 
     // Zero gamma gradient before accumulation.
     for (int d = 0; d < d_model; ++d) {
         d_gamma[d] = 0.0f;
     }
 
-    rmsnorm_backward(d_output_f,
-                     input_f,
+    rmsnorm_backward(scratch_d_output,
+                     scratch_input,
                      gamma,
                      rstd_cache,
-                     d_input_f,
+                     scratch_d_input,
                      d_gamma,
                      tokens,
                      d_model,
                      aligned_embed_dim);
 
-    convert_float_to_int8(d_input_f, d_input, total);
-
-    free_float_buffer(d_output_f);
-    free_float_buffer(input_f);
-    free_float_buffer(d_input_f);
+    convert_float_to_int8(scratch_d_input, d_input, total);
 }
+
+#pragma GCC diagnostic pop

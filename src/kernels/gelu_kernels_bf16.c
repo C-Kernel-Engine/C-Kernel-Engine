@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
@@ -8,84 +8,62 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 
-static float *alloc_float_buffer(size_t count)
+/*
+ * BF16 GELU with caller-provided scratch buffer.
+ * scratch: [n] floats - caller allocates and reuses
+ */
+void gelu_fast_inplace_bf16(uint16_t *data, size_t n, float *scratch)
 {
-    return (float *)malloc(count * sizeof(float));
-}
+    if (!scratch) return;
 
-static void free_float_buffer(float *buf)
-{
-    free(buf);
-}
-
-void gelu_fast_inplace_bf16(uint16_t *data, size_t n)
-{
-    float *tmp = alloc_float_buffer(n);
-    if (!tmp) {
-        return;
-    }
-
-    bf16_tensor_to_float(data, tmp, n);
+    bf16_tensor_to_float(data, scratch, n);
     // Use exact version to avoid fast tanh approximation error accumulating
     // with BF16 precision loss. Conversion overhead dominates anyway.
-    gelu_exact_inplace(tmp, n);
-    float_tensor_to_bf16(tmp, data, n);
-
-    free_float_buffer(tmp);
+    gelu_exact_inplace(scratch, n);
+    float_tensor_to_bf16(scratch, data, n);
 }
 
+/*
+ * BF16 GELU backward with caller-provided scratch buffers.
+ * scratch_input, scratch_d_output, scratch_d_input: each [n] floats
+ */
 void gelu_backward_exact_bf16(const uint16_t *input,
                               const uint16_t *d_output,
                               uint16_t *d_input,
-                              size_t n)
+                              size_t n,
+                              float *scratch_input,
+                              float *scratch_d_output,
+                              float *scratch_d_input)
 {
-    float *input_f = alloc_float_buffer(n);
-    float *d_output_f = alloc_float_buffer(n);
-    float *d_input_f = alloc_float_buffer(n);
-    if (!input_f || !d_output_f || !d_input_f) {
-        free_float_buffer(input_f);
-        free_float_buffer(d_output_f);
-        free_float_buffer(d_input_f);
-        return;
-    }
+    if (!scratch_input || !scratch_d_output || !scratch_d_input) return;
 
-    bf16_tensor_to_float(input, input_f, n);
-    bf16_tensor_to_float(d_output, d_output_f, n);
+    bf16_tensor_to_float(input, scratch_input, n);
+    bf16_tensor_to_float(d_output, scratch_d_output, n);
 
     // Use scalar exact version to avoid fast tanh approximation error
     // accumulating with BF16 precision loss.
-    gelu_backward_scalar(input_f, d_output_f, d_input_f, n);
+    gelu_backward_scalar(scratch_input, scratch_d_output, scratch_d_input, n);
 
-    float_tensor_to_bf16(d_input_f, d_input, n);
-
-    free_float_buffer(input_f);
-    free_float_buffer(d_output_f);
-    free_float_buffer(d_input_f);
+    float_tensor_to_bf16(scratch_d_input, d_input, n);
 }
 
+/*
+ * BF16 GELU backward (fast) with caller-provided scratch buffers.
+ */
 void gelu_backward_fast_bf16(const uint16_t *input,
                              const uint16_t *d_output,
                              uint16_t *d_input,
-                             size_t n)
+                             size_t n,
+                             float *scratch_input,
+                             float *scratch_d_output,
+                             float *scratch_d_input)
 {
-    float *input_f = alloc_float_buffer(n);
-    float *d_output_f = alloc_float_buffer(n);
-    float *d_input_f = alloc_float_buffer(n);
-    if (!input_f || !d_output_f || !d_input_f) {
-        free_float_buffer(input_f);
-        free_float_buffer(d_output_f);
-        free_float_buffer(d_input_f);
-        return;
-    }
+    if (!scratch_input || !scratch_d_output || !scratch_d_input) return;
 
-    bf16_tensor_to_float(input, input_f, n);
-    bf16_tensor_to_float(d_output, d_output_f, n);
+    bf16_tensor_to_float(input, scratch_input, n);
+    bf16_tensor_to_float(d_output, scratch_d_output, n);
 
-    gelu_backward_fast(input_f, d_output_f, d_input_f, n);
+    gelu_backward_fast(scratch_input, scratch_d_output, scratch_d_input, n);
 
-    float_tensor_to_bf16(d_input_f, d_input, n);
-
-    free_float_buffer(input_f);
-    free_float_buffer(d_output_f);
-    free_float_buffer(d_input_f);
+    float_tensor_to_bf16(scratch_d_input, d_input, n);
 }

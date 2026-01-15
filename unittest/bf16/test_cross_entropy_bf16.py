@@ -36,6 +36,7 @@ if not cpu.avx512bf16:
 
 lib = load_lib("libckernel_engine.so")
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.softmax_cross_entropy_loss_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_uint16),  # logits
     ctypes.POINTER(ctypes.c_int32),   # targets
@@ -43,6 +44,8 @@ lib.softmax_cross_entropy_loss_bf16.argtypes = [
     ctypes.c_int,                     # vocab_size
     ctypes.POINTER(ctypes.c_uint16),  # d_logits
     ctypes.POINTER(ctypes.c_float),   # loss_out
+    ctypes.POINTER(ctypes.c_float),   # scratch_logits [tokens * vocab_size]
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_logits [tokens * vocab_size]
 ]
 lib.softmax_cross_entropy_loss_bf16.restype = None
 
@@ -55,6 +58,12 @@ def run_tests(T=64, V=512, warmup=10, iterations=500):
     logits_bf16 = float32_to_bf16(logits_np.reshape(-1))
     d_logits_bf16 = np.zeros_like(logits_bf16)
     loss_out = np.zeros(1, dtype=np.float32)
+
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_logits = np.zeros(T * V, dtype=np.float32)
+    scratch_d_logits = np.zeros(T * V, dtype=np.float32)
+    scratch_logits_ptr = scratch_logits.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_d_logits_ptr = scratch_d_logits.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     targets_t = torch.from_numpy(targets).long()
     logits_t = torch.from_numpy(logits_np.copy()).to(dtype=torch.bfloat16)
@@ -85,6 +94,8 @@ def run_tests(T=64, V=512, warmup=10, iterations=500):
             ctypes.c_int(V),
             numpy_to_uint16_ptr(d_logits_bf16),
             loss_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            scratch_logits_ptr,
+            scratch_d_logits_ptr,
         )
 
     c_kernel()
