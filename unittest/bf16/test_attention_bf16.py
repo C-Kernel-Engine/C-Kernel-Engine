@@ -33,18 +33,22 @@ if not cpu.avx512bf16:
 
 lib = load_lib("libckernel_attention.so", "libckernel_engine.so")
 
+# Function signatures - updated with scratch buffer params (no internal malloc)
 lib.attention_forward_causal_head_major_gqa_bf16.argtypes = [
-    ctypes.POINTER(ctypes.c_uint16),
-    ctypes.POINTER(ctypes.c_uint16),
-    ctypes.POINTER(ctypes.c_uint16),
-    ctypes.POINTER(ctypes.c_float),
-    ctypes.POINTER(ctypes.c_float),
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_uint16),  # q
+    ctypes.POINTER(ctypes.c_uint16),  # k
+    ctypes.POINTER(ctypes.c_uint16),  # v
+    ctypes.POINTER(ctypes.c_float),   # scores
+    ctypes.POINTER(ctypes.c_float),   # output
+    ctypes.c_int,                     # num_heads
+    ctypes.c_int,                     # num_kv_heads
+    ctypes.c_int,                     # num_tokens
+    ctypes.c_int,                     # head_dim
+    ctypes.c_int,                     # aligned_head_dim
+    ctypes.c_int,                     # aligned_context_window
+    ctypes.POINTER(ctypes.c_float),   # scratch_q [num_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_k [num_kv_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_v [num_kv_heads * num_tokens * aligned_head_dim]
 ]
 lib.attention_forward_causal_head_major_gqa_bf16.restype = None
 
@@ -59,12 +63,16 @@ lib.attention_backward_causal_head_major_gqa_bf16.argtypes = [
     ctypes.POINTER(ctypes.c_float),   # d_k
     ctypes.POINTER(ctypes.c_float),   # d_v
     ctypes.POINTER(ctypes.c_float),   # d_scores
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
+    ctypes.c_int,                     # num_heads
+    ctypes.c_int,                     # num_kv_heads
+    ctypes.c_int,                     # num_tokens
+    ctypes.c_int,                     # head_dim
+    ctypes.c_int,                     # aligned_head_dim
+    ctypes.c_int,                     # aligned_context_window
+    ctypes.POINTER(ctypes.c_float),   # scratch_d_output [num_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_q [num_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_k [num_kv_heads * num_tokens * aligned_head_dim]
+    ctypes.POINTER(ctypes.c_float),   # scratch_v [num_kv_heads * num_tokens * aligned_head_dim]
 ]
 lib.attention_backward_causal_head_major_gqa_bf16.restype = None
 
@@ -135,6 +143,14 @@ def run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500):
     k_bf = float32_to_bf16(k_np)
     v_bf = float32_to_bf16(v_np)
 
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_q = np.zeros(H * T * D, dtype=np.float32)
+    scratch_k = np.zeros(H * T * D, dtype=np.float32)
+    scratch_v = np.zeros(H * T * D, dtype=np.float32)
+    scratch_q_ptr = scratch_q.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_k_ptr = scratch_k.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_v_ptr = scratch_v.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
     report = TestReport(
         test_name="Attention Forward (BF16)",
         dtype="bf16",
@@ -164,6 +180,9 @@ def run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500):
             ctypes.c_int(D),
             ctypes.c_int(D),
             ctypes.c_int(T),
+            scratch_q_ptr,
+            scratch_k_ptr,
+            scratch_v_ptr,
         )
 
     c_attention()
@@ -199,6 +218,16 @@ def run_backward_tests(H=4, T=32, D=32, warmup=10, iterations=200):
     k_bf = float32_to_bf16(k_np)
     v_bf = float32_to_bf16(v_np)
     d_out_bf = float32_to_bf16(d_out_np)
+
+    # Allocate scratch buffers (caller-provided, no malloc in kernel)
+    scratch_d_output = np.zeros(H * T * D, dtype=np.float32)
+    scratch_q = np.zeros(H * T * D, dtype=np.float32)
+    scratch_k = np.zeros(H * T * D, dtype=np.float32)
+    scratch_v = np.zeros(H * T * D, dtype=np.float32)
+    scratch_d_output_ptr = scratch_d_output.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_q_ptr = scratch_q.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_k_ptr = scratch_k.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    scratch_v_ptr = scratch_v.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     # Use the same FP32-compute reference for both the weights (passed to the C backward)
     # and the gradient reference, so we're not mixing BF16-softmax weights with an FP32
@@ -251,6 +280,10 @@ def run_backward_tests(H=4, T=32, D=32, warmup=10, iterations=200):
             ctypes.c_int(D),
             ctypes.c_int(D),
             ctypes.c_int(T),
+            scratch_d_output_ptr,
+            scratch_q_ptr,
+            scratch_k_ptr,
+            scratch_v_ptr,
         )
 
     c_backward()
