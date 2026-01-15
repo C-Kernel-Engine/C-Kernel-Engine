@@ -25,7 +25,12 @@ var ck__cli__v6_85_8c =
       [ "CHAT_TEMPLATE_QWEN", "ck__cli__v6_85_8c.html#a34a49339011ec90768afdb73eee227aba9cc46c02a6757992f62a7dec2f848e07", null ],
       [ "CHAT_TEMPLATE_LLAMA", "ck__cli__v6_85_8c.html#a34a49339011ec90768afdb73eee227aba952735d1d53b9fdca9d27427834ee0a6", null ],
       [ "CHAT_TEMPLATE_CHATML", "ck__cli__v6_85_8c.html#a34a49339011ec90768afdb73eee227abae3aceb59cfcc3678c5cd0fb3f4e04215", null ],
-      [ "CHAT_TEMPLATE_MISTRAL", "ck__cli__v6_85_8c.html#a34a49339011ec90768afdb73eee227aba9801cffbb08d45bb81a3937b66ef1351", null ]
+      [ "CHAT_TEMPLATE_MISTRAL", "ck__cli__v6_85_8c.html#a34a49339011ec90768afdb73eee227aba9801cffbb08d45bb81a3937b66ef1351", null ],
+      [ "CHAT_TEMPLATE_NONE", "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227abafd456f109159c35ffa4387794d5a8a86", null ],
+      [ "CHAT_TEMPLATE_QWEN", "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba9cc46c02a6757992f62a7dec2f848e07", null ],
+      [ "CHAT_TEMPLATE_LLAMA", "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba952735d1d53b9fdca9d27427834ee0a6", null ],
+      [ "CHAT_TEMPLATE_CHATML", "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227abae3aceb59cfcc3678c5cd0fb3f4e04215", null ],
+      [ "CHAT_TEMPLATE_MISTRAL", "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba9801cffbb08d45bb81a3937b66ef1351", null ]
     ] ],
     [ "apply_chat_template", "ck__cli__v6_85_8c.html#a2881e2d82af06d985edd9addd2c713de", null ],
     [ "decode_bpe_token", "ck__cli__v6_85_8c.html#a8e11af01f9cfb415dbaaafbc33447dfc", null ],

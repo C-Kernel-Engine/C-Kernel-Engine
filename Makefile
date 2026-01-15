@@ -1821,6 +1821,7 @@ CK_CLI := tools/ck.c
 CK_CLI_V4 := tools/ck_v4.c
 CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
+CK_CLI_V66 := src/v6.6/ck_cli_v6.6.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
@@ -1875,6 +1876,22 @@ ck-cli-v6.5: $(BUILD_DIR)/ck-cli-v6.5
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 --model qwen           # Auto-discover from cache"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 --list                 # List available models"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.5 <model.so> <weights.bump>"
+	@echo ""
+
+# v6.6 Native CLI (fusion-enabled kernels, cache-aware optimization)
+$(BUILD_DIR)/ck-cli-v6.6: $(CK_CLI_V66) $(LIB_TOKENIZER)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V66) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v6.6: $(BUILD_DIR)/ck-cli-v6.6
+	@echo ""
+	@echo "  $(C_CYAN)C-Kernel-Engine v6.6 CLI$(C_RESET)"
+	@echo "  Features: Fusion kernels, Cache-aware optimization, FP16 KV cache"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 --model qwen           # Auto-discover from cache"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 --list                 # List available models"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 <model.so> <weights.bump>"
 	@echo ""
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
