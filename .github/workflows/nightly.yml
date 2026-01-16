@@ -114,15 +114,22 @@ jobs:
           echo "=== Running Full Nightly Test Suite ==="
           echo "Includes: 30+ kernel tests, BF16, quantization, training tests"
 
-          python scripts/nightly_runner.py --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
+          # Create output directory
+          mkdir -p docs/site/nightly-results
+
+          # Run tests and write directly to the location test-report.html reads from
+          python scripts/nightly_runner.py --no-fail --json docs/site/nightly-results/latest.json 2>&1 | tee build/nightly_test.log
+
+          # Also save to build for artifact upload
+          cp docs/site/nightly-results/latest.json build/nightly_report.json 2>/dev/null || true
 
           # Show summary
-          if [ -f build/nightly_report.json ]; then
+          if [ -f docs/site/nightly-results/latest.json ]; then
             echo ""
             echo "=== Nightly Test Summary ==="
             python3 -c "
           import json
-          d = json.load(open('build/nightly_report.json'))
+          d = json.load(open('docs/site/nightly-results/latest.json'))
           s = d['summary']
           print(f\"Passed: {s['passed']}\")
           print(f\"Failed: {s['failed']}\")
@@ -149,14 +156,10 @@ jobs:
       - name: Update nightly results (main only)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          if [ -f build/nightly_report.json ]; then
-            # Write to path expected by docs/site/test-report.html
-            mkdir -p docs/site/nightly-results
-            cp build/nightly_report.json docs/site/nightly-results/latest.json
-
-            # Update index with this report
+          if [ -f docs/site/nightly-results/latest.json ]; then
+            # Create dated report
             DATE=$(date +%Y-%m-%d)
-            cp build/nightly_report.json "docs/site/nightly-results/report-${DATE}.json"
+            cp docs/site/nightly-results/latest.json "docs/site/nightly-results/report-${DATE}.json"
 
             # Create/update index.json
             echo '{"reports": [' > docs/site/nightly-results/index.json
