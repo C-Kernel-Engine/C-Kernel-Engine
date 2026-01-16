@@ -377,11 +377,16 @@ void gemv_q5_0(float *y,
                const float *x,
                int M, int K)
 {
-// TODO: Implement gemv_q5_0_avx2 for better AVX2 performance
-// For now, AVX2 falls back to AVX (backward compatible)
+// Dispatch order: AVX512 > AVX2 > AVX > SSE > ref
+// TODO: Implement proper gemv_q5_0_avx2 for AVX2 machines
+// For now, AVX2 uses SSE path (more stable at large dimensions)
 #if defined(__AVX512F__)
     gemv_q5_0_avx512(y, W, x, M, K);
-#elif defined(__AVX__) || defined(__AVX2__)
+#elif defined(__AVX2__)
+    // AVX2 machines use SSE until proper AVX2 kernel is implemented
+    // (AVX path has precision issues at large dims on AVX2)
+    gemv_q5_0_sse_v2(y, W, x, M, K);
+#elif defined(__AVX__)
     gemv_q5_0_avx(y, W, x, M, K);
 #elif defined(__SSE4_1__)
     gemv_q5_0_sse_v2(y, W, x, M, K);
