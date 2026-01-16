@@ -150,9 +150,21 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           if [ -f build/nightly_report.json ]; then
-            mkdir -p docs
-            cp build/nightly_report.json docs/
-            python scripts/generate_test_report.py build/nightly_report.json docs/test-report.html || true
+            # Write to path expected by docs/site/test-report.html
+            mkdir -p docs/site/nightly-results
+            cp build/nightly_report.json docs/site/nightly-results/latest.json
+
+            # Update index with this report
+            DATE=$(date +%Y-%m-%d)
+            cp build/nightly_report.json "docs/site/nightly-results/report-${DATE}.json"
+
+            # Create/update index.json
+            echo '{"reports": [' > docs/site/nightly-results/index.json
+            ls -1 docs/site/nightly-results/report-*.json 2>/dev/null | sort -r | head -30 | while read f; do
+              echo "\"$(basename $f)\"," >> docs/site/nightly-results/index.json
+            done
+            echo ']}' >> docs/site/nightly-results/index.json
+            sed -i 's/,\]/]/' docs/site/nightly-results/index.json
           fi
 
       - name: Deploy to GitHub Pages (main only)
@@ -160,5 +172,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
+          publish_dir: ./docs/site
           keep_files: true
