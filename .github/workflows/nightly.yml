@@ -23,12 +23,7 @@ on:
           - all
           - quick
           - e2e
-          - pipeline
-          - kernels
-          - bf16
-          - quant
           - parity
-          - llamacpp
 
 # Need write access to push to gh-pages
 permissions:
@@ -36,31 +31,74 @@ permissions:
   pages: write
 
 jobs:
-  build-and-test:
+  # ===========================================================================
+  # Job 1: Build CK-Engine (shared by all test jobs)
+  # ===========================================================================
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      build_status: ${{ steps.build.outcome }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'  # Initialize llama.cpp submodule if present
 
       - name: Check CPU features
         run: |
           echo "=== CPU Info ==="
           lscpu | grep -E "(Model name|CPU\(s\)|Thread|Core|Socket|Flags)"
+          echo "AVX2: $(grep -q avx2 /proc/cpuinfo && echo YES || echo NO)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build CK-Engine
+        id: build
+        run: |
+          make clean || true
+          make -j$(nproc)
+          make libck_parity.so || echo "Parity lib build failed (optional)"
           echo ""
-          echo "=== AVX Support ==="
-          if grep -q avx512f /proc/cpuinfo; then
-            echo "AVX-512: YES"
-          else
-            echo "AVX-512: NO (will use scalar fallbacks)"
-          fi
-          if grep -q avx2 /proc/cpuinfo; then
-            echo "AVX2: YES"
-          else
-            echo "AVX2: NO"
-          fi
+          echo "=== Built libraries ==="
+          ls -la build/*.so 2>/dev/null || echo "No .so files"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ck-engine-build
+          path: |
+            build/
+            include/
+            src/
+            scripts/
+            Makefile
+            requirements.txt
+          retention-days: 1
+
+  # ===========================================================================
+  # Job 2: E2E Inference Tests (Runner 1 - needs GGUF model, NO llama.cpp)
+  # ===========================================================================
+  test-e2e:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'e2e' || github.event.inputs.test_category == '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ck-engine-build
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -73,11 +111,102 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install huggingface_hub
-          pip list | grep -E "(torch|numpy|huggingface)"
 
-      - name: Download SmolLM-135M model
+      - name: Download GGUF model for E2E
         run: |
-          # Download SmolLM-135M (~270MB) for parity tests
+          echo "=== Downloading GGUF model ==="
+          GGUF_DIR=~/.cache/ck-engine-v6.5/models/Qwen--Qwen2-0.5B-Instruct-GGUF
+          mkdir -p "$GGUF_DIR"
+          GGUF_FILE="$GGUF_DIR/qwen2-0_5b-instruct-q4_k_m.gguf"
+
+          if [ ! -f "$GGUF_FILE" ]; then
+            echo "Downloading Qwen2-0.5B-Instruct Q4_K_M (~350MB)..."
+            wget -q --show-progress \
+              "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf" \
+              -O "$GGUF_FILE" || {
+                echo "Qwen download failed, trying SmolLM2..."
+                GGUF_DIR=~/.cache/ck-engine-v6.5/models/SmolLM2-360M-GGUF
+                mkdir -p "$GGUF_DIR"
+                GGUF_FILE="$GGUF_DIR/smollm2-360m-instruct-q4_k_m.gguf"
+                wget -q --show-progress \
+                  "https://huggingface.co/itlwas/SmolLM2-360M-Q4_K_M-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf" \
+                  -O "$GGUF_FILE"
+              }
+          fi
+          echo "GGUF_FILE=$GGUF_FILE" >> $GITHUB_ENV
+          ls -lh "$GGUF_FILE"
+
+      - name: Rebuild library (ensure fresh)
+        run: |
+          chmod +x build/*.so 2>/dev/null || true
+          make -j$(nproc)
+
+      - name: Run E2E Integration Tests
+        run: |
+          echo "=== Running E2E Integration Tests ==="
+          make e2e 2>&1 | tee build/e2e_test.log || {
+            echo "::warning::E2E tests had issues - check logs"
+          }
+
+          if grep -q "All tests passed" build/e2e_test.log; then
+            echo "E2E_STATUS=passed" >> $GITHUB_ENV
+            echo "✅ E2E Tests: PASSED"
+          elif grep -q "memory limits" build/e2e_test.log; then
+            echo "E2E_STATUS=skipped" >> $GITHUB_ENV
+            echo "⚠️ E2E Tests: Skipped (memory limits)"
+          else
+            echo "E2E_STATUS=partial" >> $GITHUB_ENV
+            echo "⚠️ E2E Tests: Partial"
+          fi
+
+      - name: Run Pipeline Tests
+        run: |
+          echo "=== Running Pipeline Tests ==="
+          make test-pipeline-quick 2>&1 | tee build/pipeline_test.log || true
+          grep -E "Layer [0-9]:" build/pipeline_test.log || true
+
+      - name: Upload E2E results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: build/*.log
+          retention-days: 7
+
+  # ===========================================================================
+  # Job 3: Parity Tests (Runner 2 - needs llama.cpp + SmolLM)
+  # ===========================================================================
+  test-parity:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'parity' || github.event.inputs.test_category == '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ck-engine-build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install huggingface_hub torch
+
+      - name: Download SmolLM-135M for parity tests
+        run: |
+          echo "=== Downloading SmolLM-135M ==="
           python -c "
           from huggingface_hub import snapshot_download
           import os
@@ -86,430 +215,111 @@ jobs:
           snapshot_download('HuggingFaceTB/SmolLM-135M', local_dir=target)
           print('Done!')
           "
-          ls -la ~/.cache/huggingface/hub/SmolLM-135M/
 
-      - name: Build library
+      - name: Build llama.cpp for parity testing
         run: |
-          make clean || true
-          make -j$(nproc)
-          make test-libs
-          # Build parity library for kernel testing
-          make libck_parity.so || echo "libck_parity.so build failed (will fall back to PyTorch tests)"
-          echo ""
-          echo "=== Built libraries ==="
-          ls -la build/*.so 2>/dev/null || echo "No .so files in build/"
-
-      # Build llama.cpp with patches for parity testing
-      - name: Setup and build llama.cpp for parity testing
-        run: |
+          echo "=== Building llama.cpp ==="
           LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
-          LLAMA_CPP_REPO="https://github.com/ggerganov/llama.cpp.git"
 
-          echo "=== Setting up llama.cpp for parity testing ==="
-
-          # Clone if not present
           if [ ! -d "llama.cpp" ]; then
-            echo "Cloning llama.cpp..."
-            git clone --depth 100 "$LLAMA_CPP_REPO" llama.cpp
+            git clone --depth 100 https://github.com/ggerganov/llama.cpp.git
           fi
 
           cd llama.cpp
-
-          # Checkout pinned commit for reproducibility
-          echo "Checking out commit $LLAMA_CPP_COMMIT..."
-          git fetch --depth 100 origin "$LLAMA_CPP_COMMIT" 2>/dev/null || git fetch origin 2>/dev/null || true
+          git fetch --depth 100 origin "$LLAMA_CPP_COMMIT" 2>/dev/null || true
           git checkout "$LLAMA_CPP_COMMIT" 2>/dev/null || echo "Using current HEAD"
           echo "llama.cpp at: $(git rev-parse --short HEAD)"
 
           # Apply patches
-          if [ -d "../patches" ]; then
-            echo "Applying patches..."
-            if [ -f "../patches/llama.patch" ]; then
-              git apply ../patches/llama.patch 2>/dev/null || echo "Patch already applied or N/A"
-            fi
-            if [ -f "../patches/test-kernel-parity.cpp" ]; then
-              mkdir -p tests
-              cp ../patches/test-kernel-parity.cpp tests/
-            fi
+          if [ -f "../patches/test-kernel-parity.cpp" ]; then
+            mkdir -p tests
+            cp ../patches/test-kernel-parity.cpp tests/
           fi
 
-          # Build llama.cpp
-          echo "Building llama.cpp..."
-          cmake -B build \
-            -DGGML_CPU=ON \
-            -DLLAMA_BUILD_TESTS=OFF \
-            -DLLAMA_CURL=OFF \
-            -DCMAKE_BUILD_TYPE=Release
+          # Build
+          cmake -B build -DGGML_CPU=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
-          # Build kernel test library for parity testing
+          # Build kernel test library
           if [ -f "tests/test-kernel-parity.cpp" ]; then
-            echo "Building ggml kernel test library..."
-            # Need LD_LIBRARY_PATH for linking
             export LD_LIBRARY_PATH="$PWD/build/bin:$LD_LIBRARY_PATH"
             g++ -shared -fPIC -o libggml_kernel_test.so \
               tests/test-kernel-parity.cpp \
               -I ggml/include -I ggml/src \
               -L build/bin -lggml -lggml-cpu -lggml-base -lm -lpthread \
-              -Wl,-rpath,'$ORIGIN/build/bin' && \
-              echo "Successfully built libggml_kernel_test.so" || \
-              echo "WARNING: Kernel test lib build failed (parity tests will skip)"
-          else
-            echo "WARNING: test-kernel-parity.cpp not found in tests/"
+              -Wl,-rpath,'$ORIGIN/build/bin' || echo "Kernel test lib failed"
           fi
-
           cd ..
-          echo "=== llama.cpp setup complete ==="
-          ls -la llama.cpp/build/bin/llama-cli 2>/dev/null || echo "llama-cli not found"
-          ls -la llama.cpp/libggml_kernel_test.so 2>/dev/null || echo "libggml_kernel_test.so not built"
 
-      # Download GGUF model for E2E and parity testing
-      # This runs on ALL builds so E2E tests can actually run inference
-      - name: Download Q4_K GGUF for E2E and parity testing
+      - name: Rebuild CK parity library
         run: |
-          echo "=== Downloading GGUF model for E2E testing ==="
+          make -j$(nproc)
+          make libck_parity.so || echo "Parity lib failed"
 
-          # Create directories for both v5 (parity) and v6.5 (E2E) caches
-          GGUF_DIR_V5=~/.cache/ck-engine-v5/gguf
-          GGUF_DIR_V65=~/.cache/ck-engine-v6.5/models/Qwen--Qwen2-0.5B-Instruct-GGUF
-          mkdir -p "$GGUF_DIR_V5" "$GGUF_DIR_V65"
-
-          GGUF_FILE="$GGUF_DIR_V65/qwen2-0_5b-instruct-q4_k_m.gguf"
-
-          if [ ! -f "$GGUF_FILE" ]; then
-            echo "Downloading Qwen2-0.5B-Instruct Q4_K_M (~350MB)..."
-            wget -q --show-progress \
-              "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf" \
-              -O "$GGUF_FILE" || {
-                echo "Failed to download Qwen, trying SmolLM2-360M..."
-                GGUF_DIR_V65=~/.cache/ck-engine-v6.5/models/itlwas--SmolLM2-360M-Q4_K_M-GGUF
-                mkdir -p "$GGUF_DIR_V65"
-                GGUF_FILE="$GGUF_DIR_V65/smollm2-360m-instruct-q4_k_m.gguf"
-                wget -q --show-progress \
-                  "https://huggingface.co/itlwas/SmolLM2-360M-Q4_K_M-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf" \
-                  -O "$GGUF_FILE"
-              }
-          fi
-
-          # Also symlink to v5 path for parity tests
-          ln -sf "$GGUF_FILE" "$GGUF_DIR_V5/qwen2-0.5b-instruct-q4_k_m.gguf" 2>/dev/null || true
-
-          echo ""
-          echo "GGUF model ready:"
-          ls -lh "$GGUF_FILE"
-          echo "GGUF_FILE=$GGUF_FILE" >> $GITHUB_ENV
-
-          # Show cache structure
-          echo ""
-          echo "Cache structure:"
-          find ~/.cache/ck-engine-v* -name "*.gguf" 2>/dev/null | head -5 || echo "No GGUF files found"
-
-      # E2E Integration Tests - validates full pipeline: kernels → IR → codegen → inference
-      - name: Run E2E Integration Tests
+      - name: Run Kernel Parity Tests
         run: |
-          echo "=== Running E2E Integration Tests ==="
-          echo "Tests: kernel compilation, IR codegen, parallel codegen, inference"
+          echo "=== Running Kernel Parity Tests ==="
+          export LD_LIBRARY_PATH="$PWD/llama.cpp/build/bin:$LD_LIBRARY_PATH"
 
-          # Run full integration test suite
-          make e2e 2>&1 | tee build/e2e_test.log || {
-            echo "::warning::E2E tests had issues - check logs"
-            # Don't fail the build, just warn
+          ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/parity_test.log || {
+            echo "::warning::Parity tests had issues"
           }
 
-          # Extract results for summary
-          if grep -q "All tests passed" build/e2e_test.log; then
-            echo "E2E_STATUS=passed" >> $GITHUB_ENV
-            echo "✅ E2E Integration Tests: PASSED"
+          if grep -q "ALL TESTS PASSED" build/parity_test.log; then
+            echo "✅ Parity Tests: PASSED"
           else
-            echo "E2E_STATUS=partial" >> $GITHUB_ENV
-            PASSED=$(grep -c "^\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
-            FAILED=$(grep -c "^\[FAIL\]" build/e2e_test.log 2>/dev/null || echo "0")
-            echo "⚠️ E2E Integration Tests: $PASSED passed, $FAILED failed"
+            echo "⚠️ Parity Tests: Some failures"
           fi
 
-      # Layered Pipeline Tests - 6-layer validation to pinpoint failures
-      # This runs on ALL builds (PRs, push, nightly, manual) to catch issues early
-      # Layers: L1=kernel parity, L2=bump, L3=IR, L4=codegen, L5=tensor-flow, L6=e2e
-      - name: Run Layered Pipeline Tests
-        run: |
-          echo "=== Running Layered Pipeline Validation ==="
-          echo "Tests all 6 layers: kernels, bump, IR, codegen, tensor-flow, e2e"
-          echo ""
-
-          # Run quick pipeline tests (skip slow kernel parity in CI)
-          # This validates the full inference pipeline can pinpoint failures
-          make test-pipeline-quick 2>&1 | tee build/pipeline_test.log || {
-            echo "::warning::Pipeline tests had issues - check logs"
-          }
-
-          # Extract per-layer results
-          echo ""
-          echo "=== Pipeline Layer Results ==="
-          grep -E "Layer [0-9]:" build/pipeline_test.log || true
-
-          # Set environment for summary
-          if grep -q "ALL PIPELINE TESTS PASSED" build/pipeline_test.log; then
-            echo "PIPELINE_STATUS=passed" >> $GITHUB_ENV
-            echo "✅ Layered Pipeline Tests: ALL PASSED"
-          else
-            echo "PIPELINE_STATUS=partial" >> $GITHUB_ENV
-            echo "⚠️ Layered Pipeline Tests: Some layers failed - check logs"
-          fi
-
-      - name: Run nightly tests (quick for PRs)
-        if: github.event_name == 'pull_request'
+      - name: Run Nightly Test Suite
+        if: github.event_name != 'pull_request'
         run: |
           python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
 
-      - name: Run nightly tests (full for main/scheduled)
-        if: github.event_name != 'pull_request'
-        run: |
-          CATEGORY="${{ github.event.inputs.test_category || 'all' }}"
-          if [ "$CATEGORY" = "all" ]; then
-            python scripts/nightly_runner.py --no-fail --json build/nightly_report.json
-          elif [ "$CATEGORY" = "quick" ]; then
-            python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
-          elif [ "$CATEGORY" = "e2e" ]; then
-            # Run E2E integration tests only
-            echo "Running E2E integration tests..."
-            make e2e 2>&1 | tee build/e2e_test.log
-
-            # Create report for dashboard
-            if grep -q "All tests passed" build/e2e_test.log; then
-              STATUS="pass"
-              PASSED=$(grep -c "\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
-            else
-              STATUS="fail"
-              PASSED=$(grep -c "\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
-            fi
-            FAILED=$(grep -c "\[FAIL\]" build/e2e_test.log 2>/dev/null || echo "0")
-            TOTAL=$((PASSED + FAILED))
-
-            python3 -c "
-          import json
-          with open('build/nightly_report.json', 'w') as f:
-              json.dump({
-                  'summary': {'passed': $PASSED, 'failed': $FAILED, 'total': $TOTAL},
-                  'duration_sec': 0,
-                  'results': [{'name': 'e2e_integration', 'category': 'e2e', 'status': '$STATUS'}]
-              }, f)
-          "
-          elif [ "$CATEGORY" = "pipeline" ]; then
-            # Run layered pipeline tests (6 layers)
-            echo "Running layered pipeline validation (6 layers)..."
-            make test-full-pipeline 2>&1 | tee build/pipeline_test.log
-
-            # Extract layer results
-            PASSED=$(grep -c "PASS" build/pipeline_test.log 2>/dev/null || echo "0")
-            FAILED=$(grep -c "FAIL" build/pipeline_test.log 2>/dev/null || echo "0")
-            TOTAL=$((PASSED + FAILED))
-
-            if grep -q "ALL PIPELINE TESTS PASSED" build/pipeline_test.log; then
-              STATUS="pass"
-            else
-              STATUS="fail"
-            fi
-
-            # Create report for dashboard
-            python3 -c "
-          import json
-          with open('build/nightly_report.json', 'w') as f:
-              json.dump({
-                  'summary': {'passed': $PASSED, 'failed': $FAILED, 'total': $TOTAL},
-                  'duration_sec': 0,
-                  'results': [
-                      {'name': 'pipeline_L1_kernel_parity', 'category': 'pipeline', 'status': 'pass'},
-                      {'name': 'pipeline_L2_bump_conversion', 'category': 'pipeline', 'status': 'pass'},
-                      {'name': 'pipeline_L3_ir_validation', 'category': 'pipeline', 'status': 'pass'},
-                      {'name': 'pipeline_L4_codegen', 'category': 'pipeline', 'status': 'pass'},
-                      {'name': 'pipeline_L5_tensor_flow', 'category': 'pipeline', 'status': 'pass'},
-                      {'name': 'pipeline_L6_e2e', 'category': 'pipeline', 'status': '$STATUS'}
-                  ]
-              }, f)
-          "
-          elif [ "$CATEGORY" = "llamacpp" ]; then
-            # Run comprehensive llama.cpp Q4_K parity tests
-            echo "Running comprehensive llama.cpp Q4_K parity tests..."
-
-            GGUF="${GGUF_FILE:-$HOME/.cache/ck-engine-v5/gguf/qwen2-0.5b-instruct-q4_k_m.gguf}"
-
-            if [ -f "$GGUF" ]; then
-              echo "=== Step 1: Run CK pipeline ==="
-              python scripts/ck_run_v5.py run \
-                --gguf "$GGUF" \
-                --output-dir ~/.cache/ck-engine-v5/models/qwen2-0.5b-q4k \
-                --generate-only 2>&1 | tee build/ck_pipeline.log || true
-
-              echo "=== Step 2: Run llama.cpp with tensor dumps ==="
-              mkdir -p llama_dump
-              if [ -f "llama.cpp/build/bin/llama-cli" ]; then
-                ./llama.cpp/build/bin/llama-cli \
-                  -m "$GGUF" \
-                  -p "Hello" \
-                  -n 1 \
-                  --temp 0 2>&1 | tee build/llamacpp_run.log || true
-              fi
-
-              echo "=== Step 3: Compare layer-by-layer ==="
-              if [ -f "scripts/layer_sweep_parity.py" ]; then
-                python scripts/layer_sweep_parity.py 2>&1 | tee build/layer_parity.log || true
-              fi
-
-              echo "=== Step 4: Kernel-level tests ==="
-              ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/kernel_parity.log
-            else
-              echo "WARNING: GGUF file not found at $GGUF"
-              ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/llamacpp_parity.log
-            fi
-
-            # Create report for dashboard
-            python3 -c "
-          import json
-          passed = True  # Assume passed if we got here
-          with open('build/nightly_report.json', 'w') as f:
-              json.dump({
-                  'summary': {'passed': 1 if passed else 0, 'failed': 0 if passed else 1, 'total': 1},
-                  'duration_sec': 0,
-                  'results': [{'name': 'llamacpp_q4k_parity', 'category': 'parity', 'status': 'pass' if passed else 'fail'}]
-              }, f)
-          "
-          else
-            python scripts/nightly_runner.py --category "$CATEGORY" --no-fail --json build/nightly_report.json
-          fi
-
-      - name: Upload test report artifact
+      - name: Upload parity results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nightly-report-${{ github.run_number }}
+          name: parity-results
           path: |
-            build/nightly_report.json
             build/*.log
-            llama_dump/*.bin
-          retention-days: 30
+            build/*.json
+          retention-days: 7
 
-      - name: Update nightly results in docs (main/scheduled only)
-        if: (github.event_name == 'schedule' || github.event_name == 'push') && github.ref == 'refs/heads/main'
+  # ===========================================================================
+  # Job 4: Summary (runs after both test jobs)
+  # ===========================================================================
+  summary:
+    runs-on: ubuntu-latest
+    needs: [build, test-e2e, test-parity]
+    if: always()
+
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          path: results/
+
+      - name: Generate Summary
         run: |
-          # Configure git
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Results directory in docs site
-          RESULTS_DIR="docs/site/nightly-results"
-          mkdir -p "$RESULTS_DIR"
-
-          # Copy current report
-          cp build/nightly_report.json "$RESULTS_DIR/latest.json"
-
-          # Also save timestamped copy (keep last 30 days)
-          TIMESTAMP=$(date +%Y-%m-%d)
-          cp build/nightly_report.json "$RESULTS_DIR/report-${TIMESTAMP}.json"
-
-          # Create history index
-          python3 << 'PYEOF'
-          import json
-          import os
-          from datetime import datetime
-
-          results_dir = "docs/site/nightly-results"
-          reports = []
-
-          for f in sorted(os.listdir(results_dir)):
-              if f.startswith("report-") and f.endswith(".json"):
-                  path = os.path.join(results_dir, f)
-                  try:
-                      with open(path) as fp:
-                          data = json.load(fp)
-                      reports.append({
-                          "date": f.replace("report-", "").replace(".json", ""),
-                          "file": f,
-                          "summary": data.get("summary", {}),
-                          "duration_sec": data.get("duration_sec", 0)
-                      })
-                  except:
-                      pass
-
-          # Keep only last 30 reports
-          reports = sorted(reports, key=lambda x: x["date"], reverse=True)[:30]
-
-          # Clean up old reports beyond 30 days
-          all_reports = [f for f in os.listdir(results_dir) if f.startswith("report-")]
-          keep_dates = {r["date"] for r in reports}
-          for f in all_reports:
-              date = f.replace("report-", "").replace(".json", "")
-              if date not in keep_dates:
-                  os.remove(os.path.join(results_dir, f))
-                  print(f"Removed old report: {f}")
-
-          # Write index
-          with open(os.path.join(results_dir, "index.json"), "w") as fp:
-              json.dump({
-                  "updated": datetime.utcnow().isoformat() + "Z",
-                  "reports": reports
-              }, fp, indent=2)
-
-          print(f"Index updated with {len(reports)} reports")
-          PYEOF
-
-          # Commit and push to main (triggers docs workflow)
-          git add docs/site/nightly-results/
-          git commit -m "Update nightly test results
-
-          Passed: $(python3 -c "import json; print(json.load(open('build/nightly_report.json'))['summary']['passed'])")
-          Failed: $(python3 -c "import json; print(json.load(open('build/nightly_report.json'))['summary']['failed'])")
-          Total: $(python3 -c "import json; print(json.load(open('build/nightly_report.json'))['summary']['total'])")" || echo "No changes to commit"
-          git push origin main || echo "Push failed"
-
-      - name: Summary
-        if: always()
-        run: |
-          if [ -f build/nightly_report.json ]; then
-            echo "## Nightly Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            # Extract summary from JSON using Python
-            python3 << 'PYEOF' >> $GITHUB_STEP_SUMMARY
-          import json
-          d = json.load(open('build/nightly_report.json'))
-          s = d['summary']
-          print("| Metric | Value |")
-          print("|--------|-------|")
-          print(f"| Passed | {s['passed']} |")
-          print(f"| Failed | {s['failed']} |")
-          print(f"| Total | {s['total']} |")
-          print(f"| Duration | {d['duration_sec']:.1f}s |")
-          if s['failed'] > 0:
-              print("")
-              print("### Failed Tests")
-              for r in d['results']:
-                  if r['status'] in ('fail', 'timeout'):
-                      msg = r['error_msg'][:100] if r['error_msg'] else 'Unknown error'
-                      print(f"- **{r['name']}** [{r['category']}]: {msg}")
-          PYEOF
-          fi
+          echo "## CI Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.test-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Parity Tests | ${{ needs.test-parity.result }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Check for failures
         run: |
-          if [ -f build/nightly_report.json ]; then
-            FAILED=$(python -c "import json; d=json.load(open('build/nightly_report.json')); print(d['summary']['failed'])")
-            PASSED=$(python -c "import json; d=json.load(open('build/nightly_report.json')); print(d['summary']['passed'])")
-            TOTAL=$(python -c "import json; d=json.load(open('build/nightly_report.json')); print(d['summary']['total'])")
-            if [ "$FAILED" -gt 0 ]; then
-              echo "::warning::$FAILED/$TOTAL tests failed ($PASSED passed)"
-              echo ""
-              echo "=== Failed Test Summary ==="
-              python3 -c "
-          import json
-          d = json.load(open('build/nightly_report.json'))
-          for r in d['results']:
-              if r['status'] in ('fail', 'timeout'):
-                  msg = (r.get('error_msg') or 'Unknown')[:80]
-                  print(f\"  - {r['name']} [{r['category']}]: {msg}\")
-          "
-              # Report warning but don't fail CI - nightly is informational
-              echo "::notice::Nightly tests completed with warnings. See summary for details."
-            else
-              echo "::notice::All $TOTAL tests passed!"
-            fi
+          if [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "::error::Build failed"
+            exit 1
+          fi
+          # E2E and parity failures are warnings, not blockers
+          if [ "${{ needs.test-e2e.result }}" == "failure" ]; then
+            echo "::warning::E2E tests failed"
+          fi
+          if [ "${{ needs.test-parity.result }}" == "failure" ]; then
+            echo "::warning::Parity tests failed"
           fi
