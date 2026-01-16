@@ -1,0 +1,230 @@
+<!-- TITLE: GEMM Memory Layout Deep Dive -->
+<!-- NAV: concepts -->
+
+<h1>GEMM Memory Layout Deep Dive</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Understanding Weight & Activation Memory Layout</strong><br>
+        This page explains how weights, activations, and quantized data are stored in memory - critical for understanding cache behavior and debugging performance issues.
+    </div>
+</div>
+
+<h2>The Big Picture: GEMM Data Flow</h2>
+
+<div class="alert alert-success">
+    <strong>Core Operation:</strong> Y = W × X where output[M] = weights[M,K] × input[K]
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Weight Matrix W [M × K]</h3>
+        <p>Row-major order (C-style): elements in the same row are contiguous.</p>
+        <pre><code>// Row 0
+W[0,0], W[0,1], W[0,2], ..., W[0,K-1]
+// Row 1
+W[1,0], W[1,1], W[1,2], ..., W[1,K-1]
+...</code></pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Input X [K], Output Y [M]</h3>
+        <pre><code>// Input vector
+X[0], X[1], X[2], ..., X[K-1]
+
+// Output vector
+Y[0], Y[1], Y[2], ..., Y[M-1]</code></pre>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Key Insight: Inner Loop Over K</h3>
+    <p>For cache-friendly access, the inner loop should iterate over K (columns) since elements in the same row are contiguous.</p>
+    <pre><code>// OPTIMAL: Inner loop over K (cache-friendly)
+for (m = 0; m < M; m++) {
+    y[m] = 0;
+    for (k = 0; k < K; k++) {       // ← K elements are contiguous in W[m]
+        y[m] += W[m][k] * x[k];     // Sequential memory access!
+    }
+}</code></pre>
+</div>
+
+<h2>Quantized Block Layout</h2>
+
+<h3>FP32 (Full Precision)</h3>
+
+<div class="card">
+    <p>32 bits per weight = 4 bytes per element</p>
+    <pre><code>// Memory layout
+addr 0x00: [31:24] [23:16] [15:8] [7:0]   // float w[0]
+addr 0x04: [31:24] [23:16] [15:8] [7:0]   // float w[1]
+addr 0x08: [31:24] [23:16] [15:8] [7:0]   // float w[2]
+...</code></pre>
+</div>
+
+<h3>Q8_0 Format (8-bit)</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">22 bytes per 32 weights = 5.5 bits/weight</h3>
+    <pre><code>struct block_q8_0 {
+    ggml_fp16_t d;      // Offset 0-1: 2 bytes FP16 scale
+    int8_t qs[32];      // Offset 2-33: 32 int8 weights
+};  // Total: 34 bytes
+
+// Memory layout
+0x00: d_low, d_high
+0x02: qs[0], qs[1], qs[2], ..., qs[31]
+...</code></pre>
+</div>
+
+<h3>Q5_0 Format (5-bit)</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">22 bytes per 32 weights = 5.5 bits/weight</h3>
+    <pre><code>struct block_q5_0 {
+    ggml_fp16_t d;      // Offset 0-1: 2 bytes FP16 scale
+    uint32_t qh[4];     // Offset 2-5: 32 high bits (1 per weight)
+    uint8_t qs[16];     // Offset 6-21: packed nibbles (2 per byte)
+};  // Total: 22 bytes
+
+// How Q5_0 weight is reconstructed:
+// Weight 0: (qs[0] & 0x0F) | (qh bit 0 << 4)
+// Weight 16: (qs[0] >> 4) | (qh bit 16 << 4)</code></pre>
+</div>
+
+<h3>Q4_K Format (4-bit K-quant)</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">144 bytes per 256 weights = 4.5 bits/weight</h3>
+    <pre><code>// Q4_K super-block structure (256 weights)
+struct block_q4_K {
+    ggml_fp16_t d1;      // Sub-block 0 scale (2 bytes)
+    ggml_fp16_t d2;      // Sub-block 1 scale (2 bytes)
+    uint8_t mins[1];     // Min values (1 byte)
+    uint8_t scales[16];  // 16 sub-block scales
+    uint8_t qs[128];     // 128 bytes of packed 4-bit weights
+};  // Total: 144 bytes</code></pre>
+</div>
+
+<h2>Multi-Dimensional Tensor Layout</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Activation Tensor: [Batch, Sequence, Hidden]</h3>
+    <p>For BERT-like model: batch=2, seq_len=512, hidden=768</p>
+    <pre><code>// Stride calculation
+stride_H = 1                    // Elements are contiguous
+stride_S = 768                  // Next sequence position = 768
+stride_B = 393216               // 512 * 768 = next batch
+
+// Address of tensor[b, s, h]:
+addr = base + b * 393216 + s * 768 + h * 1</code></pre>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Memory Layout Matters!</strong><br>
+        Hidden dimension varies fastest (stride=1) in C-style row-major order. This is why transformers store activations as [batch, seq, hidden] - not [hidden, seq, batch].
+    </div>
+</div>
+
+<h2>Cache Blocking (Tiling) for Performance</h2>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #e74c3c;">
+        <h3 style="margin-top: 0; color: #e74c3c;">Without Blocking</h3>
+        <p>Every access to W triggers DRAM fetch!</p>
+        <p><strong>Result:</strong> ~10 GB/s memory bandwidth</p>
+    </div>
+    <div class="card card-green" style="border-left: 4px solid #27ae60;">
+        <h3 style="margin-top: 0; color: #27ae60;">With Blocking (32×32)</h3>
+        <p>Data reused from L1/L2 cache!</p>
+        <p><strong>Result:</strong> ~100 GB/s effective bandwidth</p>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Blocked GEMM Pseudocode</h3>
+    <pre><code>// Cache-blocked GEMM
+for (m_tile = 0; m_tile < M; m_tile += MB) {
+    for (k_tile = 0; k_tile < K; k_tile += KB) {
+        for (n_tile = 0; n_tile < N; n_tile += NB) {
+
+            // Load blocks into cache
+            load_block_A(W[m_tile:m_tile+MB, k_tile:k_tile+KB]);  // MB×KB
+            load_block_B(X[k_tile:k_tile+KB, n_tile:n_tile+NB]);  // KB×NB
+
+            // Compute with cached data (reuse!)
+            for (i = 0; i < MB; i++) {
+                for (j = 0; j < NB; j++) {
+                    C[m_tile+i, n_tile+j] += dot(A[i, :], B[:, j]);
+                }
+            }
+        }
+    }
+}</code></pre>
+</div>
+
+<h2>KV Cache: Sliding Window in Memory</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">KV Cache Structure</h3>
+    <p>For context length 4096, n_heads=32, head_dim=128:</p>
+    <pre><code>// Key Cache: [B, n_heads, seq, head_dim]
+// Value Cache: [B, n_heads, seq, head_dim]
+
+// Stride per seq: 128 × 4 bytes = 512 bytes
+// Total K+V cache: 2 × 4096 × 32 × 128 × 4B ≈ 128 MB</code></pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">During Prefill</h3>
+        <p>Full sequence, compute all attention scores</p>
+        <pre><code>Q × K_all → Attention Scores</code></pre>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">During Decode</h3>
+        <p>New Q, existing K (sliding window)</p>
+        <pre><code>Q_new × K_existing → New Token</code></pre>
+    </div>
+</div>
+
+<h2>Summary</h2>
+
+<table>
+    <tr>
+        <th>Concept</th>
+        <th>Key Point</th>
+        <th>Performance Impact</th>
+    </tr>
+    <tr>
+        <td>Row-Major Order</td>
+        <td>Same-row elements are contiguous</td>
+        <td>Inner loop over K for cache locality</td>
+    </tr>
+    <tr>
+        <td>Quantization</td>
+        <td>Q8_0 = 34B/32w, Q5_0 = 22B/32w</td>
+        <td>4-8x memory savings vs FP32</td>
+    </tr>
+    <tr>
+        <td>Tensor Strides</td>
+        <td>Hidden varies fastest (stride=1)</td>
+        <td>Proper indexing avoids cache misses</td>
+    </tr>
+    <tr>
+        <td>Cache Blocking</td>
+        <td>Process 32×32 tiles for L1 reuse</td>
+        <td>10x bandwidth improvement</td>
+    </tr>
+    <tr>
+        <td>KV Cache</td>
+        <td>Sequential write, random-ish read</td>
+        <td>Critical for decode throughput</td>
+    </tr>
+</table>

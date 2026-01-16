@@ -1,0 +1,613 @@
+<!-- TITLE: Test Report -->
+<div class="container">
+  <h1>Test Report</h1>
+  <p class="lead">
+    Automated test results from nightly CI runs. Updated daily at 2am UTC.
+  </p>
+
+  <style>
+    .status-badge {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+    .status-pass { background: #48bb78; color: white; }
+    .status-fail { background: #f56565; color: white; }
+    .status-loading { background: #a0aec0; color: white; }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    .summary-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+    .summary-card .label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .summary-card.passed .value { color: #48bb78; }
+    .summary-card.failed .value { color: #f56565; }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    .results-table th, .results-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--grey);
+    }
+    .results-table th {
+      background: var(--dark-lighter);
+      font-weight: 600;
+    }
+    .results-table tr:hover {
+      background: var(--dark-card);
+    }
+
+    .test-pass { color: #48bb78; }
+    .test-fail { color: #f56565; }
+    .test-skip { color: #a0aec0; }
+    .test-timeout { color: #ed8936; }
+
+    .category-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: var(--grey);
+      color: var(--text-secondary);
+    }
+
+    .history-chart {
+      margin: 2rem 0;
+      padding: 1rem 1rem 1.5rem 1rem;
+      background: var(--dark-card);
+      border-radius: 8px;
+    }
+    .history-bar {
+      display: flex;
+      gap: 2px;
+      height: 70px;
+      align-items: flex-end;
+    }
+    .history-day {
+      flex: 1;
+      min-width: 20px;
+      border-radius: 2px 2px 0 0;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .history-day:hover {
+      opacity: 0.8;
+    }
+    .history-day.all-pass { background: #48bb78; }
+    .history-day.has-fail { background: #f56565; }
+    .history-day.no-data { background: var(--grey); }
+
+    /* Legend */
+    .history-legend {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    .legend-dot.pass { background: #48bb78; }
+    .legend-dot.fail { background: #f56565; }
+    .legend-dot.nodata { background: var(--grey); }
+
+    /* Date labels */
+    .history-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+      padding: 0 2px;
+      height: 50px;
+    }
+    .history-label {
+      font-size: 0.7rem;
+      color: #888;
+      transform: rotate(-45deg);
+      transform-origin: left top;
+      white-space: nowrap;
+      position: relative;
+      top: 12px;
+    }
+    .history-labels span {
+      text-align: left;
+    }
+
+    .error-msg {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #loading-state, #error-state, #results-content {
+      display: none;
+    }
+    #loading-state.active, #error-state.active, #results-content.active {
+      display: block;
+    }
+
+    .refresh-btn {
+      background: #4299e1;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .refresh-btn:hover {
+      background: #3182ce;
+    }
+
+    .updated-time {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+  </style>
+
+  <div id="loading-state" class="active">
+    <p><span class="status-badge status-loading">Loading...</span></p>
+    <p>Fetching latest test results...</p>
+  </div>
+
+  <div id="error-state">
+    <p><span class="status-badge status-fail">Error</span></p>
+    <p id="error-message">Failed to load test results.</p>
+    <button class="refresh-btn" onclick="loadResults()">Retry</button>
+  </div>
+
+  <div id="results-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div>
+        <span id="overall-status" class="status-badge status-pass">ALL PASS</span>
+        <span id="updated-time" class="updated-time"></span>
+      </div>
+      <button class="refresh-btn" onclick="loadResults()">Refresh</button>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card passed">
+        <div class="value" id="passed-count">0</div>
+        <div class="label">Passed</div>
+      </div>
+      <div class="summary-card failed">
+        <div class="value" id="failed-count">0</div>
+        <div class="label">Failed</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="total-count">0</div>
+        <div class="label">Total</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="duration">0s</div>
+        <div class="label">Duration</div>
+      </div>
+    </div>
+
+    <h2>30-Day History</h2>
+    <div class="history-chart">
+      <div class="history-bar" id="history-bar"></div>
+      <div class="history-labels" id="history-labels"></div>
+      <div class="history-legend">
+        <div class="legend-item">
+          <span class="legend-dot pass"></span>
+          <span>All passed</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot fail"></span>
+          <span>Some failed</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot nodata"></span>
+          <span>No data</span>
+        </div>
+      </div>
+    </div>
+
+    <h2>Test Details</h2>
+    <p class="sub-test-summary">
+      <span id="sub-tests-passed">0</span> kernel tests passed,
+      <span id="sub-tests-failed">0</span> failed
+      (click rows to expand)
+    </p>
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th style="width: 40px;"></th>
+          <th>Status</th>
+          <th>Test</th>
+          <th>Category</th>
+          <th>Kernels</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody id="results-tbody">
+      </tbody>
+    </table>
+  </div>
+
+  <style>
+    .sub-test-summary {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .sub-test-summary span {
+      font-weight: bold;
+    }
+    #sub-tests-passed { color: #48bb78; }
+    #sub-tests-failed { color: #f56565; }
+
+    .expandable-row {
+      cursor: pointer;
+    }
+    .expandable-row:hover {
+      background: var(--grey) !important;
+    }
+    .expand-icon {
+      display: inline-block;
+      transition: transform 0.2s;
+      color: var(--text-muted);
+    }
+    .expanded .expand-icon {
+      transform: rotate(90deg);
+    }
+
+    .sub-tests-row {
+      display: none;
+    }
+    .sub-tests-row.visible {
+      display: table-row;
+    }
+    .sub-tests-row td {
+      padding: 0;
+      background: var(--dark-lighter);
+    }
+    .sub-tests-container {
+      padding: 0.5rem 1rem 0.5rem 3rem;
+    }
+    .sub-tests-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.5rem;
+    }
+    .sub-test-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      background: var(--dark-card);
+      border-radius: 4px;
+      border: 1px solid var(--grey);
+      font-size: 0.85rem;
+    }
+    .sub-test-item.pass {
+      border-left: 3px solid #48bb78;
+    }
+    .sub-test-item.fail {
+      border-left: 3px solid #f56565;
+    }
+    .sub-test-name {
+      flex: 1;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .sub-test-metrics {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .sub-test-diff {
+      font-family: monospace;
+    }
+    .sub-test-speedup {
+      font-weight: 600;
+    }
+    .sub-test-speedup.fast { color: #48bb78; }
+    .sub-test-speedup.slow { color: #ed8936; }
+
+    .kernel-count {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .kernel-count .passed { color: #48bb78; }
+    .kernel-count .failed { color: #f56565; }
+  </style>
+
+  <hr>
+
+  <h2>About Nightly Tests</h2>
+  <p>
+    The nightly test suite runs automatically at 2am UTC every day. It includes:
+  </p>
+  <ul>
+    <li><strong>E2E Integration Tests</strong>: Full pipeline validation (kernel compile → IR codegen → inference)
+      <ul style="margin-top: 0.5rem; color: var(--text-muted);">
+        <li>Kernel compilation (all SIMD variants)</li>
+        <li>IR codegen validation (generates compilable C code)</li>
+        <li>Parallel decode codegen (OpenMP pragmas for v6.6)</li>
+        <li>Inference verification (prompts model, validates coherent response)</li>
+      </ul>
+    </li>
+    <li><strong>Kernel Unit Tests</strong>: Individual kernel parity with PyTorch</li>
+    <li><strong>BF16 Tests</strong>: BFloat16 precision tests (when CPU supports it)</li>
+    <li><strong>Quantization Tests</strong>: Q4_K, Q6_K quantized kernel tests</li>
+    <li><strong>Integration Tests</strong>: Full layer and model parity</li>
+  </ul>
+
+  <div class="alert alert-info" style="margin-top: 1rem;">
+    <span class="alert-icon">💡</span>
+    <div>
+      <strong>Run locally:</strong> <code>make e2e</code> runs the full E2E integration test suite.
+      <br>
+      <span style="color: var(--text-muted);">Tests: Qwen2-0.5B or SmolLM2-360M with actual prompt/response verification.</span>
+    </div>
+  </div>
+
+  <p>
+    View the <a href="https://github.com/antshiv/C-Kernel-Engine/actions/workflows/nightly.yml">GitHub Actions workflow</a>
+    for detailed logs.
+  </p>
+</div>
+
+<script>
+const RESULTS_URL = './nightly-results/latest.json';
+const INDEX_URL = './nightly-results/index.json';
+
+function loadResults() {
+  document.getElementById('loading-state').classList.add('active');
+  document.getElementById('error-state').classList.remove('active');
+  document.getElementById('results-content').classList.remove('active');
+
+  Promise.all([
+    fetch(RESULTS_URL).then(r => r.ok ? r.json() : Promise.reject('No latest results')),
+    fetch(INDEX_URL).then(r => r.ok ? r.json() : { reports: [] }).catch(() => ({ reports: [] }))
+  ])
+  .then(([latest, index]) => {
+    renderResults(latest);
+    renderHistory(index.reports);
+    document.getElementById('loading-state').classList.remove('active');
+    document.getElementById('results-content').classList.add('active');
+  })
+  .catch(err => {
+    console.error('Fetch error:', err);
+    document.getElementById('loading-state').classList.remove('active');
+    document.getElementById('error-state').classList.add('active');
+    document.getElementById('error-message').textContent = 'Failed to load: ' + (err.message || err);
+  });
+}
+
+function renderResults(data) {
+  const summary = data.summary || {};
+  const passed = summary.passed || 0;
+  const failed = summary.failed || 0;
+  const total = summary.total || 0;
+  const duration = data.duration_sec || 0;
+
+  document.getElementById('passed-count').textContent = passed;
+  document.getElementById('failed-count').textContent = failed;
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('duration').textContent = duration.toFixed(1) + 's';
+
+  // Sub-test summary
+  const subPassed = summary.sub_tests_passed || 0;
+  const subFailed = summary.sub_tests_failed || 0;
+  document.getElementById('sub-tests-passed').textContent = subPassed;
+  document.getElementById('sub-tests-failed').textContent = subFailed;
+
+  const statusEl = document.getElementById('overall-status');
+  if (failed > 0) {
+    statusEl.textContent = failed + ' FAILED';
+    statusEl.className = 'status-badge status-fail';
+  } else {
+    statusEl.textContent = 'ALL PASS';
+    statusEl.className = 'status-badge status-pass';
+  }
+
+  if (data.timestamp) {
+    const date = new Date(data.timestamp);
+    document.getElementById('updated-time').textContent = ' Updated: ' + date.toLocaleString();
+  }
+
+  // Render results table
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = '';
+
+  const results = data.results || [];
+  results.sort((a, b) => {
+    // Failed first, then by name
+    if (a.status !== b.status) {
+      if (a.status === 'fail' || a.status === 'timeout') return -1;
+      if (b.status === 'fail' || b.status === 'timeout') return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  results.forEach((result, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = 'expandable-row';
+    tr.dataset.idx = idx;
+
+    let statusIcon, statusClass;
+    switch (result.status) {
+      case 'pass': statusIcon = '✓'; statusClass = 'test-pass'; break;
+      case 'fail': statusIcon = '✗'; statusClass = 'test-fail'; break;
+      case 'skip': statusIcon = '○'; statusClass = 'test-skip'; break;
+      case 'timeout': statusIcon = '⏱'; statusClass = 'test-timeout'; break;
+      default: statusIcon = '?'; statusClass = ''; break;
+    }
+
+    const subTests = result.sub_tests || [];
+    const subPassed = subTests.filter(s => s.status === 'pass').length;
+    const subFailed = subTests.filter(s => s.status === 'fail').length;
+    const kernelCount = subTests.length > 0
+      ? `<span class="kernel-count"><span class="passed">${subPassed}✓</span>${subFailed > 0 ? ` <span class="failed">${subFailed}✗</span>` : ''}</span>`
+      : '-';
+
+    tr.innerHTML = `
+      <td><span class="expand-icon">▶</span></td>
+      <td><span class="${statusClass}" style="font-size: 1.2rem;">${statusIcon}</span></td>
+      <td><code>${result.name}</code></td>
+      <td><span class="category-badge">${result.category || 'general'}</span></td>
+      <td>${kernelCount}</td>
+      <td>${result.duration_sec ? result.duration_sec.toFixed(2) + 's' : '-'}</td>
+    `;
+
+    // Click handler to expand/collapse
+    tr.addEventListener('click', () => toggleSubTests(tr, idx));
+    tbody.appendChild(tr);
+
+    // Create sub-tests row (hidden by default)
+    if (subTests.length > 0) {
+      const subTr = document.createElement('tr');
+      subTr.className = 'sub-tests-row';
+      subTr.id = 'sub-tests-' + idx;
+      subTr.innerHTML = `
+        <td colspan="6">
+          <div class="sub-tests-container">
+            <div class="sub-tests-grid">
+              ${subTests.map(st => renderSubTest(st)).join('')}
+            </div>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(subTr);
+    }
+  });
+}
+
+function renderSubTest(st) {
+  const statusClass = st.status === 'pass' ? 'pass' : 'fail';
+  const statusIcon = st.status === 'pass' ? '✓' : '✗';
+
+  let metrics = '';
+  if (st.max_diff !== null && st.max_diff !== undefined) {
+    metrics += `<span class="sub-test-diff">diff: ${st.max_diff.toExponential(2)}</span>`;
+  }
+  if (st.speedup !== null && st.speedup !== undefined) {
+    const speedClass = st.speedup >= 1 ? 'fast' : 'slow';
+    metrics += `<span class="sub-test-speedup ${speedClass}">${st.speedup.toFixed(2)}x</span>`;
+  }
+
+  return `
+    <div class="sub-test-item ${statusClass}">
+      <span class="${statusClass === 'pass' ? 'test-pass' : 'test-fail'}">${statusIcon}</span>
+      <span class="sub-test-name">${st.name}</span>
+      <span class="sub-test-metrics">${metrics}</span>
+    </div>
+  `;
+}
+
+function toggleSubTests(row, idx) {
+  const subRow = document.getElementById('sub-tests-' + idx);
+  if (!subRow) return;
+
+  row.classList.toggle('expanded');
+  subRow.classList.toggle('visible');
+}
+
+function renderHistory(reports) {
+  const bar = document.getElementById('history-bar');
+  const labelsContainer = document.getElementById('history-labels');
+  bar.innerHTML = '';
+  labelsContainer.innerHTML = '';
+
+  // Create 30 days of data
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    const report = reports.find(r => r.date === dateStr);
+    days.push({
+      date: date,
+      dateStr: dateStr,
+      report: report
+    });
+  }
+
+  // Create label positions (every 5 days and at the end)
+  const labelPositions = [0, 4, 9, 14, 19, 24, 29];
+
+  days.forEach((day, idx) => {
+    const div = document.createElement('div');
+    div.className = 'history-day';
+
+    if (day.report) {
+      const summary = day.report.summary || {};
+      const passed = summary.passed || 0;
+      const failed = summary.failed || 0;
+      const total = summary.total || 1;
+
+      div.style.height = Math.max(10, (passed / total) * 100) + '%';
+
+      if (failed > 0) {
+        div.classList.add('has-fail');
+        div.title = `${day.dateStr}: ${failed} failed / ${total} total`;
+      } else {
+        div.classList.add('all-pass');
+        div.title = `${day.dateStr}: ${passed} passed`;
+      }
+    } else {
+      div.classList.add('no-data');
+      div.style.height = '10%';
+      div.title = `${day.dateStr}: No data`;
+    }
+
+    bar.appendChild(div);
+
+    // Add date label every 5 days
+    if (labelPositions.includes(idx)) {
+      const label = document.createElement('span');
+      label.className = 'history-label';
+      // Format: "Jan 2"
+      const month = day.date.toLocaleString('en-US', { month: 'short' });
+      const dayNum = day.date.getDate();
+      label.textContent = `${month} ${dayNum}`;
+      labelsContainer.appendChild(label);
+    } else {
+      // Add spacer for alignment
+      const spacer = document.createElement('span');
+      spacer.style.width = `${100/30}%`;
+      labelsContainer.appendChild(spacer);
+    }
+  });
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadResults);
+</script>

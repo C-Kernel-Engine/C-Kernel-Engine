@@ -1,0 +1,565 @@
+<!-- TITLE: Developer Guide -->
+<!-- NAV: developer-guide -->
+
+<h1>Developer Guide</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Complete Walkthrough</strong><br>
+        This guide explains how C-Kernel-Engine works from config.json to running inference, with deep dives into code generation, memory allocation, and profiling.
+    </div>
+</div>
+
+<nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+        <li><a href="#overview">Overview: The Big Picture</a></li>
+        <li><a href="#config-to-code">Step 1: Config to Code Generation</a></li>
+        <li><a href="#memory-layout">Step 2: Memory Layout & Bump Allocator</a></li>
+        <li><a href="#kernel-execution">Step 3: Kernel Execution</a></li>
+        <li><a href="#backward-pass">Step 4: Backward Pass & Training</a></li>
+        <li><a href="#testing-workflow">Testing Workflow</a></li>
+        <li><a href="#profiling-workflow">Profiling Workflow</a></li>
+        <li><a href="#adding-kernels">Adding New Kernels</a></li>
+    </ul>
+</nav>
+
+<h2 id="overview">Overview: The Big Picture</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Complete Pipeline</h3>
+    <pre>
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  config.json    │────▶│   IR Graph      │────▶│  generated.c    │
+│  (model params) │     │  (compute DAG)  │     │  (C runtime)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Output logits  │◀────│  Kernel Exec    │◀────│  GCC compile    │
+│  (inference)    │     │  (forward pass) │     │  (native binary)│
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">What Makes This Different</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Traditional ML Framework</th><th>C-Kernel-Engine</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Runtime graph interpretation</td>
+                <td>Compile-time code generation</td>
+            </tr>
+            <tr>
+                <td>Dynamic memory allocation</td>
+                <td>Single bump allocation at startup</td>
+            </tr>
+            <tr>
+                <td>Python/C++ dispatch overhead</td>
+                <td>Pure C, direct kernel calls</td>
+            </tr>
+            <tr>
+                <td>Generic kernels</td>
+                <td>Model-specific generated code</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2 id="config-to-code">Step 1: Config to Code Generation</h2>
+
+<h3>1.1 The Config File</h3>
+
+<div class="card">
+    <p>A standard HuggingFace-style config defines the model:</p>
+    <pre>{
+  "hidden_size": 64,
+  "num_attention_heads": 2,
+  "num_key_value_heads": 2,
+  "num_hidden_layers": 2,
+  "intermediate_size": 128,
+  "vocab_size": 256,
+  "max_position_embeddings": 64,
+  "rms_norm_eps": 1e-5,
+  "rope_theta": 10000.0
+}</pre>
+</div>
+
+<h3>1.2 IR Generation</h3>
+
+<div class="card">
+    <p>The codegen tool (<code>build/ck_ir_demo</code>) parses the config and builds an IR graph:</p>
+    <pre>$ make ck
+=== Forward IR ===
+CKIRGraph: layers=2, hidden_size=64, intermediate_size=128
+  L0 N0  EMBED_TOKENS  outputs=[embedded]      inputs=[tokens]
+  L0 N1  RMSNORM       outputs=[norm1]         inputs=[embedded]
+  L0 N2  LINEAR_QKV    outputs=[qkv]           inputs=[norm1]
+  L0 N3  ROPE          outputs=[qkv_rope]      inputs=[qkv]
+  L0 N4  ATTENTION     outputs=[attn_out]      inputs=[qkv_rope]
+  L0 N5  LINEAR_O      outputs=[proj]          inputs=[attn_out]
+  L0 N6  RESIDUAL_ADD  outputs=[res1]          inputs=[embedded,proj]
+  L0 N7  RMSNORM       outputs=[norm2]         inputs=[res1]
+  L0 N8  MLP_SWIGLU    outputs=[mlp]           inputs=[norm2]
+  L0 N9  RESIDUAL_ADD  outputs=[L0_out]        inputs=[res1,mlp]
+  ...</pre>
+    <p>Each node maps to a tested C kernel function.</p>
+</div>
+
+<h3>1.3 Code Emission</h3>
+
+<div class="card">
+    <p>The IR is lowered to C code with all sizes baked in:</p>
+    <pre>$ make emit CONFIG=tiny.config.json OUT=build/tiny_generated.c
+
+// Generated code snippet (simplified):
+void run_decoder_forward(TransformerModel *m) {
+    float *input = ptr_f32(m->memory_base, m->embedded_input_offset);
+    float *norm1 = ptr_f32(m->memory_base, m->layer[0].norm1_offset);
+
+    // Layer 0: Attention block
+    rmsnorm_forward(norm1, input, m->layer[0].attn_norm_weight,
+                    64, 64, 1e-5f);  // All sizes known at codegen!
+
+    attention_forward_causal_head_major_gqa(
+        attn_out, norm1, qkv, ...
+        64, 64, 2, 2, 32, 64);  // T, D, heads, kv_heads, head_dim, ctx
+    ...
+}</pre>
+</div>
+
+<h3>1.4 The Kernel Manifest</h3>
+
+<div class="card">
+    <p>Along with the C file, a <code>.kernels</code> manifest is generated:</p>
+    <pre>$ cat build/tiny_generated.c.kernels
+src/kernels/rmsnorm_kernels.c
+src/kernels/attention_kernels.c
+src/kernels/softmax_kernels.c
+src/kernels/gemm_kernels.c
+src/kernels/rope_kernels.c
+src/kernels/swiglu_kernels.c
+src/kernels/embedding_kernels.c
+src/kernels/loss_kernels.c</pre>
+    <p>This tells GCC which kernel source files to compile:</p>
+    <pre>gcc -O3 build/tiny_generated.c $(cat build/tiny_generated.c.kernels) -o build/tiny_model</pre>
+</div>
+
+<h2 id="memory-layout">Step 2: Memory Layout & Bump Allocator</h2>
+
+<h3>2.1 The Bump Allocator Philosophy</h3>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">One Allocation, Zero Fragmentation</h3>
+    <p>Instead of thousands of malloc/free calls, we:</p>
+    <ol>
+        <li><strong>Compute total size at codegen time</strong> - All buffer sizes known from config</li>
+        <li><strong>Allocate once at startup</strong> - Single <code>mmap</code> or <code>aligned_alloc</code></li>
+        <li><strong>Use offsets, not pointers</strong> - Each buffer is <code>base + offset</code></li>
+        <li><strong>Free once at exit</strong> - No leaks possible</li>
+    </ol>
+</div>
+
+<h3>2.2 Memory Layout Visualization</h3>
+
+<div class="card">
+    <pre>
+┌──────────────────────────────────────────────────────────────────┐
+│                        2MB Bump Buffer                           │
+├──────────────┬──────────────┬──────────────┬────────────────────┤
+│  Embeddings  │   Weights    │ Activations  │    Gradients       │
+│   (static)   │   (static)   │  (reused)    │   (if training)    │
+├──────────────┼──────────────┼──────────────┼────────────────────┤
+│ offset: 0    │ offset: 64K  │ offset: 512K │ offset: 1M         │
+└──────────────┴──────────────┴──────────────┴────────────────────┘
+
+// Accessing a buffer:
+float *attn_output = (float*)(model.memory_base + model.attn_output_offset);
+    </pre>
+</div>
+
+<h3>2.3 Huge Page Optimization</h3>
+
+<div class="card">
+    <p>The allocator tries to use 2MB huge pages for better TLB performance:</p>
+    <pre>void *ck_huge_alloc(size_t bytes) {
+    size_t len = align_up(bytes, 2MB);
+
+    // 1. Try explicit huge pages (best)
+    void *p = mmap(NULL, len, PROT_READ|PROT_WRITE,
+                   MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0);
+    if (p != MAP_FAILED) return p;
+
+    // 2. Fallback: aligned_alloc + THP hint
+    void *q = aligned_alloc(2MB, len);
+    madvise(q, len, MADV_HUGEPAGE);  // Ask kernel for transparent huge pages
+    return q;
+}</pre>
+    <p><strong>Why huge pages?</strong> A 540MB model needs 138,240 TLB entries with 4KB pages, but only 270 with 2MB pages.</p>
+</div>
+
+<h3>2.4 Viewing the Layout</h3>
+
+<div class="card">
+    <pre>$ make tiny-train TINY_TRAIN_ARGS="--dump"
+
+=== Memory Layout ===
+Total bytes: 2097152 (2.00 MB)
+  embedded_input_offset:     0 (16384 bytes)
+  embed_tokens_weight:   16384 (65536 bytes)
+  layer[0].attn_norm:    81920 (256 bytes)
+  layer[0].qkv_weight:   82176 (24576 bytes)
+  ...
+  logits_offset:       1048576 (65536 bytes)
+  gradients_offset:    1114112 (524288 bytes)</pre>
+</div>
+
+<h2 id="kernel-execution">Step 3: Kernel Execution</h2>
+
+<h3>3.1 Kernel Registry</h3>
+
+<div class="card">
+    <p>Each kernel is registered with its forward and backward functions:</p>
+    <pre>// src/ckernel_kernel_specs.c
+const CKKernelSpec ck_kernel_specs[] = {
+    {
+        .name = "rmsnorm",
+        .forward_fn = "rmsnorm_forward",
+        .backward_fn = "rmsnorm_backward",
+        .source_files = {"src/kernels/rmsnorm_kernels.c", NULL}
+    },
+    {
+        .name = "attention",
+        .forward_fn = "attention_forward_causal_head_major_gqa",
+        .backward_fn = "attention_backward_causal_head_major_gqa",
+        .source_files = {"src/kernels/attention_kernels.c",
+                         "src/kernels/softmax_kernels.c", NULL}
+    },
+    ...
+};</pre>
+</div>
+
+<h3>3.2 Forward Pass Flow</h3>
+
+<div class="card">
+    <pre>void run_model_forward(TransformerModel *m) {
+    // 1. Token embedding lookup
+    embed_tokens(m, tokens, seq_len);
+
+    // 2. Process each layer
+    for (int layer = 0; layer < m->num_layers; layer++) {
+        // Attention block
+        rmsnorm_forward(norm1, input, weights, D, T, eps);
+        linear_forward(qkv, norm1, qkv_weight, T, D, 3*D);
+        rope_forward(qkv, qkv, T, head_dim, theta);
+        attention_forward_causal(attn_out, qkv, T, D, heads, kv_heads);
+        linear_forward(proj, attn_out, o_weight, T, D, D);
+        residual_add(res1, input, proj, T * D);
+
+        // MLP block
+        rmsnorm_forward(norm2, res1, weights, D, T, eps);
+        mlp_swiglu_forward(mlp_out, norm2, gate, up, down, T, D, I);
+        residual_add(output, res1, mlp_out, T * D);
+
+        input = output;  // Next layer's input
+    }
+
+    // 3. Final norm + LM head
+    rmsnorm_forward(final_norm, input, weights, D, T, eps);
+    lm_head_forward(logits, final_norm, lm_weight, T, D, V);
+}</pre>
+</div>
+
+<h3>3.3 Example Kernel: RMSNorm</h3>
+
+<div class="card">
+    <pre>// src/kernels/rmsnorm_kernels.c
+void rmsnorm_forward(float *out, const float *x, const float *weight,
+                     int D, int T, float eps) {
+    for (int t = 0; t < T; t++) {
+        const float *row = x + t * D;
+        float *out_row = out + t * D;
+
+        // Compute RMS
+        float sum_sq = 0.0f;
+        for (int d = 0; d < D; d++) {
+            sum_sq += row[d] * row[d];
+        }
+        float rms = sqrtf(sum_sq / D + eps);
+        float scale = 1.0f / rms;
+
+        // Normalize and scale
+        for (int d = 0; d < D; d++) {
+            out_row[d] = row[d] * scale * weight[d];
+        }
+    }
+}</pre>
+</div>
+
+<h2 id="backward-pass">Step 4: Backward Pass & Training</h2>
+
+<h3>4.1 Gradient Computation</h3>
+
+<div class="card">
+    <p>Every forward kernel has a corresponding backward kernel:</p>
+    <pre>// Forward: y = rmsnorm(x, weight)
+rmsnorm_forward(y, x, weight, D, T, eps);
+
+// Backward: given dy, compute dx and dweight
+rmsnorm_backward(dx, dweight, dy, x, weight, D, T, eps);</pre>
+</div>
+
+<h3>4.2 Training Loop</h3>
+
+<div class="card">
+    <pre>for (int step = 0; step < num_steps; step++) {
+    // 1. Forward pass
+    embed_tokens(&m, tokens, T);
+    run_model_forward(&m);
+
+    // 2. Compute loss
+    float loss;
+    softmax_cross_entropy_forward(logits, targets, T, V, &loss);
+
+    // 3. Backward pass (reverse order)
+    softmax_cross_entropy_backward(d_logits, logits, targets, T, V);
+    run_model_backward(&m, d_logits);
+
+    // 4. SGD update
+    for (int i = 0; i < num_params; i++) {
+        weights[i] -= learning_rate * gradients[i];
+    }
+
+    printf("Step %d: loss=%.4f\n", step, loss);
+}</pre>
+</div>
+
+<h3>4.3 Training Parity Test</h3>
+
+<div class="card card-green">
+    <pre>$ make tiny-parity
+
+# Runs identical training in C and PyTorch, compares:
+# - Forward outputs (logits)
+# - Loss values
+# - All gradients
+# - Updated weights after SGD
+
+Step 0: C=10.234567 PyTorch=10.234568 diff=1e-06 ✓
+Step 1: C=9.876543  PyTorch=9.876544  diff=1e-06 ✓
+...
+Max weight diff: 1.2e-05
+PASS: Training parity verified!</pre>
+</div>
+
+<h2 id="testing-workflow">Testing Workflow</h2>
+
+<h3>5.1 Test Hierarchy</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Level</th><th>Command</th><th>What It Tests</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Kernel Unit</td>
+                <td><code>make test</code></td>
+                <td>Each kernel vs PyTorch (GELU, RMSNorm, Attention...)</td>
+            </tr>
+            <tr>
+                <td>Layer Parity</td>
+                <td><code>make layer-parity</code></td>
+                <td>Full decoder layer forward vs PyTorch</td>
+            </tr>
+            <tr>
+                <td>E2E Parity</td>
+                <td><code>make tiny-parity</code></td>
+                <td>Full model training vs PyTorch</td>
+            </tr>
+            <tr>
+                <td>Comprehensive</td>
+                <td><code>make test-quick</code></td>
+                <td>Multiple configs: tiny, GQA, no-RoPE, single-layer</td>
+            </tr>
+            <tr>
+                <td>Stress</td>
+                <td><code>make test-stress</code></td>
+                <td>Convergence tests, 500-step overfit</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>5.2 Running Individual Kernel Tests</h3>
+
+<div class="card">
+    <pre># Build kernel libs
+make test-libs
+
+# Run specific test
+python3 unittest/test_attention.py
+python3 unittest/test_rmsnorm.py
+python3 unittest/test_cross_entropy.py
+
+# Run with custom parameters
+python3 unittest/test_attention.py --tokens 1024 --heads 8 --kv-heads 2</pre>
+</div>
+
+<h3>5.3 Test Output Interpretation</h3>
+
+<div class="card">
+    <pre>$ python3 unittest/test_attention.py
+
+Testing attention forward (T=64, D=64, heads=2, kv_heads=2)...
+  PyTorch output shape: (64, 64)
+  C output shape: (64, 64)
+  Max diff: 2.3e-06
+  Mean diff: 1.1e-07
+  OK (tolerance: 1e-04)
+
+Testing attention backward...
+  dQ max diff: 3.1e-06
+  dK max diff: 2.8e-06
+  dV max diff: 2.5e-06
+  OK</pre>
+</div>
+
+<h2 id="profiling-workflow">Profiling Workflow</h2>
+
+<h3>6.1 Memory Profiling (Valgrind)</h3>
+
+<div class="card">
+    <pre>$ make profile-memory
+
+==537520== HEAP SUMMARY:
+==537520==   total heap usage: 11 allocs, 10 frees, 2,144,864 bytes allocated
+
+==537520== LEAK SUMMARY:
+==537520==    definitely lost: 0 bytes in 0 blocks  ← Clean!
+==537520==         suppressed: 8 bytes in 1 blocks  ← OpenMP internal
+
+<strong>What this tells us:</strong>
+- 11 allocations total (minimal!)
+- 10 frees (the 1 remaining is OpenMP's internal state)
+- 2MB allocated = our bump buffer
+- No memory leaks</pre>
+</div>
+
+<h3>6.2 CPU Profiling (perf)</h3>
+
+<div class="card">
+    <pre>$ echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+$ make profile-cpu
+
+# Overhead  Symbol
+# ........  ..............................
+    95.15%  gemm_blocked_serial          ← GEMM dominates (expected!)
+     3.12%  [kernel]
+     1.21%  ck_mlp_swiglu_forward
+     0.52%  attention_forward_causal...
+
+<strong>What this tells us:</strong>
+- GEMM (matrix multiply) is 95% of compute
+- This is correct for short sequences
+- For long sequences, attention would dominate</pre>
+</div>
+
+<h3>6.3 Flamegraph</h3>
+
+<div class="card">
+    <pre>$ make flamegraph
+$ firefox build/flamegraph.svg</pre>
+    <p>The flamegraph shows call stacks as stacked bars. Width = time spent. Look for:</p>
+    <ul>
+        <li><strong>Wide bars at top</strong> - Hot leaf functions (optimize these)</li>
+        <li><strong>Tall stacks</strong> - Deep call chains (possible overhead)</li>
+        <li><strong>Flat wide sections</strong> - Single functions dominating (expected for GEMM)</li>
+    </ul>
+</div>
+
+<h3>6.4 Cache Profiling (Cachegrind)</h3>
+
+<div class="card">
+    <pre>$ make profile-cache
+
+==12345== D1 miss rate: 2.1%
+==12345== LL miss rate: 0.3%
+
+<strong>What to look for:</strong>
+- D1 miss rate < 5% is good
+- LL (last-level cache) misses go to RAM - expensive!
+- High miss rates in inner loops = need better memory access patterns</pre>
+</div>
+
+<h2 id="adding-kernels">Adding New Kernels</h2>
+
+<h3>7.1 Kernel Implementation Checklist</h3>
+
+<div class="card">
+    <ol>
+        <li><strong>Write the kernel</strong> in <code>src/kernels/</code>
+            <pre>// src/kernels/my_kernel.c
+void my_kernel_forward(float *out, const float *in, int N) { ... }
+void my_kernel_backward(float *dx, const float *dy, int N) { ... }</pre>
+        </li>
+        <li><strong>Add to kernel map</strong> in <code>kernel_maps/kernels/</code>
+            <pre>// kernel_maps/kernels/my_kernel.json
+{
+  "name": "my_kernel",
+  "forward": "my_kernel_forward",
+  "backward": "my_kernel_backward",
+  "sources": ["src/kernels/my_kernel.c"]
+}</pre>
+        </li>
+        <li><strong>Regenerate specs</strong>
+            <pre>make gen-specs</pre>
+        </li>
+        <li><strong>Write Python test</strong> in <code>unittest/</code>
+            <pre># unittest/test_my_kernel.py
+# Compare C kernel output vs PyTorch reference</pre>
+        </li>
+        <li><strong>Add to Makefile</strong> PY_TESTS list</li>
+    </ol>
+</div>
+
+<h3>7.2 Kernel Design Guidelines</h3>
+
+<div class="card">
+    <ul>
+        <li><strong>Pure functions</strong> - No global state, no allocations</li>
+        <li><strong>Explicit sizes</strong> - All dimensions passed as parameters</li>
+        <li><strong>Contiguous memory</strong> - Assume row-major layout</li>
+        <li><strong>OpenMP parallel</strong> - Use <code>#pragma omp parallel for</code> for outer loops</li>
+        <li><strong>SIMD-friendly</strong> - Inner loops should vectorize</li>
+    </ul>
+</div>
+
+<h2>Quick Reference</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Common Commands</h3>
+    <pre># Build
+make                    # Build library
+make clean              # Clean build
+
+# Test
+make test               # Unit tests
+make test-quick         # Comprehensive quick tests
+make tiny-parity        # Training parity vs PyTorch
+
+# Profile
+make profile-memory     # Memory leaks (Valgrind)
+make profile-cpu        # CPU hotspots (perf)
+make flamegraph         # Visualization
+
+# Code generation
+make ck                 # Print IR
+make emit CONFIG=x.json OUT=out.c  # Generate runtime</pre>
+</div>

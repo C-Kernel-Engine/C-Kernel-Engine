@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      .title { font-size: 28px; font-weight: 700; fill: #ffb400; }
+      .subtitle { font-size: 14px; fill: #707070; }
+    </style>
+
+    <linearGradient id="gpuGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:0.25"/>
+      <stop offset="100%" style="stop-color:#ff6b6b;stop-opacity:0.05"/>
+    </linearGradient>
+
+    <linearGradient id="cpuGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#47b475;stop-opacity:0.25"/>
+      <stop offset="100%" style="stop-color:#47b475;stop-opacity:0.05"/>
+    </linearGradient>
+
+    <linearGradient id="costBarRed" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#cc4444"/>
+    </linearGradient>
+
+    <linearGradient id="costBarGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#2d7a4c"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" class="title" text-anchor="middle">Scale Economics: The Real World</text>
+  <text x="600" y="72" class="subtitle" text-anchor="middle">Training a 70B parameter model: GPU vs CPU cluster costs</text>
+
+  <!-- GPU Section (Left) -->
+  <g transform="translate(60, 100)">
+    <rect width="500" height="620" rx="12" fill="url(#gpuGrad)" stroke="#ff6b6b" stroke-width="2" filter="url(#shadow)"/>
+
+    <!-- Header -->
+    <rect x="0" y="0" width="500" height="50" rx="12" fill="#ff6b6b"/>
+    <rect x="0" y="40" width="500" height="10" fill="#ff6b6b"/>
+    <text x="250" y="33" font-size="20" font-weight="700" fill="#1a1a1a" text-anchor="middle">GPU CLUSTER</text>
+
+    <!-- GPU Grid (8 GPUs needed for 70B) -->
+    <g transform="translate(50, 75)">
+      <text x="200" y="0" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">8× H100 GPUs Required for 70B Model</text>
+
+      <!-- 2x4 GPU grid -->
+      <g transform="translate(50, 20)">
+        <rect x="0" y="0" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="35" y="22" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="35" y="38" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="80" y="0" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="115" y="22" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="115" y="38" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="160" y="0" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="195" y="22" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="195" y="38" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="240" y="0" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="275" y="22" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="275" y="38" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="0" y="65" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="35" y="87" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="35" y="103" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="80" y="65" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="115" y="87" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="115" y="103" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="160" y="65" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="195" y="87" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="195" y="103" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+
+        <rect x="240" y="65" width="70" height="55" rx="4" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="275" y="87" font-size="10" fill="#ffb400" text-anchor="middle">H100</text>
+        <text x="275" y="103" font-size="9" fill="#a0a0a0" text-anchor="middle">80GB</text>
+      </g>
+
+      <text x="200" y="160" font-size="12" fill="#707070" text-anchor="middle">Total VRAM: 640GB | Total Memory Bandwidth: 26.8 TB/s</text>
+    </g>
+
+    <!-- Cost breakdown -->
+    <g transform="translate(40, 265)">
+      <rect x="0" y="0" width="420" height="220" rx="8" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="210" y="30" font-size="16" font-weight="600" fill="#ff6b6b" text-anchor="middle">Cost Breakdown</text>
+
+      <text x="20" y="60" font-size="12" fill="#a0a0a0">8× H100 GPUs @ $40K:</text>
+      <text x="400" y="60" font-size="12" font-weight="600" fill="#ff6b6b" text-anchor="end">$320,000</text>
+
+      <text x="20" y="85" font-size="12" fill="#a0a0a0">DGX H100 Chassis:</text>
+      <text x="400" y="85" font-size="12" font-weight="600" fill="#ff6b6b" text-anchor="end">$80,000</text>
+
+      <text x="20" y="110" font-size="12" fill="#a0a0a0">NVLink + NVSwitch:</text>
+      <text x="400" y="110" font-size="12" font-weight="600" fill="#ff6b6b" text-anchor="end">$50,000</text>
+
+      <text x="20" y="135" font-size="12" fill="#a0a0a0">Networking + Storage:</text>
+      <text x="400" y="135" font-size="12" font-weight="600" fill="#ff6b6b" text-anchor="end">$30,000</text>
+
+      <line x1="20" y1="150" x2="400" y2="150" stroke="#454545" stroke-width="1"/>
+
+      <text x="20" y="175" font-size="14" font-weight="600" fill="#ffffff">Total System Cost:</text>
+      <text x="400" y="175" font-size="22" font-weight="700" fill="#ff6b6b" text-anchor="end">$480,000</text>
+
+      <text x="210" y="200" font-size="11" fill="#707070" text-anchor="middle">18-24 month lead time | Limited availability</text>
+    </g>
+
+    <!-- Access indicator -->
+    <g transform="translate(40, 505)">
+      <rect x="0" y="0" width="420" height="55" rx="6" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="210" y="25" font-size="14" font-weight="600" fill="#ff6b6b" text-anchor="middle">Who Can Afford This?</text>
+      <text x="210" y="45" font-size="12" fill="#a0a0a0" text-anchor="middle">~500 companies worldwide (well-funded startups + enterprises)</text>
+    </g>
+
+    <!-- Result -->
+    <rect x="40" y="575" width="420" height="35" rx="6" fill="#ff6b6b"/>
+    <text x="250" y="598" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="middle">High Cost + Limited Access + Long Lead Time</text>
+  </g>
+
+  <!-- VS Badge -->
+  <circle cx="600" cy="410" r="40" fill="#ffb400" filter="url(#shadow)"/>
+  <text x="600" y="418" font-size="24" font-weight="700" fill="#1a1a1a" text-anchor="middle">VS</text>
+
+  <!-- CPU Section (Right) -->
+  <g transform="translate(640, 100)">
+    <rect width="500" height="620" rx="12" fill="url(#cpuGrad)" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+
+    <!-- Header -->
+    <rect x="0" y="0" width="500" height="50" rx="12" fill="#47b475"/>
+    <rect x="0" y="40" width="500" height="10" fill="#47b475"/>
+    <text x="250" y="33" font-size="20" font-weight="700" fill="#1a1a1a" text-anchor="middle">CPU CLUSTER</text>
+
+    <!-- CPU Servers (2 servers with 4TB each) -->
+    <g transform="translate(50, 75)">
+      <text x="200" y="0" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">2× Dual-Socket Servers for 70B Model</text>
+
+      <!-- Server visualization -->
+      <g transform="translate(30, 20)">
+        <!-- Server 1 -->
+        <rect x="0" y="0" width="160" height="120" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+        <rect x="0" y="0" width="160" height="30" rx="6" fill="#47b475" opacity="0.3"/>
+        <text x="80" y="20" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Server 1</text>
+
+        <text x="80" y="50" font-size="10" fill="#a0a0a0" text-anchor="middle">2× EPYC 9654</text>
+        <text x="80" y="68" font-size="10" fill="#a0a0a0" text-anchor="middle">192 cores total</text>
+        <text x="80" y="86" font-size="10" fill="#47b475" text-anchor="middle">4TB DDR5 RAM</text>
+        <text x="80" y="108" font-size="12" font-weight="600" fill="#47b475" text-anchor="middle">~$30,000</text>
+
+        <!-- Server 2 -->
+        <rect x="180" y="0" width="160" height="120" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+        <rect x="180" y="0" width="160" height="30" rx="6" fill="#47b475" opacity="0.3"/>
+        <text x="260" y="20" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Server 2</text>
+
+        <text x="260" y="50" font-size="10" fill="#a0a0a0" text-anchor="middle">2× EPYC 9654</text>
+        <text x="260" y="68" font-size="10" fill="#a0a0a0" text-anchor="middle">192 cores total</text>
+        <text x="260" y="86" font-size="10" fill="#47b475" text-anchor="middle">4TB DDR5 RAM</text>
+        <text x="260" y="108" font-size="12" font-weight="600" fill="#47b475" text-anchor="middle">~$30,000</text>
+      </g>
+
+      <text x="200" y="160" font-size="12" fill="#707070" text-anchor="middle">Total RAM: 8TB | 384 cores | 400Gbps RDMA interconnect</text>
+    </g>
+
+    <!-- Cost breakdown -->
+    <g transform="translate(40, 265)">
+      <rect x="0" y="0" width="420" height="220" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+      <text x="210" y="30" font-size="16" font-weight="600" fill="#47b475" text-anchor="middle">Cost Breakdown</text>
+
+      <text x="20" y="60" font-size="12" fill="#a0a0a0">4× EPYC 9654 CPUs @ $6K:</text>
+      <text x="400" y="60" font-size="12" font-weight="600" fill="#47b475" text-anchor="end">$24,000</text>
+
+      <text x="20" y="85" font-size="12" fill="#a0a0a0">8TB DDR5 ECC RAM:</text>
+      <text x="400" y="85" font-size="12" font-weight="600" fill="#47b475" text-anchor="end">$16,000</text>
+
+      <text x="20" y="110" font-size="12" fill="#a0a0a0">2× Server Chassis:</text>
+      <text x="400" y="110" font-size="12" font-weight="600" fill="#47b475" text-anchor="end">$8,000</text>
+
+      <text x="20" y="135" font-size="12" fill="#a0a0a0">400Gbps RDMA NICs:</text>
+      <text x="400" y="135" font-size="12" font-weight="600" fill="#47b475" text-anchor="end">$8,000</text>
+
+      <line x1="20" y1="150" x2="400" y2="150" stroke="#454545" stroke-width="1"/>
+
+      <text x="20" y="175" font-size="14" font-weight="600" fill="#ffffff">Total System Cost:</text>
+      <text x="400" y="175" font-size="22" font-weight="700" fill="#47b475" text-anchor="end">$56,000</text>
+
+      <text x="210" y="200" font-size="11" fill="#707070" text-anchor="middle">Standard ordering | Ships in 2-4 weeks</text>
+    </g>
+
+    <!-- Access indicator -->
+    <g transform="translate(40, 505)">
+      <rect x="0" y="0" width="420" height="55" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+      <text x="210" y="25" font-size="14" font-weight="600" fill="#47b475" text-anchor="middle">Who Can Afford This?</text>
+      <text x="210" y="45" font-size="12" fill="#a0a0a0" text-anchor="middle">10,000+ companies (SMBs, startups, researchers)</text>
+    </g>
+
+    <!-- Result -->
+    <rect x="40" y="575" width="420" height="35" rx="6" fill="#47b475" filter="url(#glow)"/>
+    <text x="250" y="598" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="middle">Low Cost + Wide Access + Fast Delivery</text>
+  </g>
+
+  <!-- Bottom comparison summary -->
+  <rect x="100" y="735" width="1000" height="55" rx="8" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+  <text x="600" y="768" font-size="18" font-weight="600" fill="#ffb400" text-anchor="middle">
+    8.5x cheaper ($56K vs $480K) | 20x more accessible | 12x more memory (8TB vs 640GB)
+  </text>
+</svg>

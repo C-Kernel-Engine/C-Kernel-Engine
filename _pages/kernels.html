@@ -1,0 +1,145 @@
+<!-- TITLE: Kernel Catalog -->
+<!-- NAV: kernels -->
+
+<h1>Kernel Catalog</h1>
+
+<p>This document lists the high-performance C kernels available in the engine. These kernels are designed to be "micro-libraries"—you can copy <code>src/kernels/rope_kernels.c</code> into your own project without taking the rest of the engine.</p>
+
+<h2>Naming Convention</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <ul>
+            <li><strong><code>_naive</code></strong>: Reference implementation, easy to read, slow.</li>
+            <li><strong><code>_parallel</code></strong>: OpenMP-accelerated for multi-core CPUs.</li>
+        </ul>
+    </div>
+    <div class="card">
+        <ul>
+            <li><strong><code>_avx512</code></strong>: Explicit intrinsics for AVX-512 (x86_64).</li>
+            <li><strong><code>_head_major</code></strong>: Optimized memory layout where the "Head" dimension is outermost or stride-optimized.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>1. Attention & RoPE</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>attention_forward_causal_head_major</code></td>
+            <td><code>attention_kernels.c</code></td>
+            <td>Standard Scaled Dot-Product Attention (SDPA) with causal masking. Expects <code>[Head, Token, Dim]</code> layout.</td>
+        </tr>
+        <tr>
+            <td><code>rope_forward</code></td>
+            <td><code>rope_kernels.c</code></td>
+            <td>Rotary Positional Embeddings. Rotates query/key vectors in-place.</td>
+        </tr>
+        <tr>
+            <td><code>causal_softmax_head_major</code></td>
+            <td><code>softmax_kernels.c</code></td>
+            <td>Softmax applied to attention scores, masking out future tokens (causal mask).</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card card-accent">
+    <h3>📊 Flash Attention Analysis</h3>
+    <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
+    <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
+    <p><small>This analysis covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads.</small></p>
+</div>
+
+<h2>2. Elementwise & Activation</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>gelu_fast_inplace</code></td>
+            <td><code>gelu_kernels.c</code></td>
+            <td>Gaussian Error Linear Unit. Uses the fast approximation (tanh).</td>
+        </tr>
+        <tr>
+            <td><code>swiglu_forward</code></td>
+            <td><code>swiglu_kernels.c</code></td>
+            <td>SwiGLU activation (Gated Linear Unit with Swish). Used in Llama/Mistral. Input size is <code>2 * dim</code>.</td>
+        </tr>
+        <tr>
+            <td><code>sigmoid_forward</code></td>
+            <td><code>sigmoid_kernels.c</code></td>
+            <td>Standard logistic sigmoid function.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>3. Normalization</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>rmsnorm_forward</code></td>
+            <td><code>rmsnorm_kernels.c</code></td>
+            <td>Root Mean Square Normalization. Lighter than LayerNorm (no mean subtraction).</td>
+        </tr>
+        <tr>
+            <td><code>layernorm_naive_serial</code></td>
+            <td><code>layernorm_kernels.c</code></td>
+            <td>Standard LayerNorm. Subtracts mean, divides by variance.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>4. GEMM (Matrix Multiplication)</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>gemm_naive_parallel</code></td>
+            <td><code>gemm_kernels.c</code></td>
+            <td>OpenMP-parallelized SGEMM (C = A * B).</td>
+        </tr>
+        <tr>
+            <td><code>gemm_avx512_parallel</code></td>
+            <td><code>gemm_kernels.c</code></td>
+            <td>Hand-tuned AVX-512 implementation for max throughput on modern Intel/AMD chips.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Memory Layouts</h2>
+
+<p>Most kernels assume <strong>Row-Major</strong> contiguous memory unless specified otherwise.</p>
+
+<ul>
+    <li><strong>Matrices</strong>: <code>[Rows, Cols]</code></li>
+    <li><strong>Attention Tensors</strong>: <code>[Heads, Tokens, Head_Dim]</code> (Head-Major) helps with cache locality during the attention loop.</li>
+</ul>

@@ -1,0 +1,2302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMD & Quantization Architecture | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --red: #e74c3c;
+            --purple: #9b59b6;
+            --cyan: #00bcd4;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+        }
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .header-title { color: var(--white); font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
+        .header-subtitle { color: var(--orange); font-size: 0.8rem; font-weight: 500; }
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .site-nav > a, .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+        .site-nav > a:hover, .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+        .nav-dropdown { position: relative; }
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+        .nav-dropdown:last-child .nav-dropdown-menu { left: auto; right: 0; }
+        main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { color: var(--orange); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--orange); padding-bottom: 0.5rem; }
+        h2 { color: var(--orange-light); font-size: 1.8rem; margin: 2rem 0 1rem; }
+        h3 { color: var(--text-primary); font-size: 1.3rem; margin: 1.5rem 0 0.5rem; }
+        p { color: var(--text-secondary); margin-bottom: 1rem; }
+        .card {
+            background: var(--dark-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--grey);
+        }
+        .svg-container {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        svg { display: block; margin: 0 auto; }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            color: var(--orange-light);
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+        .highlight { color: var(--orange); }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--grey); }
+        th { color: var(--orange); background: var(--dark); }
+        td { color: var(--text-secondary); }
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .tag-green { background: rgba(71, 180, 117, 0.2); color: var(--green); }
+        .tag-blue { background: rgba(7, 173, 248, 0.2); color: var(--blue); }
+        .tag-purple { background: rgba(155, 89, 182, 0.2); color: var(--purple); }
+        .tag-orange { background: rgba(255, 180, 0, 0.2); color: var(--orange); }
+        .tag-cyan { background: rgba(0, 188, 212, 0.2); color: var(--cyan); }
+        .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+        .legend-color { width: 20px; height: 20px; border-radius: 4px; }
+        .toc { background: var(--dark-card); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
+        .toc a { color: var(--text-secondary); text-decoration: none; display: block; padding: 0.3rem 0; }
+        .toc a:hover { color: var(--orange); }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">SIMD & Quantization Architecture</div>
+            </div>
+        </a>
+        <nav class="site-nav">
+            <a href="index.html">Home</a>
+            <a href="quickstart.html">Getting Started</a>
+            <a href="developer-guide.html">Developer Guide</a>
+            <a href="scaling.html">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu">
+                    <a href="architecture.html">
+                        System Overview
+                        <small>IR, Codegen, Kernels</small>
+                    </a>
+                    <a href="kernels.html">
+                        Kernel Reference
+                        <small>All forward/backward kernels</small>
+                    </a>
+                    <a href="gemm-optimization.html">
+                        GEMM Optimization
+                        <small>AVX, MKL, blocking strategies</small>
+                    </a>
+                    <a href="quantization.html">
+                        Quantization
+                        <small>INT8, FP16, mixed precision</small>
+                    </a>
+                    <a href="simd-architecture.html" class="active">
+                        SIMD Architecture
+                        <small>AVX-512, VNNI, AMX deep dive</small>
+                    </a>
+                    <a href="codegen.html">
+                        Code Generation
+                        <small>IR to C compilation</small>
+                    </a>
+                    <a href="memory-safety.html">
+                        Memory Safety
+                        <small>Bump allocator, canaries, verification</small>
+                    </a>
+                    <a href="profiling.html">
+                        Profiling Guide
+                        <small>Valgrind, perf, flamegraphs</small>
+                    </a>
+                    <a href="concepts.html">
+                        Deep Dive Concepts
+                        <small>RoPE, Flash Attention, GQA</small>
+                    </a>
+                    <a href="testing.html">
+                        Testing Methodology
+                        <small>Numerical parity verification</small>
+                    </a>
+                </div>
+            </div>
+            <a href="pytorch-parity.html">PyTorch Parity</a>
+            <a href="research.html">Research</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <h1>SIMD Instructions & Quantization for LLM Inference</h1>
+
+        <div class="toc">
+            <strong>Table of Contents</strong>
+            <a href="#simd-hierarchy">1. SIMD Instruction Hierarchy</a>
+            <a href="#quant-formats">2. Quantization Formats (Q4_K, Q8_K)</a>
+            <a href="#transformer-ops">3. Transformer Operations & SIMD Mapping</a>
+            <a href="#cache-flow">4. Cache Hierarchy & Data Flow</a>
+            <a href="#activation-flow">5. Activation Storage & Hot Data Path</a>
+            <a href="#implementation">6. Implementation Strategy</a>
+        </div>
+
+        <!-- Section 1: SIMD Hierarchy -->
+        <section id="simd-hierarchy">
+            <h2>1. SIMD Instruction Hierarchy</h2>
+            <p>Intel x86 SIMD instructions evolved to provide increasingly wider vector operations and specialized instructions for neural network workloads.</p>
+
+            <div class="svg-container">
+                <svg width="1200" height="600" viewBox="0 0 1200 600">
+                    <defs>
+                        <linearGradient id="avxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="avx2Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="avx512Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#e67e22;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#d35400;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="vnniGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#27ae60;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#1e8449;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="amxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1" />
+                        </linearGradient>
+                        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="2" dy="4" stdDeviation="3" flood-opacity="0.3"/>
+                        </filter>
+                    </defs>
+
+                    <!-- Timeline base -->
+                    <line x1="50" y1="550" x2="1150" y2="550" stroke="#555" stroke-width="3"/>
+                    <text x="600" y="590" fill="#888" text-anchor="middle" font-size="14">CPU Generation Timeline</text>
+
+                    <!-- AVX (2011) -->
+                    <g transform="translate(100, 50)">
+                        <rect width="180" height="120" rx="10" fill="url(#avxGrad)" filter="url(#shadow)"/>
+                        <text x="90" y="30" fill="white" text-anchor="middle" font-weight="bold" font-size="18">AVX</text>
+                        <text x="90" y="55" fill="#ddd" text-anchor="middle" font-size="12">256-bit vectors</text>
+                        <text x="90" y="75" fill="#ddd" text-anchor="middle" font-size="11">8 x FP32 per instruction</text>
+                        <text x="90" y="95" fill="#aaa" text-anchor="middle" font-size="10">_mm256_add_ps</text>
+                        <text x="90" y="110" fill="#aaa" text-anchor="middle" font-size="10">_mm256_mul_ps</text>
+                    </g>
+                    <line x1="190" y1="170" x2="190" y2="550" stroke="#3498db" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="190" y="540" fill="#3498db" text-anchor="middle" font-size="11">Sandy Bridge 2011</text>
+
+                    <!-- AVX2 + FMA (2013) -->
+                    <g transform="translate(320, 50)">
+                        <rect width="180" height="140" rx="10" fill="url(#avx2Grad)" filter="url(#shadow)"/>
+                        <text x="90" y="30" fill="white" text-anchor="middle" font-weight="bold" font-size="18">AVX2 + FMA</text>
+                        <text x="90" y="55" fill="#ddd" text-anchor="middle" font-size="12">256-bit + Integer ops</text>
+                        <text x="90" y="75" fill="#ddd" text-anchor="middle" font-size="11">FMA: a*b+c in 1 cycle</text>
+                        <text x="90" y="95" fill="#aaa" text-anchor="middle" font-size="10">_mm256_fmadd_ps</text>
+                        <text x="90" y="110" fill="#aaa" text-anchor="middle" font-size="10">_mm256_maddubs_epi16</text>
+                        <text x="90" y="125" fill="#aaa" text-anchor="middle" font-size="10">INT8 multiply-add</text>
+                    </g>
+                    <line x1="410" y1="190" x2="410" y2="550" stroke="#9b59b6" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="410" y="540" fill="#9b59b6" text-anchor="middle" font-size="11">Haswell 2013</text>
+
+                    <!-- AVX-512 (2017) -->
+                    <g transform="translate(540, 50)">
+                        <rect width="200" height="160" rx="10" fill="url(#avx512Grad)" filter="url(#shadow)"/>
+                        <text x="100" y="30" fill="white" text-anchor="middle" font-weight="bold" font-size="18">AVX-512</text>
+                        <text x="100" y="55" fill="#ddd" text-anchor="middle" font-size="12">512-bit vectors</text>
+                        <text x="100" y="75" fill="#ddd" text-anchor="middle" font-size="11">16 x FP32 per instruction</text>
+                        <text x="100" y="95" fill="#ddd" text-anchor="middle" font-size="11">32 ZMM registers</text>
+                        <text x="100" y="115" fill="#aaa" text-anchor="middle" font-size="10">_mm512_fmadd_ps</text>
+                        <text x="100" y="130" fill="#aaa" text-anchor="middle" font-size="10">_mm512_reduce_add_ps</text>
+                        <text x="100" y="145" fill="#aaa" text-anchor="middle" font-size="10">Masked operations</text>
+                    </g>
+                    <line x1="640" y1="210" x2="640" y2="550" stroke="#e67e22" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="640" y="540" fill="#e67e22" text-anchor="middle" font-size="11">Skylake-X 2017</text>
+
+                    <!-- AVX-512 VNNI (2019) -->
+                    <g transform="translate(780, 50)">
+                        <rect width="200" height="180" rx="10" fill="url(#vnniGrad)" filter="url(#shadow)"/>
+                        <text x="100" y="30" fill="white" text-anchor="middle" font-weight="bold" font-size="18">AVX-512 VNNI</text>
+                        <text x="100" y="55" fill="#ddd" text-anchor="middle" font-size="12">Vector Neural Network</text>
+                        <text x="100" y="75" fill="#fff" text-anchor="middle" font-size="13" font-weight="bold">4x INT8 ops/cycle!</text>
+                        <rect x="10" y="85" width="180" height="45" rx="5" fill="rgba(0,0,0,0.3)"/>
+                        <text x="100" y="102" fill="#7f8" text-anchor="middle" font-size="10">_mm512_dpbusd_epi32</text>
+                        <text x="100" y="118" fill="#aaa" text-anchor="middle" font-size="9">64 INT8 muls + 16 INT32 adds</text>
+                        <text x="100" y="140" fill="#ddd" text-anchor="middle" font-size="11">Best for Q4_K decode!</text>
+                        <text x="100" y="160" fill="#888" text-anchor="middle" font-size="10">No BF16 (2nd Gen)</text>
+                    </g>
+                    <line x1="880" y1="230" x2="880" y2="550" stroke="#27ae60" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="880" y="540" fill="#27ae60" text-anchor="middle" font-size="11">Cascade Lake 2019 (2nd Gen)</text>
+
+                    <!-- AMX (2023 - Sapphire Rapids is 4th Gen) -->
+                    <g transform="translate(1000, 50)">
+                        <rect width="180" height="200" rx="10" fill="url(#amxGrad)" filter="url(#shadow)"/>
+                        <text x="90" y="30" fill="white" text-anchor="middle" font-weight="bold" font-size="18">AMX</text>
+                        <text x="90" y="50" fill="#ddd" text-anchor="middle" font-size="11">Advanced Matrix Ext.</text>
+                        <rect x="10" y="60" width="160" height="65" rx="5" fill="rgba(0,0,0,0.3)"/>
+                        <text x="90" y="80" fill="#fff" text-anchor="middle" font-size="12" font-weight="bold">16x16 Tile Units</text>
+                        <text x="90" y="95" fill="#faa" text-anchor="middle" font-size="10">256 INT8 muls/tile op</text>
+                        <text x="90" y="110" fill="#faa" text-anchor="middle" font-size="10">16 INT32 accumulates</text>
+                        <text x="90" y="135" fill="#ddd" text-anchor="middle" font-size="11">Best for batch > 1</text>
+                        <text x="90" y="155" fill="#aaa" text-anchor="middle" font-size="10">_tile_dpbusd (INT8)</text>
+                        <text x="90" y="170" fill="#7f8" text-anchor="middle" font-size="10">_tile_dpbf16ps (BF16!)</text>
+                        <text x="90" y="190" fill="#888" text-anchor="middle" font-size="9">8 tile registers (TMM0-7)</text>
+                    </g>
+                    <line x1="1090" y1="250" x2="1090" y2="550" stroke="#e74c3c" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="1090" y="540" fill="#e74c3c" text-anchor="middle" font-size="11">Sapphire Rapids 2023 (4th Gen)</text>
+
+                    <!-- Performance comparison -->
+                    <g transform="translate(100, 280)">
+                        <rect width="1050" height="200" rx="10" fill="#1a1a1a" stroke="#444" stroke-width="2"/>
+                        <text x="525" y="30" fill="#ffb400" text-anchor="middle" font-weight="bold" font-size="16">INT8 Dot Product Throughput (ops/cycle)</text>
+
+                        <!-- Bars -->
+                        <rect x="50" y="50" width="80" height="20" fill="#3498db"/>
+                        <text x="140" y="65" fill="#aaa" font-size="12">AVX: 32 (via INT16)</text>
+
+                        <rect x="50" y="80" width="160" height="20" fill="#9b59b6"/>
+                        <text x="220" y="95" fill="#aaa" font-size="12">AVX2: 64 (maddubs)</text>
+
+                        <rect x="50" y="110" width="320" height="20" fill="#e67e22"/>
+                        <text x="380" y="125" fill="#aaa" font-size="12">AVX-512: 128 (2x width)</text>
+
+                        <rect x="50" y="140" width="512" height="20" fill="#27ae60"/>
+                        <text x="570" y="155" fill="#fff" font-size="12" font-weight="bold">VNNI: 256 (dpbusd) - 4x faster!</text>
+
+                        <rect x="50" y="170" width="800" height="20" fill="#e74c3c"/>
+                        <text x="860" y="185" fill="#fff" font-size="12" font-weight="bold">AMX: 512+ (tile ops) - for batch</text>
+                    </g>
+
+                    <!-- Arrow showing evolution -->
+                    <path d="M 280 130 Q 310 100 340 130" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <path d="M 500 130 Q 530 100 560 130" fill="none" stroke="#666" stroke-width="2"/>
+                    <path d="M 740 130 Q 770 100 800 130" fill="none" stroke="#666" stroke-width="2"/>
+                    <path d="M 980 130 Q 1010 100 1020 130" fill="none" stroke="#666" stroke-width="2"/>
+                </svg>
+            </div>
+
+            <div class="card">
+                <h3>Key Insight: VNNI for Decode, AMX for Prefill</h3>
+                <p><strong>Single-token decode (M=1):</strong> Use <code>_mm512_dpbusd_epi32</code> (VNNI). AMX tile setup overhead makes it slower for single rows.</p>
+                <p><strong>Prefill (M=prompt_length):</strong> Use AMX tiles for 16x16 matrix blocks. Amortizes tile load/store overhead.</p>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h3>Xeon Scalable Generations: Format Support Matrix</h3>
+                <table>
+                    <tr>
+                        <th>Generation</th>
+                        <th>Codename</th>
+                        <th>Year</th>
+                        <th>AVX-512</th>
+                        <th>VNNI (INT8)</th>
+                        <th>BF16</th>
+                        <th>AMX</th>
+                        <th>Best For</th>
+                    </tr>
+                    <tr>
+                        <td>1st Gen</td>
+                        <td>Skylake-SP</td>
+                        <td>2017</td>
+                        <td class="highlight">Yes</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td>FP32 only</td>
+                    </tr>
+                    <tr>
+                        <td>2nd Gen</td>
+                        <td>Cascade Lake</td>
+                        <td>2019</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">Yes</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td>Q4_K + VNNI decode</td>
+                    </tr>
+                    <tr>
+                        <td>3rd Gen</td>
+                        <td>Ice Lake-SP</td>
+                        <td>2021</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">AVX-512 BF16</td>
+                        <td style="color: #e74c3c;">No</td>
+                        <td>BF16 training, Q4_K inference</td>
+                    </tr>
+                    <tr>
+                        <td>4th Gen</td>
+                        <td>Sapphire Rapids</td>
+                        <td>2023</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">AVX-512 + AMX</td>
+                        <td class="highlight">INT8 + BF16</td>
+                        <td>Full: Q4_K decode, AMX batch, BF16 train</td>
+                    </tr>
+                    <tr>
+                        <td>5th Gen</td>
+                        <td>Emerald Rapids</td>
+                        <td>2024</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">Yes</td>
+                        <td class="highlight">AVX-512 + AMX</td>
+                        <td class="highlight">INT8 + BF16</td>
+                        <td>Same as 4th Gen (improved cache)</td>
+                    </tr>
+                </table>
+                <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem;"><strong>Note:</strong> 2nd Gen Xeon has VNNI but no BF16 - you can still get excellent Q4_K performance! BF16 requires 3rd Gen+ for training workloads.</p>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h3>Weight Formats: Training vs Inference</h3>
+                <div class="grid-2" style="gap: 1.5rem;">
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--orange);">
+                        <h4 style="color: var(--orange); margin-bottom: 0.5rem;">Training</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Master weights:</strong> FP32 (for optimizer state: Adam moments, gradients)</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Forward/backward:</strong> BF16 preferred (same dynamic range as FP32, 2x memory savings)</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Why not FP16:</strong> FP16 has limited range (6e-5 to 65504), causes overflow in gradients</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Why not INT8:</strong> Gradients need full precision, quantization noise accumulates</p>
+                    </div>
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--green);">
+                        <h4 style="color: var(--green); margin-bottom: 0.5rem;">Inference</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Weights:</strong> Q4_K (4.5 bits) - 7x smaller than FP32, minimal quality loss</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Activations:</strong> Quantize to Q8 on-the-fly (fast, ~1KB per layer)</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>KV cache:</strong> FP16 or FP32 (quality-sensitive, stays in cache)</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;"><strong>Compute kernels:</strong> VNNI INT8 for GEMV, FP32 for softmax/RMSNorm</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h3>Why Quantization Helps (Memory Bandwidth is the Bottleneck)</h3>
+                <p style="color: var(--text-secondary);">For single-token decode, the model is <strong>memory-bandwidth bound</strong>, not compute-bound:</p>
+                <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-top: 0.5rem;">
+                    <li><strong>Each token</strong> requires loading the entire model weights from DRAM</li>
+                    <li><strong>Qwen2-0.5B FP32:</strong> ~2GB weights × 1 token = 2GB DRAM read per token</li>
+                    <li><strong>Qwen2-0.5B Q4_K:</strong> ~350MB weights × 1 token = 350MB DRAM read per token</li>
+                    <li><strong>DDR5 bandwidth:</strong> ~200 GB/s sustained → Q4_K gives ~570 tok/s theoretical vs ~100 tok/s FP32</li>
+                </ul>
+                <p style="color: var(--ffb400); margin-top: 1rem;"><strong>Bottom line:</strong> Quantization is NOT optional for competitive inference speed. Q4_K with VNNI is the sweet spot for quality vs performance on Xeon.</p>
+            </div>
+        </section>
+
+        <!-- Section 2: Quantization Formats -->
+        <section id="quant-formats">
+            <h2>2. Quantization Formats: Q4_K and Q8_K</h2>
+            <p>llama.cpp uses block-wise quantization where weights and activations are quantized in groups with per-block scale factors.</p>
+
+            <div class="svg-container">
+                <svg width="1200" height="750" viewBox="0 0 1200 750">
+                    <!-- Q4_K Format -->
+                    <g transform="translate(50, 50)">
+                        <text x="250" y="0" fill="#ffb400" font-weight="bold" font-size="20">Q4_K Block Format (256 weights = QK_K)</text>
+
+                        <!-- Block structure -->
+                        <rect x="0" y="25" width="500" height="280" rx="10" fill="#1a1a1a" stroke="#e67e22" stroke-width="2"/>
+
+                        <!-- Header -->
+                        <rect x="10" y="35" width="480" height="40" rx="5" fill="#2a2a2a"/>
+                        <text x="20" y="60" fill="#e67e22" font-weight="bold" font-size="14">Block Header (12 bytes)</text>
+
+                        <rect x="20" y="85" width="60" height="30" fill="#e74c3c"/>
+                        <text x="50" y="105" fill="white" text-anchor="middle" font-size="10">d (FP16)</text>
+                        <text x="50" y="125" fill="#888" text-anchor="middle" font-size="9">scale</text>
+
+                        <rect x="90" y="85" width="70" height="30" fill="#e74c3c"/>
+                        <text x="125" y="105" fill="white" text-anchor="middle" font-size="10">dmin (FP16)</text>
+                        <text x="125" y="125" fill="#888" text-anchor="middle" font-size="9">min scale</text>
+
+                        <rect x="170" y="85" width="300" height="30" fill="#9b59b6"/>
+                        <text x="320" y="105" fill="white" text-anchor="middle" font-size="10">scales[12] - 6-bit packed sub-block scales</text>
+
+                        <!-- Quants -->
+                        <rect x="10" y="145" width="480" height="80" rx="5" fill="#2a2a2a"/>
+                        <text x="20" y="165" fill="#27ae60" font-weight="bold" font-size="14">Quantized Weights (128 bytes)</text>
+                        <text x="20" y="185" fill="#888" font-size="12">qs[128] - 256 x 4-bit weights packed as nibbles</text>
+
+                        <!-- Visual of nibble packing -->
+                        <g transform="translate(20, 195)">
+                            <rect x="0" y="0" width="30" height="20" fill="#27ae60" stroke="#1a1a1a"/>
+                            <text x="15" y="14" fill="white" text-anchor="middle" font-size="8">w0</text>
+                            <rect x="30" y="0" width="30" height="20" fill="#2ecc71" stroke="#1a1a1a"/>
+                            <text x="45" y="14" fill="white" text-anchor="middle" font-size="8">w1</text>
+                            <text x="70" y="14" fill="#888" font-size="10">= 1 byte</text>
+
+                            <rect x="120" y="0" width="30" height="20" fill="#27ae60" stroke="#1a1a1a"/>
+                            <rect x="150" y="0" width="30" height="20" fill="#2ecc71" stroke="#1a1a1a"/>
+                            <rect x="180" y="0" width="30" height="20" fill="#27ae60" stroke="#1a1a1a"/>
+                            <rect x="210" y="0" width="30" height="20" fill="#2ecc71" stroke="#1a1a1a"/>
+                            <text x="270" y="14" fill="#888" font-size="10">... x 128 bytes</text>
+                        </g>
+
+                        <!-- Sub-block structure -->
+                        <rect x="10" y="235" width="480" height="60" rx="5" fill="#2a2a2a"/>
+                        <text x="20" y="255" fill="#07adf8" font-weight="bold" font-size="14">8 Sub-blocks of 32 weights each</text>
+                        <text x="20" y="280" fill="#888" font-size="11">Each sub-block has: scale[i] (6-bit) + min[i] (6-bit)</text>
+                        <text x="20" y="295" fill="#888" font-size="11">Dequant: w = d * scale[i] * (q - 8) + dmin * min[i]</text>
+                    </g>
+
+                    <!-- Q8_K Format (for activations) -->
+                    <g transform="translate(600, 50)">
+                        <text x="250" y="0" fill="#ffb400" font-weight="bold" font-size="20">Q8_K Block Format (256 values)</text>
+
+                        <rect x="0" y="25" width="500" height="200" rx="10" fill="#1a1a1a" stroke="#07adf8" stroke-width="2"/>
+
+                        <!-- Header -->
+                        <rect x="10" y="35" width="480" height="40" rx="5" fill="#2a2a2a"/>
+                        <text x="20" y="60" fill="#07adf8" font-weight="bold" font-size="14">Block Header</text>
+
+                        <rect x="20" y="85" width="60" height="30" fill="#e74c3c"/>
+                        <text x="50" y="105" fill="white" text-anchor="middle" font-size="10">d (FP16)</text>
+
+                        <rect x="90" y="85" width="200" height="30" fill="#9b59b6"/>
+                        <text x="190" y="105" fill="white" text-anchor="middle" font-size="10">bsums[16] - INT16 block sums</text>
+
+                        <!-- Quants -->
+                        <rect x="10" y="125" width="480" height="80" rx="5" fill="#2a2a2a"/>
+                        <text x="20" y="150" fill="#27ae60" font-weight="bold" font-size="14">Quantized Values (256 bytes)</text>
+                        <text x="20" y="170" fill="#888" font-size="12">qs[256] - 256 x INT8 values</text>
+                        <text x="20" y="190" fill="#888" font-size="11">Dequant: x = d * qs[i]</text>
+                    </g>
+
+                    <!-- Memory Layout Comparison -->
+                    <g transform="translate(50, 360)">
+                        <text x="500" y="0" fill="#ffb400" font-weight="bold" font-size="20" text-anchor="middle">Memory Footprint Comparison</text>
+
+                        <rect x="0" y="25" width="1000" height="160" rx="10" fill="#1a1a1a" stroke="#444" stroke-width="2"/>
+
+                        <!-- FP32 -->
+                        <text x="20" y="55" fill="#888" font-size="14">FP32 (32-bit):</text>
+                        <rect x="150" y="40" width="800" height="25" fill="#e74c3c"/>
+                        <text x="550" y="57" fill="white" text-anchor="middle" font-size="12">256 weights x 4 bytes = 1024 bytes (100%)</text>
+
+                        <!-- BF16 -->
+                        <text x="20" y="90" fill="#888" font-size="14">BF16 (16-bit):</text>
+                        <rect x="150" y="75" width="400" height="25" fill="#e67e22"/>
+                        <text x="350" y="92" fill="white" text-anchor="middle" font-size="12">512 bytes (50%)</text>
+
+                        <!-- Q8_K -->
+                        <text x="20" y="125" fill="#888" font-size="14">Q8_K (8-bit):</text>
+                        <rect x="150" y="110" width="280" height="25" fill="#07adf8"/>
+                        <text x="290" y="127" fill="white" text-anchor="middle" font-size="12">~292 bytes (28%)</text>
+
+                        <!-- Q4_K -->
+                        <text x="20" y="160" fill="#888" font-size="14">Q4_K (~4.5-bit):</text>
+                        <rect x="150" y="145" width="144" height="25" fill="#27ae60"/>
+                        <text x="222" y="162" fill="white" text-anchor="middle" font-size="12">~144 bytes (14%)</text>
+
+                        <!-- Bandwidth annotation -->
+                        <text x="980" y="105" fill="#ffb400" text-anchor="end" font-size="12">7x less</text>
+                        <text x="980" y="125" fill="#ffb400" text-anchor="end" font-size="12">memory</text>
+                        <text x="980" y="145" fill="#ffb400" text-anchor="end" font-size="12">bandwidth!</text>
+                    </g>
+
+                    <!-- VNNI-friendly layout -->
+                    <g transform="translate(50, 560)">
+                        <text x="500" y="0" fill="#ffb400" font-weight="bold" font-size="20" text-anchor="middle">VNNI-Friendly Data Layout</text>
+
+                        <rect x="0" y="25" width="1000" height="150" rx="10" fill="#1a1a1a" stroke="#27ae60" stroke-width="2"/>
+
+                        <text x="20" y="55" fill="#27ae60" font-weight="bold" font-size="14">_mm512_dpbusd_epi32 expects:</text>
+                        <text x="20" y="80" fill="#888" font-size="12">Unsigned INT8 (activations) x Signed INT8 (weights)</text>
+                        <text x="20" y="100" fill="#888" font-size="12">Groups of 4 bytes: [a0,a1,a2,a3] dot [w0,w1,w2,w3] -> INT32</text>
+
+                        <!-- Visual -->
+                        <g transform="translate(400, 45)">
+                            <text x="0" y="0" fill="#07adf8" font-size="12">Activations (Q8_K):</text>
+                            <rect x="0" y="10" width="30" height="25" fill="#07adf8"/>
+                            <rect x="30" y="10" width="30" height="25" fill="#3498db"/>
+                            <rect x="60" y="10" width="30" height="25" fill="#07adf8"/>
+                            <rect x="90" y="10" width="30" height="25" fill="#3498db"/>
+                            <text x="60" y="55" fill="#888" text-anchor="middle" font-size="10">4 x INT8 unsigned</text>
+
+                            <text x="150" y="25" fill="#888" font-size="20">x</text>
+
+                            <text x="180" y="0" fill="#27ae60" font-size="12">Weights (Q4_K unpacked):</text>
+                            <rect x="180" y="10" width="30" height="25" fill="#27ae60"/>
+                            <rect x="210" y="10" width="30" height="25" fill="#2ecc71"/>
+                            <rect x="240" y="10" width="30" height="25" fill="#27ae60"/>
+                            <rect x="270" y="10" width="30" height="25" fill="#2ecc71"/>
+                            <text x="240" y="55" fill="#888" text-anchor="middle" font-size="10">4 x INT8 signed</text>
+
+                            <text x="330" y="25" fill="#888" font-size="20">=</text>
+
+                            <text x="360" y="0" fill="#e67e22" font-size="12">Accumulator:</text>
+                            <rect x="360" y="10" width="60" height="25" fill="#e67e22"/>
+                            <text x="390" y="28" fill="white" text-anchor="middle" font-size="10">INT32</text>
+                            <text x="390" y="55" fill="#888" text-anchor="middle" font-size="10">sum += a*w</text>
+                        </g>
+
+                        <text x="20" y="140" fill="#ffb400" font-size="12">Note: Q4_K weights must be dequantized to INT8 (or kept as packed nibbles with special handling)</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- Section 3: Transformer Operations -->
+        <section id="transformer-ops">
+            <h2>3. Transformer Operations & SIMD Mapping</h2>
+            <p>Different operations in the transformer benefit from different SIMD approaches.</p>
+
+            <div class="svg-container">
+                <svg width="1200" height="900" viewBox="0 0 1200 900">
+                    <!-- Layer structure -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#888"/>
+                        </marker>
+                    </defs>
+
+                    <text x="600" y="30" fill="#ffb400" font-weight="bold" font-size="22" text-anchor="middle">Transformer Layer: Operations & Optimal SIMD</text>
+
+                    <!-- Input -->
+                    <rect x="500" y="50" width="200" height="40" rx="5" fill="#2a2a2a" stroke="#888"/>
+                    <text x="600" y="75" fill="#888" text-anchor="middle" font-size="14">Input: x [1, D]</text>
+                    <line x1="600" y1="90" x2="600" y2="120" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- RMSNorm 1 -->
+                    <g transform="translate(400, 120)">
+                        <rect width="400" height="80" rx="10" fill="#1a1a1a" stroke="#9b59b6" stroke-width="2"/>
+                        <text x="200" y="25" fill="#9b59b6" font-weight="bold" font-size="16" text-anchor="middle">RMSNorm</text>
+                        <text x="200" y="45" fill="#888" font-size="12" text-anchor="middle">x_norm = x * rsqrt(mean(x^2) + eps) * gamma</text>
+                        <rect x="10" y="55" width="120" height="20" rx="3" fill="rgba(155,89,182,0.3)"/>
+                        <text x="70" y="70" fill="#9b59b6" font-size="10" text-anchor="middle">AVX-512 FP32</text>
+                        <text x="200" y="70" fill="#666" font-size="10" text-anchor="middle">Compute-bound, stays in FP32</text>
+                    </g>
+                    <line x1="600" y1="200" x2="600" y2="230" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Q/K/V Projections -->
+                    <g transform="translate(100, 230)">
+                        <rect width="1000" height="140" rx="10" fill="#1a1a1a" stroke="#27ae60" stroke-width="3"/>
+                        <text x="500" y="25" fill="#27ae60" font-weight="bold" font-size="16" text-anchor="middle">Q/K/V Projections (3x GEMV)</text>
+
+                        <!-- Three projections -->
+                        <g transform="translate(50, 40)">
+                            <rect width="250" height="80" rx="5" fill="#2a2a2a"/>
+                            <text x="125" y="20" fill="#07adf8" font-weight="bold" font-size="14" text-anchor="middle">Q = x @ W_q</text>
+                            <text x="125" y="40" fill="#888" font-size="11" text-anchor="middle">[1,D] @ [D,H*hd] = [1,H*hd]</text>
+                            <rect x="10" y="50" width="80" height="22" rx="3" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="66" fill="#27ae60" font-size="10" text-anchor="middle">VNNI Q4_K</text>
+                            <rect x="100" y="50" width="60" height="22" rx="3" fill="rgba(231,76,60,0.3)"/>
+                            <text x="130" y="66" fill="#e74c3c" font-size="9" text-anchor="middle">AMX (if M>1)</text>
+                        </g>
+
+                        <g transform="translate(370, 40)">
+                            <rect width="250" height="80" rx="5" fill="#2a2a2a"/>
+                            <text x="125" y="20" fill="#07adf8" font-weight="bold" font-size="14" text-anchor="middle">K = x @ W_k</text>
+                            <text x="125" y="40" fill="#888" font-size="11" text-anchor="middle">[1,D] @ [D,Hkv*hd]</text>
+                            <rect x="10" y="50" width="80" height="22" rx="3" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="66" fill="#27ae60" font-size="10" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+
+                        <g transform="translate(690, 40)">
+                            <rect width="250" height="80" rx="5" fill="#2a2a2a"/>
+                            <text x="125" y="20" fill="#07adf8" font-weight="bold" font-size="14" text-anchor="middle">V = x @ W_v</text>
+                            <text x="125" y="40" fill="#888" font-size="11" text-anchor="middle">[1,D] @ [D,Hkv*hd]</text>
+                            <rect x="10" y="50" width="80" height="22" rx="3" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="66" fill="#27ae60" font-size="10" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+
+                        <text x="500" y="135" fill="#ffb400" font-size="12" text-anchor="middle">MEMORY BOUND - Q4_K weights reduce bandwidth 7x!</text>
+                    </g>
+                    <line x1="600" y1="370" x2="600" y2="400" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- RoPE -->
+                    <g transform="translate(400, 400)">
+                        <rect width="400" height="60" rx="10" fill="#1a1a1a" stroke="#e67e22" stroke-width="2"/>
+                        <text x="200" y="25" fill="#e67e22" font-weight="bold" font-size="16" text-anchor="middle">RoPE (Rotary Position Embedding)</text>
+                        <text x="200" y="45" fill="#888" font-size="11" text-anchor="middle">q_rot = q * cos + rotate(q) * sin</text>
+                        <text x="350" y="50" fill="#666" font-size="10">AVX-512 FP32</text>
+                    </g>
+                    <line x1="600" y1="460" x2="600" y2="490" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Attention -->
+                    <g transform="translate(200, 490)">
+                        <rect width="800" height="100" rx="10" fill="#1a1a1a" stroke="#e74c3c" stroke-width="2"/>
+                        <text x="400" y="25" fill="#e74c3c" font-weight="bold" font-size="16" text-anchor="middle">Attention: softmax(Q @ K^T / sqrt(d)) @ V</text>
+
+                        <g transform="translate(20, 35)">
+                            <rect width="180" height="50" rx="5" fill="#2a2a2a"/>
+                            <text x="90" y="20" fill="#888" font-size="12" text-anchor="middle">Q @ K^T (scores)</text>
+                            <text x="90" y="40" fill="#666" font-size="10" text-anchor="middle">FP32 or FP16 cache</text>
+                        </g>
+
+                        <g transform="translate(220, 35)">
+                            <rect width="180" height="50" rx="5" fill="#2a2a2a"/>
+                            <text x="90" y="20" fill="#888" font-size="12" text-anchor="middle">Softmax</text>
+                            <text x="90" y="40" fill="#e67e22" font-size="10" text-anchor="middle">AVX-512 FP32</text>
+                        </g>
+
+                        <g transform="translate(420, 35)">
+                            <rect width="180" height="50" rx="5" fill="#2a2a2a"/>
+                            <text x="90" y="20" fill="#888" font-size="12" text-anchor="middle">Attn @ V</text>
+                            <text x="90" y="40" fill="#666" font-size="10" text-anchor="middle">FP32/FP16</text>
+                        </g>
+
+                        <g transform="translate(620, 35)">
+                            <rect width="160" height="50" rx="5" fill="#2a2a2a"/>
+                            <text x="80" y="20" fill="#888" font-size="12" text-anchor="middle">Out Proj</text>
+                            <text x="80" y="40" fill="#27ae60" font-size="10" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+                    </g>
+                    <line x1="600" y1="590" x2="600" y2="620" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Residual + RMSNorm -->
+                    <g transform="translate(400, 620)">
+                        <rect width="400" height="50" rx="10" fill="#1a1a1a" stroke="#9b59b6" stroke-width="2"/>
+                        <text x="200" y="30" fill="#9b59b6" font-weight="bold" font-size="14" text-anchor="middle">Residual Add + RMSNorm</text>
+                        <text x="350" y="40" fill="#666" font-size="10">AVX-512 FP32</text>
+                    </g>
+                    <line x1="600" y1="670" x2="600" y2="700" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- MLP -->
+                    <g transform="translate(150, 700)">
+                        <rect width="900" height="120" rx="10" fill="#1a1a1a" stroke="#27ae60" stroke-width="3"/>
+                        <text x="450" y="25" fill="#27ae60" font-weight="bold" font-size="16" text-anchor="middle">MLP (SwiGLU): gate * up * silu(gate) then down</text>
+
+                        <g transform="translate(30, 35)">
+                            <rect width="200" height="60" rx="5" fill="#2a2a2a"/>
+                            <text x="100" y="20" fill="#888" font-size="12" text-anchor="middle">Gate: x @ W_gate</text>
+                            <text x="100" y="40" fill="#888" font-size="10" text-anchor="middle">[1,D] @ [D,4D]</text>
+                            <rect x="10" y="45" width="80" height="15" rx="2" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="56" fill="#27ae60" font-size="9" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+
+                        <g transform="translate(250, 35)">
+                            <rect width="200" height="60" rx="5" fill="#2a2a2a"/>
+                            <text x="100" y="20" fill="#888" font-size="12" text-anchor="middle">Up: x @ W_up</text>
+                            <text x="100" y="40" fill="#888" font-size="10" text-anchor="middle">[1,D] @ [D,4D]</text>
+                            <rect x="10" y="45" width="80" height="15" rx="2" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="56" fill="#27ae60" font-size="9" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+
+                        <g transform="translate(470, 35)">
+                            <rect width="150" height="60" rx="5" fill="#2a2a2a"/>
+                            <text x="75" y="20" fill="#888" font-size="12" text-anchor="middle">SiLU + Mul</text>
+                            <text x="75" y="40" fill="#e67e22" font-size="10" text-anchor="middle">AVX-512 FP32</text>
+                        </g>
+
+                        <g transform="translate(640, 35)">
+                            <rect width="200" height="60" rx="5" fill="#2a2a2a"/>
+                            <text x="100" y="20" fill="#888" font-size="12" text-anchor="middle">Down: swiglu @ W_down</text>
+                            <text x="100" y="40" fill="#888" font-size="10" text-anchor="middle">[1,4D] @ [4D,D]</text>
+                            <rect x="10" y="45" width="80" height="15" rx="2" fill="rgba(39,174,96,0.3)"/>
+                            <text x="50" y="56" fill="#27ae60" font-size="9" text-anchor="middle">VNNI Q4_K</text>
+                        </g>
+
+                        <text x="450" y="110" fill="#ffb400" font-size="12" text-anchor="middle">MLP is ~67% of compute - Q4_K VNNI here is critical!</text>
+                    </g>
+
+                    <!-- Legend -->
+                    <g transform="translate(50, 850)">
+                        <rect x="0" y="0" width="20" height="20" fill="rgba(39,174,96,0.5)"/>
+                        <text x="30" y="15" fill="#888" font-size="12">VNNI Q4_K (Memory-bound GEMV)</text>
+
+                        <rect x="250" y="0" width="20" height="20" fill="rgba(231,76,60,0.5)"/>
+                        <text x="280" y="15" fill="#888" font-size="12">AMX (Batch > 1 only)</text>
+
+                        <rect x="450" y="0" width="20" height="20" fill="rgba(230,126,34,0.5)"/>
+                        <text x="480" y="15" fill="#888" font-size="12">AVX-512 FP32 (Compute-bound)</text>
+
+                        <rect x="700" y="0" width="20" height="20" fill="rgba(155,89,182,0.5)"/>
+                        <text x="730" y="15" fill="#888" font-size="12">RMSNorm (Small, FP32)</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="card">
+                <h3>Operation Breakdown by Time (Decode, M=1)</h3>
+                <table>
+                    <tr><th>Operation</th><th>% of Time</th><th>Bottleneck</th><th>Best SIMD</th><th>Best Format</th></tr>
+                    <tr><td>Q/K/V Projections</td><td>~25%</td><td>Memory BW</td><td class="highlight">VNNI</td><td>Q4_K weights, Q8 activations</td></tr>
+                    <tr><td>Output Projection</td><td>~8%</td><td>Memory BW</td><td class="highlight">VNNI</td><td>Q4_K weights</td></tr>
+                    <tr><td>MLP (gate+up+down)</td><td>~60%</td><td>Memory BW</td><td class="highlight">VNNI</td><td>Q4_K weights</td></tr>
+                    <tr><td>Attention (Q@K, softmax, @V)</td><td>~5%</td><td>Compute</td><td>AVX-512 FP32</td><td>FP32/FP16 KV cache</td></tr>
+                    <tr><td>RMSNorm (x2)</td><td>~1%</td><td>Compute</td><td>AVX-512 FP32</td><td>FP32</td></tr>
+                    <tr><td>RoPE, Residuals</td><td>~1%</td><td>Compute</td><td>AVX-512 FP32</td><td>FP32</td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 4: Cache Hierarchy -->
+        <section id="cache-flow">
+            <h2>4. Cache Hierarchy & Data Flow</h2>
+            <p>Understanding cache behavior is crucial for keeping activations "hot" and avoiding DRAM round-trips.</p>
+
+            <div class="svg-container">
+                <svg width="1200" height="700" viewBox="0 0 1200 700">
+                    <text x="600" y="30" fill="#ffb400" font-weight="bold" font-size="22" text-anchor="middle">5th Gen Xeon Memory Hierarchy</text>
+
+                    <!-- CPU Die -->
+                    <rect x="100" y="50" width="1000" height="600" rx="20" fill="#1a1a1a" stroke="#444" stroke-width="3"/>
+
+                    <!-- Registers -->
+                    <g transform="translate(150, 80)">
+                        <rect width="900" height="80" rx="10" fill="#e74c3c" opacity="0.8"/>
+                        <text x="450" y="30" fill="white" font-weight="bold" font-size="18" text-anchor="middle">Registers (ZMM0-31: 2KB total)</text>
+                        <text x="450" y="55" fill="#fdd" font-size="14" text-anchor="middle">Access: 0 cycles | 32 x 512-bit ZMM + 8 x 1KB AMX tiles</text>
+                        <text x="450" y="75" fill="#faa" font-size="12" text-anchor="middle">Keep: Current VNNI accumulator, loop indices, scales</text>
+                    </g>
+
+                    <!-- L1 Cache -->
+                    <g transform="translate(150, 170)">
+                        <rect width="900" height="90" rx="10" fill="#e67e22" opacity="0.8"/>
+                        <text x="450" y="30" fill="white" font-weight="bold" font-size="18" text-anchor="middle">L1 Data Cache (48KB per core)</text>
+                        <text x="450" y="55" fill="#fed" font-size="14" text-anchor="middle">Access: 4-5 cycles | ~2 TB/s bandwidth</text>
+                        <text x="450" y="75" fill="#fca" font-size="12" text-anchor="middle">Keep: Current activation row (896 floats = 3.5KB), RMSNorm gamma (3.5KB)</text>
+                        <rect x="10" y="80" width="200" height="8" rx="2" fill="#27ae60"/>
+                        <text x="220" y="88" fill="#888" font-size="10">Activations fit!</text>
+                    </g>
+
+                    <!-- L2 Cache -->
+                    <g transform="translate(150, 270)">
+                        <rect width="900" height="100" rx="10" fill="#f1c40f" opacity="0.8"/>
+                        <text x="450" y="30" fill="#333" font-weight="bold" font-size="18" text-anchor="middle">L2 Cache (2MB per core)</text>
+                        <text x="450" y="55" fill="#555" font-size="14" text-anchor="middle">Access: 12-14 cycles | ~1 TB/s bandwidth</text>
+                        <text x="450" y="75" fill="#666" font-size="12" text-anchor="middle">Keep: KV cache for recent tokens, frequently used weight blocks</text>
+
+                        <g transform="translate(20, 82)">
+                            <rect width="150" height="15" rx="2" fill="#07adf8"/>
+                            <text x="160" y="12" fill="#666" font-size="10">Q8 activations (~1KB)</text>
+                        </g>
+                        <g transform="translate(350, 82)">
+                            <rect width="300" height="15" rx="2" fill="#9b59b6"/>
+                            <text x="310" y="12" fill="#666" font-size="10">KV cache (token_pos * 2 * Hkv * hd * 2 bytes)</text>
+                        </g>
+                    </g>
+
+                    <!-- L3 Cache -->
+                    <g transform="translate(150, 380)">
+                        <rect width="900" height="100" rx="10" fill="#3498db" opacity="0.8"/>
+                        <text x="450" y="30" fill="white" font-weight="bold" font-size="18" text-anchor="middle">L3 Cache (Shared, 105MB for 5th Gen Xeon)</text>
+                        <text x="450" y="55" fill="#ddd" font-size="14" text-anchor="middle">Access: 40-50 cycles | ~500 GB/s bandwidth</text>
+                        <text x="450" y="75" fill="#aaa" font-size="12" text-anchor="middle">Partial weight tiles may stay hot across tokens</text>
+
+                        <!-- Weight fit calculation -->
+                        <g transform="translate(20, 82)">
+                            <text x="0" y="12" fill="#aaa" font-size="11">Qwen2-0.5B Q4_K: ~350MB weights (won't fit)</text>
+                            <text x="450" y="12" fill="#aaa" font-size="11">| Qwen2-0.5B FP32: ~2GB (definitely won't fit)</text>
+                        </g>
+                    </g>
+
+                    <!-- DRAM -->
+                    <g transform="translate(150, 490)">
+                        <rect width="900" height="100" rx="10" fill="#2c3e50" opacity="0.9"/>
+                        <text x="450" y="30" fill="white" font-weight="bold" font-size="18" text-anchor="middle">DDR5 DRAM (8 channels @ 4800 MT/s)</text>
+                        <text x="450" y="55" fill="#ddd" font-size="14" text-anchor="middle">Access: 100+ cycles | ~300 GB/s peak (~200 GB/s sustained)</text>
+                        <text x="450" y="75" fill="#aaa" font-size="12" text-anchor="middle">Model weights live here - this is the bottleneck!</text>
+
+                        <g transform="translate(20, 82)">
+                            <rect width="600" height="15" rx="2" fill="#e74c3c"/>
+                            <text x="610" y="12" fill="#e74c3c" font-size="11" font-weight="bold">Weight loading dominates decode time</text>
+                        </g>
+                    </g>
+
+                    <!-- Data flow arrows -->
+                    <g transform="translate(1070, 80)">
+                        <text x="0" y="20" fill="#27ae60" font-size="12">HOT</text>
+                        <line x1="15" y1="30" x2="15" y2="500" stroke="#27ae60" stroke-width="3"/>
+                        <polygon points="10,500 15,520 20,500" fill="#27ae60"/>
+                        <text x="0" y="540" fill="#e74c3c" font-size="12">COLD</text>
+                    </g>
+
+                    <!-- Key insight box -->
+                    <g transform="translate(150, 600)">
+                        <rect width="900" height="40" rx="5" fill="rgba(255,180,0,0.2)" stroke="#ffb400"/>
+                        <text x="450" y="25" fill="#ffb400" font-weight="bold" font-size="14" text-anchor="middle">Key: Keep activations in L1/L2, accept weight streaming from DRAM. Q4_K reduces DRAM traffic 7x vs FP32!</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- Section 5: Activation Flow -->
+        <section id="activation-flow">
+            <h2>5. Activation Storage & Hot Data Path</h2>
+            <p>How to keep activations hot in cache while streaming weights from DRAM.</p>
+
+            <div class="svg-container">
+                <svg width="1200" height="600" viewBox="0 0 1200 600">
+                    <text x="600" y="30" fill="#ffb400" font-weight="bold" font-size="20" text-anchor="middle">Decode Token Data Flow (Keeping Activations Hot)</text>
+
+                    <!-- Timeline -->
+                    <line x1="100" y1="100" x2="1100" y2="100" stroke="#444" stroke-width="2"/>
+                    <text x="600" y="85" fill="#888" text-anchor="middle" font-size="12">Time (operations within one layer)</text>
+
+                    <!-- L1/L2 activation buffer -->
+                    <rect x="50" y="120" width="1100" height="60" rx="5" fill="rgba(39,174,96,0.2)" stroke="#27ae60"/>
+                    <text x="70" y="145" fill="#27ae60" font-size="12">L1/L2: Activation Buffer (reused)</text>
+
+                    <!-- Operations timeline -->
+                    <g transform="translate(100, 200)">
+                        <!-- RMSNorm -->
+                        <rect x="0" y="0" width="100" height="80" rx="5" fill="#9b59b6" opacity="0.7"/>
+                        <text x="50" y="25" fill="white" text-anchor="middle" font-size="11">RMSNorm</text>
+                        <text x="50" y="45" fill="#ddd" text-anchor="middle" font-size="9">Read: x (L1)</text>
+                        <text x="50" y="60" fill="#ddd" text-anchor="middle" font-size="9">Write: x_norm (L1)</text>
+
+                        <!-- Quantize -->
+                        <rect x="110" y="0" width="80" height="80" rx="5" fill="#07adf8" opacity="0.7"/>
+                        <text x="150" y="25" fill="white" text-anchor="middle" font-size="11">Quant Q8</text>
+                        <text x="150" y="45" fill="#ddd" text-anchor="middle" font-size="9">x_norm → Q8</text>
+                        <text x="150" y="60" fill="#ddd" text-anchor="middle" font-size="9">(stays L1)</text>
+
+                        <!-- Q projection -->
+                        <rect x="200" y="0" width="140" height="80" rx="5" fill="#27ae60" opacity="0.7"/>
+                        <text x="270" y="20" fill="white" text-anchor="middle" font-size="11">Q = x @ W_q</text>
+                        <text x="270" y="40" fill="#ffa" text-anchor="middle" font-size="9">Stream W_q (DRAM)</text>
+                        <text x="270" y="55" fill="#ddd" text-anchor="middle" font-size="9">x_q8 stays L1!</text>
+                        <text x="270" y="70" fill="#ddd" text-anchor="middle" font-size="9">Write Q (L2)</text>
+
+                        <!-- K projection -->
+                        <rect x="350" y="0" width="120" height="80" rx="5" fill="#27ae60" opacity="0.7"/>
+                        <text x="410" y="20" fill="white" text-anchor="middle" font-size="11">K = x @ W_k</text>
+                        <text x="410" y="40" fill="#ffa" text-anchor="middle" font-size="9">Stream W_k</text>
+                        <text x="410" y="55" fill="#ddd" text-anchor="middle" font-size="9">x_q8 still L1</text>
+
+                        <!-- V projection -->
+                        <rect x="480" y="0" width="120" height="80" rx="5" fill="#27ae60" opacity="0.7"/>
+                        <text x="540" y="20" fill="white" text-anchor="middle" font-size="11">V = x @ W_v</text>
+                        <text x="540" y="40" fill="#ffa" text-anchor="middle" font-size="9">Stream W_v</text>
+                        <text x="540" y="55" fill="#ddd" text-anchor="middle" font-size="9">x_q8 still L1</text>
+
+                        <!-- Attention -->
+                        <rect x="610" y="0" width="140" height="80" rx="5" fill="#e67e22" opacity="0.7"/>
+                        <text x="680" y="20" fill="white" text-anchor="middle" font-size="11">Attention</text>
+                        <text x="680" y="40" fill="#ddd" text-anchor="middle" font-size="9">Q,K,V from L2</text>
+                        <text x="680" y="55" fill="#ddd" text-anchor="middle" font-size="9">KV cache (L2/L3)</text>
+                        <text x="680" y="70" fill="#ddd" text-anchor="middle" font-size="9">Out → L1</text>
+
+                        <!-- Output proj -->
+                        <rect x="760" y="0" width="120" height="80" rx="5" fill="#27ae60" opacity="0.7"/>
+                        <text x="820" y="20" fill="white" text-anchor="middle" font-size="11">Out Proj</text>
+                        <text x="820" y="40" fill="#ffa" text-anchor="middle" font-size="9">Stream W_o</text>
+
+                        <!-- MLP -->
+                        <rect x="890" y="0" width="100" height="80" rx="5" fill="#27ae60" opacity="0.7"/>
+                        <text x="940" y="20" fill="white" text-anchor="middle" font-size="11">MLP</text>
+                        <text x="940" y="40" fill="#ffa" text-anchor="middle" font-size="9">Stream W1,W2</text>
+                        <text x="940" y="55" fill="#ddd" text-anchor="middle" font-size="9">Fused: no</text>
+                        <text x="940" y="70" fill="#ddd" text-anchor="middle" font-size="9">DRAM trip</text>
+                    </g>
+
+                    <!-- DRAM weight streaming -->
+                    <rect x="50" y="300" width="1100" height="40" rx="5" fill="rgba(231,76,60,0.2)" stroke="#e74c3c"/>
+                    <text x="600" y="325" fill="#e74c3c" text-anchor="middle" font-size="12">DRAM: Weight Streaming (~52MB Q4_K per layer, ~200MB FP32)</text>
+
+                    <!-- Key insight -->
+                    <g transform="translate(100, 360)">
+                        <rect width="1000" height="120" rx="10" fill="#1a1a1a" stroke="#ffb400"/>
+                        <text x="500" y="30" fill="#ffb400" font-weight="bold" font-size="16" text-anchor="middle">Key Insight: Activation Reuse Pattern</text>
+                        <text x="500" y="55" fill="#888" font-size="13" text-anchor="middle">1. Quantize x to Q8 ONCE after RMSNorm (stays in L1: ~1KB)</text>
+                        <text x="500" y="75" fill="#888" font-size="13" text-anchor="middle">2. Reuse Q8 activations for Q, K, V projections (3x reuse before eviction)</text>
+                        <text x="500" y="95" fill="#888" font-size="13" text-anchor="middle">3. Fused MLP: quantize once, use for gate+up+down (eliminates intermediate DRAM write)</text>
+                        <text x="500" y="115" fill="#27ae60" font-size="13" text-anchor="middle">Weights stream through, activations stay hot!</text>
+                    </g>
+
+                    <!-- Legend -->
+                    <g transform="translate(100, 500)">
+                        <rect x="0" y="0" width="20" height="20" fill="rgba(255,170,0,0.5)"/>
+                        <text x="30" y="15" fill="#888" font-size="12">DRAM streaming (weights)</text>
+
+                        <rect x="250" y="0" width="20" height="20" fill="rgba(39,174,96,0.5)"/>
+                        <text x="280" y="15" fill="#888" font-size="12">L1 hot (activations)</text>
+
+                        <rect x="500" y="0" width="20" height="20" fill="rgba(7,173,248,0.5)"/>
+                        <text x="530" y="15" fill="#888" font-size="12">L2 (Q/K/V, KV cache)</text>
+                    </g>
+
+                    <!-- Bandwidth calculation -->
+                    <g transform="translate(100, 540)">
+                        <text x="0" y="15" fill="#888" font-size="12">Qwen2-0.5B decode: ~52MB weights/layer x 24 layers = 1.25GB per token</text>
+                        <text x="550" y="15" fill="#888" font-size="12">@ 200GB/s = ~6.25ms/token = 160 tok/s theoretical max (Q4_K)</text>
+                        <text x="0" y="35" fill="#e74c3c" font-size="12">FP32: ~200MB/layer x 24 = 4.8GB per token @ 200GB/s = ~24ms = 42 tok/s max</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- Section 6: Implementation Strategy -->
+        <section id="implementation">
+            <h2>6. Implementation Strategy</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Phase 1: VNNI Q4_K Decode (Highest Impact)</h3>
+                    <ol style="color: var(--text-secondary); padding-left: 1.5rem;">
+                        <li>Implement <code>quantize_row_q8_k()</code> for activations</li>
+                        <li>Implement <code>vec_dot_q4_k_q8_k_vnni()</code> using <code>_mm512_dpbusd_epi32</code></li>
+                        <li>Wire into decode path: after RMSNorm, quantize to Q8, use VNNI matvec</li>
+                        <li>Keep FP32 for: RMSNorm, RoPE, Attention scores, Softmax</li>
+                    </ol>
+                    <p style="color: var(--green); margin-top: 1rem;"><strong>Expected speedup: 5-10x for decode</strong></p>
+                </div>
+
+                <div class="card">
+                    <h3>Phase 2: AMX for Prefill</h3>
+                    <ol style="color: var(--text-secondary); padding-left: 1.5rem;">
+                        <li>Implement weight repacking to VNNI tile format at load time</li>
+                        <li>Implement AMX tile kernel for Q4_K x Q8_K</li>
+                        <li>Use for M > 16 (prefill batch size)</li>
+                        <li>Keep VNNI for M = 1 (single token decode)</li>
+                    </ol>
+                    <p style="color: var(--blue); margin-top: 1rem;"><strong>Expected speedup: 2-3x for prefill</strong></p>
+                </div>
+
+                <div class="card">
+                    <h3>Phase 3: SubNUMA & Hugepages</h3>
+                    <ol style="color: var(--text-secondary); padding-left: 1.5rem;">
+                        <li>Detect SubNUMA clusters (SNC mode on Xeon)</li>
+                        <li>Allocate model weights per-SNC with <code>mbind()</code></li>
+                        <li>Use 2MB hugepages for weight buffers</li>
+                        <li>Pin threads to SNC, access local weights</li>
+                    </ol>
+                    <p style="color: var(--purple); margin-top: 1rem;"><strong>Competitive advantage over llama.cpp!</strong></p>
+                </div>
+
+                <div class="card">
+                    <h3>Phase 4: BF16 for Training</h3>
+                    <ol style="color: var(--text-secondary); padding-left: 1.5rem;">
+                        <li>Keep FP32 master weights for optimizer state</li>
+                        <li>Use BF16 for forward/backward activations</li>
+                        <li>Implement <code>_mm512_dpbf16_ps</code> for BF16 GEMM</li>
+                        <li>Optional: AMX-BF16 tiles for batch training</li>
+                    </ol>
+                    <p style="color: var(--orange); margin-top: 1rem;"><strong>For training workloads</strong></p>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Summary: What Each SIMD Is Best For</h3>
+                <table>
+                    <tr><th>SIMD</th><th>Best Use Case</th><th>Data Types</th><th>Operations</th></tr>
+                    <tr>
+                        <td><span class="tag tag-blue">AVX-512 FP32</span></td>
+                        <td>RMSNorm, Softmax, RoPE, Residuals</td>
+                        <td>FP32</td>
+                        <td><code>_mm512_fmadd_ps</code>, <code>_mm512_exp_ps</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="tag tag-green">AVX-512 VNNI</span></td>
+                        <td>Q4_K decode (M=1 GEMV)</td>
+                        <td>INT8 x INT8 → INT32</td>
+                        <td><code>_mm512_dpbusd_epi32</code> - 4x faster!</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tag tag-orange">AMX INT8</span></td>
+                        <td>Prefill (M>1), batch inference</td>
+                        <td>INT8 tiles</td>
+                        <td><code>_tile_dpbusd</code> - 16x16 tiles</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tag tag-purple">AVX-512 BF16</span></td>
+                        <td>Training, high-precision inference</td>
+                        <td>BF16</td>
+                        <td><code>_mm512_dpbf16_ps</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="tag tag-cyan">AMX BF16</span></td>
+                        <td>Training batches, dense inference</td>
+                        <td>BF16 tiles</td>
+                        <td><code>_tile_dpbf16ps</code></td>
+                    </tr>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer style="text-align: center; padding: 2rem; color: var(--text-muted); border-top: 1px solid var(--grey);">
+        C-Kernel-Engine Documentation | SIMD & Quantization Architecture Guide
+    </footer>
+</body>
+</html>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-16</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="Consolas, Monaco, monospace">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="scaleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f093fb"/>
+      <stop offset="100%" style="stop-color:#f5576c"/>
+    </linearGradient>
+    <linearGradient id="nibbleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4facfe"/>
+      <stop offset="100%" style="stop-color:#00f2fe"/>
+    </linearGradient>
+    <linearGradient id="highbitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#43e97b"/>
+      <stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#0d1117"/>
+
+  <!-- Title -->
+  <text x="600" y="45" fill="url(#headerGrad)" font-size="32" font-weight="bold" text-anchor="middle">
+    Q5_0 Quantization: 32 Weights in 22 Bytes
+  </text>
+  <text x="600" y="75" fill="#8b949e" font-size="16" text-anchor="middle">
+    5.5 bits per weight = 4-bit nibble + 1 high bit + shared FP16 scale
+  </text>
+
+  <!-- MEMORY LAYOUT SECTION -->
+  <text x="50" y="120" fill="#58a6ff" font-size="20" font-weight="bold">MEMORY LAYOUT (22 bytes total)</text>
+
+  <!-- Scale (d) - 2 bytes -->
+  <rect x="50" y="140" width="120" height="50" rx="5" fill="url(#scaleGrad)" filter="url(#shadow)"/>
+  <text x="110" y="160" fill="#000" font-size="12" text-anchor="middle" font-weight="bold">d (scale)</text>
+  <text x="110" y="178" fill="#000" font-size="10" text-anchor="middle">FP16 = 2 bytes</text>
+
+  <!-- High bits (qh) - 4 bytes -->
+  <rect x="180" y="140" width="200" height="50" rx="5" fill="url(#highbitGrad)" filter="url(#shadow)"/>
+  <text x="280" y="160" fill="#000" font-size="12" text-anchor="middle" font-weight="bold">qh[4] (high bits)</text>
+  <text x="280" y="178" fill="#000" font-size="10" text-anchor="middle">32 bits = 1 bit per weight</text>
+
+  <!-- Nibbles (qs) - 16 bytes -->
+  <rect x="390" y="140" width="400" height="50" rx="5" fill="url(#nibbleGrad)" filter="url(#shadow)"/>
+  <text x="590" y="160" fill="#000" font-size="12" text-anchor="middle" font-weight="bold">qs[16] (low nibbles)</text>
+  <text x="590" y="178" fill="#000" font-size="10" text-anchor="middle">32 x 4-bit values packed = 16 bytes</text>
+
+  <!-- Byte counts -->
+  <text x="110" y="205" fill="#8b949e" font-size="11" text-anchor="middle">2 bytes</text>
+  <text x="280" y="205" fill="#8b949e" font-size="11" text-anchor="middle">4 bytes</text>
+  <text x="590" y="205" fill="#8b949e" font-size="11" text-anchor="middle">16 bytes</text>
+  <text x="900" y="170" fill="#f0883e" font-size="14" font-weight="bold">= 22 bytes for 32 weights</text>
+
+  <!-- THE MYSTERY: qh bit extraction -->
+  <text x="50" y="260" fill="#58a6ff" font-size="20" font-weight="bold">THE MYSTERY: Why qh >> (j + 12)?</text>
+
+  <!-- qh bit layout visualization -->
+  <rect x="50" y="280" width="1100" height="100" rx="8" fill="#161b22" stroke="#30363d"/>
+
+  <!-- 32 bit boxes for qh -->
+  <g transform="translate(60, 295)">
+    <!-- Bits 0-15: weights 0-15 -->
+    <text x="240" y="-5" fill="#43e97b" font-size="11" text-anchor="middle">Bits 0-15 → Weights 0-15 (low nibbles)</text>
+    <g id="bits0-15">
+      <!-- Draw 16 bit boxes -->
+      <rect x="0" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="15" y="22" fill="#43e97b" font-size="9" text-anchor="middle">0</text>
+      <rect x="32" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="47" y="22" fill="#43e97b" font-size="9" text-anchor="middle">1</text>
+      <rect x="64" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="79" y="22" fill="#43e97b" font-size="9" text-anchor="middle">2</text>
+      <text x="110" y="22" fill="#8b949e" font-size="12">...</text>
+      <rect x="130" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="145" y="22" fill="#43e97b" font-size="9" text-anchor="middle">12</text>
+      <rect x="162" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="177" y="22" fill="#43e97b" font-size="9" text-anchor="middle">13</text>
+      <rect x="194" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="209" y="22" fill="#43e97b" font-size="9" text-anchor="middle">14</text>
+      <rect x="226" y="5" width="30" height="25" fill="#1a472a" stroke="#43e97b" rx="3"/>
+      <text x="241" y="22" fill="#43e97b" font-size="9" text-anchor="middle">15</text>
+    </g>
+
+    <!-- Bits 16-31: weights 16-31 -->
+    <text x="780" y="-5" fill="#f5576c" font-size="11" text-anchor="middle">Bits 16-31 → Weights 16-31 (high nibbles)</text>
+    <g id="bits16-31" transform="translate(520, 0)">
+      <rect x="0" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="15" y="22" fill="#f5576c" font-size="9" text-anchor="middle">16</text>
+      <rect x="32" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="47" y="22" fill="#f5576c" font-size="9" text-anchor="middle">17</text>
+      <rect x="64" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="79" y="22" fill="#f5576c" font-size="9" text-anchor="middle">18</text>
+      <text x="110" y="22" fill="#8b949e" font-size="12">...</text>
+      <rect x="130" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="145" y="22" fill="#f5576c" font-size="9" text-anchor="middle">28</text>
+      <rect x="162" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="177" y="22" fill="#f5576c" font-size="9" text-anchor="middle">29</text>
+      <rect x="194" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="209" y="22" fill="#f5576c" font-size="9" text-anchor="middle">30</text>
+      <rect x="226" y="5" width="30" height="25" fill="#3d1a1a" stroke="#f5576c" rx="3"/>
+      <text x="241" y="22" fill="#f5576c" font-size="9" text-anchor="middle">31</text>
+    </g>
+
+    <!-- Arrow showing j + 12 mapping -->
+    <path d="M 145 35 Q 400 80 665 35" stroke="#ffd700" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+    <text x="400" y="75" fill="#ffd700" font-size="11" text-anchor="middle" font-weight="bold">j=0 → bit 12, j=1 → bit 13, ...</text>
+  </g>
+
+  <!-- THE CODE EXPLAINED -->
+  <text x="50" y="420" fill="#58a6ff" font-size="20" font-weight="bold">THE CODE EXPLAINED</text>
+
+  <!-- Code block -->
+  <rect x="50" y="440" width="550" height="180" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="70" y="470" fill="#8b949e" font-size="12">// For weight j (0-15): uses LOW nibble of qs[j]</text>
+  <text x="70" y="495" fill="#79c0ff" font-size="14">xh_0 = ((qh >> j) &lt;&lt; 4) &amp; 0x10;</text>
+  <text x="70" y="515" fill="#7ee787" font-size="12">// Extract bit j, shift to position 4 (value 0 or 16)</text>
+
+  <text x="70" y="550" fill="#8b949e" font-size="12">// For weight j+16 (16-31): uses HIGH nibble of qs[j]</text>
+  <text x="70" y="575" fill="#ff7b72" font-size="14">xh_1 = ((qh >> (j + 12))) &amp; 0x10;</text>
+  <text x="70" y="595" fill="#7ee787" font-size="12">// Extract bit (j+16), but we only need bit 4 of result</text>
+  <text x="70" y="615" fill="#7ee787" font-size="12">// j+12+4 = j+16 ← the bit we actually want!</text>
+
+  <!-- Visual breakdown -->
+  <rect x="620" y="440" width="530" height="180" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="640" y="465" fill="#f0883e" font-size="14" font-weight="bold">Why j + 12 instead of j + 16?</text>
+
+  <text x="640" y="495" fill="#c9d1d9" font-size="12">We want bit (j+16) in position 4 of result.</text>
+  <text x="640" y="520" fill="#c9d1d9" font-size="12">Method 1: (qh >> (j+16)) &lt;&lt; 4    // shift right, then left</text>
+  <text x="640" y="545" fill="#c9d1d9" font-size="12">Method 2: (qh >> (j+12)) &amp; 0x10  // shift right less, mask</text>
+
+  <text x="640" y="580" fill="#7ee787" font-size="13" font-weight="bold">Both give same result! j+12 is just an optimization:</text>
+  <text x="640" y="605" fill="#8b949e" font-size="12">• Avoids extra shift operation</text>
+  <text x="640" y="625" fill="#8b949e" font-size="12">• 0x10 = bit 4 = we need bit (j+16-12) = bit (j+4) after shift</text>
+
+  <!-- RECONSTRUCTION FORMULA -->
+  <text x="50" y="660" fill="#58a6ff" font-size="20" font-weight="bold">WEIGHT RECONSTRUCTION</text>
+
+  <rect x="50" y="680" width="1100" height="90" rx="8" fill="#161b22" stroke="#30363d"/>
+
+  <!-- Formula visualization -->
+  <g transform="translate(70, 710)">
+    <text x="0" y="0" fill="#c9d1d9" font-size="16">weight[j] = d × (</text>
+    <rect x="130" y="-20" width="80" height="30" fill="#1a3a5c" stroke="#4facfe" rx="4"/>
+    <text x="170" y="3" fill="#4facfe" font-size="14" text-anchor="middle">nibble</text>
+    <text x="220" y="0" fill="#c9d1d9" font-size="16">|</text>
+    <rect x="235" y="-20" width="80" height="30" fill="#1a472a" stroke="#43e97b" rx="4"/>
+    <text x="275" y="3" fill="#43e97b" font-size="14" text-anchor="middle">high_bit</text>
+    <text x="325" y="0" fill="#c9d1d9" font-size="16">) - 16</text>
+
+    <text x="420" y="0" fill="#8b949e" font-size="14">where:</text>
+    <text x="480" y="0" fill="#4facfe" font-size="13">nibble = 0..15 (4 bits)</text>
+    <text x="650" y="0" fill="#43e97b" font-size="13">high_bit = 0 or 16 (1 bit &lt;&lt; 4)</text>
+
+    <text x="0" y="40" fill="#ffd700" font-size="14" font-weight="bold">Result: 5-bit unsigned (0..31) → signed (-16..+15)</text>
+  </g>
+
+  <!-- EXAMPLE -->
+  <text x="50" y="800" fill="#58a6ff" font-size="20" font-weight="bold">CONCRETE EXAMPLE: j=3</text>
+
+  <rect x="50" y="815" width="1100" height="70" rx="8" fill="#161b22" stroke="#30363d"/>
+  <g transform="translate(70, 835)">
+    <text x="0" y="15" fill="#c9d1d9" font-size="13">qs[3] = 0xA7 → low nibble = 7, high nibble = 10</text>
+    <text x="0" y="35" fill="#c9d1d9" font-size="13">qh = 0x0000_0808 → bit 3 = 1, bit 19 = 1</text>
+
+    <text x="400" y="15" fill="#43e97b" font-size="13">weight[3] = d × ((7 | 16) - 16) = d × 7</text>
+    <text x="400" y="35" fill="#f5576c" font-size="13">weight[19] = d × ((10 | 16) - 16) = d × 10</text>
+
+    <text x="750" y="25" fill="#ffd700" font-size="14" font-weight="bold">✓ Both high bits were set!</text>
+  </g>
+</svg>

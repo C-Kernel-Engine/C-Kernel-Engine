@@ -3,174 +3,2912 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C-Kernel-Engine Documentation</title>
+    <title>Home | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
-            --bg-color-deep: #111827;
-            --bg-color-medium: #1f2937;
-            --bg-color-light: #374151;
-            --border-color: #4b5563;
-            --text-color-main: #d1d5db;
-            --text-color-head: #f9fafb;
-            --accent-color-blue: #60a5fa;
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
         }
-        body {
-            background-color: var(--bg-color-deep);
-            color: var(--text-color-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+        * {
             margin: 0;
-            display: flex;
-            height: 100vh;
+            padding: 0;
+            box-sizing: border-box;
         }
-        aside {
-            width: 250px;
-            background-color: var(--bg-color-deep);
-            border-right: 1px solid var(--border-color);
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
-        .sidebar-header {
-            height: 64px;
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: bold;
-            color: var(--text-color-head);
-            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
         }
-        nav {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
-        nav ul {
-            list-style: none;
-            padding: 0;
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
         }
-        nav li {
-            margin-bottom: 0.5rem;
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
-        nav a {
-            display: block;
-            padding: 0.5rem 1rem;
-            color: var(--text-color-main);
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
             text-decoration: none;
-            border-radius: 6px;
-            transition: background 0.2s;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
         }
-        nav a:hover, nav a.active {
-            background-color: var(--bg-color-light);
-            color: var(--text-color-head);
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
         }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
         main {
-            flex: 1;
-            overflow-y: auto;
+            max-width: 1200px;
+            margin: 0 auto;
             padding: 2rem;
+            flex: 1;
+            width: 100%;
         }
-        .content-section {
-            display: none;
-            max-width: 800px;
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
             margin: 0 auto;
         }
-        .content-section.active {
-            display: block;
-        }
-        h2 {
-            color: var(--text-color-head);
-            border-bottom: 1px solid var(--border-color);
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
             padding-bottom: 0.5rem;
         }
-        .svg-container {
-            background-color: var(--bg-color-deep);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 2rem;
-            margin: 2rem 0;
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
             display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
             justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
         }
     </style>
 </head>
 <body>
-    <aside>
-        <div class="sidebar-header">C-Kernel-Engine</div>
-        <nav id="nav-menu">
-            <ul>
-                <li><a href="#overview" class="nav-link active" data-target="overview">Overview</a></li>
-                <li><a href="#architecture" class="nav-link" data-target="architecture">Architecture</a></li>
-                <li><a href="#ir-codegen" class="nav-link" data-target="ir-codegen">IR & Codegen</a></li>
-                <li><a href="ir-v2-format.html">IR v2 Format ↗</a></li>
-                <li><a href="doxygen_output/html/index.html" target="_blank">API Reference ↗</a></li>
-            </ul>
-        </nav>
-    </aside>
-
-    <main>
-        <div id="overview" class="content-section active">
-            <h2>Overview</h2>
-            <p>C-Kernel-Engine is a high-performance, model-agnostic inference engine for Transformer models, written in pure C with AVX-512 optimizations.</p>
-            <p>It treats model architecture as data, compiling a configuration file into a specialized C runtime.</p>
-        </div>
-
-        <div id="architecture" class="content-section">
-            <h2>Kernel Architecture</h2>
-            <p>The engine uses a three-layer architecture to separate threading logic from pure mathematical kernels.</p>
-            <div class="svg-container">
-                <svg width="600" height="400" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
-                        </linearGradient>
-                        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
-                        </linearGradient>
-                        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af" />
-                        </marker>
-                    </defs>
-                    
-                    <!-- Orchestrator Layer -->
-                    <rect x="100" y="50" width="400" height="80" rx="8" fill="url(#grad1)" />
-                    <text x="300" y="85" font-family="sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">Layer 3: Orchestrators</text>
-                    <text x="300" y="110" font-family="sans-serif" font-size="14" fill="#e5e7eb" text-anchor="middle">Manages Threads & Data Flow</text>
-
-                    <!-- Arrow -->
-                    <line x1="300" y1="130" x2="300" y2="170" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
-
-                    <!-- Kernel Layer -->
-                    <rect x="100" y="170" width="400" height="80" rx="8" fill="url(#grad2)" />
-                    <text x="300" y="205" font-family="sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">Layer 1: Core Kernels</text>
-                    <text x="300" y="230" font-family="sans-serif" font-size="14" fill="#e5e7eb" text-anchor="middle">Single-Threaded, AVX-512 Optimized</text>
-                </svg>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
             </div>
-        </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
 
-        <div id="ir-codegen" class="content-section">
-            <h2>IR & Codegen Pipeline</h2>
-            <p>Models are defined in JSON, parsed into an Intermediate Representation (IR), and compiled into C code.</p>
+<div class="hero">
+    <span class="badge badge-amber">CPU-Native LLM Training</span>
+    <h1>C-Kernel-Engine</h1>
+    <p>A code generator and kernel library for training and running LLMs on CPU hardware. Designed for low-compute devices and server-grade CPUs with full PyTorch parity.</p>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>CPU-Only by Design</strong><br>
+        This engine targets x86 and embedded ARM architectures. No GPU required. Supports AVX, AVX-512, and AMX (coming soon).
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>System Requirements</strong><br>
+        C-Kernel-Engine is designed for <strong>Linux systems</strong> only. Target platforms include:
+        <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+            <li>Server-grade CPUs (Intel Xeon, AMD EPYC) with AVX-512</li>
+            <li>Embedded systems (ARM Cortex-A, RISC-V)</li>
+            <li>Workstation CPUs with AVX2/FMA support</li>
+        </ul>
+        <small style="color: var(--text-muted);">Windows and macOS are not officially supported.</small>
+    </div>
+</div>
+
+<h2>What is C-Kernel-Engine?</h2>
+
+<p>C-Kernel-Engine is a <strong>code generator</strong> that transforms HuggingFace-style config files into optimized, standalone C code for both inference and training.</p>
+
+<div class="img-container svg-viewer" data-title="C-Kernel-Engine Pipeline">
+    <img src="assets/pipeline-overview.svg" alt="Pipeline: Config → Parse → Generate → Weights → Compile → Run">
+</div>
+
+<h2>Target Hardware</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Supported Architectures</h3>
+        <ul>
+            <li><strong>x86-64</strong> with AVX, AVX-512 support</li>
+            <li><strong>ARM</strong> for embedded systems</li>
+            <li><strong>AMX</strong> support coming soon</li>
+        </ul>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0;">Designed for low-compute hardware and server-grade CPUs. No GPU required.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Design Goals</h3>
+        <ul>
+            <li><strong>Both inference AND training</strong></li>
+            <li>Every kernel has forward + backward pass</li>
+            <li>Full parity with PyTorch autograd</li>
+            <li>Zero external dependencies</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Development Roadmap</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;"><span class="badge badge-amber">Current</span> Phase 1: Kernel Composition</h3>
+        <ul>
+            <li>Individual kernel implementation and testing</li>
+            <li>Forward and backward pass parity with PyTorch</li>
+            <li>IR-based code generation from configs</li>
+            <li>Weight loading via bump allocator</li>
+            <li>Single-node training and inference</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;"><span class="badge badge-indigo">Planned</span> Phase 2: Distributed CPU Training</h3>
+        <ul>
+            <li>RDMA-based distributed training</li>
+            <li>HPC-grade communication primitives</li>
+            <li>Multi-node gradient synchronization</li>
+            <li>Pipeline and tensor parallelism</li>
+            <li>Large-scale CPU cluster support</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Key Features</h2>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <div class="feature-icon amber">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
+        <h3 style="margin-top: 0;">Full PyTorch Parity</h3>
+        <p>Every kernel has both forward and backward passes, validated against PyTorch autograd with max diff &lt; 1e-5.</p>
+    </div>
+    <div class="card">
+        <div class="feature-icon indigo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">IR-Based Codegen</h3>
+        <p>Build an intermediate representation from config, then emit optimized C code with automatic buffer allocation.</p>
+    </div>
+    <div class="card card-green">
+        <div class="feature-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Zero Dependencies</h3>
+        <p>Pure C with optional SIMD. No external libraries required. Compiles with just GCC.</p>
+    </div>
+</div>
+
+<h2>Architecture Overview</h2>
+
+<div class="img-container">
+    <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine Architecture">
+</div>
+
+<h2>Tokenizer (16x Faster than PyTorch)</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Trie-Based Tokenization</h3>
+        <p>High-performance BPE/WordPiece tokenizer using trie-based longest-match. Achieves <strong>16.5x faster</strong> performance than PyTorch/tiktoken.</p>
+        <ul style="margin-top: 0.5rem;">
+            <li>O(k) lookup complexity vs O(n×k)</li>
+            <li>No memcpy in hot path</li>
+            <li>Full UTF-8 multilingual support</li>
+            <li>BPE, WordPiece, SentencePiece</li>
+        </ul>
+        <p style="margin-top: 1rem;"><a href="tokenizer.html" class="btn btn-sm">Learn More →</a></p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Performance Benchmarks</h3>
+        <table style="font-size: 0.85rem;">
+            <tr>
+                <th>Text Length</th>
+                <th>C-Kernel</th>
+                <th>PyTorch</th>
+                <th>Speedup</th>
+            </tr>
+            <tr>
+                <td>200 chars</td>
+                <td>20,941/s</td>
+                <td>4,616/s</td>
+                <td><span class="badge badge-green">4.5x</span></td>
+            </tr>
+            <tr>
+                <td>3,000 chars</td>
+                <td>95,923/s</td>
+                <td>6,197/s</td>
+                <td><span class="badge badge-green">15.5x</span></td>
+            </tr>
+            <tr>
+                <td>15,000 chars</td>
+                <td>114,463/s</td>
+                <td>6,237/s</td>
+                <td><span class="badge badge-green">18.4x</span></td>
+            </tr>
+        </table>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Average: 16.56x faster than PyTorch</p>
+    </div>
+</div>
+
+<h2>Kernel Library</h2>
+
+<p>All kernels implement both forward and backward passes with full PyTorch parity:</p>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Forward</th>
+        <th>Backward</th>
+        <th>Features</th>
+    </tr>
+    <tr>
+        <td><code>attention</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal mask, GQA support, head-major layout</td>
+    </tr>
+    <tr>
+        <td><code>rope</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rotary position embeddings, precomputed cache</td>
+    </tr>
+    <tr>
+        <td><code>rmsnorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused normalization, rstd caching</td>
+    </tr>
+    <tr>
+        <td><code>swiglu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused gate activation for Llama-style MLP</td>
+    </tr>
+    <tr>
+        <td><code>softmax</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal row-wise, numerically stable</td>
+    </tr>
+    <tr>
+        <td><code>layernorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rolled and unrolled variants</td>
+    </tr>
+    <tr>
+        <td><code>gelu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Exact and fast approximation</td>
+    </tr>
+    <tr>
+        <td><code>gemm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-indigo">N/A</span></td>
+        <td>Blocked serial, AVX-512, parallel variants</td>
+    </tr>
+    <tr>
+        <td><code>mlp</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>FC1 + activation + FC2, token parallel</td>
+    </tr>
+</table>
+
+<h2>Quick Start</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Build the Library</h3>
+    <pre>git clone https://github.com/antshiv/C-Kernel-Engine.git
+cd C-Kernel-Engine
+make</pre>
+    <p>This builds <code>build/libckernel_engine.so</code> with all kernels.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Run Tests</h3>
+    <pre>make test</pre>
+    <p>Runs all Python ctypes tests against PyTorch reference implementations.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Generate Model Runtime</h3>
+    <pre># From a HuggingFace config.json:
+make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
+    <p>Emits a complete C file with forward/backward passes stitched together.</p>
+</div>
+
+<h2>Data Flow</h2>
+
+<div class="img-container">
+    <img src="assets/forward-backward-flow.svg" alt="Forward and Backward Pass Data Flow">
+</div>
+
+<h2>Why CPU Training?</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Inference + Training</h3>
+        <p>Unlike inference-only engines, C-Kernel-Engine provides complete backward passes for every operation, enabling full training loops in pure C.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Modular Composition</h3>
+        <p>Each kernel is a standalone unit. The codegen layer stitches them together based on your model architecture.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Llama/SmolLM Compatible</h3>
+        <p>Full support for modern architectures: RoPE, GQA, SwiGLU, RMSNorm. Load SmolLM configs and run with full parity.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Verifiable Correctness</h3>
+        <p>Every kernel ships with Python test that loads via ctypes and compares against PyTorch autograd.</p>
+    </div>
+</div>
+
+<h2>Weight Loading</h2>
+
+<div class="card">
+    <p>After generating C code, load pretrained weights using the built-in converters:</p>
+    <table>
+        <tr>
+            <th>Source Format</th>
+            <th>Method</th>
+        </tr>
+        <tr>
+            <td>SafeTensors</td>
+            <td>Direct load to bump allocator</td>
+        </tr>
+        <tr>
+            <td>GGML</td>
+            <td>GGML → bump allocator converter</td>
+        </tr>
+        <tr>
+            <td>PyTorch (.pt/.bin)</td>
+            <td>Built-in PyTorch weight converter</td>
+        </tr>
+    </table>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 1rem;">The bump allocator provides cache-aligned, contiguous memory layout for optimal CPU performance.</p>
+</div>
+
+<h2>Project Structure</h2>
+
+<div class="folder-structure">
+    <div class="folder-header">
+        <span class="folder-title">Project Structure</span>
+        <span class="folder-updated">Updated: 2026-01-16 13:01</span>
+    </div>
+    <pre class="tree-output">
+.
+|-- ~
+|-- analysis
+|   |-- comprehensive_implementation_plan.md
+|   |-- CORRECTED_performance_analysis.md
+|   |-- flash_attention_and_quantization.md
+|   |-- flash_attention_implementation_plan.md
+|   |-- fused_kernels_comparison.md
+|   |-- implementation_status.md
+|   `-- performance_analysis_detailed.md
+|-- assets
+|   `-- cover_image.png
+|-- benchmarks
+|   |-- bench_gemm_vs_onednn.c
+|   |-- bench_gemm_vs_pytorch.py
+|   |-- bench_parallel_gemv.c
+|   |-- compare_gemm.py
+|   |-- perf_flash_attn_micro.c
+|   |-- perf_gemm_micro.c
+|   |-- perf_q4k
+|   `-- perf_q4k.c
+|-- docs
+|   |-- adr
+|   |   |-- 0001-ir-v4-pipeline.md
+|   |   |-- 0002-templates-as-canonical.md
+|   |   |-- 0003-mode-specific-lowering.md
+|   |   |-- 0004-deterministic-layout-canaries.md
+|   |   |-- 0005-kernel-selection-in-lowering.md
+|   |   |-- 0006-weight-mapping-via-template.md
+|   |   `-- README.md
+|   |-- notes
+|   |   |-- ADD_INT8_KERNEL.md
+|   |   |-- CONVERTER-SOLUTION.md
+|   |   |-- FILES_CREATED.md
+|   |   |-- fix_q4k_packing.md
+|   |   |-- FOCUS_INT8_ONLY.md
+|   |   |-- GGUF-CONVERSION-SOLUTION.md
+|   |   |-- GGUF_CONVERTER_FIX_SUMMARY.md
+|   |   |-- IMMEDIATE_ACTION_PLAN.md
+|   |   |-- IMPLEMENTATION_READY.md
+|   |   |-- IMPLEMENT_NOW.md
+|   |   |-- MULTI_ARCH_CONVERSION_SUMMARY.md
+|   |   |-- NEXT_STEPS.md
+|   |   |-- PERFORMANCE_OPTIMIZATION_COMPLETE_REPORT.md
+|   |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
+|   |   |-- performance_V6.5_qwen.md
+|   |   |-- PREFILL_ACTION_PLAN.md
+|   |   |-- PREFILL_ANALYSIS.md
+|   |   |-- QUICK_SUMMARY.md
+|   |   |-- README-BUMP-CONVERTER.md
+|   |   |-- README.md
+|   |   |-- scaling_v2.md
+|   |   |-- START_HERE.md
+|   |   |-- SUMMARY.md
+|   |   |-- TESTING.md
+|   |   |-- V6.5_CLOSURE_PLAN.md
+|   |   |-- V6.5_PERFORMANCE_ANALYSIS_REPORT.md
+|   |   |-- vibe_docs.md
+|   |   `-- VIBE_GENERATED_CONTENT.md
+|   |-- site
+|   |   |-- assets
+|   |   |-- doxygen -&gt; ../doxygen_output/html
+|   |   |-- nightly-results
+|   |   |-- _pages
+|   |   |-- _partials
+|   |   |-- scripts
+|   |   |-- api.html
+|   |   |-- architecture.html
+|   |   |-- architecture-links.html
+|   |   |-- build.sh
+|   |   |-- codegen.html
+|   |   |-- concepts.html
+|   |   |-- contributing.html
+|   |   |-- decisions-dynamic.html
+|   |   |-- decisions.html
+|   |   |-- deterministic-memory.html
+|   |   |-- developer-guide.html
+|   |   |-- flash_attention.html
+|   |   |-- gemm-memory-layout.html
+|   |   |-- gemm-memory-layout-temp.html
+|   |   |-- gemm-optimization.html
+|   |   |-- gguf-bump.html
+|   |   |-- gguf-conversion.html
+|   |   |-- index.html
+|   |   |-- ir-v2.html
+|   |   |-- iteration-philosophy.html
+|   |   |-- kernels.html
+|   |   |-- mega_fusion.html
+|   |   |-- memory-reality.html
+|   |   |-- memory-safety.html
+|   |   |-- profiling.html
+|   |   |-- pytorch-parity.html
+|   |   |-- quant-formats.html
+|   |   |-- quantization.html
+|   |   |-- quantization-math-temp.html
+|   |   |-- quantization-visuals.html
+|   |   |-- quickstart.html
+|   |   |-- research.html
+|   |   |-- scaling.html
+|   |   |-- simd-architecture.html
+|   |   |-- testing.html
+|   |   |-- test-report.html
+|   |   |-- test-viewer.html
+|   |   `-- tokenizer.html
+|   |-- study-materials
+|   |   |-- profiling
+|   |   |-- references
+|   |   |-- 00-index.md
+|   |   |-- 01-cache-hierarchy-blocking.md
+|   |   |-- 02-brgemm-architecture.md
+|   |   |-- 03-microkernel-design.md
+|   |   |-- 04-ai-shape-optimizations.md
+|   |   |-- 08-computational-complexity.md
+|   |   |-- career-roadmap-8-months.md
+|   |   `-- README.md
+|   |-- 00-quickstart.md
+|   |-- 01-llm-kernel-shapes.md
+|   |-- 02-kernel-parallelism-and-backends.md
+|   |-- 03-ir-and-codegen-design.md
+|   |-- 04-ir-v2-format.md
+|   |-- 05-ir-v4-design.md
+|   |-- architecture_diagram.md
+|   |-- bf16_format.svg
+|   |-- bf16_rounding.svg
+|   |-- bump-converter-multi-arch.md
+|   |-- c-kernel-engine-infographic.html
+|   |-- c-kernel-engine-overview.svg
+|   |-- cpu-gpu-analysis.svg
+|   |-- developer-guide.md
+|   |-- DEVLOG.md
+|   |-- Doxyfile
+|   |-- doxygen_header.html
+|   |-- gemm-in-transformers.md
+|   |-- gguf-conversion.md
+|   |-- hybrid-bottleneck.svg
+|   |-- index.html
+|   |-- ir-v2-format.html
+|   |-- ir_v2_pipeline.svg
+|   |-- iteration-philosophy.svg
+|   |-- kernel-catalog.md
+|   |-- kernel-design-pattern.md
+|   |-- LAYERED_TEST_STRATEGY.md
+|   |-- MEGA_FUSED.md
+|   |-- mega_fused_test_plan.md
+|   |-- MEGA_FUSION_CALCULATIONS.md
+|   |-- memory_layout_demo.md
+|   |-- navigation-map.html
+|   |-- PARITY_TESTING_PLAN.md
+|   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
+|   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
+|   |-- PERFORMANCE_TESTING_METHODOLOGY.md
+|   |-- preview.html
+|   |-- PROFILING_REPORT.md
+|   |-- Q5_Q8_KERNEL_ANALYSIS.md
+|   |-- QUANTIZATION_GUIDE.md
+|   |-- qwen_layer_dataflow.md
+|   |-- qwen_layer_dataflow.svg
+|   |-- scale-economics.svg
+|   |-- theory-of-constraints.svg
+|   |-- threading-strategy.md
+|   |-- tokenizer-architecture.svg
+|   |-- tokenizer-hash-vs-trie.svg
+|   |-- tokenizer.md
+|   |-- tokenizer-performance-comparison.svg
+|   |-- v4-design.md
+|   |-- v6_plan_inkscape.svg
+|   `-- v6_plan.svg
+|-- errata
+|   `-- smolm.md
+|-- examples
+|   |-- generated_multimodal_layout.c
+|   |-- generated_qwen_0.5b.c
+|   |-- generated_qwen_0.5b.h
+|   |-- generated_qwen_0.5b.map
+|   `-- generated_with_kernels_example.c
+|-- FlameGraph
+|   |-- demos
+|   |   |-- brkbytes-mysql.svg
+|   |   |-- cpu-grep.svg
+|   |   |-- cpu-illumos-ipdce.svg
+|   |   |-- cpu-illumos-syscalls.svg
+|   |   |-- cpu-illumos-tcpfuse.svg
+|   |   |-- cpu-iozone.svg
+|   |   |-- cpu-ipnet-diff.svg
+|   |   |-- cpu-linux-tar.svg
+|   |   |-- cpu-linux-tcpsend.svg
+|   |   |-- cpu-mixedmode-flamegraph-java.svg
+|   |   |-- cpu-mysql-filt.svg
+|   |   |-- cpu-mysql.svg
+|   |   |-- cpu-qemu-both.svg
+|   |   |-- cpu-zoomable.html
+|   |   |-- hotcold-kernelthread.svg
+|   |   |-- io-gzip.svg
+|   |   |-- io-mysql.svg
+|   |   |-- mallocbytes-bash.svg
+|   |   |-- off-bash.svg
+|   |   |-- off-mysql-busy.svg
+|   |   |-- off-mysql-idle.svg
+|   |   |-- palette-example-broken.svg
+|   |   |-- palette-example-working.svg
+|   |   `-- README
+|   |-- dev
+|   |   |-- gatherhc-kern.d
+|   |   |-- gatherthc-kern.d
+|   |   |-- hcstackcollapse.pl
+|   |   |-- hotcoldgraph.pl
+|   |   |-- README
+|   |   `-- thcstackcollapse.pl
+|   |-- docs
+|   |   `-- cddl1.txt
+|   |-- test
+|   |   |-- results
+|   |   |-- perf-cycles-instructions-01.txt
+|   |   |-- perf-dd-stacks-01.txt
+|   |   |-- perf-funcab-cmd-01.txt
+|   |   |-- perf-funcab-pid-01.txt
+|   |   |-- perf-iperf-stacks-pidtid-01.txt
+|   |   |-- perf-java-faults-01.txt
+|   |   |-- perf-java-stacks-01.txt
+|   |   |-- perf-java-stacks-02.txt
+|   |   |-- perf-js-stacks-01.txt
+|   |   |-- perf-mirageos-stacks-01.txt
+|   |   |-- perf-numa-stacks-01.txt
+|   |   |-- perf-rust-Yamakaky-dcpu.txt
+|   |   `-- perf-vertx-stacks-01.txt
+|   |-- aix-perf.pl
+|   |-- difffolded.pl
+|   |-- example-dtrace-stacks.txt
+|   |-- example-dtrace.svg
+|   |-- example-perf-stacks.txt.gz
+|   |-- example-perf.svg
+|   |-- files.pl
+|   |-- flamegraph.pl
+|   |-- jmaps
+|   |-- pkgsplit-perf.pl
+|   |-- range-perf.pl
+|   |-- README.md
+|   |-- record-test.sh
+|   |-- stackcollapse-aix.pl
+|   |-- stackcollapse-bpftrace.pl
+|   |-- stackcollapse-chrome-tracing.py
+|   |-- stackcollapse-elfutils.pl
+|   |-- stackcollapse-faulthandler.pl
+|   |-- stackcollapse-gdb.pl
+|   |-- stackcollapse-go.pl
+|   |-- stackcollapse-ibmjava.pl
+|   |-- stackcollapse-instruments.pl
+|   |-- stackcollapse-java-exceptions.pl
+|   |-- stackcollapse-jstack.pl
+|   |-- stackcollapse-ljp.awk
+|   |-- stackcollapse-perf.pl
+|   |-- stackcollapse-perf-sched.awk
+|   |-- stackcollapse.pl
+|   |-- stackcollapse-pmc.pl
+|   |-- stackcollapse-recursive.pl
+|   |-- stackcollapse-sample.awk
+|   |-- stackcollapse-stap.pl
+|   |-- stackcollapse-vsprof.pl
+|   |-- stackcollapse-vtune-mc.pl
+|   |-- stackcollapse-vtune.pl
+|   |-- stackcollapse-wcp.pl
+|   |-- stackcollapse-xdebug.php
+|   `-- test.sh
+|-- HPCEmbedding -&gt; /home/antshiv/Workspace/BCGov/citz-imb-ai/HPC/HPC_Embeddings/
+|-- include
+|   |-- data_structures
+|   |   `-- tries
+|   |-- tokenizer
+|   |   |-- hash_table.h
+|   |   |-- memory_pool.h
+|   |   |-- murmurhash3.h
+|   |   |-- tokenizer.h
+|   |   |-- true_bpe.h
+|   |   `-- utf8.h
+|   |-- bf16_utils.h
+|   |-- ckernel_alloc.h
+|   |-- ckernel_codegen.h
+|   |-- ckernel_codegen_v2.h
+|   |-- ckernel_dtype.h
+|   |-- ckernel_engine.h
+|   |-- ckernel_ir.h
+|   |-- ckernel_ir_v2.h
+|   |-- ckernel_ir_v2_lower.h
+|   |-- ckernel_kernel_specs.h
+|   |-- ckernel_memory_layout.h
+|   |-- ckernel_mem_plan.h
+|   |-- ckernel_model.h
+|   |-- ckernel_model_load_v4.h
+|   |-- ckernel_orchestration.h
+|   |-- ckernel_quant.h
+|   |-- ckernel_registry.h
+|   |-- ckernel_section_layout.h
+|   |-- ck_features.h
+|   |-- ck_metrics.h
+|   |-- ck_model_api.h
+|   |-- ck_parity_api.h
+|   |-- ck_tokenizer.h
+|   |-- cpu_features.h
+|   |-- fused_kernels.h
+|   |-- mega_fused_attention.h
+|   `-- system_topology.h
+|-- issues
+|   |-- errors.txt
+|   `-- run.txt
+|-- kernel_maps
+|   |-- kernels
+|   |   |-- attention.json
+|   |   |-- attn_proj.json
+|   |   |-- mlp_down.json
+|   |   |-- mlp_up.json
+|   |   |-- qkv_project.json
+|   |   |-- residual_add.json
+|   |   |-- rmsnorm.json
+|   |   |-- rope.json
+|   |   `-- swiglu.json
+|   |-- decoder_layer_plan_backward.json
+|   |-- decoder_layer_plan.json
+|   |-- global_buffers.json
+|   `-- README.md
+|-- llama.cpp
+|   |-- benches
+|   |   `-- dgx-spark
+|   |-- builds
+|   |   |-- bin
+|   |   |-- CMakeFiles
+|   |   |-- common
+|   |   |-- examples
+|   |   |-- ggml
+|   |   |-- pocs
+|   |   |-- src
+|   |   |-- Testing
+|   |   |-- tests
+|   |   |-- tools
+|   |   |-- vendor
+|   |   |-- CMakeCache.txt
+|   |   |-- cmake_install.cmake
+|   |   |-- compile_commands.json
+|   |   |-- CTestTestfile.cmake
+|   |   |-- DartConfiguration.tcl
+|   |   |-- llama-config.cmake
+|   |   |-- llama.pc
+|   |   |-- llama-version.cmake
+|   |   `-- Makefile
+|   |-- ci
+|   |   |-- README.md
+|   |   |-- README-MUSA.md
+|   |   `-- run.sh
+|   |-- cmake
+|   |   |-- arm64-apple-clang.cmake
+|   |   |-- arm64-windows-llvm.cmake
+|   |   |-- build-info.cmake
+|   |   |-- common.cmake
+|   |   |-- git-vars.cmake
+|   |   |-- llama-config.cmake.in
+|   |   |-- llama.pc.in
+|   |   |-- riscv64-spacemit-linux-gnu-gcc.cmake
+|   |   `-- x64-windows-llvm.cmake
+|   |-- common
+|   |   |-- arg.cpp
+|   |   |-- arg.h
+|   |   |-- base64.hpp
+|   |   |-- build-info.cpp.in
+|   |   |-- chat.cpp
+|   |   |-- chat.h
+|   |   |-- chat-parser.cpp
+|   |   |-- chat-parser.h
+|   |   |-- chat-parser-xml-toolcall.cpp
+|   |   |-- chat-parser-xml-toolcall.h
+|   |   |-- chat-peg-parser.cpp
+|   |   |-- chat-peg-parser.h
+|   |   |-- CMakeLists.txt
+|   |   |-- common.cpp
+|   |   |-- common.h
+|   |   |-- console.cpp
+|   |   |-- console.h
+|   |   |-- download.cpp
+|   |   |-- download.h
+|   |   |-- http.h
+|   |   |-- json-partial.cpp
+|   |   |-- json-partial.h
+|   |   |-- json-schema-to-grammar.cpp
+|   |   |-- json-schema-to-grammar.h
+|   |   |-- llguidance.cpp
+|   |   |-- log.cpp
+|   |   |-- log.h
+|   |   |-- ngram-cache.cpp
+|   |   |-- ngram-cache.h
+|   |   |-- peg-parser.cpp
+|   |   |-- peg-parser.h
+|   |   |-- preset.cpp
+|   |   |-- preset.h
+|   |   |-- regex-partial.cpp
+|   |   |-- regex-partial.h
+|   |   |-- sampling.cpp
+|   |   |-- sampling.h
+|   |   |-- speculative.cpp
+|   |   |-- speculative.h
+|   |   |-- unicode.cpp
+|   |   `-- unicode.h
+|   |-- docs
+|   |   |-- android
+|   |   |-- backend
+|   |   |-- development
+|   |   |-- multimodal
+|   |   |-- ops
+|   |   |-- android.md
+|   |   |-- build.md
+|   |   |-- build-riscv64-spacemit.md
+|   |   |-- build-s390x.md
+|   |   |-- docker.md
+|   |   |-- function-calling.md
+|   |   |-- install.md
+|   |   |-- llguidance.md
+|   |   |-- multimodal.md
+|   |   `-- ops.md
+|   |-- examples
+|   |   |-- batched
+|   |   |-- batched.swift
+|   |   |-- convert-llama2c-to-ggml
+|   |   |-- deprecation-warning
+|   |   |-- diffusion
+|   |   |-- embedding
+|   |   |-- eval-callback
+|   |   |-- gen-docs
+|   |   |-- gguf
+|   |   |-- gguf-hash
+|   |   |-- idle
+|   |   |-- llama.android
+|   |   |-- llama.swiftui
+|   |   |-- lookahead
+|   |   |-- lookup
+|   |   |-- model-conversion
+|   |   |-- parallel
+|   |   |-- passkey
+|   |   |-- retrieval
+|   |   |-- save-load-state
+|   |   |-- simple
+|   |   |-- simple-chat
+|   |   |-- simple-cmake-pkg
+|   |   |-- speculative
+|   |   |-- speculative-simple
+|   |   |-- sycl
+|   |   |-- training
+|   |   |-- CMakeLists.txt
+|   |   |-- convert_legacy_llama.py
+|   |   |-- json_schema_pydantic_example.py
+|   |   |-- json_schema_to_grammar.py
+|   |   |-- llama.vim
+|   |   |-- pydantic_models_to_grammar_examples.py
+|   |   |-- pydantic_models_to_grammar.py
+|   |   |-- reason-act.sh
+|   |   |-- regex_to_grammar.py
+|   |   |-- server_embd.py
+|   |   |-- server-llama2-13B.sh
+|   |   `-- ts-type-to-grammar.sh
+|   |-- ggml
+|   |   |-- cmake
+|   |   |-- include
+|   |   |-- src
+|   |   `-- CMakeLists.txt
+|   |-- gguf-py
+|   |   |-- examples
+|   |   |-- gguf
+|   |   |-- tests
+|   |   |-- LICENSE
+|   |   |-- pyproject.toml
+|   |   `-- README.md
+|   |-- grammars
+|   |   |-- arithmetic.gbnf
+|   |   |-- c.gbnf
+|   |   |-- chess.gbnf
+|   |   |-- english.gbnf
+|   |   |-- japanese.gbnf
+|   |   |-- json_arr.gbnf
+|   |   |-- json.gbnf
+|   |   |-- list.gbnf
+|   |   `-- README.md
+|   |-- include
+|   |   |-- llama-cpp.h
+|   |   `-- llama.h
+|   |-- licenses
+|   |   |-- LICENSE-curl
+|   |   |-- LICENSE-httplib
+|   |   |-- LICENSE-jsonhpp
+|   |   `-- LICENSE-linenoise
+|   |-- llama_dump
+|   |-- media
+|   |   |-- llama0-banner.png
+|   |   |-- llama0-logo.png
+|   |   |-- llama1-banner.png
+|   |   |-- llama1-icon.png
+|   |   |-- llama1-icon.svg
+|   |   |-- llama1-icon-transparent.png
+|   |   |-- llama1-icon-transparent.svg
+|   |   |-- llama1-logo.png
+|   |   |-- llama1-logo.svg
+|   |   |-- matmul.png
+|   |   `-- matmul.svg
+|   |-- models
+|   |   |-- templates
+|   |   |-- ggml-vocab-aquila.gguf
+|   |   |-- ggml-vocab-baichuan.gguf
+|   |   |-- ggml-vocab-bert-bge.gguf
+|   |   |-- ggml-vocab-bert-bge.gguf.inp
+|   |   |-- ggml-vocab-bert-bge.gguf.out
+|   |   |-- ggml-vocab-command-r.gguf
+|   |   |-- ggml-vocab-command-r.gguf.inp
+|   |   |-- ggml-vocab-command-r.gguf.out
+|   |   |-- ggml-vocab-deepseek-coder.gguf
+|   |   |-- ggml-vocab-deepseek-coder.gguf.inp
+|   |   |-- ggml-vocab-deepseek-coder.gguf.out
+|   |   |-- ggml-vocab-deepseek-llm.gguf
+|   |   |-- ggml-vocab-deepseek-llm.gguf.inp
+|   |   |-- ggml-vocab-deepseek-llm.gguf.out
+|   |   |-- ggml-vocab-falcon.gguf
+|   |   |-- ggml-vocab-falcon.gguf.inp
+|   |   |-- ggml-vocab-falcon.gguf.out
+|   |   |-- ggml-vocab-gpt-2.gguf
+|   |   |-- ggml-vocab-gpt-2.gguf.inp
+|   |   |-- ggml-vocab-gpt-2.gguf.out
+|   |   |-- ggml-vocab-gpt-neox.gguf
+|   |   |-- ggml-vocab-llama-bpe.gguf
+|   |   |-- ggml-vocab-llama-bpe.gguf.inp
+|   |   |-- ggml-vocab-llama-bpe.gguf.out
+|   |   |-- ggml-vocab-llama-spm.gguf
+|   |   |-- ggml-vocab-llama-spm.gguf.inp
+|   |   |-- ggml-vocab-llama-spm.gguf.out
+|   |   |-- ggml-vocab-mpt.gguf
+|   |   |-- ggml-vocab-mpt.gguf.inp
+|   |   |-- ggml-vocab-mpt.gguf.out
+|   |   |-- ggml-vocab-nomic-bert-moe.gguf
+|   |   |-- ggml-vocab-phi-3.gguf
+|   |   |-- ggml-vocab-phi-3.gguf.inp
+|   |   |-- ggml-vocab-phi-3.gguf.out
+|   |   |-- ggml-vocab-qwen2.gguf
+|   |   |-- ggml-vocab-qwen2.gguf.inp
+|   |   |-- ggml-vocab-qwen2.gguf.out
+|   |   |-- ggml-vocab-refact.gguf
+|   |   |-- ggml-vocab-refact.gguf.inp
+|   |   |-- ggml-vocab-refact.gguf.out
+|   |   |-- ggml-vocab-starcoder.gguf
+|   |   |-- ggml-vocab-starcoder.gguf.inp
+|   |   `-- ggml-vocab-starcoder.gguf.out
+|   |-- pocs
+|   |   |-- vdot
+|   |   `-- CMakeLists.txt
+|   |-- requirements
+|   |   |-- requirements-all.txt
+|   |   |-- requirements-compare-llama-bench.txt
+|   |   |-- requirements-convert_hf_to_gguf.txt
+|   |   |-- requirements-convert_hf_to_gguf_update.txt
+|   |   |-- requirements-convert_legacy_llama.txt
+|   |   |-- requirements-convert_llama_ggml_to_gguf.txt
+|   |   |-- requirements-convert_lora_to_gguf.txt
+|   |   |-- requirements-gguf_editor_gui.txt
+|   |   |-- requirements-pydantic.txt
+|   |   |-- requirements-server-bench.txt
+|   |   |-- requirements-test-tokenizer-random.txt
+|   |   `-- requirements-tool_bench.txt
+|   |-- scripts
+|   |   |-- apple
+|   |   |-- jinja
+|   |   |-- snapdragon
+|   |   |-- bench-models.sh
+|   |   |-- build-info.sh
+|   |   |-- check-requirements.sh
+|   |   |-- compare-commits.sh
+|   |   |-- compare-llama-bench.py
+|   |   |-- compare-logprobs.py
+|   |   |-- create_ops_docs.py
+|   |   |-- debug-test.sh
+|   |   |-- fetch_server_test_models.py
+|   |   |-- gen-authors.sh
+|   |   |-- gen-unicode-data.py
+|   |   |-- get_chat_template.py
+|   |   |-- get-flags.mk
+|   |   |-- get-hellaswag.sh
+|   |   |-- get-pg.sh
+|   |   |-- get-wikitext-103.sh
+|   |   |-- get-wikitext-2.sh
+|   |   |-- get-winogrande.sh
+|   |   |-- hf.sh
+|   |   |-- install-oneapi.bat
+|   |   |-- server-bench.py
+|   |   |-- serve-static.js
+|   |   |-- sync-ggml-am.sh
+|   |   |-- sync-ggml.last
+|   |   |-- sync-ggml.sh
+|   |   |-- sync_vendor.py
+|   |   |-- tool_bench.py
+|   |   |-- tool_bench.sh
+|   |   |-- verify-checksum-models.py
+|   |   `-- xxd.cmake
+|   |-- src
+|   |   |-- models
+|   |   |-- CMakeLists.txt
+|   |   |-- llama-adapter.cpp
+|   |   |-- llama-adapter.h
+|   |   |-- llama-arch.cpp
+|   |   |-- llama-arch.h
+|   |   |-- llama-batch.cpp
+|   |   |-- llama-batch.h
+|   |   |-- llama-chat.cpp
+|   |   |-- llama-chat.h
+|   |   |-- llama-context.cpp
+|   |   |-- llama-context.h
+|   |   |-- llama-cparams.cpp
+|   |   |-- llama-cparams.h
+|   |   |-- llama.cpp
+|   |   |-- llama-grammar.cpp
+|   |   |-- llama-grammar.h
+|   |   |-- llama-graph.cpp
+|   |   |-- llama-graph.h
+|   |   |-- llama-hparams.cpp
+|   |   |-- llama-hparams.h
+|   |   |-- llama-impl.cpp
+|   |   |-- llama-impl.h
+|   |   |-- llama-io.cpp
+|   |   |-- llama-io.h
+|   |   |-- llama-kv-cache.cpp
+|   |   |-- llama-kv-cache.h
+|   |   |-- llama-kv-cache-iswa.cpp
+|   |   |-- llama-kv-cache-iswa.h
+|   |   |-- llama-kv-cells.h
+|   |   |-- llama-memory.cpp
+|   |   |-- llama-memory.h
+|   |   |-- llama-memory-hybrid.cpp
+|   |   |-- llama-memory-hybrid.h
+|   |   |-- llama-memory-recurrent.cpp
+|   |   |-- llama-memory-recurrent.h
+|   |   |-- llama-mmap.cpp
+|   |   |-- llama-mmap.h
+|   |   |-- llama-model.cpp
+|   |   |-- llama-model.h
+|   |   |-- llama-model-loader.cpp
+|   |   |-- llama-model-loader.h
+|   |   |-- llama-model-saver.cpp
+|   |   |-- llama-model-saver.h
+|   |   |-- llama-quant.cpp
+|   |   |-- llama-quant.h
+|   |   |-- llama-sampling.cpp
+|   |   |-- llama-sampling.h
+|   |   |-- llama-vocab.cpp
+|   |   |-- llama-vocab.h
+|   |   |-- unicode.cpp
+|   |   |-- unicode-data.cpp
+|   |   |-- unicode-data.h
+|   |   `-- unicode.h
+|   |-- tests
+|   |   |-- peg-parser
+|   |   |-- CMakeLists.txt
+|   |   |-- get-model.cpp
+|   |   |-- get-model.h
+|   |   |-- run-json-schema-to-grammar.mjs
+|   |   |-- test-alloc.cpp
+|   |   |-- test-arg-parser.cpp
+|   |   |-- test-autorelease.cpp
+|   |   |-- test-backend-ops.cpp
+|   |   |-- test-backend-sampler.cpp
+|   |   |-- test-barrier.cpp
+|   |   |-- test-c.c
+|   |   |-- test-chat.cpp
+|   |   |-- test-chat-parser.cpp
+|   |   |-- test-chat-peg-parser.cpp
+|   |   |-- test-chat-template.cpp
+|   |   |-- test-double-float.cpp
+|   |   |-- test-gbnf-validator.cpp
+|   |   |-- test-gguf.cpp
+|   |   |-- test-grammar-integration.cpp
+|   |   |-- test-grammar-llguidance.cpp
+|   |   |-- test-grammar-parser.cpp
+|   |   |-- test-json-partial.cpp
+|   |   |-- test-json-schema-to-grammar.cpp
+|   |   |-- test-kernel-parity.cpp
+|   |   |-- test-llama-grammar.cpp
+|   |   |-- test-log.cpp
+|   |   |-- test-lora-conversion-inference.sh
+|   |   |-- test-model-load-cancel.cpp
+|   |   |-- test-mtmd-c-api.c
+|   |   |-- test-opt.cpp
+|   |   |-- test-peg-parser.cpp
+|   |   |-- test-quantize-fns.cpp
+|   |   |-- test-quantize-perf.cpp
+|   |   |-- test-quantize-stats.cpp
+|   |   |-- test-regex-partial.cpp
+|   |   |-- test-rope.cpp
+|   |   |-- test-sampling.cpp
+|   |   |-- test-state-restore-fragmented.cpp
+|   |   |-- test-thread-safety.cpp
+|   |   |-- test-tokenizer-0.cpp
+|   |   |-- test-tokenizer-0.py
+|   |   |-- test-tokenizer-0.sh
+|   |   |-- test-tokenizer-1-bpe.cpp
+|   |   |-- test-tokenizer-1-spm.cpp
+|   |   |-- test-tokenizer-random.py
+|   |   `-- test-tokenizers-repo.sh
+|   |-- tools
+|   |   |-- batched-bench
+|   |   |-- cli
+|   |   |-- completion
+|   |   |-- cvector-generator
+|   |   |-- export-lora
+|   |   |-- fit-params
+|   |   |-- gguf-split
+|   |   |-- imatrix
+|   |   |-- llama-bench
+|   |   |-- mtmd
+|   |   |-- perplexity
+|   |   |-- quantize
+|   |   |-- rpc
+|   |   |-- run
+|   |   |-- server
+|   |   |-- tokenize
+|   |   |-- tts
+|   |   `-- CMakeLists.txt
+|   |-- vendor
+|   |   |-- cpp-httplib
+|   |   |-- miniaudio
+|   |   |-- minja
+|   |   |-- nlohmann
+|   |   |-- sheredom
+|   |   `-- stb
+|   |-- AGENTS.md
+|   |-- AUTHORS
+|   |-- build-xcframework.sh
+|   |-- CLAUDE.md
+|   |-- CMakeLists.txt
+|   |-- CMakePresets.json
+|   |-- CODEOWNERS
+|   |-- CONTRIBUTING.md
+|   |-- convert_hf_to_gguf.py
+|   |-- convert_hf_to_gguf_update.py
+|   |-- convert_llama_ggml_to_gguf.py
+|   |-- convert_lora_to_gguf.py
+|   |-- flake.lock
+|   |-- flake.nix
+|   |-- LICENSE
+|   |-- Makefile
+|   |-- mypy.ini
+|   |-- poetry.lock
+|   |-- pyproject.toml
+|   |-- pyrightconfig.json
+|   |-- README.md
+|   |-- requirements.txt
+|   `-- SECURITY.md
+|-- llama_dump
+|-- logs
+|   |-- 2025-12-26-training-fix
+|   |   |-- CHANGES.md
+|   |   |-- FILES_TO_COMMIT.txt
+|   |   |-- README.md
+|   |   `-- test_output_before_fix.txt
+|   `-- 2025-12-27_quantization_support.md
+|-- meta
+|   `-- kernel_meta.json
+|-- notebooks
+|   `-- kernel_testing_workflow.ipynb
+|-- patches
+|   |-- ck-engine-parity-bench.patch
+|   |-- fix_avx512_qh_bits.patch
+|   |-- llama.patch
+|   |-- README.md
+|   |-- single_layer_dump.cpp
+|   `-- test-kernel-parity.cpp
+|-- research
+|   `-- AI -&gt; /home/antshiv/Documents/AI/
+|-- Screenshots
+|   |-- Screenshot 2026-01-13 at 16-09-58 TestReport C-Kernel-Engine.png
+|   |-- Screenshot-2026-01-16_06-29.png
+|   |-- Screenshot 2026-01-16 at 06-58-32 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-16 at 07-06-34 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-16 at 07-09-51 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-16 at 10-41-23 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-16 at 11-09-59 Settings · Ruleset · C-Kernel-Engine.png
+|   `-- Screenshot 2026-01-16 at 11-14-25 Settings · Ruleset · C-Kernel-Engine.png
+|-- scripts
+|   |-- test
+|   |   |-- compare_perf_results.py
+|   |   |-- fair_perf_comparison.py
+|   |   |-- mega_fusion_test_runner.py
+|   |   |-- test_direct_vec_dot.py
+|   |   |-- test_dram_pressure.sh
+|   |   `-- verify_q5_0_parity.py
+|   |-- v2
+|   |   `-- build_ir_v2.py
+|   |-- v3
+|   |   `-- build_ir_v3.py
+|   |-- v4
+|   |   |-- build_ir_v4.py
+|   |   |-- build_ir_v4_q4k.py
+|   |   |-- ck_model_smoke_v4.py
+|   |   |-- ck_run_v4.py
+|   |   |-- codegen_v4.py
+|   |   |-- convert_gguf_to_bump_v4_patched.py
+|   |   |-- convert_gguf_to_bump_v4.py
+|   |   |-- convert_hf_to_bump_v4.py
+|   |   |-- test_v4_q4k_pipeline.py
+|   |   `-- validate_bump_v4.py
+|   |-- v6
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6.py
+|   |   |-- chat_template_utils.py
+|   |   |-- ck_model_smoke_v6.py
+|   |   |-- ck_run_v6.py
+|   |   |-- codegen_v6.py
+|   |   |-- convert_any_gguf_v6.py
+|   |   |-- convert_any_gguf_v6.sh
+|   |   |-- convert_any_model_v6.sh
+|   |   |-- convert_gguf_to_bump_v6.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6.py
+|   |   |-- parallel_planner.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- training_config.py
+|   |   `-- v6_ir_lowering.py
+|   |-- v6.5
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6_5.py
+|   |   |-- ck_model_smoke_v6_5.py
+|   |   |-- ck_run_v6_5.py
+|   |   |-- codegen_v6_5.py
+|   |   |-- codegen_v6_5.py.old_fp32_only
+|   |   |-- convert_any_gguf_v6_5.py
+|   |   |-- convert_any_gguf_v6_5.sh
+|   |   |-- convert_any_model_v6_5.sh
+|   |   |-- convert_gguf_to_bump_v6_5.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6_5.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6_5.py
+|   |   |-- parallel_planner.py
+|   |   |-- profile_inference.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- test_kernel_direct.py
+|   |   |-- training_config.py
+|   |   |-- v6_5_ir_lowering.py
+|   |   `-- verify_test_bug.py
+|   |-- v6.6
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6_6.py
+|   |   |-- ck_model_smoke_v6_6.py
+|   |   |-- ck_run_v6_6.py
+|   |   |-- codegen_v6_6.py
+|   |   |-- codegen_v6_6.py.old_fp32_only
+|   |   |-- convert_any_gguf_v6_6.py
+|   |   |-- convert_any_gguf_v6_6.sh
+|   |   |-- convert_any_model_v6_6.sh
+|   |   |-- convert_gguf_to_bump_v6_6.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6_6.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6_6.py
+|   |   |-- parallel_planner.py
+|   |   |-- profile_inference.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- test_kernel_direct.py
+|   |   |-- training_config.py
+|   |   |-- v6_6_ir_lowering.py
+|   |   `-- verify_test_bug.py
+|   |-- add_parallel_decode.sh
+|   |-- analyze_parity.py
+|   |-- benchmark_avx512.sh
+|   |-- benchmark_vs_llamacpp.py
+|   |-- build_ir_v5.py
+|   |-- build_ir_v5_wrapper_backup.py
+|   |-- ck_chat.py
+|   |-- ck_chat_validated.py
+|   |-- ck_download.py
+|   |-- ck_run_v5.py
+|   |-- codegen_v5.py
+|   |-- compare_bump_payload.py
+|   |-- compare_bump_to_hf.py
+|   |-- compare_layer_llamacpp.py
+|   |-- compare_layer_outputs.py
+|   |-- compare_parity_huggingface.py
+|   |-- compare_runtime_parity.py
+|   |-- compare_single_thread.sh
+|   |-- compare_wq_weights.py
+|   |-- comprehensive_test.sh
+|   |-- convert_any_gguf.py
+|   |-- convert_any_gguf.sh
+|   |-- convert_any_model.sh
+|   |-- convert_devstral_gguf.sh
+|   |-- convert_gguf_to_bump.py
+|   |-- convert_gguf_to_bump_v6.py
+|   |-- convert_gguf_wrapper.py
+|   |-- convert_hf_to_bump.py
+|   |-- convert_my_gguf.sh
+|   |-- convert_to_bump_universal.py
+|   |-- debug_cli.sh
+|   |-- debug_llama_parity.py
+|   |-- download_model_v6.py
+|   |-- extract_gguf_vocab.py
+|   |-- fix_gguf_converter.py
+|   |-- full_integration_testing.sh
+|   |-- fusion_patterns.py
+|   |-- gen_kernel_specs.py
+|   |-- gen_random_bump.py
+|   |-- gen_random_tokens.py
+|   |-- gguf_tokenizer.py
+|   |-- inspect_model.py
+|   |-- inspect_weights_v5.py
+|   |-- kernel_coverage.py
+|   |-- layer_sweep_parity.py
+|   |-- llama_dump_logits.c
+|   |-- llama_hack.c
+|   |-- measure_dram.sh
+|   |-- nightly_runner.py
+|   |-- optimization_status.py
+|   |-- parallel_planner.py
+|   |-- patch_bump_converter.py
+|   |-- patch_gguf_converter.py
+|   |-- perf_decode_simple.c
+|   |-- perf_loop.sh
+|   |-- pre-merge-check.sh
+|   |-- profile_comparison.sh
+|   |-- profile_decode.py
+|   |-- profile_kernel.sh
+|   |-- profile_perf.py
+|   |-- q4_k_quantize.py
+|   |-- quant_types.py
+|   |-- run_all_tests.sh
+|   |-- run_full_validation.sh
+|   |-- run_litmus_demo.sh
+|   |-- run_parity_smoketest.sh
+|   |-- run_perf.sh
+|   |-- simple_perf.sh
+|   |-- simple_test.sh
+|   |-- smollm_forward_parity.py
+|   |-- smollm_layer_stack_diff.py
+|   |-- smollm_layer_stage_diff.py
+|   |-- smollm_train_demo.py
+|   |-- sync_kernel_meta.py
+|   |-- test_avx512_amx.sh
+|   |-- test_avx512_full.sh
+|   |-- test_avx512_parity.py
+|   |-- test_bump_conversion.py
+|   |-- test_ck_logits.py
+|   |-- test_codegen_validation.py
+|   |-- test_coverage.py
+|   |-- test_full_pipeline.sh
+|   |-- test_ir_validation.py
+|   |-- test_kernel_dispatch.sh
+|   |-- test_kernel_parity.py
+|   |-- test_kernels_real_weights.py
+|   |-- test_kernels_vs_llamacpp.py
+|   |-- test_layer0_parity.py
+|   |-- test_low_level_kernels.py
+|   |-- test_parity_direct.py
+|   |-- test_performance.sh
+|   |-- test_pytorch_parity.sh
+|   |-- test_q6k_kernels.py
+|   |-- test_q_kernel_direct.py
+|   |-- test_q_projection.py
+|   |-- test_tensor_flow.py
+|   |-- test_training_fix.sh
+|   |-- test_training.py
+|   |-- tiny_train_parity.py
+|   |-- tokenizer_to_bump.py
+|   |-- training_config.py
+|   |-- validate_model.py
+|   |-- version_check.py
+|   |-- vocab_to_tokenizer.py
+|   `-- vtune_profile.sh
+|-- src
+|   |-- data_structures
+|   |   `-- tries
+|   |-- kernels
+|   |   |-- fused
+|   |   |-- add_kernels_bf16.c
+|   |   |-- attention_decode_fused.c
+|   |   |-- attention_flash_true.c
+|   |   |-- attention_kernels.c
+|   |   |-- axpy_kernels.c
+|   |   |-- dequant_kernels.c
+|   |   |-- embedding_kernels_bf16.c
+|   |   |-- embedding_kernels.c
+|   |   |-- fused_rmsnorm_linear.c
+|   |   |-- gelu_kernels_bf16.c
+|   |   |-- gelu_kernels.c
+|   |   |-- gemm_batch_int8.c
+|   |   |-- gemm_fused_kernels.c
+|   |   |-- gemm_kernels_amx.c
+|   |   |-- gemm_kernels_bf16.c
+|   |   |-- gemm_kernels.c
+|   |   |-- gemm_kernels_f16.c
+|   |   |-- gemm_kernels_q4_0.c
+|   |   |-- gemm_kernels_q4_1.c
+|   |   |-- gemm_kernels_q4k_avx.c
+|   |   |-- gemm_kernels_q4k.c
+|   |   |-- gemm_kernels_q4k_q8k_avx2.c
+|   |   |-- gemm_kernels_q4k_q8k.c
+|   |   |-- gemm_kernels_q4k_q8k_vnni.c
+|   |   |-- gemm_kernels_q4k_sse.c
+|   |   |-- gemm_kernels_q5_0.c
+|   |   |-- gemm_kernels_q5_0_sse.c
+|   |   |-- gemm_kernels_q5_0_sse_v2.c
+|   |   |-- gemm_kernels_q5_1.c
+|   |   |-- gemm_kernels_q6k.c
+|   |   |-- gemm_kernels_q6k_q8k.c
+|   |   |-- gemm_kernels_q6k_sse.c
+|   |   |-- gemm_kernels_q8_0.c
+|   |   |-- gemm_microkernel.c
+|   |   |-- kv_cache_kernels.c
+|   |   |-- layernorm_kernels_bf16.c
+|   |   |-- layernorm_kernels.c
+|   |   |-- loss_kernels_bf16.c
+|   |   |-- loss_kernels.c
+|   |   |-- mega_fused_attention_avx.c
+|   |   |-- mlp_fused_decode.c
+|   |   |-- mlp_kernels_bf16.c
+|   |   |-- mlp_kernels.c
+|   |   |-- optimizer_kernels_bf16.c
+|   |   |-- optimizer_kernels.c
+|   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
+|   |   |-- quantize_row_q8_k_sse.c
+|   |   |-- relu_kernels_bf16.c
+|   |   |-- relu_kernels.c
+|   |   |-- rmsnorm_kernels_bf16.c
+|   |   |-- rmsnorm_kernels.c
+|   |   |-- rmsnorm_kernels_int4.c
+|   |   |-- rmsnorm_kernels_int8.c
+|   |   |-- rmsnorm_q8_k_fused.c
+|   |   |-- rope_kernels_bf16.c
+|   |   |-- rope_kernels.c
+|   |   |-- sigmoid_kernels_bf16.c
+|   |   |-- sigmoid_kernels.c
+|   |   |-- softmax_kernels_bf16.c
+|   |   |-- softmax_kernels.c
+|   |   |-- swiglu_kernels_bf16.c
+|   |   |-- swiglu_kernels.c
+|   |   |-- topk_kernels.c
+|   |   |-- vision_kernels_bf16.c
+|   |   `-- vision_kernels.c
+|   |-- tokenizer
+|   |   |-- hash_table.c
+|   |   |-- memory_pool.c
+|   |   |-- murmurhash3.c
+|   |   |-- test_tokenizer.c
+|   |   |-- tokenizer.c
+|   |   |-- true_bpe.c
+|   |   `-- utf8.c
+|   |-- v2_legacy
+|   |   |-- ckernel_codegen_v2.c
+|   |   |-- ckernel_codegen_v2_dispatch.c
+|   |   |-- ckernel_codegen_v2_emit.h
+|   |   |-- ckernel_codegen_v2_schedule.c
+|   |   |-- ckernel_codegen_v2_sections.c
+|   |   |-- ckernel_codegen_v2_struct.c
+|   |   |-- ckernel_ir_v2_builder.c
+|   |   |-- ckernel_ir_v2.c
+|   |   |-- ckernel_ir_v2_demo.c
+|   |   |-- ckernel_ir_v2_lower.c
+|   |   `-- ck_tokenizer_v2.c
+|   |-- v4_legacy
+|   |   `-- ckernel_model_load_v4.c
+|   |-- v6
+|   |   |-- scripts
+|   |   |-- build.sh
+|   |   |-- CHAT_TEMPLATE_BUMP_PLAN.md
+|   |   |-- CHAT_TEMPLATE_PLAN.md
+|   |   |-- ck_cli_v6.c
+|   |   |-- ck-engine-v6
+|   |   |-- ckernel_alloc_v6.c
+|   |   |-- ckernel_codegen_v6.c
+|   |   |-- ckernel_ir_v6.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.c
+|   |   |-- CONTEXT_LIMIT_PLAN.md
+|   |   |-- SPECIAL_TOKENS_PLAN.md
+|   |   |-- STOP_TOKEN_TABLE_PLAN.md
+|   |   |-- UTF8_PLAN.md
+|   |   |-- v6_cli.c
+|   |   |-- v6_cli_todo.md
+|   |   |-- v6_inference.c
+|   |   |-- v6_pipeline.md
+|   |   `-- v6_simple.c
+|   |-- v6.5
+|   |   |-- generated
+|   |   |-- scripts
+|   |   |-- test_generated
+|   |   |-- 6.5_prorgess.md
+|   |   |-- 6.5_roadmap.md
+|   |   |-- build.sh
+|   |   |-- ck_cli_v6.5.c
+|   |   |-- ck-engine-v6.5
+|   |   |-- ckernel_alloc_v6.5.c
+|   |   |-- ckernel_codegen_v6.5.c
+|   |   |-- ckernel_ir_v6.5.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.5.c
+|   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- profiling.md
+|   |   |-- test_bump_tokenizer.c
+|   |   |-- test_generic_api.c
+|   |   |-- test_inference_with_bump_tokenizer.c
+|   |   |-- v6.5_cli.c
+|   |   |-- v6.5_cli_todo.md
+|   |   |-- v6.5_DEBUGGING_SUMMARY.md
+|   |   |-- v6.5_GIBBERISH_DEBUGGING_REPORT.md
+|   |   |-- v6.5_inference.c
+|   |   |-- v6.5_pipeline.md
+|   |   |-- v6.5_simple.c
+|   |   |-- V6.5_UNIFIED_CLI_PLAN.md
+|   |   `-- v7_v15_roadmap.md
+|   |-- v6.6
+|   |   |-- generated
+|   |   |-- kernel_config
+|   |   |-- scripts
+|   |   |-- test_generated
+|   |   |-- 6.6_prorgess.md
+|   |   |-- 6.6_roadmap.md
+|   |   |-- build.sh
+|   |   |-- ck_cli_v6.6.c
+|   |   |-- ck-engine-v6.6
+|   |   |-- ckernel_alloc_v6.6.c
+|   |   |-- ckernel_codegen_v6.6.c
+|   |   |-- ckernel_ir_v6.6.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.6.c
+|   |   |-- FUSION_FINDINGS.md
+|   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- MEMORY_BANDWIDTH_ANALYSIS.md
+|   |   |-- PARALLELISM_PLAN.md
+|   |   |-- parallel_orchestration.c
+|   |   |-- profiling.md
+|   |   |-- test_bump_tokenizer.c
+|   |   |-- test_generic_api.c
+|   |   |-- test_inference_with_bump_tokenizer.c
+|   |   |-- TRUE_SIMD_FUSION_PLAN.md
+|   |   |-- v6.6_cli.c
+|   |   |-- v6.6_cli_todo.md
+|   |   |-- v6.6_DEBUGGING_SUMMARY.md
+|   |   |-- V6.6_FUSION_PLAN.md
+|   |   |-- v6.6_GIBBERISH_DEBUGGING_REPORT.md
+|   |   |-- v6.6_inference.c
+|   |   |-- v6.6_pipeline.md
+|   |   |-- v6.6_simple.c
+|   |   |-- V6.6_UNIFIED_CLI_PLAN.md
+|   |   `-- v7_v15_roadmap.md
+|   |-- v7
+|   |   |-- build.sh
+|   |   `-- v7_pipeline.md
+|   |-- backend_native.c
+|   |-- ck_cli_v5.c
+|   |-- ckernel_alloc.c
+|   |-- ckernel_codegen.c
+|   |-- ckernel_ir.c
+|   |-- ckernel_ir_demo.c
+|   |-- ckernel_kernel_specs.c
+|   |-- ckernel_mem_plan.c
+|   |-- ckernel_model_layout.c
+|   |-- ckernel_model_load.c
+|   |-- ckernel_orchestration.c
+|   |-- ckernel_registry.c
+|   |-- ckernel_strict.c
+|   |-- ck_parity_api.c
+|   |-- ck_tokenizer.c
+|   |-- ck_tokenizer_v2.c
+|   |-- cpu_features.c
+|   |-- show_config.c
+|   `-- system_topology.c
+|-- test_results
+|   `-- mega_fused_test_report.json
+|-- tools
+|   |-- cache_analysis.py
+|   |-- ck.c
+|   |-- ck_profile_v6.c
+|   |-- ck_server.c
+|   |-- ck_v4.c
+|   `-- debug_cpu_flags.c
+|-- unittest
+|   |-- bf16
+|   |   |-- test_attention_bf16.py
+|   |   |-- test_cross_entropy_bf16.py
+|   |   |-- test_embedding_bf16.py
+|   |   |-- test_gelu_bf16.py
+|   |   |-- test_layernorm_bf16.py
+|   |   |-- test_mlp_bf16.py
+|   |   |-- test_relu_bf16.py
+|   |   |-- test_rmsnorm_bf16.py
+|   |   |-- test_rope_bf16.py
+|   |   |-- test_sigmoid_bf16.py
+|   |   `-- test_swiglu_bf16.py
+|   |-- fixtures
+|   |   `-- mini_v4.config.json
+|   |-- validation
+|   |   |-- auto_validate.py
+|   |   |-- base.py
+|   |   |-- gibberish_detector.py
+|   |   |-- __init__.py
+|   |   |-- kernel_registry.py
+|   |   |-- stage1_weight_validation.py
+|   |   |-- stage2_dimension_validation.py
+|   |   |-- stage3_single_layer.py
+|   |   `-- utils.py
+|   |-- bf16_utils.py
+|   |-- build_dequant_test.sh
+|   |-- compare_outputs.py
+|   |-- flash_attention_omp_wrapper.c
+|   |-- generate_reference_data.py
+|   |-- lib_loader.py
+|   |-- REGRESSION_TESTS.md
+|   |-- test_add.py
+|   |-- test_attention_backward.py
+|   |-- test_attention.py
+|   |-- test_axpy.py
+|   |-- test_codegen_v4_single_layer.py
+|   |-- test_codegen_v6_decode.py
+|   |-- test_codegen_v6_prefill.py
+|   |-- test_cross_entropy.py
+|   |-- test_debug_codegen.py
+|   |-- test_dequant_vs_llamacpp
+|   |-- test_dequant_vs_llamacpp.c
+|   |-- test_embedding_parity.py
+|   |-- test_embedding.py
+|   |-- test_embedding_runtime.py
+|   |-- test_flash_attention.py
+|   |-- test_fused_attention_decode.py
+|   |-- test_fused_attention_mlp.py
+|   |-- test_fused_rmsnorm_qkv.py
+|   |-- test_fused_swiglu_decode.py
+|   |-- test_fusion_benchmark.py
+|   |-- test_gelu.py
+|   |-- test_gemm_batch_int8.py
+|   |-- test_gemm_fused.py
+|   |-- test_gemm_microkernel.py
+|   |-- test_gemm.py
+|   |-- test_gemm_variants.py
+|   |-- test_gemv_kernels_comprehensive.py
+|   |-- test_gemv_performance.c
+|   |-- test_gemv_q_benchmark.py
+|   |-- test_kernels_comprehensive.py
+|   |-- test_kv_cache_attention.py
+|   |-- test_kv_cache_layer_decode.py
+|   |-- test_layer_divergence.py
+|   |-- test_layernorm.py
+|   |-- test_layer_weights_parity.py
+|   |-- test_lm_head_litmus.py
+|   |-- test_mega_fused_attention.py
+|   |-- test_mlp_fusion_benchmark.py
+|   |-- test_mlp.py
+|   |-- test_multi_layer_parity.py
+|   |-- test_optimizer.py
+|   |-- test_orchestration_layer.py
+|   |-- test_parallel_gemv.py
+|   |-- test_parity.py
+|   |-- test_pytorch_parity.py
+|   |-- test_q4k_debug.py
+|   |-- test_q4_k_dequant_match.py
+|   |-- test_q4k_kernels.py
+|   |-- test_q4_k_q8_k_matvec.py
+|   |-- test_q4_k_quantize.py
+|   |-- test_q5_0_dequant_match.py
+|   |-- test_q5_0_parity.py
+|   |-- test_q6k_fused.py
+|   |-- test_q6k_kernels.py
+|   |-- test_q6k_q8k_parity.py
+|   |-- test_quant_kernels.py
+|   |-- test_quant_vs_llamacpp.py
+|   |-- test_relu.py
+|   |-- test_rmsnorm.py
+|   |-- test_rope.py
+|   |-- test_sigmoid.py
+|   |-- test_softmax_backward.py
+|   |-- test_softmax.py
+|   |-- test_swiglu.py
+|   |-- test_tokenizer_full_parity.py
+|   |-- test_tokenizer_gguf_parity.py
+|   |-- test_tokenizer_llamacpp.py
+|   |-- test_tokenizer_multi_model.py
+|   |-- test_tokenizer.py
+|   |-- test_tokenizer_qwen_parity.py
+|   |-- test_tokenizer_unified.py
+|   |-- test_topk.py
+|   |-- test_true_bpe_parity.py
+|   |-- test_utils.py
+|   |-- test_v4_conversion.py
+|   |-- test_vision.py
+|   `-- validate_kernel.py
+|-- vtune_fresh_20260113_171807
+|   |-- archive
+|   |   `-- binaries
+|   |-- config
+|   |   |-- analysis_type.cfg
+|   |   |-- collection.cfg
+|   |   |-- context_values.cfg
+|   |   |-- log.cfg
+|   |   |-- runss.options
+|   |   |-- search_dir.cfg
+|   |   `-- state.cfg
+|   |-- data.0
+|   |   |-- 568673-568686.0-568686.0.th
+|   |   |-- 568673-568686.0-568686.0.th.aux
+|   |   |-- 568673-568686.0.pytrace
+|   |   |-- 568673-568686.0.pytrace-sym
+|   |   |-- 568673-568686.0.trace
+|   |   |-- 568673-568686.0.trace.aux
+|   |   |-- antshiv-ThinkPad-W530.568686.jit
+|   |   |-- pytrace-568686-0x9b2f0a18.log
+|   |   `-- systemcollector-568673-antshiv-ThinkPad-W530.sc
+|   |-- log
+|   |   |-- mrtehelpers-2026.01.13-17h18m08s.568673.log
+|   |   |-- mrtehelpers-2026.01.13-17h18m08s.568689.log
+|   |   |-- perfrun-2026.01.13-17h18m08s.568673.log
+|   |   |-- perfrun-2026.01.13-17h18m08s.568687.log
+|   |   `-- perfrun-2026.01.13-17h18m08s.568689.log
+|   |-- sqlite-db
+|   |   |-- _cache_grouper_data4_dd_thread
+|   |   |-- _cache_grouper_data4_global_data_grouper
+|   |   |-- _cache_grouper_data4_global_time_interval_metrics
+|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
+|   |   |-- timelinedb
+|   |   |-- dicer.db
+|   |   `-- grouper.metadata
+|   `-- vtune_fresh_20260113_171807.vtune
+|-- vtune_hotspots_20260113_171400
+|   |-- archive
+|   |   `-- binaries
+|   |-- config
+|   |   |-- analysis_type.cfg
+|   |   |-- collection.cfg
+|   |   |-- context_values.cfg
+|   |   |-- log.cfg
+|   |   |-- runss.options
+|   |   |-- search_dir.cfg
+|   |   `-- state.cfg
+|   |-- data.0
+|   |   |-- 566500-566510.0-566510.0.th
+|   |   |-- 566500-566510.0-566510.0.th.aux
+|   |   |-- 566500-566510.0.pytrace
+|   |   |-- 566500-566510.0.pytrace-sym
+|   |   |-- 566500-566510.0.trace
+|   |   |-- 566500-566510.0.trace.aux
+|   |   |-- antshiv-ThinkPad-W530.566510.jit
+|   |   |-- pytrace-566510-0x7cfc5f85.log
+|   |   `-- systemcollector-566500-antshiv-ThinkPad-W530.sc
+|   |-- log
+|   |   |-- mrtehelpers-2026.01.13-17h14m02s.566500.log
+|   |   |-- mrtehelpers-2026.01.13-17h14m02s.566513.log
+|   |   |-- perfrun-2026.01.13-17h14m02s.566500.log
+|   |   |-- perfrun-2026.01.13-17h14m02s.566511.log
+|   |   `-- perfrun-2026.01.13-17h14m02s.566513.log
+|   |-- sqlite-db
+|   |   |-- _cache_grouper_data4_dd_thread
+|   |   |-- _cache_grouper_data4_global_data_grouper
+|   |   |-- _cache_grouper_data4_global_time_interval_metrics
+|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
+|   |   |-- timelinedb
+|   |   |-- dicer.db
+|   |   `-- grouper.metadata
+|   `-- vtune_hotspots_20260113_171400.vtune
+|-- vtune_llamacpp
+|   |-- archive
+|   |   `-- binaries
+|   |-- config
+|   |   |-- analysis_type.cfg
+|   |   |-- collection.cfg
+|   |   |-- context_values.cfg
+|   |   |-- log.cfg
+|   |   |-- runss.options
+|   |   |-- search_dir.cfg
+|   |   `-- state.cfg
+|   |-- data.0
+|   |   |-- 582212-582217.0-582217.0.th
+|   |   |-- 582212-582217.0-582217.0.th.aux
+|   |   |-- 582212-582217.0-582237.0.th
+|   |   |-- 582212-582217.0-582237.0.th.aux
+|   |   |-- 582212-582217.0-582238.0.th
+|   |   |-- 582212-582217.0-582238.0.th.aux
+|   |   |-- 582212-582217.0-582239.0.th
+|   |   |-- 582212-582217.0-582239.0.th.aux
+|   |   |-- 582212-582217.0.trace
+|   |   |-- 582212-582217.0.trace.aux
+|   |   |-- pytrace-582217-0xad8d88ba.log
+|   |   `-- systemcollector-582212-antshiv-ThinkPad-W530.sc
+|   |-- log
+|   |   |-- mrtehelpers-2026.01.13-17h48m53s.582212.log
+|   |   |-- mrtehelpers-2026.01.13-17h48m53s.582220.log
+|   |   |-- perfrun-2026.01.13-17h48m53s.582212.log
+|   |   |-- perfrun-2026.01.13-17h48m53s.582218.log
+|   |   `-- perfrun-2026.01.13-17h48m53s.582220.log
+|   |-- sqlite-db
+|   |   |-- _cache_grouper_data4_dd_thread
+|   |   |-- _cache_grouper_data4_global_data_grouper
+|   |   |-- _cache_grouper_data4_global_time_interval_metrics
+|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
+|   |   |-- timelinedb
+|   |   |-- dicer.db
+|   |   `-- grouper.metadata
+|   `-- vtune_llamacpp.vtune
+|-- vtune_results
+|   `-- hotspots_20260114-070548
+|       |-- archive
+|       |-- config
+|       |-- data.0
+|       |-- log
+|       |-- sqlite-db
+|       `-- hotspots_20260114-070548.vtune
+|-- add_int8_kernel.sh
+|-- benchmark_gemm_vs_fp32.py
+|-- benchmark_v65.py
+|-- ck-engine-v6
+|-- c-kernel-engine-power-infographic.svg
+|-- ck-kernel-inference-int8.c
+|-- ck-perf-cli.data
+|-- ck-perf-cli.data.old
+|-- ck-perf.data
+|-- ck-perf-v65-20260112-105225.svg
+|-- ck-v4
+|-- CODEGEN_HANG_FIX.md
+|-- config.json
+|-- CONTRIBUTING.md
+|-- debug_code.c
+|-- debug_v6_output.py
+|-- default.config.json
+|-- default.json
+|-- devstral2.json
+|-- interactive-infographic.html
+|-- llama_dump_logits
+|-- Makefile
+|-- requirements.txt
+|-- run_flamegraph_v6.sh
+|-- small10mb.config.json
+|-- smolLM-135.json
+|-- test_gemm_vs_gemv
+|-- test_gemm_vs_gemv.c
+|-- test_gemv
+|-- test_gemv.c
+|-- test_out.log
+|-- test_q4k_packing.py
+|-- tiny.config.json
+|-- v6.5-profile.svg
+|-- valgrind.supp
+`-- VTUNE_GUIDE.md
+
+228 directories, 1217 files
+</pre>
+</div>
+
+<style>
+.folder-structure {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 1.5rem 0;
+}
+.folder-header {
+    background: #252525;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+}
+.folder-title {
+    color: #ffb400;
+    font-weight: 600;
+    font-size: 14px;
+}
+.folder-updated {
+    color: #666;
+    font-size: 11px;
+}
+.tree-output {
+    margin: 0;
+    padding: 16px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #b0b0b0;
+    overflow-x: auto;
+    white-space: pre;
+}
+.tree-output .directory {
+    color: #6ab0f3;
+}
+</style>
     </main>
 
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
     <script>
-        const navLinks = document.querySelectorAll('.nav-link');
-        const sections = document.querySelectorAll('.content-section');
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
 
-        navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                if(link.getAttribute('target') === '_blank') return;
-                e.preventDefault();
-                const targetId = link.getAttribute('data-target');
-                
-                sections.forEach(section => section.classList.remove('active'));
-                navLinks.forEach(l => l.classList.remove('active'));
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
 
-                document.getElementById(targetId).classList.add('active');
-                link.classList.add('active');
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
             });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
         });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
     </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-16</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>

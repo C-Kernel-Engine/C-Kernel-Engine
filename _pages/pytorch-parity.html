@@ -1,0 +1,168 @@
+<!-- TITLE: PyTorch Parity -->
+<!-- NAV: parity -->
+
+<h1>PyTorch Parity Tests</h1>
+
+<p>C-Kernel-Engine validates every kernel against PyTorch's autograd implementation. Each test loads the C library via <code>ctypes</code>, runs identical operations in both C and PyTorch, and compares the results.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Target: max diff &lt; 1e-5</strong><br>
+        All kernels must match PyTorch output within this tolerance for both forward and backward passes.
+    </div>
+</div>
+
+{{TEST_RESULTS}}
+
+<h2>How Tests Work</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Forward Pass Validation</h3>
+        <pre># Python test (simplified)
+import ctypes
+import torch
+
+# Load C library
+lib = ctypes.CDLL("libckernel_engine.so")
+
+# Create random input
+x = torch.randn(8, 64)
+
+# Run PyTorch reference
+y_torch = F.gelu(x)
+
+# Run C kernel
+lib.gelu_fast_inplace(x_ptr, n)
+
+# Compare
+max_diff = (y_torch - y_c).abs().max()
+assert max_diff < 1e-5</pre>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Backward Pass Validation</h3>
+        <pre># Backward test (simplified)
+x = torch.randn(8, 64, requires_grad=True)
+y = F.gelu(x)
+y.backward(torch.ones_like(y))
+grad_torch = x.grad
+
+# C backward
+lib.gelu_backward_fast(x_ptr, d_out_ptr, d_in_ptr, n)
+
+# Compare gradients
+max_diff = (grad_torch - grad_c).abs().max()
+assert max_diff < 1e-5</pre>
+    </div>
+</div>
+
+<h2>Running Tests</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Run All Tests</h3>
+    <pre># Build the library first
+make
+
+# Run all tests with pytest
+make test
+
+# Or run individual test files
+python3 -m pytest unittest/test_attention.py -v
+python3 -m pytest unittest/test_rope.py -v</pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Litmus Tests (Quick Smoke Test)</h3>
+    <pre># Run minimal sanity checks
+make litmus</pre>
+    <p>Litmus tests run a subset of tests to quickly verify the build is working.</p>
+</div>
+
+<h2>Test Coverage</h2>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Forward</th>
+        <th>Backward</th>
+        <th>Test File</th>
+    </tr>
+    <tr>
+        <td><code>attention</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_attention.py</code>, <code>test_attention_backward.py</code></td>
+    </tr>
+    <tr>
+        <td><code>rope</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_rope.py</code></td>
+    </tr>
+    <tr>
+        <td><code>rmsnorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_rmsnorm.py</code></td>
+    </tr>
+    <tr>
+        <td><code>layernorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_layernorm.py</code></td>
+    </tr>
+    <tr>
+        <td><code>gelu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_gelu.py</code></td>
+    </tr>
+    <tr>
+        <td><code>softmax</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_softmax.py</code>, <code>test_softmax_backward.py</code></td>
+    </tr>
+    <tr>
+        <td><code>swiglu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_swiglu.py</code></td>
+    </tr>
+    <tr>
+        <td><code>sigmoid</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_sigmoid.py</code></td>
+    </tr>
+    <tr>
+        <td><code>mlp</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><code>test_mlp.py</code></td>
+    </tr>
+    <tr>
+        <td><code>gemm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-grey">N/A</span></td>
+        <td><code>test_gemm.py</code></td>
+    </tr>
+</table>
+
+<h2>Integration Tests</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Orchestration Layer</h3>
+        <p>Tests the full forward pass pipeline: RMSNorm → QKV → RoPE → Attention → Output projection.</p>
+        <pre>python3 unittest/test_orchestration_layer.py</pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">LM Head Litmus</h3>
+        <p>End-to-end test loading a model config and running inference.</p>
+        <pre>python3 unittest/test_lm_head_litmus.py</pre>
+    </div>
+</div>

@@ -1,0 +1,152 @@
+<!-- TITLE: Architecture Decision Records -->
+<!-- NAV: adr -->
+
+<h1>Architecture Decision Records (ADR)</h1>
+
+<p>This section captures key architectural decisions for the C-Kernel-Engine IR v4 code generation system.
+ADRs document the <em>why</em> behind design choices so future contributors understand the rationale.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>What is an ADR?</strong><br>
+        An Architecture Decision Record captures a significant design decision along with its context and consequences.
+        Once written, ADRs are immutable &mdash; we add new ADRs to supersede old ones rather than modifying history.
+    </div>
+</div>
+
+<h2>IR v4 Design Decisions</h2>
+
+<p>IR v4 is the "bridge release" that unifies the best parts of v2 (lowering + memory planning) with
+v3 (deterministic layout + header/body/footer structure). These ADRs trace why each step exists.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>ADR</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><a href="adr-0001.html">ADR-0001</a></td>
+            <td>Graph IR + Lowered IR + Layout Split</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+        <tr>
+            <td><a href="adr-0002.html">ADR-0002</a></td>
+            <td>Templates are Canonical, IR is Compiled Output</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+        <tr>
+            <td><a href="adr-0003.html">ADR-0003</a></td>
+            <td>Mode-Specific Buffers (Prefill/Decode/Backward)</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+        <tr>
+            <td><a href="adr-0004.html">ADR-0004</a></td>
+            <td>Deterministic Layout + Canaries for Debug</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+        <tr>
+            <td><a href="adr-0005.html">ADR-0005</a></td>
+            <td>Kernel Selection Happens in Lowering</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+        <tr>
+            <td><a href="adr-0006.html">ADR-0006</a></td>
+            <td>Weights Map from HuggingFace Names via Template</td>
+            <td><span class="badge badge-success">Accepted</span></td>
+            <td>2025-01</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>IR v4 Pipeline Overview</h2>
+
+<p>The v4 pipeline transforms HuggingFace model configs into optimized C code:</p>
+
+<pre><code class="language-plaintext">
+Input: config.json + safetensors header
+           │
+           ▼
+┌─────────────────────────────────────┐
+│   Template Selection (YAML)          │  ← ADR-0002: Templates define model structure
+│   "qwen2" → templates/qwen2.yaml     │
+└─────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│   Graph IR (High-level)              │  ← ADR-0001: Separate concerns
+│   Ops: Embed, RMSNorm, GEMM, RoPE,   │
+│        Attention, SwiGLU, Add        │
+└─────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│   Lowering Phase                     │  ← ADR-0003, ADR-0005
+│   • Resolve modes (prefill/decode)   │
+│   • Select kernel variants           │
+│   • Allocate mode-specific buffers   │
+└─────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│   Layout Phase                       │  ← ADR-0004
+│   • Compute deterministic offsets    │
+│   • 64-byte align for SIMD           │
+│   • Insert canary markers            │
+└─────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│   Code Generation                    │
+│   • Emit C from lowered IR + layout  │
+│   • Header: magic, canary offsets    │
+│   • Body: weight loading, kernels    │
+│   • Footer: cleanup                  │
+└─────────────────────────────────────┘
+           │
+           ▼
+Output: model_name.c + model_name.h + memory_layout.json
+</code></pre>
+
+<h2>File Outputs</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>File</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>model_name.c</code></td>
+            <td>Generated inference code with real kernel calls</td>
+        </tr>
+        <tr>
+            <td><code>model_name.h</code></td>
+            <td>Public API: init, forward, cleanup functions</td>
+        </tr>
+        <tr>
+            <td><code>memory_layout.json</code></td>
+            <td>All tensor offsets for debugging and visualization</td>
+        </tr>
+        <tr>
+            <td><code>graph.json</code></td>
+            <td>Graph IR representation for tooling</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>See the individual ADRs for detailed rationale behind each design decision.</p>

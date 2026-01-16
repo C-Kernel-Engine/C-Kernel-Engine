@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 950" font-family="Consolas, Monaco, monospace">
+  <defs>
+    <linearGradient id="fp32Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffd700"/>
+      <stop offset="100%" style="stop-color:#ff8c00"/>
+    </linearGradient>
+    <linearGradient id="int8Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#43e97b"/>
+      <stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <linearGradient id="quantGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f093fb"/>
+      <stop offset="100%" style="stop-color:#f5576c"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="950" fill="#0d1117"/>
+
+  <!-- Title -->
+  <text x="600" y="40" fill="#c9d1d9" font-size="28" font-weight="bold" text-anchor="middle">
+    Quantization in Transformers: The Big Picture
+  </text>
+
+  <!-- BIT WIDTH COMPARISON -->
+  <text x="50" y="85" fill="#58a6ff" font-size="18" font-weight="bold">BITS PER WEIGHT COMPARISON</text>
+
+  <g transform="translate(50, 100)">
+    <rect x="0" y="0" width="1100" height="100" rx="8" fill="#161b22" stroke="#30363d"/>
+
+    <!-- FP32 bar -->
+    <rect x="20" y="15" width="400" height="25" rx="4" fill="url(#fp32Grad)" opacity="0.8"/>
+    <text x="430" y="33" fill="#ffd700" font-size="12" font-weight="bold">FP32: 32 bits</text>
+    <text x="530" y="33" fill="#8b949e" font-size="11">Full precision, 4 bytes per weight</text>
+
+    <!-- Q8_0 bar -->
+    <rect x="20" y="45" width="100" height="25" rx="4" fill="#4facfe" opacity="0.8"/>
+    <text x="130" y="63" fill="#4facfe" font-size="12" font-weight="bold">Q8_0: 8.5 bits</text>
+    <text x="230" y="63" fill="#8b949e" font-size="11">(8-bit + 2-bit scale per 32) = 34 bytes / 32 weights</text>
+
+    <!-- Q5_0 bar -->
+    <rect x="20" y="75" width="69" height="25" rx="4" fill="#7ee787" opacity="0.8"/>
+    <text x="100" y="93" fill="#7ee787" font-size="12" font-weight="bold">Q5_0: 5.5 bits</text>
+    <text x="200" y="93" fill="#8b949e" font-size="11">(5-bit + shared scale) = 22 bytes / 32 weights</text>
+
+    <!-- Q4_K bar -->
+    <rect x="700" y="15" width="56" height="25" rx="4" fill="#f5576c" opacity="0.8"/>
+    <text x="770" y="33" fill="#f5576c" font-size="12" font-weight="bold">Q4_K: 4.5 bits</text>
+    <text x="870" y="33" fill="#8b949e" font-size="11">144 bytes / 256 weights (K-quant)</text>
+
+    <!-- Memory savings -->
+    <text x="700" y="75" fill="#ffd700" font-size="13" font-weight="bold">Memory savings vs FP32:</text>
+    <text x="700" y="93" fill="#8b949e" font-size="11">Q4_K: 7x smaller | Q5_0: 6x smaller | Q8_0: 4x smaller</text>
+  </g>
+
+  <!-- TRANSFORMER LAYER DIAGRAM -->
+  <text x="50" y="235" fill="#58a6ff" font-size="18" font-weight="bold">WHERE QUANTIZATION HAPPENS (One Transformer Layer)</text>
+
+  <g transform="translate(50, 255)">
+    <rect x="0" y="0" width="1100" height="320" rx="8" fill="#161b22" stroke="#30363d"/>
+
+    <!-- Input -->
+    <rect x="30" y="130" width="80" height="60" rx="5" fill="#2a2a1a" stroke="#ffd700"/>
+    <text x="70" y="155" fill="#ffd700" font-size="11" text-anchor="middle" font-weight="bold">Input</text>
+    <text x="70" y="172" fill="#8b949e" font-size="9" text-anchor="middle">FP32</text>
+
+    <!-- Arrow to RMSNorm -->
+    <path d="M 115 160 L 145 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- RMSNorm -->
+    <rect x="150" y="130" width="90" height="60" rx="5" fill="#1a2a3d" stroke="#4facfe"/>
+    <text x="195" y="152" fill="#4facfe" font-size="10" text-anchor="middle" font-weight="bold">RMSNorm</text>
+    <text x="195" y="168" fill="#8b949e" font-size="9" text-anchor="middle">normalize</text>
+    <text x="195" y="183" fill="#4facfe" font-size="8" text-anchor="middle">→ FP32</text>
+
+    <!-- Quantize activations (for INT8 path) -->
+    <path d="M 245 160 L 275 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="280" y="115" width="100" height="90" rx="5" fill="#1a3d1a" stroke="#7ee787" stroke-width="2"/>
+    <text x="330" y="138" fill="#7ee787" font-size="10" text-anchor="middle" font-weight="bold">Quantize</text>
+    <text x="330" y="155" fill="#7ee787" font-size="9" text-anchor="middle">to Q8_0</text>
+    <text x="330" y="180" fill="#8b949e" font-size="8" text-anchor="middle">FP32 → INT8</text>
+    <text x="330" y="195" fill="#8b949e" font-size="8" text-anchor="middle">+ scale</text>
+
+    <!-- QKV Projections -->
+    <path d="M 385 160 L 415 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="420" y="50" width="120" height="220" rx="5" fill="#3d1a3d" stroke="#f093fb"/>
+    <text x="480" y="75" fill="#f093fb" font-size="11" text-anchor="middle" font-weight="bold">Q/K/V</text>
+    <text x="480" y="92" fill="#f093fb" font-size="10" text-anchor="middle">Projections</text>
+
+    <rect x="435" y="105" width="90" height="35" rx="3" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="480" y="128" fill="#667eea" font-size="9" text-anchor="middle">WQ (Q5_0)</text>
+
+    <rect x="435" y="145" width="90" height="35" rx="3" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="480" y="168" fill="#667eea" font-size="9" text-anchor="middle">WK (Q5_0)</text>
+
+    <rect x="435" y="185" width="90" height="35" rx="3" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="480" y="208" fill="#667eea" font-size="9" text-anchor="middle">WV (Q8_0)</text>
+
+    <text x="480" y="250" fill="#7ee787" font-size="9" text-anchor="middle" font-weight="bold">INT8 GEMM</text>
+
+    <!-- Attention -->
+    <path d="M 545 160 L 575 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="580" y="100" width="100" height="120" rx="5" fill="#2a2a1a" stroke="#ffd700"/>
+    <text x="630" y="125" fill="#ffd700" font-size="11" text-anchor="middle" font-weight="bold">Attention</text>
+    <text x="630" y="145" fill="#8b949e" font-size="9" text-anchor="middle">softmax(QK^T/√d)V</text>
+    <text x="630" y="170" fill="#ffd700" font-size="9" text-anchor="middle">FP32 compute</text>
+    <text x="630" y="190" fill="#8b949e" font-size="8" text-anchor="middle">(scores need precision)</text>
+
+    <!-- WO projection -->
+    <path d="M 685 160 L 715 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="720" y="115" width="100" height="90" rx="5" fill="#3d1a3d" stroke="#f5576c"/>
+    <text x="770" y="140" fill="#f5576c" font-size="10" text-anchor="middle" font-weight="bold">WO Proj</text>
+    <text x="770" y="158" fill="#8b949e" font-size="9" text-anchor="middle">(Q5_0 weights)</text>
+    <text x="770" y="185" fill="#7ee787" font-size="9" text-anchor="middle" font-weight="bold">INT8 GEMM</text>
+
+    <!-- MLP -->
+    <path d="M 825 160 L 855 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="860" y="80" width="120" height="160" rx="5" fill="#3d1a3d" stroke="#f5576c"/>
+    <text x="920" y="105" fill="#f5576c" font-size="11" text-anchor="middle" font-weight="bold">MLP</text>
+
+    <rect x="875" y="115" width="90" height="30" rx="3" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="920" y="135" fill="#667eea" font-size="9" text-anchor="middle">W1 (Q5_0)</text>
+
+    <text x="920" y="160" fill="#ffd700" font-size="9" text-anchor="middle">SiLU ×</text>
+
+    <rect x="875" y="170" width="90" height="30" rx="3" fill="#1a1a3d" stroke="#667eea"/>
+    <text x="920" y="190" fill="#667eea" font-size="9" text-anchor="middle">W2 (Q6_K)</text>
+
+    <text x="920" y="225" fill="#7ee787" font-size="9" text-anchor="middle" font-weight="bold">INT8/FP32 GEMM</text>
+
+    <!-- Output -->
+    <path d="M 985 160 L 1015 160" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="1020" y="130" width="60" height="60" rx="5" fill="#2a2a1a" stroke="#ffd700"/>
+    <text x="1050" y="155" fill="#ffd700" font-size="10" text-anchor="middle" font-weight="bold">Out</text>
+    <text x="1050" y="172" fill="#8b949e" font-size="9" text-anchor="middle">FP32</text>
+
+    <!-- Legend -->
+    <g transform="translate(30, 280)">
+      <rect x="0" y="0" width="15" height="15" fill="#ffd700" rx="2"/>
+      <text x="22" y="12" fill="#8b949e" font-size="10">FP32 activations/compute</text>
+
+      <rect x="200" y="0" width="15" height="15" fill="#7ee787" rx="2"/>
+      <text x="222" y="12" fill="#8b949e" font-size="10">INT8 quantized activations</text>
+
+      <rect x="450" y="0" width="15" height="15" fill="#f5576c" rx="2"/>
+      <text x="472" y="12" fill="#8b949e" font-size="10">Quantized weights (Q4_K/Q5_0/Q8_0)</text>
+    </g>
+  </g>
+
+  <!-- KERNEL SELECTION TABLE -->
+  <text x="50" y="610" fill="#58a6ff" font-size="18" font-weight="bold">KERNEL SELECTION BY WEIGHT TYPE</text>
+
+  <g transform="translate(50, 630)">
+    <rect x="0" y="0" width="1100" height="150" rx="8" fill="#161b22" stroke="#30363d"/>
+
+    <!-- Table header -->
+    <rect x="10" y="10" width="180" height="30" fill="#1c2128" rx="4"/>
+    <text x="100" y="30" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="bold">Weight Type</text>
+
+    <rect x="200" y="10" width="300" height="30" fill="#1c2128" rx="4"/>
+    <text x="350" y="30" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">INT8 Activation Kernel</text>
+
+    <rect x="510" y="10" width="250" height="30" fill="#1c2128" rx="4"/>
+    <text x="635" y="30" fill="#ffd700" font-size="12" text-anchor="middle" font-weight="bold">FP32 Activation Kernel</text>
+
+    <rect x="770" y="10" width="320" height="30" fill="#1c2128" rx="4"/>
+    <text x="930" y="30" fill="#c9d1d9" font-size="12" text-anchor="middle" font-weight="bold">Speedup</text>
+
+    <!-- Q5_0 row -->
+    <text x="100" y="65" fill="#f5576c" font-size="12" text-anchor="middle">Q5_0</text>
+    <text x="350" y="65" fill="#7ee787" font-size="11" text-anchor="middle">gemm_nt_q5_0_q8_0()</text>
+    <text x="635" y="65" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q5_0()</text>
+    <text x="930" y="65" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~4.5x faster</text>
+
+    <!-- Q8_0 row -->
+    <text x="100" y="90" fill="#f5576c" font-size="12" text-anchor="middle">Q8_0</text>
+    <text x="350" y="90" fill="#7ee787" font-size="11" text-anchor="middle">gemm_nt_q8_0_q8_0()</text>
+    <text x="635" y="90" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q8_0()</text>
+    <text x="930" y="90" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~4x faster</text>
+
+    <!-- Q4_K row -->
+    <text x="100" y="115" fill="#f5576c" font-size="12" text-anchor="middle">Q4_K</text>
+    <text x="350" y="115" fill="#7ee787" font-size="11" text-anchor="middle">gemm_nt_q4_k_q8_k()</text>
+    <text x="635" y="115" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q4_k()</text>
+    <text x="930" y="115" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~3-4x faster</text>
+
+    <!-- Q6_K row -->
+    <text x="100" y="140" fill="#f5576c" font-size="12" text-anchor="middle">Q6_K</text>
+    <text x="350" y="140" fill="#ff7b72" font-size="11" text-anchor="middle">❌ Not implemented</text>
+    <text x="635" y="140" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q6_k()</text>
+    <text x="930" y="140" fill="#8b949e" font-size="12" text-anchor="middle">FP32 only</text>
+  </g>
+
+  <!-- KEY TAKEAWAYS -->
+  <rect x="50" y="800" width="1100" height="130" rx="8" fill="#1c2128" stroke="#f0883e" stroke-width="2"/>
+  <text x="600" y="830" fill="#f0883e" font-size="16" font-weight="bold" text-anchor="middle">KEY TAKEAWAYS</text>
+
+  <g transform="translate(80, 850)">
+    <text x="0" y="0" fill="#7ee787" font-size="13">1. Weights are quantized at model conversion time (offline)</text>
+    <text x="0" y="25" fill="#7ee787" font-size="13">2. Activations are quantized at runtime (FP32 → Q8_0/Q8_K) before each GEMM</text>
+    <text x="0" y="50" fill="#7ee787" font-size="13">3. Integer dot products are ~4x faster than FP32 (SIMD parallelism + simpler ALU)</text>
+    <text x="0" y="75" fill="#7ee787" font-size="13">4. Scale factors multiply ONCE per block, not per element → huge savings</text>
+
+    <text x="600" y="0" fill="#ffd700" font-size="13">The bit manipulation (qh >> j+12) exists to pack</text>
+    <text x="600" y="25" fill="#ffd700" font-size="13">more weights in fewer bytes while preserving accuracy.</text>
+    <text x="600" y="50" fill="#ffd700" font-size="13">It's compression optimized for SIMD unpacking.</text>
+  </g>
+</svg>

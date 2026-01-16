@@ -1,0 +1,130 @@
+<!-- TITLE: Architecture Links -->
+<!-- NAV: architecture-links -->
+
+<h1>Architecture Links</h1>
+
+<p>A comprehensive guide to all architecture documentation in C-Kernel-Engine.</p>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Core</h3>
+        <ul class="link-list">
+            <li><a href="architecture.html">System Overview</a>
+                <span class="subtitle">IR, Codegen, Kernels</span></li>
+            <li><a href="tokenizer.html">Tokenizer</a>
+                <span class="subtitle">BPE, WordPiece, Trie</span></li>
+            <li><a href="kernels.html">Kernel Reference</a>
+                <span class="subtitle">Forward/backward ops</span></li>
+            <li><a href="codegen.html">Code Generation</a>
+                <span class="subtitle">IR to C compilation</span></li>
+            <li><a href="iteration-philosophy.html">Iteration Philosophy</a>
+                <span class="subtitle">Why v1→v6 matters</span></li>
+            <li><a href="ir-v2.html">IR v2 Format</a>
+                <span class="subtitle">Case study: symbolic dimensions</span></li>
+            <li><a href="concepts.html">Deep Dive Concepts</a>
+                <span class="subtitle">RoPE, Flash Attention, GQA</span></li>
+        </ul>
+    </div>
+
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Quantization</h3>
+        <ul class="link-list">
+            <li><a href="quantization.html">Quant Fundamentals</a>
+                <span class="subtitle">Block formats, grouping</span></li>
+            <li><a href="quantization-visuals.html">Bit Manipulation Visuals</a>
+                <span class="subtitle">Q5_0, Q4_K, INT8 with spaced repetition</span></li>
+            <li><a href="quant-formats.html">Quant Format Reference</a>
+                <span class="subtitle">Byte-level visualization</span></li>
+            <li><a href="gguf-bump.html">GGUF to Bump</a>
+                <span class="subtitle">Weight conversion</span></li>
+            <li><a href="gguf-conversion.html">GGUF Parsing</a>
+                <span class="subtitle">Byte-level guide</span></li>
+        </ul>
+    </div>
+
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Optimization</h3>
+        <ul class="link-list">
+            <li><a href="gemm-memory-layout.html">GEMM Memory Layout</a>
+                <span class="subtitle">NN/NT layouts, offsets</span></li>
+            <li><a href="gemm-optimization.html">GEMM Optimization</a>
+                <span class="subtitle">AVX, MKL, blocking</span></li>
+            <li><a href="simd-architecture.html">SIMD Architecture</a>
+                <span class="subtitle">AVX-512, VNNI, AMX</span></li>
+            <li><a href="flash_attention.html">Flash Attention Analysis</a>
+                <span class="subtitle">Why llama.cpp is faster</span></li>
+        </ul>
+    </div>
+
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Infrastructure</h3>
+        <ul class="link-list">
+            <li><a href="memory-safety.html">Memory Safety</a>
+                <span class="subtitle">Bump allocator, canaries</span></li>
+            <li><a href="deterministic-memory.html">Deterministic Memory</a>
+                <span class="subtitle">RDMA, interpretability</span></li>
+            <li><a href="profiling.html">Profiling Guide</a>
+                <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
+            <li><a href="testing.html">Testing</a>
+                <span class="subtitle">Numerical parity verification</span></li>
+        </ul>
+    </div>
+</div>
+
+<h2>Temp / Work in Progress</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Draft Documentation</strong><br>
+        These pages are work-in-progress and may be moved or updated.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Quantization Math Deep Dive</h3>
+        <p>Explains Q5_0/Q8_0 block formats, dequantization math, and AVX-512 vectorization strategy.</p>
+        <a href="quantization-math-temp.html" class="btn btn-primary">Read More</a>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">GEMM Memory Layout</h3>
+        <p>Covers quantized block storage, cache blocking strategies, and KV cache layouts.</p>
+        <a href="gemm-memory-layout-temp.html" class="btn btn-primary">Read More</a>
+    </div>
+</div>
+
+<h2>Quick Navigation</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">By Task</h3>
+    <table>
+        <tr>
+            <th>Task</th>
+            <th>Documentation</th>
+        </tr>
+        <tr>
+            <td><strong>Understanding the system</strong></td>
+            <td><a href="architecture.html">System Overview</a>, <a href="concepts.html">Concepts</a></td>
+        </tr>
+        <tr>
+            <td><strong>Implementing new kernels</strong></td>
+            <td><a href="kernels.html">Kernel Reference</a>, <a href="codegen.html">Codegen</a></td>
+        </tr>
+        <tr>
+            <td><strong>Quantization work</strong></td>
+            <td><a href="quantization.html">Quant Fundamentals</a>, <a href="quantization-visuals.html">Bit Visuals</a>, <a href="gguf-conversion.html">GGUF Parsing</a></td>
+        </tr>
+        <tr>
+            <td><strong>Performance optimization</strong></td>
+            <td><a href="gemm-memory-layout.html">GEMM Layout</a>, <a href="simd-architecture.html">SIMD</a></td>
+        </tr>
+        <tr>
+            <td><strong>Debugging & profiling</strong></td>
+            <td><a href="profiling.html">Profiling</a>, <a href="testing.html">Testing</a></td>
+        </tr>
+    </table>
+</div>

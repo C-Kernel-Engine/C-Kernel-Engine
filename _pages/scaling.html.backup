@@ -1,0 +1,430 @@
+<!-- TITLE: Scaling Philosophy -->
+<!-- NAV: scaling -->
+
+<h1>Scaling Philosophy</h1>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>CPU-First, RDMA-Connected, No GPU Lock-in</strong><br>
+        We scale across CPUs using RDMA and proper networking. This is a deliberate architectural choice.
+    </div>
+</div>
+
+<h2>The Core Insight</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Models Are Just Numbers</h3>
+    <p>There is no fundamental difference between training a 70M parameter model and a 600B parameter model. The code is identical. Only the numbers change:</p>
+    <pre>
+┌─────────────────┬─────────────┬─────────────┬──────────────┐
+│ Model           │ hidden_size │ layers      │ What Changes │
+├─────────────────┼─────────────┼─────────────┼──────────────┤
+│ Tiny (70M)      │ 512         │ 12          │ Numbers      │
+│ Medium (7B)     │ 4096        │ 32          │ Numbers      │
+│ Large (70B)     │ 8192        │ 80          │ Numbers      │
+│ Massive (600B)  │ 16384       │ 126         │ Numbers      │
+└─────────────────┴─────────────┴─────────────┴──────────────┘
+    </pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Same Kernels, Different Sizes</h3>
+    <pre>// This exact same function trains a 70M model and a 600B model
+void gemm_forward(float *C, const float *A, const float *B,
+                  int M, int N, int K);
+
+// 70M:  gemm_forward(out, A, B, 1024, 512, 512);
+// 600B: gemm_forward(out, A, B, 65536, 16384, 16384);
+
+// Same code. Different numbers. That's it.</pre>
+</div>
+
+<h2>Target Platform</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Server-Grade Hardware</h3>
+    <p>C-Kernel-Engine is designed for modern server CPUs, not laptops or desktops. We target:</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">CPU Requirements</h3>
+        <ul>
+            <li><strong>High core count</strong> - 64-128+ cores per socket</li>
+            <li><strong>Large L3 cache</strong> - Good core-to-cache ratio (1-2MB/core)</li>
+            <li><strong>AVX-512</strong> - 512-bit SIMD for vectorized math</li>
+            <li><strong>AMX</strong> - Advanced Matrix Extensions (Sapphire Rapids+)</li>
+            <li><strong>Multiple sockets</strong> - NUMA-aware memory access</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Memory Requirements</h3>
+        <ul>
+            <li><strong>DDR5</strong> - Higher bandwidth, lower latency</li>
+            <li><strong>Multi-channel</strong> - 8-12 channels per socket</li>
+            <li><strong>Large capacity</strong> - 512GB - 2TB+ per node</li>
+            <li><strong>ECC</strong> - Error correction for reliability</li>
+            <li><strong>NUMA-local</strong> - Pin threads to local memory</li>
+        </ul>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Accelerators</h3>
+        <ul>
+            <li><strong>Intel DSA</strong> - Data Streaming Accelerator for memory copies</li>
+            <li><strong>Intel IAA</strong> - Analytics Accelerator for compression</li>
+            <li><strong>Intel QAT</strong> - QuickAssist for crypto (if needed)</li>
+            <li><strong>CXL</strong> - Memory expansion and pooling (future)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Networking</h3>
+        <ul>
+            <li><strong>RDMA</strong> - InfiniBand or RoCEv2</li>
+            <li><strong>100-400 Gbps</strong> - High bandwidth interconnect</li>
+            <li><strong>Low latency</strong> - 1-2 μs for RDMA operations</li>
+            <li><strong>Kernel bypass</strong> - Zero-copy transfers</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Operating System</h3>
+    <p><strong>Linux-only.</strong> We use Linux-specific features:</p>
+    <ul>
+        <li><code>mmap()</code> with <code>MAP_HUGETLB</code> for huge pages</li>
+        <li><code>madvise(MADV_HUGEPAGE)</code> for transparent huge pages</li>
+        <li><code>numactl</code> / <code>set_mempolicy()</code> for NUMA binding</li>
+        <li><code>sched_setaffinity()</code> for core pinning</li>
+        <li><code>perf</code> for profiling</li>
+        <li><code>io_uring</code> for async I/O (weight loading)</li>
+        <li>Intel DSA via <code>libaccel-config</code> / <code>idxd</code> driver</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Target CPU Families</h3>
+    <table class="table">
+        <thead>
+            <tr><th>CPU</th><th>Cores</th><th>AVX-512</th><th>AMX</th><th>DDR5 Channels</th><th>DSA</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>AMD EPYC 9004 (Genoa)</td>
+                <td>Up to 128</td>
+                <td>Yes</td>
+                <td>No</td>
+                <td>12</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td>AMD EPYC 9005 (Turin)</td>
+                <td>Up to 192</td>
+                <td>Yes</td>
+                <td>No</td>
+                <td>12</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Sapphire Rapids</td>
+                <td>Up to 60</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Emerald Rapids</td>
+                <td>Up to 64</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Granite Rapids</td>
+                <td>Up to 128</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Ampere Altra Max</td>
+                <td>128</td>
+                <td>No (ARM)</td>
+                <td>No</td>
+                <td>8</td>
+                <td>No</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2>Why CPU-Only?</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Advantages</h3>
+        <ul>
+            <li><strong>No vendor lock-in</strong> - Works on any x86/ARM CPU</li>
+            <li><strong>Commodity hardware</strong> - Standard servers, not $40K GPUs</li>
+            <li><strong>Larger memory</strong> - 2TB RAM per node, no 80GB VRAM limit</li>
+            <li><strong>Better debugging</strong> - GDB, Valgrind, perf all work</li>
+            <li><strong>Simpler deployment</strong> - No CUDA, no driver hell</li>
+            <li><strong>Open ecosystem</strong> - GCC, Linux, standard tools</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">The Trade-off</h3>
+        <ul>
+            <li>GPUs have higher peak FLOPS</li>
+            <li>But: memory bandwidth often bottlenecks anyway</li>
+            <li>But: PCIe transfer overhead for large models</li>
+            <li>But: multi-GPU coordination is complex</li>
+            <li>But: CPU memory is 10-100x larger and cheaper</li>
+        </ul>
+        <p><strong>For inference:</strong> CPUs are often faster for batch=1</p>
+        <p><strong>For training:</strong> Scale horizontally with RDMA</p>
+    </div>
+</div>
+
+<h2>Distributed Architecture</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">RDMA-Connected CPU Cluster</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                     RDMA Fabric (100Gbps+)                      │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│                 │                 │                             │
+▼                 ▼                 ▼                             │
+┌─────────┐   ┌─────────┐   ┌─────────┐                          │
+│ Node 0  │   │ Node 1  │   │ Node 2  │  ...  Node N             │
+│ 128 cores│   │ 128 cores│   │ 128 cores│                        │
+│ 2TB RAM │   │ 2TB RAM │   │ 2TB RAM │                          │
+│         │   │         │   │         │                          │
+│ Layers  │   │ Layers  │   │ Layers  │                          │
+│ 0-15    │   │ 16-31   │   │ 32-47   │                          │
+└─────────┘   └─────────┘   └─────────┘                          │
+    </pre>
+</div>
+
+<h3>Parallelism Strategies</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">1. Pipeline Parallelism</h3>
+    <p>Different layers on different nodes. Activations flow through the pipeline.</p>
+    <pre>Node 0: Layers 0-15   →  activations  →  Node 1: Layers 16-31  →  ...
+        (forward)           (RDMA)              (forward)</pre>
+    <p><strong>Communication:</strong> Send activations between pipeline stages via RDMA.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">2. Tensor Parallelism</h3>
+    <p>Large matrices split across nodes. Each node computes a shard.</p>
+    <pre>// 16384 x 16384 weight matrix split across 4 nodes
+Node 0: W[0:4096, :]      // Shard 0
+Node 1: W[4096:8192, :]   // Shard 1
+Node 2: W[8192:12288, :]  // Shard 2
+Node 3: W[12288:16384, :] // Shard 3
+
+// After local GEMM, all-reduce to combine</pre>
+    <p><strong>Communication:</strong> RDMA all-reduce after each sharded operation.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">3. Data Parallelism</h3>
+    <p>Same model replicated. Different batches. Gradient averaging.</p>
+    <pre>Node 0: Model copy, Batch 0  →  gradients  ─┐
+Node 1: Model copy, Batch 1  →  gradients  ─┼→  All-reduce  →  Update all
+Node 2: Model copy, Batch 2  →  gradients  ─┤
+Node 3: Model copy, Batch 3  →  gradients  ─┘</pre>
+</div>
+
+<h2>RDMA: The Key Enabler</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why RDMA?</h3>
+    <p><strong>Remote Direct Memory Access</strong> - Zero-copy, kernel-bypass networking.</p>
+    <table class="table">
+        <thead>
+            <tr><th>Metric</th><th>TCP/IP</th><th>RDMA</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Latency</td><td>~50-100 μs</td><td>~1-2 μs</td></tr>
+            <tr><td>Bandwidth</td><td>10-25 Gbps</td><td>100-400 Gbps</td></tr>
+            <tr><td>CPU overhead</td><td>High (kernel, copies)</td><td>Near zero</td></tr>
+            <tr><td>Memory copies</td><td>Multiple</td><td>Zero (DMA)</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RDMA Primitives We Need</h3>
+    <pre>// One-sided operations (no remote CPU involvement)
+rdma_write(remote_addr, local_buf, size);  // Write to remote memory
+rdma_read(local_buf, remote_addr, size);   // Read from remote memory
+
+// Collective operations (built on one-sided)
+rdma_allreduce(buf, size, SUM);  // Gradient averaging
+rdma_broadcast(buf, size, root); // Weight distribution
+rdma_barrier();                   // Synchronization</pre>
+</div>
+
+<h2>Implementation Roadmap</h2>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Phase</th><th>Feature</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Single-node training (current)</td>
+                <td><span class="badge badge-green">Done</span></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Multi-core parallelism (OpenMP)</td>
+                <td><span class="badge badge-green">Done</span></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>RDMA communication primitives</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Pipeline parallelism</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Tensor parallelism (sharded GEMM)</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>Encoder + cross-attention</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>600B+ training</td>
+                <td><span class="badge" style="background:#666;color:#ccc;">Future</span></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2>The Math Doesn't Change</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">From Tiny to Massive: Same Operations</h3>
+    <pre>
+Forward pass (any size model):
+1. embed_tokens()           // Lookup: tokens → vectors
+2. for each layer:
+   a. rmsnorm()             // Normalize
+   b. linear() × 3          // Q, K, V projections
+   c. rope()                // Rotary embeddings
+   d. attention()           // Softmax(QK^T)V
+   e. linear()              // Output projection
+   f. residual_add()        // Skip connection
+   g. rmsnorm()             // Normalize
+   h. mlp_swiglu()          // FFN with gating
+   i. residual_add()        // Skip connection
+3. rmsnorm()                // Final norm
+4. lm_head()                // Logits
+
+Backward pass: Same operations in reverse.
+SGD: weights -= lr * gradients
+
+That's it. For any model size.
+    </pre>
+</div>
+
+<h2>Hardware Recommendations</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">For Different Scales</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Model Size</th><th>Recommended Setup</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>< 7B</td>
+                <td>Single server, 32+ cores, 128GB+ RAM</td>
+            </tr>
+            <tr>
+                <td>7B - 70B</td>
+                <td>Single server, 128 cores, 512GB-2TB RAM</td>
+            </tr>
+            <tr>
+                <td>70B - 200B</td>
+                <td>2-4 nodes, RDMA interconnect, 2TB RAM each</td>
+            </tr>
+            <tr>
+                <td>200B - 600B</td>
+                <td>8-16 nodes, 100Gbps+ RDMA fabric</td>
+            </tr>
+            <tr>
+                <td>600B+</td>
+                <td>32+ nodes, 400Gbps RDMA, pipeline + tensor parallel</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Recommended CPUs</h3>
+    <ul>
+        <li><strong>AMD EPYC 9004 (Genoa)</strong> - Up to 128 cores, AVX-512, 12-channel DDR5</li>
+        <li><strong>Intel Xeon Sapphire Rapids</strong> - Up to 60 cores, AMX for matrix ops</li>
+        <li><strong>Ampere Altra Max</strong> - 128 ARM cores, good perf/watt</li>
+        <li><strong>AWS Graviton3</strong> - Cost-effective cloud ARM option</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RDMA Options</h3>
+    <ul>
+        <li><strong>Mellanox/NVIDIA ConnectX-7</strong> - 400Gbps InfiniBand</li>
+        <li><strong>Intel E810</strong> - 100Gbps RoCE (RDMA over Ethernet)</li>
+        <li><strong>AWS EFA</strong> - Cloud RDMA for EC2 instances</li>
+    </ul>
+</div>
+
+<h2>Why Not GPU?</h2>
+
+<div class="card">
+    <blockquote style="border-left: 4px solid var(--orange); padding-left: 1rem; margin: 1rem 0; font-style: italic;">
+        "Nvidia, f**k you."<br>
+        <small>— Linus Torvalds, 2012 (regarding their closed-source Linux drivers)</small>
+    </blockquote>
+    <p>Beyond the open-source concerns:</p>
+    <ul>
+        <li><strong>Cost</strong> - H100 = $40,000. EPYC server with 2TB RAM = $15,000</li>
+        <li><strong>Memory</strong> - 80GB VRAM vs 2TB+ system RAM</li>
+        <li><strong>Availability</strong> - GPU shortages vs commodity CPUs</li>
+        <li><strong>Flexibility</strong> - Run anywhere: cloud, on-prem, edge, embedded</li>
+        <li><strong>Debugging</strong> - printf works. GDB works. Valgrind works.</li>
+        <li><strong>Longevity</strong> - C code compiles forever. CUDA versions break.</li>
+    </ul>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="developer-guide.html">Developer Guide</a> - How the engine works</li>
+    <li><a href="memory-safety.html">Memory Safety</a> - Bump allocator design</li>
+    <li><a href="profiling.html">Profiling Guide</a> - Performance optimization</li>
+</ul>

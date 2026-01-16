@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450">
+  <defs>
+    <marker id="arrowW" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowWRev" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+      <polygon points="10 0, 0 3.5, 10 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="450" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">Weight Tying: Shared Embeddings</text>
+  <text x="450" y="50" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Token embedding matrix = LM head output projection (transposed)</text>
+
+  <!-- Without weight tying -->
+  <g transform="translate(30, 75)">
+    <rect x="0" y="0" width="400" height="170" rx="6" fill="#2a2a2a" stroke="#e74c3c"/>
+    <text x="200" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#e74c3c" text-anchor="middle">Without Weight Tying</text>
+
+    <!-- Token Embedding -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="100" height="60" rx="4" fill="#323232" stroke="#07adf8"/>
+      <text x="50" y="25" font-family="Inter, sans-serif" font-size="10" fill="#07adf8" text-anchor="middle">Embedding E</text>
+      <text x="50" y="45" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">[V × D]</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="135" y1="80" x2="165" y2="80" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowW)"/>
+    <text x="150" y="70" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">id→vec</text>
+
+    <!-- Hidden states -->
+    <g transform="translate(170, 50)">
+      <rect x="0" y="0" width="60" height="60" rx="4" fill="#323232" stroke="#454545"/>
+      <text x="30" y="25" font-family="Inter, sans-serif" font-size="9" fill="#b0b0b0" text-anchor="middle">Decoder</text>
+      <text x="30" y="40" font-family="Inter, sans-serif" font-size="9" fill="#b0b0b0" text-anchor="middle">Stack</text>
+      <text x="30" y="55" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">[T × D]</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="235" y1="80" x2="265" y2="80" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowW)"/>
+    <text x="250" y="70" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">vec→logits</text>
+
+    <!-- LM Head -->
+    <g transform="translate(270, 50)">
+      <rect x="0" y="0" width="100" height="60" rx="4" fill="#323232" stroke="#47b475"/>
+      <text x="50" y="25" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">LM Head W</text>
+      <text x="50" y="45" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">[D × V]</text>
+    </g>
+
+    <!-- Memory stats -->
+    <text x="200" y="140" font-family="Inter, sans-serif" font-size="10" fill="#e74c3c" text-anchor="middle">Two separate [V × D] matrices</text>
+    <text x="200" y="158" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">V=32K, D=4K → 256M params × 2 = 512M params</text>
+  </g>
+
+  <!-- With weight tying -->
+  <g transform="translate(470, 75)">
+    <rect x="0" y="0" width="400" height="170" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+    <text x="200" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#47b475" text-anchor="middle">With Weight Tying</text>
+
+    <!-- Shared Embedding -->
+    <g transform="translate(150, 45)">
+      <rect x="0" y="0" width="100" height="70" rx="4" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+      <text x="50" y="20" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">E = W.T</text>
+      <text x="50" y="38" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">[V × D]</text>
+      <text x="50" y="55" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Shared!</text>
+    </g>
+
+    <!-- Input arrow -->
+    <path d="M 50,80 L 145,80" fill="none" stroke="#07adf8" stroke-width="1.5" marker-end="url(#arrowW)"/>
+    <text x="100" y="70" font-family="Inter, sans-serif" font-size="8" fill="#07adf8" text-anchor="middle">E[id]</text>
+
+    <!-- Output arrow -->
+    <path d="M 255,80 L 350,80" fill="none" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrowW)"/>
+    <text x="300" y="70" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">h @ E.T</text>
+
+    <!-- Input token -->
+    <g transform="translate(20, 60)">
+      <rect x="0" y="0" width="30" height="40" rx="3" fill="#323232" stroke="#07adf8"/>
+      <text x="15" y="25" font-family="monospace" font-size="9" fill="#07adf8" text-anchor="middle">id</text>
+    </g>
+
+    <!-- Output logits -->
+    <g transform="translate(350, 55)">
+      <rect x="0" y="0" width="35" height="50" rx="3" fill="#323232" stroke="#47b475"/>
+      <text x="17" y="20" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">logits</text>
+      <text x="17" y="40" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">[V]</text>
+    </g>
+
+    <!-- Memory stats -->
+    <text x="200" y="140" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">One shared [V × D] matrix</text>
+    <text x="200" y="158" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">V=32K, D=4K → 256M params (50% savings!)</text>
+  </g>
+
+  <!-- Mathematical explanation -->
+  <g transform="translate(30, 265)">
+    <rect x="0" y="0" width="420" height="160" rx="6" fill="#2a2a2a" stroke="#ffb400"/>
+    <text x="210" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffb400" text-anchor="middle">Why It Works</text>
+
+    <text x="20" y="50" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Token Embedding (forward):</text>
+    <text x="30" y="70" font-family="monospace" font-size="10" fill="#07adf8">h = E[token_id]  // lookup row id of E</text>
+
+    <text x="20" y="95" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">LM Head (forward):</text>
+    <text x="30" y="115" font-family="monospace" font-size="10" fill="#47b475">logits = hidden @ E.T  // project to vocab</text>
+
+    <text x="20" y="145" font-family="Inter, sans-serif" font-size="10" fill="#ffb400">Key insight: Both operations use the same space!</text>
+    <text x="20" y="160" font-family="Inter, sans-serif" font-size="9" fill="#707070">Embedding maps tokens → semantic space, LM head maps back</text>
+  </g>
+
+  <!-- Benefits and trade-offs -->
+  <g transform="translate(470, 265)">
+    <rect x="0" y="0" width="400" height="160" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="200" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#b0b0b0" text-anchor="middle">Benefits &amp; Considerations</text>
+
+    <text x="20" y="50" font-family="Inter, sans-serif" font-size="10" fill="#47b475">✓ 50% reduction in embedding params</text>
+    <text x="20" y="70" font-family="Inter, sans-serif" font-size="10" fill="#47b475">✓ Better generalization (shared semantics)</text>
+    <text x="20" y="90" font-family="Inter, sans-serif" font-size="10" fill="#47b475">✓ Faster training (fewer params to update)</text>
+
+    <text x="20" y="115" font-family="Inter, sans-serif" font-size="10" fill="#707070">Config field:</text>
+    <text x="30" y="133" font-family="monospace" font-size="9" fill="#ffb400">tie_word_embeddings: true</text>
+
+    <text x="20" y="155" font-family="Inter, sans-serif" font-size="9" fill="#707070">Used by: Llama, GPT-2, T5, most modern LLMs</text>
+  </g>
+</svg>

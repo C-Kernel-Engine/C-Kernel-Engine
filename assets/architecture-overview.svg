@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="35" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">C-Kernel-Engine Architecture</text>
+  <text x="450" y="55" font-family="Inter, sans-serif" font-size="12" fill="#707070" text-anchor="middle">From Model Config to Optimized C Runtime</text>
+
+  <!-- Stage 1: Model Config -->
+  <g transform="translate(50, 90)">
+    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
+    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">Model Config</text>
+    <text x="70" y="55" font-family="monospace" font-size="10" fill="#707070" text-anchor="middle">config.json</text>
+    <text x="70" y="75" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">hidden_size: 768</text>
+    <text x="70" y="90" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">num_heads: 12</text>
+    <text x="70" y="105" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">num_layers: 6</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <g transform="translate(195, 145)">
+    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+  </g>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Stage 2: IR Builder -->
+  <g transform="translate(250, 90)">
+    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
+    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">IR Builder</text>
+    <text x="70" y="55" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Intermediate</text>
+    <text x="70" y="70" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Representation</text>
+    <rect x="20" y="80" width="100" height="25" rx="4" fill="#2a2a2a"/>
+    <text x="70" y="97" font-family="monospace" font-size="9" fill="#ffb400" text-anchor="middle">CKLayerIR[]</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <g transform="translate(395, 145)">
+    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+  </g>
+
+  <!-- Stage 3: Code Generator -->
+  <g transform="translate(450, 90)">
+    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
+    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">Code Generator</text>
+    <text x="70" y="55" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Emits optimized C</text>
+    <text x="70" y="75" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">forward_layer_0()</text>
+    <text x="70" y="90" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">backward_layer_0()</text>
+    <text x="70" y="105" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">alloc_buffers()</text>
+  </g>
+
+  <!-- Arrow 3 -->
+  <g transform="translate(595, 145)">
+    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+  </g>
+
+  <!-- Stage 4: C Runtime -->
+  <g transform="translate(650, 90)">
+    <rect width="180" height="120" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="3" filter="url(#shadow)"/>
+    <rect width="180" height="30" rx="8" fill="url(#accentGrad)"/>
+    <text x="90" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">C Runtime</text>
+    <text x="90" y="55" font-family="monospace" font-size="10" fill="#a0a0a0" text-anchor="middle">model_forward()</text>
+    <text x="90" y="75" font-family="monospace" font-size="10" fill="#a0a0a0" text-anchor="middle">model_backward()</text>
+    <rect x="20" y="90" width="140" height="20" rx="4" fill="#1a3d2a"/>
+    <text x="90" y="104" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Full PyTorch Parity</text>
+  </g>
+
+  <!-- Kernel Library Section -->
+  <g transform="translate(50, 250)">
+    <rect width="780" height="200" rx="12" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="780" height="35" rx="12" fill="#2a2a2a"/>
+    <text x="390" y="23" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400" text-anchor="middle">Kernel Library (libckernel_engine.so)</text>
+
+    <!-- Kernel boxes -->
+    <!-- Row 1 -->
+    <g transform="translate(20, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Attention</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">GQA + RoPE</text>
+    </g>
+
+    <g transform="translate(135, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RMSNorm</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fused</text>
+    </g>
+
+    <g transform="translate(250, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">SwiGLU</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fused gate</text>
+    </g>
+
+    <g transform="translate(365, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GEMM</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">blocked serial</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">AVX-512</text>
+    </g>
+
+    <g transform="translate(480, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Softmax</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Causal</text>
+    </g>
+
+    <g transform="translate(595, 50)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RoPE</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Precomputed</text>
+    </g>
+
+    <!-- Row 2 -->
+    <g transform="translate(20, 120)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">LayerNorm</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Unrolled</text>
+    </g>
+
+    <g transform="translate(135, 120)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GELU</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fast approx</text>
+    </g>
+
+    <g transform="translate(250, 120)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Sigmoid</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Scalar + vector</text>
+    </g>
+
+    <g transform="translate(365, 120)">
+      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">MLP</text>
+      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">fc1 + fc2 backward</text>
+      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Token parallel</text>
+    </g>
+
+    <!-- PyTorch Parity Test Box -->
+    <g transform="translate(540, 120)">
+      <rect width="220" height="60" rx="6" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+      <text x="110" y="20" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">PyTorch Parity Tests</text>
+      <text x="110" y="37" font-family="Inter, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">ctypes bindings + autograd comparison</text>
+      <text x="110" y="52" font-family="Inter, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">max diff &lt; 1e-5 for all kernels</text>
+    </g>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(700, 470)">
+    <rect x="0" y="0" width="12" height="12" rx="2" fill="#ffb400"/>
+    <text x="18" y="10" font-family="Inter, sans-serif" font-size="10" fill="#707070">Core Pipeline</text>
+    <rect x="90" y="0" width="12" height="12" rx="2" fill="#47b475"/>
+    <text x="108" y="10" font-family="Inter, sans-serif" font-size="10" fill="#707070">Output</text>
+  </g>
+</svg>

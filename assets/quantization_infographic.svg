@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 2400" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="fp32Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe"/>
+      <stop offset="100%" style="stop-color:#00f2fe"/>
+    </linearGradient>
+    <linearGradient id="bf16Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#43e97b"/>
+      <stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <linearGradient id="fp16Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fa709a"/>
+      <stop offset="100%" style="stop-color:#fee140"/>
+    </linearGradient>
+    <linearGradient id="int8Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#6366f1"/>
+    </linearGradient>
+    <linearGradient id="int4Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ef4444"/>
+    </linearGradient>
+    <linearGradient id="avx512Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0071c5"/>
+      <stop offset="100%" style="stop-color:#00aeef"/>
+    </linearGradient>
+    <linearGradient id="amxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    
+    <!-- Drop shadow filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="2400" fill="#0f0f1a"/>
+  
+  <!-- Grid pattern -->
+  <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+    <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1a1a2e" stroke-width="1"/>
+  </pattern>
+  <rect width="1400" height="2400" fill="url(#grid)" opacity="0.5"/>
+
+  <!-- Header -->
+  <rect x="50" y="30" width="1300" height="120" rx="15" fill="url(#headerGrad)" filter="url(#shadow)"/>
+  <text x="700" y="85" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="bold">
+    Quantization Formats &amp; Intel Instruction Sets
+  </text>
+  <text x="700" y="125" text-anchor="middle" fill="#8892b0" font-size="20">
+    A Deep Dive into Data Types for CPU-Based AI Inference
+  </text>
+
+  <!-- ============================================== -->
+  <!-- SECTION 1: BIT LAYOUT VISUALIZATION -->
+  <!-- ============================================== -->
+  
+  <text x="700" y="200" text-anchor="middle" fill="#64ffda" font-size="28" font-weight="bold">
+    Binary Layout Comparison
+  </text>
+  
+  <!-- FP32 - 32 bits -->
+  <g transform="translate(100, 230)">
+    <rect x="0" y="0" width="1200" height="80" rx="10" fill="#1a1a2e" stroke="#4facfe" stroke-width="2"/>
+    <text x="-80" y="50" fill="#4facfe" font-size="20" font-weight="bold">FP32</text>
+    <text x="-80" y="70" fill="#8892b0" font-size="14">32 bits</text>
+    
+    <!-- Sign bit -->
+    <rect x="20" y="15" width="35" height="50" rx="5" fill="#ef4444"/>
+    <text x="37" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="bold">S</text>
+    <text x="37" y="58" text-anchor="middle" fill="white" font-size="10">1</text>
+    
+    <!-- Exponent - 8 bits -->
+    <rect x="60" y="15" width="280" height="50" rx="5" fill="#f59e0b"/>
+    <text x="200" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Exponent</text>
+    <text x="200" y="58" text-anchor="middle" fill="white" font-size="12">8 bits (bias: 127)</text>
+    
+    <!-- Mantissa - 23 bits -->
+    <rect x="345" y="15" width="835" height="50" rx="5" fill="#3b82f6"/>
+    <text x="762" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Mantissa (Fraction)</text>
+    <text x="762" y="58" text-anchor="middle" fill="white" font-size="12">23 bits</text>
+  </g>
+
+  <!-- BF16 - 16 bits -->
+  <g transform="translate(100, 320)">
+    <rect x="0" y="0" width="600" height="80" rx="10" fill="#1a1a2e" stroke="#43e97b" stroke-width="2"/>
+    <text x="-80" y="50" fill="#43e97b" font-size="20" font-weight="bold">BF16</text>
+    <text x="-80" y="70" fill="#8892b0" font-size="14">16 bits</text>
+    
+    <!-- Sign bit -->
+    <rect x="20" y="15" width="35" height="50" rx="5" fill="#ef4444"/>
+    <text x="37" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="bold">S</text>
+    <text x="37" y="58" text-anchor="middle" fill="white" font-size="10">1</text>
+    
+    <!-- Exponent - 8 bits -->
+    <rect x="60" y="15" width="280" height="50" rx="5" fill="#f59e0b"/>
+    <text x="200" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Exponent</text>
+    <text x="200" y="58" text-anchor="middle" fill="white" font-size="12">8 bits (same as FP32!)</text>
+    
+    <!-- Mantissa - 7 bits -->
+    <rect x="345" y="15" width="235" height="50" rx="5" fill="#3b82f6"/>
+    <text x="462" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Mantissa</text>
+    <text x="462" y="58" text-anchor="middle" fill="white" font-size="12">7 bits</text>
+    
+    <!-- Annotation -->
+    <text x="650" y="50" fill="#43e97b" font-size="14">← Truncated FP32</text>
+  </g>
+
+  <!-- FP16 - 16 bits -->
+  <g transform="translate(100, 410)">
+    <rect x="0" y="0" width="600" height="80" rx="10" fill="#1a1a2e" stroke="#fa709a" stroke-width="2"/>
+    <text x="-80" y="50" fill="#fa709a" font-size="20" font-weight="bold">FP16</text>
+    <text x="-80" y="70" fill="#8892b0" font-size="14">16 bits</text>
+    
+    <!-- Sign bit -->
+    <rect x="20" y="15" width="35" height="50" rx="5" fill="#ef4444"/>
+    <text x="37" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="bold">S</text>
+    <text x="37" y="58" text-anchor="middle" fill="white" font-size="10">1</text>
+    
+    <!-- Exponent - 5 bits -->
+    <rect x="60" y="15" width="175" height="50" rx="5" fill="#f59e0b"/>
+    <text x="147" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Exp</text>
+    <text x="147" y="58" text-anchor="middle" fill="white" font-size="12">5 bits</text>
+    
+    <!-- Mantissa - 10 bits -->
+    <rect x="240" y="15" width="340" height="50" rx="5" fill="#3b82f6"/>
+    <text x="410" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Mantissa</text>
+    <text x="410" y="58" text-anchor="middle" fill="white" font-size="12">10 bits (more precision)</text>
+    
+    <!-- Annotation -->
+    <text x="650" y="50" fill="#fa709a" font-size="14">← Limited range (±65504)</text>
+  </g>
+
+  <!-- INT8 - 8 bits -->
+  <g transform="translate(100, 500)">
+    <rect x="0" y="0" width="300" height="80" rx="10" fill="#1a1a2e" stroke="#a855f7" stroke-width="2"/>
+    <text x="-80" y="50" fill="#a855f7" font-size="20" font-weight="bold">INT8</text>
+    <text x="-80" y="70" fill="#8892b0" font-size="14">8 bits</text>
+    
+    <!-- Sign bit (for signed) -->
+    <rect x="20" y="15" width="35" height="50" rx="5" fill="#ef4444"/>
+    <text x="37" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="bold">S</text>
+    <text x="37" y="58" text-anchor="middle" fill="white" font-size="10">1</text>
+    
+    <!-- Value - 7 bits -->
+    <rect x="60" y="15" width="220" height="50" rx="5" fill="#8b5cf6"/>
+    <text x="170" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Value</text>
+    <text x="170" y="58" text-anchor="middle" fill="white" font-size="12">7 bits (-128 to 127)</text>
+    
+    <!-- Annotation -->
+    <text x="350" y="50" fill="#a855f7" font-size="14">← Requires scale + zero_point</text>
+  </g>
+
+  <!-- INT4 - 4 bits -->
+  <g transform="translate(100, 590)">
+    <rect x="0" y="0" width="150" height="80" rx="10" fill="#1a1a2e" stroke="#f97316" stroke-width="2"/>
+    <text x="-80" y="50" fill="#f97316" font-size="20" font-weight="bold">INT4</text>
+    <text x="-80" y="70" fill="#8892b0" font-size="14">4 bits</text>
+    
+    <!-- Value - 4 bits -->
+    <rect x="20" y="15" width="110" height="50" rx="5" fill="#ea580c"/>
+    <text x="75" y="45" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Value</text>
+    <text x="75" y="58" text-anchor="middle" fill="white" font-size="12">-8 to 7</text>
+    
+    <!-- Annotation -->
+    <text x="200" y="50" fill="#f97316" font-size="14">← 2 values packed per byte</text>
+  </g>
+
+  <!-- ============================================== -->
+  <!-- SECTION 2: FORMAT COMPARISON TABLE -->
+  <!-- ============================================== -->
+  
+  <text x="700" y="720" text-anchor="middle" fill="#64ffda" font-size="28" font-weight="bold">
+    Format Specifications
+  </text>
+
+  <!-- Table -->
+  <g transform="translate(50, 750)">
+    <!-- Header row -->
+    <rect x="0" y="0" width="1300" height="50" rx="10" fill="#1a1a2e"/>
+    <text x="100" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Format</text>
+    <text x="250" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Size</text>
+    <text x="400" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Range</text>
+    <text x="600" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Precision</text>
+    <text x="800" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Ops/Cycle*</text>
+    <text x="980" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Memory</text>
+    <text x="1150" y="32" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Use Case</text>
+    
+    <!-- FP32 row -->
+    <rect x="0" y="55" width="1300" height="50" rx="5" fill="#1e293b"/>
+    <rect x="5" y="60" width="8" height="40" rx="2" fill="url(#fp32Grad)"/>
+    <text x="100" y="85" text-anchor="middle" fill="#4facfe" font-size="15" font-weight="bold">FP32</text>
+    <text x="250" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">32 bits</text>
+    <text x="400" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">±3.4×10³⁸</text>
+    <text x="600" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">~7 decimal digits</text>
+    <text x="800" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">32 (AVX-512)</text>
+    <text x="980" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">1× (baseline)</text>
+    <text x="1150" y="85" text-anchor="middle" fill="#e2e8f0" font-size="14">Training</text>
+    
+    <!-- BF16 row -->
+    <rect x="0" y="110" width="1300" height="50" rx="5" fill="#0f172a"/>
+    <rect x="5" y="115" width="8" height="40" rx="2" fill="url(#bf16Grad)"/>
+    <text x="100" y="140" text-anchor="middle" fill="#43e97b" font-size="15" font-weight="bold">BF16</text>
+    <text x="250" y="140" text-anchor="middle" fill="#e2e8f0" font-size="14">16 bits</text>
+    <text x="400" y="140" text-anchor="middle" fill="#e2e8f0" font-size="14">±3.4×10³⁸</text>
+    <text x="600" y="140" text-anchor="middle" fill="#e2e8f0" font-size="14">~3 decimal digits</text>
+    <text x="800" y="140" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">1024 (AMX)</text>
+    <text x="980" y="140" text-anchor="middle" fill="#e2e8f0" font-size="14">2× savings</text>
+    <text x="1150" y="140" text-anchor="middle" fill="#e2e8f0" font-size="14">Training + Inference</text>
+    
+    <!-- FP16 row -->
+    <rect x="0" y="165" width="1300" height="50" rx="5" fill="#1e293b"/>
+    <rect x="5" y="170" width="8" height="40" rx="2" fill="url(#fp16Grad)"/>
+    <text x="100" y="195" text-anchor="middle" fill="#fa709a" font-size="15" font-weight="bold">FP16</text>
+    <text x="250" y="195" text-anchor="middle" fill="#e2e8f0" font-size="14">16 bits</text>
+    <text x="400" y="195" text-anchor="middle" fill="#fca5a5" font-size="14">±65,504</text>
+    <text x="600" y="195" text-anchor="middle" fill="#e2e8f0" font-size="14">~4 decimal digits</text>
+    <text x="800" y="195" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">1024 (AMX-FP16)</text>
+    <text x="980" y="195" text-anchor="middle" fill="#e2e8f0" font-size="14">2× savings</text>
+    <text x="1150" y="195" text-anchor="middle" fill="#e2e8f0" font-size="14">Inference (careful!)</text>
+    
+    <!-- INT8 row -->
+    <rect x="0" y="220" width="1300" height="50" rx="5" fill="#0f172a"/>
+    <rect x="5" y="225" width="8" height="40" rx="2" fill="url(#int8Grad)"/>
+    <text x="100" y="250" text-anchor="middle" fill="#a855f7" font-size="15" font-weight="bold">INT8</text>
+    <text x="250" y="250" text-anchor="middle" fill="#e2e8f0" font-size="14">8 bits</text>
+    <text x="400" y="250" text-anchor="middle" fill="#e2e8f0" font-size="14">-128 to 127</text>
+    <text x="600" y="250" text-anchor="middle" fill="#e2e8f0" font-size="14">Fixed (256 levels)</text>
+    <text x="800" y="250" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">2048 (AMX)</text>
+    <text x="980" y="250" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">4× savings</text>
+    <text x="1150" y="250" text-anchor="middle" fill="#e2e8f0" font-size="14">Inference</text>
+    
+    <!-- INT4 row -->
+    <rect x="0" y="275" width="1300" height="50" rx="5" fill="#1e293b"/>
+    <rect x="5" y="280" width="8" height="40" rx="2" fill="url(#int4Grad)"/>
+    <text x="100" y="305" text-anchor="middle" fill="#f97316" font-size="15" font-weight="bold">INT4</text>
+    <text x="250" y="305" text-anchor="middle" fill="#e2e8f0" font-size="14">4 bits</text>
+    <text x="400" y="305" text-anchor="middle" fill="#e2e8f0" font-size="14">-8 to 7</text>
+    <text x="600" y="305" text-anchor="middle" fill="#e2e8f0" font-size="14">Fixed (16 levels)</text>
+    <text x="800" y="305" text-anchor="middle" fill="#fbbf24" font-size="14">Software decode</text>
+    <text x="980" y="305" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">8× savings</text>
+    <text x="1150" y="305" text-anchor="middle" fill="#e2e8f0" font-size="14">Inference (weights)</text>
+    
+    <text x="650" y="355" text-anchor="middle" fill="#64748b" font-size="13">
+      *Ops/Cycle per core on Sapphire Rapids (4th Gen Xeon)
+    </text>
+  </g>
+
+  <!-- ============================================== -->
+  <!-- SECTION 3: AVX-512 INSTRUCTION MAPPING -->
+  <!-- ============================================== -->
+  
+  <text x="700" y="1160" text-anchor="middle" fill="#64ffda" font-size="28" font-weight="bold">
+    AVX-512 Instructions by Data Type
+  </text>
+  
+  <g transform="translate(50, 1190)">
+    <!-- AVX-512 Header -->
+    <rect x="0" y="0" width="1300" height="60" rx="15" fill="url(#avx512Grad)" filter="url(#shadow)"/>
+    <text x="650" y="38" text-anchor="middle" fill="white" font-size="22" font-weight="bold">
+      AVX-512 (512-bit vectors = 16×FP32 or 32×FP16 or 64×INT8)
+    </text>
+    
+    <!-- FP32 AVX-512 -->
+    <rect x="0" y="75" width="420" height="200" rx="10" fill="#1a1a2e" stroke="#4facfe" stroke-width="2"/>
+    <text x="210" y="105" text-anchor="middle" fill="#4facfe" font-size="18" font-weight="bold">FP32 Operations</text>
+    <text x="20" y="135" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_fmadd_ps(a,b,c)</text>
+    <text x="20" y="155" fill="#64748b" font-size="12">→ Fused multiply-add: a*b+c</text>
+    <text x="20" y="180" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_mul_ps(a,b)</text>
+    <text x="20" y="200" fill="#64748b" font-size="12">→ Multiply 16 floats</text>
+    <text x="20" y="225" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_add_ps(a,b)</text>
+    <text x="20" y="245" fill="#64748b" font-size="12">→ Add 16 floats</text>
+    <text x="20" y="265" fill="#22c55e" font-size="13">32 FLOPs/cycle (FMA)</text>
+    
+    <!-- BF16 AVX-512 -->
+    <rect x="440" y="75" width="420" height="200" rx="10" fill="#1a1a2e" stroke="#43e97b" stroke-width="2"/>
+    <text x="650" y="105" text-anchor="middle" fill="#43e97b" font-size="18" font-weight="bold">BF16 Operations (AVX-512 BF16)</text>
+    <text x="460" y="135" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_dpbf16_ps(c,a,b)</text>
+    <text x="460" y="155" fill="#64748b" font-size="12">→ Dot product BF16→FP32 accum</text>
+    <text x="460" y="180" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_cvtne2ps_pbh(a,b)</text>
+    <text x="460" y="200" fill="#64748b" font-size="12">→ Convert FP32 to BF16</text>
+    <text x="460" y="225" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_cvtpbh_ps(a)</text>
+    <text x="460" y="245" fill="#64748b" font-size="12">→ Convert BF16 to FP32</text>
+    <text x="460" y="265" fill="#22c55e" font-size="13">64 FLOPs/cycle (DPBF16)</text>
+    
+    <!-- INT8 AVX-512 VNNI -->
+    <rect x="880" y="75" width="420" height="200" rx="10" fill="#1a1a2e" stroke="#a855f7" stroke-width="2"/>
+    <text x="1090" y="105" text-anchor="middle" fill="#a855f7" font-size="18" font-weight="bold">INT8 Operations (VNNI)</text>
+    <text x="900" y="135" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_dpbusd_epi32(c,a,b)</text>
+    <text x="900" y="155" fill="#64748b" font-size="12">→ U8×S8 dot product → INT32</text>
+    <text x="900" y="180" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_dpbusds_epi32(c,a,b)</text>
+    <text x="900" y="200" fill="#64748b" font-size="12">→ Saturating version</text>
+    <text x="900" y="225" fill="#e2e8f0" font-size="14" font-family="monospace">_mm512_dpwssd_epi32(c,a,b)</text>
+    <text x="900" y="245" fill="#64748b" font-size="12">→ INT16 dot product → INT32</text>
+    <text x="900" y="265" fill="#22c55e" font-size="13">256 INT8 ops/cycle</text>
+  </g>
+
+  <!-- ============================================== -->
+  <!-- SECTION 4: AMX INSTRUCTION MAPPING -->
+  <!-- ============================================== -->
+  
+  <text x="700" y="1520" text-anchor="middle" fill="#64ffda" font-size="28" font-weight="bold">
+    Intel AMX (Advanced Matrix Extensions)
+  </text>
+  
+  <g transform="translate(50, 1550)">
+    <!-- AMX Header -->
+    <rect x="0" y="0" width="1300" height="80" rx="15" fill="url(#amxGrad)" filter="url(#shadow)"/>
+    <text x="650" y="35" text-anchor="middle" fill="white" font-size="22" font-weight="bold">
+      AMX TILES: 8 registers × 1KB each (16 rows × 64 bytes)
+    </text>
+    <text x="650" y="60" text-anchor="middle" fill="#e9d5ff" font-size="16">
+      Matrix operations on 2D tiles — NOT vectors. Requires Sapphire Rapids or newer.
+    </text>
+    
+    <!-- Tile visualization -->
+    <g transform="translate(50, 100)">
+      <text x="0" y="20" fill="#c4b5fd" font-size="16" font-weight="bold">Tile Register (tmm0-tmm7)</text>
+      <rect x="0" y="30" width="300" height="150" rx="5" fill="#1e1b4b" stroke="#7c3aed" stroke-width="2"/>
+      <!-- Grid lines -->
+      <g stroke="#4c1d95" stroke-width="1">
+        <line x1="0" y1="40" x2="300" y2="40"/>
+        <line x1="0" y1="50" x2="300" y2="50"/>
+        <line x1="0" y1="60" x2="300" y2="60"/>
+        <line x1="0" y1="70" x2="300" y2="70"/>
+        <line x1="0" y1="80" x2="300" y2="80"/>
+        <line x1="0" y1="90" x2="300" y2="90"/>
+        <line x1="0" y1="100" x2="300" y2="100"/>
+        <line x1="0" y1="110" x2="300" y2="110"/>
+        <line x1="0" y1="120" x2="300" y2="120"/>
+        <line x1="0" y1="130" x2="300" y2="130"/>
+        <line x1="0" y1="140" x2="300" y2="140"/>
+        <line x1="0" y1="150" x2="300" y2="150"/>
+        <line x1="0" y1="160" x2="300" y2="160"/>
+        <line x1="0" y1="170" x2="300" y2="170"/>
+      </g>
+      <text x="150" y="105" text-anchor="middle" fill="#a78bfa" font-size="14">16 rows × 64 bytes</text>
+      <text x="320" y="60" fill="#e2e8f0" font-size="13">= 1024 INT8 values</text>
+      <text x="320" y="80" fill="#e2e8f0" font-size="13">= 512 BF16 values</text>
+      <text x="320" y="100" fill="#e2e8f0" font-size="13">= 256 FP32 values</text>
+    </g>
+    
+    <!-- AMX-INT8 Instructions -->
+    <rect x="0" y="290" width="420" height="220" rx="10" fill="#1a1a2e" stroke="#a855f7" stroke-width="2"/>
+    <text x="210" y="320" text-anchor="middle" fill="#a855f7" font-size="18" font-weight="bold">AMX-INT8</text>
+    <text x="20" y="355" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_loadd(dst, ptr, stride)</text>
+    <text x="20" y="375" fill="#64748b" font-size="12">→ Load tile from memory</text>
+    <text x="20" y="405" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_dpbusd(dst, a, b)</text>
+    <text x="20" y="425" fill="#64748b" font-size="12">→ INT8 matmul: dst += a × b</text>
+    <text x="20" y="455" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_stored(ptr, src, stride)</text>
+    <text x="20" y="475" fill="#64748b" font-size="12">→ Store tile to memory</text>
+    <rect x="20" y="485" width="380" height="20" rx="5" fill="#22c55e"/>
+    <text x="210" y="500" text-anchor="middle" fill="white" font-size="13" font-weight="bold">2048 INT8 ops/cycle</text>
+    
+    <!-- AMX-BF16 Instructions -->
+    <rect x="440" y="290" width="420" height="220" rx="10" fill="#1a1a2e" stroke="#43e97b" stroke-width="2"/>
+    <text x="650" y="320" text-anchor="middle" fill="#43e97b" font-size="18" font-weight="bold">AMX-BF16</text>
+    <text x="460" y="355" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_dpbf16ps(dst, a, b)</text>
+    <text x="460" y="375" fill="#64748b" font-size="12">→ BF16 matmul with FP32 accum</text>
+    <text x="460" y="405" fill="#e2e8f0" font-size="14" font-family="monospace">// Accumulates into FP32 tile</text>
+    <text x="460" y="425" fill="#64748b" font-size="12">→ No precision loss in accumulation</text>
+    <text x="460" y="455" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_zero(dst)</text>
+    <text x="460" y="475" fill="#64748b" font-size="12">→ Zero a tile register</text>
+    <rect x="460" y="485" width="380" height="20" rx="5" fill="#22c55e"/>
+    <text x="650" y="500" text-anchor="middle" fill="white" font-size="13" font-weight="bold">1024 BF16 ops/cycle</text>
+    
+    <!-- AMX-FP16 Instructions -->
+    <rect x="880" y="290" width="420" height="220" rx="10" fill="#1a1a2e" stroke="#fa709a" stroke-width="2"/>
+    <text x="1090" y="320" text-anchor="middle" fill="#fa709a" font-size="18" font-weight="bold">AMX-FP16 (Granite Rapids)</text>
+    <text x="900" y="355" fill="#e2e8f0" font-size="14" font-family="monospace">_tile_dpfp16ps(dst, a, b)</text>
+    <text x="900" y="375" fill="#64748b" font-size="12">→ FP16 matmul with FP32 accum</text>
+    <text x="900" y="405" fill="#e2e8f0" font-size="14" font-family="monospace">// IEEE FP16 precision</text>
+    <text x="900" y="425" fill="#64748b" font-size="12">→ More precision than BF16</text>
+    <text x="900" y="455" fill="#fbbf24" font-size="14">⚠️ 6th Gen Xeon only</text>
+    <text x="900" y="475" fill="#64748b" font-size="12">→ Not available on Sapphire Rapids</text>
+    <rect x="900" y="485" width="380" height="20" rx="5" fill="#22c55e"/>
+    <text x="1090" y="500" text-anchor="middle" fill="white" font-size="13" font-weight="bold">1024 FP16 ops/cycle</text>
+  </g>
+
+  <!-- ============================================== -->
+  <!-- SECTION 5: QUANTIZATION WORKFLOW -->
+  <!-- ============================================== -->
+  
+  <text x="700" y="2110" text-anchor="middle" fill="#64ffda" font-size="28" font-weight="bold">
+    INT8 Quantization: Scale + Zero Point
+  </text>
+  
+  <g transform="translate(50, 2130)">
+    <rect x="0" y="0" width="1300" height="220" rx="15" fill="#1a1a2e" filter="url(#shadow)"/>
+    
+    <!-- Formula -->
+    <text x="650" y="40" text-anchor="middle" fill="#e2e8f0" font-size="20" font-family="monospace">
+      quantized = round(float_val / scale) + zero_point
+    </text>
+    <text x="650" y="70" text-anchor="middle" fill="#e2e8f0" font-size="20" font-family="monospace">
+      dequantized = (quantized - zero_point) × scale
+    </text>
+    
+    <!-- Example -->
+    <rect x="50" y="90" width="500" height="110" rx="10" fill="#0f172a"/>
+    <text x="300" y="115" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Symmetric Quantization</text>
+    <text x="70" y="145" fill="#e2e8f0" font-size="14">float range: [-1.0, 1.0]</text>
+    <text x="70" y="165" fill="#e2e8f0" font-size="14">scale = 1.0 / 127 ≈ 0.00787</text>
+    <text x="70" y="185" fill="#e2e8f0" font-size="14">zero_point = 0</text>
+    
+    <rect x="580" y="90" width="500" height="110" rx="10" fill="#0f172a"/>
+    <text x="830" y="115" text-anchor="middle" fill="#64ffda" font-size="16" font-weight="bold">Asymmetric Quantization</text>
+    <text x="600" y="145" fill="#e2e8f0" font-size="14">float range: [0.0, 6.0] (ReLU6)</text>
+    <text x="600" y="165" fill="#e2e8f0" font-size="14">scale = 6.0 / 255 ≈ 0.02353</text>
+    <text x="600" y="185" fill="#e2e8f0" font-size="14">zero_point = 0 (maps to 0.0)</text>
+    
+    <!-- Key insight -->
+    <rect x="1100" y="90" width="180" height="110" rx="10" fill="#14532d"/>
+    <text x="1190" y="130" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">Key Insight:</text>
+    <text x="1190" y="155" text-anchor="middle" fill="#e2e8f0" font-size="13">Compute in INT8</text>
+    <text x="1190" y="175" text-anchor="middle" fill="#e2e8f0" font-size="13">Accumulate in INT32</text>
+    <text x="1190" y="195" text-anchor="middle" fill="#e2e8f0" font-size="13">Rescale at end</text>
+  </g>
+
+  <!-- Footer -->
+  <rect x="50" y="2360" width="1300" height="30" rx="5" fill="#1a1a2e"/>
+  <text x="700" y="2382" text-anchor="middle" fill="#64748b" font-size="14">
+    Created for Anthony @ ANTSHIV ROBOTICS | CPU-Based AI Infrastructure | 2025
+  </text>
+</svg>

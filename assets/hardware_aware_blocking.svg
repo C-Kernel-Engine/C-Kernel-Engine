@@ -1,0 +1,335 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1800">
+  <defs>
+    <linearGradient id="hwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#748ffc"/>
+      <stop offset="100%" style="stop-color:#5c7cfa"/>
+    </linearGradient>
+    <linearGradient id="detectGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#69db7c"/>
+      <stop offset="100%" style="stop-color:#51cf66"/>
+    </linearGradient>
+    <linearGradient id="conservGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd43b"/>
+      <stop offset="100%" style="stop-color:#fab005"/>
+    </linearGradient>
+    <linearGradient id="kernelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#ee5a5a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#495057"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="1800" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="800" y="40" font-family="Arial, sans-serif" font-size="26" font-weight="bold" text-anchor="middle" fill="#212529">
+    Hardware-Aware Blocking: Detection vs Conservative Default
+  </text>
+  <text x="800" y="70" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#868e96">
+    How the kernel decides tile sizes for fused operations
+  </text>
+
+  <!-- Section 1: The Two Approaches -->
+  <rect x="30" y="95" width="1540" height="280" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="125" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">1. Two Blocking Strategies</text>
+
+  <!-- Strategy A: Runtime Detection -->
+  <rect x="50" y="145" width="720" height="210" fill="#e7f5ff" rx="5"/>
+  <text x="70" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1971c2">Strategy A: Runtime Hardware Detection</text>
+  
+  <text x="70" y="205" font-family="monospace" font-size="11" fill="#212529">// At init time (once per process)</text>
+  <text x="70" y="225" font-family="monospace" font-size="11" fill="#212529">hw_config_t hw = detect_hardware();</text>
+  <text x="70" y="245" font-family="monospace" font-size="11" fill="#495057">  → L1_size = 48KB (from cpuid/sysfs)</text>
+  <text x="70" y="265" font-family="monospace" font-size="11" fill="#495057">  → L2_size = 1.25MB</text>
+  <text x="70" y="285" font-family="monospace" font-size="11" fill="#495057">  → L3_size = 36MB</text>
+  <text x="70" y="305" font-family="monospace" font-size="11" fill="#495057">  → cache_line = 64B</text>
+  <text x="70" y="325" font-family="monospace" font-size="11" fill="#495057">  → n_cores = 8</text>
+  
+  <text x="400" y="205" font-family="monospace" font-size="11" fill="#212529">// Compute optimal tiles</text>
+  <text x="400" y="225" font-family="monospace" font-size="11" fill="#212529">T_kv = compute_kv_tile(hw.L1_size, d);</text>
+  <text x="400" y="245" font-family="monospace" font-size="11" fill="#212529">T_gemm = compute_gemm_tile(hw.L1_size);</text>
+  <text x="400" y="265" font-family="monospace" font-size="11" fill="#2f9e44">// Result: T_kv=128, T_gemm=64×64</text>
+  <text x="400" y="290" font-family="Arial, sans-serif" font-size="11" fill="#1971c2" font-weight="bold">✓ Optimal for specific hardware</text>
+  <text x="400" y="310" font-family="Arial, sans-serif" font-size="11" fill="#1971c2" font-weight="bold">✓ Uses full cache capacity</text>
+  <text x="400" y="330" font-family="Arial, sans-serif" font-size="11" fill="#c92a2a">✗ Requires detection code</text>
+
+  <!-- Strategy B: Conservative Default -->
+  <rect x="800" y="145" width="720" height="210" fill="#fff3bf" rx="5"/>
+  <text x="820" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#e67700">Strategy B: Conservative 64-Byte Default</text>
+  
+  <text x="820" y="205" font-family="monospace" font-size="11" fill="#212529">// Always use cache line as minimum unit</text>
+  <text x="820" y="225" font-family="monospace" font-size="11" fill="#212529">#define CACHE_LINE 64</text>
+  <text x="820" y="245" font-family="monospace" font-size="11" fill="#212529">#define MIN_TILE (CACHE_LINE / sizeof(float16))</text>
+  <text x="820" y="265" font-family="monospace" font-size="11" fill="#495057">  → MIN_TILE = 32 elements</text>
+  <text x="820" y="285" font-family="monospace" font-size="11" fill="#495057">  → Always fits ANY L1 cache</text>
+  <text x="820" y="305" font-family="monospace" font-size="11" fill="#495057">  → No false sharing ever</text>
+  
+  <text x="1150" y="205" font-family="monospace" font-size="11" fill="#212529">// Process in cache line chunks</text>
+  <text x="1150" y="225" font-family="monospace" font-size="11" fill="#212529">for (i = 0; i &lt; H; i += 32) {</text>
+  <text x="1150" y="245" font-family="monospace" font-size="11" fill="#212529">  process_64bytes(&amp;x[i]);</text>
+  <text x="1150" y="265" font-family="monospace" font-size="11" fill="#212529">}</text>
+  <text x="1150" y="290" font-family="Arial, sans-serif" font-size="11" fill="#2f9e44" font-weight="bold">✓ Always correct</text>
+  <text x="1150" y="310" font-family="Arial, sans-serif" font-size="11" fill="#2f9e44" font-weight="bold">✓ Portable everywhere</text>
+  <text x="1150" y="330" font-family="Arial, sans-serif" font-size="11" fill="#c92a2a">✗ May underutilize large caches</text>
+
+  <!-- Section 2: The Hybrid Approach -->
+  <rect x="30" y="395" width="1540" height="350" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="425" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">2. The Right Approach: Detect Once, Fall Back Gracefully</text>
+
+  <rect x="50" y="450" width="1500" height="280" fill="#282c34" rx="5"/>
+  
+  <text x="70" y="480" font-family="monospace" font-size="12" fill="#7f848e">// system_topology.h - You already have this structure!</text>
+  <text x="70" y="505" font-family="monospace" font-size="12" fill="#c678dd">typedef struct</text>
+  <text x="170" y="505" font-family="monospace" font-size="12" fill="#abb2bf"> {</text>
+  <text x="80" y="525" font-family="monospace" font-size="12" fill="#e5c07b">size_t</text>
+  <text x="140" y="525" font-family="monospace" font-size="12" fill="#abb2bf"> L1_size;      </text>
+  <text x="290" y="525" font-family="monospace" font-size="12" fill="#7f848e">// 0 if detection failed</text>
+  <text x="80" y="545" font-family="monospace" font-size="12" fill="#e5c07b">size_t</text>
+  <text x="140" y="545" font-family="monospace" font-size="12" fill="#abb2bf"> L2_size;</text>
+  <text x="80" y="565" font-family="monospace" font-size="12" fill="#e5c07b">size_t</text>
+  <text x="140" y="565" font-family="monospace" font-size="12" fill="#abb2bf"> L3_size;</text>
+  <text x="80" y="585" font-family="monospace" font-size="12" fill="#e5c07b">size_t</text>
+  <text x="140" y="585" font-family="monospace" font-size="12" fill="#abb2bf"> cache_line;   </text>
+  <text x="290" y="585" font-family="monospace" font-size="12" fill="#7f848e">// Always 64 on x86</text>
+  <text x="80" y="605" font-family="monospace" font-size="12" fill="#e5c07b">int</text>
+  <text x="120" y="605" font-family="monospace" font-size="12" fill="#abb2bf"> n_cores;</text>
+  <text x="80" y="625" font-family="monospace" font-size="12" fill="#e5c07b">bool</text>
+  <text x="130" y="625" font-family="monospace" font-size="12" fill="#abb2bf"> detected;     </text>
+  <text x="290" y="625" font-family="monospace" font-size="12" fill="#7f848e">// false = use conservative</text>
+  <text x="70" y="645" font-family="monospace" font-size="12" fill="#abb2bf">} hw_topology_t;</text>
+
+  <text x="550" y="480" font-family="monospace" font-size="12" fill="#7f848e">// Tile computation with fallback</text>
+  <text x="550" y="505" font-family="monospace" font-size="12" fill="#e5c07b">int</text>
+  <text x="585" y="505" font-family="monospace" font-size="12" fill="#61afef"> compute_kv_tile</text>
+  <text x="730" y="505" font-family="monospace" font-size="12" fill="#abb2bf">(hw_topology_t* hw, int d) {</text>
+  <text x="560" y="525" font-family="monospace" font-size="12" fill="#c678dd">if</text>
+  <text x="585" y="525" font-family="monospace" font-size="12" fill="#abb2bf"> (!hw->detected || hw->L1_size == 0) {</text>
+  <text x="570" y="545" font-family="monospace" font-size="12" fill="#7f848e">// Conservative: 1 cache line per KV element</text>
+  <text x="570" y="565" font-family="monospace" font-size="12" fill="#c678dd">return</text>
+  <text x="620" y="565" font-family="monospace" font-size="12" fill="#d19a66"> 64</text>
+  <text x="645" y="565" font-family="monospace" font-size="12" fill="#abb2bf"> / (d * </text>
+  <text x="710" y="565" font-family="monospace" font-size="12" fill="#c678dd">sizeof</text>
+  <text x="765" y="565" font-family="monospace" font-size="12" fill="#abb2bf">(fp16_t));</text>
+  <text x="860" y="565" font-family="monospace" font-size="12" fill="#7f848e">// T=1</text>
+  <text x="560" y="585" font-family="monospace" font-size="12" fill="#abb2bf">}</text>
+  <text x="560" y="610" font-family="monospace" font-size="12" fill="#7f848e">// Optimal: fill 80% of L1</text>
+  <text x="560" y="630" font-family="monospace" font-size="12" fill="#e5c07b">size_t</text>
+  <text x="615" y="630" font-family="monospace" font-size="12" fill="#abb2bf"> usable = hw->L1_size * </text>
+  <text x="825" y="630" font-family="monospace" font-size="12" fill="#d19a66">0.8</text>
+  <text x="855" y="630" font-family="monospace" font-size="12" fill="#abb2bf">;</text>
+  <text x="560" y="650" font-family="monospace" font-size="12" fill="#e5c07b">int</text>
+  <text x="590" y="650" font-family="monospace" font-size="12" fill="#abb2bf"> T = (usable - </text>
+  <text x="715" y="650" font-family="monospace" font-size="12" fill="#d19a66">2</text>
+  <text x="725" y="650" font-family="monospace" font-size="12" fill="#abb2bf">*d*B) / (</text>
+  <text x="800" y="650" font-family="monospace" font-size="12" fill="#d19a66">2</text>
+  <text x="815" y="650" font-family="monospace" font-size="12" fill="#abb2bf">*d*B);</text>
+  <text x="560" y="670" font-family="monospace" font-size="12" fill="#c678dd">return</text>
+  <text x="615" y="670" font-family="monospace" font-size="12" fill="#abb2bf"> ALIGN_DOWN(T, </text>
+  <text x="755" y="670" font-family="monospace" font-size="12" fill="#d19a66">64</text>
+  <text x="775" y="670" font-family="monospace" font-size="12" fill="#abb2bf">/B);</text>
+  <text x="820" y="670" font-family="monospace" font-size="12" fill="#7f848e">// Cache line aligned</text>
+  <text x="550" y="690" font-family="monospace" font-size="12" fill="#abb2bf">}</text>
+
+  <text x="1050" y="480" font-family="monospace" font-size="12" fill="#7f848e">// Example tile sizes</text>
+  <text x="1050" y="510" font-family="monospace" font-size="12" fill="#69db7c">// Detected (48KB L1, d=64):</text>
+  <text x="1050" y="530" font-family="monospace" font-size="12" fill="#abb2bf">T_kv = 128    </text>
+  <text x="1180" y="530" font-family="monospace" font-size="12" fill="#7f848e">// 128 KV pairs/tile</text>
+  <text x="1050" y="550" font-family="monospace" font-size="12" fill="#abb2bf">Working = 33KB</text>
+  <text x="1180" y="550" font-family="monospace" font-size="12" fill="#7f848e">// fits L1 ✓</text>
+  
+  <text x="1050" y="590" font-family="monospace" font-size="12" fill="#ffd43b">// Conservative fallback:</text>
+  <text x="1050" y="610" font-family="monospace" font-size="12" fill="#abb2bf">T_kv = 1      </text>
+  <text x="1180" y="610" font-family="monospace" font-size="12" fill="#7f848e">// 1 KV pair/tile</text>
+  <text x="1050" y="630" font-family="monospace" font-size="12" fill="#abb2bf">Working = 256B</text>
+  <text x="1180" y="630" font-family="monospace" font-size="12" fill="#7f848e">// fits ANY cache</text>
+  
+  <text x="1050" y="670" font-family="monospace" font-size="12" fill="#ff6b6b">// Tradeoff: 128× more loop iterations</text>
+  <text x="1050" y="690" font-family="monospace" font-size="12" fill="#ff6b6b">// but guaranteed correctness</text>
+
+  <!-- Section 3: Fused Pipeline with Blocking -->
+  <rect x="30" y="765" width="1540" height="420" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="795" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">3. The Fused Pipeline: Processing in Cache-Line Chunks</text>
+
+  <text x="50" y="825" font-family="Arial, sans-serif" font-size="14" fill="#495057">
+    Whether T=128 (optimal) or T=1 (conservative), the fusion logic is identical - only tile size changes:
+  </text>
+
+  <!-- The pipeline diagram -->
+  <g transform="translate(50, 850)">
+    <!-- Input chunk -->
+    <rect x="0" y="0" width="140" height="60" fill="url(#hwGrad)" rx="5"/>
+    <text x="70" y="25" font-family="monospace" font-size="11" text-anchor="middle" fill="white">Load x chunk</text>
+    <text x="70" y="42" font-family="monospace" font-size="9" text-anchor="middle" fill="white">[T_chunk × H]</text>
+    <text x="70" y="75" font-family="monospace" font-size="9" text-anchor="middle" fill="#495057">64B minimum</text>
+    
+    <path d="M 145 30 L 170 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- RMSNorm -->
+    <rect x="175" y="0" width="120" height="60" fill="url(#detectGrad)" rx="5"/>
+    <text x="235" y="25" font-family="monospace" font-size="11" text-anchor="middle" fill="white">RMSNorm</text>
+    <text x="235" y="42" font-family="monospace" font-size="9" text-anchor="middle" fill="white">in registers</text>
+    
+    <path d="M 300 30 L 325 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- QKV GEMM -->
+    <rect x="330" y="0" width="180" height="60" fill="url(#conservGrad)" rx="5"/>
+    <text x="420" y="20" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">QKV GEMM + bias</text>
+    <text x="420" y="37" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">stream weights</text>
+    <text x="420" y="52" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">Q,K,V stay in L2</text>
+    
+    <path d="M 515 30 L 540 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- RoPE -->
+    <rect x="545" y="0" width="100" height="60" fill="url(#kernelGrad)" rx="5"/>
+    <text x="595" y="25" font-family="monospace" font-size="11" text-anchor="middle" fill="white">RoPE</text>
+    <text x="595" y="42" font-family="monospace" font-size="9" text-anchor="middle" fill="white">in registers</text>
+    
+    <path d="M 650 30 L 675 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- Flash Attention -->
+    <rect x="680" y="0" width="200" height="60" fill="url(#kernelGrad)" rx="5"/>
+    <text x="780" y="20" font-family="monospace" font-size="11" text-anchor="middle" fill="white">Flash Attention</text>
+    <text x="780" y="37" font-family="monospace" font-size="9" text-anchor="middle" fill="white">tile KV by T_kv</text>
+    <text x="780" y="52" font-family="monospace" font-size="9" text-anchor="middle" fill="white">online softmax</text>
+    
+    <path d="M 885 30 L 910 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- Output proj -->
+    <rect x="915" y="0" width="180" height="60" fill="url(#conservGrad)" rx="5"/>
+    <text x="1005" y="20" font-family="monospace" font-size="11" text-anchor="middle" fill="#212529">Out Proj + bias</text>
+    <text x="1005" y="37" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">+ residual</text>
+    <text x="1005" y="52" font-family="monospace" font-size="9" text-anchor="middle" fill="#212529">stream weights</text>
+    
+    <path d="M 1100 30 L 1125 30" stroke="#495057" stroke-width="2" marker-end="url(#arrow)"/>
+    
+    <!-- Output -->
+    <rect x="1130" y="0" width="140" height="60" fill="url(#hwGrad)" rx="5"/>
+    <text x="1200" y="25" font-family="monospace" font-size="11" text-anchor="middle" fill="white">Store output</text>
+    <text x="1200" y="42" font-family="monospace" font-size="9" text-anchor="middle" fill="white">[T_chunk × H]</text>
+    <text x="1200" y="75" font-family="monospace" font-size="9" text-anchor="middle" fill="#495057">64B minimum</text>
+    
+    <!-- Continuation to MLP -->
+    <path d="M 1275 30 L 1300 30" stroke="#495057" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+    <text x="1350" y="35" font-family="Arial, sans-serif" font-size="12" fill="#495057">→ MLP...</text>
+  </g>
+
+  <!-- The key insight -->
+  <rect x="50" y="955" width="700" height="100" fill="#d3f9d8" rx="5"/>
+  <text x="70" y="980" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2f9e44">Key Insight: Cache Line is the Fundamental Unit</text>
+  <text x="70" y="1005" font-family="monospace" font-size="11" fill="#212529">64 bytes = 32 FP16 = 16 FP32 = 1 ZMM register = 1 AVX-512 load</text>
+  <text x="70" y="1025" font-family="monospace" font-size="11" fill="#212529">Everything aligns to this: tiles, head boundaries, output chunks</text>
+  <text x="70" y="1045" font-family="monospace" font-size="11" fill="#2f9e44">Process 64B through entire fusion → GUARANTEED no false sharing</text>
+
+  <!-- Performance comparison -->
+  <rect x="770" y="955" width="700" height="100" fill="#fff3bf" rx="5"/>
+  <text x="790" y="980" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e67700">Performance Tradeoff:</text>
+  <text x="790" y="1005" font-family="monospace" font-size="11" fill="#212529">Optimal (T=128):     1 iteration  → max throughput, needs detection</text>
+  <text x="790" y="1025" font-family="monospace" font-size="11" fill="#212529">Conservative (T=1): 128 iterations → loop overhead, always works</text>
+  <text x="790" y="1045" font-family="monospace" font-size="11" fill="#e67700">In practice: detection overhead is ~1μs, amortized over millions of ops</text>
+
+  <!-- Code for the chunked fused kernel -->
+  <rect x="50" y="1070" width="1420" height="100" fill="#282c34" rx="5"/>
+  <text x="70" y="1095" font-family="monospace" font-size="11" fill="#7f848e">// The universal fused kernel - tile size is a parameter, not hardcoded</text>
+  <text x="70" y="1115" font-family="monospace" font-size="11" fill="#c678dd">void</text>
+  <text x="105" y="1115" font-family="monospace" font-size="11" fill="#61afef"> fused_attention_block</text>
+  <text x="275" y="1115" font-family="monospace" font-size="11" fill="#abb2bf">(float* out, float* x, weights_t* W, </text>
+  <text x="620" y="1115" font-family="monospace" font-size="11" fill="#e5c07b">hw_topology_t*</text>
+  <text x="740" y="1115" font-family="monospace" font-size="11" fill="#abb2bf"> hw) {</text>
+  <text x="80" y="1135" font-family="monospace" font-size="11" fill="#e5c07b">int</text>
+  <text x="110" y="1135" font-family="monospace" font-size="11" fill="#abb2bf"> T_kv = compute_kv_tile(hw, head_dim);  </text>
+  <text x="430" y="1135" font-family="monospace" font-size="11" fill="#7f848e">// 128 if detected, 1 if conservative</text>
+  <text x="80" y="1155" font-family="monospace" font-size="11" fill="#e5c07b">int</text>
+  <text x="110" y="1155" font-family="monospace" font-size="11" fill="#abb2bf"> T_gemm = compute_gemm_tile(hw);        </text>
+  <text x="430" y="1155" font-family="monospace" font-size="11" fill="#7f848e">// 64×64 if detected, 32×32 if conservative</text>
+  <text x="80" y="1175" font-family="monospace" font-size="11" fill="#7f848e">// ... rest of kernel uses T_kv, T_gemm for all blocking decisions</text>
+
+  <!-- Section 4: Your Existing Code -->
+  <rect x="30" y="1205" width="1540" height="280" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="1235" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">4. You Already Have This Infrastructure!</text>
+
+  <g transform="translate(50, 1260)">
+    <rect x="0" y="0" width="480" height="200" fill="#f1f3f5" rx="5"/>
+    <text x="20" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#212529">Your existing files:</text>
+    
+    <text x="20" y="55" font-family="monospace" font-size="12" fill="#1971c2">src/system_topology.c</text>
+    <text x="20" y="75" font-family="monospace" font-size="10" fill="#495057">  → Detects CPU topology, cache sizes</text>
+    
+    <text x="20" y="100" font-family="monospace" font-size="12" fill="#1971c2">src/cpu_features.c</text>
+    <text x="20" y="120" font-family="monospace" font-size="10" fill="#495057">  → Detects AVX-512, AMX, cache line</text>
+    
+    <text x="20" y="145" font-family="monospace" font-size="12" fill="#1971c2">include/system_topology.h</text>
+    <text x="20" y="165" font-family="monospace" font-size="10" fill="#495057">  → hw_topology_t struct definition</text>
+    
+    <text x="20" y="190" font-family="monospace" font-size="12" fill="#2f9e44">Just need to wire it to kernel tile decisions!</text>
+
+    <rect x="510" y="0" width="480" height="200" fill="#e7f5ff" rx="5"/>
+    <text x="530" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1971c2">What to add:</text>
+    
+    <text x="530" y="55" font-family="monospace" font-size="11" fill="#212529">1. compute_optimal_tiles(hw_topology_t*)</text>
+    <text x="530" y="75" font-family="monospace" font-size="10" fill="#495057">   Returns {T_kv, T_gemm_m, T_gemm_n, T_gemm_k}</text>
+    
+    <text x="530" y="100" font-family="monospace" font-size="11" fill="#212529">2. Conservative fallback when !hw->detected</text>
+    <text x="530" y="120" font-family="monospace" font-size="10" fill="#495057">   T_* = cache_line / (element_size * dim)</text>
+    
+    <text x="530" y="145" font-family="monospace" font-size="11" fill="#212529">3. Pass tile config to all kernels</text>
+    <text x="530" y="165" font-family="monospace" font-size="10" fill="#495057">   kernel_config_t with all tile sizes</text>
+    
+    <text x="530" y="190" font-family="monospace" font-size="11" fill="#212529">4. Align all allocations to cache_line</text>
+
+    <rect x="1020" y="0" width="450" height="200" fill="#fff3bf" rx="5"/>
+    <text x="1040" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e67700">The formula to implement:</text>
+    
+    <text x="1040" y="55" font-family="monospace" font-size="10" fill="#212529">// KV tile for flash attention</text>
+    <text x="1040" y="75" font-family="monospace" font-size="10" fill="#212529">T_kv = (L1 × 0.8 - 2×d×B) / (2×d×B)</text>
+    <text x="1040" y="95" font-family="monospace" font-size="10" fill="#495057">Fallback: T_kv = 1</text>
+    
+    <text x="1040" y="120" font-family="monospace" font-size="10" fill="#212529">// GEMM tile (square for simplicity)</text>
+    <text x="1040" y="140" font-family="monospace" font-size="10" fill="#212529">T_gemm = sqrt(L1 × 0.8 / (3 × B))</text>
+    <text x="1040" y="160" font-family="monospace" font-size="10" fill="#495057">Fallback: T_gemm = 32 (1 cache line)</text>
+    
+    <text x="1040" y="185" font-family="monospace" font-size="10" fill="#e67700">Always: T = ALIGN_DOWN(T, 64/B)</text>
+  </g>
+
+  <!-- Section 5: Full Fusion with Blocking -->
+  <rect x="30" y="1505" width="1540" height="270" rx="10" fill="white" filter="url(#shadow)"/>
+  <text x="50" y="1535" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#212529">5. Full Fused Attention + MLP in Cache-Line Chunks</text>
+
+  <rect x="50" y="1555" width="1500" height="200" fill="#282c34" rx="5"/>
+  
+  <text x="70" y="1580" font-family="monospace" font-size="11" fill="#7f848e">// Process entire transformer block in cache-line aligned chunks</text>
+  <text x="70" y="1600" font-family="monospace" font-size="11" fill="#c678dd">for</text>
+  <text x="100" y="1600" font-family="monospace" font-size="11" fill="#abb2bf"> (</text>
+  <text x="115" y="1600" font-family="monospace" font-size="11" fill="#e5c07b">int</text>
+  <text x="145" y="1600" font-family="monospace" font-size="11" fill="#abb2bf"> chunk = 0; chunk &lt; seq_len; chunk += T_seq) { </text>
+  <text x="500" y="1600" font-family="monospace" font-size="11" fill="#7f848e">// T_seq = 1 for decode, larger for prefill</text>
+  
+  <text x="80" y="1625" font-family="monospace" font-size="11" fill="#7f848e">// === ATTENTION BLOCK (all fused, biases included) ===</text>
+  <text x="80" y="1645" font-family="monospace" font-size="11" fill="#abb2bf">x_norm = rmsnorm_chunk(&amp;x[chunk], H);              </text>
+  <text x="520" y="1645" font-family="monospace" font-size="11" fill="#7f848e">// In registers</text>
+  <text x="80" y="1665" font-family="monospace" font-size="11" fill="#abb2bf">qkv_gemm_fused(Q, K, V, x_norm, W_qkv, b_qkv, T_gemm); </text>
+  <text x="565" y="1665" font-family="monospace" font-size="11" fill="#7f848e">// Bias in accum init</text>
+  <text x="80" y="1685" font-family="monospace" font-size="11" fill="#abb2bf">rope_inplace(Q, K, pos + chunk);                   </text>
+  <text x="520" y="1685" font-family="monospace" font-size="11" fill="#7f848e">// In registers</text>
+  <text x="80" y="1705" font-family="monospace" font-size="11" fill="#abb2bf">O = flash_attention(Q, K, V, kv_cache, T_kv);      </text>
+  <text x="520" y="1705" font-family="monospace" font-size="11" fill="#7f848e">// Online softmax, tiled</text>
+  <text x="80" y="1725" font-family="monospace" font-size="11" fill="#abb2bf">attn_out = out_proj_fused(O, W_o, b_o, &amp;x[chunk], T_gemm); </text>
+  <text x="595" y="1725" font-family="monospace" font-size="11" fill="#7f848e">// +residual</text>
+  
+  <text x="750" y="1580" font-family="monospace" font-size="11" fill="#7f848e">// === MLP BLOCK (can also fuse!) ===</text>
+  <text x="750" y="1600" font-family="monospace" font-size="11" fill="#abb2bf">x_norm2 = rmsnorm_chunk(attn_out, H);</text>
+  <text x="750" y="1620" font-family="monospace" font-size="11" fill="#abb2bf">gate = gemm_fused(x_norm2, W_gate, b_gate, T_gemm);</text>
+  <text x="750" y="1640" font-family="monospace" font-size="11" fill="#abb2bf">up = gemm_fused(x_norm2, W_up, b_up, T_gemm);</text>
+  <text x="750" y="1660" font-family="monospace" font-size="11" fill="#abb2bf">hidden = silu(gate) * up;            </text>
+  <text x="1050" y="1660" font-family="monospace" font-size="11" fill="#7f848e">// In registers</text>
+  <text x="750" y="1680" font-family="monospace" font-size="11" fill="#abb2bf">out[chunk] = gemm_fused(hidden, W_down, b_down, T_gemm)</text>
+  <text x="750" y="1700" font-family="monospace" font-size="11" fill="#abb2bf">          + attn_out;                </text>
+  <text x="1050" y="1700" font-family="monospace" font-size="11" fill="#7f848e">// +residual, ONLY DRAM write!</text>
+  <text x="70" y="1745" font-family="monospace" font-size="11" fill="#abb2bf">}</text>
+
+</svg>

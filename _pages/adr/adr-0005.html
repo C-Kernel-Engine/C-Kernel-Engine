@@ -1,0 +1,167 @@
+<!-- TITLE: ADR-0005 Kernel Selection in Lowering -->
+<!-- NAV: adr -->
+
+<h1>ADR-0005: Kernel Selection Happens in Lowering</h1>
+
+<div class="card">
+    <table>
+        <tr><td><strong>Status</strong></td><td><span class="badge badge-success">Accepted</span></td></tr>
+        <tr><td><strong>Date</strong></td><td>2025-01</td></tr>
+        <tr><td><strong>Related</strong></td><td><a href="adr-0001.html">ADR-0001</a>, <a href="adr-0003.html">ADR-0003</a></td></tr>
+    </table>
+</div>
+
+<h2>Context</h2>
+
+<p>C-Kernel-Engine has multiple kernel implementations for the same operation:</p>
+
+<ul>
+    <li><strong>GEMM</strong>: <code>gemm_blocked_serial_bf16</code>, <code>gemm_blocked_parallel_bf16</code>, <code>gemm_1x1_bf16</code> (decode)</li>
+    <li><strong>Attention</strong>: <code>attention_forward_causal_head_major_gqa_bf16</code>, <code>attention_decode_single_query_bf16</code></li>
+    <li><strong>RMSNorm</strong>: <code>rmsnorm_forward_bf16</code>, <code>rmsnorm_forward_parallel_bf16</code></li>
+</ul>
+
+<p>The "best" kernel depends on:</p>
+<ul>
+    <li><strong>Execution mode</strong>: Prefill (batch) vs decode (single token)</li>
+    <li><strong>Tensor shapes</strong>: Large M benefits from parallel, small M prefers serial</li>
+    <li><strong>Hardware</strong>: AVX-512 vs AVX2, number of cores</li>
+</ul>
+
+<h2>Decision</h2>
+
+<p><strong>Kernel selection is a lowering-phase decision, not a runtime decision.</strong></p>
+
+<p>The Graph IR uses abstract operation names. The lowering phase resolves these to concrete kernel function names based on execution mode and shape analysis.</p>
+
+<h3>Graph IR (Abstract)</h3>
+
+<pre><code class="language-python">
+# High-level: just "GEMM" - no kernel specified
+{
+    "op": "GEMM",
+    "inputs": ["normed", "wq"],
+    "output": "q"
+}
+</code></pre>
+
+<h3>Lowered IR (Concrete)</h3>
+
+<pre><code class="language-python">
+# Prefill mode lowering
+{
+    "kernel": "gemm_blocked_parallel_bf16",  # Large M, use parallel
+    "args": ["normed", "wq", "NULL", "q", "num_tokens", 896, 896]
+}
+
+# Decode mode lowering
+{
+    "kernel": "gemm_1x1_bf16",  # M=1, specialized kernel
+    "args": ["normed", "wq", "NULL", "q", 1, 896, 896]
+}
+</code></pre>
+
+<h3>Kernel Selection Rules</h3>
+
+<pre><code class="language-python">
+def select_gemm_kernel(mode, M, N, K, num_threads):
+    """Select optimal GEMM kernel based on context."""
+    if mode == "decode":
+        # Single-token: use 1x1 kernel (no parallel overhead)
+        return "gemm_1x1_bf16"
+    elif M >= 64 and num_threads > 1:
+        # Large batch: use parallel kernel
+        return "gemm_blocked_parallel_bf16"
+    else:
+        # Small batch or single-threaded: serial kernel
+        return "gemm_blocked_serial_bf16"
+
+def select_attention_kernel(mode, num_heads, num_kv_heads, seq_len):
+    """Select attention kernel variant."""
+    if mode == "decode":
+        return "attention_decode_single_query_gqa_bf16"
+    elif num_kv_heads < num_heads:
+        return "attention_forward_causal_head_major_gqa_bf16"  # GQA
+    else:
+        return "attention_forward_causal_head_major_bf16"  # MHA
+</code></pre>
+
+<h3>Kernel Registry</h3>
+
+<p>Maintain a registry mapping (op, mode, constraints) to kernel functions:</p>
+
+<pre><code class="language-python">
+KERNEL_REGISTRY = {
+    ("GEMM", "prefill", "large"): {
+        "function": "gemm_blocked_parallel_bf16",
+        "signature": "(A, B, bias, C, M, N, K)",
+        "constraints": {"M >= 64", "num_threads > 1"}
+    },
+    ("GEMM", "prefill", "small"): {
+        "function": "gemm_blocked_serial_bf16",
+        "signature": "(A, B, bias, C, M, N, K)",
+        "constraints": {}
+    },
+    ("GEMM", "decode", "*"): {
+        "function": "gemm_1x1_bf16",
+        "signature": "(A, B, bias, C, 1, N, K)",
+        "constraints": {"M == 1"}
+    },
+    ("Attention", "prefill", "gqa"): {
+        "function": "attention_forward_causal_head_major_gqa_bf16",
+        "signature": "(Q, K, V, scores, output, num_heads, num_kv_heads, ...)"
+    }
+    # ...
+}
+</code></pre>
+
+<h2>Consequences</h2>
+
+<h3>Benefits</h3>
+<ul>
+    <li><strong>No runtime branching</strong>: Kernel choice baked into generated code</li>
+    <li><strong>Mode-specific optimization</strong>: Different code paths for prefill/decode</li>
+    <li><strong>Explicit traceability</strong>: Can see exactly which kernel is used where</li>
+    <li><strong>Easier testing</strong>: Test each kernel variant in isolation</li>
+</ul>
+
+<h3>Costs</h3>
+<ul>
+    <li><strong>Code duplication</strong>: Separate generated functions per mode</li>
+    <li><strong>Recompilation</strong>: Changing kernel requires regenerating code</li>
+    <li><strong>Registry maintenance</strong>: Must keep kernel registry in sync with <code>src/kernels/</code></li>
+</ul>
+
+<h2>Generated Code Example</h2>
+
+<pre><code class="language-c">
+// Prefill mode: uses parallel GEMM
+void qwen2_prefill_layer_0_qkv(Model *model, int num_tokens) {
+    gemm_blocked_parallel_bf16(
+        PTR_BF16(model, OFFSET_LAYER_0_NORMED),   // A
+        PTR_BF16(model, OFFSET_LAYER_0_WQ),        // B
+        NULL,                                       // bias
+        PTR_BF16(model, OFFSET_PREFILL_LAYER_0_Q), // C
+        num_tokens, 896, 896
+    );
+    // ... K, V projections
+}
+
+// Decode mode: uses 1x1 GEMM
+void qwen2_decode_layer_0_qkv(Model *model) {
+    gemm_1x1_bf16(
+        PTR_BF16(model, OFFSET_DECODE_LAYER_0_NORMED),
+        PTR_BF16(model, OFFSET_LAYER_0_WQ),
+        NULL,
+        PTR_BF16(model, OFFSET_DECODE_LAYER_0_Q),
+        1, 896, 896
+    );
+    // ...
+}
+</code></pre>
+
+<h2>Related ADRs</h2>
+<ul>
+    <li><a href="adr-0001.html">ADR-0001</a>: Lowering is a distinct phase</li>
+    <li><a href="adr-0003.html">ADR-0003</a>: Mode-specific buffer allocation</li>
+</ul>

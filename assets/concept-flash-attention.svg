@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500">
+  <defs>
+    <marker id="arrowF" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">Flash Attention: Memory-Efficient Exact Attention</text>
+  <text x="450" y="50" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Not an approximation - same result, less memory, faster</text>
+
+  <!-- Standard Attention Problem -->
+  <g transform="translate(30, 75)">
+    <rect x="0" y="0" width="400" height="180" rx="6" fill="#2a2a2a" stroke="#e74c3c"/>
+    <text x="200" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#e74c3c" text-anchor="middle">Standard Attention: The Memory Problem</text>
+
+    <!-- N x N matrix visualization -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="100" height="100" fill="#323232" stroke="#e74c3c"/>
+      <text x="50" y="55" font-family="monospace" font-size="12" fill="#e74c3c" text-anchor="middle">N × N</text>
+      <text x="50" y="75" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">scores matrix</text>
+      <text x="50" y="-10" font-family="monospace" font-size="10" fill="#707070" text-anchor="middle">QK^T</text>
+    </g>
+
+    <!-- Memory stats -->
+    <g transform="translate(160, 55)">
+      <text x="0" y="0" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Memory = O(N²)</text>
+      <text x="0" y="22" font-family="monospace" font-size="9" fill="#707070">N = 2K:   16 MB</text>
+      <text x="0" y="38" font-family="monospace" font-size="9" fill="#707070">N = 8K:   256 MB</text>
+      <text x="0" y="54" font-family="monospace" font-size="9" fill="#707070">N = 32K:  4 GB</text>
+      <text x="0" y="70" font-family="monospace" font-size="9" fill="#e74c3c">N = 128K: 64 GB ✗</text>
+      <text x="0" y="92" font-family="Inter, sans-serif" font-size="10" fill="#e74c3c">Won't fit in GPU memory!</text>
+    </g>
+  </g>
+
+  <!-- Flash Attention Solution -->
+  <g transform="translate(470, 75)">
+    <rect x="0" y="0" width="400" height="180" rx="6" fill="#2a2a2a" stroke="#47b475"/>
+    <text x="200" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#47b475" text-anchor="middle">Flash Attention: Tiled Computation</text>
+
+    <!-- Tiled matrix visualization -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="100" height="100" fill="#323232" stroke="#454545"/>
+      <!-- Tiles -->
+      <rect x="5" y="5" width="20" height="20" fill="#1a3d2a" stroke="#47b475"/>
+      <rect x="30" y="5" width="20" height="20" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="55" y="5" width="20" height="20" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="5" y="30" width="20" height="20" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="30" y="30" width="20" height="20" fill="#1a3d2a" stroke="#47b475"/>
+      <rect x="5" y="55" width="20" height="20" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <text x="50" y="-10" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Process in tiles</text>
+      <text x="50" y="120" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Only 1 tile in memory</text>
+    </g>
+
+    <!-- Benefits -->
+    <g transform="translate(160, 55)">
+      <text x="0" y="0" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Memory = O(N) ✓</text>
+      <text x="0" y="22" font-family="monospace" font-size="9" fill="#47b475">N = 128K: ~512 MB</text>
+      <text x="0" y="44" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Speed: 2-4x faster</text>
+      <text x="0" y="60" font-family="Inter, sans-serif" font-size="9" fill="#707070">(memory-bound → compute-bound)</text>
+      <text x="0" y="82" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Exact same result!</text>
+      <text x="0" y="98" font-family="Inter, sans-serif" font-size="9" fill="#707070">(not an approximation)</text>
+    </g>
+  </g>
+
+  <!-- Algorithm visualization -->
+  <g transform="translate(30, 275)">
+    <rect x="0" y="0" width="840" height="200" rx="6" fill="#2a2a2a" stroke="#ffb400"/>
+    <text x="420" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffb400" text-anchor="middle">The Algorithm: Tiled Processing with Online Softmax</text>
+
+    <!-- Q tiles -->
+    <g transform="translate(40, 50)">
+      <text x="25" y="-5" font-family="Inter, sans-serif" font-size="10" fill="#07adf8" text-anchor="middle">Q</text>
+      <rect x="0" y="0" width="50" height="120" fill="#323232" stroke="#07adf8"/>
+      <rect x="5" y="5" width="40" height="25" fill="#1a3d4a" stroke="#07adf8"/>
+      <text x="25" y="22" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">tile_q</text>
+      <rect x="5" y="35" width="40" height="25" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="5" y="65" width="40" height="25" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="5" y="95" width="40" height="20" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <text x="25" y="145" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">in SRAM</text>
+    </g>
+
+    <!-- Arrow -->
+    <text x="120" y="110" font-family="Inter, sans-serif" font-size="10" fill="#707070">×</text>
+
+    <!-- K tiles (streaming) -->
+    <g transform="translate(150, 50)">
+      <text x="60" y="-5" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">K^T (stream through)</text>
+      <rect x="0" y="0" width="120" height="50" fill="#323232" stroke="#47b475"/>
+      <rect x="5" y="5" width="25" height="40" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="35" y="5" width="25" height="40" fill="#1a3d2a" stroke="#47b475"/>
+      <text x="47" y="30" font-family="monospace" font-size="7" fill="#47b475" text-anchor="middle">k_j</text>
+      <rect x="65" y="5" width="25" height="40" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+      <rect x="95" y="5" width="20" height="40" fill="#323232" stroke="#454545" stroke-dasharray="2"/>
+
+      <!-- Streaming arrow -->
+      <path d="M 30,60 L 90,60" fill="none" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrowF)"/>
+      <text x="60" y="75" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">streaming</text>
+    </g>
+
+    <!-- Arrow -->
+    <text x="290" y="95" font-family="Inter, sans-serif" font-size="10" fill="#707070">=</text>
+
+    <!-- Partial scores -->
+    <g transform="translate(310, 65)">
+      <rect x="0" y="0" width="60" height="35" fill="#323232" stroke="#ffb400"/>
+      <text x="30" y="22" font-family="monospace" font-size="9" fill="#ffb400" text-anchor="middle">S_ij</text>
+      <text x="30" y="50" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">partial scores</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="380" y1="82" x2="410" y2="82" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowF)"/>
+
+    <!-- Online softmax box -->
+    <g transform="translate(420, 55)">
+      <rect x="0" y="0" width="180" height="120" rx="4" fill="#323232" stroke="#9b59b6"/>
+      <text x="90" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#9b59b6" text-anchor="middle">Online Softmax</text>
+      <text x="10" y="38" font-family="monospace" font-size="8" fill="#b0b0b0">m_new = max(m_old, max(S_ij))</text>
+      <text x="10" y="55" font-family="monospace" font-size="8" fill="#b0b0b0">l_new = l_old * exp(m_old - m_new)</text>
+      <text x="10" y="72" font-family="monospace" font-size="8" fill="#b0b0b0">      + sum(exp(S_ij - m_new))</text>
+      <text x="10" y="92" font-family="monospace" font-size="8" fill="#b0b0b0">O_new = O_old * (l_old/l_new)</text>
+      <text x="10" y="109" font-family="monospace" font-size="8" fill="#b0b0b0">      + exp(S_ij-m_new) @ V_j</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="610" y1="115" x2="640" y2="115" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowF)"/>
+
+    <!-- Accumulate -->
+    <g transform="translate(650, 55)">
+      <rect x="0" y="0" width="80" height="55" rx="4" fill="#323232" stroke="#47b475"/>
+      <text x="40" y="22" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">Accumulate</text>
+      <text x="40" y="42" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">O += ...</text>
+    </g>
+
+    <!-- Final output -->
+    <g transform="translate(750, 50)">
+      <rect x="0" y="0" width="70" height="60" rx="4" fill="#1a3d2a" stroke="#47b475"/>
+      <text x="35" y="25" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">Output</text>
+      <text x="35" y="45" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">[N, d]</text>
+    </g>
+
+    <!-- Key insight -->
+    <rect x="320" y="150" width="350" height="35" rx="4" fill="#323232"/>
+    <text x="495" y="172" font-family="Inter, sans-serif" font-size="10" fill="#ffb400" text-anchor="middle">Key: Never materialize full N×N matrix - process tiles, accumulate incrementally</text>
+  </g>
+
+  <!-- CPU note -->
+  <g transform="translate(600, 420)">
+    <rect x="0" y="0" width="270" height="60" rx="4" fill="#2a2a2a" stroke="#707070"/>
+    <text x="135" y="20" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#707070" text-anchor="middle">Note for CPU</text>
+    <text x="135" y="38" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">Flash Attention is primarily a GPU optimization.</text>
+    <text x="135" y="52" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">On CPU, standard tiled attention often suffices.</text>
+  </g>
+</svg>

@@ -1,0 +1,444 @@
+<!-- TITLE: Research Tracker -->
+<!-- NAV: research -->
+
+<h1>Research Tracker</h1>
+
+<p>Tracking new techniques from recent papers for potential implementation in C-Kernel-Engine. This helps stay current with the field and plan future kernel additions.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Living Document</strong><br>
+        Updated as new papers are reviewed. Techniques marked "Planned" are candidates for implementation.
+    </div>
+</div>
+
+<h2>Implementation Status Legend</h2>
+<p>
+    <span class="badge badge-green">Implemented</span>
+    <span class="badge badge-amber">Planned</span>
+    <span class="badge badge-indigo">Researching</span>
+    <span class="badge" style="background: #444; color: #999;">Archived</span>
+</p>
+
+<hr>
+
+<h2>Attention Variants</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>Multi-Head Attention</strong></td>
+        <td>Transformer (2017)</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Base attention with causal mask</td>
+    </tr>
+    <tr>
+        <td><strong>Grouped Query Attention (GQA)</strong></td>
+        <td>Llama 2</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Shared K/V heads, reduces KV cache</td>
+    </tr>
+    <tr>
+        <td><strong>Multi-Query Attention (MQA)</strong></td>
+        <td>PaLM, Falcon</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>GQA with kv_heads=1</td>
+    </tr>
+    <tr>
+        <td><strong>Sliding Window Attention</strong></td>
+        <td>Mistral, Gemma 2</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Local attention window, reduces memory for long context</td>
+    </tr>
+    <tr>
+        <td><strong>Multi-Head Latent Attention (MLA)</strong></td>
+        <td>DeepSeek-V2</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Low-rank KV compression, massive KV cache reduction</td>
+    </tr>
+    <tr>
+        <td><strong>Native Sparse Attention (NSA)</strong></td>
+        <td>DeepSeek-V3</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Hardware-aligned sparse attention patterns</td>
+    </tr>
+    <tr>
+        <td><strong>Differential Attention</strong></td>
+        <td>Microsoft (2024)</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Subtracts two softmax attentions to reduce noise</td>
+    </tr>
+</table>
+
+<h3>Deep Dive: Multi-Head Latent Attention (MLA)</h3>
+
+<div class="card card-accent">
+    <h4 style="margin-top: 0;">The KV Cache Problem</h4>
+    <p>Standard attention requires storing K and V tensors for each token in the sequence. For long contexts, this becomes massive:</p>
+    <pre>KV Cache size = 2 × num_layers × seq_len × num_heads × head_dim × bytes_per_element
+
+Example (70B model, 128K context):
+= 2 × 80 × 128,000 × 64 × 128 × 2 bytes (FP16)
+= 167 GB just for KV cache!</pre>
+    <p>GQA/MQA reduce this by sharing K/V heads, but MLA takes a different approach.</p>
+</div>
+
+<div class="card card-green">
+    <h4 style="margin-top: 0;">MLA: Low-Rank KV Compression</h4>
+    <p>Instead of reducing heads, MLA compresses the KV cache into a low-rank latent space:</p>
+    <pre>Standard Attention:
+  h → W_K → K (full size)
+  h → W_V → V (full size)
+  Cache: [K, V] per layer
+
+MLA:
+  h → W_compress → c (small latent vector, e.g., 1024-dim)
+  Cache: [c] per layer  ← 93% smaller!
+
+  At attention time:
+  c → W_decompress_K → K (reconstruct)
+  c → W_decompress_V → V (reconstruct)</pre>
+</div>
+
+<div class="card">
+    <h4 style="margin-top: 0;">MLA Results (DeepSeek-V2)</h4>
+    <table class="table">
+        <thead>
+            <tr><th>Metric</th><th>Standard</th><th>MLA</th><th>Improvement</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>KV Cache Size</td><td>100%</td><td>6.7%</td><td><strong>93.3% reduction</strong></td></tr>
+            <tr><td>Generation Throughput</td><td>1x</td><td>5.76x</td><td><strong>5.76x faster</strong></td></tr>
+            <tr><td>Training Cost</td><td>100%</td><td>57.5%</td><td><strong>42.5% cheaper</strong></td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h4 style="margin-top: 0;">RoPE Compatibility Challenge</h4>
+    <p>RoPE encodes position in both Q and K, but MLA compresses K into a latent space. DeepSeek's solution:</p>
+    <ul>
+        <li>Keep RoPE on a <em>subset</em> of dimensions (not compressed)</li>
+        <li>Compress the remaining dimensions (NoPE - no positional encoding)</li>
+        <li>Requires careful dimension partitioning</li>
+    </ul>
+    <pre>Q = [Q_rope (with position), Q_nope (compressed)]
+K = [K_rope (with position), K_nope (from latent)]</pre>
+</div>
+
+<div class="card">
+    <h4 style="margin-top: 0;">Implementation Considerations for C-Kernel-Engine</h4>
+    <ul>
+        <li><strong>New kernel:</strong> <code>mla_compress</code> - h → latent (small matmul)</li>
+        <li><strong>New kernel:</strong> <code>mla_decompress</code> - latent → K, V (during attention)</li>
+        <li><strong>Modified attention:</strong> Handle split RoPE/NoPE dimensions</li>
+        <li><strong>KV cache layout:</strong> Store latent vectors instead of full K/V</li>
+        <li><strong>Memory savings:</strong> Critical for long context on CPU (limited RAM vs GPU)</li>
+    </ul>
+    <p><strong>Priority:</strong> High for long-context inference. The 93% KV cache reduction is huge for CPU deployment.</p>
+</div>
+
+<div class="card">
+    <h4 style="margin-top: 0;">References</h4>
+    <ul>
+        <li><a href="https://arxiv.org/abs/2405.04434" target="_blank">DeepSeek-V2 Paper</a> - Original MLA introduction</li>
+        <li><a href="https://medium.com/data-science/deepseek-v3-explained-1-multi-head-latent-attention-ed6bee2a67c4" target="_blank">DeepSeek-V3 MLA Explained</a> - Visual walkthrough</li>
+        <li><a href="https://planetbanatt.net/articles/mla.html" target="_blank">Understanding MLA</a> - Technical deep dive</li>
+        <li><a href="https://arxiv.org/abs/2502.07864" target="_blank">TransMLA</a> - Converting GQA models to MLA</li>
+    </ul>
+</div>
+
+<h2>Position Encodings</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>RoPE</strong></td>
+        <td>RoFormer, Llama</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Rotary position embedding, relative position via rotation</td>
+    </tr>
+    <tr>
+        <td><strong>ALiBi</strong></td>
+        <td>BLOOM</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Linear bias, no learned params, easy length extrapolation</td>
+    </tr>
+    <tr>
+        <td><strong>YaRN (RoPE scaling)</strong></td>
+        <td>Together AI</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>NTK-aware RoPE interpolation for context extension</td>
+    </tr>
+    <tr>
+        <td><strong>Longrope</strong></td>
+        <td>Microsoft</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Progressive interpolation for very long context</td>
+    </tr>
+</table>
+
+<h2>Normalization</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>RMSNorm</strong></td>
+        <td>Llama, Mistral</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Simpler than LayerNorm, no mean centering</td>
+    </tr>
+    <tr>
+        <td><strong>LayerNorm</strong></td>
+        <td>Original Transformer</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Full normalization with mean and variance</td>
+    </tr>
+    <tr>
+        <td><strong>QK-Norm</strong></td>
+        <td>Gemma 2</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>RMSNorm on Q and K before attention, training stability</td>
+    </tr>
+    <tr>
+        <td><strong>Deep Norm</strong></td>
+        <td>Microsoft</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Scaled residual connections for very deep models</td>
+    </tr>
+</table>
+
+<h2>Activations & MLP</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>SwiGLU</strong></td>
+        <td>Llama, Mistral</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Gated activation: Swish(xW_gate) * (xW_up)</td>
+    </tr>
+    <tr>
+        <td><strong>GELU</strong></td>
+        <td>GPT-2, BERT</td>
+        <td><span class="badge badge-green">Implemented</span></td>
+        <td>Gaussian Error Linear Unit</td>
+    </tr>
+    <tr>
+        <td><strong>GeGLU</strong></td>
+        <td>GLU Variants</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>GELU-gated variant</td>
+    </tr>
+    <tr>
+        <td><strong>Mixture of Experts (MoE)</strong></td>
+        <td>Mixtral, DeepSeek</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Sparse expert routing, key for scaling</td>
+    </tr>
+    <tr>
+        <td><strong>Shared Expert MoE</strong></td>
+        <td>DeepSeek-V2</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Some experts always active, rest routed</td>
+    </tr>
+</table>
+
+<h2>Quantization & Efficiency</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>FP8 Training</strong></td>
+        <td>DeepSeek-V3</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>8-bit floating point for training efficiency</td>
+    </tr>
+    <tr>
+        <td><strong>INT8 Inference</strong></td>
+        <td>Various</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Post-training quantization for inference</td>
+    </tr>
+    <tr>
+        <td><strong>GPTQ</strong></td>
+        <td>Frantar et al.</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>One-shot weight quantization</td>
+    </tr>
+    <tr>
+        <td><strong>AWQ</strong></td>
+        <td>MIT</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Activation-aware weight quantization</td>
+    </tr>
+</table>
+
+<h2>Training Techniques</h2>
+
+<table>
+    <tr>
+        <th>Technique</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><strong>AdamW</strong></td>
+        <td>Standard</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Decoupled weight decay, next after SGD</td>
+    </tr>
+    <tr>
+        <td><strong>Gradient Checkpointing</strong></td>
+        <td>Various</td>
+        <td><span class="badge badge-amber">Planned</span></td>
+        <td>Trade compute for memory during backprop</td>
+    </tr>
+    <tr>
+        <td><strong>μP (Maximal Update)</strong></td>
+        <td>Microsoft</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Hyperparameter transfer across model sizes</td>
+    </tr>
+    <tr>
+        <td><strong>Multi-Token Prediction</strong></td>
+        <td>Meta (2024)</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>Predict N tokens at once, better representations</td>
+    </tr>
+    <tr>
+        <td><strong>Auxiliary-Loss-Free Load Balancing</strong></td>
+        <td>DeepSeek-V3</td>
+        <td><span class="badge badge-indigo">Researching</span></td>
+        <td>MoE balancing without aux loss</td>
+    </tr>
+</table>
+
+<hr>
+
+<h2>Paper Deep Dives</h2>
+
+<p>Detailed notes on key papers for implementation reference.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">DeepSeek-V3 (Dec 2024)</h3>
+    <p><strong>Key innovations:</strong></p>
+    <ul>
+        <li><strong>MLA (Multi-Head Latent Attention)</strong> - Compresses KV cache via low-rank projection</li>
+        <li><strong>DeepSeekMoE</strong> - Fine-grained experts with shared experts</li>
+        <li><strong>FP8 Training</strong> - Mixed precision with FP8 for efficiency</li>
+        <li><strong>Auxiliary-Loss-Free Balancing</strong> - Expert load balancing without extra loss terms</li>
+        <li><strong>Multi-Token Prediction</strong> - Speculative decoding friendly</li>
+    </ul>
+    <p><strong>Relevance:</strong> MLA could significantly reduce memory for long context. MoE is key for scaling.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Gemma 2 (Jun 2024)</h3>
+    <p><strong>Key innovations:</strong></p>
+    <ul>
+        <li><strong>Sliding Window + Global Attention</strong> - Alternating layers</li>
+        <li><strong>QK-Norm</strong> - RMSNorm on Q/K for stability</li>
+        <li><strong>Logit Soft-Capping</strong> - Prevents extreme attention scores</li>
+        <li><strong>Knowledge Distillation</strong> - Smaller models trained from larger</li>
+    </ul>
+    <p><strong>Relevance:</strong> Sliding window is practical for CPU (local memory access). QK-Norm is simple to add.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Qwen2 (Jun 2024)</h3>
+    <p><strong>Key innovations:</strong></p>
+    <ul>
+        <li><strong>GQA</strong> - Standard grouped query attention</li>
+        <li><strong>SwiGLU</strong> - Standard gated activation</li>
+        <li><strong>RoPE with YaRN</strong> - Extended context via interpolation</li>
+        <li><strong>Dual Chunk Attention</strong> - For very long context variants</li>
+    </ul>
+    <p><strong>Relevance:</strong> Mostly implemented. YaRN scaling would extend context capability.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">MiniMax-01 (Jan 2025)</h3>
+    <p><strong>Key innovations:</strong></p>
+    <ul>
+        <li><strong>Lightning Attention</strong> - Linear attention variant</li>
+        <li><strong>Mixture of Experts</strong> - Sparse activation</li>
+        <li><strong>1M+ context</strong> - Very long context support</li>
+    </ul>
+    <p><strong>Relevance:</strong> Linear attention could be interesting for CPU (no N² memory). Needs investigation.</p>
+</div>
+
+<hr>
+
+<h2>Implementation Priority</h2>
+
+<p>Based on impact and feasibility for C-Kernel-Engine:</p>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">High Priority (Next Up)</h3>
+    <ol>
+        <li><strong>AdamW optimizer</strong> - Required for real training</li>
+        <li><strong>Sliding Window Attention</strong> - Memory efficiency for long context</li>
+        <li><strong>QK-Norm</strong> - Simple addition, helps stability</li>
+        <li><strong>ALiBi</strong> - Alternative to RoPE, easy length extrapolation</li>
+    </ol>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Medium Priority</h3>
+    <ul>
+        <li>YaRN (RoPE scaling)</li>
+        <li>Gradient checkpointing</li>
+        <li>Basic MoE routing</li>
+        <li>INT8 inference kernels</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Research/Long-term</h3>
+    <ul>
+        <li>MLA (requires deeper architectural changes)</li>
+        <li>FP8 training (CPU support unclear)</li>
+        <li>Linear attention variants</li>
+        <li>Multi-token prediction</li>
+    </ul>
+</div>
+
+<h2>Adding New Papers</h2>
+
+<p>When reviewing a new paper, add an entry with:</p>
+<ol>
+    <li>Technique name and source</li>
+    <li>Status: <code>Researching</code> → <code>Planned</code> → <code>Implemented</code></li>
+    <li>Implementation notes: what kernels affected, complexity estimate</li>
+    <li>Relevance to CPU training (some techniques are GPU-specific)</li>
+</ol>

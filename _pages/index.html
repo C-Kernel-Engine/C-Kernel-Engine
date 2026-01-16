@@ -1,0 +1,314 @@
+<!-- TITLE: Home -->
+<!-- NAV: index -->
+
+<div class="hero">
+    <span class="badge badge-amber">CPU-Native LLM Training</span>
+    <h1>C-Kernel-Engine</h1>
+    <p>A code generator and kernel library for training and running LLMs on CPU hardware. Designed for low-compute devices and server-grade CPUs with full PyTorch parity.</p>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>CPU-Only by Design</strong><br>
+        This engine targets x86 and embedded ARM architectures. No GPU required. Supports AVX, AVX-512, and AMX (coming soon).
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>System Requirements</strong><br>
+        C-Kernel-Engine is designed for <strong>Linux systems</strong> only. Target platforms include:
+        <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+            <li>Server-grade CPUs (Intel Xeon, AMD EPYC) with AVX-512</li>
+            <li>Embedded systems (ARM Cortex-A, RISC-V)</li>
+            <li>Workstation CPUs with AVX2/FMA support</li>
+        </ul>
+        <small style="color: var(--text-muted);">Windows and macOS are not officially supported.</small>
+    </div>
+</div>
+
+<h2>What is C-Kernel-Engine?</h2>
+
+<p>C-Kernel-Engine is a <strong>code generator</strong> that transforms HuggingFace-style config files into optimized, standalone C code for both inference and training.</p>
+
+<div class="img-container svg-viewer" data-title="C-Kernel-Engine Pipeline">
+    <img src="assets/pipeline-overview.svg" alt="Pipeline: Config → Parse → Generate → Weights → Compile → Run">
+</div>
+
+<h2>Target Hardware</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Supported Architectures</h3>
+        <ul>
+            <li><strong>x86-64</strong> with AVX, AVX-512 support</li>
+            <li><strong>ARM</strong> for embedded systems</li>
+            <li><strong>AMX</strong> support coming soon</li>
+        </ul>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0;">Designed for low-compute hardware and server-grade CPUs. No GPU required.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Design Goals</h3>
+        <ul>
+            <li><strong>Both inference AND training</strong></li>
+            <li>Every kernel has forward + backward pass</li>
+            <li>Full parity with PyTorch autograd</li>
+            <li>Zero external dependencies</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Development Roadmap</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;"><span class="badge badge-amber">Current</span> Phase 1: Kernel Composition</h3>
+        <ul>
+            <li>Individual kernel implementation and testing</li>
+            <li>Forward and backward pass parity with PyTorch</li>
+            <li>IR-based code generation from configs</li>
+            <li>Weight loading via bump allocator</li>
+            <li>Single-node training and inference</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;"><span class="badge badge-indigo">Planned</span> Phase 2: Distributed CPU Training</h3>
+        <ul>
+            <li>RDMA-based distributed training</li>
+            <li>HPC-grade communication primitives</li>
+            <li>Multi-node gradient synchronization</li>
+            <li>Pipeline and tensor parallelism</li>
+            <li>Large-scale CPU cluster support</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Key Features</h2>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <div class="feature-icon amber">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Full PyTorch Parity</h3>
+        <p>Every kernel has both forward and backward passes, validated against PyTorch autograd with max diff &lt; 1e-5.</p>
+    </div>
+    <div class="card">
+        <div class="feature-icon indigo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">IR-Based Codegen</h3>
+        <p>Build an intermediate representation from config, then emit optimized C code with automatic buffer allocation.</p>
+    </div>
+    <div class="card card-green">
+        <div class="feature-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Zero Dependencies</h3>
+        <p>Pure C with optional SIMD. No external libraries required. Compiles with just GCC.</p>
+    </div>
+</div>
+
+<h2>Architecture Overview</h2>
+
+<div class="img-container">
+    <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine Architecture">
+</div>
+
+<h2>Tokenizer (16x Faster than PyTorch)</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Trie-Based Tokenization</h3>
+        <p>High-performance BPE/WordPiece tokenizer using trie-based longest-match. Achieves <strong>16.5x faster</strong> performance than PyTorch/tiktoken.</p>
+        <ul style="margin-top: 0.5rem;">
+            <li>O(k) lookup complexity vs O(n×k)</li>
+            <li>No memcpy in hot path</li>
+            <li>Full UTF-8 multilingual support</li>
+            <li>BPE, WordPiece, SentencePiece</li>
+        </ul>
+        <p style="margin-top: 1rem;"><a href="tokenizer.html" class="btn btn-sm">Learn More →</a></p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Performance Benchmarks</h3>
+        <table style="font-size: 0.85rem;">
+            <tr>
+                <th>Text Length</th>
+                <th>C-Kernel</th>
+                <th>PyTorch</th>
+                <th>Speedup</th>
+            </tr>
+            <tr>
+                <td>200 chars</td>
+                <td>20,941/s</td>
+                <td>4,616/s</td>
+                <td><span class="badge badge-green">4.5x</span></td>
+            </tr>
+            <tr>
+                <td>3,000 chars</td>
+                <td>95,923/s</td>
+                <td>6,197/s</td>
+                <td><span class="badge badge-green">15.5x</span></td>
+            </tr>
+            <tr>
+                <td>15,000 chars</td>
+                <td>114,463/s</td>
+                <td>6,237/s</td>
+                <td><span class="badge badge-green">18.4x</span></td>
+            </tr>
+        </table>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Average: 16.56x faster than PyTorch</p>
+    </div>
+</div>
+
+<h2>Kernel Library</h2>
+
+<p>All kernels implement both forward and backward passes with full PyTorch parity:</p>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Forward</th>
+        <th>Backward</th>
+        <th>Features</th>
+    </tr>
+    <tr>
+        <td><code>attention</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal mask, GQA support, head-major layout</td>
+    </tr>
+    <tr>
+        <td><code>rope</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rotary position embeddings, precomputed cache</td>
+    </tr>
+    <tr>
+        <td><code>rmsnorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused normalization, rstd caching</td>
+    </tr>
+    <tr>
+        <td><code>swiglu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused gate activation for Llama-style MLP</td>
+    </tr>
+    <tr>
+        <td><code>softmax</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal row-wise, numerically stable</td>
+    </tr>
+    <tr>
+        <td><code>layernorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rolled and unrolled variants</td>
+    </tr>
+    <tr>
+        <td><code>gelu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Exact and fast approximation</td>
+    </tr>
+    <tr>
+        <td><code>gemm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-indigo">N/A</span></td>
+        <td>Blocked serial, AVX-512, parallel variants</td>
+    </tr>
+    <tr>
+        <td><code>mlp</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>FC1 + activation + FC2, token parallel</td>
+    </tr>
+</table>
+
+<h2>Quick Start</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Build the Library</h3>
+    <pre>git clone https://github.com/antshiv/C-Kernel-Engine.git
+cd C-Kernel-Engine
+make</pre>
+    <p>This builds <code>build/libckernel_engine.so</code> with all kernels.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Run Tests</h3>
+    <pre>make test</pre>
+    <p>Runs all Python ctypes tests against PyTorch reference implementations.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Generate Model Runtime</h3>
+    <pre># From a HuggingFace config.json:
+make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
+    <p>Emits a complete C file with forward/backward passes stitched together.</p>
+</div>
+
+<h2>Data Flow</h2>
+
+<div class="img-container">
+    <img src="assets/forward-backward-flow.svg" alt="Forward and Backward Pass Data Flow">
+</div>
+
+<h2>Why CPU Training?</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Inference + Training</h3>
+        <p>Unlike inference-only engines, C-Kernel-Engine provides complete backward passes for every operation, enabling full training loops in pure C.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Modular Composition</h3>
+        <p>Each kernel is a standalone unit. The codegen layer stitches them together based on your model architecture.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Llama/SmolLM Compatible</h3>
+        <p>Full support for modern architectures: RoPE, GQA, SwiGLU, RMSNorm. Load SmolLM configs and run with full parity.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Verifiable Correctness</h3>
+        <p>Every kernel ships with Python test that loads via ctypes and compares against PyTorch autograd.</p>
+    </div>
+</div>
+
+<h2>Weight Loading</h2>
+
+<div class="card">
+    <p>After generating C code, load pretrained weights using the built-in converters:</p>
+    <table>
+        <tr>
+            <th>Source Format</th>
+            <th>Method</th>
+        </tr>
+        <tr>
+            <td>SafeTensors</td>
+            <td>Direct load to bump allocator</td>
+        </tr>
+        <tr>
+            <td>GGML</td>
+            <td>GGML → bump allocator converter</td>
+        </tr>
+        <tr>
+            <td>PyTorch (.pt/.bin)</td>
+            <td>Built-in PyTorch weight converter</td>
+        </tr>
+    </table>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 1rem;">The bump allocator provides cache-aligned, contiguous memory layout for optimal CPU performance.</p>
+</div>
+
+<h2>Project Structure</h2>
+
+{{FOLDER_STRUCTURE}}

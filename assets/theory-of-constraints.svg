@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      .title { font-size: 28px; font-weight: 700; fill: #ffb400; }
+      .subtitle { font-size: 14px; fill: #707070; }
+    </style>
+
+    <linearGradient id="gpuNodeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#ff6b6b;stop-opacity:0.1"/>
+    </linearGradient>
+
+    <linearGradient id="cpuNodeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#47b475;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#47b475;stop-opacity:0.1"/>
+    </linearGradient>
+
+    <linearGradient id="ethernetGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ff8c00"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" class="title" text-anchor="middle">The Ethernet Equalizer</text>
+  <text x="600" y="72" class="subtitle" text-anchor="middle">At scale, both GPU and CPU clusters hit the same constraint: Ethernet</text>
+
+  <!-- Central insight -->
+  <rect x="200" y="90" width="800" height="50" rx="8" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+  <text x="600" y="122" font-size="16" font-weight="600" fill="#ffb400" text-anchor="middle">
+    NVLink is fast within a node. But NVLink doesn't scale to infinity. Ethernet does.
+  </text>
+
+  <!-- GPU Cluster Side -->
+  <g transform="translate(60, 160)">
+    <text x="240" y="0" font-size="16" font-weight="600" fill="#ff6b6b" text-anchor="middle">GPU CLUSTER AT SCALE</text>
+
+    <!-- Node 1 -->
+    <g transform="translate(40, 25)">
+      <rect x="0" y="0" width="180" height="120" rx="8" fill="url(#gpuNodeGrad)" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="90" y="25" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">Node 1</text>
+      <text x="90" y="45" font-size="10" fill="#a0a0a0" text-anchor="middle">8× H100 GPUs</text>
+
+      <rect x="20" y="55" width="140" height="25" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1.5"/>
+      <text x="90" y="72" font-size="10" fill="#47b475" text-anchor="middle">NVLink: 900 GB/s</text>
+
+      <text x="90" y="105" font-size="9" fill="#707070" text-anchor="middle">Fast within node!</text>
+    </g>
+
+    <!-- Node 2 -->
+    <g transform="translate(260, 25)">
+      <rect x="0" y="0" width="180" height="120" rx="8" fill="url(#gpuNodeGrad)" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="90" y="25" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">Node 2</text>
+      <text x="90" y="45" font-size="10" fill="#a0a0a0" text-anchor="middle">8× H100 GPUs</text>
+
+      <rect x="20" y="55" width="140" height="25" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1.5"/>
+      <text x="90" y="72" font-size="10" fill="#47b475" text-anchor="middle">NVLink: 900 GB/s</text>
+
+      <text x="90" y="105" font-size="9" fill="#707070" text-anchor="middle">Fast within node!</text>
+    </g>
+
+    <!-- Ethernet connection (bottleneck) -->
+    <g transform="translate(40, 160)">
+      <rect x="0" y="0" width="400" height="50" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="3"/>
+
+      <!-- Bottleneck visualization -->
+      <rect x="150" y="10" width="100" height="30" rx="4" fill="#ffb400"/>
+      <text x="200" y="30" font-size="11" font-weight="600" fill="#1a1a1a" text-anchor="middle">ETHERNET</text>
+
+      <text x="75" y="30" font-size="10" fill="#ff6b6b" text-anchor="middle">Node 1</text>
+      <text x="325" y="30" font-size="10" fill="#ff6b6b" text-anchor="middle">Node 2</text>
+
+      <line x1="115" y1="25" x2="150" y2="25" stroke="#ffb400" stroke-width="2"/>
+      <line x1="250" y1="25" x2="285" y2="25" stroke="#ffb400" stroke-width="2"/>
+    </g>
+
+    <!-- Bandwidth callout -->
+    <g transform="translate(40, 225)">
+      <rect x="0" y="0" width="400" height="80" rx="8" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="200" y="25" font-size="13" font-weight="600" fill="#ff6b6b" text-anchor="middle">The GPU Bottleneck</text>
+      <text x="20" y="50" font-size="11" fill="#a0a0a0">Within node (NVLink):</text>
+      <text x="380" y="50" font-size="11" fill="#47b475" text-anchor="end">900 GB/s</text>
+      <text x="20" y="70" font-size="11" fill="#a0a0a0">Between nodes (Ethernet):</text>
+      <text x="380" y="70" font-size="11" fill="#ffb400" text-anchor="end">50 GB/s (constraint!)</text>
+    </g>
+
+    <!-- System speed -->
+    <rect x="40" y="320" width="400" height="40" rx="6" fill="#ff6b6b"/>
+    <text x="240" y="346" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="middle">System Speed = 50 GB/s (Ethernet-limited)</text>
+  </g>
+
+  <!-- VS Badge -->
+  <circle cx="600" cy="360" r="35" fill="#ffb400" filter="url(#shadow)"/>
+  <text x="600" y="367" font-size="20" font-weight="700" fill="#1a1a1a" text-anchor="middle">VS</text>
+
+  <!-- CPU Cluster Side -->
+  <g transform="translate(660, 160)">
+    <text x="240" y="0" font-size="16" font-weight="600" fill="#47b475" text-anchor="middle">CPU CLUSTER AT SCALE</text>
+
+    <!-- Node 1 -->
+    <g transform="translate(40, 25)">
+      <rect x="0" y="0" width="180" height="120" rx="8" fill="url(#cpuNodeGrad)" stroke="#47b475" stroke-width="2"/>
+      <text x="90" y="25" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">Node 1</text>
+      <text x="90" y="45" font-size="10" fill="#a0a0a0" text-anchor="middle">2× EPYC + 4TB RAM</text>
+
+      <rect x="20" y="55" width="140" height="25" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1.5"/>
+      <text x="90" y="72" font-size="10" fill="#47b475" text-anchor="middle">DDR5: 460 GB/s</text>
+
+      <text x="90" y="105" font-size="9" fill="#707070" text-anchor="middle">Fast to local RAM!</text>
+    </g>
+
+    <!-- Node 2 -->
+    <g transform="translate(260, 25)">
+      <rect x="0" y="0" width="180" height="120" rx="8" fill="url(#cpuNodeGrad)" stroke="#47b475" stroke-width="2"/>
+      <text x="90" y="25" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">Node 2</text>
+      <text x="90" y="45" font-size="10" fill="#a0a0a0" text-anchor="middle">2× EPYC + 4TB RAM</text>
+
+      <rect x="20" y="55" width="140" height="25" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1.5"/>
+      <text x="90" y="72" font-size="10" fill="#47b475" text-anchor="middle">DDR5: 460 GB/s</text>
+
+      <text x="90" y="105" font-size="9" fill="#707070" text-anchor="middle">Fast to local RAM!</text>
+    </g>
+
+    <!-- Ethernet connection (same constraint) -->
+    <g transform="translate(40, 160)">
+      <rect x="0" y="0" width="400" height="50" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="3"/>
+
+      <!-- Same Ethernet -->
+      <rect x="150" y="10" width="100" height="30" rx="4" fill="#ffb400"/>
+      <text x="200" y="30" font-size="11" font-weight="600" fill="#1a1a1a" text-anchor="middle">ETHERNET</text>
+
+      <text x="75" y="30" font-size="10" fill="#47b475" text-anchor="middle">Node 1</text>
+      <text x="325" y="30" font-size="10" fill="#47b475" text-anchor="middle">Node 2</text>
+
+      <line x1="115" y1="25" x2="150" y2="25" stroke="#ffb400" stroke-width="2"/>
+      <line x1="250" y1="25" x2="285" y2="25" stroke="#ffb400" stroke-width="2"/>
+    </g>
+
+    <!-- Bandwidth callout -->
+    <g transform="translate(40, 225)">
+      <rect x="0" y="0" width="400" height="80" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+      <text x="200" y="25" font-size="13" font-weight="600" fill="#47b475" text-anchor="middle">The CPU Reality</text>
+      <text x="20" y="50" font-size="11" fill="#a0a0a0">Within node (DDR5):</text>
+      <text x="380" y="50" font-size="11" fill="#47b475" text-anchor="end">460 GB/s</text>
+      <text x="20" y="70" font-size="11" fill="#a0a0a0">Between nodes (Ethernet):</text>
+      <text x="380" y="70" font-size="11" fill="#ffb400" text-anchor="end">50 GB/s (same!)</text>
+    </g>
+
+    <!-- System speed -->
+    <rect x="40" y="320" width="400" height="40" rx="6" fill="#47b475" filter="url(#glow)"/>
+    <text x="240" y="346" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="middle">System Speed = 50 GB/s (Same constraint!)</text>
+  </g>
+
+  <!-- Key insight box -->
+  <g transform="translate(100, 550)">
+    <rect x="0" y="0" width="1000" height="120" rx="10" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+
+    <text x="500" y="35" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">Theory of Constraints: The Equalizer</text>
+
+    <text x="50" y="65" font-size="13" fill="#a0a0a0">At scale, both architectures hit Ethernet (50 GB/s).</text>
+    <text x="50" y="90" font-size="13" fill="#a0a0a0">NVLink's 900 GB/s advantage disappears when you cross node boundaries.</text>
+    <text x="50" y="115" font-size="14" font-weight="600" fill="#47b475">Result: Same network constraint, but CPU costs 15× less. Choose wisely.</text>
+  </g>
+
+  <!-- Without NVLink warning -->
+  <g transform="translate(100, 690)">
+    <rect x="0" y="0" width="1000" height="90" rx="10" fill="#2a2a2a" stroke="#ff6b6b" stroke-width="2"/>
+
+    <text x="500" y="30" font-size="14" font-weight="600" fill="#ff6b6b" text-anchor="middle">Without NVLink? GPUs Are Even Slower.</text>
+
+    <text x="50" y="55" font-size="12" fill="#a0a0a0">If you can't afford NVLink switches ($200K+), GPUs communicate via PCIe → Ethernet.</text>
+    <text x="50" y="75" font-size="12" fill="#a0a0a0">PCIe 5.0 = 64 GB/s. That's slower than DDR5's 460 GB/s within the node.</text>
+    <text x="950" y="65" font-size="12" font-weight="600" fill="#ff6b6b" text-anchor="end">CPU wins outright.</text>
+  </g>
+</svg>

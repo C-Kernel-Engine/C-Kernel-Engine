@@ -1,0 +1,197 @@
+<!-- TITLE: ADR-0004 Deterministic Layout + Canaries -->
+<!-- NAV: adr -->
+
+<h1>ADR-0004: Deterministic Layout + Canaries for Debug</h1>
+
+<div class="card">
+    <table>
+        <tr><td><strong>Status</strong></td><td><span class="badge badge-success">Accepted</span></td></tr>
+        <tr><td><strong>Date</strong></td><td>2025-01</td></tr>
+        <tr><td><strong>Origin</strong></td><td>IR v3 design (retained in v4)</td></tr>
+    </table>
+</div>
+
+<h2>Context</h2>
+
+<p>Neural network inference involves many tensor operations on shared memory. Common debugging challenges:</p>
+
+<ul>
+    <li><strong>Buffer overflows</strong>: GEMM writes past tensor bounds</li>
+    <li><strong>Wrong offsets</strong>: Kernel reads from wrong location</li>
+    <li><strong>Non-reproducible bugs</strong>: Different runs, different memory layouts</li>
+    <li><strong>Difficult visualization</strong>: Can't inspect memory without knowing layout</li>
+</ul>
+
+<p>IR v2 used dynamic allocation, making these bugs hard to reproduce and debug.</p>
+
+<h2>Decision</h2>
+
+<p><strong>Use deterministic memory layout with canary markers between tensors.</strong></p>
+
+<h3>Deterministic Offsets</h3>
+
+<p>All tensor offsets are computed at code generation time and baked into the generated C code:</p>
+
+<pre><code class="language-c">
+// Generated code - offsets are compile-time constants
+#define OFFSET_EMBED_WEIGHT      64
+#define OFFSET_LAYER_0_WQ        1606720
+#define OFFSET_LAYER_0_WK        3211328
+// ...
+
+// No runtime allocation for individual tensors
+static const size_t TOTAL_BYTES = 1073741824;
+
+uint16_t *embed_weight = (uint16_t*)(model->base + OFFSET_EMBED_WEIGHT);
+</code></pre>
+
+<h3>64-Byte Alignment</h3>
+
+<p>All tensors are aligned to 64 bytes (AVX-512 cache line):</p>
+
+<pre><code class="language-python">
+def align_up(offset, alignment=64):
+    return (offset + alignment - 1) & ~(alignment - 1)
+
+def compute_offset(current, tensor_size):
+    aligned = align_up(current)
+    return aligned, aligned + tensor_size
+</code></pre>
+
+<h3>Canary Markers</h3>
+
+<p>Insert 64-byte canary regions between tensors in debug builds:</p>
+
+<pre><code class="language-plaintext">
+┌────────────────────────────────────────────────────────────┐
+│ Tensor A (e.g., layer_0_wq)                                │
+│ [actual data...]                                           │
+├────────────────────────────────────────────────────────────┤
+│ CANARY (64 bytes)                                          │
+│ Pattern: 0xDEADBEEF 0xDEADBEEF ... (repeating)             │
+├────────────────────────────────────────────────────────────┤
+│ Tensor B (e.g., layer_0_wk)                                │
+│ [actual data...]                                           │
+├────────────────────────────────────────────────────────────┤
+│ CANARY (64 bytes)                                          │
+│ Pattern: 0xDEADBEEF 0xDEADBEEF ...                         │
+└────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<h3>Canary Validation</h3>
+
+<pre><code class="language-c">
+#define CANARY_PATTERN 0xDEADBEEFDEADBEEFULL
+
+// Initialize canaries at model load time
+void init_canaries(Model *model) {
+    for (int i = 0; i < NUM_CANARIES; i++) {
+        uint64_t *canary = (uint64_t*)(model->base + CANARY_OFFSETS[i]);
+        for (int j = 0; j < 8; j++) {  // 64 bytes = 8 × uint64_t
+            canary[j] = CANARY_PATTERN;
+        }
+    }
+}
+
+// Verify canaries after each layer (debug mode)
+bool verify_canaries(Model *model) {
+    for (int i = 0; i < NUM_CANARIES; i++) {
+        uint64_t *canary = (uint64_t*)(model->base + CANARY_OFFSETS[i]);
+        for (int j = 0; j < 8; j++) {
+            if (canary[j] != CANARY_PATTERN) {
+                fprintf(stderr, "CANARY VIOLATION at offset %zu (canary %d)\n",
+                        CANARY_OFFSETS[i] + j * 8, i);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+</code></pre>
+
+<h3>Memory Layout JSON</h3>
+
+<p>Export layout for debugging tools:</p>
+
+<pre><code class="language-json">
+{
+    "total_bytes": 1073741824,
+    "alignment": 64,
+    "canary_pattern": "0xDEADBEEF",
+    "tensors": [
+        {
+            "name": "embed_weight",
+            "offset": 64,
+            "size": 272629760,
+            "shape": [151936, 896],
+            "dtype": "bf16"
+        },
+        {
+            "name": "canary_0",
+            "offset": 272629824,
+            "size": 64,
+            "type": "canary"
+        },
+        {
+            "name": "layer_0_wq",
+            "offset": 272629888,
+            "size": 1605632,
+            "shape": [896, 896],
+            "dtype": "bf16"
+        }
+    ]
+}
+</code></pre>
+
+<h2>Consequences</h2>
+
+<h3>Benefits</h3>
+<ul>
+    <li><strong>Reproducibility</strong>: Same offsets every run, bugs are reproducible</li>
+    <li><strong>Early detection</strong>: Canary violations caught before corruption spreads</li>
+    <li><strong>Visualization</strong>: Memory layout can be rendered graphically</li>
+    <li><strong>No malloc overhead</strong>: Single allocation, no fragmentation</li>
+    <li><strong>Debug symbols</strong>: Offset constants appear in debugger</li>
+</ul>
+
+<h3>Costs</h3>
+<ul>
+    <li><strong>Memory overhead</strong>: Canaries add ~64B per tensor (negligible)</li>
+    <li><strong>Verification cost</strong>: Canary checks add latency (debug only)</li>
+    <li><strong>Rigidity</strong>: Can't resize tensors at runtime</li>
+</ul>
+
+<h2>Debug vs Release</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th>Debug Build</th>
+            <th>Release Build</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Canary regions</td>
+            <td>Allocated and initialized</td>
+            <td>Not allocated (offsets adjusted)</td>
+        </tr>
+        <tr>
+            <td>Canary verification</td>
+            <td>After each layer</td>
+            <td>Disabled</td>
+        </tr>
+        <tr>
+            <td>Layout JSON</td>
+            <td>Generated</td>
+            <td>Optional</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Related ADRs</h2>
+<ul>
+    <li><a href="adr-0001.html">ADR-0001</a>: Layout is a separate phase</li>
+    <li><a href="adr-0003.html">ADR-0003</a>: Layout includes mode-specific buffers</li>
+</ul>

@@ -1,0 +1,96 @@
+<!-- TITLE: Developer Guide -->
+<!-- NAV: contributing -->
+
+<h1>Developer Guide</h1>
+
+<p>So you want to hack on the engine? Welcome!</p>
+<p>This guide explains how to add a new kernel (operation) to the system, from the math implementation to the compiler integration.</p>
+
+<h2>Workflow: Adding a New Kernel</h2>
+
+<p>Let's say you want to add a <code>GELU_TANH</code> op.</p>
+
+<h3>1. Define the Op in IR</h3>
+
+<p>Open <code>include/ckernel_ir.h</code> and add your op to the <code>CKOpType</code> enum:</p>
+
+<pre><code>typedef enum {
+    // ...
+    CK_OP_SWIGLU,
+    CK_OP_GELU_TANH, // <--- Add this
+    // ...
+} CKOpType;</code></pre>
+
+<h3>2. Implement the Kernel</h3>
+
+<p>Create a new file <code>src/kernels/gelu_tanh.c</code> (or add to <code>src/kernels/gelu_kernels.c</code> if it fits):</p>
+
+<pre><code>#include &lt;math.h&gt;
+
+void gelu_tanh_forward(const float *x, float *y, int n) {
+    // fast tanh approximation...
+    for (int i = 0; i < n; ++i) {
+        // ...
+    }
+}</code></pre>
+
+<p>Then expose it in <code>include/ckernel_engine.h</code>:</p>
+
+<pre><code>void gelu_tanh_forward(const float *x, float *y, int n);</code></pre>
+
+<h3>3. Register the Op Name</h3>
+
+<p>Open <code>src/ckernel_registry.c</code> and map the enum to a string name:</p>
+
+<pre><code>static const char *ck_op_name(CKOpType op) {
+    switch (op) {
+        // ...
+        case CK_OP_GELU_TANH: return "GELU_TANH";
+        // ...
+    }
+}</code></pre>
+
+<p>And ensure <code>ck_op_supported</code> returns 1 for it.</p>
+
+<h3>4. Update the Code Generator</h3>
+
+<p>Open <code>src/ckernel_codegen.c</code>. You need to ensure the runtime knows how to emit code for this op.</p>
+<p>First, update the local <code>op_name</code> helper if it duplicates the registry logic.</p>
+<p>Then, if you are emitting a full runtime (in <code>emit_runtime_preamble</code> or the main loop inside <code>ck_codegen_emit_runtime</code>), you need to make sure your kernel's source file is included in the output <code>ai.c</code>.</p>
+
+<p>For example, in <code>emit_runtime_preamble</code>:</p>
+
+<pre><code>if (emit_source_filtered(out, "src/kernels/gelu_tanh.c") != 0) return -1;</code></pre>
+
+<h3>5. Add a Test</h3>
+
+<p>We verify everything against PyTorch. Create <code>unittest/test_gelu_tanh.py</code>:</p>
+
+<pre><code>import torch
+import ctypes
+import numpy as np
+
+# Load your new library (you might need to add a target to Makefile first!)
+lib = ctypes.CDLL("build/libckernel_gelu.so") 
+
+def test_gelu_tanh():
+    # ... setup input ...
+    # ... call C function ...
+    # ... compare with torch.nn.functional.gelu(..., approximate='tanh') ...</code></pre>
+
+<h3>6. Build and Verify</h3>
+
+<pre><code>make
+make test</code></pre>
+
+<h2>Compiler Architecture</h2>
+
+<p>The "Compiler" is just <code>ckernel_ir_demo.c</code>. It doesn't generate machine code directly; it generates <strong>C source code</strong>. This is known as "Transpilation" or "Source-to-Source" compilation.</p>
+
+<ol>
+    <li><strong>Parser</strong>: Reads <code>config.json</code> -> <code>CKModelConfig</code>.</li>
+    <li><strong>IR Builder</strong>: Constructs <code>CKIRGraph</code> (a flat list of nodes).</li>
+    <li><strong>Codegen</strong>: Walks the <code>CKIRGraph</code> and prints C code to a file (<code>ai.c</code>).</li>
+</ol>
+
+<p>This generated <code>ai.c</code> is <strong>standalone</strong>. It contains all the kernel code (inlined/included) and a <code>main()</code> function. You can compile it with <code>gcc -O3 ai.c -o ai</code> and run it anywhere, without needing the original library.</p>

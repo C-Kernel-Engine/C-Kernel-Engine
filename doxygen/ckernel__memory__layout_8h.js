@@ -1,0 +1,38 @@
+var ckernel__memory__layout_8h =
+[
+    [ "CKLayerGradOffsets", "structCKLayerGradOffsets.html", "structCKLayerGradOffsets" ],
+    [ "CKLayerOffsets", "structCKLayerOffsets.html", "structCKLayerOffsets" ],
+    [ "CKModel", "structCKModel.html", "structCKModel" ],
+    [ "CKSection", "structCKSection.html", "structCKSection" ],
+    [ "CKSectionConfig", "structCKSectionConfig.html", "structCKSectionConfig" ],
+    [ "CK_CACHE_LINE", "ckernel__memory__layout_8h.html#a452e44b0d33892f36e77c590eba38daf", null ],
+    [ "CK_GRAD", "ckernel__memory__layout_8h.html#a35b79f7b661f83a89e63ee704117d053", null ],
+    [ "CK_HUGE_1GB", "ckernel__memory__layout_8h.html#aba136a9c872b1032356fc97e8a863909", null ],
+    [ "CK_HUGE_2MB", "ckernel__memory__layout_8h.html#ad8aec518dbda9e1ffdcb5388f61c3bca", null ],
+    [ "CK_LAYER", "ckernel__memory__layout_8h.html#ab71d40d0a04a0bdda4dd754953078d00", null ],
+    [ "CK_PTR", "ckernel__memory__layout_8h.html#aed689667a597546f4ca76393d018eb06", null ],
+    [ "CK_SIMD_ALIGN", "ckernel__memory__layout_8h.html#ae4fcfb595850676b0e59177879acef97", null ],
+    [ "CKFusionFlags", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efe", [
+      [ "CK_FUSE_NONE", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db", null ],
+      [ "CK_FUSE_EMBED_NORM", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21", null ],
+      [ "CK_FUSE_NORM_QKV", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9", null ],
+      [ "CK_FUSE_QKV_ROPE", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959", null ],
+      [ "CK_FUSE_ATTN_PROJ", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce", null ],
+      [ "CK_FUSE_NORM_MLP", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca", null ],
+      [ "CK_FUSE_MLP_GATE_UP", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02", null ],
+      [ "CK_FUSE_MLP_ACT_DOWN", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2", null ],
+      [ "CK_FUSE_ADD_NORM", "ckernel__memory__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea784a02f46d179bd5baf2ae6c9b628a7a", null ],
+      [ "CK_FUSE_NONE", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db", null ],
+      [ "CK_FUSE_EMBED_NORM", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21", null ],
+      [ "CK_FUSE_NORM_QKV", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9", null ],
+      [ "CK_FUSE_QKV_ROPE", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959", null ],
+      [ "CK_FUSE_ATTN_PROJ", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce", null ],
+      [ "CK_FUSE_NORM_MLP", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca", null ],
+      [ "CK_FUSE_MLP_GATE_UP", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02", null ],
+      [ "CK_FUSE_MLP_ACT_DOWN", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2", null ],
+      [ "CK_FUSE_RESIDUAL_NORM", "ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea6a3bb26ab9dcc8bb90714a3c77250997", null ]
+    ] ],
+    [ "ck_memory_allocate", "ckernel__memory__layout_8h.html#a27e838b35bf29a1fa749490d9e7fdd38", null ],
+    [ "ck_memory_free", "ckernel__memory__layout_8h.html#ad32d33988f932adf3a059635aac8c79c", null ],
+    [ "ck_memory_plan", "ckernel__memory__layout_8h.html#a73c5439888aa533ee2b15697fac6f8e0", null ]
+];

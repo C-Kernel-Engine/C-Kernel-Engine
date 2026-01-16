@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 850" width="950" height="850">
+  <defs>
+    <style>
+      .title { font: bold 22px 'Segoe UI', Arial, sans-serif; fill: #1a1a2e; }
+      .subtitle { font: bold 14px 'Segoe UI', Arial, sans-serif; fill: #16213e; }
+      .label { font: 12px 'Courier New', monospace; fill: #333; }
+      .formula { font: 13px 'Courier New', monospace; fill: #0f3460; }
+      .small { font: 10px 'Segoe UI', Arial, sans-serif; fill: #666; }
+      .annotation { font: 11px 'Segoe UI', Arial, sans-serif; fill: #444; }
+      .step-num { font: bold 16px 'Segoe UI', Arial, sans-serif; fill: white; }
+      .code { font: 11px 'Courier New', monospace; fill: #2c3e50; }
+    </style>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#0077b6"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2ecc71"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e67e22"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="950" height="850" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="475" y="35" text-anchor="middle" class="title">Online Softmax: The Key to Flash Attention</text>
+  <text x="475" y="58" text-anchor="middle" class="annotation">Computing softmax incrementally without storing all values first</text>
+
+  <!-- ===== SECTION 1: The Problem with Standard Softmax ===== -->
+  <rect x="30" y="80" width="420" height="200" rx="8" fill="#fff5f5" stroke="#e74c3c" stroke-width="2"/>
+  <text x="240" y="105" text-anchor="middle" class="subtitle" fill="#e74c3c">The Problem: Standard Softmax</text>
+
+  <!-- Formula -->
+  <text x="50" y="140" class="formula">softmax(x_i) = e^(x_i) / sum(e^(x_j))</text>
+  <text x="50" y="165" class="annotation">                    j=0..N</text>
+
+  <!-- Problem explanation -->
+  <text x="50" y="195" class="annotation">Problem: Must compute ALL e^(x_j) values</text>
+  <text x="50" y="215" class="annotation">before computing ANY softmax output!</text>
+
+  <!-- Memory issue -->
+  <rect x="50" y="230" width="380" height="35" rx="4" fill="#ffe6e6"/>
+  <text x="240" y="253" text-anchor="middle" class="small" fill="#c0392b">For N=100K tokens: Store 100K floats = 400KB just for exp values</text>
+
+  <!-- ===== SECTION 2: The Online Solution ===== -->
+  <rect x="500" y="80" width="420" height="200" rx="8" fill="#f0fff4" stroke="#2ecc71" stroke-width="2"/>
+  <text x="710" y="105" text-anchor="middle" class="subtitle" fill="#2ecc71">The Solution: Online Softmax</text>
+
+  <!-- Key insight -->
+  <text x="520" y="140" class="annotation">Key insight: We can rescale partial results</text>
+  <text x="520" y="160" class="annotation">when we encounter a new maximum!</text>
+
+  <!-- State variables -->
+  <text x="520" y="195" class="code">Track: m = running max</text>
+  <text x="520" y="215" class="code">       d = running sum of scaled exp</text>
+
+  <!-- Memory benefit -->
+  <rect x="520" y="235" width="380" height="35" rx="4" fill="#d4edda"/>
+  <text x="710" y="258" text-anchor="middle" class="small" fill="#155724">O(1) memory: Just 2 floats regardless of sequence length!</text>
+
+  <!-- ===== SECTION 3: The Algorithm Step by Step ===== -->
+  <text x="475" y="315" text-anchor="middle" class="subtitle">The Algorithm: Processing One Element at a Time</text>
+
+  <!-- Step 1 -->
+  <g transform="translate(50, 340)">
+    <circle cx="20" cy="20" r="20" fill="#3498db"/>
+    <text x="20" y="26" text-anchor="middle" class="step-num">1</text>
+    <text x="55" y="15" class="subtitle">Initialize</text>
+    <rect x="55" y="25" width="200" height="50" rx="4" fill="#e8f4f8" stroke="#3498db"/>
+    <text x="65" y="45" class="code">m = -infinity</text>
+    <text x="65" y="63" class="code">d = 0</text>
+  </g>
+
+  <!-- Step 2 -->
+  <g transform="translate(300, 340)">
+    <circle cx="20" cy="20" r="20" fill="#e67e22"/>
+    <text x="20" y="26" text-anchor="middle" class="step-num">2</text>
+    <text x="55" y="15" class="subtitle">For each x_i</text>
+    <rect x="55" y="25" width="280" height="70" rx="4" fill="#fef5e7" stroke="#e67e22"/>
+    <text x="65" y="48" class="code">m_new = max(m, x_i)</text>
+    <text x="65" y="68" class="code">d = d * exp(m - m_new)  // rescale!</text>
+    <text x="65" y="88" class="code">d = d + exp(x_i - m_new)</text>
+  </g>
+
+  <!-- Step 3 -->
+  <g transform="translate(630, 340)">
+    <circle cx="20" cy="20" r="20" fill="#2ecc71"/>
+    <text x="20" y="26" text-anchor="middle" class="step-num">3</text>
+    <text x="55" y="15" class="subtitle">Result</text>
+    <rect x="55" y="25" width="220" height="50" rx="4" fill="#d4edda" stroke="#2ecc71"/>
+    <text x="65" y="45" class="code">softmax(x_i) = exp(x_i - m) / d</text>
+    <text x="65" y="63" class="small">Apply in second pass or inline</text>
+  </g>
+
+  <!-- ===== SECTION 4: Visual Example ===== -->
+  <text x="475" y="465" text-anchor="middle" class="subtitle">Visual Example: x = [2, 5, 1, 8, 3]</text>
+
+  <!-- Example walkthrough -->
+  <g transform="translate(50, 485)">
+    <!-- Headers -->
+    <text x="0" y="0" class="label">Step</text>
+    <text x="80" y="0" class="label">x_i</text>
+    <text x="140" y="0" class="label">m (max)</text>
+    <text x="240" y="0" class="label">Rescale Factor</text>
+    <text x="400" y="0" class="label">d (sum)</text>
+    <text x="520" y="0" class="label">Action</text>
+
+    <!-- Divider -->
+    <line x1="0" y1="10" x2="850" y2="10" stroke="#ccc"/>
+
+    <!-- Row 0: Init -->
+    <text x="0" y="35" class="code">init</text>
+    <text x="80" y="35" class="code">-</text>
+    <text x="140" y="35" class="code">-inf</text>
+    <text x="240" y="35" class="code">-</text>
+    <text x="400" y="35" class="code">0</text>
+    <text x="520" y="35" class="small">Initialize state</text>
+
+    <!-- Row 1: x=2 -->
+    <rect x="-5" y="45" width="855" height="25" fill="#e8f4f8" rx="2"/>
+    <text x="0" y="62" class="code">1</text>
+    <text x="80" y="62" class="code" fill="#3498db">2</text>
+    <text x="140" y="62" class="code">2</text>
+    <text x="240" y="62" class="code">exp(-inf - 2) = 0</text>
+    <text x="400" y="62" class="code">0*0 + exp(0) = 1</text>
+    <text x="520" y="62" class="small">New max! d = e^(2-2) = 1</text>
+
+    <!-- Row 2: x=5 -->
+    <rect x="-5" y="72" width="855" height="25" fill="#fef5e7" rx="2"/>
+    <text x="0" y="89" class="code">2</text>
+    <text x="80" y="89" class="code" fill="#e67e22">5</text>
+    <text x="140" y="89" class="code">5</text>
+    <text x="240" y="89" class="code" fill="#e67e22">exp(2 - 5) = 0.05</text>
+    <text x="400" y="89" class="code">1*0.05 + exp(0) = 1.05</text>
+    <text x="520" y="89" class="small" fill="#e67e22">New max! Rescale old sum</text>
+
+    <!-- Row 3: x=1 -->
+    <rect x="-5" y="99" width="855" height="25" fill="#f8f9fa" rx="2"/>
+    <text x="0" y="116" class="code">3</text>
+    <text x="80" y="116" class="code">1</text>
+    <text x="140" y="116" class="code">5</text>
+    <text x="240" y="116" class="code">exp(5 - 5) = 1</text>
+    <text x="400" y="116" class="code">1.05*1 + exp(-4) = 1.07</text>
+    <text x="520" y="116" class="small">No rescale (1 &lt; 5)</text>
+
+    <!-- Row 4: x=8 -->
+    <rect x="-5" y="126" width="855" height="25" fill="#fef5e7" rx="2"/>
+    <text x="0" y="143" class="code">4</text>
+    <text x="80" y="143" class="code" fill="#e67e22">8</text>
+    <text x="140" y="143" class="code">8</text>
+    <text x="240" y="143" class="code" fill="#e67e22">exp(5 - 8) = 0.05</text>
+    <text x="400" y="143" class="code">1.07*0.05 + exp(0) = 1.05</text>
+    <text x="520" y="143" class="small" fill="#e67e22">New max! Rescale again</text>
+
+    <!-- Row 5: x=3 -->
+    <rect x="-5" y="153" width="855" height="25" fill="#f8f9fa" rx="2"/>
+    <text x="0" y="170" class="code">5</text>
+    <text x="80" y="170" class="code">3</text>
+    <text x="140" y="170" class="code">8</text>
+    <text x="240" y="170" class="code">exp(8 - 8) = 1</text>
+    <text x="400" y="170" class="code">1.05*1 + exp(-5) = 1.06</text>
+    <text x="520" y="170" class="small">No rescale (3 &lt; 8)</text>
+
+    <!-- Final result -->
+    <rect x="-5" y="185" width="855" height="30" fill="#d4edda" rx="2"/>
+    <text x="0" y="207" class="code" fill="#155724">Final: m=8, d=1.0586</text>
+    <text x="240" y="207" class="code" fill="#155724">softmax = [e^(2-8)/d, e^(5-8)/d, e^(1-8)/d, e^(8-8)/d, e^(3-8)/d]</text>
+  </g>
+
+  <!-- ===== SECTION 5: The Rescaling Magic ===== -->
+  <text x="475" y="720" text-anchor="middle" class="subtitle">Why Rescaling Works: The Mathematical Trick</text>
+
+  <g transform="translate(50, 740)">
+    <rect x="0" y="0" width="850" height="90" rx="6" fill="#f8f9fa" stroke="#9b59b6" stroke-width="2"/>
+
+    <!-- Left side: Before rescale -->
+    <text x="20" y="25" class="code">Before seeing x_new (with old max m):</text>
+    <text x="20" y="45" class="formula">d_old = sum( e^(x_i - m) )  for i seen so far</text>
+
+    <!-- Arrow -->
+    <line x1="420" y1="35" x2="450" y2="35" stroke="#9b59b6" stroke-width="2" marker-end="url(#arrow-orange)"/>
+
+    <!-- Right side: After rescale -->
+    <text x="470" y="25" class="code">After seeing x_new > m (new max = x_new):</text>
+    <text x="470" y="45" class="formula">d_new = d_old * e^(m - x_new) + e^(x_new - x_new)</text>
+    <text x="470" y="65" class="formula">      = d_old * e^(m - x_new) + 1</text>
+
+    <!-- Key insight -->
+    <text x="425" y="82" text-anchor="middle" class="small" fill="#9b59b6">Multiplying by e^(m - x_new) converts old sum to new reference frame!</text>
+  </g>
+
+</svg>

@@ -1,0 +1,504 @@
+<!-- TITLE: Deep Dive: LLM Concepts -->
+<!-- NAV: concepts -->
+
+<h1>Deep Dive: LLM Concepts</h1>
+
+<p>This page explains the key concepts, algorithms, and computational techniques used in modern Large Language Models. Understanding these fundamentals helps you know <em>why</em> each kernel exists and how they fit together.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Reading Guide</strong><br>
+        Each section includes: conceptual explanation, where it fits in the architecture, the math, and our C implementation.
+    </div>
+</div>
+
+<h2>Table of Contents</h2>
+<ul>
+    <li><a href="#architecture">Transformer Architecture Overview</a></li>
+    <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
+    <li><a href="#attention">Attention Mechanisms</a></li>
+    <li><a href="#flash-attention">Flash Attention</a></li>
+    <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
+    <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
+    <li><a href="#activations">Activations: SwiGLU, GELU</a></li>
+    <li><a href="#weight-tying">Weight Tying</a></li>
+</ul>
+
+<hr>
+
+<h2 id="architecture">Transformer Architecture Overview</h2>
+
+<p>Before diving into individual components, let's see where everything fits in a decoder-only transformer (like Llama, GPT).</p>
+
+<div class="img-container svg-viewer" data-title="Transformer Architecture Overview">
+    <img src="assets/concept-transformer-overview.svg" alt="Transformer Architecture Overview">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Flow</h3>
+    <ol>
+        <li><strong>Token Embedding</strong>: Convert token IDs to vectors</li>
+        <li><strong>Position Encoding</strong>: Add position information (RoPE applied inside attention)</li>
+        <li><strong>N Decoder Layers</strong>, each containing:
+            <ul>
+                <li>RMSNorm &rarr; Self-Attention &rarr; Residual Add</li>
+                <li>RMSNorm &rarr; MLP (SwiGLU) &rarr; Residual Add</li>
+            </ul>
+        </li>
+        <li><strong>Final RMSNorm</strong></li>
+        <li><strong>LM Head</strong>: Project back to vocabulary (often weight-tied with embedding)</li>
+    </ol>
+</div>
+
+<hr>
+
+<h2 id="rope">RoPE: Rotary Position Embedding</h2>
+
+<p>RoPE encodes position information by <em>rotating</em> query and key vectors based on their position in the sequence. Unlike absolute position embeddings, RoPE naturally captures <strong>relative</strong> position.</p>
+
+<div class="img-container svg-viewer" data-title="RoPE: Rotary Position Embedding">
+    <img src="assets/concept-rope-detailed.svg" alt="RoPE Detailed Explanation">
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">!</div>
+    <div>
+        <strong>Key Insight: RoPE Replaces Additive Position Embeddings</strong><br>
+        With RoPE, you go <strong>straight from token embedding to decoder layers</strong>. There's no separate <code>position_embed</code> to add. Position is injected via rotation <em>inside</em> each attention layer.
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Flow with RoPE</h3>
+    <pre>
+Traditional (GPT-2 style):
+  token_embed + position_embed &rarr; layers
+
+With RoPE:
+  token_embed &rarr; layers (RoPE applied inside attention)
+
+Token: "The"  "cat"  "sat"  "on"   "mat"
+Pos:     0      1      2      3      4
+
+Embedding lookup (NO position added):
+  [vec0] [vec1] [vec2] [vec3] [vec4]
+           |
+      Decoder Layer
+           |
+      Q, K, V projection
+           |
+    +---------------------------+
+    |  RoPE: rotate Q and K     |
+    |  Q_0 rotated by 0*theta   |
+    |  Q_1 rotated by 1*theta   |
+    |  Q_2 rotated by 2*theta   |
+    |  (same angles for K)      |
+    +---------------------------+
+           |
+      Attention: Q @ K.T (now position-aware!)
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">What is rope_theta?</h3>
+        <p><code>rope_theta</code> (default: 10000) is the <strong>base frequency</strong> that controls how quickly positions rotate through the embedding space.</p>
+        <pre>theta_i = rope_theta ^ (-2i / d)
+
+For d=64, i=0:  theta = 10000^0 = 1
+For d=64, i=16: theta = 10000^(-0.5) = 0.01
+For d=64, i=31: theta = 10000^(-0.97) ~ 0.0001</pre>
+        <p><strong>Higher rope_theta</strong> = slower rotation = better for long contexts<br>
+        (Llama 3.1 uses 500,000 for 128K context)</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Position vs Dimension</h3>
+        <p>Both are involved, but differently:</p>
+        <pre>angle(pos, dim) = position * theta_i</pre>
+        <table>
+            <tr><th>Axis</th><th>What it controls</th></tr>
+            <tr><td><strong>Position</strong></td><td>How much to rotate (angle magnitude)</td></tr>
+            <tr><td><strong>Dim pair</strong></td><td>How fast to rotate (frequency)</td></tr>
+        </table>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+        Dim pair 0: rotates FAST (local patterns)<br>
+        Dim pair 31: rotates SLOW (global patterns)
+        </p>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Same Rotation for Q and K?</h3>
+        <p><strong>YES!</strong> At the same position, both Q and K get the same rotation:</p>
+        <pre>At position m:
+  Q_m = rotate(Q_m, angle = m * theta)
+  K_m = rotate(K_m, angle = m * theta)
+
+At position n:
+  K_n = rotate(K_n, angle = n * theta)</pre>
+        <p>The magic happens in the dot product...</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Why Rotation Works</h3>
+        <p>When you compute <code>Q_m · K_n</code> after rotation:</p>
+        <pre>Q_m · K_n = f(Q, K, m - n)</pre>
+        <p>Only the <strong>angle difference</strong> matters!</p>
+        <ul>
+            <li>Pos 5 → Pos 3: angle diff = 2*theta</li>
+            <li>Pos 100 → Pos 98: angle diff = 2*theta</li>
+        </ul>
+        <p>Same relative distance = same attention behavior.</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RoPE Math</h3>
+    <p>For each pair of dimensions (2i, 2i+1) at position m:</p>
+    <pre>
+Forward:
+    theta_i = rope_theta ^ (-2i / head_dim)
+    angle = m * theta_i
+
+    x'[2i]   = x[2i] * cos(angle) - x[2i+1] * sin(angle)
+    x'[2i+1] = x[2i] * sin(angle) + x[2i+1] * cos(angle)
+
+Backward:
+    Simply rotate by negative angle (transpose of rotation matrix)
+    </pre>
+    <p><strong>Our implementation:</strong> <code>rope_kernels.c</code> - precomputes cos/sin cache, applies in-place to Q and K</p>
+</div>
+
+<hr>
+
+<h2 id="attention">Attention Mechanisms</h2>
+
+<p>Attention is the core of transformers: it lets each token "look at" all other tokens and decide what's relevant.</p>
+
+<div class="img-container svg-viewer" data-title="Scaled Dot-Product Attention">
+    <img src="assets/kernel-attention.svg" alt="Scaled Dot-Product Attention">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Attention Math</h3>
+    <pre>
+1. Project input to Q, K, V:
+   Q = input @ W_q    # What am I looking for?
+   K = input @ W_k    # What do I contain?
+   V = input @ W_v    # What do I offer?
+
+2. Compute attention scores:
+   scores = Q @ K.T / sqrt(d_k)    # How relevant is each position?
+
+3. Apply causal mask (decoder only):
+   scores[i][j] = -inf if j > i    # Can't look at future tokens
+
+4. Softmax to get weights:
+   weights = softmax(scores)       # Normalize to probabilities
+
+5. Weighted sum of values:
+   output = weights @ V            # Aggregate information
+    </pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Why Scale by sqrt(d_k)?</h3>
+    <p>Without scaling, dot products grow with dimension size, pushing softmax into saturation (all attention on one token). Scaling keeps gradients healthy.</p>
+    <pre>
+d_k = 64:  scale = 1/8 = 0.125
+d_k = 128: scale = 1/11.3 ≈ 0.088
+    </pre>
+</div>
+
+<hr>
+
+<h2 id="flash-attention">Flash Attention</h2>
+
+<p>Flash Attention is an <strong>algorithmic optimization</strong> that computes exact attention without materializing the full N×N attention matrix. It's about memory efficiency, not approximation.</p>
+
+<div class="img-container svg-viewer" data-title="Flash Attention: Memory-Efficient Exact Attention">
+    <img src="assets/concept-flash-attention.svg" alt="Flash Attention Algorithm">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Problem</h3>
+        <p>Standard attention materializes the full score matrix:</p>
+        <pre>scores = Q @ K.T  # [N, N] matrix!
+
+N = 2048:  16 MB
+N = 8192:  256 MB
+N = 32768: 4 GB
+N = 131072: 64 GB  # Won't fit in GPU!</pre>
+        <p>Memory is O(N²), which limits context length.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Flash Attention Solution</h3>
+        <p>Process in <strong>tiles</strong>, never storing full N×N matrix:</p>
+        <ol>
+            <li>Load Q tile to fast SRAM</li>
+            <li>Stream K, V tiles through</li>
+            <li>Compute partial softmax with online algorithm</li>
+            <li>Accumulate output incrementally</li>
+        </ol>
+        <p>Memory: O(N) instead of O(N²)</p>
+        <p>Speed: 2-4x faster (memory-bound → compute-bound)</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Online Softmax Trick</h3>
+    <p>The key insight: you can compute softmax incrementally without seeing all values first.</p>
+    <pre>
+Traditional: softmax(x) = exp(x) / sum(exp(x))  # Need all x first
+
+Online (Flash):
+    For each new block of scores:
+        1. Update running max: m_new = max(m_old, max(block))
+        2. Rescale previous sum: sum *= exp(m_old - m_new)
+        3. Add new block contribution: sum += sum(exp(block - m_new))
+        4. Update running output with correction factor
+    </pre>
+    <p><strong>Key Insight:</strong> Flash Attention reduces memory traffic from O(N²) to O(N), making it valuable for any hardware where memory bandwidth is a bottleneck. The algorithmic improvement (online softmax + tiling) applies to both CPU and GPU.</p>
+</div>
+
+<div class="card card-blue">
+    <h3>📊 Performance Analysis: CPU Flash Attention</h3>
+    <p>For a detailed comparison of CPU attention implementations (including benchmarks vs llama.cpp's ggml), see:</p>
+    <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
+    <p><small>Covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads (small vs large models, different context lengths).</small></p>
+</div>
+
+<hr>
+
+<h2 id="gqa">Grouped Query Attention (GQA)</h2>
+
+<p>GQA reduces memory and compute by sharing K, V heads across multiple Q heads.</p>
+
+<div class="img-container svg-viewer" data-title="Grouped Query Attention (GQA)">
+    <img src="assets/concept-gqa.svg" alt="Grouped Query Attention">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why GQA?</h3>
+    <table>
+        <tr>
+            <th>Type</th>
+            <th>Q Heads</th>
+            <th>K,V Heads</th>
+            <th>KV Cache Size</th>
+            <th>Model</th>
+        </tr>
+        <tr>
+            <td>MHA (Multi-Head)</td>
+            <td>32</td>
+            <td>32</td>
+            <td>100%</td>
+            <td>GPT-3, Llama 1</td>
+        </tr>
+        <tr>
+            <td>GQA</td>
+            <td>32</td>
+            <td>8</td>
+            <td>25%</td>
+            <td>Llama 2 70B, Llama 3</td>
+        </tr>
+        <tr>
+            <td>MQA (Multi-Query)</td>
+            <td>32</td>
+            <td>1</td>
+            <td>3%</td>
+            <td>Falcon, PaLM</td>
+        </tr>
+    </table>
+    <p>GQA is the sweet spot: 4x smaller KV cache with minimal quality loss.</p>
+</div>
+
+<hr>
+
+<h2 id="normalization">Normalization: RMSNorm vs LayerNorm</h2>
+
+<p>Normalization stabilizes training by keeping activations in a reasonable range.</p>
+
+<div class="img-container svg-viewer" data-title="RMSNorm vs LayerNorm">
+    <img src="assets/kernel-rmsnorm.svg" alt="RMSNorm">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">LayerNorm (Original)</h3>
+        <pre>
+mean = sum(x) / n
+var = sum((x - mean)²) / n
+y = gamma * (x - mean) / sqrt(var + eps) + beta
+        </pre>
+        <p>4 operations: mean, center, variance, normalize</p>
+        <p>Learnable: gamma (scale) and beta (shift)</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">RMSNorm (Simpler)</h3>
+        <pre>
+rms = sqrt(sum(x²) / n)
+y = gamma * x / (rms + eps)
+        </pre>
+        <p>2 operations: RMS, normalize</p>
+        <p>Learnable: gamma only (no beta)</p>
+        <p><strong>~15% faster</strong>, same quality</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why Remove Mean Centering?</h3>
+    <p>Research found that the re-centering (subtracting mean) in LayerNorm isn't necessary for good performance. RMSNorm keeps just the scaling, which is what matters for gradient flow.</p>
+    <p><strong>Used in:</strong> Llama, Mistral, Qwen, Gemma (most modern LLMs)</p>
+</div>
+
+<hr>
+
+<h2 id="activations">Activations: SwiGLU, GELU</h2>
+
+<p>Activation functions introduce non-linearity. Modern LLMs use gated activations for better gradient flow.</p>
+
+<div class="img-container svg-viewer" data-title="SwiGLU: Gated Linear Unit">
+    <img src="assets/kernel-swiglu.svg" alt="SwiGLU Activation">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">GELU (GPT-2, BERT)</h3>
+        <pre>
+GELU(x) = x * Φ(x)
+        ≈ x * sigmoid(1.702 * x)
+        </pre>
+        <p>Smooth approximation of ReLU that allows small negative values.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">SwiGLU (Llama, Mistral)</h3>
+        <pre>
+Swish(x) = x * sigmoid(x)
+
+SwiGLU(x) = Swish(x @ W_gate) * (x @ W_up)
+        </pre>
+        <p><strong>Gated</strong>: One path controls how much of the other passes through.</p>
+        <p>2x parameters in MLP, but better performance per FLOP.</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why Gating Works</h3>
+    <p>The gate learns to selectively activate different features:</p>
+    <pre>
+gate = sigmoid(x @ W_gate)  # Values in [0, 1]
+value = x @ W_up            # The actual content
+
+output = gate * value       # Gate controls information flow
+    </pre>
+    <p>This gives the network more expressive power: it can learn to completely shut off certain dimensions for certain inputs.</p>
+</div>
+
+<hr>
+
+<h2 id="weight-tying">Weight Tying</h2>
+
+<p>Weight tying shares parameters between the input embedding and output projection, reducing model size with minimal quality loss.</p>
+
+<div class="img-container svg-viewer" data-title="Weight Tying: Shared Embeddings">
+    <img src="assets/concept-weight-tying.svg" alt="Weight Tying">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">What Gets Shared</h3>
+    <pre>
+Input embedding:  token_id → vector    E[vocab, hidden]
+Output projection: vector → logits     W[vocab, hidden]
+
+With weight tying: W = E  (same matrix!)
+    </pre>
+    <p><strong>Savings:</strong> For vocab=128K, hidden=4096: saves 2 GB of parameters</p>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Why It Works</h3>
+    <p>Intuition: The embedding and LM head learn similar things:</p>
+    <ul>
+        <li><strong>Embedding:</strong> "What vector represents this token?"</li>
+        <li><strong>LM Head:</strong> "Which token does this vector represent?"</li>
+    </ul>
+    <p>These are inverse operations, so sharing makes sense semantically.</p>
+    <p><strong>Gradient implication:</strong> During training, gradients from both the embedding lookup and the LM head accumulate into the same weight matrix.</p>
+</div>
+
+<hr>
+
+<h2>Summary: What Each Config Field Controls</h2>
+
+<div class="card">
+    <table>
+        <tr>
+            <th>Config Field</th>
+            <th>What It Controls</th>
+            <th>Typical Values</th>
+        </tr>
+        <tr>
+            <td><code>hidden_size</code></td>
+            <td>Main embedding dimension</td>
+            <td>768, 2048, 4096, 8192</td>
+        </tr>
+        <tr>
+            <td><code>num_hidden_layers</code></td>
+            <td>Number of transformer blocks</td>
+            <td>12, 24, 32, 80</td>
+        </tr>
+        <tr>
+            <td><code>num_attention_heads</code></td>
+            <td>Q heads for attention</td>
+            <td>12, 32, 64</td>
+        </tr>
+        <tr>
+            <td><code>num_key_value_heads</code></td>
+            <td>K,V heads (GQA)</td>
+            <td>Same as heads, or 8, 4, 1</td>
+        </tr>
+        <tr>
+            <td><code>intermediate_size</code></td>
+            <td>MLP hidden dimension</td>
+            <td>4x hidden (SwiGLU: 2.67x)</td>
+        </tr>
+        <tr>
+            <td><code>rope_theta</code></td>
+            <td>RoPE base frequency</td>
+            <td>10000, 500000, 1000000</td>
+        </tr>
+        <tr>
+            <td><code>rms_norm_eps</code></td>
+            <td>Numerical stability in norm</td>
+            <td>1e-5, 1e-6</td>
+        </tr>
+        <tr>
+            <td><code>vocab_size</code></td>
+            <td>Vocabulary size</td>
+            <td>32000, 50257, 128256</td>
+        </tr>
+        <tr>
+            <td><code>max_position_embeddings</code></td>
+            <td>Maximum context length</td>
+            <td>2048, 8192, 131072</td>
+        </tr>
+        <tr>
+            <td><code>tie_word_embeddings</code></td>
+            <td>Share embed &amp; LM head</td>
+            <td>true/false</td>
+        </tr>
+    </table>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="kernels.html">Kernel Reference</a> - API documentation for each kernel</li>
+    <li><a href="codegen.html">Code Generation</a> - How we generate C from configs</li>
+    <li><a href="doxygen/files.html">Source Code</a> - Browse the implementation</li>
+</ul>
