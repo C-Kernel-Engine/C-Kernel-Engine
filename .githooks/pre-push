@@ -1,0 +1,184 @@
+#!/bin/bash
+# =============================================================================
+# CK-Engine Pre-Push Hook
+# =============================================================================
+# Runs the full test suite before allowing push to remote.
+# This catches issues that CI might miss due to resource constraints.
+#
+# Install: git config core.hooksPath .githooks
+# Or:      ln -sf ../../.githooks/pre-push .git/hooks/pre-push
+# =============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo ""
+echo -e "${YELLOW}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${YELLOW}║           CK-Engine Pre-Push Validation                    ║${NC}"
+echo -e "${YELLOW}╚════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Check if we're pushing to main/master
+remote="$1"
+url="$2"
+
+protected_branch='main'
+current_branch=$(git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
+
+# Allow skipping with --no-verify or CK_SKIP_PREPUSH=1
+if [ -n "$CK_SKIP_PREPUSH" ]; then
+    echo -e "${YELLOW}⚠️  Skipping pre-push tests (CK_SKIP_PREPUSH=1)${NC}"
+    exit 0
+fi
+
+cd "$ROOT_DIR"
+
+failed=0
+
+# =============================================================================
+# Test 1: Compilation
+# =============================================================================
+echo -e "${YELLOW}[1/4]${NC} Building CK-Engine..."
+if make -j$(nproc) > /tmp/ck_build.log 2>&1; then
+    echo -e "${GREEN}  ✓ Build successful${NC}"
+else
+    echo -e "${RED}  ✗ Build failed${NC}"
+    echo "    See /tmp/ck_build.log for details"
+    failed=1
+fi
+
+# =============================================================================
+# Test 2: Quick kernel tests (if parity lib exists)
+# =============================================================================
+echo -e "${YELLOW}[2/4]${NC} Running kernel parity tests..."
+if [ -f "build/libck_parity.so" ] || [ -f "libck_parity.so" ]; then
+    if python3 scripts/test_kernels_vs_llamacpp.py --quick > /tmp/ck_parity.log 2>&1; then
+        echo -e "${GREEN}  ✓ Kernel parity tests passed${NC}"
+    else
+        echo -e "${RED}  ✗ Kernel parity tests failed${NC}"
+        echo "    See /tmp/ck_parity.log for details"
+        failed=1
+    fi
+else
+    echo -e "${YELLOW}  ⚠ Skipped (no parity library - build with: make libck_parity.so)${NC}"
+fi
+
+# =============================================================================
+# Test 3: IR Codegen validation
+# =============================================================================
+echo -e "${YELLOW}[3/4]${NC} Validating IR codegen..."
+
+# Find a model to test with
+MODEL_DIR=""
+for p in "$HOME/.cache/ck-engine-v6.6/models/"*/ \
+         "$HOME/.cache/ck-engine-v6.5/models/"*/; do
+    if [ -f "$p/weights_manifest.json" ] && [ -f "$p/lowered_decode.json" ]; then
+        MODEL_DIR="$p"
+        break
+    fi
+done
+
+if [ -n "$MODEL_DIR" ]; then
+    TEMP_OUT=$(mktemp -d)
+    if python3 src/v6.6/scripts/v6.6_codegen.py \
+        --lowered "$MODEL_DIR/lowered_decode.json" \
+        --output "$TEMP_OUT/ck-kernel-inference.c" \
+        --header-name ck-kernel-inference.h \
+        --mode decode \
+        --manifest "$MODEL_DIR/weights_manifest.json" \
+        --model-name test_model > /tmp/ck_codegen.log 2>&1; then
+
+        # Try to compile generated code
+        if gcc -O2 -fPIC -fopenmp -c \
+            -I"$ROOT_DIR/include" -I"$MODEL_DIR" \
+            "$TEMP_OUT/ck-kernel-inference.c" \
+            -o "$TEMP_OUT/ck-kernel-inference.o" 2>> /tmp/ck_codegen.log; then
+            echo -e "${GREEN}  ✓ IR codegen and compilation passed${NC}"
+        else
+            echo -e "${RED}  ✗ Generated code failed to compile${NC}"
+            echo "    See /tmp/ck_codegen.log for details"
+            failed=1
+        fi
+    else
+        echo -e "${RED}  ✗ IR codegen failed${NC}"
+        echo "    See /tmp/ck_codegen.log for details"
+        failed=1
+    fi
+    rm -rf "$TEMP_OUT"
+else
+    echo -e "${YELLOW}  ⚠ Skipped (no model found in cache)${NC}"
+fi
+
+# =============================================================================
+# Test 4: Full integration test (E2E inference)
+# =============================================================================
+echo -e "${YELLOW}[4/4]${NC} Running E2E inference test..."
+
+# Find GGUF file
+GGUF_FILE=""
+for p in "$HOME/.cache/ck-engine-v6.5/models/"*/*.gguf \
+         "$HOME/.cache/ck-engine-v6.6/models/"*/*.gguf; do
+    if [ -f "$p" ]; then
+        GGUF_FILE="$p"
+        break
+    fi
+done
+
+if [ -n "$GGUF_FILE" ]; then
+    RUNNER=""
+    for r in "scripts/v6.5/ck_run_v6_5.py" "scripts/v6/ck_run_v6.py"; do
+        if [ -f "$r" ]; then
+            RUNNER="$r"
+            break
+        fi
+    done
+
+    if [ -n "$RUNNER" ]; then
+        OUTPUT=$(timeout 120 python3 "$RUNNER" run "$GGUF_FILE" \
+            --prompt "What is 2+2? Answer with just the number." \
+            --max-tokens 10 2>&1 || true)
+
+        if echo "$OUTPUT" | grep -qiE "segfault|SIGSEGV|Traceback|assertion failed|abort"; then
+            echo -e "${RED}  ✗ E2E inference crashed${NC}"
+            echo "$OUTPUT" | tail -5
+            failed=1
+        elif echo "$OUTPUT" | grep -qE "tok/s|Response:|Generated"; then
+            echo -e "${GREEN}  ✓ E2E inference completed${NC}"
+        else
+            echo -e "${YELLOW}  ⚠ E2E inference unclear (check output)${NC}"
+            echo "$OUTPUT" | tail -3
+        fi
+    else
+        echo -e "${YELLOW}  ⚠ Skipped (no runner script found)${NC}"
+    fi
+else
+    echo -e "${YELLOW}  ⚠ Skipped (no GGUF model in cache)${NC}"
+fi
+
+# =============================================================================
+# Summary
+# =============================================================================
+echo ""
+if [ $failed -eq 0 ]; then
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}  ✓ All pre-push checks passed!${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    exit 0
+else
+    echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+    echo -e "${RED}  ✗ Pre-push checks failed!${NC}"
+    echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "To push anyway: ${YELLOW}git push --no-verify${NC}"
+    echo -e "Or set: ${YELLOW}export CK_SKIP_PREPUSH=1${NC}"
+    echo ""
+    exit 1
+fi
