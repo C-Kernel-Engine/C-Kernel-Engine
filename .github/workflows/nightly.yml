@@ -256,7 +256,7 @@ jobs:
           make -j$(nproc)
           make libck_parity.so || echo "Parity lib failed"
 
-      - name: Run Kernel Parity Tests
+      - name: Run Kernel Parity Tests (llama.cpp reference)
         run: |
           echo "=== Running Kernel Parity Tests ==="
           export LD_LIBRARY_PATH="$PWD/llama.cpp/build/bin:$LD_LIBRARY_PATH"
@@ -271,10 +271,28 @@ jobs:
             echo "⚠️ Parity Tests: Some failures"
           fi
 
-      - name: Run Nightly Test Suite
-        if: github.event_name != 'pull_request'
+      - name: Run Full Nightly Test Suite
         run: |
-          python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
+          echo "=== Running Full Nightly Test Suite ==="
+          echo "This includes: kernel tests, BF16 tests, quant tests, etc."
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # Quick tests for PRs
+            python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
+          else
+            # Full tests for main/scheduled
+            python scripts/nightly_runner.py --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
+          fi
+
+          # Show summary
+          if [ -f build/nightly_report.json ]; then
+            python3 -c "
+          import json
+          d = json.load(open('build/nightly_report.json'))
+          s = d['summary']
+          print(f\"Nightly Suite: {s['passed']} passed, {s['failed']} failed, {s['total']} total\")
+          "
+          fi
 
       - name: Upload parity results
         uses: actions/upload-artifact@v4
