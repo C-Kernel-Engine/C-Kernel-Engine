@@ -649,6 +649,8 @@ void gemv_q5_0_parallel_simd(float *y,
 #if defined(__AVX512F__)
         /* Call single-row AVX512 implementation */
         gemv_q5_0_avx512(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
+#elif defined(__AVX2__)
+        gemv_q5_0_avx2(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
 #elif defined(__AVX__)
         gemv_q5_0_avx(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
 #else
