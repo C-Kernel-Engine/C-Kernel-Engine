@@ -951,6 +951,89 @@ e2e-smollm:
 	@echo "Running E2E test with SmolLM2-360M..."
 	@$(PYTHON) scripts/v6.5/ck_run_v6_5.py run "hf://itlwas/SmolLM2-360M-Q4_K_M-GGUF/smollm2-360m-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 10
 
+# =============================================================================
+# LAYERED PIPELINE TESTS
+# =============================================================================
+# These tests validate each stage of the inference pipeline independently.
+# Run them in order to pinpoint exactly where failures occur.
+#
+# Layer 1: Kernel parity with llama.cpp (do kernels match?)
+# Layer 2: Bump conversion (are weights correct?)
+# Layer 3: IR structure (is computation graph correct?)
+# Layer 4: Codegen validation (does code compile?)
+# Layer 5: Tensor flow (are dimensions correct?)
+# Layer 6: E2E inference (does it produce coherent output?)
+# =============================================================================
+
+# Run all 6 layers of testing (stops at first failure)
+test-full-pipeline:
+	@echo "========================================"
+	@echo "  CK-Engine Full Pipeline Validation"
+	@echo "========================================"
+	@bash scripts/test_full_pipeline.sh
+
+# Quick pipeline test (skips slow kernel parity)
+test-pipeline-quick:
+	@bash scripts/test_full_pipeline.sh --quick
+
+# Layer 1: Kernel parity with llama.cpp
+test-kernel-parity:
+	@echo "[Layer 1] Kernel Parity Tests..."
+	@if [ -f scripts/test_kernels_vs_llamacpp.py ]; then \
+		$(PYTHON) scripts/test_kernels_vs_llamacpp.py --quick; \
+	else \
+		echo "Kernel parity test not found"; \
+	fi
+
+test-kernel-parity-full:
+	@echo "[Layer 1] Full Kernel Parity Tests..."
+	@$(PYTHON) scripts/test_kernels_vs_llamacpp.py 2>&1 || echo "Run 'make parity-libs' first"
+
+# Layer 2: Bump conversion validation
+test-bump-conversion:
+	@echo "[Layer 2] Bump Conversion Tests..."
+	@$(PYTHON) scripts/test_bump_conversion.py --auto
+
+# Layer 3: IR structure validation
+test-ir-validation:
+	@echo "[Layer 3] IR Structure Validation..."
+	@$(PYTHON) scripts/test_ir_validation.py --auto
+
+# Layer 4: Codegen validation
+test-codegen-validation:
+	@echo "[Layer 4] Codegen Validation..."
+	@$(PYTHON) scripts/test_codegen_validation.py --auto
+
+# Layer 5: Tensor flow validation (the "gibberish" detector)
+test-tensor-flow:
+	@echo "[Layer 5] Tensor Flow Validation..."
+	@$(PYTHON) scripts/test_tensor_flow.py --auto
+
+# Individual layer with specific model
+test-layer-%:
+	@bash scripts/test_full_pipeline.sh --layer $*
+
+# List all pipeline test layers
+test-pipeline-help:
+	@echo ""
+	@echo "Layered Pipeline Tests:"
+	@echo "  make test-full-pipeline      - Run all 6 layers"
+	@echo "  make test-pipeline-quick     - Run layers 2-6 (skip kernel parity)"
+	@echo ""
+	@echo "Individual Layers:"
+	@echo "  make test-kernel-parity      - Layer 1: Kernel parity (quick)"
+	@echo "  make test-kernel-parity-full - Layer 1: Kernel parity (all)"
+	@echo "  make test-bump-conversion    - Layer 2: Bump conversion"
+	@echo "  make test-ir-validation      - Layer 3: IR structure"
+	@echo "  make test-codegen-validation - Layer 4: Codegen"
+	@echo "  make test-tensor-flow        - Layer 5: Tensor flow"
+	@echo "  make e2e                     - Layer 6: E2E inference"
+	@echo ""
+	@echo "Run specific layer:"
+	@echo "  make test-layer-1            - Run layer 1 only"
+	@echo "  make test-layer-5            - Run layer 5 only"
+	@echo ""
+
 unittest:
 	@echo ""
 	@echo "=========================================="
@@ -1098,6 +1181,32 @@ showtests:
 	@echo "  make nightly-bf16     Only BF16 tests"
 	@echo "  make nightly-quant    Only quantization tests"
 	@echo "  make nightly-parity   Only parity tests (PyTorch + llama.cpp)"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  LAYERED PIPELINE TESTS (Pinpoint Failures)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "Full Pipeline (6 layers):"
+	@echo "  make test-full-pipeline   Run all 6 validation layers"
+	@echo "  make test-pipeline-quick  Skip kernel parity (faster)"
+	@echo ""
+	@echo "Individual Layers:"
+	@echo "  make test-kernel-parity      L1: Kernel parity vs llama.cpp"
+	@echo "  make test-kernel-parity-full L1: Full kernel parity (all dtypes)"
+	@echo "  make test-bump-conversion    L2: GGUF→Bump weight conversion"
+	@echo "  make test-ir-validation      L3: IR structure validation"
+	@echo "  make test-codegen-validation L4: Generated code validation"
+	@echo "  make test-tensor-flow        L5: Tensor dimension flow (*gibberish detector*)"
+	@echo "  make e2e                     L6: End-to-end inference"
+	@echo ""
+	@echo "Run Specific Layer:"
+	@echo "  make test-layer-1 through test-layer-6"
+	@echo ""
+	@echo "E2E Integration:"
+	@echo "  make e2e              Full integration test suite"
+	@echo "  make e2e-quick        Quick E2E test"
+	@echo "  make e2e-qwen         E2E with Qwen2-0.5B"
+	@echo "  make e2e-smollm       E2E with SmolLM2-360M"
 	@echo ""
 	@echo "For Python unittest scripts: make unittest"
 	@echo ""
