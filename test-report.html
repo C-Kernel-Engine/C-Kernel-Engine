@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CK-Engine Test Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .summary { display: flex; gap: 20px; margin: 20px 0; }
+        .stat { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; flex: 1; }
+        .stat-value { font-size: 36px; font-weight: bold; }
+        .stat-label { color: #666; margin-top: 5px; }
+        .passed { color: #28a745; }
+        .failed { color: #dc3545; }
+        .category { background: white; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }
+        .category-header { background: #007bff; color: white; padding: 15px 20px; font-weight: bold; }
+        .test-list { padding: 0; margin: 0; list-style: none; }
+        .test-item { padding: 12px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .test-item:last-child { border-bottom: none; }
+        .test-name { font-weight: 500; }
+        .test-status { padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-pass { background: #d4edda; color: #155724; }
+        .status-fail { background: #f8d7da; color: #721c24; }
+        .status-skip { background: #fff3cd; color: #856404; }
+        .timestamp { color: #666; font-size: 14px; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CK-Engine Nightly Test Report</h1>
+
+        <div class="summary">
+            <div class="stat">
+                <div class="stat-value passed">43</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value failed">1</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">44</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Bench (1 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">GEMM Benchmark</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Bf16 (11 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">ReLU BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">GELU BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Sigmoid BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">SwiGLU BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">LayerNorm BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">RMSNorm BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">RoPE BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Embedding BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Attention BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">MLP BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Cross Entropy BF16</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Kernels (23 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">GEMM</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">GEMM Variants</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">GEMM Microkernel</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">GEMM Fused</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">ReLU</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">GELU</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Sigmoid</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Softmax</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">SwiGLU</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">LayerNorm</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">RMSNorm</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">RoPE</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Embedding</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Attention</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">KV Cache Attention</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">KV Cache Decode</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Fused Attention Decode</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Fused SwiGLU Decode</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">MLP</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Cross Entropy</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">LM Head Litmus</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Vision</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Flash Attention (50K+)</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Parity (3 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">PyTorch Parity</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Litmus Test</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">llama.cpp Parity (Full)</span>
+                    <span class="test-status status-fail">✗ FAIL</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Quant (3 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">Q4_K Kernels</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Q6_K Kernels</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Q4_K x Q8_K MatVec</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <div class="category-header">Training (3 tests)</div>
+            <ul class="test-list">
+                <li class="test-item">
+                    <span class="test-name">Optimizer (AdamW/SGD)</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Softmax Backward</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+                <li class="test-item">
+                    <span class="test-name">Attention Backward</span>
+                    <span class="test-status status-pass">✓ PASS</span>
+                </li>
+            </ul>
+        </div>
+
+        <p class="timestamp">Generated: 2026-01-16 21:13 UTC</p>
+    </div>
+</body>
+</html>
