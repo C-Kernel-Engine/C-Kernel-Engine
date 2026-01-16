@@ -1,0 +1,1014 @@
+<!-- TITLE: GGUF Conversion Deep Dive -->
+<!-- NAV: quantization -->
+
+<h1>GGUF to Bump: Step-by-Step Conversion</h1>
+
+<p>This document walks through every step of converting a GGUF file to C-Kernel-Engine's bump allocator format. We'll trace through the actual bytes, show the parsing logic, and explain how GGUF tensor names map to our weight layout.</p>
+
+<div class="alert alert-info">
+    <span class="alert-icon">&#128269;</span>
+    <div>
+        <strong>Source Code:</strong> <code>scripts/convert_gguf_to_bump.py</code> implements this entire pipeline. This document explains the "why" behind each step.
+    </div>
+</div>
+
+<h2>Overview: The 8-Step Pipeline</h2>
+
+<div class="img-container">
+    <svg viewBox="0 0 900 200" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Steps -->
+        <g transform="translate(20, 80)">
+            <!-- Step 1 -->
+            <rect x="0" y="0" width="90" height="60" fill="#ffb400" rx="6"/>
+            <text x="45" y="25" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">Step 1</text>
+            <text x="45" y="42" text-anchor="middle" fill="#2a2a2a" font-size="9">Read Magic</text>
+
+            <line x1="90" y1="30" x2="105" y2="30" stroke="#ffb400" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 2 -->
+            <rect x="105" y="0" width="90" height="60" fill="#47b475" rx="6"/>
+            <text x="150" y="25" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Step 2</text>
+            <text x="150" y="42" text-anchor="middle" fill="#fff" font-size="9">Parse Header</text>
+
+            <line x1="195" y1="30" x2="210" y2="30" stroke="#47b475" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 3 -->
+            <rect x="210" y="0" width="90" height="60" fill="#07adf8" rx="6"/>
+            <text x="255" y="25" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Step 3</text>
+            <text x="255" y="42" text-anchor="middle" fill="#fff" font-size="9">Read Metadata</text>
+
+            <line x1="300" y1="30" x2="315" y2="30" stroke="#07adf8" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 4 -->
+            <rect x="315" y="0" width="90" height="60" fill="#9b59b6" rx="6"/>
+            <text x="360" y="25" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Step 4</text>
+            <text x="360" y="42" text-anchor="middle" fill="#fff" font-size="9">Tensor Info</text>
+
+            <line x1="405" y1="30" x2="420" y2="30" stroke="#9b59b6" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 5 -->
+            <rect x="420" y="0" width="90" height="60" fill="#e74c3c" rx="6"/>
+            <text x="465" y="25" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Step 5</text>
+            <text x="465" y="42" text-anchor="middle" fill="#fff" font-size="9">Align & Seek</text>
+
+            <line x1="510" y1="30" x2="525" y2="30" stroke="#e74c3c" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 6 -->
+            <rect x="525" y="0" width="90" height="60" fill="#f39c12" rx="6"/>
+            <text x="570" y="25" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">Step 6</text>
+            <text x="570" y="42" text-anchor="middle" fill="#2a2a2a" font-size="9">Dtype Table</text>
+
+            <line x1="615" y1="30" x2="630" y2="30" stroke="#f39c12" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 7 -->
+            <rect x="630" y="0" width="90" height="60" fill="#1abc9c" rx="6"/>
+            <text x="675" y="25" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Step 7</text>
+            <text x="675" y="42" text-anchor="middle" fill="#fff" font-size="9">Write Header</text>
+
+            <line x1="720" y1="30" x2="735" y2="30" stroke="#1abc9c" stroke-width="2" marker-end="url(#arr)"/>
+
+            <!-- Step 8 -->
+            <rect x="735" y="0" width="90" height="60" fill="#ffb400" rx="6"/>
+            <text x="780" y="25" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">Step 8</text>
+            <text x="780" y="42" text-anchor="middle" fill="#2a2a2a" font-size="9">Stream Data</text>
+        </g>
+
+        <!-- Arrow marker -->
+        <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <polygon points="0 0, 6 3, 0 6" fill="#808080"/>
+            </marker>
+        </defs>
+
+        <!-- Labels -->
+        <text x="450" y="30" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">GGUF → Bump Conversion Pipeline</text>
+        <text x="450" y="170" text-anchor="middle" fill="#808080" font-size="11">Input: model.Q4_K_M.gguf → Output: weights.bump + config.json</text>
+    </svg>
+</div>
+
+<h2>Step 1: Read and Validate Magic</h2>
+
+<p>Every GGUF file starts with the 4-byte magic string "GGUF". This identifies the file format and catches truncated or corrupted files early.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 700 150" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="350" y="25" text-anchor="middle" fill="#ffb400" font-size="14" font-weight="bold">GGUF Magic Bytes (Offset 0x00)</text>
+
+        <!-- Byte boxes -->
+        <g transform="translate(150, 50)">
+            <rect x="0" y="0" width="80" height="60" fill="#ffb400" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="40" y="25" text-anchor="middle" fill="#2a2a2a" font-size="20" font-weight="bold" font-family="monospace">G</text>
+            <text x="40" y="50" text-anchor="middle" fill="#2a2a2a" font-size="10" font-family="monospace">0x47</text>
+
+            <rect x="90" y="0" width="80" height="60" fill="#ffb400" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="130" y="25" text-anchor="middle" fill="#2a2a2a" font-size="20" font-weight="bold" font-family="monospace">G</text>
+            <text x="130" y="50" text-anchor="middle" fill="#2a2a2a" font-size="10" font-family="monospace">0x47</text>
+
+            <rect x="180" y="0" width="80" height="60" fill="#ffb400" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="220" y="25" text-anchor="middle" fill="#2a2a2a" font-size="20" font-weight="bold" font-family="monospace">U</text>
+            <text x="220" y="50" text-anchor="middle" fill="#2a2a2a" font-size="10" font-family="monospace">0x55</text>
+
+            <rect x="270" y="0" width="80" height="60" fill="#ffb400" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="310" y="25" text-anchor="middle" fill="#2a2a2a" font-size="20" font-weight="bold" font-family="monospace">F</text>
+            <text x="310" y="50" text-anchor="middle" fill="#2a2a2a" font-size="10" font-family="monospace">0x46</text>
+        </g>
+
+        <!-- Offset labels -->
+        <text x="190" y="130" text-anchor="middle" fill="#808080" font-size="10">+0</text>
+        <text x="280" y="130" text-anchor="middle" fill="#808080" font-size="10">+1</text>
+        <text x="370" y="130" text-anchor="middle" fill="#808080" font-size="10">+2</text>
+        <text x="460" y="130" text-anchor="middle" fill="#808080" font-size="10">+3</text>
+    </svg>
+</div>
+
+<div class="card">
+    <h3>Code: Magic Validation</h3>
+<pre><code>magic = f.read(4)
+if magic != b"GGUF":
+    raise GGUFError(f"Invalid magic {magic!r} (expected b'GGUF')")</code></pre>
+</div>
+
+<h2>Step 2: Parse GGUF Header</h2>
+
+<p>After the magic, we read the version and counts. GGUF v2+ uses 64-bit counts (v1 used 32-bit).</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 200" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#47b475" font-size="14" font-weight="bold">GGUF Header Structure (After Magic)</text>
+
+        <!-- Header fields -->
+        <g transform="translate(50, 50)">
+            <!-- Magic (already read) -->
+            <rect x="0" y="0" width="100" height="50" fill="#454545" stroke="#808080" stroke-width="1" rx="4"/>
+            <text x="50" y="20" text-anchor="middle" fill="#808080" font-size="10">magic</text>
+            <text x="50" y="38" text-anchor="middle" fill="#808080" font-size="9">4 bytes</text>
+
+            <!-- Version -->
+            <rect x="110" y="0" width="100" height="50" fill="#47b475" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="160" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">version</text>
+            <text x="160" y="38" text-anchor="middle" fill="#fff" font-size="9">u32 (4 bytes)</text>
+
+            <!-- n_tensors -->
+            <rect x="220" y="0" width="140" height="50" fill="#47b475" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="290" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">n_tensors</text>
+            <text x="290" y="38" text-anchor="middle" fill="#fff" font-size="9">u64 (8 bytes, v2+)</text>
+
+            <!-- n_kv -->
+            <rect x="370" y="0" width="140" height="50" fill="#47b475" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="440" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">n_kv</text>
+            <text x="440" y="38" text-anchor="middle" fill="#fff" font-size="9">u64 (8 bytes, v2+)</text>
+
+            <!-- Metadata follows -->
+            <rect x="520" y="0" width="170" height="50" fill="#323232" stroke="#07adf8" stroke-width="2" rx="4" stroke-dasharray="5,3"/>
+            <text x="605" y="20" text-anchor="middle" fill="#07adf8" font-size="10">metadata[n_kv]</text>
+            <text x="605" y="38" text-anchor="middle" fill="#07adf8" font-size="9">variable length...</text>
+        </g>
+
+        <!-- Offsets -->
+        <g transform="translate(50, 115)">
+            <text x="50" y="0" text-anchor="middle" fill="#808080" font-size="9">0x00</text>
+            <text x="160" y="0" text-anchor="middle" fill="#47b475" font-size="9">0x04</text>
+            <text x="290" y="0" text-anchor="middle" fill="#47b475" font-size="9">0x08</text>
+            <text x="440" y="0" text-anchor="middle" fill="#47b475" font-size="9">0x10</text>
+            <text x="605" y="0" text-anchor="middle" fill="#07adf8" font-size="9">0x18</text>
+        </g>
+
+        <!-- Example values -->
+        <rect x="50" y="135" width="690" height="45" fill="#1a1a1a" stroke="#47b475" stroke-width="1" rx="4"/>
+        <text x="70" y="160" fill="#47b475" font-size="11" font-weight="bold">Example (Qwen2.5-3B):</text>
+        <text x="230" y="160" fill="#b0b0b0" font-size="11" font-family="monospace">version=3  n_tensors=291  n_kv=26</text>
+    </svg>
+</div>
+
+<div class="card">
+    <h3>Code: Header Parsing</h3>
+<pre><code>version = r.u32()  # Read 4-byte unsigned int
+
+if version >= 2:
+    n_tensors = r.u64()  # 8-byte count
+    n_kv = r.u64()
+else:
+    n_tensors = r.u32()  # v1: 4-byte count
+    n_kv = r.u32()
+
+# Sanity check (catches corrupt headers)
+if n_tensors > 1_000_000 or n_kv > 1_000_000:
+    raise GGUFError(f"Header counts look corrupt: {n_tensors=}, {n_kv=}")</code></pre>
+</div>
+
+<h2>Step 3: Read Metadata Key-Value Pairs</h2>
+
+<p>GGUF metadata contains model configuration. We only parse the keys we need and skip the rest for performance (especially important for large tokenizer arrays).</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 320" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#07adf8" font-size="14" font-weight="bold">Metadata Key-Value Structure</text>
+
+        <!-- Single KV entry -->
+        <g transform="translate(50, 50)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">Each metadata entry:</text>
+
+            <!-- Key string -->
+            <rect x="0" y="30" width="80" height="40" fill="#07adf8" rx="4"/>
+            <text x="40" y="50" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">key_len</text>
+            <text x="40" y="62" text-anchor="middle" fill="#fff" font-size="8">u64</text>
+
+            <rect x="90" y="30" width="200" height="40" fill="#07adf8" rx="4"/>
+            <text x="190" y="55" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">key_string[key_len]</text>
+
+            <!-- Value type -->
+            <rect x="300" y="30" width="80" height="40" fill="#9b59b6" rx="4"/>
+            <text x="340" y="50" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">val_type</text>
+            <text x="340" y="62" text-anchor="middle" fill="#fff" font-size="8">u32</text>
+
+            <!-- Value data -->
+            <rect x="390" y="30" width="300" height="40" fill="#9b59b6" rx="4"/>
+            <text x="540" y="55" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">value_data (type-dependent)</text>
+        </g>
+
+        <!-- Value types table -->
+        <g transform="translate(50, 130)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">Value Types:</text>
+
+            <rect x="0" y="25" width="690" height="150" fill="#323232" stroke="#9b59b6" stroke-width="1" rx="4"/>
+
+            <text x="20" y="50" fill="#9b59b6" font-size="10" font-family="monospace">Type 0-6:</text>
+            <text x="100" y="50" fill="#b0b0b0" font-size="10" font-family="monospace">u8, i8, u16, i16, u32, i32, f32</text>
+
+            <text x="20" y="70" fill="#9b59b6" font-size="10" font-family="monospace">Type 7:</text>
+            <text x="100" y="70" fill="#b0b0b0" font-size="10" font-family="monospace">bool (u8)</text>
+
+            <text x="20" y="90" fill="#9b59b6" font-size="10" font-family="monospace">Type 8:</text>
+            <text x="100" y="90" fill="#b0b0b0" font-size="10" font-family="monospace">string (u64 len + bytes)</text>
+
+            <text x="20" y="110" fill="#ffb400" font-size="10" font-family="monospace">Type 9:</text>
+            <text x="100" y="110" fill="#ffb400" font-size="10" font-family="monospace">array (u32 elem_type + u64 len + elements) ← tokenizer vocab!</text>
+
+            <text x="20" y="130" fill="#9b59b6" font-size="10" font-family="monospace">Type 10-12:</text>
+            <text x="100" y="130" fill="#b0b0b0" font-size="10" font-family="monospace">u64, i64, f64</text>
+
+            <!-- Important note -->
+            <text x="20" y="160" fill="#e74c3c" font-size="10">⚠ Array type can be huge (100K+ tokens). We skip reading array contents.</text>
+        </g>
+    </svg>
+</div>
+
+<h3>Keys We Extract</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>GGUF Key</th>
+            <th>Type</th>
+            <th>Maps To</th>
+            <th>Example</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>general.architecture</code></td>
+            <td>string</td>
+            <td>model_type</td>
+            <td>"llama"</td>
+        </tr>
+        <tr>
+            <td><code>llama.block_count</code></td>
+            <td>u32</td>
+            <td>num_layers</td>
+            <td>36</td>
+        </tr>
+        <tr>
+            <td><code>llama.embedding_length</code></td>
+            <td>u32</td>
+            <td>hidden_size</td>
+            <td>3584</td>
+        </tr>
+        <tr>
+            <td><code>llama.feed_forward_length</code></td>
+            <td>u32</td>
+            <td>intermediate_size</td>
+            <td>18944</td>
+        </tr>
+        <tr>
+            <td><code>llama.attention.head_count</code></td>
+            <td>u32</td>
+            <td>num_heads</td>
+            <td>28</td>
+        </tr>
+        <tr>
+            <td><code>llama.attention.head_count_kv</code></td>
+            <td>u32</td>
+            <td>num_kv_heads</td>
+            <td>4</td>
+        </tr>
+        <tr>
+            <td><code>llama.context_length</code></td>
+            <td>u32</td>
+            <td>max_position_embeddings</td>
+            <td>32768</td>
+        </tr>
+        <tr>
+            <td><code>llama.rope.freq_base</code></td>
+            <td>f32</td>
+            <td>rope_theta</td>
+            <td>1000000.0</td>
+        </tr>
+        <tr>
+            <td><code>llama.norm_rms_eps</code></td>
+            <td>f32</td>
+            <td>rms_norm_eps</td>
+            <td>1e-6</td>
+        </tr>
+        <tr>
+            <td><code>general.alignment</code></td>
+            <td>u32</td>
+            <td>(internal)</td>
+            <td>32</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card">
+    <h3>Code: Selective Metadata Parsing</h3>
+<pre><code>wanted_meta = {
+    "general.architecture",
+    "llama.block_count",
+    "llama.embedding_length",
+    # ... other keys we need
+}
+
+meta = {}
+for _ in range(n_kv):
+    key = r.key_str()      # Read key length + key bytes
+    vtype = r.u32()        # Read value type
+
+    if key in wanted_meta:
+        meta[key] = _gguf_read_value(r, vtype)  # Parse value
+    else:
+        _gguf_skip_value(r, vtype)              # Skip unknown keys (fast!)</code></pre>
+</div>
+
+<h2>Step 4: Read Tensor Info (Headers Only)</h2>
+
+<p>For each tensor, we read its name, dimensions, type, and offset within the data section. The actual tensor data comes later - this is just the index.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 250" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#9b59b6" font-size="14" font-weight="bold">Tensor Info Structure (Per Tensor)</text>
+
+        <!-- Tensor info fields -->
+        <g transform="translate(30, 50)">
+            <!-- Name -->
+            <rect x="0" y="0" width="60" height="45" fill="#9b59b6" rx="4"/>
+            <text x="30" y="18" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">name_len</text>
+            <text x="30" y="35" text-anchor="middle" fill="#fff" font-size="7">u64</text>
+
+            <rect x="70" y="0" width="180" height="45" fill="#9b59b6" rx="4"/>
+            <text x="160" y="28" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">name[name_len]</text>
+
+            <!-- n_dims -->
+            <rect x="260" y="0" width="60" height="45" fill="#07adf8" rx="4"/>
+            <text x="290" y="18" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">n_dims</text>
+            <text x="290" y="35" text-anchor="middle" fill="#fff" font-size="7">u32</text>
+
+            <!-- dims -->
+            <rect x="330" y="0" width="180" height="45" fill="#07adf8" rx="4"/>
+            <text x="420" y="28" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">dims[n_dims] (u64 each)</text>
+
+            <!-- ggml_type -->
+            <rect x="520" y="0" width="80" height="45" fill="#e74c3c" rx="4"/>
+            <text x="560" y="18" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">ggml_type</text>
+            <text x="560" y="35" text-anchor="middle" fill="#fff" font-size="7">u32</text>
+
+            <!-- offset -->
+            <rect x="610" y="0" width="120" height="45" fill="#ffb400" rx="4"/>
+            <text x="670" y="18" text-anchor="middle" fill="#2a2a2a" font-size="8" font-weight="bold">data_offset</text>
+            <text x="670" y="35" text-anchor="middle" fill="#2a2a2a" font-size="7">u64</text>
+        </g>
+
+        <!-- Example tensor -->
+        <rect x="30" y="110" width="710" height="80" fill="#323232" stroke="#9b59b6" stroke-width="1" rx="4"/>
+        <text x="50" y="135" fill="#9b59b6" font-size="11" font-weight="bold">Example Tensor:</text>
+
+        <text x="50" y="160" fill="#b0b0b0" font-size="10" font-family="monospace">name = "blk.0.attn_q.weight"</text>
+        <text x="300" y="160" fill="#b0b0b0" font-size="10" font-family="monospace">n_dims = 2</text>
+        <text x="420" y="160" fill="#b0b0b0" font-size="10" font-family="monospace">dims = [3584, 3584]</text>
+
+        <text x="50" y="180" fill="#e74c3c" font-size="10" font-family="monospace">ggml_type = 12 (Q4_K)</text>
+        <text x="300" y="180" fill="#ffb400" font-size="10" font-family="monospace">offset = 0x00123000 (relative to data_start)</text>
+
+        <!-- GGML dimension note -->
+        <rect x="30" y="200" width="710" height="35" fill="#1a1a1a" stroke="#ffb400" stroke-width="1" rx="4"/>
+        <text x="50" y="222" fill="#ffb400" font-size="10">⚠ GGML dims are [ne0, ne1, ...] = [inner_dim, outer_dim]. For weight [3584,3584]: ne0=3584 cols, ne1=3584 rows</text>
+    </svg>
+</div>
+
+<div class="card">
+    <h3>Code: Building Tensor Index</h3>
+<pre><code>@dataclass
+class TensorInfo:
+    name: str
+    dims: Tuple[int, ...]  # GGML order: ne0, ne1, ...
+    ggml_type: int
+    offset: int            # Relative to data section start
+
+tensors: Dict[str, TensorInfo] = {}
+
+for _ in range(n_tensors):
+    name = r.key_str()           # Read name
+    n_dims = r.u32()             # Read dimension count
+    dims = tuple(r.u64() for _ in range(n_dims))
+    ggml_type = r.u32()          # Q4_K=12, F32=0, etc.
+    offset = r.u64()             # Byte offset in data section
+
+    tensors[name] = TensorInfo(name=name, dims=dims,
+                               ggml_type=ggml_type, offset=offset)</code></pre>
+</div>
+
+<h2>Step 5: Calculate Data Section Start (Alignment)</h2>
+
+<p>GGUF aligns the data section to a boundary (typically 32 bytes). This ensures tensor data is properly aligned for SIMD operations.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 180" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#e74c3c" font-size="14" font-weight="bold">Finding Data Section Start</text>
+
+        <!-- File layout -->
+        <g transform="translate(50, 50)">
+            <rect x="0" y="0" width="100" height="50" fill="#454545" rx="4"/>
+            <text x="50" y="30" text-anchor="middle" fill="#808080" font-size="10">Header</text>
+
+            <rect x="110" y="0" width="200" height="50" fill="#07adf8" rx="4"/>
+            <text x="210" y="30" text-anchor="middle" fill="#fff" font-size="10">Metadata (variable)</text>
+
+            <rect x="320" y="0" width="200" height="50" fill="#9b59b6" rx="4"/>
+            <text x="420" y="30" text-anchor="middle" fill="#fff" font-size="10">Tensor Info (variable)</text>
+
+            <!-- Current position -->
+            <line x1="520" y1="0" x2="520" y2="70" stroke="#e74c3c" stroke-width="2" stroke-dasharray="5,3"/>
+            <text x="520" y="85" text-anchor="middle" fill="#e74c3c" font-size="10">current_pos</text>
+
+            <!-- Padding -->
+            <rect x="520" y="0" width="40" height="50" fill="#808080" rx="4"/>
+            <text x="540" y="30" text-anchor="middle" fill="#fff" font-size="8">pad</text>
+
+            <!-- Data section -->
+            <rect x="560" y="0" width="130" height="50" fill="#ffb400" rx="4"/>
+            <text x="625" y="30" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">Tensor Data</text>
+
+            <!-- data_start -->
+            <line x1="560" y1="0" x2="560" y2="70" stroke="#47b475" stroke-width="3"/>
+            <text x="560" y="85" text-anchor="middle" fill="#47b475" font-size="10" font-weight="bold">data_start</text>
+        </g>
+
+        <!-- Formula -->
+        <rect x="50" y="110" width="700" height="50" fill="#1a1a1a" stroke="#47b475" stroke-width="1" rx="4"/>
+        <text x="70" y="135" fill="#47b475" font-size="12" font-weight="bold">Formula:</text>
+        <text x="160" y="135" fill="#fff" font-size="12" font-family="monospace">data_start = align_up(current_pos, alignment)</text>
+        <text x="70" y="152" fill="#b0b0b0" font-size="10" font-family="monospace">align_up(n, a) = ((n + a - 1) // a) * a</text>
+    </svg>
+</div>
+
+<div class="card">
+    <h3>Code: Calculate and Seek to Data</h3>
+<pre><code>alignment = meta.get("general.alignment", 32)  # Default 32 bytes
+
+# Current position after reading all tensor info
+current_pos = r.tell()
+
+# Align to boundary
+data_start = ((current_pos + alignment - 1) // alignment) * alignment
+
+# Seek to data section (some writers already align, this handles both)
+r.seek(data_start)</code></pre>
+</div>
+
+<h2>Step 6: Build Dtype Table</h2>
+
+<p>The bump format stores a per-tensor dtype table so the runtime knows which dequantization kernel to use. Each tensor gets a 1-byte type code.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 280" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#f39c12" font-size="14" font-weight="bold">Dtype Table: Per-Tensor Type Codes</text>
+
+        <!-- Type codes -->
+        <g transform="translate(50, 50)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">CK Dtype Codes:</text>
+
+            <rect x="0" y="25" width="320" height="120" fill="#323232" stroke="#f39c12" stroke-width="1" rx="4"/>
+
+            <text x="20" y="50" fill="#f39c12" font-size="11" font-family="monospace">CK_DT_FP32  = 0</text>
+            <text x="180" y="50" fill="#b0b0b0" font-size="10">32-bit float</text>
+
+            <text x="20" y="70" fill="#f39c12" font-size="11" font-family="monospace">CK_DT_BF16  = 1</text>
+            <text x="180" y="70" fill="#b0b0b0" font-size="10">Brain float 16</text>
+
+            <text x="20" y="90" fill="#f39c12" font-size="11" font-family="monospace">CK_DT_FP16  = 2</text>
+            <text x="180" y="90" fill="#b0b0b0" font-size="10">IEEE float 16</text>
+
+            <text x="20" y="110" fill="#ffb400" font-size="11" font-family="monospace" font-weight="bold">CK_DT_Q4_K  = 6</text>
+            <text x="180" y="110" fill="#ffb400" font-size="10">K-quant 4-bit</text>
+
+            <text x="20" y="130" fill="#f39c12" font-size="11" font-family="monospace">CK_DT_Q6_K  = 7</text>
+            <text x="180" y="130" fill="#b0b0b0" font-size="10">K-quant 6-bit</text>
+        </g>
+
+        <!-- GGML to CK mapping -->
+        <g transform="translate(420, 50)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">GGML → CK Mapping:</text>
+
+            <rect x="0" y="25" width="330" height="120" fill="#323232" stroke="#07adf8" stroke-width="1" rx="4"/>
+
+            <text x="20" y="50" fill="#07adf8" font-size="11" font-family="monospace">GGML_TYPE_F32  (0)  → CK_DT_FP32</text>
+            <text x="20" y="70" fill="#07adf8" font-size="11" font-family="monospace">GGML_TYPE_F16  (1)  → CK_DT_FP16</text>
+            <text x="20" y="90" fill="#07adf8" font-size="11" font-family="monospace">GGML_TYPE_BF16 (16) → CK_DT_BF16</text>
+            <text x="20" y="110" fill="#ffb400" font-size="11" font-family="monospace" font-weight="bold">GGML_TYPE_Q4_K (12) → CK_DT_Q4_K</text>
+            <text x="20" y="130" fill="#07adf8" font-size="11" font-family="monospace">GGML_TYPE_Q6_K (14) → CK_DT_Q6_K</text>
+        </g>
+
+        <!-- Dtype table layout -->
+        <g transform="translate(50, 185)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">Dtype Table Layout (written to bump file):</text>
+
+            <rect x="0" y="25" width="700" height="50" fill="#1a1a1a" stroke="#f39c12" stroke-width="2" rx="4"/>
+
+            <rect x="10" y="35" width="50" height="30" fill="#f39c12" rx="2"/>
+            <text x="35" y="55" text-anchor="middle" fill="#2a2a2a" font-size="9">tok_emb</text>
+
+            <rect x="70" y="35" width="50" height="30" fill="#454545" rx="2"/>
+            <text x="95" y="55" text-anchor="middle" fill="#b0b0b0" font-size="9">pos_emb</text>
+
+            <rect x="130" y="35" width="40" height="30" fill="#47b475" rx="2"/>
+            <text x="150" y="55" text-anchor="middle" fill="#fff" font-size="8">ln1</text>
+
+            <rect x="180" y="35" width="40" height="30" fill="#47b475" rx="2"/>
+            <text x="200" y="55" text-anchor="middle" fill="#fff" font-size="8">ln2</text>
+
+            <rect x="230" y="35" width="35" height="30" fill="#07adf8" rx="2"/>
+            <text x="247" y="55" text-anchor="middle" fill="#fff" font-size="8">Wq</text>
+
+            <rect x="275" y="35" width="35" height="30" fill="#454545" rx="2"/>
+            <text x="292" y="55" text-anchor="middle" fill="#b0b0b0" font-size="8">bq</text>
+
+            <text x="330" y="55" fill="#808080" font-size="12">...</text>
+
+            <rect x="360" y="35" width="35" height="30" fill="#07adf8" rx="2"/>
+            <text x="377" y="55" text-anchor="middle" fill="#fff" font-size="8">W↓</text>
+
+            <rect x="405" y="35" width="35" height="30" fill="#454545" rx="2"/>
+            <text x="422" y="55" text-anchor="middle" fill="#b0b0b0" font-size="8">b2</text>
+
+            <text x="460" y="55" fill="#808080" font-size="10">× num_layers</text>
+
+            <rect x="550" y="35" width="60" height="30" fill="#47b475" rx="2"/>
+            <text x="580" y="55" text-anchor="middle" fill="#fff" font-size="8">final_ln</text>
+
+            <rect x="620" y="35" width="60" height="30" fill="#454545" rx="2"/>
+            <text x="650" y="55" text-anchor="middle" fill="#b0b0b0" font-size="8">final_b</text>
+        </g>
+    </svg>
+</div>
+
+<div class="card">
+    <h3>Code: Build Dtype Table</h3>
+<pre><code># Start with token embedding dtype
+token_dtype = ck_dtype_from_ggml_type(tok.ggml_type)
+dtype_table = [token_dtype, CK_DT_FP32]  # tok_emb, pos_emb
+
+# Per-layer dtypes (14 entries per layer)
+for layer in range(num_layers):
+    wq = tensors[f"blk.{layer}.attn_q.weight"]
+    wk = tensors[f"blk.{layer}.attn_k.weight"]
+    # ... get other tensors
+
+    dtype_table.extend([
+        CK_DT_FP32,  # ln1_gamma (always FP32)
+        CK_DT_FP32,  # ln2_gamma (always FP32)
+        ck_dtype_from_ggml_type(wq.ggml_type),  # Wq
+        CK_DT_FP32,  # bq (bias placeholder)
+        ck_dtype_from_ggml_type(wk.ggml_type),  # Wk
+        CK_DT_FP32,  # bk
+        # ... etc
+    ])
+
+# Final layer
+dtype_table.extend([CK_DT_FP32, CK_DT_FP32])  # final_ln, final_bias
+
+# Write as bytes
+out_f.write(struct.pack("&lt;I", len(dtype_table)))
+out_f.write(bytes(dtype_table))</code></pre>
+</div>
+
+<h2>Step 7: Write Bump Header</h2>
+
+<p>The bump header is 128 bytes containing everything the runtime needs to interpret the weight data. We write a placeholder first, then fill it in after computing the SHA-256 checksum.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 350" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#1abc9c" font-size="14" font-weight="bold">Bump File Header (128 bytes)</text>
+
+        <!-- Header fields -->
+        <g transform="translate(50, 50)">
+            <!-- Row 1 -->
+            <rect x="0" y="0" width="140" height="45" fill="#1abc9c" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="70" y="18" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">"BUMPWGT3"</text>
+            <text x="70" y="35" text-anchor="middle" fill="#fff" font-size="8">8 bytes (magic)</text>
+
+            <rect x="150" y="0" width="80" height="45" fill="#1abc9c" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="190" y="18" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">version</text>
+            <text x="190" y="35" text-anchor="middle" fill="#fff" font-size="8">u32 = 3</text>
+
+            <rect x="240" y="0" width="80" height="45" fill="#454545" stroke="#808080" stroke-width="1" rx="4"/>
+            <text x="280" y="18" text-anchor="middle" fill="#b0b0b0" font-size="9">model_type</text>
+            <text x="280" y="35" text-anchor="middle" fill="#b0b0b0" font-size="8">u32 = 1</text>
+
+            <rect x="330" y="0" width="80" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="370" y="18" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">num_layers</text>
+            <text x="370" y="35" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <rect x="420" y="0" width="80" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="460" y="18" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">vocab_size</text>
+            <text x="460" y="35" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <rect x="510" y="0" width="80" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="550" y="18" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">embed_dim</text>
+            <text x="550" y="35" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <rect x="600" y="0" width="90" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="645" y="18" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">context_len</text>
+            <text x="645" y="35" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <!-- Row 2 -->
+            <rect x="0" y="55" width="80" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="40" y="73" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">num_heads</text>
+            <text x="40" y="90" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <rect x="90" y="55" width="80" height="45" fill="#ffb400" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="130" y="73" text-anchor="middle" fill="#2a2a2a" font-size="9" font-weight="bold">head_dim</text>
+            <text x="130" y="90" text-anchor="middle" fill="#2a2a2a" font-size="8">u32</text>
+
+            <rect x="180" y="55" width="130" height="45" fill="#07adf8" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="245" y="73" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">aligned_embed</text>
+            <text x="245" y="90" text-anchor="middle" fill="#fff" font-size="8">u64</text>
+
+            <rect x="320" y="55" width="130" height="45" fill="#07adf8" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="385" y="73" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">aligned_head</text>
+            <text x="385" y="90" text-anchor="middle" fill="#fff" font-size="8">u64</text>
+
+            <rect x="460" y="55" width="130" height="45" fill="#07adf8" stroke="#fff" stroke-width="1" rx="4"/>
+            <text x="525" y="73" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">aligned_ctx</text>
+            <text x="525" y="90" text-anchor="middle" fill="#fff" font-size="8">u64</text>
+
+            <!-- Row 3 - Checksum -->
+            <rect x="0" y="110" width="400" height="45" fill="#e74c3c" stroke="#fff" stroke-width="2" rx="4"/>
+            <text x="200" y="130" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">SHA-256 Checksum (32 bytes)</text>
+            <text x="200" y="145" text-anchor="middle" fill="#fff" font-size="9">Computed over all data after header</text>
+
+            <!-- Row 4 - Reserved -->
+            <rect x="410" y="110" width="280" height="45" fill="#454545" stroke="#808080" stroke-width="1" rx="4"/>
+            <text x="550" y="138" text-anchor="middle" fill="#808080" font-size="10">Reserved (32 bytes zeros)</text>
+        </g>
+
+        <!-- Offset table -->
+        <g transform="translate(50, 220)">
+            <text x="0" y="15" fill="#fff" font-size="12" font-weight="bold">Byte Offsets:</text>
+
+            <rect x="0" y="25" width="700" height="80" fill="#323232" stroke="#1abc9c" stroke-width="1" rx="4"/>
+
+            <text x="20" y="50" fill="#1abc9c" font-size="10" font-family="monospace">0x00: magic[8]</text>
+            <text x="150" y="50" fill="#1abc9c" font-size="10" font-family="monospace">0x08: version</text>
+            <text x="280" y="50" fill="#1abc9c" font-size="10" font-family="monospace">0x0C: model_type</text>
+            <text x="420" y="50" fill="#1abc9c" font-size="10" font-family="monospace">0x10: num_layers</text>
+            <text x="560" y="50" fill="#1abc9c" font-size="10" font-family="monospace">0x14: vocab_size</text>
+
+            <text x="20" y="70" fill="#1abc9c" font-size="10" font-family="monospace">0x18: embed_dim</text>
+            <text x="150" y="70" fill="#1abc9c" font-size="10" font-family="monospace">0x1C: context_len</text>
+            <text x="280" y="70" fill="#1abc9c" font-size="10" font-family="monospace">0x20: num_heads</text>
+            <text x="420" y="70" fill="#1abc9c" font-size="10" font-family="monospace">0x24: head_dim</text>
+
+            <text x="20" y="90" fill="#07adf8" font-size="10" font-family="monospace">0x28: aligned_embed (u64)</text>
+            <text x="220" y="90" fill="#07adf8" font-size="10" font-family="monospace">0x30: aligned_head (u64)</text>
+            <text x="420" y="90" fill="#07adf8" font-size="10" font-family="monospace">0x38: aligned_ctx (u64)</text>
+
+            <text x="20" y="100" fill="#e74c3c" font-size="10" font-family="monospace">0x40: checksum[32]</text>
+            <text x="220" y="100" fill="#808080" font-size="10" font-family="monospace">0x60: reserved[32]</text>
+        </g>
+    </svg>
+</div>
+
+<h2>Step 8: Stream Tensor Data</h2>
+
+<p>This is where the actual conversion happens. We read tensors from GGUF and write them to bump in a specific order. Importantly, we <strong>don't dequantize</strong> - we copy the quantized blocks directly.</p>
+
+<h3>GGUF → Bump Tensor Name Mapping</h3>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 450" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#ffb400" font-size="14" font-weight="bold">GGUF Tensor Names → Bump Layout Order</text>
+
+        <!-- Two columns -->
+        <g transform="translate(30, 50)">
+            <!-- GGUF names -->
+            <rect x="0" y="0" width="350" height="380" fill="#323232" stroke="#07adf8" stroke-width="2" rx="4"/>
+            <text x="175" y="25" text-anchor="middle" fill="#07adf8" font-size="12" font-weight="bold">GGUF Tensor Names</text>
+
+            <text x="20" y="55" fill="#ffb400" font-size="10" font-weight="bold">Global:</text>
+            <text x="30" y="75" fill="#b0b0b0" font-size="10" font-family="monospace">token_embd.weight</text>
+            <text x="30" y="95" fill="#808080" font-size="10" font-family="monospace">(no pos_emb - RoPE models)</text>
+
+            <text x="20" y="125" fill="#47b475" font-size="10" font-weight="bold">Per-Layer (blk.{N}.*):</text>
+            <text x="30" y="145" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.attn_norm.weight</text>
+            <text x="30" y="165" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.ffn_norm.weight</text>
+            <text x="30" y="185" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.attn_q.weight</text>
+            <text x="30" y="205" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.attn_k.weight</text>
+            <text x="30" y="225" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.attn_v.weight</text>
+            <text x="30" y="245" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.attn_output.weight</text>
+            <text x="30" y="265" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.ffn_gate.weight</text>
+            <text x="30" y="285" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.ffn_up.weight</text>
+            <text x="30" y="305" fill="#b0b0b0" font-size="10" font-family="monospace">blk.{N}.ffn_down.weight</text>
+
+            <text x="20" y="335" fill="#e74c3c" font-size="10" font-weight="bold">Final:</text>
+            <text x="30" y="355" fill="#b0b0b0" font-size="10" font-family="monospace">output_norm.weight</text>
+            <text x="30" y="375" fill="#808080" font-size="10" font-family="monospace">(output.weight often tied to embed)</text>
+        </g>
+
+        <!-- Arrows -->
+        <g transform="translate(380, 50)">
+            <text x="20" y="75" fill="#ffb400" font-size="16">→</text>
+            <text x="20" y="145" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="185" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="205" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="225" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="245" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="285" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="305" fill="#47b475" font-size="16">→</text>
+            <text x="20" y="355" fill="#e74c3c" font-size="16">→</text>
+        </g>
+
+        <!-- Bump layout -->
+        <g transform="translate(420, 50)">
+            <rect x="0" y="0" width="350" height="380" fill="#323232" stroke="#ffb400" stroke-width="2" rx="4"/>
+            <text x="175" y="25" text-anchor="middle" fill="#ffb400" font-size="12" font-weight="bold">Bump Layout Order</text>
+
+            <text x="20" y="55" fill="#ffb400" font-size="10" font-weight="bold">1. Embeddings:</text>
+            <text x="30" y="75" fill="#b0b0b0" font-size="10" font-family="monospace">tok_emb (Q4_K blocks copied)</text>
+            <text x="30" y="95" fill="#808080" font-size="10" font-family="monospace">pos_emb (zeros - RoPE in kernel)</text>
+
+            <text x="20" y="125" fill="#47b475" font-size="10" font-weight="bold">2. Per-Layer (×num_layers):</text>
+            <text x="30" y="145" fill="#b0b0b0" font-size="10" font-family="monospace">ln1_gamma (FP32, read from F16/BF16)</text>
+            <text x="30" y="165" fill="#b0b0b0" font-size="10" font-family="monospace">ln2_gamma (FP32)</text>
+            <text x="30" y="185" fill="#b0b0b0" font-size="10" font-family="monospace">Wq (Q4_K, head-packed)</text>
+            <text x="30" y="205" fill="#808080" font-size="10" font-family="monospace">bq (zeros - no bias)</text>
+            <text x="30" y="225" fill="#b0b0b0" font-size="10" font-family="monospace">Wk (Q4_K, head-packed)</text>
+            <text x="30" y="245" fill="#808080" font-size="10" font-family="monospace">bk (zeros)</text>
+            <text x="30" y="265" fill="#b0b0b0" font-size="10" font-family="monospace">Wv, bv, Wo, bo...</text>
+            <text x="30" y="285" fill="#b0b0b0" font-size="10" font-family="monospace">W_gate (Q4_K)</text>
+            <text x="30" y="305" fill="#b0b0b0" font-size="10" font-family="monospace">W_up (Q4_K)</text>
+            <text x="30" y="325" fill="#808080" font-size="10" font-family="monospace">b1 (zeros)</text>
+            <text x="30" y="345" fill="#b0b0b0" font-size="10" font-family="monospace">W_down, b2...</text>
+
+            <text x="20" y="365" fill="#e74c3c" font-size="10" font-weight="bold">3. Final:</text>
+            <text x="110" y="365" fill="#b0b0b0" font-size="10" font-family="monospace">final_ln_gamma, final_bias</text>
+        </g>
+    </svg>
+</div>
+
+<h3>Key Transformations During Copy</h3>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3>1. Norm Vectors: FP16/BF16 → FP32</h3>
+        <p>GGUF stores RMSNorm gammas as FP16 or BF16. We convert to FP32 for the kernel:</p>
+<pre><code>def read_vector_f32(f, info):
+    raw = f.read(row_bytes)
+    if info.ggml_type == GGML_TYPE_F16:
+        return np.frombuffer(raw, np.float16).astype(np.float32)
+    elif info.ggml_type == GGML_TYPE_BF16:
+        u16 = np.frombuffer(raw, np.uint16)
+        u32 = u16.astype(np.uint32) << 16
+        return u32.view(np.float32)
+    return np.frombuffer(raw, np.float32)</code></pre>
+    </div>
+    <div class="card card-green">
+        <h3>2. Q/K/V: Head-Packed Layout</h3>
+        <p>GGUF stores Q/K/V as flat [in_dim × out_dim]. We repack per-head for aligned access:</p>
+<pre><code># For each head, copy head_dim rows
+# Then pad to aligned_head_dim if needed
+for head in range(num_heads):
+    for row in range(head_dim):
+        copy_row(src, dst)
+    # Zero-pad extra rows
+    for row in range(head_dim, aligned_head_dim):
+        write_zero_row(dst)</code></pre>
+    </div>
+</div>
+
+<div class="card card-blue">
+    <h3>3. Q4_K Blocks: Direct Copy (No Dequant!)</h3>
+    <p>The key optimization: we copy quantized blocks byte-for-byte. Dequantization happens at inference time in the GEMM kernel.</p>
+<pre><code>def copy_bytes_stream(f_in, src_pos, nbytes, w_out, chunk=1MB):
+    """Stream copy without loading entire tensor into memory"""
+    f_in.seek(src_pos)
+    remaining = nbytes
+    while remaining > 0:
+        buf = f_in.read(min(remaining, chunk))
+        w_out.write(buf)
+        remaining -= len(buf)</code></pre>
+</div>
+
+<h2>Complete Data Flow Example</h2>
+
+<p>Let's trace a single weight tensor through the entire pipeline:</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 400" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="25" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Example: blk.0.attn_q.weight (Q4_K)</text>
+
+        <!-- GGUF side -->
+        <g transform="translate(30, 50)">
+            <rect x="0" y="0" width="340" height="320" fill="#323232" stroke="#07adf8" stroke-width="2" rx="4"/>
+            <text x="170" y="25" text-anchor="middle" fill="#07adf8" font-size="12" font-weight="bold">GGUF File</text>
+
+            <!-- Tensor info -->
+            <rect x="20" y="40" width="300" height="80" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="60" fill="#07adf8" font-size="10" font-weight="bold">Tensor Info (from header):</text>
+            <text x="30" y="80" fill="#b0b0b0" font-size="9" font-family="monospace">name = "blk.0.attn_q.weight"</text>
+            <text x="30" y="95" fill="#b0b0b0" font-size="9" font-family="monospace">dims = [3584, 3584] (ne0=cols, ne1=rows)</text>
+            <text x="30" y="110" fill="#ffb400" font-size="9" font-family="monospace">type = Q4_K (12)  offset = 0x1A2B3C</text>
+
+            <!-- Data location -->
+            <rect x="20" y="130" width="300" height="100" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="150" fill="#07adf8" font-size="10" font-weight="bold">Raw Data (in data section):</text>
+            <text x="30" y="170" fill="#b0b0b0" font-size="9" font-family="monospace">total_elements = 3584 × 3584 = 12,845,056</text>
+            <text x="30" y="185" fill="#b0b0b0" font-size="9" font-family="monospace">Q4_K blocks = 12,845,056 / 256 = 50,176</text>
+            <text x="30" y="200" fill="#b0b0b0" font-size="9" font-family="monospace">bytes = 50,176 × 144 = 7,225,344</text>
+            <text x="30" y="220" fill="#47b475" font-size="9" font-family="monospace">≈ 6.9 MB (vs 49 MB for FP32!)</text>
+
+            <!-- Block structure -->
+            <rect x="20" y="240" width="300" height="60" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="260" fill="#07adf8" font-size="10" font-weight="bold">Each Q4_K Block:</text>
+            <text x="30" y="280" fill="#b0b0b0" font-size="9" font-family="monospace">[d:2][dmin:2][scales:12][qs:128] = 144 bytes</text>
+            <text x="30" y="295" fill="#b0b0b0" font-size="9" font-family="monospace">Contains 256 weights @ 4.5 bits each</text>
+        </g>
+
+        <!-- Arrow -->
+        <g transform="translate(380, 180)">
+            <line x1="0" y1="0" x2="40" y2="0" stroke="#ffb400" stroke-width="3" marker-end="url(#arr)"/>
+            <text x="20" y="20" text-anchor="middle" fill="#ffb400" font-size="10" font-weight="bold">Copy</text>
+            <text x="20" y="35" text-anchor="middle" fill="#808080" font-size="8">(no dequant)</text>
+        </g>
+
+        <!-- Bump side -->
+        <g transform="translate(430, 50)">
+            <rect x="0" y="0" width="340" height="320" fill="#323232" stroke="#ffb400" stroke-width="2" rx="4"/>
+            <text x="170" y="25" text-anchor="middle" fill="#ffb400" font-size="12" font-weight="bold">Bump File</text>
+
+            <!-- Position in bump -->
+            <rect x="20" y="40" width="300" height="80" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="60" fill="#ffb400" font-size="10" font-weight="bold">Position in Bump:</text>
+            <text x="30" y="80" fill="#b0b0b0" font-size="9" font-family="monospace">After: tok_emb, pos_emb, ln1, ln2</text>
+            <text x="30" y="95" fill="#b0b0b0" font-size="9" font-family="monospace">Layer 0, Weight Index: Wq (4th tensor)</text>
+            <text x="30" y="110" fill="#47b475" font-size="9" font-family="monospace">dtype_table[4] = CK_DT_Q4_K (6)</text>
+
+            <!-- Head packing -->
+            <rect x="20" y="130" width="300" height="100" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="150" fill="#ffb400" font-size="10" font-weight="bold">Head-Packed Layout:</text>
+            <text x="30" y="170" fill="#b0b0b0" font-size="9" font-family="monospace">num_heads = 28, head_dim = 128</text>
+            <text x="30" y="185" fill="#b0b0b0" font-size="9" font-family="monospace">For each head (0..27):</text>
+            <text x="40" y="200" fill="#b0b0b0" font-size="9" font-family="monospace">Copy 128 rows of [3584] Q4_K blocks</text>
+            <text x="40" y="215" fill="#808080" font-size="9" font-family="monospace">(padding rows if aligned_head > head_dim)</text>
+
+            <!-- Usage at runtime -->
+            <rect x="20" y="240" width="300" height="60" fill="#1a1a1a" rx="4"/>
+            <text x="30" y="260" fill="#ffb400" font-size="10" font-weight="bold">At Runtime:</text>
+            <text x="30" y="280" fill="#b0b0b0" font-size="9" font-family="monospace">1. Check dtype_table → CK_DT_Q4_K</text>
+            <text x="30" y="295" fill="#b0b0b0" font-size="9" font-family="monospace">2. Call dequant_q4_k_* during GEMM</text>
+        </g>
+    </svg>
+</div>
+
+<h2>Checksumming</h2>
+
+<p>After writing all data, we compute a SHA-256 checksum over the payload (everything after the 128-byte header). This catches corruption during download or storage.</p>
+
+<div class="card">
+    <h3>Code: Checksum with HashingWriter</h3>
+<pre><code>class HashingWriter:
+    """Wraps file writes to compute running SHA-256"""
+    def __init__(self, f):
+        self._f = f
+        self._h = hashlib.sha256()
+        self.bytes_written = 0
+
+    def write(self, data):
+        self._f.write(data)
+        self._h.update(data)
+        self.bytes_written += len(data)
+
+    def digest(self):
+        return self._h.digest()  # 32 bytes
+
+# Usage:
+with open(output_path, "w+b") as f:
+    f.write(b"\x00" * 128)  # Placeholder header
+    w = HashingWriter(f)
+
+    # ... write all tensor data through w ...
+
+    checksum = w.digest()
+
+    # Go back and fill in header
+    f.seek(0)
+    f.write(b"BUMPWGT3")
+    # ... write other fields ...
+    f.seek(0x40)
+    f.write(checksum)  # 32 bytes at offset 0x40</code></pre>
+</div>
+
+<h2>Validation Checklist</h2>
+
+<p>The converter validates many conditions before writing:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Shape Validation</h3>
+        <ul>
+            <li>Q4_K tensors must have <code>ne0 % 256 == 0</code></li>
+            <li>embed_dim must be divisible by num_heads</li>
+            <li>K/V dimensions must match GQA ratios</li>
+            <li>MLP gate/up must have same dtype</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>Required Tensors</h3>
+        <ul>
+            <li><code>token_embd.weight</code> (embeddings)</li>
+            <li><code>output_norm.weight</code> (final norm)</li>
+            <li>All per-layer attention tensors (q/k/v/o)</li>
+            <li>All per-layer MLP tensors (gate/up/down)</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Output Files</h2>
+
+<p>The converter produces two files:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>File</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>weights.bump</code></td>
+            <td>Binary weight data (header + dtype table + tensors)</td>
+        </tr>
+        <tr>
+            <td><code>config.json</code></td>
+            <td>HuggingFace-compatible model config (for tooling)</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card">
+    <h3>Example config.json Output</h3>
+<pre><code>{
+  "architectures": ["LlamaForCausalLM"],
+  "model_type": "llama",
+  "num_hidden_layers": 36,
+  "hidden_size": 3584,
+  "intermediate_size": 18944,
+  "num_attention_heads": 28,
+  "num_key_value_heads": 4,
+  "vocab_size": 151936,
+  "max_position_embeddings": 32768,
+  "rms_norm_eps": 1e-06,
+  "rope_theta": 1000000.0
+}</code></pre>
+</div>
+
+<h2>Summary</h2>
+
+<div class="alert alert-success">
+    <span class="alert-icon">&#9989;</span>
+    <div>
+        <strong>Key Insight:</strong> The GGUF→Bump conversion is a <em>layout transformation</em>, not a dequantization. Quantized blocks are copied byte-for-byte. The only conversions are:
+        <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+            <li>Norm gammas: FP16/BF16 → FP32 (for kernel compatibility)</li>
+            <li>Attention weights: Flat → Head-packed (for aligned access)</li>
+            <li>Biases: Generate zeros (GGUF models typically have no bias)</li>
+        </ul>
+    </div>
+</div>

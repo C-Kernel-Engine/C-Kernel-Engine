@@ -1,0 +1,671 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="cpu__features_8c" kind="file" language="C++">
+    <compoundname>cpu_features.c</compoundname>
+    <includes refid="cpu__features_8h" local="yes">cpu_features.h</includes>
+    <includes local="no">stdio.h</includes>
+    <includes local="no">string.h</includes>
+    <includes local="no">stdlib.h</includes>
+    <includes local="no">unistd.h</includes>
+    <incdepgraph>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="7">
+        <label>stdlib.h</label>
+      </node>
+      <node id="4">
+        <label>stddef.h</label>
+      </node>
+      <node id="6">
+        <label>string.h</label>
+      </node>
+      <node id="8">
+        <label>unistd.h</label>
+      </node>
+      <node id="1">
+        <label>cpu_features.c</label>
+        <link refid="cpu__features_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>stdio.h</label>
+      </node>
+      <node id="2">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="var">
+      <memberdef kind="variable" id="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" prot="public" static="no" mutable="no">
+        <type><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref></type>
+        <definition>CPUInfo g_cpu_info</definition>
+        <argsstring></argsstring>
+        <name>g_cpu_info</name>
+        <initializer>= {0}</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>CPU Feature Detection and Cache-Aware Parameter Tuning</para>
+<para>Detects CPU features, cache sizes, and core counts at runtime. Computes optimal GEMM blocking parameters based on actual hardware. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="28" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="28" bodyend="-1"/>
+        <referencedby refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</referencedby>
+        <referencedby refid="cpu__features_8h_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" compoundref="cpu__features_8c" startline="377" endline="380">get_cpu_info</referencedby>
+        <referencedby refid="cpu__features_8h_1a538a4414821926cda2c9e989764c00fd" compoundref="cpu__features_8c" startline="382" endline="402">print_cpu_info</referencedby>
+      </memberdef>
+      <memberdef kind="variable" id="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" prot="public" static="no" mutable="no">
+        <type>int</type>
+        <definition>int g_cpu_initialized</definition>
+        <argsstring></argsstring>
+        <name>g_cpu_initialized</name>
+        <initializer>= 0</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="30" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="30" bodyend="-1"/>
+        <referencedby refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</referencedby>
+        <referencedby refid="cpu__features_8h_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" compoundref="cpu__features_8c" startline="377" endline="380">get_cpu_info</referencedby>
+        <referencedby refid="cpu__features_8h_1ab1ad13308616a6d3d811b97eef9abfe6" compoundref="cpu__features_8c" startline="372" endline="375">get_gemm_params</referencedby>
+        <referencedby refid="cpu__features_8h_1a538a4414821926cda2c9e989764c00fd" compoundref="cpu__features_8c" startline="382" endline="402">print_cpu_info</referencedby>
+      </memberdef>
+      <memberdef kind="variable" id="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" prot="public" static="no" mutable="no">
+        <type><ref refid="structGEMMParams" kindref="compound">GEMMParams</ref></type>
+        <definition>GEMMParams g_gemm_params</definition>
+        <argsstring></argsstring>
+        <name>g_gemm_params</name>
+        <initializer>= {0}</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="29" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="29" bodyend="-1"/>
+        <referencedby refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</referencedby>
+        <referencedby refid="cpu__features_8h_1ab1ad13308616a6d3d811b97eef9abfe6" compoundref="cpu__features_8c" startline="372" endline="375">get_gemm_params</referencedby>
+        <referencedby refid="cpu__features_8h_1a538a4414821926cda2c9e989764c00fd" compoundref="cpu__features_8c" startline="382" endline="402">print_cpu_info</referencedby>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="cpu__features_8c_1a6465c90ac7e832c18d8e5a21df58653b" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>static void compute_gemm_params</definition>
+        <argsstring>(const CPUInfo *cpu, GEMMParams *params)</argsstring>
+        <name>compute_gemm_params</name>
+        <param>
+          <type>const <ref refid="structCPUInfo" kindref="compound">CPUInfo</ref> *</type>
+          <declname>cpu</declname>
+        </param>
+        <param>
+          <type><ref refid="structGEMMParams" kindref="compound">GEMMParams</ref> *</type>
+          <declname>params</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="268" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="268" bodyend="338"/>
+        <references refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" compoundref="cpu__features_8h" startline="26">CPUInfo::has_avx</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" compoundref="cpu__features_8h" startline="28">CPUInfo::has_avx512f</references>
+        <references refid="structCPUInfo_1a675b39fcccd4eac9995984acbe5d3d15" compoundref="cpu__features_8h" startline="29">CPUInfo::has_fma</references>
+        <references refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" compoundref="cpu__features_8h" startline="38">GEMMParams::KC</references>
+        <references refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" compoundref="cpu__features_8h" startline="21">CPUInfo::l1d_size</references>
+        <references refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" compoundref="cpu__features_8h" startline="22">CPUInfo::l2_size</references>
+        <references refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" compoundref="cpu__features_8h" startline="23">CPUInfo::l3_size</references>
+        <references refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" compoundref="cpu__features_8h" startline="36">GEMMParams::MC</references>
+        <references refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" compoundref="cpu__features_8h" startline="34">GEMMParams::MR</references>
+        <references refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" compoundref="cpu__features_8h" startline="37">GEMMParams::NC</references>
+        <references refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" compoundref="cpu__features_8h" startline="35">GEMMParams::NR</references>
+        <references refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" compoundref="cpu__features_8h" startline="25">CPUInfo::num_cores</references>
+        <referencedby refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void cpu_features_init</definition>
+        <argsstring>(void)</argsstring>
+        <name>cpu_features_init</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="344" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="344" bodyend="370"/>
+        <references refid="cpu__features_8c_1a6465c90ac7e832c18d8e5a21df58653b" compoundref="cpu__features_8c" startline="268" endline="338">compute_gemm_params</references>
+        <references refid="cpu__features_8c_1a8f4a571a19e02f7714b53aa1e5d50f91" compoundref="cpu__features_8c" startline="246" endline="262">detect_physical_cores</references>
+        <references refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" compoundref="cpu__features_8c" startline="28">g_cpu_info</references>
+        <references refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" compoundref="cpu__features_8c" startline="30">g_cpu_initialized</references>
+        <references refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" compoundref="cpu__features_8c" startline="29">g_gemm_params</references>
+        <references refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" compoundref="cpu__features_8h" startline="21">CPUInfo::l1d_size</references>
+        <references refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" compoundref="cpu__features_8h" startline="25">CPUInfo::num_cores</references>
+        <referencedby refid="cpu__features_8h_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" compoundref="cpu__features_8c" startline="377" endline="380">get_cpu_info</referencedby>
+        <referencedby refid="cpu__features_8h_1ab1ad13308616a6d3d811b97eef9abfe6" compoundref="cpu__features_8c" startline="372" endline="375">get_gemm_params</referencedby>
+        <referencedby refid="cpu__features_8h_1a538a4414821926cda2c9e989764c00fd" compoundref="cpu__features_8c" startline="382" endline="402">print_cpu_info</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="cpu__features_8c_1a8f4a571a19e02f7714b53aa1e5d50f91" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>static int detect_physical_cores</definition>
+        <argsstring>(void)</argsstring>
+        <name>detect_physical_cores</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="246" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="246" bodyend="262"/>
+        <referencedby refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="cpu__features_8c_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>const <ref refid="structCPUInfo" kindref="compound">CPUInfo</ref> *</type>
+        <definition>const CPUInfo* get_cpu_info</definition>
+        <argsstring>(void)</argsstring>
+        <name>get_cpu_info</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="377" column="15" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="377" bodyend="380"/>
+        <references refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</references>
+        <references refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" compoundref="cpu__features_8c" startline="28">g_cpu_info</references>
+        <references refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" compoundref="cpu__features_8c" startline="30">g_cpu_initialized</references>
+        <referencedby refid="gemm__microkernel_8c_1a2ecba71250e316cfb6a7415be7346f1c" compoundref="gemm__microkernel_8c" startline="905" endline="922">gemm_init_threads</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="cpu__features_8c_1ab1ad13308616a6d3d811b97eef9abfe6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>const <ref refid="structGEMMParams" kindref="compound">GEMMParams</ref> *</type>
+        <definition>const GEMMParams* get_gemm_params</definition>
+        <argsstring>(void)</argsstring>
+        <name>get_gemm_params</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="372" column="18" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="372" bodyend="375"/>
+        <references refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</references>
+        <references refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" compoundref="cpu__features_8c" startline="30">g_cpu_initialized</references>
+        <references refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" compoundref="cpu__features_8c" startline="29">g_gemm_params</references>
+      </memberdef>
+      <memberdef kind="function" id="cpu__features_8c_1a538a4414821926cda2c9e989764c00fd" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void print_cpu_info</definition>
+        <argsstring>(void)</argsstring>
+        <name>print_cpu_info</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" line="382" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c" bodystart="382" bodyend="402"/>
+        <references refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" compoundref="cpu__features_8c" startline="344" endline="370">cpu_features_init</references>
+        <references refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" compoundref="cpu__features_8c" startline="28">g_cpu_info</references>
+        <references refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" compoundref="cpu__features_8c" startline="30">g_cpu_initialized</references>
+        <references refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" compoundref="cpu__features_8c" startline="29">g_gemm_params</references>
+        <references refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" compoundref="cpu__features_8h" startline="26">CPUInfo::has_avx</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" compoundref="cpu__features_8h" startline="28">CPUInfo::has_avx512f</references>
+        <references refid="structCPUInfo_1a675b39fcccd4eac9995984acbe5d3d15" compoundref="cpu__features_8h" startline="29">CPUInfo::has_fma</references>
+        <references refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" compoundref="cpu__features_8h" startline="38">GEMMParams::KC</references>
+        <references refid="structCPUInfo_1aec1d73dace532ccaa255243ad9222d44" compoundref="cpu__features_8h" startline="24">CPUInfo::l1_line_size</references>
+        <references refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" compoundref="cpu__features_8h" startline="21">CPUInfo::l1d_size</references>
+        <references refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" compoundref="cpu__features_8h" startline="22">CPUInfo::l2_size</references>
+        <references refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" compoundref="cpu__features_8h" startline="23">CPUInfo::l3_size</references>
+        <references refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" compoundref="cpu__features_8h" startline="36">GEMMParams::MC</references>
+        <references refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" compoundref="cpu__features_8h" startline="34">GEMMParams::MR</references>
+        <references refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" compoundref="cpu__features_8h" startline="37">GEMMParams::NC</references>
+        <references refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" compoundref="cpu__features_8h" startline="35">GEMMParams::NR</references>
+        <references refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" compoundref="cpu__features_8h" startline="25">CPUInfo::num_cores</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>CPU<sp/>Feature<sp/>Detection<sp/>and<sp/>Cache-Aware<sp/>Parameter<sp/>Tuning</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Detects<sp/>CPU<sp/>features,<sp/>cache<sp/>sizes,<sp/>and<sp/>core<sp/>counts<sp/>at<sp/>runtime.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Computes<sp/>optimal<sp/>GEMM<sp/>blocking<sp/>parameters<sp/>based<sp/>on<sp/>actual<sp/>hardware.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="cpu__features_8h" kindref="compound">cpu_features.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_WIN32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;windows.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;intrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;unistd.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__x86_64__)<sp/>||<sp/>defined(_M_X64)<sp/>||<sp/>defined(__i386__)<sp/>||<sp/>defined(_M_IX86)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>X86_CPU<sp/>1</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__GNUC__)<sp/>||<sp/>defined(__clang__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;cpuid.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Global<sp/>instances</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28" refid="cpu__features_8h_1a87e02c44ce8117ceb227f928980a175a" refkind="member"><highlight class="normal"><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref><sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref><sp/>=<sp/>{0};</highlight></codeline>
+<codeline lineno="29" refid="cpu__features_8h_1add9495a8b0827ace67807e0826a890d1" refkind="member"><highlight class="normal"><ref refid="structGEMMParams" kindref="compound">GEMMParams</ref><sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref><sp/>=<sp/>{0};</highlight></codeline>
+<codeline lineno="30" refid="cpu__features_8h_1a9f67b8a4e1c74de8b6f0d8b535e44877" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight><highlight class="comment">//<sp/>CPUID<sp/>helpers<sp/>for<sp/>x86</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>X86_CPU</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>cpuid(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>leaf,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>subleaf,<sp/>uint32_t*<sp/>eax,<sp/>uint32_t*<sp/>ebx,<sp/>uint32_t*<sp/>ecx,<sp/>uint32_t*<sp/>edx)<sp/>{</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__GNUC__)<sp/>||<sp/>defined(__clang__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/>__cpuid_count(leaf,<sp/>subleaf,<sp/>*eax,<sp/>*ebx,<sp/>*ecx,<sp/>*edx);</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(_MSC_VER)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>regs[4];</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/>__cpuidex(regs,<sp/>leaf,<sp/>subleaf);</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/>*eax<sp/>=<sp/>regs[0];<sp/>*ebx<sp/>=<sp/>regs[1];<sp/>*ecx<sp/>=<sp/>regs[2];<sp/>*edx<sp/>=<sp/>regs[3];</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/>*eax<sp/>=<sp/>*ebx<sp/>=<sp/>*ecx<sp/>=<sp/>*edx<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"></highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>detect_x86_features(<ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>*<sp/>info)<sp/>{</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>eax,<sp/>ebx,<sp/>ecx,<sp/>edx;</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Check<sp/>max<sp/>CPUID<sp/>leaf</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/>cpuid(0,<sp/>0,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>max_leaf<sp/>=<sp/>eax;</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max_leaf<sp/>&gt;=<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cpuid(1,<sp/>0,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" kindref="member">has_avx</ref><sp/>=<sp/>(ecx<sp/>&gt;&gt;<sp/>28)<sp/>&amp;<sp/>1;</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a675b39fcccd4eac9995984acbe5d3d15" kindref="member">has_fma</ref><sp/>=<sp/>(ecx<sp/>&gt;&gt;<sp/>12)<sp/>&amp;<sp/>1;</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"></highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max_leaf<sp/>&gt;=<sp/>7)<sp/>{</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cpuid(7,<sp/>0,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" kindref="member">has_avx2</ref><sp/>=<sp/>(ebx<sp/>&gt;&gt;<sp/>5)<sp/>&amp;<sp/>1;</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" kindref="member">has_avx512f</ref><sp/>=<sp/>(ebx<sp/>&gt;&gt;<sp/>16)<sp/>&amp;<sp/>1;</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="67"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Detect<sp/>cache<sp/>sizes<sp/>using<sp/>CPUID<sp/>leaf<sp/>0x04<sp/>(Intel)<sp/>or<sp/>leaf<sp/>0x8000001D<sp/>(AMD)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>detect_x86_cache_sizes(<ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>*<sp/>info)<sp/>{</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/>eax,<sp/>ebx,<sp/>ecx,<sp/>edx;</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Try<sp/>Intel<sp/>deterministic<sp/>cache<sp/>parameters<sp/>(leaf<sp/>0x04)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index<sp/>=<sp/>0;<sp/>index<sp/>&lt;<sp/>16;<sp/>index++)<sp/>{</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cpuid(0x04,<sp/>index,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_type<sp/>=<sp/>eax<sp/>&amp;<sp/>0x1F;</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_type<sp/>==<sp/>0)<sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;<sp/><sp/></highlight><highlight class="comment">//<sp/>No<sp/>more<sp/>caches</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_level<sp/>=<sp/>(eax<sp/>&gt;&gt;<sp/>5)<sp/>&amp;<sp/>0x7;</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>line_size<sp/>=<sp/>(ebx<sp/>&amp;<sp/>0xFFF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>partitions<sp/>=<sp/>((ebx<sp/>&gt;&gt;<sp/>12)<sp/>&amp;<sp/>0x3FF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ways<sp/>=<sp/>((ebx<sp/>&gt;&gt;<sp/>22)<sp/>&amp;<sp/>0x3FF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>sets<sp/>=<sp/>ecx<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>cache_size<sp/>=<sp/>(size_t)line_size<sp/>*<sp/>partitions<sp/>*<sp/>ways<sp/>*<sp/>sets;</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"></highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_type<sp/>==<sp/>1<sp/>||<sp/>cache_type<sp/>==<sp/>3)<sp/>{<sp/><sp/></highlight><highlight class="comment">//<sp/>Data<sp/>or<sp/>unified<sp/>cache</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1aec1d73dace532ccaa255243ad9222d44" kindref="member">l1_line_size</ref><sp/>=<sp/>line_size;</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>2)<sp/>{</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>3)<sp/>{</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"></highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>If<sp/>Intel<sp/>method<sp/>didn&apos;t<sp/>work,<sp/>try<sp/>AMD<sp/>method<sp/>(leaf<sp/>0x8000001D)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(info-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cpuid(0x80000000,<sp/>0,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(eax<sp/>&gt;=<sp/>0x8000001D)<sp/>{</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index<sp/>=<sp/>0;<sp/>index<sp/>&lt;<sp/>16;<sp/>index++)<sp/>{</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cpuid(0x8000001D,<sp/>index,<sp/>&amp;eax,<sp/>&amp;ebx,<sp/>&amp;ecx,<sp/>&amp;edx);</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"></highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_type<sp/>=<sp/>eax<sp/>&amp;<sp/>0x1F;</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_type<sp/>==<sp/>0)<sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_level<sp/>=<sp/>(eax<sp/>&gt;&gt;<sp/>5)<sp/>&amp;<sp/>0x7;</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>line_size<sp/>=<sp/>(ebx<sp/>&amp;<sp/>0xFFF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>partitions<sp/>=<sp/>((ebx<sp/>&gt;&gt;<sp/>12)<sp/>&amp;<sp/>0x3FF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ways<sp/>=<sp/>((ebx<sp/>&gt;&gt;<sp/>22)<sp/>&amp;<sp/>0x3FF)<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>sets<sp/>=<sp/>ecx<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>cache_size<sp/>=<sp/>(size_t)line_size<sp/>*<sp/>partitions<sp/>*<sp/>ways<sp/>*<sp/>sets;</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_type<sp/>==<sp/>1<sp/>||<sp/>cache_type<sp/>==<sp/>3)<sp/>{</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1aec1d73dace532ccaa255243ad9222d44" kindref="member">l1_line_size</ref><sp/>=<sp/>line_size;</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>2)<sp/>{</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cache_level<sp/>==<sp/>3)<sp/>{</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>info-&gt;<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>=<sp/>cache_size;</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="131"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight></codeline>
+<codeline lineno="134"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="135"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Linux<sp/>sysfs<sp/>fallback<sp/>for<sp/>cache<sp/>detection</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__linux__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>read_sysfs_cache_size(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cpu,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index)<sp/>{</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>path[256];</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/>snprintf(path,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(path),</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="stringliteral">&quot;/sys/devices/system/cpu/cpu%d/cache/index%d/size&quot;</highlight><highlight class="normal">,<sp/>cpu,<sp/>index);</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE*<sp/>f<sp/>=<sp/>fopen(path,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!f)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"></highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>buf[32];</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!fgets(buf,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(buf),<sp/>f))<sp/>{</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>unit<sp/>=<sp/></highlight><highlight class="charliteral">&apos;K&apos;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/>sscanf(buf,<sp/></highlight><highlight class="stringliteral">&quot;%zu%c&quot;</highlight><highlight class="normal">,<sp/>&amp;size,<sp/>&amp;unit);</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(unit<sp/>==<sp/></highlight><highlight class="charliteral">&apos;K&apos;</highlight><highlight class="normal"><sp/>||<sp/>unit<sp/>==<sp/></highlight><highlight class="charliteral">&apos;k&apos;</highlight><highlight class="normal">)<sp/>size<sp/>*=<sp/>1024;</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(unit<sp/>==<sp/></highlight><highlight class="charliteral">&apos;M&apos;</highlight><highlight class="normal"><sp/>||<sp/>unit<sp/>==<sp/></highlight><highlight class="charliteral">&apos;m&apos;</highlight><highlight class="normal">)<sp/>size<sp/>*=<sp/>1024<sp/>*<sp/>1024;</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"></highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>size;</highlight></codeline>
+<codeline lineno="162"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"></highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>read_sysfs_cache_level(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cpu,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index)<sp/>{</highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>path[256];</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/>snprintf(path,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(path),</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="stringliteral">&quot;/sys/devices/system/cpu/cpu%d/cache/index%d/level&quot;</highlight><highlight class="normal">,<sp/>cpu,<sp/>index);</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"></highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE*<sp/>f<sp/>=<sp/>fopen(path,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!f)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>level<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fscanf(f,<sp/></highlight><highlight class="stringliteral">&quot;%d&quot;</highlight><highlight class="normal">,<sp/>&amp;level)<sp/>!=<sp/>1)<sp/>level<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>level;</highlight></codeline>
+<codeline lineno="176"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"></highlight></codeline>
+<codeline lineno="178"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>detect_linux_cache_sizes(<ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>*<sp/>info)<sp/>{</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Read<sp/>from<sp/>CPU<sp/>0&apos;s<sp/>cache<sp/>info</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index<sp/>=<sp/>0;<sp/>index<sp/>&lt;<sp/>10;<sp/>index++)<sp/>{</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size<sp/>=<sp/>read_sysfs_cache_size(0,<sp/>index);</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(size<sp/>==<sp/>0)<sp/></highlight><highlight class="keywordflow">break</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"></highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>level<sp/>=<sp/>read_sysfs_cache_level(0,<sp/>index);</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"></highlight></codeline>
+<codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Check<sp/>if<sp/>it&apos;s<sp/>data<sp/>or<sp/>unified<sp/>cache</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>path[256];</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>snprintf(path,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(path),</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="stringliteral">&quot;/sys/devices/system/cpu/cpu0/cache/index%d/type&quot;</highlight><highlight class="normal">,<sp/>index);</highlight></codeline>
+<codeline lineno="190"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>FILE*<sp/>f<sp/>=<sp/>fopen(path,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(f)<sp/>{</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>type[32]<sp/>=<sp/>{0};</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fscanf(f,<sp/></highlight><highlight class="stringliteral">&quot;%31s&quot;</highlight><highlight class="normal">,<sp/>type)<sp/>!=<sp/>1)<sp/>type[0]<sp/>=<sp/></highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="195"><highlight class="normal"></highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strcmp(type,<sp/></highlight><highlight class="stringliteral">&quot;Data&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0<sp/>||<sp/>strcmp(type,<sp/></highlight><highlight class="stringliteral">&quot;Unified&quot;</highlight><highlight class="normal">)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(level<sp/>==<sp/>1)<sp/>info-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>=<sp/>size;</highlight></codeline>
+<codeline lineno="198"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(level<sp/>==<sp/>2)<sp/>info-&gt;<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>=<sp/>size;</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(level<sp/>==<sp/>3)<sp/>info-&gt;<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>=<sp/>size;</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="203"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"></highlight></codeline>
+<codeline lineno="205"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>detect_linux_physical_cores(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Count<sp/>unique<sp/>physical<sp/>cores<sp/>by<sp/>reading<sp/>core_id</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_core_id<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_processors<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="209"><highlight class="normal"></highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE*<sp/>f<sp/>=<sp/>fopen(</highlight><highlight class="stringliteral">&quot;/proc/cpuinfo&quot;</highlight><highlight class="normal">,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!f)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
+<codeline lineno="212"><highlight class="normal"></highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>line[256];</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(fgets(line,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(line),<sp/>f))<sp/>{</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strncmp(line,<sp/></highlight><highlight class="stringliteral">&quot;processor&quot;</highlight><highlight class="normal">,<sp/>9)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_processors++;</highlight></codeline>
+<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strncmp(line,<sp/></highlight><highlight class="stringliteral">&quot;cpu<sp/>cores&quot;</highlight><highlight class="normal">,<sp/>9)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cores<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;cpu<sp/>cores<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;cores);</highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cores<sp/>&gt;<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>cores;</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(strncmp(line,<sp/></highlight><highlight class="stringliteral">&quot;core<sp/>id&quot;</highlight><highlight class="normal">,<sp/>7)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>core_id<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;core<sp/>id<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;core_id);</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(core_id<sp/>&gt;<sp/>max_core_id)<sp/>max_core_id<sp/>=<sp/>core_id;</highlight></codeline>
+<codeline lineno="230"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="231"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="233"><highlight class="normal"></highlight></codeline>
+<codeline lineno="234"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Fallback:<sp/>use<sp/>processor<sp/>count<sp/>(may<sp/>include<sp/>hyperthreads)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="235"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max_core_id<sp/>&gt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>max_core_id<sp/>+<sp/>1;</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>num_processors<sp/>&gt;<sp/>0<sp/>?<sp/>num_processors<sp/>:<sp/>1;</highlight></codeline>
+<codeline lineno="239"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="240"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="241"><highlight class="normal"></highlight></codeline>
+<codeline lineno="242"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="243"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Physical<sp/>core<sp/>detection</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="244"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="245"><highlight class="normal"></highlight></codeline>
+<codeline lineno="246" refid="cpu__features_8c_1a8f4a571a19e02f7714b53aa1e5d50f91" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="cpu__features_8c_1a8f4a571a19e02f7714b53aa1e5d50f91" kindref="member">detect_physical_cores</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__linux__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>detect_linux_physical_cores();</highlight></codeline>
+<codeline lineno="249"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(_WIN32)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="250"><highlight class="normal"><sp/><sp/><sp/><sp/>SYSTEM_INFO<sp/>sysinfo;</highlight></codeline>
+<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/>GetSystemInfo(&amp;sysinfo);</highlight></codeline>
+<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Windows:<sp/>this<sp/>gives<sp/>logical<sp/>processors,<sp/>divide<sp/>by<sp/>2<sp/>for<sp/>HT<sp/>estimate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>sysinfo.dwNumberOfProcessors<sp/>/<sp/>2;</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__APPLE__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cores<sp/>=<sp/>1;</highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>len<sp/>=<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(cores);</highlight></codeline>
+<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/>sysctlbyname(</highlight><highlight class="stringliteral">&quot;hw.physicalcpu&quot;</highlight><highlight class="normal">,<sp/>&amp;cores,<sp/>&amp;len,<sp/>NULL,<sp/>0);</highlight></codeline>
+<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>cores;</highlight></codeline>
+<codeline lineno="259"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="260"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>1;</highlight></codeline>
+<codeline lineno="261"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="262"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="263"><highlight class="normal"></highlight></codeline>
+<codeline lineno="264"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="265"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Compute<sp/>optimal<sp/>GEMM<sp/>blocking<sp/>parameters</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="266"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="267"><highlight class="normal"></highlight></codeline>
+<codeline lineno="268" refid="cpu__features_8c_1a6465c90ac7e832c18d8e5a21df58653b" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="cpu__features_8c_1a6465c90ac7e832c18d8e5a21df58653b" kindref="member">compute_gemm_params</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>*<sp/>cpu,<sp/><ref refid="structGEMMParams" kindref="compound">GEMMParams</ref>*<sp/>params)<sp/>{</highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Microkernel<sp/>sizes<sp/>based<sp/>on<sp/>SIMD<sp/>width</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>MUST<sp/>match<sp/>compile-time<sp/>MR_FIXED/NR_FIXED<sp/>in<sp/>gemm_microkernel.c</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="271"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cpu-&gt;<ref refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" kindref="member">has_avx512f</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="272"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>=<sp/>6;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>6<sp/>rows</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>=<sp/>32;<sp/><sp/></highlight><highlight class="comment">//<sp/>32<sp/>cols<sp/>(2<sp/>x<sp/>ZMM<sp/>registers)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cpu-&gt;<ref refid="structCPUInfo_1a675b39fcccd4eac9995984acbe5d3d15" kindref="member">has_fma</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="275"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX2+FMA:<sp/>can<sp/>use<sp/>6x16<sp/>with<sp/>FMA<sp/>hiding<sp/>register<sp/>spilling</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>=<sp/>6;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>6<sp/>rows</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>=<sp/>16;<sp/><sp/></highlight><highlight class="comment">//<sp/>16<sp/>cols<sp/>(2<sp/>x<sp/>YMM<sp/>registers)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="278"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(cpu-&gt;<ref refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" kindref="member">has_avx</ref><sp/>||<sp/>cpu-&gt;<ref refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" kindref="member">has_avx2</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="279"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX<sp/>without<sp/>FMA:<sp/>use<sp/>4x16<sp/>to<sp/>avoid<sp/>register<sp/>spilling</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="280"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>=<sp/>4;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>4<sp/>rows<sp/>(reduced<sp/>to<sp/>fit<sp/>in<sp/>16<sp/>YMM<sp/>registers)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="281"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>=<sp/>16;<sp/><sp/></highlight><highlight class="comment">//<sp/>16<sp/>cols<sp/>(2<sp/>x<sp/>YMM<sp/>registers)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="282"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="283"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>=<sp/>4;</highlight></codeline>
+<codeline lineno="284"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>=<sp/>4;</highlight></codeline>
+<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="286"><highlight class="normal"></highlight></codeline>
+<codeline lineno="287"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Get<sp/>cache<sp/>sizes<sp/>(use<sp/>defaults<sp/>if<sp/>detection<sp/>failed)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="288"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l1<sp/>=<sp/>cpu-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>&gt;<sp/>0<sp/>?<sp/>cpu-&gt;<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>:<sp/>32<sp/>*<sp/>1024;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Default<sp/>32KB</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="289"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l2<sp/>=<sp/>cpu-&gt;<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>&gt;<sp/>0<sp/>?<sp/>cpu-&gt;<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>:<sp/>256<sp/>*<sp/>1024;<sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Default<sp/>256KB</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="290"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l3<sp/>=<sp/>cpu-&gt;<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>&gt;<sp/>0<sp/>?<sp/>cpu-&gt;<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>:<sp/>8<sp/>*<sp/>1024<sp/>*<sp/>1024;<sp/></highlight><highlight class="comment">//<sp/>Default<sp/>8MB</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="291"><highlight class="normal"></highlight></codeline>
+<codeline lineno="292"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>BLIS-style<sp/>blocking<sp/>parameter<sp/>computation</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="293"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Reference:<sp/>&quot;Anatomy<sp/>of<sp/>High-Performance<sp/>Matrix<sp/>Multiplication&quot;<sp/>(Goto<sp/>&amp;<sp/>Van<sp/>de<sp/>Geijn)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>KC:<sp/>Controls<sp/>L1<sp/>usage</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="296"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>A<sp/>micropanel:<sp/>MR<sp/>x<sp/>KC</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>B<sp/>micropanel:<sp/>KC<sp/>x<sp/>NR<sp/>(streamed<sp/>from<sp/>L2)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="298"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>Want<sp/>MR<sp/>*<sp/>KC<sp/>*<sp/>sizeof(float)<sp/>to<sp/>fit<sp/>in<sp/>~half<sp/>of<sp/>L1</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="299"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>MC:<sp/>Controls<sp/>L2<sp/>usage</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>A<sp/>block:<sp/>MC<sp/>x<sp/>KC<sp/>should<sp/>fit<sp/>in<sp/>L2</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="302"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>NC:<sp/>Controls<sp/>L3<sp/>usage<sp/>/<sp/>main<sp/>memory<sp/>streaming</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>B<sp/>panel:<sp/>KC<sp/>x<sp/>NC</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="305"><highlight class="normal"></highlight></codeline>
+<codeline lineno="306"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>KC:<sp/>Controls<sp/>L1<sp/>usage</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="307"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>For<sp/>optimal<sp/>performance,<sp/>both<sp/>A<sp/>micropanel<sp/>and<sp/>B<sp/>row<sp/>should<sp/>fit<sp/>in<sp/>L1:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="308"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>A<sp/>micropanel:<sp/>MR<sp/>*<sp/>KC<sp/>floats</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/><sp/><sp/>-<sp/>B<sp/>row<sp/>for<sp/>streaming:<sp/>NR<sp/>floats<sp/>per<sp/>iteration<sp/>(small)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="310"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>~25%<sp/>of<sp/>L1<sp/>for<sp/>A<sp/>micropanel<sp/>to<sp/>leave<sp/>room<sp/>for<sp/>B<sp/>and<sp/>working<sp/>set</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="311"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l1_for_a<sp/>=<sp/>(l1<sp/>*<sp/>25)<sp/>/<sp/>100;</highlight></codeline>
+<codeline lineno="312"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>=<sp/>(int)(l1_for_a<sp/>/<sp/>(params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)));</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"></highlight></codeline>
+<codeline lineno="314"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Round<sp/>KC<sp/>to<sp/>multiple<sp/>of<sp/>8<sp/>for<sp/>alignment</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="315"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>=<sp/>(params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>/<sp/>8)<sp/>*<sp/>8;</highlight></codeline>
+<codeline lineno="316"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>&lt;<sp/>64)<sp/>params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>=<sp/>64;</highlight></codeline>
+<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>&gt;<sp/>512)<sp/>params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>=<sp/>512;<sp/><sp/></highlight><highlight class="comment">//<sp/>Cap<sp/>at<sp/>512<sp/>for<sp/>better<sp/>cache<sp/>fit</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="318"><highlight class="normal"></highlight></codeline>
+<codeline lineno="319"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>MC:<sp/>A<sp/>block<sp/>=<sp/>MC<sp/>*<sp/>KC<sp/>*<sp/>4<sp/>bytes<sp/>should<sp/>fit<sp/>in<sp/>~80%<sp/>of<sp/>L2</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="320"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l2_for_a<sp/>=<sp/>(l2<sp/>*<sp/>80)<sp/>/<sp/>100;</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>=<sp/>(int)(l2_for_a<sp/>/<sp/>(params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)));</highlight></codeline>
+<codeline lineno="322"><highlight class="normal"></highlight></codeline>
+<codeline lineno="323"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Round<sp/>MC<sp/>to<sp/>multiple<sp/>of<sp/>MR</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>=<sp/>(params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>/<sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref>)<sp/>*<sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref>;</highlight></codeline>
+<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/>if<sp/>(params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>&lt;<sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>*<sp/>4)<sp/>params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>=<sp/>params-&gt;<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref><sp/>*<sp/>4;</highlight></codeline>
+<codeline lineno="326"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>&gt;<sp/>512)<sp/>params-&gt;<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref><sp/>=<sp/>512;</highlight></codeline>
+<codeline lineno="327"><highlight class="normal"></highlight></codeline>
+<codeline lineno="328"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>NC:<sp/>B<sp/>panel<sp/>=<sp/>KC<sp/>*<sp/>NC<sp/>*<sp/>4<sp/>bytes</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="329"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>For<sp/>L3,<sp/>we<sp/>want<sp/>good<sp/>streaming,<sp/>use<sp/>~50%<sp/>of<sp/>L3<sp/>/<sp/>num_cores</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="330"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l3_per_core<sp/>=<sp/>l3<sp/>/<sp/>(cpu-&gt;<ref refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" kindref="member">num_cores</ref><sp/>&gt;<sp/>0<sp/>?<sp/>cpu-&gt;<ref refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" kindref="member">num_cores</ref><sp/>:<sp/>1);</highlight></codeline>
+<codeline lineno="331"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>l3_for_b<sp/>=<sp/>(l3_per_core<sp/>*<sp/>50)<sp/>/<sp/>100;</highlight></codeline>
+<codeline lineno="332"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>=<sp/>(int)(l3_for_b<sp/>/<sp/>(params-&gt;<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)));</highlight></codeline>
+<codeline lineno="333"><highlight class="normal"></highlight></codeline>
+<codeline lineno="334"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Round<sp/>NC<sp/>to<sp/>multiple<sp/>of<sp/>NR</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="335"><highlight class="normal"><sp/><sp/><sp/><sp/>params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>=<sp/>(params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>/<sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref>)<sp/>*<sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref>;</highlight></codeline>
+<codeline lineno="336"><highlight class="normal"><sp/><sp/><sp/><sp/>if<sp/>(params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>&lt;<sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>*<sp/>8)<sp/>params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>=<sp/>params-&gt;<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref><sp/>*<sp/>8;</highlight></codeline>
+<codeline lineno="337"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>&gt;<sp/>8192)<sp/>params-&gt;<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref><sp/>=<sp/>8192;</highlight></codeline>
+<codeline lineno="338"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="339"><highlight class="normal"></highlight></codeline>
+<codeline lineno="340"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="341"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Public<sp/>API</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="342"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="343"><highlight class="normal"></highlight></codeline>
+<codeline lineno="344" refid="cpu__features_8h_1ab051fa0f4c2fc0723066eab07401fed6" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" kindref="member">cpu_features_init</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="345"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref>)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="346"><highlight class="normal"></highlight></codeline>
+<codeline lineno="347"><highlight class="normal"><sp/><sp/><sp/><sp/>memset(&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>));</highlight></codeline>
+<codeline lineno="348"><highlight class="normal"><sp/><sp/><sp/><sp/>memset(&amp;<ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>));</highlight></codeline>
+<codeline lineno="349"><highlight class="normal"></highlight></codeline>
+<codeline lineno="350"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Detect<sp/>SIMD<sp/>features</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="351"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>X86_CPU</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="352"><highlight class="normal"><sp/><sp/><sp/><sp/>detect_x86_features(&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>);</highlight></codeline>
+<codeline lineno="353"><highlight class="normal"><sp/><sp/><sp/><sp/>detect_x86_cache_sizes(&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>);</highlight></codeline>
+<codeline lineno="354"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="355"><highlight class="normal"></highlight></codeline>
+<codeline lineno="356"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Linux<sp/>sysfs<sp/>fallback<sp/>for<sp/>cache<sp/>sizes</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="357"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__linux__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="358"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="359"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>detect_linux_cache_sizes(&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>);</highlight></codeline>
+<codeline lineno="360"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="361"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="362"><highlight class="normal"></highlight></codeline>
+<codeline lineno="363"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Detect<sp/>physical<sp/>cores</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="364"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" kindref="member">num_cores</ref><sp/>=<sp/><ref refid="cpu__features_8c_1a8f4a571a19e02f7714b53aa1e5d50f91" kindref="member">detect_physical_cores</ref>();</highlight></codeline>
+<codeline lineno="365"><highlight class="normal"></highlight></codeline>
+<codeline lineno="366"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>GEMM<sp/>parameters<sp/>based<sp/>on<sp/>detected<sp/>hardware</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="367"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="cpu__features_8c_1a6465c90ac7e832c18d8e5a21df58653b" kindref="member">compute_gemm_params</ref>(&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>,<sp/>&amp;<ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>);</highlight></codeline>
+<codeline lineno="368"><highlight class="normal"></highlight></codeline>
+<codeline lineno="369"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref><sp/>=<sp/>1;</highlight></codeline>
+<codeline lineno="370"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="371"><highlight class="normal"></highlight></codeline>
+<codeline lineno="372" refid="cpu__features_8h_1ab1ad13308616a6d3d811b97eef9abfe6" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structGEMMParams" kindref="compound">GEMMParams</ref>*<sp/><ref refid="cpu__features_8c_1ab1ad13308616a6d3d811b97eef9abfe6" kindref="member">get_gemm_params</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="373"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!<ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref>)<sp/><ref refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" kindref="member">cpu_features_init</ref>();</highlight></codeline>
+<codeline lineno="374"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>&amp;<ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>;</highlight></codeline>
+<codeline lineno="375"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="376"><highlight class="normal"></highlight></codeline>
+<codeline lineno="377" refid="cpu__features_8h_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>*<sp/><ref refid="cpu__features_8c_1a3c6e32bab9ac6dbe68fb4f17d6378e7d" kindref="member">get_cpu_info</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="378"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!<ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref>)<sp/><ref refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" kindref="member">cpu_features_init</ref>();</highlight></codeline>
+<codeline lineno="379"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>&amp;<ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>;</highlight></codeline>
+<codeline lineno="380"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="381"><highlight class="normal"></highlight></codeline>
+<codeline lineno="382" refid="cpu__features_8h_1a538a4414821926cda2c9e989764c00fd" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="cpu__features_8c_1a538a4414821926cda2c9e989764c00fd" kindref="member">print_cpu_info</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="383"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!<ref refid="cpu__features_8c_1a9f67b8a4e1c74de8b6f0d8b535e44877" kindref="member">g_cpu_initialized</ref>)<sp/><ref refid="cpu__features_8c_1ab051fa0f4c2fc0723066eab07401fed6" kindref="member">cpu_features_init</ref>();</highlight></codeline>
+<codeline lineno="384"><highlight class="normal"></highlight></codeline>
+<codeline lineno="385"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;===<sp/>CPU<sp/>Info<sp/>===\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="386"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;Physical<sp/>cores:<sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1aa4bcdef1bf48fa3860742a28a7d57d6d" kindref="member">num_cores</ref>);</highlight></codeline>
+<codeline lineno="387"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;L1<sp/>Data<sp/>Cache:<sp/><sp/>%zu<sp/>KB\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a2e9b76fe6d69b6a1b6c194cd4ca35d86" kindref="member">l1d_size</ref><sp/>/<sp/>1024);</highlight></codeline>
+<codeline lineno="388"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;L2<sp/>Cache:<sp/><sp/><sp/><sp/><sp/><sp/><sp/>%zu<sp/>KB\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1accaf39347e29f639b10e0d99825a0ca5" kindref="member">l2_size</ref><sp/>/<sp/>1024);</highlight></codeline>
+<codeline lineno="389"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;L3<sp/>Cache:<sp/><sp/><sp/><sp/><sp/><sp/><sp/>%zu<sp/>MB\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a50cf2d09ca804dfbdbbc1759cb71943c" kindref="member">l3_size</ref><sp/>/<sp/>(1024<sp/>*<sp/>1024));</highlight></codeline>
+<codeline lineno="390"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;Cache<sp/>line:<sp/><sp/><sp/><sp/><sp/>%zu<sp/>bytes\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1aec1d73dace532ccaa255243ad9222d44" kindref="member">l1_line_size</ref>);</highlight></codeline>
+<codeline lineno="391"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;AVX:<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" kindref="member">has_avx</ref><sp/>?<sp/></highlight><highlight class="stringliteral">&quot;yes&quot;</highlight><highlight class="normal"><sp/>:<sp/></highlight><highlight class="stringliteral">&quot;no&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="392"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;AVX2:<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" kindref="member">has_avx2</ref><sp/>?<sp/></highlight><highlight class="stringliteral">&quot;yes&quot;</highlight><highlight class="normal"><sp/>:<sp/></highlight><highlight class="stringliteral">&quot;no&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="393"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;AVX-512F:<sp/><sp/><sp/><sp/><sp/><sp/><sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" kindref="member">has_avx512f</ref><sp/>?<sp/></highlight><highlight class="stringliteral">&quot;yes&quot;</highlight><highlight class="normal"><sp/>:<sp/></highlight><highlight class="stringliteral">&quot;no&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="394"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;FMA:<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%s\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kindref="member">g_cpu_info</ref>.<ref refid="structCPUInfo_1a675b39fcccd4eac9995984acbe5d3d15" kindref="member">has_fma</ref><sp/>?<sp/></highlight><highlight class="stringliteral">&quot;yes&quot;</highlight><highlight class="normal"><sp/>:<sp/></highlight><highlight class="stringliteral">&quot;no&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="395"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n===<sp/>GEMM<sp/>Blocking<sp/>Parameters<sp/>===\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="396"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;MR<sp/>(microkernel<sp/>rows):<sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>.<ref refid="structGEMMParams_1a6b0b003d129e3c027928ac6ad089e110" kindref="member">MR</ref>);</highlight></codeline>
+<codeline lineno="397"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;NR<sp/>(microkernel<sp/>cols):<sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>.<ref refid="structGEMMParams_1adc0714de30284b4b62ecfac446979251" kindref="member">NR</ref>);</highlight></codeline>
+<codeline lineno="398"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;MC<sp/>(M<sp/>block):<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>.<ref refid="structGEMMParams_1a2956e1497d1e97174d5d17e872707769" kindref="member">MC</ref>);</highlight></codeline>
+<codeline lineno="399"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;NC<sp/>(N<sp/>block):<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>.<ref refid="structGEMMParams_1a450121a9c76be4c90fe5326b1808eb1a" kindref="member">NC</ref>);</highlight></codeline>
+<codeline lineno="400"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;KC<sp/>(K<sp/>block):<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>%d\n&quot;</highlight><highlight class="normal">,<sp/><ref refid="cpu__features_8c_1add9495a8b0827ace67807e0826a890d1" kindref="member">g_gemm_params</ref>.<ref refid="structGEMMParams_1aa84a148f54c8ec49fec73e7b2354761c" kindref="member">KC</ref>);</highlight></codeline>
+<codeline lineno="401"><highlight class="normal"><sp/><sp/><sp/><sp/>printf(</highlight><highlight class="stringliteral">&quot;\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="402"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/cpu_features.c"/>
+  </compounddef>
+</doxygen>

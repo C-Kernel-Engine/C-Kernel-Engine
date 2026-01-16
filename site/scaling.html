@@ -1,0 +1,3001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScalingPhilosophy | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<h1>Scaling Philosophy</h1>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Two First Principles. Everything Else Follows.</strong><br>
+        Our entire scaling philosophy rests on two fundamental truths from first-principles thinking.
+    </div>
+</div>
+
+<h2>The Two First Principles</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Principle 1: 0 × ∞ = 0</h3>
+        <p><strong>If your model doesn't fit in memory, compute speed is irrelevant.</strong></p>
+        <p>A GPU with 80GB VRAM running at infinite FLOPS still equals zero if your 70B model requires 140GB+ for weights alone.</p>
+        <p><strong>The cost implication:</strong> You're FORCED to buy 8+ GPUs ($320K+) just to fit the model. With CPUs and 4TB RAM per server, you need 1-2 servers ($60K).</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Principle 2: Theory of Constraints</h3>
+        <p><strong>Your system is only as fast as its slowest component.</strong></p>
+        <p>NVLink is fast (900 GB/s) <em>within a node</em>. But NVLink doesn't scale infinitely. At scale, EVERYONE hits Ethernet.</p>
+        <p><strong>The equalizer:</strong> At the Ethernet boundary, CPUs and GPUs face the same constraint. Without NVLink, GPUs are often <em>slower</em> than server-grade CPUs.</p>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Proof of Infinite CPU Scaling</strong><br>
+        The internet itself. Billions of CPUs, connected by Ethernet, scaling infinitely. No NVLink required.
+    </div>
+</div>
+
+<h2>History Repeats: Commodity Always Wins</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Pattern That Never Fails</h3>
+    <p>Every generation, expensive proprietary hardware dominates... until commodity hardware + brilliant software disrupts it.</p>
+    <p><strong>We've seen this movie before. We know how it ends.</strong></p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Era</th><th>Incumbent (Expensive)</th><th>Disruptor (Commodity)</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>1998</strong></td>
+                <td>Sun/SGI servers ($500K+)</td>
+                <td>Google: x86 PCs + MapReduce/GFS</td>
+                <td style="color: #4ade80;">Sun bankrupt (2010)</td>
+            </tr>
+            <tr>
+                <td><strong>2006</strong></td>
+                <td>Enterprise data centers</td>
+                <td>AWS: Shopping server excess → EC2</td>
+                <td style="color: #4ade80;">$80B cloud market created</td>
+            </tr>
+            <tr>
+                <td><strong>2011</strong></td>
+                <td>HP/Dell proprietary servers</td>
+                <td>Facebook Open Compute Project</td>
+                <td style="color: #4ade80;">Industry-wide cost reduction</td>
+            </tr>
+            <tr>
+                <td><strong>1990s</strong></td>
+                <td>SPARC, Alpha, PA-RISC</td>
+                <td>Intel x86 commodity chips</td>
+                <td style="color: #4ade80;">RISC architectures dead</td>
+            </tr>
+            <tr>
+                <td><strong>1990s</strong></td>
+                <td>Solaris, AIX, HP-UX ($$$)</td>
+                <td>Linux (free)</td>
+                <td style="color: #4ade80;">Unix market collapsed</td>
+            </tr>
+            <tr>
+                <td><strong>2014</strong></td>
+                <td>Oracle Database ($47K/core)</td>
+                <td>PostgreSQL (free) + good engineering</td>
+                <td style="color: #4ade80;">Oracle losing market share</td>
+            </tr>
+            <tr>
+                <td><strong>2009</strong></td>
+                <td>Teradata, Netezza ($1M+)</td>
+                <td>Hadoop on commodity clusters</td>
+                <td style="color: #4ade80;">Big data democratized</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-info" style="margin: 20px 0; padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid #3b82f6;">
+    <p style="margin: 0; color: #a0b0c0; font-size: 15px; line-height: 1.6;">
+        <strong style="color: #fbbf24;">In 1998, "serious" computing meant Sun Enterprise servers.</strong>
+        Google used cheap x86 PCs with software that expected hardware to fail (GFS, MapReduce), and scaled horizontally.
+        <strong>Result:</strong> Sun Microsystems filed for bankruptcy in 2010.
+        The same pattern is emerging in AI: as models hit hundreds of gigabytes, the dominant costs shift from compute to memory, coordination, and reliability.
+        CPUs—built for exactly this regime—are positioned to disrupt GPU-centric assumptions.
+    </p>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Inevitable Question</strong><br>
+        In 1995, "You can't run serious workloads on cheap PCs" was conventional wisdom.<br>
+        In 2024, "You can't run serious AI on cheap CPUs" is conventional wisdom.<br>
+        <strong>The pattern suggests one of these beliefs will age poorly.</strong>
+    </div>
+</div>
+
+<h2>Principle 1: The Cost of 0 × ∞ = 0</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The GPU Memory Trap</h3>
+    <p>Yes, you CAN fit a 70B model on GPUs using tensor/pipeline parallelism. That's not the point.</p>
+    <p><strong>The point is: you're now FORCED to buy 8+ GPUs.</strong></p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Model Size</th><th>GPU Requirement</th><th>GPU Cost</th><th>CPU Requirement</th><th>CPU Cost</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>7B (14GB weights)</td>
+                <td>1× 80GB GPU</td>
+                <td>$40,000</td>
+                <td>1× server, 128GB RAM</td>
+                <td>$8,000</td>
+            </tr>
+            <tr>
+                <td>70B (140GB weights)</td>
+                <td>2-4× 80GB GPUs + NVLink</td>
+                <td>$160,000+</td>
+                <td>1× server, 512GB RAM</td>
+                <td>$15,000</td>
+            </tr>
+            <tr>
+                <td>70B (with optimizer states)</td>
+                <td>8× 80GB GPUs + NVLink</td>
+                <td>$480,000+</td>
+                <td>1-2× servers, 2TB RAM each</td>
+                <td>$60,000</td>
+            </tr>
+            <tr>
+                <td>405B (Llama 3.1 scale)</td>
+                <td>32+ GPUs across nodes</td>
+                <td>$2,000,000+</td>
+                <td>4-8× servers, 4TB RAM each</td>
+                <td>$200,000</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Math That Matters</h3>
+    <pre>
+GPU Path:
+  Model doesn't fit in 80GB → Buy 8 GPUs → $320K for GPUs alone
+  Need NVLink for fast communication → Another $50K+
+  Need DGX chassis → Another $80K+
+  Total: $450K+ just to START
+
+CPU Path:
+  Model fits in 4TB RAM → Buy 1-2 servers → $30K each
+  Standard Ethernet networking → $2K
+  Total: $60K and you're running
+    </pre>
+    <p><strong>The "0 × ∞ = 0" principle forces GPU users into expensive multi-GPU setups. CPUs avoid this entirely.</strong></p>
+</div>
+
+<h2>Target Platform</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Server-Grade Hardware by Instruction Set</h3>
+    <p>C-Kernel-Engine uses <code>ck_features.h</code> for feature detection. We target by SIMD capability, not CPU model:</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Instruction Set Priority</h3>
+        <ul>
+            <li><strong>AMX</strong> - 512-bit tile ops (Intel Sapphire Rapids+)</li>
+            <li><strong>AVX-512</strong> - 512-bit vector (Intel Skylake-X+, AMD Zen 4)</li>
+            <li><strong>AVX2+FMA</strong> - 256-bit with FMA (Intel Haswell+, AMD Zen 2+)</li>
+            <li><strong>AVX</strong> - 256-bit vector (Intel Sandy Bridge+, AMD Zen 1)</li>
+            <li><strong>NEON</strong> - 128-bit (ARM64, Apple Silicon)</li>
+        </ul>
+        <p><strong>Auto-detection:</strong> The engine selects the best kernel at compile time.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">CPU Requirements</h3>
+        <ul>
+            <li><strong>High core count</strong> - 64-128+ cores per socket</li>
+            <li><strong>Large L3 cache</strong> - Good core-to-cache ratio (1-2MB/core)</li>
+            <li><strong>Vector width</strong> - 256-bit minimum (AVX)</li>
+            <li><strong>FMA</strong> - Recommended for 2x throughput</li>
+            <li><strong>Multiple sockets</strong> - NUMA-aware memory access</li>
+        </ul>
+    </div>
+</div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Memory Requirements</h3>
+        <ul>
+            <li><strong>DDR5</strong> - Higher bandwidth, lower latency</li>
+            <li><strong>Multi-channel</strong> - 8-12 channels per socket</li>
+            <li><strong>Large capacity</strong> - 512GB - 2TB+ per node</li>
+            <li><strong>ECC</strong> - Error correction for reliability</li>
+            <li><strong>NUMA-local</strong> - Pin threads to local memory</li>
+        </ul>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Accelerators</h3>
+        <ul>
+            <li><strong>Intel DSA</strong> - Data Streaming Accelerator for memory copies</li>
+            <li><strong>Intel IAA</strong> - Analytics Accelerator for compression</li>
+            <li><strong>Intel QAT</strong> - QuickAssist for crypto (if needed)</li>
+            <li><strong>CXL</strong> - Memory expansion and pooling (future)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Networking</h3>
+        <ul>
+            <li><strong>RDMA</strong> - InfiniBand or RoCEv2</li>
+            <li><strong>100-400 Gbps</strong> - High bandwidth interconnect</li>
+            <li><strong>Low latency</strong> - 1-2 μs for RDMA operations</li>
+            <li><strong>Kernel bypass</strong> - Zero-copy transfers</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Operating System</h3>
+    <p><strong>Linux-only.</strong> We use Linux-specific features:</p>
+    <ul>
+        <li><code>mmap()</code> with <code>MAP_HUGETLB</code> for huge pages</li>
+        <li><code>madvise(MADV_HUGEPAGE)</code> for transparent huge pages</li>
+        <li><code>numactl</code> / <code>set_mempolicy()</code> for NUMA binding</li>
+        <li><code>sched_setaffinity()</code> for core pinning</li>
+        <li><code>perf</code> for profiling</li>
+        <li><code>io_uring</code> for async I/O (weight loading)</li>
+        <li>Intel DSA via <code>libaccel-config</code> / <code>idxd</code> driver</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Target CPU Families</h3>
+    <div class="table-container">
+        <table class="table">
+        <thead>
+            <tr><th>CPU</th><th>Cores</th><th>AVX-512</th><th>AMX</th><th>DDR5 Channels</th><th>DSA</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>AMD EPYC 9004 (Genoa)</td>
+                <td>Up to 128</td>
+                <td>Yes</td>
+                <td>No</td>
+                <td>12</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td>AMD EPYC 9005 (Turin)</td>
+                <td>Up to 192</td>
+                <td>Yes</td>
+                <td>No</td>
+                <td>12</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Sapphire Rapids</td>
+                <td>Up to 60</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Emerald Rapids</td>
+                <td>Up to 64</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Intel Xeon Granite Rapids</td>
+                <td>Up to 128</td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td>8</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>Ampere Altra Max</td>
+                <td>128</td>
+                <td>No (ARM)</td>
+                <td>No</td>
+                <td>8</td>
+                <td>No</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+    <p><strong>Note:</strong> C-Kernel-Engine detects available instruction sets at compile time using <code>ck_features.h</code>. See <code>include/ck_features.h</code> for the feature detection macros.</p>
+</div>
+
+<h2>Why CPU-Only?</h2>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Advantages</h3>
+        <ul>
+            <li><strong>No vendor lock-in</strong> - Works on any x86/ARM CPU</li>
+            <li><strong>Commodity hardware</strong> - Standard servers, not $40K GPUs</li>
+            <li><strong>Larger memory</strong> - 2TB RAM per node, no 80GB VRAM limit</li>
+            <li><strong>Better debugging</strong> - GDB, Valgrind, perf all work</li>
+            <li><strong>Simpler deployment</strong> - No CUDA, no driver hell</li>
+            <li><strong>Open ecosystem</strong> - GCC, Linux, standard tools</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">The Trade-off</h3>
+        <ul>
+            <li>GPUs have higher peak FLOPS</li>
+            <li>But: memory bandwidth often bottlenecks anyway</li>
+            <li>But: PCIe transfer overhead for large models</li>
+            <li>But: multi-GPU coordination is complex</li>
+            <li>But: CPU memory is 10-100x larger and cheaper</li>
+        </ul>
+        <p><strong>For inference:</strong> CPUs are often faster for batch=1</p>
+        <p><strong>For training:</strong> Scale horizontally with RDMA</p>
+    </div>
+</div>
+
+<h2>The Fundamental Math: 0 × ∞ = 0</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Memory Constraint</strong><br>
+        It doesn't matter how fast your compute is if your model won't fit in memory. Being 10x faster at computing doesn't help if you're limited by 0 × ∞ = 0.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU: Memory Wins</h3>
+        <ul>
+            <li><strong>Dual Xeon:</strong> 4-6TB DDR5</li>
+            <li><strong>Can train:</strong> 1TB model in BF16</li>
+            <li><strong>Math:</strong> 4-6TB × Dual Socket = Non-zero</li>
+            <li><strong>Result:</strong> Actually trains the model!</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">GPU: Compute Fast, Memory Fails</h3>
+        <ul>
+            <li><strong>A100:</strong> 80GB VRAM</li>
+            <li><strong>Can't train:</strong> 1TB model</li>
+            <li><strong>Math:</strong> 80GB × ∞ GPUs = 0 (won't fit)</li>
+            <li><strong>Result:</strong> Fast but useless for large models</li>
+        </ul>
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="CPU vs GPU Memory Analysis">
+    <img src="assets/cpu-gpu-analysis.svg" alt="CPU vs GPU Memory Analysis">
+</div>
+
+<h2>GPU Performance Comparison: Reality Check</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">GPU Specifications and Real-World Performance</h3>
+    <p>Let's examine actual GPU capabilities and their limitations for large-scale ML training.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">RTX 3090</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
+            <div style="color: #a0a0a0;">VRAM</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 936 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 10,496</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 35</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,500</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Can't fit 70B+ models. Max practical: 13B in FP16.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">RTX 4090</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
+            <div style="color: #a0a0a0;">VRAM</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1008 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,384</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 83</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,600</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Same VRAM as 3090. Still can't fit large models.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">A100</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
+            <div style="color: #a0a0a0;">HBM2e</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1,935 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 6,912</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 312</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$15,000</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Can fit up to ~40B models. Needs 25+ GPUs for 70B+.
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top: 0; text-align: center;">H100</h3>
+        <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
+            <div style="color: #a0a0a0;">HBM3</div>
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 3,350 GB/s</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,896</li>
+            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 989</li>
+            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$40,000</li>
+        </ul>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
+            <strong style="color: #ff6b6b;">Reality:</strong> Same 80GB VRAM limit. Needs 12+ GPUs for 70B+ models.
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+        <strong>The Pattern is Clear</strong><br>
+        Every GPU hits the same VRAM wall. Whether 24GB or 80GB, large models require massive GPU counts. This is the fundamental constraint that CPU-only architecture bypasses entirely.
+    </div>
+</div>
+
+<h2>Energy Efficiency: The CPU Advantage at Realistic Utilization</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+    </div>
+    <div>
+        <strong>"CPUs burn too much power per token"</strong><br>
+        This is the final argument GPU advocates use. But the math changes dramatically when we look at <strong>realistic utilization</strong>, not theoretical peak FLOPS.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Utilization Problem</h3>
+    <p>GPU efficiency claims assume <strong>100% compute utilization</strong>. Real inference doesn't work that way:</p>
+    <ul>
+        <li><strong>Batch=1 latency:</strong> Most production inference is single-request</li>
+        <li><strong>Memory-bound:</strong> KV cache and weight loading dominate</li>
+        <li><strong>Token-to-token:</strong> 90%+ of time is waiting for next token</li>
+        <li><strong>I/O bound:</strong> Network, disk, and tokenization overhead</li>
+    </ul>
+    <p><strong>The dirty secret:</strong> GPUs spend most of their time <em>idle</em>, still drawing full power.</p>
+</div>
+
+<h3>The Idle Power Reality</h3>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU: Always Hungry</h3>
+        <ul>
+            <li><strong>H100 at idle:</strong> ~150W (just sitting there)</li>
+            <li><strong>H100 at compute:</strong> ~700W</li>
+            <li><strong>PCIe overhead:</strong> +50W for data transfer</li>
+            <li><strong>VRAM stays powered:</strong> Weights must remain loaded</li>
+        </ul>
+        <p><strong>Real-world:</strong> If your GPU is only computing 20% of the time, you're wasting 80% of that 700W.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU: Scales Down</h3>
+        <ul>
+            <li><strong>Dual Xeon at idle:</strong> ~100-150W (bare OS, minimal load)</li>
+            <li><strong>Dual Xeon at compute:</strong> ~800-1000W (full load)</li>
+            <li><strong>DVFS:</strong> Scales from 0.8GHz to 3.5GHz dynamically</li>
+            <li><strong>C-states:</strong> Deep sleep cores when waiting for I/O</li>
+        </ul>
+        <p><strong>Real-world:</strong> Enterprise server with 2TB RAM typically draws 200-400W average for inference workloads.</p>
+    </div>
+</div>
+
+<h3>Power-Per-Token Analysis</h3>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Scenario</th><th>GPU Power</th><th>CPU Power</th><th>Winner</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Theoretical peak FLOPS</strong></td>
+                <td>700W / 989 TFLOPS = 0.71 W/TFLOPS</td>
+                <td>1000W / 6 TFLOPS = 167 W/TFLOPS</td>
+                <td style="color: #ff6b6b;">GPU (theoretical)</td>
+            </tr>
+            <tr>
+                <td><strong>Memory-bound (typical inference)</strong></td>
+                <td>700W (can't scale down)</td>
+                <td>200-400W (scales with load)</td>
+                <td style="color: #47b475;">CPU (2-3.5x less)</td>
+            </tr>
+            <tr>
+                <td><strong>Batch=1, high I/O wait</strong></td>
+                <td>300W average (60% idle)</td>
+                <td>150-200W average (70% idle)</td>
+                <td style="color: #47b475;">CPU (1.5-2x less)</td>
+            </tr>
+            <tr>
+                <td><strong>Multi-tenant (6 models)</strong></td>
+                <td>6 × 700W = 4,200W (all active)</td>
+                <td>800-1000W (all on one server)</td>
+                <td style="color: #47b475;">CPU (4-5x less)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Utilization Math</h3>
+    <pre>
+GPU (6× H100) for 6-department enterprise:
+  6 departments × 1 GPU each = 4,200W continuous
+  Even when only 1-2 departments are active.
+  Plus: $240,000+ in hardware, NVLink complexity.
+
+CPU (1× Dual Xeon Platinum) for 6-department enterprise:
+  All 6 models resident in 2TB RAM = ~1000W max
+  Each department waits its turn = efficient time-sharing
+  Scales power with actual compute load (not fixed at max)
+
+Net difference: 4-5x less power, 10x lower hardware cost
+    </pre>
+</div>
+
+<h3>Watts Per Token: The Real Numbers</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Enterprise Deployment Comparison</h3>
+    <pre>
+Scenario: 6 models, 24/7 operation, mixed workload
+
+GPU Cluster (6× H100):
+  Idle power: 6 × 150W = 900W
+  Compute power: 6 × 700W = 4,200W (when all busy)
+  Average (typical 20% compute): ~1,500W
+  Power/24hr: 36 kWh
+  Power/year: 13,140 kWh
+  @ $0.10/kWh: $1,314/year
+
+CPU Server (1× Dual Xeon Platinum, 2TB RAM):
+  Idle power: ~150W (bare OS, all models in RAM)
+  Compute power: ~1000W (all models active)
+  Average (typical 20% compute): ~320W
+  Power/24hr: 7.7 kWh
+  Power/year: 2,800 kWh
+  @ $0.10/kWh: $280/year
+
+Net difference: 4-5x less power = ~$1,000+/year savings
+    </pre>
+</div>
+
+<h3>Carbon Footprint: Real-World Impact</h3>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU Advantage</h3>
+        <ul>
+            <li><strong>4-5x less electricity</strong> for multi-tenant inference</li>
+            <li><strong>No GPU manufacturing impact</strong> (TSMC 4nm vs 5nm)</li>
+            <li><strong>Lower cooling</strong> due to lower heat output</li>
+            <li><strong>Uses existing infrastructure</strong> - no new hardware needed</li>
+            <li><strong>10x lower hardware cost</strong> ($60K vs $600K+)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">When GPUs Make Sense</h3>
+        <ul>
+            <li><strong>Training large models</strong> (100B+) at 100% utilization</li>
+            <li><strong>Very high throughput</strong> with batching</li>
+            <li><strong>Research</strong> where peak FLOPS matter more than efficiency</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Bottom Line</strong><br>
+        GPU efficiency claims assume 100% compute utilization. Real inference workloads are typically 10-30% compute-bound. At realistic utilization, CPUs consume 3-5x less power for multi-tenant inference. Plus: 10x lower hardware cost. This isn't theory - it's simple thermodynamics based on how often your hardware is actually doing work.
+    </div>
+</div>
+
+<h2>Principle 2: The Ethernet Equalizer</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+    </div>
+    <div>
+        <strong>NVLink Doesn't Scale Infinitely</strong><br>
+        NVLink is 900 GB/s <em>within a single node</em>. But you can only fit 8 GPUs per node. Go beyond that? You hit Ethernet. And at the Ethernet boundary, CPUs and GPUs face the exact same constraint.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Bandwidth Reality</h3>
+    <p>Let's be precise about the numbers:</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Connection Type</th><th>Bandwidth</th><th>Where It Applies</th><th>Scales To</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NVLink 4.0</td>
+                <td>900 GB/s</td>
+                <td>GPU-to-GPU within 1 node</td>
+                <td>8 GPUs max</td>
+            </tr>
+            <tr>
+                <td>DDR5 (12-channel)</td>
+                <td>460 GB/s</td>
+                <td>CPU-to-RAM within 1 socket</td>
+                <td>Per socket</td>
+            </tr>
+            <tr>
+                <td>400GbE Ethernet</td>
+                <td>50 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Infinite nodes</td>
+            </tr>
+            <tr>
+                <td>100GbE Ethernet</td>
+                <td>12.5 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Infinite nodes</td>
+            </tr>
+            <tr>
+                <td>InfiniBand HDR</td>
+                <td>25 GB/s</td>
+                <td>Node-to-node</td>
+                <td>Thousands of nodes</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Theory of Constraints Applied</h3>
+    <pre>
+GPU Cluster at Scale:
+  Within node:  NVLink 900 GB/s (fast!)
+  Between nodes: Ethernet 50 GB/s (constraint!)
+  System speed = 50 GB/s (bottleneck)
+
+CPU Cluster at Scale:
+  Within node:  DDR5 460 GB/s
+  Between nodes: Ethernet 50 GB/s (same constraint!)
+  System speed = 50 GB/s (same bottleneck)
+
+AT SCALE, THEY HIT THE SAME WALL.
+    </pre>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Without NVLink, GPUs Are Often Slower</strong><br>
+        If you can't afford NVLink switches ($200K+), your GPUs communicate over PCIe → Ethernet. That's 12.5-50 GB/s. A server-grade CPU with DDR5 has 460 GB/s to its own memory. For memory-bound workloads, the CPU wins.
+    </div>
+</div>
+
+<h2>Designing Your Ethernet Network</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Ethernet Switch Topology for ML Clusters</h3>
+    <p>Since Ethernet is the equalizer at scale, designing it well is critical.</p>
+</div>
+
+<h3>Leaf-Spine Architecture</h3>
+
+<div class="card">
+    <pre>
+                    ┌─────────────┐     ┌─────────────┐
+                    │  Spine 1    │     │  Spine 2    │
+                    │ 400GbE      │     │ 400GbE      │
+                    └──────┬──────┘     └──────┬──────┘
+                           │                   │
+         ┌─────────────────┼───────────────────┼─────────────────┐
+         │                 │                   │                 │
+    ┌────┴────┐       ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
+    │ Leaf 1  │       │ Leaf 2  │       │ Leaf 3  │       │ Leaf 4  │
+    │ 100GbE  │       │ 100GbE  │       │ 100GbE  │       │ 100GbE  │
+    └────┬────┘       └────┬────┘       └────┬────┘       └────┴────┘
+         │                 │                 │                 │
+    ┌────┴────┐       ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
+    │Server 1 │       │Server 3 │       │Server 5 │       │Server 7 │
+    │Server 2 │       │Server 4 │       │Server 6 │       │Server 8 │
+    └─────────┘       └─────────┘       └─────────┘       └─────────┘
+    </pre>
+</div>
+
+<h3>Switch Sizing Calculator</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Bandwidth Requirements</h3>
+    <pre>
+For distributed training with data parallelism:
+  Gradient size = Model parameters × bytes per param
+  70B model in FP16 = 70B × 2 bytes = 140 GB
+
+All-reduce bandwidth needed:
+  Per iteration: 2 × gradient size (reduce-scatter + all-gather)
+  70B model: 2 × 140 GB = 280 GB per iteration
+
+With 100GbE (12.5 GB/s):
+  All-reduce time = 280 GB ÷ 12.5 GB/s = 22.4 seconds
+
+With 400GbE (50 GB/s):
+  All-reduce time = 280 GB ÷ 50 GB/s = 5.6 seconds
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Small Cluster (8-16 servers)</h3>
+        <ul>
+            <li><strong>Topology:</strong> Single 400GbE switch</li>
+            <li><strong>Switch:</strong> Arista 7060X5 or similar</li>
+            <li><strong>Ports:</strong> 32× 400GbE</li>
+            <li><strong>Cost:</strong> ~$30,000</li>
+            <li><strong>Bisection BW:</strong> 12.8 Tbps</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Medium Cluster (32-64 servers)</h3>
+        <ul>
+            <li><strong>Topology:</strong> Leaf-spine (2 spine, 4 leaf)</li>
+            <li><strong>Spine:</strong> 2× 400GbE switches</li>
+            <li><strong>Leaf:</strong> 4× 100GbE switches</li>
+            <li><strong>Cost:</strong> ~$120,000</li>
+            <li><strong>Bisection BW:</strong> 25.6 Tbps</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Large Cluster (100+ servers)</h3>
+    <ul>
+        <li><strong>Topology:</strong> 3-tier Clos or fat-tree</li>
+        <li><strong>Consider:</strong> InfiniBand for lower latency</li>
+        <li><strong>RDMA:</strong> RoCEv2 over Ethernet or native IB</li>
+        <li><strong>Cost:</strong> $500K-2M depending on scale</li>
+    </ul>
+    <p><strong>Key insight:</strong> A GPU cluster at this scale needs the SAME network infrastructure. The Ethernet cost is equal. But CPUs don't need the $2M+ in NVLink switches.</p>
+</div>
+
+<h3>RDMA Configuration</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RoCEv2 Setup</h3>
+    <pre>
+# Enable RDMA over Converged Ethernet v2
+# On each server with Mellanox/NVIDIA ConnectX NICs:
+
+# 1. Enable PFC (Priority Flow Control) on switch
+#    Required for lossless Ethernet
+
+# 2. Configure ECN (Explicit Congestion Notification)
+mlnx_qos -i eth0 --pfc 0,0,0,1,0,0,0,0  # Enable PFC on priority 3
+mlnx_qos -i eth0 --trust=dscp
+
+# 3. Set up RDMA
+modprobe rdma_ucm
+modprobe rdma_cm
+
+# 4. Verify RDMA is working
+ibv_devinfo
+rdma link show
+    </pre>
+</div>
+
+<div class="img-container svg-viewer" data-title="Ethernet Switch Topology">
+    <img src="assets/ethernet-topology.svg" alt="Ethernet Switch Topology for ML Clusters">
+</div>
+
+<h2>Scale Economics: The Real Comparison</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Why CPU-Only Wins at Scale</h3>
+</div>
+
+<div class="img-container svg-viewer" data-title="Scale Economics Comparison">
+    <img src="assets/scale-economics.svg" alt="Scale Economics Comparison">
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">GPU Cluster at Scale</h3>
+        <ul>
+            <li><strong>For 1TB model:</strong> 100 GPUs minimum</li>
+            <li><strong>Total cost:</strong> $4 Billion</li>
+            <li><strong>Who can afford:</strong> 5 companies globally</li>
+            <li><strong>Result:</strong> Elite-only access</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU Cluster at Scale</h3>
+        <ul>
+            <li><strong>For same scale:</strong> 80 servers</li>
+            <li><strong>Total cost:</strong> $240 Million</li>
+            <li><strong>Who can afford:</strong> 1000+ companies</li>
+            <li><strong>Result:</strong> Accessible to everyone</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Economics: 16x Cheaper, 200x More Accessible</h3>
+    <p>While GPU costs stay high and GPU access remains limited, CPU clusters deliver the same scale at a fraction of the cost. This makes large-scale ML accessible to 1000+ companies instead of just 5.</p>
+</div>
+
+<h2>The Hybrid Trap: CPU+GPU = CPU-Bound</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+        <strong>Common Question:</strong><br>
+        "Why not use CPU for memory and GPU for compute? Get the best of both!"<br><br>
+        <strong>Answer:</strong> You're then AS FAST AS THE CPU anyway! You get the complexity of both with the performance of neither.
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="Hybrid CPU+GPU Bottleneck">
+    <img src="assets/hybrid-bottleneck.svg" alt="Hybrid CPU+GPU Bottleneck">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Hybrid Bottleneck</h3>
+    <p>When CPU holds weights and transfers to GPU for compute:</p>
+    <ul>
+        <li><strong>Transfer bottleneck:</strong> 100 GB/s limits throughput</li>
+        <li><strong>GPU idle time:</strong> Waits for data from CPU</li>
+        <li><strong>You get:</strong> GPU performance = CPU performance</li>
+        <li><strong>Plus:</strong> Double the code complexity, double the cost</li>
+    </ul>
+    <p><strong>Conclusion:</strong> If the GPU is limited by the CPU anyway, just use CPUs! Simpler, faster, cheaper.</p>
+</div>
+
+<h2>Why CPU-Only is the Future</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Strategic Advantage</h3>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Technical Wins</h3>
+        <ul>
+            <li><strong>Memory capacity:</strong> 4-6TB per node vs 80GB VRAM</li>
+            <li><strong>No transfer bottleneck:</strong> CPU memory + CPU compute</li>
+            <li><strong>Optimize interconnect:</strong> RDMA, core pinning, cache</li>
+            <li><strong>Get close to theoretical FLOPS</strong></li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Market Wins</h3>
+        <ul>
+            <li><strong>16x cheaper</strong> at scale</li>
+            <li><strong>200x more accessible</strong> to companies</li>
+            <li><strong>Commodity hardware</strong> - no special requirements</li>
+            <li><strong>Open ecosystem</strong> - standard Linux tools</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Commodity Economics: The CPU Trajectory</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">CPUs Follow Commodity Price Curves</h3>
+    <p>Unlike GPUs which are supply-constrained and vendor-controlled, CPUs are commodity hardware. Every improvement happens automatically, at scale, with competition driving prices down.</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Component</th><th>2023</th><th>2025</th><th>2027 (projected)</th><th>Trend</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Memory Standard</td>
+                <td>DDR5-4800</td>
+                <td>DDR5-6400</td>
+                <td>DDR6</td>
+                <td>+33% bandwidth per gen</td>
+            </tr>
+            <tr>
+                <td>Channels per Socket</td>
+                <td>8</td>
+                <td>12</td>
+                <td>16</td>
+                <td>+50% channels</td>
+            </tr>
+            <tr>
+                <td>Max RAM per Server</td>
+                <td>4TB</td>
+                <td>8TB</td>
+                <td>16TB+</td>
+                <td>2x per generation</td>
+            </tr>
+            <tr>
+                <td>Cores per Socket</td>
+                <td>64 (Genoa)</td>
+                <td>128 (Turin)</td>
+                <td>192+</td>
+                <td>+50% per gen</td>
+            </tr>
+            <tr>
+                <td>L3 Cache</td>
+                <td>256MB</td>
+                <td>384MB</td>
+                <td>512MB+</td>
+                <td>Growing</td>
+            </tr>
+            <tr>
+                <td>Ethernet Speed</td>
+                <td>100GbE</td>
+                <td>400GbE</td>
+                <td>800GbE</td>
+                <td>4x per 3 years</td>
+            </tr>
+            <tr>
+                <td>$/TFLOP (CPU)</td>
+                <td>$500</td>
+                <td>$300</td>
+                <td>$150</td>
+                <td>-50% per 2 years</td>
+            </tr>
+            <tr>
+                <td>$/TFLOP (GPU)</td>
+                <td>$50</td>
+                <td>$40</td>
+                <td>$35</td>
+                <td>-15% per 2 years</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Crossover Point</strong><br>
+        GPUs will always have higher peak FLOPS per dollar for raw compute. But for memory-bound ML inference (which is most real-world LLM usage), CPUs are already competitive. And the gap closes every year because CPU economics follow commodity curves.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Why CPU Economics Win</h3>
+        <ul>
+            <li><strong>Competition:</strong> Intel vs AMD vs ARM vs RISC-V</li>
+            <li><strong>Volume:</strong> Billions of CPUs vs millions of GPUs</li>
+            <li><strong>Supply:</strong> Multiple fabs, no bottlenecks</li>
+            <li><strong>Standards:</strong> DDR5 is an industry standard, not proprietary</li>
+            <li><strong>Software:</strong> Linux, GCC, standard tools (free)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Why GPU Economics Struggle</h3>
+        <ul>
+            <li><strong>Monopoly:</strong> NVIDIA dominates (~90% market)</li>
+            <li><strong>Supply-constrained:</strong> Artificial scarcity</li>
+            <li><strong>Proprietary:</strong> CUDA lock-in, HBM limited fabs</li>
+            <li><strong>High margins:</strong> No price competition pressure</li>
+            <li><strong>Lead times:</strong> 12-24 month waits</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Infinite CPU Scaling: The Internet Proof</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">CPUs Scale to Infinity</h3>
+    <p>Unlike GPUs, which hit cost and availability ceilings, CPUs scale infinitely through distributed computing across the internet. Your computer is part of that infinity!</p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Insight</strong><br>
+        Want more FLOPs? Add more CPUs + RDMA! Get your 100 PFLOPS while your friends on the other side keep bragging about their limited GPU clusters. FLOPs is just an accumulation problem that CPUs solve through clever distributed training.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">∞ Infinite Scaling</h3>
+        <ul>
+            <li><strong>Internet-scale distributed computing</strong></li>
+            <li><strong>No ceiling:</strong> Add 10, 100, 1000 CPUs</li>
+            <li><strong>Your computer contributes:</strong> Every device matters</li>
+            <li><strong>Result:</strong> Unlimited FLOP accumulation</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU Improvements Track</h3>
+        <ul>
+            <li><strong>Cores:</strong> Increasing year over year</li>
+            <li><strong>Cache:</strong> Growing bigger</li>
+            <li><strong>Efficiency:</strong> Getting better</li>
+            <li><strong>Cost:</strong> Decreasing over time</li>
+        </ul>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Memory Scaling</h3>
+        <ul>
+            <li><strong>DDR5 → DDR6:</strong> 2400 GB/s → higher bandwidth</li>
+            <li><strong>Memory slots:</strong> 8 → 12 → 16 slots per node</li>
+            <li><strong>Total per node:</strong> 4TB → 8TB → 16TB RAM</li>
+            <li><strong>Cost/GB:</strong> Constantly decreasing</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Model Efficiency</h3>
+        <ul>
+            <li><strong>Smaller models:</strong> Getting more efficient</li>
+            <li><strong>Better quantization:</strong> Q4, Q8, hybrid methods</li>
+            <li><strong>Architecture improvements:</strong> MoE, mixture of experts</li>
+            <li><strong>Training optimization:</strong> Better algorithms</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The C-Kernel Engine Goal</h3>
+    <p>Exploit this infinite CPU scaling on server-grade CPUs. As models get smaller and CPUs get more powerful, the combination becomes unbeatable:</p>
+    <ul>
+        <li><strong>No GPU dependency:</strong> Commodity hardware only</li>
+        <li><strong>Accessible to everyone:</strong> Your laptop contributes to the cluster</li>
+        <li><strong>Sustainable scaling:</strong> Economics favor CPU-only approach</li>
+        <li><strong>Future-proof:</strong> CPU improvements continue while GPU costs stay high</li>
+    </ul>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Multi-Model Parallelism: Enterprise Real Workload</h3>
+    <p>Unlike GPUs which are designed for single-model throughput, CPUs excel at running <strong>multiple models simultaneously</strong> on the same system.</p>
+</div>
+
+<h2>Enterprise & Government: The Multi-Model Reality</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Real Enterprise Scenario</strong><br>
+        In government ministries, large enterprises, and multi-department organizations, different teams need to run different models simultaneously. This is where GPUs become a nightmare.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Government Ministry Example</h3>
+        <ul>
+            <li><strong>Health Dept:</strong> Medical document analysis model</li>
+            <li><strong>Finance Dept:</strong> Fraud detection model</li>
+            <li><strong>Education Dept:</strong> Student assessment model</li>
+            <li><strong>Transport Dept:</strong> Traffic prediction model</li>
+            <li><strong>HR Dept:</strong> Resume screening model</li>
+            <li><strong>Legal Dept:</strong> Contract analysis model</li>
+        </ul>
+        <p><strong>Reality:</strong> 6 departments, 6 different models, all need to run simultaneously.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Enterprise Example</h3>
+        <ul>
+            <li><strong>Sales:</strong> Lead scoring + CRM assistant</li>
+            <li><strong>Support:</strong> Customer chatbot + ticket routing</li>
+            <li><strong>Engineering:</strong> Code review + documentation</li>
+            <li><strong>Marketing:</strong> Content generation + analytics</li>
+            <li><strong>Security:</strong> Threat detection + log analysis</li>
+            <li><strong>Finance:</strong> Expense analysis + forecasting</li>
+        </ul>
+        <p><strong>Reality:</strong> Each department has specialized models for their domain.</p>
+    </div>
+</div>
+
+<h3>The GPU Context-Switching Nightmare</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">GPU Model Switching: Slow and Expensive</h3>
+    <pre>
+GPU Workflow for Multi-Model Serving:
+  1. Load Model A weights into VRAM (80GB)     → 30-60 seconds
+  2. Run inference for Department A            → fast
+  3. Unload Model A from VRAM                  → 10 seconds
+  4. Load Model B weights into VRAM            → 30-60 seconds
+  5. Run inference for Department B            → fast
+  6. Repeat for each model...
+
+Problem: Each context switch = 40-70 seconds of GPU sitting idle!
+With 6 departments cycling through: most of the time is loading/unloading.
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU Multi-Model Issues</h3>
+        <ul>
+            <li><strong>VRAM limit:</strong> 80GB can only hold 1-2 large models</li>
+            <li><strong>Context switching:</strong> Load/unload weights takes 30-60s per model</li>
+            <li><strong>No sharing:</strong> GPU can't easily share between containers</li>
+            <li><strong>MIG complexity:</strong> Multi-Instance GPU splits VRAM, reduces per-model capacity</li>
+            <li><strong>Kubernetes pain:</strong> GPU scheduling requires special plugins, node affinity</li>
+            <li><strong>Cost:</strong> Need dedicated GPU per department = $40K × 6 = $240K</li>
+        </ul>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU Multi-Model Solution</h3>
+        <ul>
+            <li><strong>RAM abundance:</strong> 4TB holds ALL models simultaneously</li>
+            <li><strong>No context switching:</strong> All models resident in RAM, instant access</li>
+            <li><strong>Native sharing:</strong> Standard Linux process isolation works</li>
+            <li><strong>Docker native:</strong> Just containers, no special GPU passthrough</li>
+            <li><strong>Kubernetes native:</strong> Standard pod scheduling, no GPU plugins</li>
+            <li><strong>Cost:</strong> One $60K server runs all 6 departments</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Kubernetes & Docker: CPUs Are First-Class Citizens</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Container Orchestration Reality</h3>
+    <pre>
+GPU Kubernetes Deployment:
+  - Install NVIDIA device plugin
+  - Configure GPU node pools
+  - Set resource limits: nvidia.com/gpu: 1
+  - Deal with GPU memory fragmentation
+  - Handle driver version mismatches
+  - Manage MIG partitioning (if sharing)
+  - Debug CUDA OOM errors in production
+
+CPU Kubernetes Deployment:
+  - Just deploy your container
+  - Set resource limits: cpu: "32", memory: "64Gi"
+  - Done. Standard k8s scheduling handles the rest.
+    </pre>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">CPU Multi-Model Architecture</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                    Single CPU Server (4TB RAM)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ Container 1  │  │ Container 2  │  │ Container 3  │           │
+│  │ Health Model │  │ Finance Model│  │ Education    │           │
+│  │ 70B (140GB)  │  │ 13B (26GB)   │  │ 7B (14GB)    │           │
+│  │ 32 cores     │  │ 16 cores     │  │ 8 cores      │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ Container 4  │  │ Container 5  │  │ Container 6  │           │
+│  │ Transport    │  │ HR Model     │  │ Legal Model  │           │
+│  │ 7B (14GB)    │  │ 3B (6GB)     │  │ 13B (26GB)   │           │
+│  │ 8 cores      │  │ 4 cores      │  │ 16 cores     │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│                                                                  │
+│  Total: 226GB used / 4TB available = 5.6% RAM utilization       │
+│  All 6 models running simultaneously, no context switching      │
+└─────────────────────────────────────────────────────────────────┘
+    </pre>
+    <p><strong>Key insight:</strong> 6 models totaling 226GB fit easily in 4TB RAM. All running 24/7, no loading/unloading, instant response for any department.</p>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Enterprise Reality Check</strong><br>
+        Most enterprise/government deployments need to run 5-20 different models for different use cases. CPUs handle this natively with standard containers. GPUs require expensive, complex multi-GPU setups with painful orchestration. This alone makes CPUs the practical choice for most real-world deployments.
+    </div>
+</div>
+
+<h2>CPU-Only: Complete Solution for All Model Sizes</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">One Architecture, All Scales</h3>
+    <p>CPU-only isn't just for large models. It's the complete solution for <strong>every model size</strong>, for <strong>both training and inference</strong>.</p>
+</div>
+
+<div class="grid grid-3">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Small Models (1-7B)</h3>
+        <ul>
+            <li><strong>Training:</strong> Single CPU server</li>
+            <li><strong>Inference:</strong> Laptop or edge device</li>
+            <li><strong>Latency:</strong> Sub-millisecond</li>
+            <li><strong>Cost:</strong> < $100/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Chatbots, code completion, mobile AI</p>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Medium Models (7-70B)</h3>
+        <ul>
+            <li><strong>Training:</strong> 2-8 CPU servers</li>
+            <li><strong>Inference:</strong> Single CPU server</li>
+            <li><strong>Throughput:</strong> High batch processing</li>
+            <li><strong>Cost:</strong> $500-2000/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Enterprise AI, content generation, analysis</p>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Large Models (70B+)</h3>
+        <ul>
+            <li><strong>Training:</strong> 10-100 CPU servers</li>
+            <li><strong>Inference:</strong> 2-20 CPU servers</li>
+            <li><strong>Scale:</strong> Distributed across RDMA</li>
+            <li><strong>Cost:</strong> $5000-50000/month</li>
+        </ul>
+        <p><strong>Use cases:</strong> Foundation models, research, large-scale analytics</p>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Unified Approach</strong><br>
+        Same CPU-only architecture scales from your laptop (1B model) to global clusters (1T+ parameters). No architecture changes, no GPU lock-in, no complexity multiplication.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Training at Every Scale</h3>
+        <ul>
+            <li><strong>Small:</strong> Fine-tune on laptop (1-7B)</li>
+            <li><strong>Medium:</strong> Train on workstation (7-70B)</li>
+            <li><strong>Large:</strong> Distributed training (70B+)</li>
+            <li><strong>Methodology:</strong> Same principles, same tools</li>
+        </ul>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Inference at Every Scale</h3>
+        <ul>
+            <li><strong>Small:</strong> Edge deployment (1-7B)</li>
+            <li><strong>Medium:</strong> Server deployment (7-70B)</li>
+            <li><strong>Large:</strong> Distributed inference (70B+)</li>
+            <li><strong>Performance:</strong> Optimized for each tier</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Why This Matters</h3>
+    <p>Organizations can start small and scale infinitely without ever switching architectures:</p>
+    <ol>
+        <li><strong>Start:</strong> Train small model on laptop (fine-tuning)</li>
+        <li><strong>Grow:</strong> Move to server as model size increases</li>
+        <li><strong>Scale:</strong> Add more servers when needed (distributed training)</li>
+        <li><strong>Enterprise:</strong> Run multiple models on same hardware</li>
+    </ol>
+    <p><strong>No lock-in. No architecture migrations. No GPU dependency. Just scale as you grow.</strong></p>
+</div>
+
+<h2>Memory Reality: What NVIDIA Marketing Won't Tell You</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Hidden Truth About LLM Memory</strong><br>
+        GPU marketing focuses on FLOPS. Real-world LLM inference is dominated by <strong>memory bandwidth and capacity</strong>. Here are the actual numbers.
+    </div>
+</div>
+
+<h3>Activation Memory Per Token (Decode)</h3>
+
+<div class="card">
+    <h4 style="margin-top: 0;">Memory Writes Per Token</h4>
+    <p>For Qwen2-0.5B (hidden=896, intermediate=4864, 24 layers):</p>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Operation</th><th>Per Layer</th><th>24 Layers</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>RMSNorm output</td><td>3.5 KB</td><td>84 KB</td></tr>
+                <tr><td>Q, K, V projections</td><td>10.5 KB</td><td>252 KB</td></tr>
+                <tr><td>Attention output</td><td>3.5 KB</td><td>84 KB</td></tr>
+                <tr><td>O projection</td><td>3.5 KB</td><td>84 KB</td></tr>
+                <tr><td>MLP gate + up</td><td>38 KB</td><td>912 KB</td></tr>
+                <tr><td>MLP down</td><td>3.5 KB</td><td>84 KB</td></tr>
+                <tr><td>KV cache (new token)</td><td>1 KB</td><td>24 KB</td></tr>
+                <tr><td>Final logits (once)</td><td>-</td><td>600 KB</td></tr>
+                <tr style="font-weight: bold; background: rgba(255,180,0,0.1);"><td>Total per token</td><td>~63 KB</td><td>~2.1 MB</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p style="color: #888; font-size: 0.9em;">This is memory bandwidth consumed per generated token. Reducing this is key for decode performance.</p>
+</div>
+
+<h3>Context Length: The Memory Multiplier</h3>
+
+<div class="card card-accent">
+    <h4 style="margin-top: 0;">KV Cache Formula</h4>
+    <pre>KV Cache = 2 × n_layers × n_kv_heads × head_dim × context_length × bytes_per_element
+           ↑
+         (K and V)</pre>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Context</th><th>KV Cache (FP16)</th><th>+ Model (140GB)</th><th>Fits H100 (80GB)?</th><th>Fits 2TB Server?</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>8K</td>
+                <td>2.6 GB</td>
+                <td>143 GB</td>
+                <td style="color: #ff6b6b;">No (need 2×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>32K</td>
+                <td>10 GB</td>
+                <td>150 GB</td>
+                <td style="color: #ff6b6b;">No (need 2×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>128K</td>
+                <td>41 GB</td>
+                <td>181 GB</td>
+                <td style="color: #ff6b6b;">No (need 3×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>1M</td>
+                <td>320 GB</td>
+                <td>460 GB</td>
+                <td style="color: #ff6b6b;">No (need 6×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<details style="margin: 20px 0; background: #1a1a2e; border-radius: 8px; border: 1px solid #333;">
+    <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; color: #fbbf24;">
+        📐 Show the Math: How We Calculated This
+    </summary>
+    <div style="padding: 0 20px 20px 20px;">
+        <h4 style="color: #4ade80; margin-top: 15px;">Model Architecture (Llama 3.1 70B)</h4>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Parameter</th><th>Value</th><th>Explanation</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>n_layers</code></td><td>80</td><td>Number of transformer layers</td></tr>
+                    <tr><td><code>n_attention_heads</code></td><td>64</td><td>Query heads per layer</td></tr>
+                    <tr><td><code>n_kv_heads</code></td><td>8</td><td>KV heads (GQA: 8 groups, each serves 8 Q heads)</td></tr>
+                    <tr><td><code>hidden_dim</code></td><td>8192</td><td>Model hidden dimension</td></tr>
+                    <tr><td><code>head_dim</code></td><td>128</td><td>= hidden_dim / n_attention_heads = 8192/64</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 style="color: #4ade80;">Step 1: KV Cache Per Token</h4>
+        <pre style="background: #0f0f1a; padding: 15px; border-radius: 6px; overflow-x: auto;">
+<span style="color: #888;">// FP16 = 2 bytes per element</span>
+KV_per_token = 2 × n_layers × n_kv_heads × head_dim × bytes
+             = 2 × 80 × 8 × 128 × 2
+             = 327,680 bytes
+             = <span style="color: #4ade80; font-weight: bold;">320 KB per token</span></pre>
+
+        <h4 style="color: #4ade80;">Step 2: Scale by Context Length</h4>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Context</th><th>Calculation</th><th>KV Cache</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>8K</td>
+                        <td><code>8,192 × 320 KB</code></td>
+                        <td>2.62 GB</td>
+                    </tr>
+                    <tr>
+                        <td>32K</td>
+                        <td><code>32,768 × 320 KB</code></td>
+                        <td>10.5 GB</td>
+                    </tr>
+                    <tr>
+                        <td>128K</td>
+                        <td><code>131,072 × 320 KB</code></td>
+                        <td>41.9 GB</td>
+                    </tr>
+                    <tr>
+                        <td>1M</td>
+                        <td><code>1,048,576 × 320 KB</code></td>
+                        <td>335 GB</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 style="color: #4ade80;">Step 3: Add Model Weights</h4>
+        <pre style="background: #0f0f1a; padding: 15px; border-radius: 6px; overflow-x: auto;">
+Model weights (70B params × 2 bytes FP16) = <span style="color: #fbbf24; font-weight: bold;">140 GB</span>
+
+Total Memory = Model Weights + KV Cache
+  8K context:   140 + 2.6  = 143 GB  → need 2× H100s
+  32K context:  140 + 10.5 = 150 GB  → need 2× H100s
+  128K context: 140 + 42   = 182 GB  → need 3× H100s
+  1M context:   140 + 335  = 475 GB  → need 6× H100s</pre>
+
+        <h4 style="color: #4ade80;">Why GQA Matters</h4>
+        <p style="color: #a0a0b0;">Grouped Query Attention (GQA) reduces KV cache by sharing KV heads across Q heads:</p>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Attention Type</th><th>KV Heads</th><th>KV per Token</th><th>128K KV Cache</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Multi-Head (MHA)</td>
+                        <td>64</td>
+                        <td>2.56 MB</td>
+                        <td style="color: #ff6b6b;">335 GB</td>
+                    </tr>
+                    <tr>
+                        <td>Grouped Query (GQA-8)</td>
+                        <td>8</td>
+                        <td>320 KB</td>
+                        <td style="color: #4ade80;">42 GB</td>
+                    </tr>
+                    <tr>
+                        <td>Multi-Query (MQA)</td>
+                        <td>1</td>
+                        <td>40 KB</td>
+                        <td style="color: #4ade80;">5.2 GB</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p style="color: #888; font-size: 0.9em;">GQA-8 gives 8× memory savings over MHA with minimal quality loss.</p>
+    </div>
+</details>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Long Context Reality</strong><br>
+        70B model + 1M context needs ~475 GB. That's 6× H100s ($240K+) vs one 2TB CPU server ($30K). This isn't about FLOPS - it's about <strong>where the data can physically exist</strong>.
+    </div>
+</div>
+
+<h3>Prefill Memory Scaling</h3>
+
+<div class="card">
+    <p>Prefill (processing the input prompt) requires storing activations for ALL tokens simultaneously:</p>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Prefill Length</th><th>Activation Memory</th><th>+ KV Cache</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>256 tokens</td><td>~400 MB</td><td>~6 MB</td></tr>
+                <tr><td>1K tokens</td><td>~1.5 GB</td><td>~24 MB</td></tr>
+                <tr><td>4K tokens</td><td>~6 GB</td><td>~96 MB</td></tr>
+                <tr><td>16K tokens</td><td>~24 GB</td><td>~384 MB</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p style="color: #888; font-size: 0.9em;">Prefill is compute-bound but still needs memory for activations. Long prompts can exceed GPU VRAM.</p>
+</div>
+
+<h3>Visual Guide</h3>
+
+<div class="card" style="max-width: 800px;">
+    <h4 style="margin-top: 0;">Memory Reality Infographic</h4>
+    <p>GPU vs CPU memory comparison for LLM inference:</p>
+    <a href="../assets/memory-reality-infographic.svg" target="_blank">
+        <img src="../assets/memory-reality-infographic.svg" alt="Memory Reality - GPU vs CPU comparison showing memory capacity, 70B model fit analysis, and cost comparison" style="width: 100%; border-radius: 8px; border: 1px solid #333;">
+    </a>
+    <p style="font-size: 0.9em; color: #888; margin-top: 8px;">Click to view full size</p>
+</div>
+
+<h2>Training Advantages: Where CPUs Dominate</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Critical Training Scenarios</h3>
+    <p>CPU-only architecture solves training problems that GPU-only simply can't handle.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">1. Long Context Training: KV Cache Explosion</h3>
+        <p><strong>The Problem:</strong> Long context windows create quadratic KV cache growth</p>
+        <ul>
+            <li><strong>4K context:</strong> ~32GB KV cache</li>
+            <li><strong>32K context:</strong> ~256GB KV cache</li>
+            <li><strong>128K context:</strong> ~4TB KV cache</li>
+            <li><strong>1M context:</strong> ~128TB KV cache</li>
+        </ul>
+        <p><strong>CPU Advantage:</strong></p>
+        <ul>
+            <li><strong>4-16TB RAM:</strong> Fits massive KV caches</li>
+            <li><strong>No transfer bottleneck:</strong> Everything in memory</li>
+            <li><strong>GPU Reality:</strong> KV cache doesn't fit = can't train</li>
+        </ul>
+        <div class="alert alert-warning">
+            <strong>Result:</strong> GPU training hits memory wall at 32K context. CPUs handle 1M+ context natively.
+        </div>
+    </div>
+
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">2. Massive Batch Training</h3>
+        <p><strong>The Need:</strong> Large batch sizes improve convergence and throughput</p>
+        <ul>
+            <li><strong>Standard batch:</strong> 32-128 samples</li>
+            <li><strong>Large batch:</strong> 512-2048 samples</li>
+            <li><strong>Massive batch:</strong> 8192+ samples</li>
+            <li><strong>Enterprise batch:</strong> 100K+ samples</li>
+        </ul>
+        <p><strong>CPU Scaling Strategy:</strong></p>
+        <ul>
+            <li><strong>32 CPUs:</strong> 32 batches in parallel</li>
+            <li><strong>Each batch:</strong> 1-10TB RAM available</li>
+            <li><strong>Total effective batch:</strong> 32x larger</li>
+            <li><strong>No communication overhead:</strong> Each CPU independent</li>
+        </ul>
+        <div class="alert alert-success">
+            <strong>Result:</strong> Scale to any batch size by adding more CPUs. No GPU memory constraints!
+        </div>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">The Training Reality Check</h3>
+    <div class="grid grid-2">
+        <div>
+            <h4>GPU Training Limits</h4>
+            <ul>
+                <li>❌ KV cache fits → max context ~32K</li>
+                <li>❌ Batch size limited by VRAM</li>
+                <li>❌ Large batches require model parallelism</li>
+                <li>❌ Complex coordination across GPUs</li>
+                <li>❌ Expensive hardware (NVLink required)</li>
+            </ul>
+        </div>
+        <div>
+            <h4>CPU Training Advantages</h4>
+            <ul>
+                <li>✅ KV cache fits → context up to 1M+</li>
+                <li>✅ Batch size scales with CPUs</li>
+                <li>✅ Data parallelism = simple scaling</li>
+                <li>✅ RDMA for necessary communication</li>
+                <li>✅ Commodity hardware (Ethernet)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>Why This Matters</strong><br>
+        Real-world training needs long context (RAG, document analysis) and large batches (throughput, convergence). CPU-only architecture handles both naturally. GPU-only hits walls that require expensive workarounds.
+    </div>
+</div>
+
+<h2>Distributed Architecture</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">RDMA-Connected CPU Cluster</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                     RDMA Fabric (100Gbps+)                      │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│                 │                 │                             │
+▼                 ▼                 ▼                             │
+┌─────────┐   ┌─────────┐   ┌─────────┐                          │
+│ Node 0  │   │ Node 1  │   │ Node 2  │  ...  Node N             │
+│ 128 cores│   │ 128 cores│   │ 128 cores│                        │
+│ 2TB RAM │   │ 2TB RAM │   │ 2TB RAM │                          │
+│         │   │         │   │         │                          │
+│ Layers  │   │ Layers  │   │ Layers  │                          │
+│ 0-15    │   │ 16-31   │   │ 32-47   │                          │
+└─────────┘   └─────────┘   └─────────┘                          │
+    </pre>
+</div>
+
+<h3>Parallelism Strategies</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">1. Pipeline Parallelism</h3>
+    <p>Different layers on different nodes. Activations flow through the pipeline.</p>
+    <pre>Node 0: Layers 0-15   →  activations  →  Node 1: Layers 16-31  →  ...
+        (forward)           (RDMA)              (forward)</pre>
+    <p><strong>Communication:</strong> Send activations between pipeline stages via RDMA.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">2. Tensor Parallelism</h3>
+    <p>Large matrices split across nodes. Each node computes a shard.</p>
+    <pre>// 16384 x 16384 weight matrix split across 4 nodes
+Node 0: W[0:4096, :]      // Shard 0
+Node 1: W[4096:8192, :]   // Shard 1
+Node 2: W[8192:12288, :]  // Shard 2
+Node 3: W[12288:16384, :] // Shard 3
+
+// After local GEMM, all-reduce to combine</pre>
+    <p><strong>Communication:</strong> RDMA all-reduce after each sharded operation.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">3. Data Parallelism</h3>
+    <p>Same model replicated. Different batches. Gradient averaging.</p>
+    <pre>Node 0: Model copy, Batch 0  →  gradients  ─┐
+Node 1: Model copy, Batch 1  →  gradients  ─┼→  All-reduce  →  Update all
+Node 2: Model copy, Batch 2  →  gradients  ─┤
+Node 3: Model copy, Batch 3  →  gradients  ─┘</pre>
+</div>
+
+<h2>RDMA: The Key Enabler</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why RDMA?</h3>
+    <p><strong>Remote Direct Memory Access</strong> - Zero-copy, kernel-bypass networking.</p>
+    <div class="table-container">
+        <table class="table">
+        <thead>
+            <tr><th>Metric</th><th>TCP/IP</th><th>RDMA</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Latency</td><td>~50-100 μs</td><td>~1-2 μs</td></tr>
+            <tr><td>Bandwidth</td><td>10-25 Gbps</td><td>100-400 Gbps</td></tr>
+            <tr><td>CPU overhead</td><td>High (kernel, copies)</td><td>Near zero</td></tr>
+            <tr><td>Memory copies</td><td>Multiple</td><td>Zero (DMA)</td></tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RDMA Primitives We Need</h3>
+    <pre>// One-sided operations (no remote CPU involvement)
+rdma_write(remote_addr, local_buf, size);  // Write to remote memory
+rdma_read(local_buf, remote_addr, size);   // Read from remote memory
+
+// Collective operations (built on one-sided)
+rdma_allreduce(buf, size, SUM);  // Gradient averaging
+rdma_broadcast(buf, size, root); // Weight distribution
+rdma_barrier();                   // Synchronization</pre>
+</div>
+
+<h2>Implementation Roadmap</h2>
+
+<div class="card">
+    <div class="table-container">
+        <table class="table">
+        <thead>
+            <tr><th>Phase</th><th>Feature</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Single-node training (current)</td>
+                <td><span class="badge badge-green">Done</span></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Multi-core parallelism (OpenMP)</td>
+                <td><span class="badge badge-green">Done</span></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>RDMA communication primitives</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Pipeline parallelism</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Tensor parallelism (sharded GEMM)</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>Encoder + cross-attention</td>
+                <td><span class="badge badge-orange">Planned</span></td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>600B+ training</td>
+                <td><span class="badge" style="background:#666;color:#ccc;">Future</span></td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<h2>The Math Doesn't Change</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">From Tiny to Massive: Same Operations</h3>
+    <pre>
+Forward pass (any size model):
+1. embed_tokens()           // Lookup: tokens → vectors
+2. for each layer:
+   a. rmsnorm()             // Normalize
+   b. linear() × 3          // Q, K, V projections
+   c. rope()                // Rotary embeddings
+   d. attention()           // Softmax(QK^T)V
+   e. linear()              // Output projection
+   f. residual_add()        // Skip connection
+   g. rmsnorm()             // Normalize
+   h. mlp_swiglu()          // FFN with gating
+   i. residual_add()        // Skip connection
+3. rmsnorm()                // Final norm
+4. lm_head()                // Logits
+
+Backward pass: Same operations in reverse.
+SGD: weights -= lr * gradients
+
+That's it. For any model size.
+    </pre>
+</div>
+
+<h2>Hardware Recommendations</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">For Different Scales</h3>
+    <div class="table-container">
+        <table class="table">
+        <thead>
+            <tr><th>Model Size</th><th>Recommended Setup</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>< 7B</td>
+                <td>Single server, 32+ cores, 128GB+ RAM</td>
+            </tr>
+            <tr>
+                <td>7B - 70B</td>
+                <td>Single server, 128 cores, 512GB-2TB RAM</td>
+            </tr>
+            <tr>
+                <td>70B - 200B</td>
+                <td>2-4 nodes, RDMA interconnect, 2TB RAM each</td>
+            </tr>
+            <tr>
+                <td>200B - 600B</td>
+                <td>8-16 nodes, 100Gbps+ RDMA fabric</td>
+            </tr>
+            <tr>
+                <td>600B+</td>
+                <td>32+ nodes, 400Gbps RDMA, pipeline + tensor parallel</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Recommended CPUs by Instruction Set</h3>
+    <ul>
+        <li><strong>AMD EPYC 9004/9005 (Genoa/Turin)</strong> - Up to 192 cores, AVX-512 (512-bit), 12-channel DDR5</li>
+        <li><strong>Intel Xeon Sapphire Rapids/Granite Rapids</strong> - Up to 128 cores, AVX-512 + AMX (512-bit tile)</li>
+        <li><strong>Ampere Altra Max</strong> - 128 ARM cores, NEON (128-bit), good perf/watt</li>
+        <li><strong>AWS Graviton3/4</strong> - Cost-effective ARM, NEON + SVE2</li>
+    </ul>
+    <p><strong>Minimum requirement:</strong> AVX (256-bit) or NEON (128-bit). For best performance, AVX-512 or AMX.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">RDMA Options</h3>
+    <ul>
+        <li><strong>Mellanox/NVIDIA ConnectX-7</strong> - 400Gbps InfiniBand</li>
+        <li><strong>Intel E810</strong> - 100Gbps RoCE (RDMA over Ethernet)</li>
+        <li><strong>AWS EFA</strong> - Cloud RDMA for EC2 instances</li>
+    </ul>
+</div>
+
+<h2>Why Not GPU?</h2>
+
+<div class="card">
+    <blockquote style="border-left: 4px solid var(--orange); padding-left: 1rem; margin: 1rem 0; font-style: italic;">
+        "Nvidia, f**k you."<br>
+        <small>— Linus Torvalds, 2012 (<a href="https://www.youtube.com/watch?v=iYWzMvlj2RQ" target="_blank" rel="noopener" style="color: inherit;">video source</a>) regarding their closed-source Linux drivers</small>
+    </blockquote>
+    <p>Beyond the open-source concerns:</p>
+    <ul>
+        <li><strong>Cost</strong> - H100 = $40,000. EPYC server with 2TB RAM = $15,000</li>
+        <li><strong>Memory</strong> - 80GB VRAM vs 2TB+ system RAM</li>
+        <li><strong>Availability</strong> - GPU shortages vs commodity CPUs</li>
+        <li><strong>Flexibility</strong> - Run anywhere: cloud, on-prem, edge, embedded</li>
+        <li><strong>Debugging</strong> - printf works. GDB works. Valgrind works.</li>
+        <li><strong>Longevity</strong> - C code compiles forever. CUDA versions break.</li>
+    </ul>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="memory-reality.html">Memory Reality</a> - What NVIDIA marketing won't tell you about LLM memory</li>
+    <li><a href="developer-guide.html">Developer Guide</a> - How the engine works</li>
+    <li><a href="memory-safety.html">Memory Safety</a> - Bump allocator design</li>
+    <li><a href="profiling.html">Profiling Guide</a> - Performance optimization</li>
+</ul>
+    </main>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-16</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!-- TITLE: API Reference -->
+<!-- NAV: api -->
+
+<h1>API Reference</h1>
+
+<p>Complete API documentation for C-Kernel-Engine kernels. All functions are exported from <code>libckernel_engine.so</code> and can be called from C or via Python ctypes.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Auto-generated from source</strong><br>
+        This documentation is extracted from the C header files using Doxygen. Functions marked <span class="badge badge-green">Forward</span> compute activations, and <span class="badge badge-blue" style="background: var(--blue);">Backward</span> compute gradients.
+    </div>
+</div>
+
+<h2>Quick Reference</h2>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Include Header</h3>
+        <pre>#include "ckernel_engine.h"</pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Link Library</h3>
+        <pre>-lckernel_engine</pre>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Python ctypes</h3>
+        <pre>lib = ctypes.CDLL("libckernel_engine.so")</pre>
+    </div>
+</div>
+
+<h2>Memory Layouts</h2>
+
+<div class="card">
+    <p>All kernels use consistent memory layouts optimized for cache efficiency:</p>
+    <table>
+        <tr>
+            <th>Buffer</th>
+            <th>Layout</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>input/output</code></td>
+            <td>[B, T, D]</td>
+            <td>Batch × Tokens × Embedding dimension</td>
+        </tr>
+        <tr>
+            <td><code>Q</code></td>
+            <td>[H, T, d_k]</td>
+            <td>num_heads × Tokens × head_dim (head-major)</td>
+        </tr>
+        <tr>
+            <td><code>K, V</code></td>
+            <td>[H_kv, T, d_k]</td>
+            <td>num_kv_heads × Tokens × head_dim (for GQA)</td>
+        </tr>
+        <tr>
+            <td><code>scores</code></td>
+            <td>[H, T, T]</td>
+            <td>num_heads × query_tokens × key_tokens</td>
+        </tr>
+        <tr>
+            <td><code>weights</code></td>
+            <td>[out, in]</td>
+            <td>Row-major weight matrices</td>
+        </tr>
+    </table>
+</div>
+
+<h2>Kernel Functions</h2>
+
+{{API_CONTENT}}
+
+<h2>Usage Example</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Forward + Backward Pass</h3>
+    <pre>// Forward pass
+rmsnorm_forward(input, gamma, norm_out, rstd_cache, tokens, d_model, d_model, eps);
+attention_forward_causal_head_major_gqa(q, k, v, scores, attn_out, heads, kv_heads, tokens, head_dim, head_dim, ctx_len);
+swiglu_forward(mlp_in, mlp_out, tokens, hidden_dim);
+
+// Backward pass (reverse order)
+swiglu_backward(mlp_in, d_mlp_out, d_mlp_in, tokens, hidden_dim);
+attention_backward_causal_head_major_gqa(d_attn_out, q, k, v, scores, d_q, d_k, d_v, d_scores, heads, kv_heads, tokens, head_dim, head_dim, ctx_len);
+rmsnorm_backward(d_norm_out, input, gamma, rstd_cache, d_input, d_gamma, tokens, d_model, d_model);</pre>
+</div>

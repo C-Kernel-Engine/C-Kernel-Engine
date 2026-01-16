@@ -1,0 +1,243 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="gemm__kernels__q4k__sse_8c" kind="file" language="C++">
+    <compoundname>gemm_kernels_q4k_sse.c</compoundname>
+    <includes local="no">immintrin.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">string.h</includes>
+    <includes refid="ckernel__quant_8h" local="yes">ckernel_quant.h</includes>
+    <incdepgraph>
+      <node id="5">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="2">
+        <label>immintrin.h</label>
+      </node>
+      <node id="6">
+        <label>stddef.h</label>
+      </node>
+      <node id="4">
+        <label>string.h</label>
+      </node>
+      <node id="1">
+        <label>gemm_kernels_q4k_sse.c</label>
+        <link refid="gemm__kernels__q4k__sse_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="gemm__kernels__q4k__sse_8c_1afae7b0ff0904761e59897e996ddd862f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q4_k_q8_k_sse</definition>
+        <argsstring>(float *y, const void *W, const void *x_q8, int M, int K)</argsstring>
+        <name>gemv_q4_k_q8_k_sse</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>x_q8</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q4k_sse.c" line="18" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q4k_sse.c" bodystart="18" bodyend="117"/>
+        <references refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" compoundref="ckernel__quant_8h" startline="155">block_q8_K::bsums</references>
+        <references refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" compoundref="ckernel__quant_8h" startline="325">CK_FP16_TO_FP32</references>
+        <references refid="structblock__q4__K_1a37fe013be58ed82df03c3362450590d3" compoundref="ckernel__quant_8h" startline="124">block_q4_K::d</references>
+        <references refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" compoundref="ckernel__quant_8h" startline="153">block_q8_K::d</references>
+        <references refid="structblock__q4__K_1a86e4a2173d9a1def4939ccb248a1bc49" compoundref="ckernel__quant_8h" startline="125">block_q4_K::dmin</references>
+        <references refid="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" compoundref="gemm__kernels__q4k__sse_8c" startline="10" endline="16">hsum_epi32_sse</references>
+        <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
+        <references refid="structblock__q4__K_1a74d5a6318849909fb1c19248961d7ac9" compoundref="ckernel__quant_8h" startline="127">block_q4_K::qs</references>
+        <references refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" compoundref="ckernel__quant_8h" startline="154">block_q8_K::qs</references>
+        <references refid="structblock__q4__K_1a3a603ea5f9ee6a3732d96a244cb6a3b5" compoundref="ckernel__quant_8h" startline="126">block_q4_K::scales</references>
+        <references refid="ckernel__quant_8h_1adc037213865781c5c1ea63708ef94307" compoundref="ckernel__quant_8h" startline="226" endline="250">unpack_q4_k_scales</references>
+        <referencedby refid="ckernel__engine_8h_1abd2ce09c06d448b502b30fac01bc1d30" compoundref="gemm__kernels__q4k__q8k_8c" startline="230" endline="248">gemv_q4_k_q8_k</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>int32_t</type>
+        <definition>static int32_t hsum_epi32_sse</definition>
+        <argsstring>(__m128i v)</argsstring>
+        <name>hsum_epi32_sse</name>
+        <param>
+          <type>__m128i</type>
+          <declname>v</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q4k_sse.c" line="10" column="23" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q4k_sse.c" bodystart="10" bodyend="16"/>
+        <referencedby refid="ckernel__quant_8h_1afae7b0ff0904761e59897e996ddd862f" compoundref="gemm__kernels__q4k__sse_8c" startline="18" endline="117">gemv_q4_k_q8_k_sse</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__quant_8h" kindref="compound">ckernel_quant.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="comment">//<sp/>SSE4.1<sp/>implementation<sp/>of<sp/>Q4_K<sp/>*<sp/>Q8_K<sp/>dot<sp/>product</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Compatible<sp/>with<sp/>standard<sp/>AVX<sp/>(Sandy<sp/>Bridge/Ivy<sp/>Bridge)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10" refid="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>int32_t<sp/><ref refid="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" kindref="member">hsum_epi32_sse</ref>(__m128i<sp/>v)<sp/>{</highlight></codeline>
+<codeline lineno="11"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128i<sp/>shuf<sp/>=<sp/>_mm_shuffle_epi32(v,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2));</highlight></codeline>
+<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128i<sp/>sums<sp/>=<sp/>_mm_add_epi32(v,<sp/>shuf);</highlight></codeline>
+<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/>shuf<sp/>=<sp/>_mm_shuffle_epi32(sums,<sp/>_MM_SHUFFLE(2,<sp/>3,<sp/>0,<sp/>1));</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/>sums<sp/>=<sp/>_mm_add_epi32(sums,<sp/>shuf);</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm_cvtsi128_si32(sums);</highlight></codeline>
+<codeline lineno="16"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18" refid="ckernel__quant_8h_1afae7b0ff0904761e59897e996ddd862f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q4k__sse_8c_1afae7b0ff0904761e59897e996ddd862f" kindref="member">gemv_q4_k_q8_k_sse</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*x_q8,</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="22"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q4__K" kindref="compound">block_q4_K</ref><sp/>*blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q4__K" kindref="compound">block_q4_K</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*x<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*)x_q8;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m128i<sp/>mask_low<sp/>=<sp/>_mm_set1_epi8(0x0F);</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>0;<sp/>row<sp/>&lt;<sp/>M;<sp/>++row)<sp/>{</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sumf<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q4__K" kindref="compound">block_q4_K</ref><sp/>*w_row<sp/>=<sp/>blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row;</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>blocks_per_row;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q4__K" kindref="compound">block_q4_K</ref><sp/>*b4<sp/>=<sp/>&amp;w_row[i];</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*b8<sp/>=<sp/>&amp;x[i];</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Unpack<sp/>scales<sp/>(same<sp/>as<sp/>ref)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint8_t<sp/>sc[8],<sp/>m_val[8];</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__quant_8h_1adc037213865781c5c1ea63708ef94307" kindref="member">unpack_q4_k_scales</ref>(b4-&gt;<ref refid="structblock__q4__K_1a3a603ea5f9ee6a3732d96a244cb6a3b5" kindref="member">scales</ref>,<sp/>sc,<sp/>m_val);</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>d<sp/>=<sp/><ref refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" kindref="member">CK_FP16_TO_FP32</ref>(b4-&gt;<ref refid="structblock__q4__K_1a37fe013be58ed82df03c3362450590d3" kindref="member">d</ref>)<sp/>*<sp/>b8-&gt;<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref>;</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dmin<sp/>=<sp/><ref refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" kindref="member">CK_FP16_TO_FP32</ref>(b4-&gt;<ref refid="structblock__q4__K_1a86e4a2173d9a1def4939ccb248a1bc49" kindref="member">dmin</ref>)<sp/>*<sp/>b8-&gt;<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref>;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>is<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>q_offset<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Process<sp/>4<sp/>chunks<sp/>of<sp/>64<sp/>elements<sp/>(256<sp/>total)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>j<sp/>+=<sp/>64)<sp/>{</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>We<sp/>process<sp/>32<sp/>bytes<sp/>of<sp/>qs<sp/>(covering<sp/>64<sp/>elements<sp/>via<sp/>low/high<sp/>nibbles)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>We<sp/>access<sp/>qs[0..31]<sp/>relative<sp/>to<sp/>q_offset</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Accumulators<sp/>for<sp/>this<sp/>64-element<sp/>chunk</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>acc_lo<sp/>=<sp/>_mm_setzero_si128();</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>acc_hi<sp/>=<sp/>_mm_setzero_si128();</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Inner<sp/>loop:<sp/>2<sp/>iters<sp/>of<sp/>16<sp/>bytes<sp/>(32<sp/>elements)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>l<sp/>=<sp/>0;<sp/>l<sp/>&lt;<sp/>32;<sp/>l<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Load<sp/>16<sp/>bytes<sp/>of<sp/>Q4</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_vec<sp/>=<sp/>_mm_loadu_si128((</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m128i<sp/>*)(b4-&gt;<ref refid="structblock__q4__K_1a74d5a6318849909fb1c19248961d7ac9" kindref="member">qs</ref><sp/>+<sp/>q_offset<sp/>+<sp/>l));</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Low<sp/>nibbles<sp/>-&gt;<sp/>correspond<sp/>to<sp/>q8_lo<sp/>(elements<sp/>j+l<sp/>..<sp/>j+l+15)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_lo<sp/>=<sp/>_mm_and_si128(q4_vec,<sp/>mask_low);</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>High<sp/>nibbles<sp/>-&gt;<sp/>correspond<sp/>to<sp/>q8_hi<sp/>(elements<sp/>j+32+l<sp/>..<sp/>j+32+l+15)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_hi<sp/>=<sp/>_mm_and_si128(_mm_srli_epi16(q4_vec,<sp/>4),<sp/>mask_low);</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Load<sp/>Q8</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_lo_vec<sp/>=<sp/>_mm_loadu_si128((</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m128i<sp/>*)(b8-&gt;<ref refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" kindref="member">qs</ref><sp/>+<sp/>j<sp/>+<sp/>l));</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_hi_vec<sp/>=<sp/>_mm_loadu_si128((</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m128i<sp/>*)(b8-&gt;<ref refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" kindref="member">qs</ref><sp/>+<sp/>j<sp/>+<sp/>32<sp/>+<sp/>l));</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Expand<sp/>and<sp/>Multiply-Add:<sp/>Q4(u8)<sp/>*<sp/>Q8(s8)<sp/>-&gt;<sp/>i32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Since<sp/>Q4<sp/>is<sp/>u8<sp/>and<sp/>Q8<sp/>is<sp/>s8,<sp/>we<sp/>use<sp/>intermediate<sp/>i16</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>LO<sp/>PART</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_lo_16_L<sp/>=<sp/>_mm_cvtepu8_epi16(q4_lo);<sp/></highlight><highlight class="comment">//<sp/>lower<sp/>8<sp/>-&gt;<sp/>16</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_lo_16_L<sp/>=<sp/>_mm_cvtepi8_epi16(q8_lo_vec);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>prod_lo_L<sp/>=<sp/>_mm_madd_epi16(q4_lo_16_L,<sp/>q8_lo_16_L);<sp/></highlight><highlight class="comment">//<sp/>i32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc_lo<sp/>=<sp/>_mm_add_epi32(acc_lo,<sp/>prod_lo_L);</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_lo_16_H<sp/>=<sp/>_mm_cvtepu8_epi16(_mm_srli_si128(q4_lo,<sp/>8));<sp/></highlight><highlight class="comment">//<sp/>upper<sp/>8<sp/>-&gt;<sp/>16</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_lo_16_H<sp/>=<sp/>_mm_cvtepi8_epi16(_mm_srli_si128(q8_lo_vec,<sp/>8));</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>prod_lo_H<sp/>=<sp/>_mm_madd_epi16(q4_lo_16_H,<sp/>q8_lo_16_H);<sp/></highlight><highlight class="comment">//<sp/>i32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc_lo<sp/>=<sp/>_mm_add_epi32(acc_lo,<sp/>prod_lo_H);</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>HI<sp/>PART</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_hi_16_L<sp/>=<sp/>_mm_cvtepu8_epi16(q4_hi);</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_hi_16_L<sp/>=<sp/>_mm_cvtepi8_epi16(q8_hi_vec);</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>prod_hi_L<sp/>=<sp/>_mm_madd_epi16(q4_hi_16_L,<sp/>q8_hi_16_L);</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc_hi<sp/>=<sp/>_mm_add_epi32(acc_hi,<sp/>prod_hi_L);</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"></highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q4_hi_16_H<sp/>=<sp/>_mm_cvtepu8_epi16(_mm_srli_si128(q4_hi,<sp/>8));</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q8_hi_16_H<sp/>=<sp/>_mm_cvtepi8_epi16(_mm_srli_si128(q8_hi_vec,<sp/>8));</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>prod_hi_H<sp/>=<sp/>_mm_madd_epi16(q4_hi_16_H,<sp/>q8_hi_16_H);</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc_hi<sp/>=<sp/>_mm_add_epi32(acc_hi,<sp/>prod_hi_H);</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"></highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>sum_q4q8_lo<sp/>=<sp/><ref refid="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" kindref="member">hsum_epi32_sse</ref>(acc_lo);</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>sum_q4q8_hi<sp/>=<sp/><ref refid="gemm__kernels__q4k__sse_8c_1a1fd457548cf919a5f340dd1c8636eb01" kindref="member">hsum_epi32_sse</ref>(acc_hi);</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"></highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>bsums:<sp/>each<sp/>bsum<sp/>is<sp/>16<sp/>elements<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>bsum_lo<sp/>=<sp/>(int32_t)b8-&gt;<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[j<sp/>/<sp/>16]<sp/>+</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(int32_t)b8-&gt;<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[j<sp/>/<sp/>16<sp/>+<sp/>1];</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>bsum_hi<sp/>=<sp/>(int32_t)b8-&gt;<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[(j<sp/>+<sp/>32)<sp/>/<sp/>16]<sp/>+</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(int32_t)b8-&gt;<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[(j<sp/>+<sp/>32)<sp/>/<sp/>16<sp/>+<sp/>1];</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sumf<sp/>+=<sp/>d<sp/>*<sp/>(float)sc[is]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)sum_q4q8_lo;</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sumf<sp/>-=<sp/>dmin<sp/>*<sp/>(float)m_val[is]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)bsum_lo;</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sumf<sp/>+=<sp/>d<sp/>*<sp/>(float)sc[is<sp/>+<sp/>1]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)sum_q4q8_hi;</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sumf<sp/>-=<sp/>dmin<sp/>*<sp/>(float)m_val[is<sp/>+<sp/>1]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)bsum_hi;</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>q_offset<sp/>+=<sp/>32;</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>is<sp/>+=<sp/>2;</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[row]<sp/>=<sp/>sumf;</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="117"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q4k_sse.c"/>
+  </compounddef>
+</doxygen>

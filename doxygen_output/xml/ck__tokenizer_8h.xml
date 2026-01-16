@@ -1,0 +1,846 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ck__tokenizer_8h" kind="file" language="C++">
+    <compoundname>ck_tokenizer.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdbool.h</includes>
+    <includedby refid="ck__tokenizer_8c" local="yes">ck_tokenizer.c</includedby>
+    <includedby refid="ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
+    <includedby refid="v2__legacy_2ck__tokenizer__v2_8c" local="yes">ck_tokenizer_v2.c</includedby>
+    <includedby refid="ck__tokenizer__v6_8c" local="yes">ck_tokenizer_v6.c</includedby>
+    <includedby refid="v6__inference_8c" local="yes">v6_inference.c</includedby>
+    <includedby refid="ck__tokenizer__v6_85_8c" local="yes">ck_tokenizer_v6.5.c</includedby>
+    <includedby refid="ck__tokenizer__v6_86_8c" local="yes">ck_tokenizer_v6.6.c</includedby>
+    <incdepgraph>
+      <node id="4">
+        <label>stdbool.h</label>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>ck_tokenizer.h</label>
+        <link refid="ck__tokenizer_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="1">
+        <label>ck_tokenizer.h</label>
+        <link refid="ck__tokenizer_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>ck_tokenizer_v2.c</label>
+        <link refid="ck__tokenizer__v2_8c"/>
+      </node>
+      <node id="6">
+        <label>v6_inference.c</label>
+        <link refid="v6__inference_8c"/>
+      </node>
+      <node id="4">
+        <label>ck_tokenizer_v2.c</label>
+        <link refid="v2__legacy_2ck__tokenizer__v2_8c"/>
+      </node>
+      <node id="2">
+        <label>ck_tokenizer.c</label>
+        <link refid="ck__tokenizer_8c"/>
+      </node>
+      <node id="7">
+        <label>ck_tokenizer_v6.5.c</label>
+        <link refid="ck__tokenizer__v6_85_8c"/>
+      </node>
+      <node id="8">
+        <label>ck_tokenizer_v6.6.c</label>
+        <link refid="ck__tokenizer__v6_86_8c"/>
+      </node>
+      <node id="5">
+        <label>ck_tokenizer_v6.c</label>
+        <link refid="ck__tokenizer__v6_8c"/>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structCKMemPool" prot="public">CKMemPool</innerclass>
+    <innerclass refid="structCKMergeRule" prot="public">CKMergeRule</innerclass>
+    <innerclass refid="structCKPoolBlock" prot="public">CKPoolBlock</innerclass>
+    <innerclass refid="structCKTokenizer" prot="public">CKTokenizer</innerclass>
+    <innerclass refid="structCKVocabEntry" prot="public">CKVocabEntry</innerclass>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="ck__tokenizer_8h_1abb08eb27f9bc2409d72e7062f332feeb" prot="public" static="no">
+        <name>CK_MAX_TOKEN_LEN</name>
+        <initializer>256</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="25" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" bodystart="25" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ck__tokenizer_8h_1a28501527109241976fb03e6118259a32" prot="public" static="no">
+        <name>CK_MAX_VOCAB_SIZE</name>
+        <initializer>256000</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="28" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" bodystart="28" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ck__tokenizer_8h_1aafbed2100fc7b365d7cb7acdd8548b13" prot="public" static="no">
+        <name>CK_POOL_BLOCK_SIZE</name>
+        <initializer>(1024 * 1024)  /* 1MB */</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="31" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" bodystart="31" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_pool_alloc</definition>
+        <argsstring>(CKMemPool *pool, size_t size)</argsstring>
+        <name>ck_pool_alloc</name>
+        <param>
+          <type><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>size</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="115" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="49" bodyend="76" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="115" declcolumn="6"/>
+        <references refid="ck__tokenizer_8h_1aafbed2100fc7b365d7cb7acdd8548b13" compoundref="ck__tokenizer_8h" startline="31">CK_POOL_BLOCK_SIZE</references>
+        <references refid="structCKMemPool_1a4fa13f6e99896ec541cba40c99e70f9c" compoundref="ck__tokenizer_8h" startline="46">CKMemPool::current</references>
+        <references refid="structCKPoolBlock_1a28b34d622ad98214bd709675b430f459" compoundref="ck__tokenizer_8h" startline="38">CKPoolBlock::data</references>
+        <references refid="structCKMemPool_1ac7919cceb17dccce7584f443a2f9eb4e" compoundref="ck__tokenizer_8h" startline="45">CKMemPool::head</references>
+        <references refid="structCKPoolBlock_1a39f197d57191d7ab700d17ad918d03c5" compoundref="ck__tokenizer_8h" startline="41">CKPoolBlock::next</references>
+        <references refid="ck__tokenizer_8c_1a8757ee39b4eea9e8c09e4c778f137ddf" compoundref="ck__tokenizer_8c" startline="35" endline="47">pool_new_block</references>
+        <references refid="structCKMemPool_1ac7e607885b7d68b849240ab7cd91ddac" compoundref="ck__tokenizer_8h" startline="47">CKMemPool::total_allocated</references>
+        <references refid="structCKPoolBlock_1ad15144404362a0676f0c46a5b5a8d0ba" compoundref="ck__tokenizer_8h" startline="39">CKPoolBlock::used</references>
+        <referencedby refid="ck__tokenizer_8h_1aaaef67621f30b7a785983b247ab00f94" compoundref="ck__tokenizer_8c" startline="78" endline="85">ck_pool_strdup</referencedby>
+        <referencedby refid="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" compoundref="ck__tokenizer_8c" startline="176" endline="205">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</referencedby>
+        <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1aba3724127379a06a8baf1c63d478aa3a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_pool_free</definition>
+        <argsstring>(CKMemPool *pool)</argsstring>
+        <name>ck_pool_free</name>
+        <param>
+          <type><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="125" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="87" bodyend="96" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="125" declcolumn="6"/>
+        <references refid="structCKPoolBlock_1a28b34d622ad98214bd709675b430f459" compoundref="ck__tokenizer_8h" startline="38">CKPoolBlock::data</references>
+        <references refid="structCKMemPool_1ac7919cceb17dccce7584f443a2f9eb4e" compoundref="ck__tokenizer_8h" startline="45">CKMemPool::head</references>
+        <references refid="structCKPoolBlock_1a39f197d57191d7ab700d17ad918d03c5" compoundref="ck__tokenizer_8h" startline="41">CKPoolBlock::next</references>
+        <referencedby refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="ck__tokenizer_8c" startline="163" endline="170">ck_tokenizer_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a22dd876d597bf3a6f43e60d0702a7065" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_pool_init</definition>
+        <argsstring>(CKMemPool *pool)</argsstring>
+        <name>ck_pool_init</name>
+        <param>
+          <type><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="110" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="31" bodyend="33" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="110" declcolumn="6"/>
+        <referencedby refid="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" compoundref="ck__tokenizer_8c" startline="128" endline="161">ck_tokenizer_init</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1aaaef67621f30b7a785983b247ab00f94" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>char *</type>
+        <definition>char* ck_pool_strdup</definition>
+        <argsstring>(CKMemPool *pool, const char *s, int len)</argsstring>
+        <name>ck_pool_strdup</name>
+        <param>
+          <type><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="120" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="78" bodyend="85" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="120" declcolumn="6"/>
+        <references refid="ck__tokenizer_8c_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="49" endline="76">ck_pool_alloc</references>
+        <referencedby refid="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" compoundref="ck__tokenizer_8c" startline="176" endline="205">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_add_merge</definition>
+        <argsstring>(CKTokenizer *tok, int32_t left, int32_t right, int32_t merged)</argsstring>
+        <name>ck_tokenizer_add_merge</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>left</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>right</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>merged</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="154" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="228" bodyend="254" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="154" declcolumn="5"/>
+        <references refid="ck__tokenizer_8c_1aec779163dcf0f67868d1fdf622326da3" compoundref="ck__tokenizer_8c" startline="113" endline="122">hash_pair</references>
+        <references refid="structCKMergeRule_1a2f4fb999c8ad7581926948836ad96949" compoundref="ck__tokenizer_8h" startline="67">CKMergeRule::left</references>
+        <references refid="true__bpe_8h_1abf33d3f8e74eb48d5a4394c67ac4f1cd" compoundref="true__bpe_8h" startline="130">left</references>
+        <references refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" compoundref="ck__tokenizer_8h" startline="93">CKTokenizer::merge_hash</references>
+        <references refid="structCKTokenizer_1a9b7a80f60b651e50d40ffb9b1130eccc" compoundref="ck__tokenizer_8h" startline="94">CKTokenizer::merge_hash_size</references>
+        <references refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" compoundref="ck__tokenizer_8h" startline="69">CKMergeRule::merged</references>
+        <references refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" compoundref="ck__tokenizer_8h" startline="89">CKTokenizer::merges</references>
+        <references refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" compoundref="ck__tokenizer_8h" startline="90">CKTokenizer::num_merges</references>
+        <references refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" compoundref="ck__tokenizer_8h" startline="70">CKMergeRule::priority</references>
+        <references refid="structCKMergeRule_1ad429814a773c9faa0526991078347e4f" compoundref="ck__tokenizer_8h" startline="68">CKMergeRule::right</references>
+        <references refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" compoundref="true__bpe_8h" startline="131">right</references>
+        <referencedby refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</referencedby>
+        <referencedby refid="tokenizer_8h_1a4de5533c0e1c9f89bfb77bee05cf97fd" compoundref="ck__tokenizer__v2_8c" startline="18" endline="56">ck_tokenizer_load_binary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int32_t</type>
+        <definition>int32_t ck_tokenizer_add_token</definition>
+        <argsstring>(CKTokenizer *tok, const char *token, int len)</argsstring>
+        <name>ck_tokenizer_add_token</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>token</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="143" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="176" bodyend="205" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="143" declcolumn="9"/>
+        <references refid="ck__tokenizer_8h_1a28501527109241976fb03e6118259a32" compoundref="ck__tokenizer_8h" startline="28">CK_MAX_VOCAB_SIZE</references>
+        <references refid="ck__tokenizer_8c_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="49" endline="76">ck_pool_alloc</references>
+        <references refid="ck__tokenizer_8c_1aaaef67621f30b7a785983b247ab00f94" compoundref="ck__tokenizer_8c" startline="78" endline="85">ck_pool_strdup</references>
+        <references refid="ck__tokenizer_8c_1a2559a1955d6dbd45babf7b294f538494" compoundref="ck__tokenizer_8c" startline="207" endline="217">ck_tokenizer_lookup</references>
+        <references refid="ck__tokenizer_8c_1a6f11f138126f83f02adef65dc6ceef4b" compoundref="ck__tokenizer_8c" startline="103" endline="110">hash_string</references>
+        <references refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" compoundref="ck__tokenizer_8h" startline="58">CKVocabEntry::id</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" compoundref="ck__tokenizer_8h" startline="59">CKVocabEntry::next</references>
+        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" compoundref="ck__tokenizer_8h" startline="56">CKVocabEntry::token</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <references refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" compoundref="ck__tokenizer_8h" startline="57">CKVocabEntry::token_len</references>
+        <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</referencedby>
+        <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a25fd8f38cf8e62b1e19e347e53225e8c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_decode</definition>
+        <argsstring>(const CKTokenizer *tok, const int32_t *ids, int num_ids, char *text, int max_len)</argsstring>
+        <name>ck_tokenizer_decode</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>const int32_t *</type>
+          <declname>ids</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_ids</declname>
+        </param>
+        <param>
+          <type>char *</type>
+          <declname>text</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>max_len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="176" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="717" bodyend="763" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="176" declcolumn="5"/>
+        <references refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" compoundref="ck__tokenizer_8h" startline="98">CKTokenizer::bos_id</references>
+        <references refid="ck__tokenizer_8c_1a8305a4a576ed2473bccd0a5dff347aa1" compoundref="ck__tokenizer_8c" startline="219" endline="222">ck_tokenizer_id_to_token</references>
+        <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
+        <references refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" compoundref="tokenizer_8h" startline="399">ids</references>
+        <references refid="true__bpe_8h_1a59dd98a65ac03cdb1deea39c7580fb33" compoundref="true__bpe_8h" startline="264">max_len</references>
+        <references refid="tokenizer_8h_1a2f30fc798d162629916e2faa69137745" compoundref="tokenizer_8h" startline="400">num_ids</references>
+        <references refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" compoundref="ck__tokenizer_8h" startline="100">CKTokenizer::pad_id</references>
+        <references refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" compoundref="tokenizer_8h" startline="494">text</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_encode</definition>
+        <argsstring>(const CKTokenizer *tok, const char *text, int text_len, int32_t *ids, int max_ids)</argsstring>
+        <name>ck_tokenizer_encode</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>text</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>text_len</declname>
+        </param>
+        <param>
+          <type>int32_t *</type>
+          <declname>ids</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>max_ids</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="166" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="618" bodyend="711" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="166" declcolumn="5"/>
+        <references refid="structCKTokenizer_1af13d7f81c356bfb82e80d6742352a376" compoundref="ck__tokenizer_8h" startline="103">CKTokenizer::add_bos</references>
+        <references refid="structCKTokenizer_1a8668f96025566da654689955d9407400" compoundref="ck__tokenizer_8h" startline="104">CKTokenizer::add_eos</references>
+        <references refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" compoundref="ck__tokenizer_8h" startline="98">CKTokenizer::bos_id</references>
+        <references refid="ck__tokenizer_8c_1a2559a1955d6dbd45babf7b294f538494" compoundref="ck__tokenizer_8c" startline="207" endline="217">ck_tokenizer_lookup</references>
+        <references refid="ck__tokenizer_8c_1ae0173ee4612f5c5cfd44817e097c927f" compoundref="ck__tokenizer_8c" startline="256" endline="270">ck_tokenizer_lookup_merge</references>
+        <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
+        <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
+        <references refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" compoundref="tokenizer_8h" startline="399">ids</references>
+        <references refid="true__bpe_8h_1adc7b8f0514fd7d4fefa123e27ce8922d" compoundref="true__bpe_8h" startline="248">max_ids</references>
+        <references refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" compoundref="ck__tokenizer_8h" startline="69">CKMergeRule::merged</references>
+        <references refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" compoundref="ck__tokenizer_8h" startline="89">CKTokenizer::merges</references>
+        <references refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" compoundref="ck__tokenizer_8h" startline="90">CKTokenizer::num_merges</references>
+        <references refid="tokenizer_8h_1afcd8f560b02b3c7a2bc2b3effa325fcf" compoundref="tokenizer_8h" startline="401">out_len</references>
+        <references refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" compoundref="ck__tokenizer_8h" startline="70">CKMergeRule::priority</references>
+        <references refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" compoundref="tokenizer_8h" startline="494">text</references>
+        <references refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" compoundref="true__bpe_8h" startline="246">text_len</references>
+        <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
+        <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_free</definition>
+        <argsstring>(CKTokenizer *tok)</argsstring>
+        <name>ck_tokenizer_free</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="191" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="163" bodyend="170" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="191" declcolumn="6"/>
+        <references refid="ck__tokenizer_8c_1aba3724127379a06a8baf1c63d478aa3a" compoundref="ck__tokenizer_8c" startline="87" endline="96">ck_pool_free</references>
+        <references refid="hash__table_8h_1a7a93b1af26ca875e7f75de188d6fc39d" compoundref="hash__table_8c" startline="140" endline="156">ck_tokenizer_hash_table_free</references>
+        <references refid="memory__pool_8h_1a8825ca1a45f75b31e9a24a25856eca88" compoundref="memory__pool_8c" startline="28" endline="35">ck_tokenizer_mempool_free</references>
+        <references refid="include_2data__structures_2tries_2trie_8h_1ab747873883085231decec598e26d69ff" compoundref="trie_8c" startline="51" endline="78">ck_trie_free</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" compoundref="ck__tokenizer_8h" startline="93">CKTokenizer::merge_hash</references>
+        <references refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" compoundref="ck__tokenizer_8h" startline="89">CKTokenizer::merges</references>
+        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKTokenizer_1a878700375e60c6a752440d7e8265df12" compoundref="tokenizer_8h" startline="92">CKTokenizer::vocab</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <references refid="structCKTokenizer_1a04da4f7678ae2191f13c434960df3e66" compoundref="tokenizer_8h" startline="95">CKTokenizer::vocab_trie</references>
+        <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+        <referencedby refid="v6_85__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6_85__inference_8c" startline="197" endline="338">run_inference</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>const char *</type>
+        <definition>const char* ck_tokenizer_id_to_token</definition>
+        <argsstring>(const CKTokenizer *tok, int32_t id)</argsstring>
+        <name>ck_tokenizer_id_to_token</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>id</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="186" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="219" bodyend="222" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="186" declcolumn="12"/>
+        <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="ck__tokenizer_8h_1a25fd8f38cf8e62b1e19e347e53225e8c" compoundref="ck__tokenizer_8c" startline="717" endline="763">ck_tokenizer_decode</referencedby>
+        <referencedby refid="ck__cli__v5_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="ck__cli__v5_8c" startline="110" endline="203">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_init</definition>
+        <argsstring>(CKTokenizer *tok)</argsstring>
+        <name>ck_tokenizer_init</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="131" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="128" bodyend="161" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="131" declcolumn="5"/>
+        <references refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" compoundref="ck__tokenizer_8h" startline="98">CKTokenizer::bos_id</references>
+        <references refid="ck__tokenizer_8h_1a28501527109241976fb03e6118259a32" compoundref="ck__tokenizer_8h" startline="28">CK_MAX_VOCAB_SIZE</references>
+        <references refid="ck__tokenizer_8c_1a22dd876d597bf3a6f43e60d0702a7065" compoundref="ck__tokenizer_8c" startline="31" endline="33">ck_pool_init</references>
+        <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" compoundref="ck__tokenizer_8h" startline="93">CKTokenizer::merge_hash</references>
+        <references refid="structCKTokenizer_1a9b7a80f60b651e50d40ffb9b1130eccc" compoundref="ck__tokenizer_8h" startline="94">CKTokenizer::merge_hash_size</references>
+        <references refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" compoundref="ck__tokenizer_8h" startline="100">CKTokenizer::pad_id</references>
+        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_load</definition>
+        <argsstring>(CKTokenizer *tok, const char *path)</argsstring>
+        <name>ck_tokenizer_load</name>
+        <param>
+          <type><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>path</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="137" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="412" bodyend="612" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="137" declcolumn="5"/>
+        <references refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" compoundref="ck__tokenizer_8h" startline="98">CKTokenizer::bos_id</references>
+        <references refid="ck__tokenizer_8h_1abb08eb27f9bc2409d72e7062f332feeb" compoundref="ck__tokenizer_8h" startline="25">CK_MAX_TOKEN_LEN</references>
+        <references refid="ck__tokenizer_8c_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="49" endline="76">ck_pool_alloc</references>
+        <references refid="ck__tokenizer_8c_1aaaef67621f30b7a785983b247ab00f94" compoundref="ck__tokenizer_8c" startline="78" endline="85">ck_pool_strdup</references>
+        <references refid="ck__tokenizer_8c_1a10ff92cd939960842b992ee6faf904cc" compoundref="ck__tokenizer_8c" startline="228" endline="254">ck_tokenizer_add_merge</references>
+        <references refid="ck__tokenizer_8c_1ab7a38c00a25ae5bdc8bb91ee07c26714" compoundref="ck__tokenizer_8c" startline="176" endline="205">ck_tokenizer_add_token</references>
+        <references refid="ck__tokenizer_8c_1a2559a1955d6dbd45babf7b294f538494" compoundref="ck__tokenizer_8c" startline="207" endline="217">ck_tokenizer_lookup</references>
+        <references refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" compoundref="ck__tokenizer_8h" startline="99">CKTokenizer::eos_id</references>
+        <references refid="ck__tokenizer_8c_1a6f11f138126f83f02adef65dc6ceef4b" compoundref="ck__tokenizer_8c" startline="103" endline="110">hash_string</references>
+        <references refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" compoundref="ck__tokenizer_8h" startline="58">CKVocabEntry::id</references>
+        <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
+        <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
+        <references refid="ck__tokenizer_8c_1aa594820638376a5b192bdb1b69b5702a" compoundref="ck__tokenizer_8c" startline="282" endline="289">json_match_char</references>
+        <references refid="ck__tokenizer_8c_1aee9814670b666abb18ca2b92936d4716" compoundref="ck__tokenizer_8c" startline="343" endline="363">json_parse_int</references>
+        <references refid="ck__tokenizer_8c_1ac754cedfb55bf16207263841d468f710" compoundref="ck__tokenizer_8c" startline="291" endline="341">json_parse_string</references>
+        <references refid="ck__tokenizer_8c_1aedb60f83a635dc16ac2ceb687a911e17" compoundref="ck__tokenizer_8c" startline="365" endline="406">json_skip_value</references>
+        <references refid="ck__tokenizer_8c_1a719dc18eefdc25d7115f13dd18efccb9" compoundref="ck__tokenizer_8c" startline="276" endline="280">json_skip_whitespace</references>
+        <references refid="true__bpe_8h_1acc4488e0b6a8a2700b10d41c0371df4a" compoundref="true__bpe_8h" startline="114">merged_id</references>
+        <references refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" compoundref="ck__tokenizer_8h" startline="59">CKVocabEntry::next</references>
+        <references refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" compoundref="ck__tokenizer_8h" startline="90">CKTokenizer::num_merges</references>
+        <references refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" compoundref="ck__tokenizer_8h" startline="100">CKTokenizer::pad_id</references>
+        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" compoundref="ck__tokenizer_8h" startline="56">CKVocabEntry::token</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <references refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" compoundref="ck__tokenizer_8h" startline="57">CKVocabEntry::token_len</references>
+        <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1a2559a1955d6dbd45babf7b294f538494" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int32_t</type>
+        <definition>int32_t ck_tokenizer_lookup</definition>
+        <argsstring>(const CKTokenizer *tok, const char *token, int len)</argsstring>
+        <name>ck_tokenizer_lookup</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>token</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="149" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="207" bodyend="217" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="149" declcolumn="9"/>
+        <references refid="ck__tokenizer_8c_1a6f11f138126f83f02adef65dc6ceef4b" compoundref="ck__tokenizer_8c" startline="103" endline="110">hash_string</references>
+        <references refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" compoundref="ck__tokenizer_8h" startline="59">CKVocabEntry::next</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <references refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" compoundref="ck__tokenizer_8h" startline="97">CKTokenizer::unk_id</references>
+        <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
+        <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
+        <referencedby refid="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" compoundref="ck__tokenizer_8c" startline="176" endline="205">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" compoundref="ck__tokenizer_8c" startline="618" endline="711">ck_tokenizer_encode</referencedby>
+        <referencedby refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" compoundref="ck__tokenizer_8c" startline="412" endline="612">ck_tokenizer_load</referencedby>
+        <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1ae0173ee4612f5c5cfd44817e097c927f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_lookup_merge</definition>
+        <argsstring>(const CKTokenizer *tok, int32_t left, int32_t right)</argsstring>
+        <name>ck_tokenizer_lookup_merge</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>left</declname>
+        </param>
+        <param>
+          <type>int32_t</type>
+          <declname>right</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="160" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_tokenizer.c" bodystart="256" bodyend="270" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" declline="160" declcolumn="5"/>
+        <references refid="ck__tokenizer_8c_1aec779163dcf0f67868d1fdf622326da3" compoundref="ck__tokenizer_8c" startline="113" endline="122">hash_pair</references>
+        <references refid="structCKMergeRule_1a2f4fb999c8ad7581926948836ad96949" compoundref="ck__tokenizer_8h" startline="67">CKMergeRule::left</references>
+        <references refid="true__bpe_8h_1abf33d3f8e74eb48d5a4394c67ac4f1cd" compoundref="true__bpe_8h" startline="130">left</references>
+        <references refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" compoundref="ck__tokenizer_8h" startline="93">CKTokenizer::merge_hash</references>
+        <references refid="structCKTokenizer_1a9b7a80f60b651e50d40ffb9b1130eccc" compoundref="ck__tokenizer_8h" startline="94">CKTokenizer::merge_hash_size</references>
+        <references refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" compoundref="ck__tokenizer_8h" startline="89">CKTokenizer::merges</references>
+        <references refid="structCKMergeRule_1ad429814a773c9faa0526991078347e4f" compoundref="ck__tokenizer_8h" startline="68">CKMergeRule::right</references>
+        <references refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" compoundref="true__bpe_8h" startline="131">right</references>
+        <referencedby refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" compoundref="ck__tokenizer_8c" startline="618" endline="711">ck_tokenizer_encode</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__tokenizer_8h_1aed1d9d02b4dfc4cafcea97d08c44964e" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>int</type>
+        <definition>static int ck_tokenizer_vocab_size</definition>
+        <argsstring>(const CKTokenizer *tok)</argsstring>
+        <name>ck_tokenizer_vocab_size</name>
+        <param>
+          <type>const <ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref> *</type>
+          <declname>tok</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" line="196" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h" bodystart="196" bodyend="198"/>
+        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <referencedby refid="test__tokenizer_8c_1a3c04138a5bfe5d72780bb7e82a18e627" compoundref="test__tokenizer_8c" startline="10" endline="100">main</referencedby>
+        <referencedby refid="v6__inference_8c_1aa10c33b09b10aed5be3f540d46064b2c" compoundref="v6__inference_8c" startline="197" endline="320">run_inference</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>C-Kernel-Engine<sp/>BPE<sp/>Tokenizer</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Pure<sp/>C<sp/>implementation<sp/>of<sp/>Byte-Pair<sp/>Encoding<sp/>tokenizer</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>compatible<sp/>with<sp/>HuggingFace<sp/>tokenizer.json<sp/>format.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>The<sp/>tokenizer<sp/>uses<sp/>a<sp/>memory<sp/>pool<sp/>for<sp/>allocations<sp/>and<sp/>maps<sp/>tokens</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>directly<sp/>to<sp/>dense<sp/>embedding<sp/>indices<sp/>(token_id<sp/>==<sp/>embedding<sp/>row).</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>By<sp/>Anthony<sp/>Shivakumar</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_TOKENIZER_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdbool.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Maximum<sp/>token<sp/>length<sp/>in<sp/>bytes<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25" refid="ck__tokenizer_8h_1abb08eb27f9bc2409d72e7062f332feeb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_MAX_TOKEN_LEN<sp/>256</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Maximum<sp/>vocabulary<sp/>size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28" refid="ck__tokenizer_8h_1a28501527109241976fb03e6118259a32" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_MAX_VOCAB_SIZE<sp/>256000</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Memory<sp/>pool<sp/>block<sp/>size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31" refid="ck__tokenizer_8h_1aafbed2100fc7b365d7cb7acdd8548b13" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_POOL_BLOCK_SIZE<sp/>(1024<sp/>*<sp/>1024)<sp/><sp/></highlight><highlight class="comment">/*<sp/>1MB<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="34"><highlight class="comment"><sp/>*<sp/>Memory<sp/>pool<sp/>for<sp/>tokenizer<sp/>allocations.</highlight></codeline>
+<codeline lineno="35"><highlight class="comment"><sp/>*<sp/>Avoids<sp/>malloc<sp/>overhead<sp/>for<sp/>small<sp/>allocations.</highlight></codeline>
+<codeline lineno="36"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="37" refid="structCKPoolBlock" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKPoolBlock" kindref="compound">CKPoolBlock</ref><sp/>{</highlight></codeline>
+<codeline lineno="38" refid="structCKPoolBlock_1a28b34d622ad98214bd709675b430f459" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint8_t<sp/>*<ref refid="structCKPoolBlock_1a28b34d622ad98214bd709675b430f459" kindref="member">data</ref>;</highlight></codeline>
+<codeline lineno="39" refid="structCKPoolBlock_1ad15144404362a0676f0c46a5b5a8d0ba" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKPoolBlock_1ad15144404362a0676f0c46a5b5a8d0ba" kindref="member">used</ref>;</highlight></codeline>
+<codeline lineno="40" refid="structCKPoolBlock_1ae3840902acd7df911c6273760f3c63d5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKPoolBlock_1ae3840902acd7df911c6273760f3c63d5" kindref="member">capacity</ref>;</highlight></codeline>
+<codeline lineno="41" refid="structCKPoolBlock_1a39f197d57191d7ab700d17ad918d03c5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKPoolBlock" kindref="compound">CKPoolBlock</ref><sp/>*<ref refid="structCKPoolBlock_1a39f197d57191d7ab700d17ad918d03c5" kindref="member">next</ref>;</highlight></codeline>
+<codeline lineno="42"><highlight class="normal">}<sp/><ref refid="structCKPoolBlock" kindref="compound">CKPoolBlock</ref>;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight></codeline>
+<codeline lineno="44" refid="structCKMemPool" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="45" refid="structCKMemPool_1ac7919cceb17dccce7584f443a2f9eb4e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKPoolBlock" kindref="compound">CKPoolBlock</ref><sp/>*<ref refid="structCKMemPool_1ac7919cceb17dccce7584f443a2f9eb4e" kindref="member">head</ref>;</highlight></codeline>
+<codeline lineno="46" refid="structCKMemPool_1a4fa13f6e99896ec541cba40c99e70f9c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKPoolBlock" kindref="compound">CKPoolBlock</ref><sp/>*<ref refid="structCKMemPool_1a4fa13f6e99896ec541cba40c99e70f9c" kindref="member">current</ref>;</highlight></codeline>
+<codeline lineno="47" refid="structCKMemPool_1ac7e607885b7d68b849240ab7cd91ddac" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKMemPool_1ac7e607885b7d68b849240ab7cd91ddac" kindref="member">total_allocated</ref>;</highlight></codeline>
+<codeline lineno="48"><highlight class="normal">}<sp/><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref>;</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/>Vocabulary<sp/>entry.</highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*<sp/>Token<sp/>string<sp/>-&gt;<sp/>ID<sp/>mapping.</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>IDs<sp/>are<sp/>dense<sp/>indices<sp/>into<sp/>the<sp/>embedding<sp/>table.</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55" refid="structCKVocabEntry" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>{</highlight></codeline>
+<codeline lineno="56" refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" kindref="member">token</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Token<sp/>string<sp/>(UTF-8)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="57" refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" kindref="member">token_len</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Length<sp/>in<sp/>bytes<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="58" refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" kindref="member">id</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Dense<sp/>embedding<sp/>index<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59" refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*<ref refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" kindref="member">next</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Hash<sp/>chain<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal">}<sp/><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref>;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"></highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="63"><highlight class="comment"><sp/>*<sp/>BPE<sp/>merge<sp/>rule.</highlight></codeline>
+<codeline lineno="64"><highlight class="comment"><sp/>*<sp/>Pair<sp/>of<sp/>token<sp/>IDs<sp/>-&gt;<sp/>merged<sp/>token<sp/>ID.</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="66" refid="structCKMergeRule" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="67" refid="structCKMergeRule_1a2f4fb999c8ad7581926948836ad96949" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKMergeRule_1a2f4fb999c8ad7581926948836ad96949" kindref="member">left</ref>;</highlight></codeline>
+<codeline lineno="68" refid="structCKMergeRule_1ad429814a773c9faa0526991078347e4f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKMergeRule_1ad429814a773c9faa0526991078347e4f" kindref="member">right</ref>;</highlight></codeline>
+<codeline lineno="69" refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKMergeRule_1adacd50b760f95bfe3bd04d8618fb4c19" kindref="member">merged</ref>;</highlight></codeline>
+<codeline lineno="70" refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKMergeRule_1af89e288682de3079e22683c57b629d4c" kindref="member">priority</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Lower<sp/>=<sp/>higher<sp/>priority<sp/>(earlier<sp/>in<sp/>merges<sp/>list)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal">}<sp/><ref refid="structCKMergeRule" kindref="compound">CKMergeRule</ref>;</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*<sp/>Tokenizer<sp/>state.</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76" refid="structCKTokenizer" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Memory<sp/>pool<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="78" refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKMemPool" kindref="compound">CKMemPool</ref><sp/><ref refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" kindref="member">pool</ref>;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Vocabulary:<sp/>token<sp/>string<sp/>-&gt;<sp/>ID<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="81" refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="82" refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>**<ref refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" kindref="member">vocab_hash</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Hash<sp/>table<sp/>for<sp/>string<sp/>-&gt;<sp/>ID<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="83" refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" kindref="member">vocab_hash_size</ref>;</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Reverse<sp/>vocabulary:<sp/>ID<sp/>-&gt;<sp/>token<sp/>string<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86" refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>**<ref refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" kindref="member">id_to_token</ref>;</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"></highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>BPE<sp/>merge<sp/>rules<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="89" refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKMergeRule" kindref="compound">CKMergeRule</ref><sp/>*<ref refid="structCKTokenizer_1a9fbb827cf89c461569b0dfc2b8ef5fe9" kindref="member">merges</ref>;</highlight></codeline>
+<codeline lineno="90" refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1a64d0be7dac3d476548e873e3f2d05d50" kindref="member">num_merges</ref>;</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Merge<sp/>lookup:<sp/>(left_id,<sp/>right_id)<sp/>-&gt;<sp/>merge<sp/>index<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="93" refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>*<ref refid="structCKTokenizer_1ae92078c4ca97a78a2fcce8d3193d4cd1" kindref="member">merge_hash</ref>;</highlight></codeline>
+<codeline lineno="94" refid="structCKTokenizer_1a9b7a80f60b651e50d40ffb9b1130eccc" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1a9b7a80f60b651e50d40ffb9b1130eccc" kindref="member">merge_hash_size</ref>;</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"></highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Special<sp/>tokens<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="97" refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKTokenizer_1a35f73551a504361ab117452f40fe81bf" kindref="member">unk_id</ref>;</highlight></codeline>
+<codeline lineno="98" refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKTokenizer_1a0e16f753888edda5716eefba903d6001" kindref="member">bos_id</ref>;</highlight></codeline>
+<codeline lineno="99" refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKTokenizer_1a70622f7babd13c77a93825497fdf2c5f" kindref="member">eos_id</ref>;</highlight></codeline>
+<codeline lineno="100" refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>int32_t<sp/><ref refid="structCKTokenizer_1af683cca99ab7ca70c6b680c4a276277b" kindref="member">pad_id</ref>;</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Config<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="103" refid="structCKTokenizer_1af13d7f81c356bfb82e80d6742352a376" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1af13d7f81c356bfb82e80d6742352a376" kindref="member">add_bos</ref>;</highlight></codeline>
+<codeline lineno="104" refid="structCKTokenizer_1a8668f96025566da654689955d9407400" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer_1a8668f96025566da654689955d9407400" kindref="member">add_eos</ref>;</highlight></codeline>
+<codeline lineno="105"><highlight class="normal">}<sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref>;</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"></highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="108"><highlight class="comment"><sp/>*<sp/>Initialize<sp/>memory<sp/>pool.</highlight></codeline>
+<codeline lineno="109"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1a22dd876d597bf3a6f43e60d0702a7065" kindref="member">ck_pool_init</ref>(<ref refid="structCKMemPool" kindref="compound">CKMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"></highlight></codeline>
+<codeline lineno="112"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="113"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>from<sp/>memory<sp/>pool.</highlight></codeline>
+<codeline lineno="114"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" kindref="member">ck_pool_alloc</ref>(<ref refid="structCKMemPool" kindref="compound">CKMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size);</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"></highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="118"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>and<sp/>copy<sp/>string.</highlight></codeline>
+<codeline lineno="119"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="120"><highlight class="normal"></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="ck__tokenizer_8h_1aaaef67621f30b7a785983b247ab00f94" kindref="member">ck_pool_strdup</ref>(<ref refid="structCKMemPool" kindref="compound">CKMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*s,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len);</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"></highlight></codeline>
+<codeline lineno="122"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="123"><highlight class="comment"><sp/>*<sp/>Free<sp/>memory<sp/>pool.</highlight></codeline>
+<codeline lineno="124"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="125"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1aba3724127379a06a8baf1c63d478aa3a" kindref="member">ck_pool_free</ref>(<ref refid="structCKMemPool" kindref="compound">CKMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="128"><highlight class="comment"><sp/>*<sp/>Initialize<sp/>tokenizer.</highlight></codeline>
+<codeline lineno="129"><highlight class="comment"><sp/>*<sp/>Returns<sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>error.</highlight></codeline>
+<codeline lineno="130"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="131"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1a6a224e5a246987a80e869592fd46e36e" kindref="member">ck_tokenizer_init</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok);</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"></highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="134"><highlight class="comment"><sp/>*<sp/>Load<sp/>tokenizer<sp/>from<sp/>HuggingFace<sp/>tokenizer.json.</highlight></codeline>
+<codeline lineno="135"><highlight class="comment"><sp/>*<sp/>Returns<sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>error.</highlight></codeline>
+<codeline lineno="136"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1a9d42d9476e56bcb10e04c07265b335fb" kindref="member">ck_tokenizer_load</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*path);</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="140"><highlight class="comment"><sp/>*<sp/>Add<sp/>a<sp/>token<sp/>to<sp/>the<sp/>vocabulary.</highlight></codeline>
+<codeline lineno="141"><highlight class="comment"><sp/>*<sp/>Returns<sp/>the<sp/>token<sp/>ID.</highlight></codeline>
+<codeline lineno="142"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="143"><highlight class="normal">int32_t<sp/><ref refid="ck__tokenizer_8h_1ab7a38c00a25ae5bdc8bb91ee07c26714" kindref="member">ck_tokenizer_add_token</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len);</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="146"><highlight class="comment"><sp/>*<sp/>Look<sp/>up<sp/>token<sp/>ID<sp/>by<sp/>string.</highlight></codeline>
+<codeline lineno="147"><highlight class="comment"><sp/>*<sp/>Returns<sp/>token<sp/>ID<sp/>or<sp/>unk_id<sp/>if<sp/>not<sp/>found.</highlight></codeline>
+<codeline lineno="148"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="149"><highlight class="normal">int32_t<sp/><ref refid="ck__tokenizer_8h_1a2559a1955d6dbd45babf7b294f538494" kindref="member">ck_tokenizer_lookup</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len);</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"></highlight></codeline>
+<codeline lineno="151"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="152"><highlight class="comment"><sp/>*<sp/>Add<sp/>a<sp/>BPE<sp/>merge<sp/>rule.</highlight></codeline>
+<codeline lineno="153"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" kindref="member">ck_tokenizer_add_merge</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/>int32_t<sp/><ref refid="true__bpe_8h_1abf33d3f8e74eb48d5a4394c67ac4f1cd" kindref="member">left</ref>,<sp/>int32_t<sp/><ref refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" kindref="member">right</ref>,<sp/>int32_t<sp/>merged);</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"></highlight></codeline>
+<codeline lineno="156"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="157"><highlight class="comment"><sp/>*<sp/>Look<sp/>up<sp/>merge<sp/>rule<sp/>for<sp/>a<sp/>pair.</highlight></codeline>
+<codeline lineno="158"><highlight class="comment"><sp/>*<sp/>Returns<sp/>merge<sp/>index<sp/>or<sp/>-1<sp/>if<sp/>no<sp/>merge.</highlight></codeline>
+<codeline lineno="159"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="160"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1ae0173ee4612f5c5cfd44817e097c927f" kindref="member">ck_tokenizer_lookup_merge</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/>int32_t<sp/><ref refid="true__bpe_8h_1abf33d3f8e74eb48d5a4394c67ac4f1cd" kindref="member">left</ref>,<sp/>int32_t<sp/><ref refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" kindref="member">right</ref>);</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"></highlight></codeline>
+<codeline lineno="162"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="163"><highlight class="comment"><sp/>*<sp/>Encode<sp/>text<sp/>to<sp/>token<sp/>IDs.</highlight></codeline>
+<codeline lineno="164"><highlight class="comment"><sp/>*<sp/>Returns<sp/>number<sp/>of<sp/>tokens<sp/>written<sp/>to<sp/>`ids`.</highlight></codeline>
+<codeline lineno="165"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1aad7d008ac73952c45a288cbb69806835" kindref="member">ck_tokenizer_encode</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" kindref="member">text</ref>,</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1a888f9023ee38c1b409b124b34c084f55" kindref="member">text_len</ref>,</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int32_t<sp/>*<ref refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" kindref="member">ids</ref>,</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1adc7b8f0514fd7d4fefa123e27ce8922d" kindref="member">max_ids</ref>);</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="173"><highlight class="comment"><sp/>*<sp/>Decode<sp/>token<sp/>IDs<sp/>to<sp/>text.</highlight></codeline>
+<codeline lineno="174"><highlight class="comment"><sp/>*<sp/>Returns<sp/>number<sp/>of<sp/>bytes<sp/>written<sp/>to<sp/>`text`.</highlight></codeline>
+<codeline lineno="175"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="176"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1a25fd8f38cf8e62b1e19e347e53225e8c" kindref="member">ck_tokenizer_decode</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*<ref refid="tokenizer_8h_1a115bba665e9d8c38fea5507a93c4749c" kindref="member">ids</ref>,</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="tokenizer_8h_1a2f30fc798d162629916e2faa69137745" kindref="member">num_ids</ref>,</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a462f1390f421769e5f487370f8f21ee9" kindref="member">text</ref>,</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1a59dd98a65ac03cdb1deea39c7580fb33" kindref="member">max_len</ref>);</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"></highlight></codeline>
+<codeline lineno="182"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="183"><highlight class="comment"><sp/>*<sp/>Get<sp/>token<sp/>string<sp/>for<sp/>an<sp/>ID.</highlight></codeline>
+<codeline lineno="184"><highlight class="comment"><sp/>*<sp/>Returns<sp/>NULL<sp/>if<sp/>ID<sp/>is<sp/>invalid.</highlight></codeline>
+<codeline lineno="185"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="186"><highlight class="normal"></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="ck__tokenizer_8h_1a8305a4a576ed2473bccd0a5dff347aa1" kindref="member">ck_tokenizer_id_to_token</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok,<sp/>int32_t<sp/></highlight><highlight class="keywordtype">id</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"></highlight></codeline>
+<codeline lineno="188"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="189"><highlight class="comment"><sp/>*<sp/>Free<sp/>tokenizer<sp/>resources.</highlight></codeline>
+<codeline lineno="190"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="191"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1adcfcdd58b3b91d043d6974b35aea1ad4" kindref="member">ck_tokenizer_free</ref>(<ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok);</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"></highlight></codeline>
+<codeline lineno="193"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="194"><highlight class="comment"><sp/>*<sp/>Get<sp/>vocabulary<sp/>size.</highlight></codeline>
+<codeline lineno="195"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="196" refid="ck__tokenizer_8h_1aed1d9d02b4dfc4cafcea97d08c44964e" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__tokenizer_8h_1aed1d9d02b4dfc4cafcea97d08c44964e" kindref="member">ck_tokenizer_vocab_size</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizer" kindref="compound">CKTokenizer</ref><sp/>*tok)<sp/>{</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>tok-&gt;<ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="198"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"></highlight></codeline>
+<codeline lineno="200"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="201"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="203"><highlight class="normal"></highlight></codeline>
+<codeline lineno="204"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_TOKENIZER_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_tokenizer.h"/>
+  </compounddef>
+</doxygen>

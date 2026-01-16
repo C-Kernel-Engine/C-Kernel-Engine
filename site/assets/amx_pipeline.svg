@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="amxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2a2a2a"/>
+      <stop offset="100%" style="stop-color:#363636"/>
+    </linearGradient>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#47b475"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#07adf8"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#e74c3c"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="24" font-weight="700">AMX-INT8 vs Weight-Only Quantization Pipelines</text>
+
+  <!-- AMX-INT8 Constraint Box -->
+  <rect x="50" y="70" width="500" height="100" rx="8" fill="#2a2a2a" stroke="#e74c3c" stroke-width="2"/>
+  <text x="300" y="100" text-anchor="middle" fill="#e74c3c" font-family="Inter, sans-serif" font-size="16" font-weight="600">AMX-INT8 Requirement</text>
+  <text x="300" y="130" text-anchor="middle" fill="#f5f5f5" font-family="JetBrains Mono, monospace" font-size="14">_tile_dpbusd: UINT8 x INT8 → INT32</text>
+  <text x="300" y="155" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="12">Both operands MUST be INT8. No exceptions.</text>
+
+  <!-- Option Labels -->
+  <text x="300" y="210" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="18" font-weight="700">Option 1: Full INT8 Pipeline</text>
+  <text x="900" y="210" text-anchor="middle" fill="#07adf8" font-family="Inter, sans-serif" font-size="18" font-weight="700">Option 2: Weight-Only INT8</text>
+
+  <!-- Divider -->
+  <line x1="600" y1="190" x2="600" y2="780" stroke="#454545" stroke-width="2" stroke-dasharray="5,5"/>
+
+  <!-- ===== Option 1: Full INT8 Pipeline ===== -->
+
+  <!-- FP32 Input -->
+  <rect x="100" y="240" width="120" height="50" rx="6" fill="#9b59b6" stroke="#9b59b6" stroke-width="2"/>
+  <text x="160" y="270" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">FP32 Input</text>
+
+  <!-- Quantize step -->
+  <rect x="100" y="320" width="120" height="50" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="2"/>
+  <text x="160" y="340" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="12" font-weight="600">Quantize</text>
+  <text x="160" y="358" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="10">(AVX-512)</text>
+
+  <!-- Arrow -->
+  <line x1="160" y1="290" x2="160" y2="318" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowOrange)"/>
+
+  <!-- INT8 Activations -->
+  <rect x="100" y="400" width="120" height="50" rx="6" fill="#47b475" stroke="#47b475" stroke-width="2"/>
+  <text x="160" y="430" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">INT8 Activations</text>
+
+  <!-- Arrow -->
+  <line x1="160" y1="370" x2="160" y2="398" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- INT8 Weights -->
+  <rect x="280" y="400" width="120" height="50" rx="6" fill="#47b475" stroke="#47b475" stroke-width="2"/>
+  <text x="340" y="430" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">INT8 Weights</text>
+
+  <!-- AMX-INT8 Box -->
+  <rect x="150" y="490" width="200" height="70" rx="8" fill="#e74c3c" stroke="#e74c3c" stroke-width="2"/>
+  <text x="250" y="520" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="16" font-weight="700">AMX-INT8</text>
+  <text x="250" y="545" text-anchor="middle" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="11">_tile_dpbusd</text>
+
+  <!-- Arrows to AMX -->
+  <line x1="160" y1="450" x2="200" y2="488" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <line x1="340" y1="450" x2="300" y2="488" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- INT32 Accumulator -->
+  <rect x="190" y="590" width="120" height="50" rx="6" fill="#07adf8" stroke="#07adf8" stroke-width="2"/>
+  <text x="250" y="620" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">INT32 Accum</text>
+
+  <!-- Arrow -->
+  <line x1="250" y1="560" x2="250" y2="588" stroke="#07adf8" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Dequantize -->
+  <rect x="190" y="670" width="120" height="50" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="2"/>
+  <text x="250" y="690" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="12" font-weight="600">Dequantize</text>
+  <text x="250" y="708" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="10">(AVX-512)</text>
+
+  <!-- Arrow -->
+  <line x1="250" y1="640" x2="250" y2="668" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowOrange)"/>
+
+  <!-- FP32 Output -->
+  <rect x="190" y="750" width="120" height="40" rx="6" fill="#9b59b6" stroke="#9b59b6" stroke-width="2"/>
+  <text x="250" y="775" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">FP32 Output</text>
+
+  <!-- Arrow -->
+  <line x1="250" y1="720" x2="250" y2="748" stroke="#9b59b6" stroke-width="2"/>
+
+  <!-- Requirements note -->
+  <rect x="400" y="320" width="180" height="80" rx="6" fill="#2a2a2a" stroke="#e74c3c" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="490" y="345" text-anchor="middle" fill="#e74c3c" font-family="Inter, sans-serif" font-size="11" font-weight="600">Requires:</text>
+  <text x="490" y="365" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">• Calibration data</text>
+  <text x="490" y="380" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">• Per-layer scales</text>
+  <text x="490" y="395" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">• ~1-2% accuracy loss</text>
+
+  <!-- ===== Option 2: Weight-Only INT8 ===== -->
+
+  <!-- BF16 Activations -->
+  <rect x="700" y="280" width="140" height="50" rx="6" fill="#07adf8" stroke="#07adf8" stroke-width="2"/>
+  <text x="770" y="310" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">BF16 Activations</text>
+
+  <!-- INT8 Weights -->
+  <rect x="880" y="280" width="140" height="50" rx="6" fill="#47b475" stroke="#47b475" stroke-width="2"/>
+  <text x="950" y="310" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">INT8 Weights</text>
+
+  <!-- Dequant box -->
+  <rect x="880" y="370" width="140" height="50" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="2"/>
+  <text x="950" y="390" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="12" font-weight="600">Dequantize</text>
+  <text x="950" y="408" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="10">(AVX-512)</text>
+
+  <!-- Arrow -->
+  <line x1="950" y1="330" x2="950" y2="368" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowOrange)"/>
+
+  <!-- BF16 Weights -->
+  <rect x="880" y="460" width="140" height="50" rx="6" fill="#07adf8" stroke="#07adf8" stroke-width="2"/>
+  <text x="950" y="490" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">BF16 Weights</text>
+
+  <!-- Arrow -->
+  <line x1="950" y1="420" x2="950" y2="458" stroke="#07adf8" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- AMX-BF16 Box -->
+  <rect x="750" y="550" width="200" height="70" rx="8" fill="#07adf8" stroke="#07adf8" stroke-width="2"/>
+  <text x="850" y="580" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="16" font-weight="700">AMX-BF16</text>
+  <text x="850" y="605" text-anchor="middle" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="11">_tile_dpbf16ps</text>
+
+  <!-- Arrows to AMX -->
+  <path d="M770,330 L770,400 L750,540" stroke="#07adf8" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+  <line x1="950" y1="510" x2="900" y2="548" stroke="#07adf8" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- FP32 Accumulator -->
+  <rect x="790" y="660" width="120" height="50" rx="6" fill="#9b59b6" stroke="#9b59b6" stroke-width="2"/>
+  <text x="850" y="690" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">FP32 Accum</text>
+
+  <!-- Arrow -->
+  <line x1="850" y1="620" x2="850" y2="658" stroke="#9b59b6" stroke-width="2"/>
+
+  <!-- FP32 Output -->
+  <rect x="790" y="750" width="120" height="40" rx="6" fill="#9b59b6" stroke="#9b59b6" stroke-width="2"/>
+  <text x="850" y="775" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="14" font-weight="600">FP32 Output</text>
+
+  <!-- Arrow -->
+  <line x1="850" y1="710" x2="850" y2="748" stroke="#9b59b6" stroke-width="2"/>
+
+  <!-- Advantage note -->
+  <rect x="1020" y="370" width="160" height="80" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="1100" y="395" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="11" font-weight="600">Advantages:</text>
+  <text x="1100" y="415" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">• No calibration needed</text>
+  <text x="1100" y="430" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">• Preserves activation</text>
+  <text x="1100" y="445" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">  precision</text>
+
+  <!-- Key insight box -->
+  <rect x="650" y="70" width="500" height="100" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+  <text x="900" y="100" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="16" font-weight="600">LLM Reality</text>
+  <text x="900" y="125" text-anchor="middle" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Most LLM deployments use INT4/INT8 weights + BF16 activations</text>
+  <text x="900" y="145" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="11">AMX-INT8 rarely used because quantizing activations hurts quality</text>
+
+  <!-- Legend -->
+  <rect x="50" y="760" width="500" height="30" rx="4" fill="#2a2a2a"/>
+  <circle cx="80" cy="775" r="8" fill="#9b59b6"/>
+  <text x="95" y="780" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">FP32</text>
+  <circle cx="150" cy="775" r="8" fill="#07adf8"/>
+  <text x="165" y="780" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">BF16</text>
+  <circle cx="220" cy="775" r="8" fill="#47b475"/>
+  <text x="235" y="780" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">INT8</text>
+  <circle cx="290" cy="775" r="8" fill="#e74c3c"/>
+  <text x="305" y="780" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">AMX-INT8</text>
+  <circle cx="385" cy="775" r="8" fill="#ffb400"/>
+  <text x="400" y="780" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Convert (AVX-512)</text>
+</svg>

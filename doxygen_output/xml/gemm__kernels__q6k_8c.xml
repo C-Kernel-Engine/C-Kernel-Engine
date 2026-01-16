@@ -1,0 +1,517 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="gemm__kernels__q6k_8c" kind="file" language="C++">
+    <compoundname>gemm_kernels_q6k.c</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stddef.h</includes>
+    <includes refid="ckernel__quant_8h" local="yes">ckernel_quant.h</includes>
+    <incdepgraph>
+      <node id="4">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>gemm_kernels_q6k.c</label>
+        <link refid="gemm__kernels__q6k_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="gemm__kernels__q6k_8c_1ab62992893fe8543ddcb7159102136a0a" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>float</type>
+        <definition>static float dot_q6_k_ref</definition>
+        <argsstring>(const block_q6_K *w, const float *x, int K)</argsstring>
+        <name>dot_q6_k_ref</name>
+        <param>
+          <type>const <ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref> *</type>
+          <declname>w</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" line="30" column="14" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" bodystart="30" bodyend="67"/>
+        <references refid="structblock__q6__K_1ad1e527fb25c7c76c5e9c543e7965e84d" compoundref="ckernel__quant_8h" startline="142">block_q6_K::d</references>
+        <references refid="ckernel__quant_8h_1a15b32ff704be7dc7da90abdc72487a97" compoundref="ckernel__quant_8h" startline="332">GGML_FP16_TO_FP32</references>
+        <references refid="structblock__q6__K_1aae24d4e8e582b9b2c5e8f219c467d008" compoundref="ckernel__quant_8h" startline="140">block_q6_K::qh</references>
+        <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
+        <references refid="structblock__q6__K_1a2804e4fef4f6c2eaf41230ddbed8e479" compoundref="ckernel__quant_8h" startline="139">block_q6_K::ql</references>
+        <references refid="structblock__q6__K_1a9c13aa47c6703aac41f1bc92e30e08af" compoundref="ckernel__quant_8h" startline="141">block_q6_K::scales</references>
+        <referencedby refid="ckernel__engine_8h_1a3c98619f74662804d8551efbd4d02b52" compoundref="gemm__kernels__q6k_8c" startline="160" endline="184">gemv_q6_k</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q6k_8c_1a7568db3d490c7a7372a5236d8b2fe207" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemm_nt_q6_k</definition>
+        <argsstring>(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</argsstring>
+        <name>gemm_nt_q6_k</name>
+        <param>
+          <type>const float *</type>
+          <declname>A</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>B</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" line="203" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" bodystart="203" bodyend="231"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="gemm__kernels__q6k_8c_1a07fcd594f867f5c6afb487ab989213e1" compoundref="gemm__kernels__q6k_8c" startline="186" endline="201">gemm_q6_k</references>
+        <referencedby refid="ckernel__orchestration_8h_1a9cdd7c7d9a965eabe81a394e560b1258" compoundref="ckernel__orchestration_8c" startline="303" endline="338">ck_gemm_nt_quant</referencedby>
+        <referencedby refid="ckernel__quant_8h_1a69a759de291fac064cd027839afb4bce" compoundref="gemm__kernels__q6k_8c" startline="234" endline="241">gemm_nt_q6_k_ref</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a54e2aba39375fd8df03520d41ee5acff" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="814" endline="951">qwen2_0_5b_decode_layer_0_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1aa0bfb039a5a1afb4fd62a43ebb7ad301" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="2234" endline="2371">qwen2_0_5b_decode_layer_10_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a46e8ab1cf411726801b26420aac39739" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="2660" endline="2797">qwen2_0_5b_decode_layer_13_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a103089856415dfa7dcf06968b94a55ee" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="3086" endline="3223">qwen2_0_5b_decode_layer_16_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a56a1e6ed9c95375f32c056ef84069326" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="3512" endline="3649">qwen2_0_5b_decode_layer_19_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1aba2af8c43c7107b610b68eef1dca2b04" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="956" endline="1093">qwen2_0_5b_decode_layer_1_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1aa1affed3de5ec1317dfc6f04b9b2c275" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="3796" endline="3933">qwen2_0_5b_decode_layer_21_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a0510fee3ff5d11afcae9436c01636ebc" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="1240" endline="1377">qwen2_0_5b_decode_layer_3_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a5afc869eed344be9cbe243da013e412e" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="1666" endline="1803">qwen2_0_5b_decode_layer_6_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a603e2dd5bd6b367a59a0d877038b6acd" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="1808" endline="1945">qwen2_0_5b_decode_layer_7_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a40fd2085b4a6972bdd956e1080459611" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="1950" endline="2087">qwen2_0_5b_decode_layer_8_decode</referencedby>
+        <referencedby refid="v6_86_2generated_2ck-kernel-inference_8c_1a9cdc13ab71c3c11ffd53fbb205b1c423" compoundref="v6_86_2generated_2ck-kernel-inference_8c" startline="2092" endline="2229">qwen2_0_5b_decode_layer_9_decode</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q6k_8c_1a69a759de291fac064cd027839afb4bce" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemm_nt_q6_k_ref</definition>
+        <argsstring>(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</argsstring>
+        <name>gemm_nt_q6_k_ref</name>
+        <param>
+          <type>const float *</type>
+          <declname>A</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>B</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" line="234" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" bodystart="234" bodyend="241"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="gemm__kernels__q6k_8c_1a7568db3d490c7a7372a5236d8b2fe207" compoundref="gemm__kernels__q6k_8c" startline="203" endline="231">gemm_nt_q6_k</references>
+        <referencedby refid="ckernel__quant_8h_1a85298cbfbb7e45cb2df10251ea4bb487" compoundref="gemm__kernels__q6k__sse_8c" startline="52" endline="83">gemm_nt_q6_k_sse</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q6k_8c_1a07fcd594f867f5c6afb487ab989213e1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemm_q6_k</definition>
+        <argsstring>(float *Y, const void *W, const float *X, int M, int N, int K)</argsstring>
+        <name>gemm_q6_k</name>
+        <param>
+          <type>float *</type>
+          <declname>Y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>X</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" line="186" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" bodystart="186" bodyend="201"/>
+        <references refid="gemm__kernels__q6k_8c_1a3c98619f74662804d8551efbd4d02b52" compoundref="gemm__kernels__q6k_8c" startline="160" endline="184">gemv_q6_k</references>
+        <referencedby refid="ckernel__engine_8h_1a7568db3d490c7a7372a5236d8b2fe207" compoundref="gemm__kernels__q6k_8c" startline="203" endline="231">gemm_nt_q6_k</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q6k_8c_1a3c98619f74662804d8551efbd4d02b52" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q6_k</definition>
+        <argsstring>(float *y, const void *W, const float *x, int M, int K)</argsstring>
+        <name>gemv_q6_k</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" line="160" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c" bodystart="160" bodyend="184"/>
+        <references refid="gemm__kernels__q6k_8c_1ab62992893fe8543ddcb7159102136a0a" compoundref="gemm__kernels__q6k_8c" startline="30" endline="67">dot_q6_k_ref</references>
+        <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
+        <referencedby refid="ckernel__engine_8h_1a07fcd594f867f5c6afb487ab989213e1" compoundref="gemm__kernels__q6k_8c" startline="186" endline="201">gemm_q6_k</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>GEMM/GEMV kernels with Q6_K quantized weights. </para>
+    </briefdescription>
+    <detaileddescription>
+<para>Implements matrix multiplication where:<itemizedlist>
+<listitem><para>Activations (input): FP32</para>
+</listitem><listitem><para>Weights: Q6_K (6-bit k-quant, int8 scales)</para>
+</listitem><listitem><para>Output: FP32</para>
+</listitem></itemizedlist>
+</para>
+<para>Q6_K Format (256 weights per block):<itemizedlist>
+<listitem><para>d: FP16 super-block scale</para>
+</listitem><listitem><para>ql: 128 bytes (low 4 bits of each weight)</para>
+</listitem><listitem><para>qh: 64 bytes (high 2 bits of each weight)</para>
+</listitem><listitem><para>scales: 16 int8 sub-block scales </para>
+</listitem></itemizedlist>
+</para>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>gemm_kernels_q6k.c</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>GEMM/GEMV<sp/>kernels<sp/>with<sp/>Q6_K<sp/>quantized<sp/>weights</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Implements<sp/>matrix<sp/>multiplication<sp/>where:</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Activations<sp/>(input):<sp/>FP32</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Weights:<sp/>Q6_K<sp/>(6-bit<sp/>k-quant,<sp/>int8<sp/>scales)</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Output:<sp/>FP32</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>Q6_K<sp/>Format<sp/>(256<sp/>weights<sp/>per<sp/>block):</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>d:<sp/>FP16<sp/>super-block<sp/>scale</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>ql:<sp/>128<sp/>bytes<sp/>(low<sp/>4<sp/>bits<sp/>of<sp/>each<sp/>weight)</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>qh:<sp/>64<sp/>bytes<sp/>(high<sp/>2<sp/>bits<sp/>of<sp/>each<sp/>weight)</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>scales:<sp/>16<sp/>int8<sp/>sub-block<sp/>scales</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__quant_8h" kindref="compound">ckernel_quant.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Include<sp/>SIMD<sp/>headers<sp/>based<sp/>on<sp/>available<sp/>extensions<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)<sp/>||<sp/>defined(__AVX2__)<sp/>||<sp/>defined(__AVX__)<sp/>||<sp/>defined(__SSE4_1__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/>GEMV:<sp/>y<sp/>=<sp/>W<sp/>@<sp/>x<sp/><sp/>(W<sp/>is<sp/>Q6_K,<sp/>x<sp/>and<sp/>y<sp/>are<sp/>FP32)</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight></codeline>
+<codeline lineno="30" refid="gemm__kernels__q6k_8c_1ab62992893fe8543ddcb7159102136a0a" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q6k_8c_1ab62992893fe8543ddcb7159102136a0a" kindref="member">dot_q6_k_ref</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*w,</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="33"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>0;<sp/>b<sp/>&lt;<sp/>blocks_per_row;<sp/>++b)<sp/>{</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*block<sp/>=<sp/>&amp;w[b];</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>d<sp/>=<sp/><ref refid="ckernel__quant_8h_1a15b32ff704be7dc7da90abdc72487a97" kindref="member">GGML_FP16_TO_FP32</ref>(block-&gt;<ref refid="structblock__q6__K_1ad1e527fb25c7c76c5e9c543e7965e84d" kindref="member">d</ref>);</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint8_t<sp/>*ql<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1a2804e4fef4f6c2eaf41230ddbed8e479" kindref="member">ql</ref>;</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint8_t<sp/>*qh<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1aae24d4e8e582b9b2c5e8f219c467d008" kindref="member">qh</ref>;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>*sc<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1a9c13aa47c6703aac41f1bc92e30e08af" kindref="member">scales</ref>;</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*xp<sp/>=<sp/>x<sp/>+<sp/>(size_t)b<sp/>*<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"></highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>0;<sp/>n<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>n<sp/>+=<sp/>128)<sp/>{</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>l<sp/>=<sp/>0;<sp/>l<sp/>&lt;<sp/>32;<sp/>++l)<sp/>{</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>is<sp/>=<sp/>l<sp/>/<sp/>16;</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q1<sp/>=<sp/>(int8_t)((ql[l<sp/>+<sp/>0]<sp/>&amp;<sp/>0xF)<sp/>|<sp/>(((qh[l]<sp/>&gt;&gt;<sp/>0)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q2<sp/>=<sp/>(int8_t)((ql[l<sp/>+<sp/>32]<sp/>&amp;<sp/>0xF)<sp/>|<sp/>(((qh[l]<sp/>&gt;&gt;<sp/>2)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q3<sp/>=<sp/>(int8_t)((ql[l<sp/>+<sp/>0]<sp/>&gt;&gt;<sp/>4)<sp/>|<sp/>(((qh[l]<sp/>&gt;&gt;<sp/>4)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q4<sp/>=<sp/>(int8_t)((ql[l<sp/>+<sp/>32]<sp/>&gt;&gt;<sp/>4)<sp/>|<sp/>(((qh[l]<sp/>&gt;&gt;<sp/>6)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>(d<sp/>*<sp/>(float)sc[is<sp/>+<sp/>0]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q1)<sp/>*<sp/>xp[l<sp/>+<sp/>0];</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>(d<sp/>*<sp/>(float)sc[is<sp/>+<sp/>2]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q2)<sp/>*<sp/>xp[l<sp/>+<sp/>32];</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>(d<sp/>*<sp/>(float)sc[is<sp/>+<sp/>4]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q3)<sp/>*<sp/>xp[l<sp/>+<sp/>64];</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>(d<sp/>*<sp/>(float)sc[is<sp/>+<sp/>6]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q4)<sp/>*<sp/>xp[l<sp/>+<sp/>96];</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>xp<sp/>+=<sp/>128;</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ql<sp/>+=<sp/>64;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qh<sp/>+=<sp/>32;</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sc<sp/>+=<sp/>8;</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>sum;</highlight></codeline>
+<codeline lineno="67"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*<sp/>AVX<sp/>Implementation<sp/>(256-bit)</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/>*<sp/>Q6_K<sp/>is<sp/>complex:<sp/>6-bit<sp/>weights<sp/>packed<sp/>as<sp/>4+2<sp/>bits,<sp/>with<sp/>16<sp/>sub-block<sp/>scales.</highlight></codeline>
+<codeline lineno="73"><highlight class="comment"><sp/>*<sp/>Uses<sp/>AVX<sp/>for<sp/>the<sp/>final<sp/>accumulation<sp/>while<sp/>keeping<sp/>scalar<sp/>dequantization</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*<sp/>for<sp/>simplicity<sp/>and<sp/>correctness.</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>&amp;&amp;<sp/>!defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="78"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dot_q6_k_avx(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*w,</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="81"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"></highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Use<sp/>4<sp/>accumulators<sp/>for<sp/>better<sp/>ILP<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>acc0<sp/>=<sp/>_mm256_setzero_ps();</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>acc1<sp/>=<sp/>_mm256_setzero_ps();</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>acc2<sp/>=<sp/>_mm256_setzero_ps();</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>acc3<sp/>=<sp/>_mm256_setzero_ps();</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>0;<sp/>b<sp/>&lt;<sp/>blocks_per_row;<sp/>++b)<sp/>{</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*block<sp/>=<sp/>&amp;w[b];</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>d<sp/>=<sp/><ref refid="ckernel__quant_8h_1a15b32ff704be7dc7da90abdc72487a97" kindref="member">GGML_FP16_TO_FP32</ref>(block-&gt;<ref refid="structblock__q6__K_1ad1e527fb25c7c76c5e9c543e7965e84d" kindref="member">d</ref>);</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"></highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint8_t<sp/>*ql<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1a2804e4fef4f6c2eaf41230ddbed8e479" kindref="member">ql</ref>;</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint8_t<sp/>*qh<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1aae24d4e8e582b9b2c5e8f219c467d008" kindref="member">qh</ref>;</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>*sc<sp/>=<sp/>block-&gt;<ref refid="structblock__q6__K_1a9c13aa47c6703aac41f1bc92e30e08af" kindref="member">scales</ref>;</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*xp<sp/>=<sp/>x<sp/>+<sp/>(size_t)b<sp/>*<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"></highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Process<sp/>256<sp/>weights<sp/>in<sp/>2<sp/>iterations<sp/>of<sp/>128<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>0;<sp/>n<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>n<sp/>+=<sp/>128)<sp/>{</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Process<sp/>32<sp/>elements<sp/>at<sp/>a<sp/>time<sp/>in<sp/>groups<sp/>of<sp/>8<sp/>for<sp/>AVX<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>l<sp/>=<sp/>0;<sp/>l<sp/>&lt;<sp/>32;<sp/>l<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>is<sp/>=<sp/>l<sp/>/<sp/>16;</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"></highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Dequantize<sp/>8<sp/>weights<sp/>for<sp/>each<sp/>of<sp/>the<sp/>4<sp/>streams<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dq0[8],<sp/>dq1[8],<sp/>dq2[8],<sp/>dq3[8];</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>8;<sp/>i++)<sp/>{</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>idx<sp/>=<sp/>l<sp/>+<sp/>i;</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q1<sp/>=<sp/>(int8_t)((ql[idx<sp/>+<sp/>0]<sp/>&amp;<sp/>0xF)<sp/>|<sp/>(((qh[idx]<sp/>&gt;&gt;<sp/>0)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q2<sp/>=<sp/>(int8_t)((ql[idx<sp/>+<sp/>32]<sp/>&amp;<sp/>0xF)<sp/>|<sp/>(((qh[idx]<sp/>&gt;&gt;<sp/>2)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q3<sp/>=<sp/>(int8_t)((ql[idx<sp/>+<sp/>0]<sp/>&gt;&gt;<sp/>4)<sp/>|<sp/>(((qh[idx]<sp/>&gt;&gt;<sp/>4)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int8_t<sp/>q4<sp/>=<sp/>(int8_t)((ql[idx<sp/>+<sp/>32]<sp/>&gt;&gt;<sp/>4)<sp/>|<sp/>(((qh[idx]<sp/>&gt;&gt;<sp/>6)<sp/>&amp;<sp/>3)<sp/>&lt;&lt;<sp/>4))<sp/>-<sp/>32;</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>is_i<sp/>=<sp/>(l<sp/>+<sp/>i)<sp/>/<sp/>16;</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dq0[i]<sp/>=<sp/>d<sp/>*<sp/>(float)sc[is_i<sp/>+<sp/>0]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q1;</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dq1[i]<sp/>=<sp/>d<sp/>*<sp/>(float)sc[is_i<sp/>+<sp/>2]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q2;</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dq2[i]<sp/>=<sp/>d<sp/>*<sp/>(float)sc[is_i<sp/>+<sp/>4]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q3;</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dq3[i]<sp/>=<sp/>d<sp/>*<sp/>(float)sc[is_i<sp/>+<sp/>6]<sp/>*<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">)q4;</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"></highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vw0<sp/>=<sp/>_mm256_loadu_ps(dq0);</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vw1<sp/>=<sp/>_mm256_loadu_ps(dq1);</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vw2<sp/>=<sp/>_mm256_loadu_ps(dq2);</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vw3<sp/>=<sp/>_mm256_loadu_ps(dq3);</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vx0<sp/>=<sp/>_mm256_loadu_ps(&amp;xp[l<sp/>+<sp/>0]);</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vx1<sp/>=<sp/>_mm256_loadu_ps(&amp;xp[l<sp/>+<sp/>32]);</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vx2<sp/>=<sp/>_mm256_loadu_ps(&amp;xp[l<sp/>+<sp/>64]);</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vx3<sp/>=<sp/>_mm256_loadu_ps(&amp;xp[l<sp/>+<sp/>96]);</highlight></codeline>
+<codeline lineno="131"><highlight class="normal"></highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc0<sp/>=<sp/>_mm256_add_ps(acc0,<sp/>_mm256_mul_ps(vw0,<sp/>vx0));</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc1<sp/>=<sp/>_mm256_add_ps(acc1,<sp/>_mm256_mul_ps(vw1,<sp/>vx1));</highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc2<sp/>=<sp/>_mm256_add_ps(acc2,<sp/>_mm256_mul_ps(vw2,<sp/>vx2));</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc3<sp/>=<sp/>_mm256_add_ps(acc3,<sp/>_mm256_mul_ps(vw3,<sp/>vx3));</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>xp<sp/>+=<sp/>128;</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ql<sp/>+=<sp/>64;</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>qh<sp/>+=<sp/>32;</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sc<sp/>+=<sp/>8;</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Combine<sp/>accumulators<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>sum01<sp/>=<sp/>_mm256_add_ps(acc0,<sp/>acc1);</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>sum23<sp/>=<sp/>_mm256_add_ps(acc2,<sp/>acc3);</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>sum<sp/>=<sp/>_mm256_add_ps(sum01,<sp/>sum23);</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"></highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Horizontal<sp/>sum<sp/>of<sp/>8<sp/>floats<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>hi<sp/>=<sp/>_mm256_extractf128_ps(sum,<sp/>1);</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>lo<sp/>=<sp/>_mm256_castps256_ps128(sum);</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>sum128<sp/>=<sp/>_mm_add_ps(hi,<sp/>lo);</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/>sum128<sp/>=<sp/>_mm_hadd_ps(sum128,<sp/>sum128);</highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/>sum128<sp/>=<sp/>_mm_hadd_ps(sum128,<sp/>sum128);</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"></highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm_cvtss_f32(sum128);</highlight></codeline>
+<codeline lineno="157"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="158"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>__AVX__<sp/>&amp;&amp;<sp/>!__AVX512F__<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="159"><highlight class="normal"></highlight></codeline>
+<codeline lineno="160" refid="ckernel__engine_8h_1a3c98619f74662804d8551efbd4d02b52" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q6k_8c_1a3c98619f74662804d8551efbd4d02b52" kindref="member">gemv_q6_k</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="164"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!y<sp/>||<sp/>!W<sp/>||<sp/>!x)<sp/>{</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(M<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>TEMPORARILY<sp/>DISABLE<sp/>NEW<sp/>AVX<sp/>KERNELS<sp/>-<sp/>USE<sp/>REFERENCE<sp/>ONLY</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"></highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"></highlight></codeline>
+<codeline lineno="176"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>0;<sp/>row<sp/>&lt;<sp/>M;<sp/>++row)<sp/>{</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q6__K" kindref="compound">block_q6_K</ref><sp/>*w_row<sp/>=<sp/>blocks<sp/>+<sp/>(size_t)row<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)blocks_per_row;</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>&amp;&amp;<sp/>!defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[row]<sp/>=<sp/>dot_q6_k_avx(w_row,<sp/>x,<sp/>K);</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[row]<sp/>=<sp/><ref refid="gemm__kernels__q6k_8c_1ab62992893fe8543ddcb7159102136a0a" kindref="member">dot_q6_k_ref</ref>(w_row,<sp/>x,<sp/>K);</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="184"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"></highlight></codeline>
+<codeline lineno="186" refid="ckernel__engine_8h_1a07fcd594f867f5c6afb487ab989213e1" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q6k_8c_1a07fcd594f867f5c6afb487ab989213e1" kindref="member">gemm_q6_k</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*Y,</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*X,</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="190"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!Y<sp/>||<sp/>!W<sp/>||<sp/>!X)<sp/>{</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(M<sp/>&lt;=<sp/>0<sp/>||<sp/>N<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="195"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"></highlight></codeline>
+<codeline lineno="198"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>0;<sp/>n<sp/>&lt;<sp/>N;<sp/>++n)<sp/>{</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q6k_8c_1a3c98619f74662804d8551efbd4d02b52" kindref="member">gemv_q6_k</ref>(&amp;Y[n<sp/>*<sp/>M],<sp/>W,<sp/>&amp;X[n<sp/>*<sp/>K],<sp/>M,<sp/>K);</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="201"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"></highlight></codeline>
+<codeline lineno="203" refid="ckernel__engine_8h_1a7568db3d490c7a7372a5236d8b2fe207" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q6k_8c_1a7568db3d490c7a7372a5236d8b2fe207" kindref="member">gemm_nt_q6_k</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*A,</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*B,</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,</highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,</highlight></codeline>
+<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="208"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="209"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!A<sp/>||<sp/>!B<sp/>||<sp/>!<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="212"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(M<sp/>&lt;=<sp/>0<sp/>||<sp/>N<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"></highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>gemm_q6_k<sp/>produces<sp/>Y<sp/>as<sp/>[batch<sp/>x<sp/>M_out]<sp/>where:</highlight></codeline>
+<codeline lineno="217"><highlight class="comment"><sp/><sp/><sp/><sp/><sp/>*<sp/><sp/><sp/>batch<sp/>=<sp/>M<sp/>(tokens)</highlight></codeline>
+<codeline lineno="218"><highlight class="comment"><sp/><sp/><sp/><sp/><sp/>*<sp/><sp/><sp/>M_out<sp/>=<sp/>N<sp/>(output<sp/>channels)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q6k_8c_1a07fcd594f867f5c6afb487ab989213e1" kindref="member">gemm_q6_k</ref>(<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/>B,<sp/>A,<sp/></highlight><highlight class="comment">/*M_out=*/</highlight><highlight class="normal">N,<sp/></highlight><highlight class="comment">/*N_batch=*/</highlight><highlight class="normal">M,<sp/>K);</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!bias)<sp/>{</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"></highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>M;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref><sp/>+<sp/>(size_t)i<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)N;</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>N;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>row[j]<sp/>+=<sp/>bias[j];</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="230"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="231"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="232"><highlight class="normal"></highlight></codeline>
+<codeline lineno="233"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Reference<sp/>implementation<sp/>-<sp/>used<sp/>as<sp/>fallback<sp/>from<sp/>SSE<sp/>when<sp/>K<sp/>not<sp/>aligned<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="234" refid="ckernel__quant_8h_1a69a759de291fac064cd027839afb4bce" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q6k_8c_1a69a759de291fac064cd027839afb4bce" kindref="member">gemm_nt_q6_k_ref</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*A,</highlight></codeline>
+<codeline lineno="235"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*B,</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,</highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="239"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="240"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q6k_8c_1a7568db3d490c7a7372a5236d8b2fe207" kindref="member">gemm_nt_q6_k</ref>(A,<sp/>B,<sp/>bias,<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/>M,<sp/>N,<sp/>K);</highlight></codeline>
+<codeline lineno="241"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k.c"/>
+  </compounddef>
+</doxygen>

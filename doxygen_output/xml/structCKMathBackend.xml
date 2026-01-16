@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="structCKMathBackend" kind="struct" language="C++" prot="public">
+    <compoundname>CKMathBackend</compoundname>
+    <includes refid="ckernel__engine_8h" local="no">ckernel_engine.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structCKMathBackend_1a7e59ba4baa9c776241287338a219d9c4" prot="public" static="no" mutable="no">
+        <type>void(*</type>
+        <definition>void(* CKMathBackend::sgemm) (int M, int N, int K, const float *A, int lda, const float *B, int ldb, const float *bias, float *C, int ldc)</definition>
+        <argsstring>)(int M, int N, int K, const float *A, int lda, const float *B, int ldb, const float *bias, float *C, int ldc)</argsstring>
+        <name>sgemm</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_engine.h" line="26" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_engine.h" bodystart="26" bodyend="-1"/>
+        <referencedby refid="ckernel__engine_8h_1a6c6a2e37aa74b6f118d94eb08debcff3" compoundref="backend__native_8c" startline="39" endline="44">ckernel_backend_native</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Core math backend interface for C-Kernel-Engine.</para>
+<para>This is intentionally minimal and matches the conventions already used in C-Transformer for GEMM kernels.</para>
+<para>Layout assumptions (LLM-style shapes):<itemizedlist>
+<listitem><para>A: [M x K], row-major, A(i,k) = A[i*K + k]</para>
+</listitem><listitem><para>B: [N x K], row-major, B(j,k) = B[j*K + k]</para>
+</listitem><listitem><para>C: [M x N], row-major, <ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C(i,j)</ref> = C[i*N + j]</para>
+</listitem><listitem><para>bias: optional [N], added per output column j </para>
+</listitem></itemizedlist>
+</para>
+    </detaileddescription>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_engine.h" line="25" column="1" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_engine.h" bodystart="25" bodyend="31"/>
+    <listofallmembers>
+      <member refid="structCKMathBackend_1a7e59ba4baa9c776241287338a219d9c4" prot="public" virt="non-virtual"><scope>CKMathBackend</scope><name>sgemm</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,316 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ckernel__model_8h" kind="file" language="C++">
+    <compoundname>ckernel_model.h</compoundname>
+    <includes refid="ckernel__ir_8h" local="yes">ckernel_ir.h</includes>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includedby refid="ckernel__model__layout_8c" local="yes">ckernel_model_layout.c</includedby>
+    <includedby refid="ckernel__model__load_8c" local="yes">ckernel_model_load.c</includedby>
+    <incdepgraph>
+      <node id="1">
+        <label>ckernel_model.h</label>
+        <link refid="ckernel__model_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="5">
+        <label>stddef.h</label>
+      </node>
+      <node id="2">
+        <label>ckernel_ir.h</label>
+        <link refid="ckernel__ir_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stdio.h</label>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="1">
+        <label>ckernel_model.h</label>
+        <link refid="ckernel__model_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>ckernel_model_layout.c</label>
+        <link refid="ckernel__model__layout_8c"/>
+      </node>
+      <node id="3">
+        <label>ckernel_model_load.c</label>
+        <link refid="ckernel__model__load_8c"/>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structCKLayerLayout" prot="public">CKLayerLayout</innerclass>
+    <innerclass refid="structTransformerModel" prot="public">TransformerModel</innerclass>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ckernel__model_8h_1a408dbae8dc539ddfe04ee35f35c9257d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_model_load_weights_flat</definition>
+        <argsstring>(TransformerModel *m, const char *path)</argsstring>
+        <name>ck_model_load_weights_flat</name>
+        <param>
+          <type><ref refid="structTransformerModel" kindref="compound">TransformerModel</ref> *</type>
+          <declname>m</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>path</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Load weights from a single flat binary file into model-&gt;memory_base.</para>
+<para>Expected layout in the file (float32, little-endian), in the same order as layout_transformer_from_ir assigns weight offsets:</para>
+<para>1) Token embeddings [vocab_size × hidden_size] 2) Pos embeddings [context_window × hidden_size] 3) For each layer L = 0..num_layers-1:<itemizedlist>
+<listitem><para>LN1 gamma [hidden_size]</para>
+</listitem><listitem><para>LN1 beta [hidden_size]</para>
+</listitem><listitem><para>QKV weight [hidden_size × 3*hidden_size]</para>
+</listitem><listitem><para>QKV bias [3*hidden_size]</para>
+</listitem><listitem><para>Attn proj W [hidden_size × hidden_size]</para>
+</listitem><listitem><para>Attn proj b [hidden_size]</para>
+</listitem><listitem><para>FC1 weight [hidden_size × intermediate_size]</para>
+</listitem><listitem><para>FC1 bias [intermediate_size]</para>
+</listitem><listitem><para>FC2 weight [intermediate_size × hidden_size]</para>
+</listitem><listitem><para>FC2 bias [hidden_size] 4) Final LN gamma [hidden_size] 5) Final LN beta [hidden_size] 6) LM head weight [vocab_size × hidden_size]</para>
+</listitem></itemizedlist>
+</para>
+<para>Activation buffers (embedded_input_offset, final_output_offset, logits_offset) are NOT populated by this loader.</para>
+<para>Returns 0 on success, non-zero on failure. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model.h" line="115" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c" bodystart="24" bodyend="186" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model.h" declline="115" declcolumn="5"/>
+        <references refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" compoundref="ckernel__model_8h" startline="29">CKLayerLayout::attn_proj_bias_offset</references>
+        <references refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" compoundref="ckernel__model_8h" startline="28">CKLayerLayout::attn_proj_weight_offset</references>
+        <references refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" compoundref="ckernel__model_8h" startline="39">TransformerModel::cfg</references>
+        <references refid="structCKModelConfig_1a18a327829d25405e92ba46a79009b89f" compoundref="ckernel__ir_8h" startline="30">CKModelConfig::context_window</references>
+        <references refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" compoundref="ckernel__model_8h" startline="32">CKLayerLayout::fc1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" compoundref="ckernel__model_8h" startline="31">CKLayerLayout::fc1_weight_offset</references>
+        <references refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" compoundref="ckernel__model_8h" startline="35">CKLayerLayout::fc2_bias_offset</references>
+        <references refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" compoundref="ckernel__model_8h" startline="34">CKLayerLayout::fc2_weight_offset</references>
+        <references refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" compoundref="ckernel__model_8h" startline="54">TransformerModel::final_ln_bias_offset</references>
+        <references refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" compoundref="ckernel__model_8h" startline="53">TransformerModel::final_ln_weight_offset</references>
+        <references refid="structCKModelConfig_1afd04ffe4db48600b90f32904c49d73af" compoundref="ckernel__ir_8h" startline="25">CKModelConfig::hidden_size</references>
+        <references refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" compoundref="ck__model__api_8h" startline="37">CKModelConfig::intermediate_size</references>
+        <references refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" compoundref="ckernel__model_8h" startline="61">TransformerModel::layers</references>
+        <references refid="structTransformerModel_1a04378052961669504042e717e3219736" compoundref="ckernel__model_8h" startline="57">TransformerModel::lm_head_weight_offset</references>
+        <references refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" compoundref="ckernel__model_8h" startline="23">CKLayerLayout::ln1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" compoundref="ckernel__model_8h" startline="22">CKLayerLayout::ln1_weight_offset</references>
+        <references refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" compoundref="ckernel__model_8h" startline="42">TransformerModel::memory_base</references>
+        <references refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" compoundref="ck__model__api_8h" startline="38">CKModelConfig::num_layers</references>
+        <references refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" compoundref="ckernel__model_8h" startline="49">TransformerModel::pos_emb_offset</references>
+        <references refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" compoundref="ckernel__model_8h" startline="26">CKLayerLayout::qkv_bias_offset</references>
+        <references refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" compoundref="ckernel__model_8h" startline="25">CKLayerLayout::qkv_weight_offset</references>
+        <references refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" compoundref="ckernel__model__load_8c" startline="8" endline="22">read_floats</references>
+        <references refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" compoundref="ckernel__model_8h" startline="48">TransformerModel::token_emb_offset</references>
+        <references refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" compoundref="ck__model__api_8h" startline="39">CKModelConfig::vocab_size</references>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__model_8h_1a0c71a82f45792351885418444cbfd5cd" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void layout_transformer_from_ir</definition>
+        <argsstring>(TransformerModel *m, const CKIRGraph *ir)</argsstring>
+        <name>layout_transformer_from_ir</name>
+        <param>
+          <type><ref refid="structTransformerModel" kindref="compound">TransformerModel</ref> *</type>
+          <declname>m</declname>
+        </param>
+        <param>
+          <type>const <ref refid="structCKIRGraph" kindref="compound">CKIRGraph</ref> *</type>
+          <declname>ir</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Compute a simple forward-only layout for <ref refid="structTransformerModel" kindref="compound">TransformerModel</ref> based on:<itemizedlist>
+<listitem><para><ref refid="structCKModelConfig" kindref="compound">CKModelConfig</ref> (dims, heads, vocab, context)</para>
+</listitem><listitem><para>The IR graph structure (number of layers, op types)</para>
+</listitem></itemizedlist>
+</para>
+<para>This function:<itemizedlist>
+<listitem><para>Fills token/pos embedding offsets</para>
+</listitem><listitem><para>Assigns per-layer weight offsets for LN, QKV, attention proj, MLP</para>
+</listitem><listitem><para>Sets final LN / LM head / logits offsets</para>
+</listitem><listitem><para>Populates total_bytes with the required byte capacity</para>
+</listitem></itemizedlist>
+</para>
+<para>Offsets are in bytes counted from memory_base. The exact shapes and alignment strategy will evolve; this initial version focuses on correctness and clarity over tight packing. Layout the <ref refid="structTransformerModel" kindref="compound">TransformerModel</ref> memory based on its cfg and (optionally) the IR.</para>
+<para>If <computeroutput>ir</computeroutput> is non-NULL, its config is copied into <computeroutput>m-&gt;cfg</computeroutput>. If <computeroutput>ir</computeroutput> is NULL, the function trusts that <computeroutput>m-&gt;cfg</computeroutput> has already been populated. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model.h" line="85" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_layout.c" bodystart="21" bodyend="153" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model.h" declline="85" declcolumn="6"/>
+        <references refid="ckernel__model__layout_8c_1a19108c1ddea653d46840daefcf542bb5" compoundref="ckernel__model__layout_8c" startline="8" endline="12">align_up_bytes</references>
+        <references refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" compoundref="ckernel__model_8h" startline="29">CKLayerLayout::attn_proj_bias_offset</references>
+        <references refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" compoundref="ckernel__model_8h" startline="28">CKLayerLayout::attn_proj_weight_offset</references>
+        <references refid="ckernel__model__layout_8c_1a1b626cc9eda38d35b5e64d1885783452" compoundref="ckernel__model__layout_8c" startline="14" endline="19">bump_bytes</references>
+        <references refid="ckernel__model__layout_8c_1a4538b5ec4a295a2b8a52560e61575041" compoundref="ckernel__model__layout_8c" startline="6">CACHELINE_BYTES</references>
+        <references refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" compoundref="ckernel__model_8h" startline="39">TransformerModel::cfg</references>
+        <references refid="structCKIRGraph_1af12e4b320dee98416c63539b743801f2" compoundref="ckernel__ir_8h" startline="73">CKIRGraph::config</references>
+        <references refid="structCKModelConfig_1a18a327829d25405e92ba46a79009b89f" compoundref="ckernel__ir_8h" startline="30">CKModelConfig::context_window</references>
+        <references refid="structTransformerModel_1a15ebe2bd4db54209b7cc8e89bb1cb8fd" compoundref="ckernel__model_8h" startline="45">TransformerModel::elem_bytes</references>
+        <references refid="structTransformerModel_1a1989f1f535ad94b85bb4242ec2148969" compoundref="ckernel__model_8h" startline="50">TransformerModel::embedded_input_offset</references>
+        <references refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" compoundref="ckernel__model_8h" startline="32">CKLayerLayout::fc1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" compoundref="ckernel__model_8h" startline="31">CKLayerLayout::fc1_weight_offset</references>
+        <references refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" compoundref="ckernel__model_8h" startline="35">CKLayerLayout::fc2_bias_offset</references>
+        <references refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" compoundref="ckernel__model_8h" startline="34">CKLayerLayout::fc2_weight_offset</references>
+        <references refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" compoundref="ckernel__model_8h" startline="54">TransformerModel::final_ln_bias_offset</references>
+        <references refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" compoundref="ckernel__model_8h" startline="53">TransformerModel::final_ln_weight_offset</references>
+        <references refid="structTransformerModel_1aa4fd42c5214bd3b0adcbc64f82461ee7" compoundref="ckernel__model_8h" startline="55">TransformerModel::final_output_offset</references>
+        <references refid="structCKModelConfig_1afd04ffe4db48600b90f32904c49d73af" compoundref="ckernel__ir_8h" startline="25">CKModelConfig::hidden_size</references>
+        <references refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" compoundref="ck__model__api_8h" startline="37">CKModelConfig::intermediate_size</references>
+        <references refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" compoundref="ckernel__model_8h" startline="61">TransformerModel::layers</references>
+        <references refid="structTransformerModel_1a920af187f3562257c0fb9c80c05b4582" compoundref="ckernel__model_8h" startline="51">TransformerModel::layers_start_offset</references>
+        <references refid="structTransformerModel_1a04378052961669504042e717e3219736" compoundref="ckernel__model_8h" startline="57">TransformerModel::lm_head_weight_offset</references>
+        <references refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" compoundref="ckernel__model_8h" startline="23">CKLayerLayout::ln1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" compoundref="ckernel__model_8h" startline="22">CKLayerLayout::ln1_weight_offset</references>
+        <references refid="structTransformerModel_1adc7918eda6b620de8efa5722b57111f8" compoundref="ckernel__model_8h" startline="58">TransformerModel::logits_offset</references>
+        <references refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" compoundref="ck__model__api_8h" startline="38">CKModelConfig::num_layers</references>
+        <references refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" compoundref="ckernel__model_8h" startline="49">TransformerModel::pos_emb_offset</references>
+        <references refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" compoundref="ckernel__model_8h" startline="26">CKLayerLayout::qkv_bias_offset</references>
+        <references refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" compoundref="ckernel__model_8h" startline="25">CKLayerLayout::qkv_weight_offset</references>
+        <references refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" compoundref="ckernel__model_8h" startline="48">TransformerModel::token_emb_offset</references>
+        <references refid="structTransformerModel_1a9fb01acf28cf0c0f53a8b4c416cedd59" compoundref="ckernel__model_8h" startline="43">TransformerModel::total_bytes</references>
+        <references refid="structTransformerModel_1aa1da3a055e1f53a6aa8aa54d380e04d1" compoundref="ckernel__model_8h" startline="44">TransformerModel::total_floats</references>
+        <references refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" compoundref="ck__model__api_8h" startline="39">CKModelConfig::vocab_size</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#ifndef<sp/>CKERNEL_MODEL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CKERNEL_MODEL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__ir_8h" kindref="compound">ckernel_ir.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="9"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>Simplified<sp/>forward-only<sp/>model<sp/>layout.</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>the<sp/>first<sp/>step<sp/>toward<sp/>the<sp/>full<sp/>TransformerModel<sp/>/<sp/>TrulyOptimalLayer</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/>/<sp/>GradientStorage<sp/>design.<sp/>It<sp/>focuses<sp/>on:</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>A<sp/>single<sp/>contiguous<sp/>memory<sp/>block<sp/>for<sp/>weights<sp/>+<sp/>activations</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Per-layer<sp/>weight<sp/>offsets<sp/>for<sp/>the<sp/>core<sp/>decoder<sp/>kernels</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*<sp/>Backward/optimizer<sp/>offsets<sp/>and<sp/>KV<sp/>cache<sp/>layout<sp/>will<sp/>be<sp/>layered<sp/>on<sp/>later.</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20" refid="structCKLayerLayout" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Per-layer<sp/>weight<sp/>offsets,<sp/>measured<sp/>in<sp/>bytes<sp/>from<sp/>memory_base.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" kindref="member">ln1_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="23" refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" kindref="member">ln1_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25" refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" kindref="member">qkv_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="26" refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" kindref="member">qkv_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28" refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" kindref="member">attn_proj_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="29" refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" kindref="member">attn_proj_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight></codeline>
+<codeline lineno="31" refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" kindref="member">fc1_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="32" refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" kindref="member">fc1_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34" refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" kindref="member">fc2_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="35" refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" kindref="member">fc2_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal">}<sp/><ref refid="structCKLayerLayout" kindref="compound">CKLayerLayout</ref>;</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight></codeline>
+<codeline lineno="38" refid="structTransformerModel" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="39" refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKModelConfig" kindref="compound">CKModelConfig</ref><sp/><ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>parsed<sp/>from<sp/>HF<sp/>config<sp/>/<sp/>IR<sp/>config<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Unified<sp/>memory<sp/>block<sp/>(weights<sp/>+<sp/>activations).<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="42" refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint8_t<sp/>*<ref refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" kindref="member">memory_base</ref>;</highlight></codeline>
+<codeline lineno="43" refid="structTransformerModel_1a9fb01acf28cf0c0f53a8b4c416cedd59" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><sp/><sp/><ref refid="structTransformerModel_1a9fb01acf28cf0c0f53a8b4c416cedd59" kindref="member">total_bytes</ref>;</highlight></codeline>
+<codeline lineno="44" refid="structTransformerModel_1aa1da3a055e1f53a6aa8aa54d380e04d1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><sp/><sp/><ref refid="structTransformerModel_1aa1da3a055e1f53a6aa8aa54d380e04d1" kindref="member">total_floats</ref>;<sp/></highlight><highlight class="comment">/*<sp/>legacy:<sp/>bytes<sp/>/<sp/>elem_bytes<sp/>when<sp/>elem_bytes==4<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="45" refid="structTransformerModel_1a15ebe2bd4db54209b7cc8e89bb1cb8fd" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><sp/><sp/><ref refid="structTransformerModel_1a15ebe2bd4db54209b7cc8e89bb1cb8fd" kindref="member">elem_bytes</ref>;</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Global<sp/>offsets<sp/>(bytes)<sp/>into<sp/>memory_base.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="48" refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" kindref="member">token_emb_offset</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[vocab_size<sp/>×<sp/>hidden_size]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="49" refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" kindref="member">pos_emb_offset</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[context_window<sp/>×<sp/>hidden_size]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50" refid="structTransformerModel_1a1989f1f535ad94b85bb4242ec2148969" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a1989f1f535ad94b85bb4242ec2148969" kindref="member">embedded_input_offset</ref>;<sp/></highlight><highlight class="comment">/*<sp/>[context_window<sp/>×<sp/>hidden_size]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51" refid="structTransformerModel_1a920af187f3562257c0fb9c80c05b4582" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a920af187f3562257c0fb9c80c05b4582" kindref="member">layers_start_offset</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>start<sp/>of<sp/>first<sp/>layer<sp/>block<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"></highlight></codeline>
+<codeline lineno="53" refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" kindref="member">final_ln_weight_offset</ref>;</highlight></codeline>
+<codeline lineno="54" refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" kindref="member">final_ln_bias_offset</ref>;</highlight></codeline>
+<codeline lineno="55" refid="structTransformerModel_1aa4fd42c5214bd3b0adcbc64f82461ee7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1aa4fd42c5214bd3b0adcbc64f82461ee7" kindref="member">final_output_offset</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[context_window<sp/>×<sp/>hidden_size]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"></highlight></codeline>
+<codeline lineno="57" refid="structTransformerModel_1a04378052961669504042e717e3219736" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1a04378052961669504042e717e3219736" kindref="member">lm_head_weight_offset</ref>;<sp/></highlight><highlight class="comment">/*<sp/>often<sp/>tied<sp/>to<sp/>token_emb_offset<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="58" refid="structTransformerModel_1adc7918eda6b620de8efa5722b57111f8" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structTransformerModel_1adc7918eda6b620de8efa5722b57111f8" kindref="member">logits_offset</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[context_window<sp/>×<sp/>vocab_size]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Per-layer<sp/>layouts<sp/>(length<sp/>=<sp/>cfg.num_layers).<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="61" refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKLayerLayout" kindref="compound">CKLayerLayout</ref><sp/>*<ref refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" kindref="member">layers</ref>;</highlight></codeline>
+<codeline lineno="62"><highlight class="normal">}<sp/><ref refid="structTransformerModel" kindref="compound">TransformerModel</ref>;</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="64"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*<sp/>Compute<sp/>a<sp/>simple<sp/>forward-only<sp/>layout<sp/>for<sp/>TransformerModel<sp/>based<sp/>on:</highlight></codeline>
+<codeline lineno="66"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>CKModelConfig<sp/>(dims,<sp/>heads,<sp/>vocab,<sp/>context)</highlight></codeline>
+<codeline lineno="67"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>The<sp/>IR<sp/>graph<sp/>structure<sp/>(number<sp/>of<sp/>layers,<sp/>op<sp/>types)</highlight></codeline>
+<codeline lineno="68"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="69"><highlight class="comment"><sp/>*<sp/>This<sp/>function:</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Fills<sp/>token/pos<sp/>embedding<sp/>offsets</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Assigns<sp/>per-layer<sp/>weight<sp/>offsets<sp/>for<sp/>LN,<sp/>QKV,<sp/>attention<sp/>proj,<sp/>MLP</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Sets<sp/>final<sp/>LN<sp/>/<sp/>LM<sp/>head<sp/>/<sp/>logits<sp/>offsets</highlight></codeline>
+<codeline lineno="73"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Populates<sp/>total_bytes<sp/>with<sp/>the<sp/>required<sp/>byte<sp/>capacity</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*<sp/>Offsets<sp/>are<sp/>in<sp/>bytes<sp/>counted<sp/>from<sp/>memory_base.<sp/>The<sp/>exact<sp/>shapes</highlight></codeline>
+<codeline lineno="76"><highlight class="comment"><sp/>*<sp/>and<sp/>alignment<sp/>strategy<sp/>will<sp/>evolve;<sp/>this<sp/>initial<sp/>version<sp/>focuses<sp/>on</highlight></codeline>
+<codeline lineno="77"><highlight class="comment"><sp/>*<sp/>correctness<sp/>and<sp/>clarity<sp/>over<sp/>tight<sp/>packing.</highlight></codeline>
+<codeline lineno="78"><highlight class="comment"><sp/>*/</highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="79"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*<sp/>Layout<sp/>the<sp/>TransformerModel<sp/>memory<sp/>based<sp/>on<sp/>its<sp/>cfg<sp/>and<sp/>(optionally)<sp/>the<sp/>IR.</highlight></codeline>
+<codeline lineno="81"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="82"><highlight class="comment"><sp/>*<sp/>If<sp/>`ir`<sp/>is<sp/>non-NULL,<sp/>its<sp/>config<sp/>is<sp/>copied<sp/>into<sp/>`m-&gt;cfg`.<sp/>If<sp/>`ir`<sp/>is<sp/>NULL,</highlight></codeline>
+<codeline lineno="83"><highlight class="comment"><sp/>*<sp/>the<sp/>function<sp/>trusts<sp/>that<sp/>`m-&gt;cfg`<sp/>has<sp/>already<sp/>been<sp/>populated.</highlight></codeline>
+<codeline lineno="84"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__model_8h_1a0c71a82f45792351885418444cbfd5cd" kindref="member">layout_transformer_from_ir</ref>(<ref refid="structTransformerModel" kindref="compound">TransformerModel</ref><sp/>*m,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKIRGraph" kindref="compound">CKIRGraph</ref><sp/>*ir);</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="87"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*<sp/>Load<sp/>weights<sp/>from<sp/>a<sp/>single<sp/>flat<sp/>binary<sp/>file<sp/>into<sp/>model-&gt;memory_base.</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*<sp/>Expected<sp/>layout<sp/>in<sp/>the<sp/>file<sp/>(float32,<sp/>little-endian),<sp/>in<sp/>the<sp/>same<sp/>order</highlight></codeline>
+<codeline lineno="91"><highlight class="comment"><sp/>*<sp/>as<sp/>layout_transformer_from_ir<sp/>assigns<sp/>weight<sp/>offsets:</highlight></codeline>
+<codeline lineno="92"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="93"><highlight class="comment"><sp/>*<sp/><sp/><sp/>1)<sp/>Token<sp/>embeddings<sp/><sp/><sp/>[vocab_size<sp/>×<sp/>hidden_size]</highlight></codeline>
+<codeline lineno="94"><highlight class="comment"><sp/>*<sp/><sp/><sp/>2)<sp/>Pos<sp/>embeddings<sp/><sp/><sp/><sp/><sp/>[context_window<sp/>×<sp/>hidden_size]</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*<sp/><sp/><sp/>3)<sp/>For<sp/>each<sp/>layer<sp/>L<sp/>=<sp/>0..num_layers-1:</highlight></codeline>
+<codeline lineno="96"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>LN1<sp/>gamma<sp/><sp/><sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="97"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>LN1<sp/>beta<sp/><sp/><sp/><sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="98"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>QKV<sp/>weight<sp/><sp/><sp/><sp/><sp/>[hidden_size<sp/>×<sp/>3*hidden_size]</highlight></codeline>
+<codeline lineno="99"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>QKV<sp/>bias<sp/><sp/><sp/><sp/><sp/><sp/><sp/>[3*hidden_size]</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>Attn<sp/>proj<sp/>W<sp/><sp/><sp/><sp/>[hidden_size<sp/>×<sp/>hidden_size]</highlight></codeline>
+<codeline lineno="101"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>Attn<sp/>proj<sp/>b<sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="102"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>FC1<sp/>weight<sp/><sp/><sp/><sp/><sp/>[hidden_size<sp/>×<sp/>intermediate_size]</highlight></codeline>
+<codeline lineno="103"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>FC1<sp/>bias<sp/><sp/><sp/><sp/><sp/><sp/><sp/>[intermediate_size]</highlight></codeline>
+<codeline lineno="104"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>FC2<sp/>weight<sp/><sp/><sp/><sp/><sp/>[intermediate_size<sp/>×<sp/>hidden_size]</highlight></codeline>
+<codeline lineno="105"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>-<sp/>FC2<sp/>bias<sp/><sp/><sp/><sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*<sp/><sp/><sp/>4)<sp/>Final<sp/>LN<sp/>gamma<sp/><sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*<sp/><sp/><sp/>5)<sp/>Final<sp/>LN<sp/>beta<sp/><sp/><sp/><sp/><sp/><sp/>[hidden_size]</highlight></codeline>
+<codeline lineno="108"><highlight class="comment"><sp/>*<sp/><sp/><sp/>6)<sp/>LM<sp/>head<sp/>weight<sp/><sp/><sp/><sp/><sp/>[vocab_size<sp/>×<sp/>hidden_size]</highlight></codeline>
+<codeline lineno="109"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="110"><highlight class="comment"><sp/>*<sp/>Activation<sp/>buffers<sp/>(embedded_input_offset,<sp/>final_output_offset,<sp/>logits_offset)</highlight></codeline>
+<codeline lineno="111"><highlight class="comment"><sp/>*<sp/>are<sp/>NOT<sp/>populated<sp/>by<sp/>this<sp/>loader.</highlight></codeline>
+<codeline lineno="112"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="113"><highlight class="comment"><sp/>*<sp/>Returns<sp/>0<sp/>on<sp/>success,<sp/>non-zero<sp/>on<sp/>failure.</highlight></codeline>
+<codeline lineno="114"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__model_8h_1a408dbae8dc539ddfe04ee35f35c9257d" kindref="member">ck_model_load_weights_flat</ref>(<ref refid="structTransformerModel" kindref="compound">TransformerModel</ref><sp/>*m,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*path);</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"></highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_MODEL_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model.h"/>
+  </compounddef>
+</doxygen>

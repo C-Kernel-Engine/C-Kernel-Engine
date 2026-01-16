@@ -1,0 +1,209 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="sigmoid__kernels__bf16_8c" kind="file" language="C++">
+    <compoundname>sigmoid_kernels_bf16.c</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes refid="bf16__utils_8h" local="yes">bf16_utils.h</includes>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <incdepgraph>
+      <node id="7">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="8">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="1">
+        <label>sigmoid_kernels_bf16.c</label>
+        <link refid="sigmoid__kernels__bf16_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="4">
+        <label>bf16_utils.h</label>
+        <link refid="bf16__utils_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="6">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="sigmoid__kernels__bf16_8c_1a90690701828d7be0e2d375c4cbde511d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void sigmoid_backward_bf16</definition>
+        <argsstring>(const uint16_t *input, const uint16_t *d_output, uint16_t *d_input, size_t n, float *scratch_input, float *scratch_d_output, float *scratch_d_input)</argsstring>
+        <name>sigmoid_backward_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>d_output</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>d_input</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>n</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_input</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/sigmoid_kernels_bf16.c" line="29" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/sigmoid_kernels_bf16.c" bodystart="29" bodyend="44"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="ckernel__engine_8h_1aad3b3666d63fcbaa243ad4a988e187d8" compoundref="sigmoid__kernels_8c" startline="123" endline="138">sigmoid_backward</references>
+      </memberdef>
+      <memberdef kind="function" id="sigmoid__kernels__bf16_8c_1a8ff367a15f1448b30193ac1fe96446d8" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void sigmoid_forward_bf16</definition>
+        <argsstring>(const uint16_t *input, uint16_t *output, size_t n, float *scratch_input, float *scratch_output)</argsstring>
+        <name>sigmoid_forward_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>n</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_output</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/sigmoid_kernels_bf16.c" line="11" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/sigmoid_kernels_bf16.c" bodystart="11" bodyend="23"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="ckernel__engine_8h_1af621782be75fb6a9acf541f7935b87d5" compoundref="sigmoid__kernels_8c" startline="107" endline="118">sigmoid_forward</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="bf16__utils_8h" kindref="compound">bf16_utils.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>BF16<sp/>sigmoid<sp/>forward<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>scratch_input,<sp/>scratch_output:<sp/>each<sp/>[n]<sp/>floats</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11" refid="ckernel__engine_8h_1a8ff367a15f1448b30193ac1fe96446d8" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="sigmoid__kernels__bf16_8c_1a8ff367a15f1448b30193ac1fe96446d8" kindref="member">sigmoid_forward_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*output,</highlight></codeline>
+<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n,</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_input,</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_output)</highlight></codeline>
+<codeline lineno="16"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input<sp/>||<sp/>!output<sp/>||<sp/>n<sp/>==<sp/>0)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_input<sp/>||<sp/>!scratch_output)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>scratch_input,<sp/>n);</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1af621782be75fb6a9acf541f7935b87d5" kindref="member">sigmoid_forward</ref>(scratch_input,<sp/>scratch_output,<sp/>n);</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_output,<sp/>output,<sp/>n);</highlight></codeline>
+<codeline lineno="23"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/>BF16<sp/>sigmoid<sp/>backward<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/>scratch_input,<sp/>scratch_d_output,<sp/>scratch_d_input:<sp/>each<sp/>[n]<sp/>floats</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29" refid="ckernel__engine_8h_1a90690701828d7be0e2d375c4cbde511d" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="sigmoid__kernels__bf16_8c_1a90690701828d7be0e2d375c4cbde511d" kindref="member">sigmoid_backward_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_output,</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_input,</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n,</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_input,</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_output,</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_input)</highlight></codeline>
+<codeline lineno="36"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input<sp/>||<sp/>!d_output<sp/>||<sp/>!d_input<sp/>||<sp/>n<sp/>==<sp/>0)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_input<sp/>||<sp/>!scratch_d_output<sp/>||<sp/>!scratch_d_input)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>scratch_input,<sp/>n);</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_output,<sp/>scratch_d_output,<sp/>n);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1aad3b3666d63fcbaa243ad4a988e187d8" kindref="member">sigmoid_backward</ref>(scratch_input,<sp/>scratch_d_output,<sp/>scratch_d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_d_input,<sp/>d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="44"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/sigmoid_kernels_bf16.c"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,758 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="attention__decode__fused_8c" kind="file" language="C++">
+    <compoundname>attention_decode_fused.c</compoundname>
+    <includes refid="ckernel__orchestration_8h" local="yes">ckernel_orchestration.h</includes>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <includes local="no">stddef.h</includes>
+    <incdepgraph>
+      <node id="8">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>attention_decode_fused.c</label>
+        <link refid="attention__decode__fused_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="6">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="2">
+        <label>ckernel_orchestration.h</label>
+        <link refid="ckernel__orchestration_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="attention__decode__fused_8c_1ade31f5d0f381b108e331db103adc6251" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_attention_project_head_major_decode_token</definition>
+        <argsstring>(const float *attn_token, const float *wo, const float *bo, float *out_token, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim)</argsstring>
+        <name>ck_attention_project_head_major_decode_token</name>
+        <param>
+          <type>const float *</type>
+          <declname>attn_token</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>wo</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bo</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>out_token</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>embed_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_embed_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="99" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="99" bodyend="125"/>
+        <references refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" compoundref="attention__decode__fused_8c" startline="25" endline="60">ck_dot_f32</references>
+        <referencedby refid="ckernel__orchestration_8h_1a745d032ebb518826e284b4a3680a8cb5" compoundref="ckernel__orchestration_8c" startline="1257" endline="1415">ck_layer_forward_rmsnorm_swiglu_decode</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ab8d674c4a63b69a0cc0b38bbe58fa9f2" compoundref="ckernel__orchestration_8c" startline="1417" endline="1570">ck_layer_forward_rmsnorm_swiglu_decode_fused</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ae07680f1a438bd1824fa4b1c3e4e826e" compoundref="ckernel__orchestration_8c" startline="2480" endline="2643">ck_layer_forward_rmsnorm_swiglu_decode_quant</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>static void ck_attention_project_head_major_decode_token_residual</definition>
+        <argsstring>(const float *attn_token, const float *wo, const float *bo, const float *residual_in, float *proj_out, float *residual_out, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim)</argsstring>
+        <name>ck_attention_project_head_major_decode_token_residual</name>
+        <param>
+          <type>const float *</type>
+          <declname>attn_token</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>wo</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bo</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>residual_in</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>proj_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>residual_out</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>embed_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_embed_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="129" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="129" bodyend="163"/>
+        <references refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" compoundref="attention__decode__fused_8c" startline="25" endline="60">ck_dot_f32</references>
+        <referencedby refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" compoundref="attention__decode__fused_8c" startline="165" endline="325">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>float</type>
+        <definition>static float ck_dot_f32</definition>
+        <argsstring>(const float *a, const float *b, int len)</argsstring>
+        <name>ck_dot_f32</name>
+        <param>
+          <type>const float *</type>
+          <declname>a</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>b</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="25" column="21" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="25" bodyend="60"/>
+        <referencedby refid="ckernel__orchestration_8h_1ade31f5d0f381b108e331db103adc6251" compoundref="attention__decode__fused_8c" startline="99" endline="125">ck_attention_project_head_major_decode_token</referencedby>
+        <referencedby refid="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" compoundref="attention__decode__fused_8c" startline="129" endline="163">ck_attention_project_head_major_decode_token_residual</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1ad466e4eeb1c0ab92d9c9bf15cb51f679" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</definition>
+        <argsstring>(const CKLayerForwardParams *p, int token_index, int cache_capacity)</argsstring>
+        <name>ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</name>
+        <param>
+          <type>const <ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref> *</type>
+          <declname>p</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>token_index</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>cache_capacity</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="327" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="327" bodyend="335"/>
+        <references refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" compoundref="attention__decode__fused_8c" startline="165" endline="325">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</references>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>static void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</definition>
+        <argsstring>(const CKLayerForwardParams *p, int token_index, int cache_capacity, int fuse_mlp)</argsstring>
+        <name>ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</name>
+        <param>
+          <type>const <ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref> *</type>
+          <declname>p</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>token_index</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>cache_capacity</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>fuse_mlp</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="165" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="165" bodyend="325"/>
+        <references refid="structCKLayerForwardParams_1adcd26186adf7f31c20dbdfed35cc0d88" compoundref="ckernel__orchestration_8h" startline="14">CKLayerForwardParams::aligned_embed_dim</references>
+        <references refid="structCKLayerForwardParams_1a4eb2bdb409cf3a010bbb554a98e61e65" compoundref="ckernel__orchestration_8h" startline="18">CKLayerForwardParams::aligned_head_dim</references>
+        <references refid="structCKLayerForwardParams_1add2c7b423bea0a7261e1fbdc2820d3d6" compoundref="ckernel__orchestration_8h" startline="21">CKLayerForwardParams::aligned_intermediate_dim</references>
+        <references refid="ckernel__engine_8h_1a935728e009d1712976ed3cff71f50387" compoundref="attention__kernels_8c" startline="901" endline="950">attention_forward_decode_head_major_gqa_regular</references>
+        <references refid="structCKLayerForwardParams_1a8b216d5540d147750b5b7d6ebe238445" compoundref="ckernel__orchestration_8h" startline="43">CKLayerForwardParams::b1</references>
+        <references refid="structCKLayerForwardParams_1acc91fa02742733363b55e38ff2305e7f" compoundref="ckernel__orchestration_8h" startline="45">CKLayerForwardParams::b2</references>
+        <references refid="structCKLayerForwardParams_1a7e508ab8ae215c31fbae4f78b23d5929" compoundref="ckernel__orchestration_8h" startline="35">CKLayerForwardParams::bk</references>
+        <references refid="structCKLayerForwardParams_1ae1e3ff68d1bc957125df225fec96dcc2" compoundref="ckernel__orchestration_8h" startline="40">CKLayerForwardParams::bo</references>
+        <references refid="structCKLayerForwardParams_1a1002972e750e6b75ba1151cc4de47a05" compoundref="ckernel__orchestration_8h" startline="33">CKLayerForwardParams::bq</references>
+        <references refid="structCKLayerForwardParams_1ab2e6f98706c4822473bee01a6b4c46d6" compoundref="ckernel__orchestration_8h" startline="37">CKLayerForwardParams::bv</references>
+        <references refid="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" compoundref="attention__decode__fused_8c" startline="129" endline="163">ck_attention_project_head_major_decode_token_residual</references>
+        <references refid="ckernel__orchestration_8h_1a2e894b79792aaf694427446c1d89fab8" compoundref="ckernel__orchestration_8c" startline="920" endline="940">ck_mlp_swiglu_forward</references>
+        <references refid="ckernel__orchestration_8h_1a6aaebd943ca5ad278729a207b401ab45" compoundref="ckernel__orchestration_8c" startline="1215" endline="1255">ck_mlp_swiglu_forward_fully_fused_token</references>
+        <references refid="attention__decode__fused_8c_1ab6c6524b0f30733a077e3783bb55a592" compoundref="attention__decode__fused_8c" startline="62" endline="97">ck_qkv_project_head_major_token</references>
+        <references refid="ckernel__orchestration_8h_1ab0948def8f4a6c6fd8a5288aacd22f01" compoundref="ckernel__orchestration_8c" startline="107" endline="117">ck_residual_add_token_major</references>
+        <references refid="structCKLayerForwardParams_1a0a48ad009d13315fb1a18ec1f9aff5c8" compoundref="ckernel__orchestration_8h" startline="13">CKLayerForwardParams::embed_dim</references>
+        <references refid="structCKLayerForwardParams_1a63e37652b3bb5e0d394ea70af0895595" compoundref="ckernel__orchestration_8h" startline="22">CKLayerForwardParams::eps</references>
+        <references refid="structCKLayerForwardParams_1a7ca0c2bd14cfcde3504bd43030609e4b" compoundref="ckernel__orchestration_8h" startline="59">CKLayerForwardParams::fc1_out</references>
+        <references refid="structCKLayerForwardParams_1a5aac19a779c176623a55fd48bb9502cf" compoundref="ckernel__orchestration_8h" startline="17">CKLayerForwardParams::head_dim</references>
+        <references refid="structCKLayerForwardParams_1ad678ed659e2a04e07062a4aff3fe50a7" compoundref="ckernel__orchestration_8h" startline="25">CKLayerForwardParams::input</references>
+        <references refid="structCKLayerForwardParams_1ac4abe1c97c14c49d953ae5dd8f910c96" compoundref="ckernel__orchestration_8h" startline="50">CKLayerForwardParams::k</references>
+        <references refid="ckernel__engine_8h_1a6add8eaed40b7a32a537cf4cffb39709" compoundref="kv__cache__kernels_8c" startline="48" endline="87">kv_cache_write_head_major</references>
+        <references refid="structCKLayerForwardParams_1a4a3337a600f787d4b2fe9ab83f7594c9" compoundref="ckernel__orchestration_8h" startline="26">CKLayerForwardParams::ln1_gamma</references>
+        <references refid="structCKLayerForwardParams_1aace627c9eb6644fac5c3fc5a4748f1f4" compoundref="ckernel__orchestration_8h" startline="27">CKLayerForwardParams::ln2_gamma</references>
+        <references refid="structCKLayerForwardParams_1a122026c6f33e91f706fc37dab39c10b2" compoundref="ckernel__orchestration_8h" startline="57">CKLayerForwardParams::ln2_out</references>
+        <references refid="structCKLayerForwardParams_1a4bad26d55e52ce0462fb8b4081880a0f" compoundref="ckernel__orchestration_8h" startline="58">CKLayerForwardParams::ln2_rstd</references>
+        <references refid="structCKLayerForwardParams_1a86060e45304124966b764eb8db0365b7" compoundref="ckernel__orchestration_8h" startline="61">CKLayerForwardParams::mlp_out</references>
+        <references refid="structCKLayerForwardParams_1a6ef0a14fb20cf0840ecc43d05ece08a5" compoundref="ckernel__orchestration_8h" startline="15">CKLayerForwardParams::num_heads</references>
+        <references refid="structCKLayerForwardParams_1a16731d5e0724c25e7b807955d41be75a" compoundref="ckernel__orchestration_8h" startline="16">CKLayerForwardParams::num_kv_heads</references>
+        <references refid="structCKLayerForwardParams_1a61d1bcef2bcffd12c7a49d243a6c51d1" compoundref="ckernel__orchestration_8h" startline="62">CKLayerForwardParams::output</references>
+        <references refid="structCKLayerForwardParams_1a97ce8698227c9cf419c8e21d17cebc12" compoundref="ckernel__orchestration_8h" startline="56">CKLayerForwardParams::residual1</references>
+        <references refid="ckernel__engine_8h_1a9a068ed02d809a81a23f09e61b820baf" compoundref="rmsnorm__kernels_8c" startline="30" endline="150">rmsnorm_forward</references>
+        <references refid="structCKLayerForwardParams_1a3be9a0f9fae1ab8fddc30e14628d74a0" compoundref="ckernel__orchestration_8h" startline="29">CKLayerForwardParams::rope_cos</references>
+        <references refid="ckernel__engine_8h_1ab18869516e9a6ab5998038716ac8a179" compoundref="rope__kernels_8c" startline="394" endline="407">rope_forward_qk</references>
+        <references refid="structCKLayerForwardParams_1ad0e18a97d0cd2746890333bcc2d0d0e1" compoundref="ckernel__orchestration_8h" startline="23">CKLayerForwardParams::rope_pos_offset</references>
+        <references refid="structCKLayerForwardParams_1a332fc12fb11a99adfd72dba034c56ea7" compoundref="ckernel__orchestration_8h" startline="30">CKLayerForwardParams::rope_sin</references>
+        <references refid="structCKLayerForwardParams_1a64b3c9bf08573696fe23f773e0af3f4a" compoundref="ckernel__orchestration_8h" startline="60">CKLayerForwardParams::swiglu_out</references>
+        <references refid="structCKLayerForwardParams_1ac49cad0850ce2e111044fc2114783d16" compoundref="ckernel__orchestration_8h" startline="51">CKLayerForwardParams::v</references>
+        <references refid="structCKLayerForwardParams_1a72a52720f195370d45e7cc00a6985651" compoundref="ckernel__orchestration_8h" startline="42">CKLayerForwardParams::w1</references>
+        <references refid="structCKLayerForwardParams_1a070376c4c42bb40d7cdd919ea74c669b" compoundref="ckernel__orchestration_8h" startline="44">CKLayerForwardParams::w2</references>
+        <references refid="structCKLayerForwardParams_1a14ca061d781c1ed9631ff94df3e6278b" compoundref="ckernel__orchestration_8h" startline="34">CKLayerForwardParams::wk</references>
+        <references refid="structCKLayerForwardParams_1a98753685d03e778a1d655f8f3cd486ea" compoundref="ckernel__orchestration_8h" startline="39">CKLayerForwardParams::wo</references>
+        <references refid="structCKLayerForwardParams_1a621ed21298acc47932068d4a97ba72d7" compoundref="ckernel__orchestration_8h" startline="32">CKLayerForwardParams::wq</references>
+        <references refid="structCKLayerForwardParams_1a7e8ccf20ccec87eb230737334d589f5d" compoundref="ckernel__orchestration_8h" startline="36">CKLayerForwardParams::wv</references>
+        <referencedby refid="ckernel__orchestration_8h_1ad466e4eeb1c0ab92d9c9bf15cb51f679" compoundref="attention__decode__fused_8c" startline="327" endline="335">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a50899fc552648f5d1cadd0e4c5671dc1" compoundref="attention__decode__fused_8c" startline="337" endline="345">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1a50899fc552648f5d1cadd0e4c5671dc1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</definition>
+        <argsstring>(const CKLayerForwardParams *p, int token_index, int cache_capacity)</argsstring>
+        <name>ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</name>
+        <param>
+          <type>const <ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref> *</type>
+          <declname>p</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>token_index</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>cache_capacity</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="337" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="337" bodyend="345"/>
+        <references refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" compoundref="attention__decode__fused_8c" startline="165" endline="325">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</references>
+      </memberdef>
+      <memberdef kind="function" id="attention__decode__fused_8c_1ab6c6524b0f30733a077e3783bb55a592" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_qkv_project_head_major_token</definition>
+        <argsstring>(const float *input_row, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, float *q_token, float *k_token, float *v_token, int aligned_embed_dim, int num_heads, int num_kv_heads, int aligned_head_dim)</argsstring>
+        <name>ck_qkv_project_head_major_token</name>
+        <param>
+          <type>const float *</type>
+          <declname>input_row</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>wq</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bq</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>wk</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bk</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>wv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bv</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>q_token</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>k_token</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>v_token</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_embed_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" line="62" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c" bodystart="62" bodyend="97"/>
+        <references refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" compoundref="gemm__kernels_8c" startline="642" endline="733">gemm_blocked_serial</references>
+        <referencedby refid="ckernel__orchestration_8h_1a745d032ebb518826e284b4a3680a8cb5" compoundref="ckernel__orchestration_8c" startline="1257" endline="1415">ck_layer_forward_rmsnorm_swiglu_decode</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ab8d674c4a63b69a0cc0b38bbe58fa9f2" compoundref="ckernel__orchestration_8c" startline="1417" endline="1570">ck_layer_forward_rmsnorm_swiglu_decode_fused</referencedby>
+        <referencedby refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" compoundref="attention__decode__fused_8c" startline="165" endline="325">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__orchestration_8h" kindref="compound">ckernel_orchestration.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>||<sp/>defined(__AVX2__)<sp/>||<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>&amp;&amp;<sp/>!defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>ck_hsum256_ps(__m256<sp/>v)</highlight></codeline>
+<codeline lineno="13"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>lo<sp/>=<sp/>_mm256_castps256_ps128(v);</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>hi<sp/>=<sp/>_mm256_extractf128_ps(v,<sp/>1);</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>sum128<sp/>=<sp/>_mm_add_ps(lo,<sp/>hi);</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>shuf<sp/>=<sp/>_mm_movehdup_ps(sum128);</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/>__m128<sp/>sums<sp/>=<sp/>_mm_add_ps(sum128,<sp/>shuf);</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/>shuf<sp/>=<sp/>_mm_movehl_ps(shuf,<sp/>sums);</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/>sums<sp/>=<sp/>_mm_add_ss(sums,<sp/>shuf);</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm_cvtss_f32(sums);</highlight></codeline>
+<codeline lineno="22"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25" refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" kindref="member">ck_dot_f32</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*a,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len)</highlight></codeline>
+<codeline lineno="26"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>acc<sp/>=<sp/>_mm512_setzero_ps();</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>&lt;=<sp/>len<sp/>-<sp/>16;<sp/>i<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>va<sp/>=<sp/>_mm512_loadu_ps(a<sp/>+<sp/>i);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>vb<sp/>=<sp/>_mm512_loadu_ps(b<sp/>+<sp/>i);</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc<sp/>=<sp/>_mm512_fmadd_ps(va,<sp/>vb,<sp/>acc);</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>_mm512_reduce_add_ps(acc);</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>&lt;<sp/>len;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>a[i]<sp/>*<sp/>b[i];</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>sum;</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>acc<sp/>=<sp/>_mm256_setzero_ps();</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>&lt;=<sp/>len<sp/>-<sp/>8;<sp/>i<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>va<sp/>=<sp/>_mm256_loadu_ps(a<sp/>+<sp/>i);</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>vb<sp/>=<sp/>_mm256_loadu_ps(b<sp/>+<sp/>i);</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>acc<sp/>=<sp/>_mm256_add_ps(acc,<sp/>_mm256_mul_ps(va,<sp/>vb));</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>ck_hsum256_ps(acc);</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>i<sp/>&lt;<sp/>len;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>a[i]<sp/>*<sp/>b[i];</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>sum;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>len;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>a[i]<sp/>*<sp/>b[i];</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>sum;</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"></highlight></codeline>
+<codeline lineno="62" refid="ckernel__orchestration_8h_1ab6c6524b0f30733a077e3783bb55a592" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1ab6c6524b0f30733a077e3783bb55a592" kindref="member">ck_qkv_project_head_major_token</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input_row,</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wq,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bq,</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wk,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bk,</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wv,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bv,</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*q_token,</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k_token,</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*v_token,</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_embed_dim,</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim)</highlight></codeline>
+<codeline lineno="73"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input_row<sp/>||<sp/>!wq<sp/>||<sp/>!wk<sp/>||<sp/>!wv<sp/>||<sp/>!q_token<sp/>||<sp/>!k_token<sp/>||<sp/>!v_token)<sp/>{</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>q_out<sp/>=<sp/>num_heads<sp/>*<sp/>aligned_head_dim;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" kindref="member">gemm_blocked_serial</ref>(input_row,<sp/>wq,<sp/>bq,<sp/>q_token,</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,<sp/>q_out,<sp/>aligned_embed_dim);</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head_weight_stride<sp/>=<sp/>(size_t)aligned_head_dim<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_embed_dim;</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)<sp/>if(num_kv_heads<sp/>&gt;<sp/>1)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>h<sp/>=<sp/>0;<sp/>h<sp/>&lt;<sp/>num_kv_heads;<sp/>++h)<sp/>{</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wk_h<sp/>=<sp/>wk<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_weight_stride;</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wv_h<sp/>=<sp/>wv<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_weight_stride;</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bk_h<sp/>=<sp/>bk<sp/>?<sp/>(bk<sp/>+<sp/>(size_t)h<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim)<sp/>:<sp/>NULL;</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bv_h<sp/>=<sp/>bv<sp/>?<sp/>(bv<sp/>+<sp/>(size_t)h<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim)<sp/>:<sp/>NULL;</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k_h<sp/>=<sp/>k_token<sp/>+<sp/>(size_t)h<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim;</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*v_h<sp/>=<sp/>v_token<sp/>+<sp/>(size_t)h<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim;</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" kindref="member">gemm_blocked_serial</ref>(input_row,<sp/>wk_h,<sp/>bk_h,<sp/>k_h,</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,<sp/>aligned_head_dim,<sp/>aligned_embed_dim);</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" kindref="member">gemm_blocked_serial</ref>(input_row,<sp/>wv_h,<sp/>bv_h,<sp/>v_h,</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,<sp/>aligned_head_dim,<sp/>aligned_embed_dim);</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="97"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"></highlight></codeline>
+<codeline lineno="99" refid="ckernel__orchestration_8h_1ade31f5d0f381b108e331db103adc6251" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1ade31f5d0f381b108e331db103adc6251" kindref="member">ck_attention_project_head_major_decode_token</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*attn_token,</highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wo,</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bo,</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*out_token,</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>embed_dim,</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_embed_dim,</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim)</highlight></codeline>
+<codeline lineno="107"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head_in_stride<sp/>=<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head_weight_stride<sp/>=<sp/>(size_t)aligned_embed_dim<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim;</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight></codeline>
+<codeline lineno="111"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>embed_dim;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>bo<sp/>?<sp/>bo[j]<sp/>:<sp/>0.0f;</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>h<sp/>=<sp/>0;<sp/>h<sp/>&lt;<sp/>num_heads;<sp/>++h)<sp/>{</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*head_in<sp/>=<sp/>attn_token<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_in_stride;</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wo_row<sp/>=<sp/>wo<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_weight_stride<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)j<sp/>*<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/><ref refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" kindref="member">ck_dot_f32</ref>(head_in,<sp/>wo_row,<sp/>aligned_head_dim);</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_token[j]<sp/>=<sp/>sum;</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"></highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>embed_dim;<sp/>j<sp/>&lt;<sp/>aligned_embed_dim;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_token[j]<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="125"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Per-output<sp/>dot<sp/>products<sp/>keep<sp/>the<sp/>attn<sp/>token<sp/>hot,<sp/>but<sp/>can<sp/>be<sp/>slower<sp/>than<sp/>a<sp/>matvec</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128"><highlight class="normal"></highlight><highlight class="comment">//<sp/>microkernel<sp/>on<sp/>some<sp/>CPUs.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="129" refid="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" kindref="member">ck_attention_project_head_major_decode_token_residual</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*attn_token,</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wo,</highlight></codeline>
+<codeline lineno="131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bo,</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*residual_in,</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*proj_out,</highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*residual_out,</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>embed_dim,</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_embed_dim,</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim)</highlight></codeline>
+<codeline lineno="139"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head_in_stride<sp/>=<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>head_weight_stride<sp/>=<sp/>(size_t)aligned_embed_dim<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)aligned_head_dim;</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"></highlight></codeline>
+<codeline lineno="143"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>embed_dim;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>bo<sp/>?<sp/>bo[j]<sp/>:<sp/>0.0f;</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>h<sp/>=<sp/>0;<sp/>h<sp/>&lt;<sp/>num_heads;<sp/>++h)<sp/>{</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*head_in<sp/>=<sp/>attn_token<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_in_stride;</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*wo_row<sp/>=<sp/>wo<sp/>+<sp/>(size_t)h<sp/>*<sp/>head_weight_stride<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)j<sp/>*<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/><ref refid="attention__decode__fused_8c_1a481d5a4d4ee37e40f432109b3873bc05" kindref="member">ck_dot_f32</ref>(head_in,<sp/>wo_row,<sp/>aligned_head_dim);</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(proj_out)<sp/>{</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>proj_out[j]<sp/>=<sp/>sum;</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>residual_out[j]<sp/>=<sp/>sum<sp/>+<sp/>residual_in[j];</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"></highlight></codeline>
+<codeline lineno="157"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>embed_dim;<sp/>j<sp/>&lt;<sp/>aligned_embed_dim;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(proj_out)<sp/>{</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>proj_out[j]<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>residual_out[j]<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="163"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165" refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" kindref="member">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref><sp/>*p,</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>token_index,</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_capacity,</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>fuse_mlp)</highlight></codeline>
+<codeline lineno="169"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!p)<sp/>{</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!p-&gt;<ref refid="structCKLayerForwardParams_1ad678ed659e2a04e07062a4aff3fe50a7" kindref="member">input</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a4a3337a600f787d4b2fe9ab83f7594c9" kindref="member">ln1_gamma</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1aace627c9eb6644fac5c3fc5a4748f1f4" kindref="member">ln2_gamma</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a621ed21298acc47932068d4a97ba72d7" kindref="member">wq</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a14ca061d781c1ed9631ff94df3e6278b" kindref="member">wk</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a7e8ccf20ccec87eb230737334d589f5d" kindref="member">wv</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a98753685d03e778a1d655f8f3cd486ea" kindref="member">wo</ref><sp/>||</highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a72a52720f195370d45e7cc00a6985651" kindref="member">w1</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a070376c4c42bb40d7cdd919ea74c669b" kindref="member">w2</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1ac4abe1c97c14c49d953ae5dd8f910c96" kindref="member">k</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1ac49cad0850ce2e111044fc2114783d16" kindref="member">v</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a97ce8698227c9cf419c8e21d17cebc12" kindref="member">residual1</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a122026c6f33e91f706fc37dab39c10b2" kindref="member">ln2_out</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a64b3c9bf08573696fe23f773e0af3f4a" kindref="member">swiglu_out</ref><sp/>||</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a86060e45304124966b764eb8db0365b7" kindref="member">mlp_out</ref><sp/>||<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a61d1bcef2bcffd12c7a49d243a6c51d1" kindref="member">output</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="176"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!fuse_mlp<sp/>&amp;&amp;<sp/>!p-&gt;<ref refid="structCKLayerForwardParams_1a7ca0c2bd14cfcde3504bd43030609e4b" kindref="member">fc1_out</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(token_index<sp/>&lt;<sp/>0<sp/>||<sp/>cache_capacity<sp/>&lt;=<sp/>0<sp/>||<sp/>token_index<sp/>&gt;=<sp/>cache_capacity)<sp/>{</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(p-&gt;<ref refid="structCKLayerForwardParams_1a6ef0a14fb20cf0840ecc43d05ece08a5" kindref="member">num_heads</ref><sp/>&lt;=<sp/>0<sp/>||<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a16731d5e0724c25e7b807955d41be75a" kindref="member">num_kv_heads</ref><sp/>&lt;=<sp/>0<sp/>||<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a4eb2bdb409cf3a010bbb554a98e61e65" kindref="member">aligned_head_dim</ref><sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"></highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a0a48ad009d13315fb1a18ec1f9aff5c8" kindref="member">embed_dim</ref>;</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_D<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1adcd26186adf7f31c20dbdfed35cc0d88" kindref="member">aligned_embed_dim</ref>;</highlight></codeline>
+<codeline lineno="190"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>H<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a6ef0a14fb20cf0840ecc43d05ece08a5" kindref="member">num_heads</ref>;</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>H_kv<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a16731d5e0724c25e7b807955d41be75a" kindref="member">num_kv_heads</ref>;</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hd<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a5aac19a779c176623a55fd48bb9502cf" kindref="member">head_dim</ref>;</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ad<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a4eb2bdb409cf3a010bbb554a98e61e65" kindref="member">aligned_head_dim</ref>;</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_intermediate<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1add2c7b423bea0a7261e1fbdc2820d3d6" kindref="member">aligned_intermediate_dim</ref>;</highlight></codeline>
+<codeline lineno="195"><highlight class="normal"></highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Decode<sp/>buffers<sp/>are<sp/>single-token;<sp/>token_index<sp/>only<sp/>applies<sp/>to<sp/>KV<sp/>cache.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="197"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>token_slot<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="198"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ad678ed659e2a04e07062a4aff3fe50a7" kindref="member">input</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_D;</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*proj_row<sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*residual_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a97ce8698227c9cf419c8e21d17cebc12" kindref="member">residual1</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_D;</highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*ln2_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a122026c6f33e91f706fc37dab39c10b2" kindref="member">ln2_out</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_D;</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*swiglu_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a64b3c9bf08573696fe23f773e0af3f4a" kindref="member">swiglu_out</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_intermediate;</highlight></codeline>
+<codeline lineno="203"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*mlp_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a86060e45304124966b764eb8db0365b7" kindref="member">mlp_out</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_D;</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*out_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a61d1bcef2bcffd12c7a49d243a6c51d1" kindref="member">output</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)aligned_D;</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"></highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>ln1_rstd_tmp<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="207"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>ln2_rstd_tmp<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*ln2_rstd<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a4bad26d55e52ce0462fb8b4081880a0f" kindref="member">ln2_rstd</ref><sp/>?<sp/>(p-&gt;<ref refid="structCKLayerForwardParams_1a4bad26d55e52ce0462fb8b4081880a0f" kindref="member">ln2_rstd</ref><sp/>+<sp/>token_slot)<sp/>:<sp/>&amp;ln2_rstd_tmp;</highlight></codeline>
+<codeline lineno="209"><highlight class="normal"></highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>ln1_row[aligned_D];</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"></highlight></codeline>
+<codeline lineno="212"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>(input_row,</highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a4a3337a600f787d4b2fe9ab83f7594c9" kindref="member">ln1_gamma</ref>,</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ln1_row,</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;ln1_rstd_tmp,</highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,</highlight></codeline>
+<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>D,</highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a63e37652b3bb5e0d394ea70af0895595" kindref="member">eps</ref>);</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>q_elems<sp/>=<sp/>(size_t)H<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)ad;</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>kv_elems<sp/>=<sp/>(size_t)H_kv<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)ad;</highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>q_token[q_elems];</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>k_token[kv_elems];</highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>v_token[kv_elems];</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>attn_token[q_elems];</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"></highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="attention__decode__fused_8c_1ab6c6524b0f30733a077e3783bb55a592" kindref="member">ck_qkv_project_head_major_token</ref>(ln1_row,</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a621ed21298acc47932068d4a97ba72d7" kindref="member">wq</ref>,<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a1002972e750e6b75ba1151cc4de47a05" kindref="member">bq</ref>,</highlight></codeline>
+<codeline lineno="230"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a14ca061d781c1ed9631ff94df3e6278b" kindref="member">wk</ref>,<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a7e508ab8ae215c31fbae4f78b23d5929" kindref="member">bk</ref>,</highlight></codeline>
+<codeline lineno="231"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a7e8ccf20ccec87eb230737334d589f5d" kindref="member">wv</ref>,<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ab2e6f98706c4822473bee01a6b4c46d6" kindref="member">bv</ref>,</highlight></codeline>
+<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>q_token,<sp/>k_token,<sp/>v_token,</highlight></codeline>
+<codeline lineno="233"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="234"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H,</highlight></codeline>
+<codeline lineno="235"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H_kv,</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ad);</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"></highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(p-&gt;<ref refid="structCKLayerForwardParams_1a3be9a0f9fae1ab8fddc30e14628d74a0" kindref="member">rope_cos</ref><sp/>&amp;&amp;<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a332fc12fb11a99adfd72dba034c56ea7" kindref="member">rope_sin</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="239"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1ab18869516e9a6ab5998038716ac8a179" kindref="member">rope_forward_qk</ref>(q_token,</highlight></codeline>
+<codeline lineno="240"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>k_token,</highlight></codeline>
+<codeline lineno="241"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a3be9a0f9fae1ab8fddc30e14628d74a0" kindref="member">rope_cos</ref>,</highlight></codeline>
+<codeline lineno="242"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a332fc12fb11a99adfd72dba034c56ea7" kindref="member">rope_sin</ref>,</highlight></codeline>
+<codeline lineno="243"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H,</highlight></codeline>
+<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H_kv,</highlight></codeline>
+<codeline lineno="245"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*num_tokens=*/</highlight><highlight class="normal">1,</highlight></codeline>
+<codeline lineno="246"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hd,</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ad,</highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ad0e18a97d0cd2746890333bcc2d0d0e1" kindref="member">rope_pos_offset</ref>);</highlight></codeline>
+<codeline lineno="249"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="250"><highlight class="normal"></highlight></codeline>
+<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a6add8eaed40b7a32a537cf4cffb39709" kindref="member">kv_cache_write_head_major</ref>(k_token,</highlight></codeline>
+<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_token,</highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ac4abe1c97c14c49d953ae5dd8f910c96" kindref="member">k</ref>,</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ac49cad0850ce2e111044fc2114783d16" kindref="member">v</ref>,</highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H_kv,</highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>token_index,</highlight></codeline>
+<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cache_capacity,</highlight></codeline>
+<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hd,</highlight></codeline>
+<codeline lineno="259"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ad);</highlight></codeline>
+<codeline lineno="260"><highlight class="normal"></highlight></codeline>
+<codeline lineno="261"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a935728e009d1712976ed3cff71f50387" kindref="member">attention_forward_decode_head_major_gqa_regular</ref>(q_token,</highlight></codeline>
+<codeline lineno="262"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ac4abe1c97c14c49d953ae5dd8f910c96" kindref="member">k</ref>,</highlight></codeline>
+<codeline lineno="263"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ac49cad0850ce2e111044fc2114783d16" kindref="member">v</ref>,</highlight></codeline>
+<codeline lineno="264"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>attn_token,</highlight></codeline>
+<codeline lineno="265"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H,</highlight></codeline>
+<codeline lineno="266"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H_kv,</highlight></codeline>
+<codeline lineno="267"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*kv_tokens=*/</highlight><highlight class="normal">token_index<sp/>+<sp/>1,</highlight></codeline>
+<codeline lineno="268"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cache_capacity,</highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hd,</highlight></codeline>
+<codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ad);</highlight></codeline>
+<codeline lineno="271"><highlight class="normal"></highlight></codeline>
+<codeline lineno="272"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="attention__decode__fused_8c_1a606857bd1c4a89fc378a6787ce01d348" kindref="member">ck_attention_project_head_major_decode_token_residual</ref>(attn_token,</highlight></codeline>
+<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a98753685d03e778a1d655f8f3cd486ea" kindref="member">wo</ref>,</highlight></codeline>
+<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1ae1e3ff68d1bc957125df225fec96dcc2" kindref="member">bo</ref>,</highlight></codeline>
+<codeline lineno="275"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>input_row,</highlight></codeline>
+<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>proj_row,</highlight></codeline>
+<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>residual_row,</highlight></codeline>
+<codeline lineno="278"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>D,</highlight></codeline>
+<codeline lineno="279"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="280"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>H,</highlight></codeline>
+<codeline lineno="281"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ad);</highlight></codeline>
+<codeline lineno="282"><highlight class="normal"></highlight></codeline>
+<codeline lineno="283"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>(residual_row,</highlight></codeline>
+<codeline lineno="284"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1aace627c9eb6644fac5c3fc5a4748f1f4" kindref="member">ln2_gamma</ref>,</highlight></codeline>
+<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ln2_row,</highlight></codeline>
+<codeline lineno="286"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>ln2_rstd,</highlight></codeline>
+<codeline lineno="287"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,</highlight></codeline>
+<codeline lineno="288"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>D,</highlight></codeline>
+<codeline lineno="289"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="290"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a63e37652b3bb5e0d394ea70af0895595" kindref="member">eps</ref>);</highlight></codeline>
+<codeline lineno="291"><highlight class="normal"></highlight></codeline>
+<codeline lineno="292"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fuse_mlp)<sp/>{</highlight></codeline>
+<codeline lineno="293"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Fully<sp/>fused<sp/>MLP<sp/>avoids<sp/>writing<sp/>SwiGLU<sp/>activations<sp/>to<sp/>DRAM<sp/>(aligned<sp/>dims</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>match<sp/>padded<sp/>weight<sp/>layout).</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__orchestration_8h_1a6aaebd943ca5ad278729a207b401ab45" kindref="member">ck_mlp_swiglu_forward_fully_fused_token</ref>(ln2_row,</highlight></codeline>
+<codeline lineno="296"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a72a52720f195370d45e7cc00a6985651" kindref="member">w1</ref>,</highlight></codeline>
+<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a8b216d5540d147750b5b7d6ebe238445" kindref="member">b1</ref>,</highlight></codeline>
+<codeline lineno="298"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a070376c4c42bb40d7cdd919ea74c669b" kindref="member">w2</ref>,</highlight></codeline>
+<codeline lineno="299"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1acc91fa02742733363b55e38ff2305e7f" kindref="member">b2</ref>,</highlight></codeline>
+<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>mlp_row,</highlight></codeline>
+<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="302"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_intermediate);</highlight></codeline>
+<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>up_dim<sp/>=<sp/>2<sp/>*<sp/>aligned_intermediate;</highlight></codeline>
+<codeline lineno="305"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*fc1_row<sp/>=<sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a7ca0c2bd14cfcde3504bd43030609e4b" kindref="member">fc1_out</ref><sp/>+<sp/>token_slot<sp/>*<sp/>(size_t)up_dim;</highlight></codeline>
+<codeline lineno="306"><highlight class="normal"></highlight></codeline>
+<codeline lineno="307"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__orchestration_8h_1a2e894b79792aaf694427446c1d89fab8" kindref="member">ck_mlp_swiglu_forward</ref>(ln2_row,</highlight></codeline>
+<codeline lineno="308"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a72a52720f195370d45e7cc00a6985651" kindref="member">w1</ref>,</highlight></codeline>
+<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a8b216d5540d147750b5b7d6ebe238445" kindref="member">b1</ref>,</highlight></codeline>
+<codeline lineno="310"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1a070376c4c42bb40d7cdd919ea74c669b" kindref="member">w2</ref>,</highlight></codeline>
+<codeline lineno="311"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p-&gt;<ref refid="structCKLayerForwardParams_1acc91fa02742733363b55e38ff2305e7f" kindref="member">b2</ref>,</highlight></codeline>
+<codeline lineno="312"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fc1_row,</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>swiglu_row,</highlight></codeline>
+<codeline lineno="314"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>mlp_row,</highlight></codeline>
+<codeline lineno="315"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,</highlight></codeline>
+<codeline lineno="316"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D,</highlight></codeline>
+<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_intermediate);</highlight></codeline>
+<codeline lineno="318"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="319"><highlight class="normal"></highlight></codeline>
+<codeline lineno="320"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__orchestration_8h_1ab0948def8f4a6c6fd8a5288aacd22f01" kindref="member">ck_residual_add_token_major</ref>(residual_row,</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>mlp_row,</highlight></codeline>
+<codeline lineno="322"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_row,</highlight></codeline>
+<codeline lineno="323"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*tokens=*/</highlight><highlight class="normal">1,</highlight></codeline>
+<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>aligned_D);</highlight></codeline>
+<codeline lineno="325"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="326"><highlight class="normal"></highlight></codeline>
+<codeline lineno="327" refid="ckernel__orchestration_8h_1ad466e4eeb1c0ab92d9c9bf15cb51f679" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1ad466e4eeb1c0ab92d9c9bf15cb51f679" kindref="member">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref><sp/>*p,</highlight></codeline>
+<codeline lineno="328"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>token_index,</highlight></codeline>
+<codeline lineno="329"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_capacity)</highlight></codeline>
+<codeline lineno="330"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="331"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" kindref="member">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</ref>(p,</highlight></codeline>
+<codeline lineno="332"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>token_index,</highlight></codeline>
+<codeline lineno="333"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cache_capacity,</highlight></codeline>
+<codeline lineno="334"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*fuse_mlp=*/</highlight><highlight class="normal">0);</highlight></codeline>
+<codeline lineno="335"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="336"><highlight class="normal"></highlight></codeline>
+<codeline lineno="337" refid="ckernel__orchestration_8h_1a50899fc552648f5d1cadd0e4c5671dc1" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="attention__decode__fused_8c_1a50899fc552648f5d1cadd0e4c5671dc1" kindref="member">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKLayerForwardParams" kindref="compound">CKLayerForwardParams</ref><sp/>*p,</highlight></codeline>
+<codeline lineno="338"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>token_index,</highlight></codeline>
+<codeline lineno="339"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>cache_capacity)</highlight></codeline>
+<codeline lineno="340"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="341"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" kindref="member">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</ref>(p,</highlight></codeline>
+<codeline lineno="342"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>token_index,</highlight></codeline>
+<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>cache_capacity,</highlight></codeline>
+<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*fuse_mlp=*/</highlight><highlight class="normal">1);</highlight></codeline>
+<codeline lineno="345"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/attention_decode_fused.c"/>
+  </compounddef>
+</doxygen>

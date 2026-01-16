@@ -1,0 +1,754 @@
+<!-- TITLE: Memory Safety -->
+<!-- NAV: memory-safety -->
+
+<h1>Memory Safety</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Design Document</strong><br>
+        This page describes our memory safety design philosophy and planned features. Sections marked <span class="badge badge-pending">Planned</span> are not yet implemented.
+    </div>
+</div>
+
+<h2>Philosophy: Safety Through Simplicity</h2>
+
+<p>Rather than relying on language-level safety (Rust) or runtime garbage collection, C-Kernel-Engine achieves memory safety through <strong>architectural simplicity</strong>:</p>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Traditional C Problems</h3>
+        <ul>
+            <li><code>malloc</code>/<code>free</code> scattered everywhere</li>
+            <li>Use-after-free vulnerabilities</li>
+            <li>Double-free crashes</li>
+            <li>Runtime size calculations (overflow risk)</li>
+            <li>Manual pointer arithmetic</li>
+            <li>Unknown buffer boundaries</li>
+        </ul>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Our Approach</h3>
+        <ul>
+            <li>One <code>mmap</code> at start, one <code>munmap</code> at end</li>
+            <li>No frees during execution → no use-after-free</li>
+            <li>Nothing to double-free</li>
+            <li>All sizes from config at codegen time</li>
+            <li>Pre-computed offsets, no pointer math</li>
+            <li>Every buffer size baked into generated code</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Memory Allocation Hierarchy</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Why Huge Pages?</strong><br>
+        A 540MB model needs 138,240 TLB entries with 4KB pages, but only 270 entries with 2MB huge pages. Fewer TLB misses = faster memory access.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The Fallback Hierarchy</h3>
+    <pre>void *ck_huge_alloc(size_t bytes)
+{
+    size_t len = align_up_bytes(bytes, HUGE_PAGE_SIZE);  // 2MB alignment
+
+    // 1. Try explicit huge pages (best performance)
+    void *p = mmap(NULL, len,
+                   PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
+                   -1, 0);
+    if (p != MAP_FAILED) {
+        return p;  // Got 2MB pages directly from kernel
+    }
+
+    // 2. Fallback: aligned_alloc + transparent huge page hint
+    void *q = aligned_alloc(HUGE_PAGE_SIZE, len);
+    if (!q) return NULL;
+
+    // 3. Hint to kernel: please use huge pages if possible
+    madvise(q, len, MADV_HUGEPAGE);
+    return q;
+}</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 1: MAP_HUGETLB (Explicit Huge Pages)</h3>
+    <p><strong>What it does:</strong> Requests 2MB pages directly from the kernel's hugepage pool.</p>
+    <p><strong>Requirements:</strong></p>
+    <pre># Reserve 1GB of huge pages (512 × 2MB)
+echo 512 | sudo tee /proc/sys/vm/nr_hugepages
+
+# Or make permanent in /etc/sysctl.conf
+vm.nr_hugepages = 512</pre>
+    <p><strong>Why it's best:</strong> Guaranteed 2MB pages, lowest TLB pressure, physically contiguous memory.</p>
+    <p><strong>When it fails:</strong> No huge pages reserved, or pool exhausted.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 2: aligned_alloc + madvise(MADV_HUGEPAGE)</h3>
+    <p><strong>What it does:</strong> Allocates 2MB-aligned memory, then hints to kernel to use Transparent Huge Pages (THP).</p>
+    <pre>// Allocate with 2MB alignment
+void *q = aligned_alloc(2 * 1024 * 1024, len);
+
+// Tell kernel: "I'd like huge pages here please"
+madvise(q, len, MADV_HUGEPAGE);</pre>
+    <p><strong>How THP works:</strong> Kernel can promote 4KB pages to 2MB pages in the background (khugepaged daemon).</p>
+    <p><strong>Trade-off:</strong> Not guaranteed, may take time to promote, but works without root.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 3: Regular 4KB Pages (Implicit Fallback)</h3>
+    <p>If <code>madvise</code> hint is ignored, you get regular pages. Still works, just more TLB pressure.</p>
+</div>
+
+<h2>Understanding THP and madvise</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>THP = Transparent Huge Pages</strong><br>
+        A Linux kernel feature that automatically promotes 4KB pages to 2MB pages. <code>madvise()</code> is how you tell the kernel which memory regions to promote.
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">THP Modes</h3>
+    <pre># Check current mode
+cat /sys/kernel/mm/transparent_hugepage/enabled
+# [always] madvise never</pre>
+    <table>
+        <tr>
+            <th>Mode</th>
+            <th>Behavior</th>
+            <th>madvise needed?</th>
+            <th>Recommendation</th>
+        </tr>
+        <tr>
+            <td><code>always</code></td>
+            <td>Kernel promotes ALL allocations</td>
+            <td>No, automatic</td>
+            <td>Can cause stalls</td>
+        </tr>
+        <tr>
+            <td><code>madvise</code></td>
+            <td>Only promotes if you hint</td>
+            <td>Yes, you must call it</td>
+            <td>Best for production</td>
+        </tr>
+        <tr>
+            <td><code>never</code></td>
+            <td>THP disabled entirely</td>
+            <td>N/A, ignored</td>
+            <td>Use explicit hugepages</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">How THP Modes Affect Your Code</h3>
+    <pre>// Your allocation:
+void *q = aligned_alloc(2MB, 100MB);
+madvise(q, 100MB, MADV_HUGEPAGE);
+
+// What happens next depends on THP mode:</pre>
+
+    <div class="grid grid-3">
+        <div class="card" style="margin-bottom: 0;">
+            <h4 style="margin-top: 0; color: var(--orange);">mode = "always"</h4>
+            <p style="font-size: 0.85rem;">Kernel already trying to promote everything. Your <code>madvise</code> is redundant but harmless.</p>
+        </div>
+        <div class="card" style="margin-bottom: 0;">
+            <h4 style="margin-top: 0; color: var(--green);">mode = "madvise"</h4>
+            <p style="font-size: 0.85rem;">Kernel marks your region for promotion. <code>khugepaged</code> will promote it in background.</p>
+        </div>
+        <div class="card" style="margin-bottom: 0;">
+            <h4 style="margin-top: 0; color: var(--text-muted);">mode = "never"</h4>
+            <p style="font-size: 0.85rem;">THP disabled. Your <code>madvise</code> is ignored. Stays as 4KB pages.</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Timeline: What Actually Happens</h3>
+    <pre>Time 0ms:    aligned_alloc(100MB)
+             → Kernel allocates 25,600 × 4KB pages
+
+Time 0ms:    madvise(ptr, 100MB, MADV_HUGEPAGE)
+             → Kernel marks region: "promote this when possible"
+
+Time 1ms:    Your code continues running...
+             → Still using 4KB pages, TLB pressure is high
+
+Time 100ms:  khugepaged daemon wakes up
+             → Scans memory for marked regions
+
+Time 150ms:  khugepaged finds your region
+             → Merges 512 × 4KB pages into 1 × 2MB page
+             → Repeats until region is fully promoted
+
+Time 200ms+: Your code now using 2MB pages
+             → TLB pressure reduced 512×</pre>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Recommended: Use "madvise" Mode</h3>
+    <pre># Set system to madvise mode
+echo madvise | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+
+# Make permanent in /etc/rc.local or systemd service</pre>
+    <p><strong>Why madvise mode is best:</strong></p>
+    <ul>
+        <li><code>always</code> → kernel tries to promote everything, causes random stalls</li>
+        <li><code>madvise</code> → you control exactly which allocations get huge pages</li>
+        <li>Your model memory → promoted (you called madvise)</li>
+        <li>Small temp buffers → left as 4KB (no overhead)</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Complete Allocation Flow</h3>
+    <pre>void *ck_huge_alloc(size_t bytes)
+{
+    // ATTEMPT 1: Explicit huge pages
+    // Bypasses THP entirely - goes directly to kernel's hugepage pool
+    void *p = mmap(..., MAP_HUGETLB);
+    if (p != MAP_FAILED) {
+        return p;  // Got guaranteed 2MB pages, done!
+    }
+
+    // ATTEMPT 2: Regular allocation + THP hint
+    void *q = aligned_alloc(2MB, len);  // Initially 4KB pages
+
+    madvise(q, len, MADV_HUGEPAGE);     // Hint to kernel
+    // ↓
+    // If THP="always"  → already being promoted, hint redundant
+    // If THP="madvise" → khugepaged will promote in background
+    // If THP="never"   → stays 4KB, hint ignored
+
+    return q;
+}</pre>
+</div>
+
+<table>
+    <tr>
+        <th>Method</th>
+        <th>Page Size</th>
+        <th>TLB Entries (540MB)</th>
+        <th>Requirements</th>
+        <th>Status</th>
+    </tr>
+    <tr>
+        <td><code>MAP_HUGETLB</code></td>
+        <td>2MB</td>
+        <td>270</td>
+        <td>Hugepages reserved</td>
+        <td><span class="badge badge-implemented">Implemented</span></td>
+    </tr>
+    <tr>
+        <td><code>madvise(MADV_HUGEPAGE)</code></td>
+        <td>2MB (if promoted)</td>
+        <td>270 (best case)</td>
+        <td>THP enabled</td>
+        <td><span class="badge badge-implemented">Implemented</span></td>
+    </tr>
+    <tr>
+        <td>Regular mmap</td>
+        <td>4KB</td>
+        <td>138,240</td>
+        <td>None</td>
+        <td>Fallback</td>
+    </tr>
+</table>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Why This Hierarchy Works</h3>
+    <ol>
+        <li><strong>Best case (production):</strong> Pre-reserve huge pages → <code>MAP_HUGETLB</code> succeeds → maximum performance</li>
+        <li><strong>Development:</strong> No reservation → THP kicks in → good performance without root</li>
+        <li><strong>Worst case:</strong> Everything falls back to 4KB → still correct, just slower</li>
+    </ol>
+    <p>The model always works. Performance scales with what the system provides.</p>
+</div>
+
+<h2>Production Tuning: Squeezing Every Ounce</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Hidden Truth</strong><br>
+        When you buy NVIDIA GPUs, all this tuning is done for you. VRAM, TLB, memory channels - all optimized by NVIDIA engineers. For CPU inference, <em>you</em> are the systems engineer.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">1GB Huge Pages for Large Models</h3>
+    <p>For models &gt;1GB, use 1GB huge pages instead of 2MB:</p>
+    <pre># Check if 1GB pages are supported
+grep pdpe1gb /proc/cpuinfo
+
+# Reserve 1GB huge pages (requires reboot or boot param)
+# In /etc/default/grub:
+GRUB_CMDLINE_LINUX="hugepagesz=1G hugepages=16 default_hugepagesz=1G"
+
+# Or at runtime (if supported):
+echo 16 | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages</pre>
+    <table>
+        <tr>
+            <th>Model Size</th>
+            <th>2MB Pages</th>
+            <th>1GB Pages</th>
+            <th>TLB Improvement</th>
+        </tr>
+        <tr>
+            <td>7B (28GB)</td>
+            <td>14,336 entries</td>
+            <td>28 entries</td>
+            <td>512× fewer</td>
+        </tr>
+        <tr>
+            <td>70B (280GB)</td>
+            <td>143,360 entries</td>
+            <td>280 entries</td>
+            <td>512× fewer</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">DDR Channel Awareness</h3>
+    <p>Modern CPUs have multiple DDR channels (4-8 on server chips). Each channel provides ~25-50 GB/s bandwidth.</p>
+    <pre># Check memory topology
+lsmem
+numactl --hardware
+dmidecode -t memory | grep -E "Size|Locator"</pre>
+    <p><strong>Why it matters:</strong> A 12GB model allocation with 1GB huge pages gets physically contiguous memory. The kernel can place each 1GB page on a different DDR channel, maximizing bandwidth.</p>
+    <p><strong>Goal:</strong> Spread memory across all channels, not concentrated on one.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">NUMA and Core Pinning</h3>
+    <p>Multi-socket servers have Non-Uniform Memory Access. Memory is "local" or "remote" to each CPU.</p>
+    <pre># Run on specific NUMA node (memory + CPU affinity)
+numactl --cpunodebind=0 --membind=0 ./model
+
+# Or pin to specific cores
+taskset -c 0-15 ./model
+
+# In code: set thread affinity
+#define _GNU_SOURCE
+#include &lt;sched.h&gt;
+cpu_set_t cpuset;
+CPU_ZERO(&cpuset);
+CPU_SET(0, &cpuset);  // Pin to core 0
+pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);</pre>
+    <p><strong>Rule:</strong> Keep threads and their memory on the same NUMA node. Remote memory access is 2-3× slower.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Model Size → System Tuning Guide</h3>
+    <table>
+        <tr>
+            <th>Model</th>
+            <th>Memory</th>
+            <th>Huge Pages</th>
+            <th>NUMA</th>
+            <th>Cores</th>
+        </tr>
+        <tr>
+            <td>SmolLM-135M</td>
+            <td>~540MB</td>
+            <td>2MB sufficient</td>
+            <td>Single node</td>
+            <td>4-8 cores</td>
+        </tr>
+        <tr>
+            <td>Llama-7B</td>
+            <td>~28GB</td>
+            <td>1GB recommended</td>
+            <td>Single node</td>
+            <td>16-32 cores</td>
+        </tr>
+        <tr>
+            <td>Llama-70B</td>
+            <td>~280GB</td>
+            <td>1GB required</td>
+            <td>Multi-node, pin carefully</td>
+            <td>All cores, both sockets</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Production Checklist</h3>
+    <pre>#!/bin/bash
+# production_setup.sh - Run before deploying model
+
+MODEL_GB=$1  # e.g., 28 for 7B model
+
+# 1. Reserve 1GB huge pages (need MODEL_GB + buffer)
+PAGES=$((MODEL_GB + 4))
+echo $PAGES | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+
+# 2. Disable THP compaction (avoid latency spikes)
+echo never | sudo tee /sys/kernel/mm/transparent_hugepage/defrag
+
+# 3. Set CPU governor to performance
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    echo performance | sudo tee $cpu
+done
+
+# 4. Disable swap (avoid page-out during inference)
+sudo swapoff -a
+
+# 5. Check NUMA topology
+numactl --hardware
+
+echo "System ready for ${MODEL_GB}GB model"</pre>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Theoretical Limits</strong><br>
+        With proper tuning, CPU inference can approach theoretical memory bandwidth limits. A DDR5 system with 8 channels at 4800 MT/s provides ~300 GB/s. For a memory-bound 7B model at 2 bytes/param, that's ~50 tokens/second theoretical max. Tuning gets you close; without it, you're at 10-20%.
+    </div>
+</div>
+
+<h2>Bump Allocator: Why It's Safer</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Single Contiguous Memory Block</h3>
+    <pre>// At startup: one allocation
+void *memory = mmap(NULL, total_bytes, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+// All buffers are offsets into this block
+float *token_emb = (float*)(memory + m->token_emb_offset);
+float *q = (float*)(memory + layer->q_offset);
+float *k = (float*)(memory + layer->k_offset);
+
+// At shutdown: one deallocation
+munmap(memory, total_bytes);</pre>
+    <p>No malloc/free during model execution. No fragmentation. No leaks possible.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">All Sizes Known at Codegen Time</h3>
+    <pre>// Generated at codegen time - not runtime
+m->q_offset = 1048576;      // Computed from config
+m->q_size = 786432;         // num_heads × tokens × head_dim × sizeof(float)
+m->k_offset = 1835008;      // q_offset + q_size + alignment
+m->k_size = 262144;         // num_kv_heads × tokens × head_dim × sizeof(float)</pre>
+    <p>Buffer sizes come from model config. No runtime calculations that could overflow.</p>
+</div>
+
+<h2>Defense in Depth</h2>
+
+<table>
+    <tr>
+        <th>Layer</th>
+        <th>Protection</th>
+        <th>Status</th>
+    </tr>
+    <tr>
+        <td>Architecture</td>
+        <td>Bump allocator, no dynamic allocation</td>
+        <td><span class="badge badge-implemented">Implemented</span></td>
+    </tr>
+    <tr>
+        <td>Codegen</td>
+        <td>All offsets/sizes computed from config</td>
+        <td><span class="badge badge-implemented">Implemented</span></td>
+    </tr>
+    <tr>
+        <td>Testing</td>
+        <td>PyTorch parity tests catch logic errors</td>
+        <td><span class="badge badge-implemented">Implemented</span></td>
+    </tr>
+    <tr>
+        <td>Canaries</td>
+        <td>Guard values between buffers</td>
+        <td><span class="badge badge-pending">Planned</span></td>
+    </tr>
+    <tr>
+        <td>Bounds Checking</td>
+        <td>Debug-mode index validation</td>
+        <td><span class="badge badge-pending">Planned</span></td>
+    </tr>
+    <tr>
+        <td>Static Analysis</td>
+        <td>Automated cppcheck/scan-build</td>
+        <td><span class="badge badge-pending">Planned</span></td>
+    </tr>
+    <tr>
+        <td>Sanitizers</td>
+        <td>AddressSanitizer in CI</td>
+        <td><span class="badge badge-pending">Planned</span></td>
+    </tr>
+    <tr>
+        <td>Layout Verification</td>
+        <td>Script to verify no buffer overlap</td>
+        <td><span class="badge badge-pending">Planned</span></td>
+    </tr>
+</table>
+
+<h2><span class="badge badge-pending">Planned</span> Canary System</h2>
+
+<p>Guard values placed between buffers to detect overflow at runtime:</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Canary Placement</h3>
+    <pre>// Memory layout with canaries (debug builds)
+// [CANARY][token_emb][CANARY][pos_emb][CANARY][q][CANARY][k][CANARY]...
+
+#define CANARY_VALUE 0xDEADBEEFCAFEBABE
+#define CANARY_SIZE 64  // one cacheline
+
+static size_t bump_with_canary(size_t *off, size_t bytes) {
+    // Canary before
+    write_canary(base + *off);
+    *off += CANARY_SIZE;
+
+    size_t data_offset = *off;
+    *off += align64(bytes);
+
+    // Canary after
+    write_canary(base + *off);
+    *off += CANARY_SIZE;
+
+    return data_offset;
+}</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Canary Verification</h3>
+    <pre>void ck_verify_memory_integrity(const TransformerModel *m) {
+    const uint8_t *base = m->memory_base;
+
+    for (int i = 0; i < m->num_buffers; i++) {
+        CKBufferInfo *buf = &m->buffers[i];
+
+        // Check canary before buffer
+        uint64_t *before = (uint64_t*)(base + buf->offset - CANARY_SIZE);
+        if (*before != CANARY_VALUE) {
+            fprintf(stderr, "UNDERFLOW detected: buffer '%s' at offset %zu\n",
+                    buf->name, buf->offset);
+            abort();
+        }
+
+        // Check canary after buffer
+        uint64_t *after = (uint64_t*)(base + buf->offset + buf->size);
+        if (*after != CANARY_VALUE) {
+            fprintf(stderr, "OVERFLOW detected: buffer '%s' at offset %zu\n",
+                    buf->name, buf->offset);
+            abort();
+        }
+    }
+}</pre>
+</div>
+
+<h2><span class="badge badge-pending">Planned</span> Bounds-Checked Access</h2>
+
+<p>Optional bounds checking in debug builds:</p>
+
+<div class="card">
+    <pre>#ifdef CK_DEBUG_BOUNDS
+
+#define CK_LOAD(buf, idx, max) ck_load_checked(buf, idx, max, __FILE__, __LINE__)
+#define CK_STORE(buf, idx, max, val) ck_store_checked(buf, idx, max, val, __FILE__, __LINE__)
+
+static inline float ck_load_checked(const float *buf, size_t idx, size_t max,
+                                     const char *file, int line) {
+    if (idx >= max) {
+        fprintf(stderr, "%s:%d: OUT OF BOUNDS READ: idx=%zu, max=%zu\n",
+                file, line, idx, max);
+        abort();
+    }
+    return buf[idx];
+}
+
+static inline void ck_store_checked(float *buf, size_t idx, size_t max, float val,
+                                     const char *file, int line) {
+    if (idx >= max) {
+        fprintf(stderr, "%s:%d: OUT OF BOUNDS WRITE: idx=%zu, max=%zu\n",
+                file, line, idx, max);
+        abort();
+    }
+    buf[idx] = val;
+}
+
+#else
+
+#define CK_LOAD(buf, idx, max) ((buf)[idx])
+#define CK_STORE(buf, idx, max, val) ((buf)[idx] = (val))
+
+#endif</pre>
+</div>
+
+<h2><span class="badge badge-pending">Planned</span> Verification Script</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">verify_memory_safety.sh</h3>
+    <pre>#!/bin/bash
+set -e
+
+echo "=== C-Kernel-Engine Memory Safety Verification ==="
+
+# 1. Static Analysis
+echo "[1/5] Running static analysis..."
+cppcheck --enable=all --error-exitcode=1 src/kernels/*.c
+scan-build -o /tmp/scan-build make clean all
+
+# 2. Verify buffer layout (no overlaps)
+echo "[2/5] Verifying buffer layout..."
+./build/ck_layout_check --config test/configs/smollm-135m.json
+
+# 3. Build with AddressSanitizer
+echo "[3/5] Building with AddressSanitizer..."
+make clean
+CFLAGS="-fsanitize=address -g -O1" make all
+
+# 4. Run tests with ASAN
+echo "[4/5] Running tests with AddressSanitizer..."
+./build/test_all
+
+# 5. Valgrind check
+echo "[5/5] Running Valgrind..."
+valgrind --leak-check=full --error-exitcode=1 ./build/test_orchestration
+
+echo "=== All memory safety checks passed ==="</pre>
+</div>
+
+<h2><span class="badge badge-pending">Planned</span> Layout Verification</h2>
+
+<p>Compile-time verification that buffers don't overlap:</p>
+
+<div class="card">
+    <pre>int ck_verify_layout(const TransformerModel *m) {
+    // Sort buffers by offset
+    CKBufferRange ranges[MAX_BUFFERS];
+    int n = collect_buffer_ranges(m, ranges);
+    qsort(ranges, n, sizeof(CKBufferRange), compare_by_offset);
+
+    // Check for overlaps
+    for (int i = 0; i < n - 1; i++) {
+        size_t end_i = ranges[i].offset + ranges[i].size;
+        size_t start_next = ranges[i + 1].offset;
+
+        if (end_i > start_next) {
+            fprintf(stderr, "OVERLAP: '%s' [%zu-%zu] overlaps '%s' [%zu-%zu]\n",
+                    ranges[i].name, ranges[i].offset, end_i,
+                    ranges[i+1].name, start_next,
+                    ranges[i+1].offset + ranges[i+1].size);
+            return -1;
+        }
+    }
+
+    // Verify total doesn't exceed allocation
+    size_t last_end = ranges[n-1].offset + ranges[n-1].size;
+    if (last_end > m->total_bytes) {
+        fprintf(stderr, "OVERFLOW: buffers extend to %zu but only %zu allocated\n",
+                last_end, m->total_bytes);
+        return -1;
+    }
+
+    return 0;  // Layout is valid
+}</pre>
+</div>
+
+<h2>Rust Comparison</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Different Approaches, Same Goal</strong><br>
+        Rust prevents memory errors at compile time. We prevent them through architectural constraints + runtime verification.
+    </div>
+</div>
+
+<table>
+    <tr>
+        <th>Aspect</th>
+        <th>Rust</th>
+        <th>C-Kernel-Engine</th>
+    </tr>
+    <tr>
+        <td>Safety guarantee</td>
+        <td>Compile-time (borrow checker)</td>
+        <td>Design-time + runtime verification</td>
+    </tr>
+    <tr>
+        <td>Dynamic allocation</td>
+        <td>Safe via ownership</td>
+        <td>Eliminated entirely (bump allocator)</td>
+    </tr>
+    <tr>
+        <td>Buffer bounds</td>
+        <td>Checked by default</td>
+        <td>Sizes baked in at codegen + optional runtime checks</td>
+    </tr>
+    <tr>
+        <td>Post-compile tampering</td>
+        <td>Vulnerable (binary can be modified)</td>
+        <td>Vulnerable (same)</td>
+    </tr>
+    <tr>
+        <td>Auditability</td>
+        <td>Requires Rust expertise</td>
+        <td>Simple C, one memory block, predictable layout</td>
+    </tr>
+</table>
+
+<h2>Guiding Principles</h2>
+
+<div class="grid grid-3">
+    <div class="card">
+        <h3 style="margin-top: 0;">1. Don't Touch Generated Code</h3>
+        <p>The generated <code>model.c</code> comes from tested kernels. Manual edits introduce risk.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">2. Trust the Config</h3>
+        <p>All sizes derived from <code>config.json</code>. If config is valid, layout is valid.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">3. Verify, Don't Assume</h3>
+        <p>Canaries, bounds checks, and layout verification catch errors early.</p>
+    </div>
+</div>
+
+<style>
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.badge-implemented {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    border: 1px solid #22c55e;
+}
+.badge-pending {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
+}
+</style>

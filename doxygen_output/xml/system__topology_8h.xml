@@ -1,0 +1,1363 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="system__topology_8h" kind="file" language="C++">
+    <compoundname>system_topology.h</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdbool.h</includes>
+    <includedby refid="show__config_8c" local="yes">show_config.c</includedby>
+    <includedby refid="system__topology_8c" local="yes">system_topology.c</includedby>
+    <incdepgraph>
+      <node id="3">
+        <label>stdbool.h</label>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>system_topology.h</label>
+        <link refid="system__topology_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="2">
+        <label>show_config.c</label>
+        <link refid="show__config_8c"/>
+      </node>
+      <node id="3">
+        <label>system_topology.c</label>
+        <link refid="system__topology_8c"/>
+      </node>
+      <node id="1">
+        <label>system_topology.h</label>
+        <link refid="system__topology_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structAffinityInfo" prot="public">AffinityInfo</innerclass>
+    <innerclass refid="structCacheInfo" prot="public">CacheInfo</innerclass>
+    <innerclass refid="structCacheTopology" prot="public">CacheTopology</innerclass>
+    <innerclass refid="structCPUInfo" prot="public">CPUInfo</innerclass>
+    <innerclass refid="structMemoryInfo" prot="public">MemoryInfo</innerclass>
+    <innerclass refid="structMemorySlot" prot="public">MemorySlot</innerclass>
+    <innerclass refid="structNetworkInterface" prot="public">NetworkInterface</innerclass>
+    <innerclass refid="structNetworkTopology" prot="public">NetworkTopology</innerclass>
+    <innerclass refid="structNUMANode" prot="public">NUMANode</innerclass>
+    <innerclass refid="structNUMATopology" prot="public">NUMATopology</innerclass>
+    <innerclass refid="structPCIeDevice" prot="public">PCIeDevice</innerclass>
+    <innerclass refid="structPCIeTopology" prot="public">PCIeTopology</innerclass>
+    <innerclass refid="structRecommendation" prot="public">Recommendation</innerclass>
+    <innerclass refid="structRecommendationList" prot="public">RecommendationList</innerclass>
+    <innerclass refid="structSystemTopology" prot="public">SystemTopology</innerclass>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="system__topology_8h_1a5a07324805d0e6b5535ccfd66a198a43" prot="public" static="no">
+        <name>MAX_CACHE_LEVELS</name>
+        <initializer>4</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="24" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="24" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" prot="public" static="no">
+        <name>MAX_CPUS</name>
+        <initializer>256</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="23" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="23" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1a653d809668c0f9aed5323a47614f16b5" prot="public" static="no">
+        <name>MAX_MEMORY_SLOTS</name>
+        <initializer>16</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="27" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="27" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1ab44d92c45e9155a2b343f0372630ec35" prot="public" static="no">
+        <name>MAX_NICS</name>
+        <initializer>8</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="25" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="25" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" prot="public" static="no">
+        <name>MAX_NUMA_NODES</name>
+        <initializer>8</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="22" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="22" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1aeb96e2b430111e055cfe76293dbf2258" prot="public" static="no">
+        <name>MAX_PCIE_DEVICES</name>
+        <initializer>32</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="26" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="26" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1a418478bfd80cdc978000fcd7e8ab9c28" prot="public" static="no">
+        <name>MAX_RECOMMENDATIONS</name>
+        <initializer>32</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="280" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="280" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="system__topology_8h_1a58ce36916c399104e18d32ff090f21c6" prot="public" static="no">
+        <name>MAX_STR_LEN</name>
+        <initializer>256</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="28" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="28" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="enum">
+      <memberdef kind="enum" id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446" prot="public" static="no" strong="no">
+        <type></type>
+        <name>RecommendationCategory</name>
+        <enumvalue id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a86e1aa77256345474354d36dade4c2cc" prot="public">
+          <name>REC_CATEGORY_MEMORY</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e" prot="public">
+          <name>REC_CATEGORY_CPU</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba" prot="public">
+          <name>REC_CATEGORY_NETWORK</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b" prot="public">
+          <name>REC_CATEGORY_AFFINITY</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446ab4c62d868d6055729709c1e2b51bf688" prot="public">
+          <name>REC_CATEGORY_PCIE</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="272" column="1" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="272" bodyend="278"/>
+      </memberdef>
+      <memberdef kind="enum" id="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69" prot="public" static="no" strong="no">
+        <type></type>
+        <name>RecommendationPriority</name>
+        <enumvalue id="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69aff18fa78a746a2cfe6521f96f2985d0d" prot="public">
+          <name>REC_PRIORITY_LOW</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ac060aa16ba5ff6de278ec1a69c992740" prot="public">
+          <name>REC_PRIORITY_MEDIUM</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ae2b3a4412e439de7cd932d5c9c239628" prot="public">
+          <name>REC_PRIORITY_HIGH</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ad2c44c068f9a309b584934d165738405" prot="public">
+          <name>REC_PRIORITY_CRITICAL</name>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="265" column="1" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" bodystart="265" bodyend="270"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover</definition>
+        <argsstring>(SystemTopology *topo)</argsstring>
+        <name>topology_discover</name>
+        <param>
+          <type><ref refid="structSystemTopology" kindref="compound">SystemTopology</ref> *</type>
+          <declname>topo</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="300" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="979" bodyend="1004" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="300" declcolumn="6"/>
+        <references refid="structSystemTopology_1afe211eb662869fd63bc5191d0fde7086" compoundref="system__topology_8h" startline="253">SystemTopology::affinity</references>
+        <references refid="structSystemTopology_1a5987f9ac86ee94f588a8fcfaf85d2cf7" compoundref="system__topology_8h" startline="248">SystemTopology::cache</references>
+        <references refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" compoundref="system__topology_8h" startline="247">SystemTopology::cpu</references>
+        <references refid="structSystemTopology_1aeb78a0d10978d57768a6d03e4a94497b" compoundref="system__topology_8h" startline="256">SystemTopology::has_root_access</references>
+        <references refid="structSystemTopology_1a8c3a908fdf3d9b0c50e3346a66f68a13" compoundref="system__topology_8h" startline="257">SystemTopology::hostname</references>
+        <references refid="structSystemTopology_1aea0398c023b6251b7e490f65c74edc73" compoundref="system__topology_8h" startline="258">SystemTopology::kernel_version</references>
+        <references refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" compoundref="system__topology_8h" startline="250">SystemTopology::memory</references>
+        <references refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" compoundref="system__topology_8h" startline="252">SystemTopology::network</references>
+        <references refid="structSystemTopology_1a614df36f023f6261b3819210d15a5fe7" compoundref="system__topology_8h" startline="249">SystemTopology::numa</references>
+        <references refid="structSystemTopology_1a9dcefa468bbc7aaceb4d0a8cab2d3a31" compoundref="system__topology_8h" startline="251">SystemTopology::pcie</references>
+        <references refid="system__topology_8c_1af347a49445c57e42f3d5edba2039591e" compoundref="system__topology_8c" startline="936" endline="973">topology_discover_affinity</references>
+        <references refid="system__topology_8c_1a6a740276441a137e33d3b11888bfd2da" compoundref="system__topology_8c" startline="246" endline="297">topology_discover_cache</references>
+        <references refid="system__topology_8c_1a4367943c7d4c62e0865d1171252a6b84" compoundref="system__topology_8c" startline="112" endline="221">topology_discover_cpu</references>
+        <references refid="system__topology_8c_1a349f2755a1cb7361bbbe5c729985136d" compoundref="system__topology_8c" startline="553" endline="717">topology_discover_memory</references>
+        <references refid="system__topology_8c_1a8d1095a0656548a8adae0cf8ad6a59cd" compoundref="system__topology_8c" startline="832" endline="930">topology_discover_network</references>
+        <references refid="system__topology_8c_1afd3ae767003bf9070768199caa3f7ee1" compoundref="system__topology_8c" startline="303" endline="389">topology_discover_numa</references>
+        <references refid="system__topology_8c_1a3e80c10682d58f63c4fa70b98e6a7dfb" compoundref="system__topology_8c" startline="730" endline="826">topology_discover_pcie</references>
+        <referencedby refid="show__config_8c_1a0ddf1224851353fc92bfbff6f499fa97" compoundref="show__config_8c" startline="680" endline="710">main</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1af347a49445c57e42f3d5edba2039591e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_affinity</definition>
+        <argsstring>(AffinityInfo *aff)</argsstring>
+        <name>topology_discover_affinity</name>
+        <param>
+          <type><ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref> *</type>
+          <declname>aff</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="309" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="936" bodyend="973" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="309" declcolumn="6"/>
+        <references refid="structAffinityInfo_1a905e3d4bab481748227b9b65665a82fa" compoundref="system__topology_8h" startline="238">AffinityInfo::affinity_cpus</references>
+        <references refid="structAffinityInfo_1ad7c543698d7fa66a65b006a8e16e5368" compoundref="system__topology_8h" startline="235">AffinityInfo::affinity_set</references>
+        <references refid="tokenizer_8h_1a03e2f161893f8f58a0999812d5274d2f" compoundref="tokenizer_8h" startline="216">mask</references>
+        <references refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" compoundref="system__topology_8h" startline="23">MAX_CPUS</references>
+        <references refid="structAffinityInfo_1aa8aceed4896f9d850b42199624e74f02" compoundref="system__topology_8h" startline="239">AffinityInfo::num_affinity_cpus</references>
+        <references refid="structAffinityInfo_1a335a14b8b3b93f722ef8e2b6455122f5" compoundref="system__topology_8h" startline="232">AffinityInfo::omp_num_threads</references>
+        <references refid="structAffinityInfo_1ac336f376702b1b1724111b291c9fac84" compoundref="system__topology_8h" startline="234">AffinityInfo::omp_places</references>
+        <references refid="structAffinityInfo_1aed549054fb9376cc874f3d8d710d1e89" compoundref="system__topology_8h" startline="233">AffinityInfo::omp_proc_bind</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a6a740276441a137e33d3b11888bfd2da" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_cache</definition>
+        <argsstring>(CacheTopology *cache)</argsstring>
+        <name>topology_discover_cache</name>
+        <param>
+          <type><ref refid="structCacheTopology" kindref="compound">CacheTopology</ref> *</type>
+          <declname>cache</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="304" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="246" bodyend="297" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="304" declcolumn="6"/>
+        <references refid="system__topology_8c_1a34a4d2fcf0318c8d64e4ff73e1f2e6e5" compoundref="system__topology_8c" startline="228" endline="244">cache_compare</references>
+        <references refid="system__topology_8c_1a817c234eb71a734950fee25dceb5b02b" compoundref="system__topology_8c" startline="77" endline="88">count_set_bits</references>
+        <references refid="structCacheTopology_1aad6fb272149cb50628325bed91adfa37" compoundref="system__topology_8h" startline="85">CacheTopology::l3_total_kb</references>
+        <references refid="structCacheInfo_1a2bbafb632144b03c4ac4d74fea63b438" compoundref="system__topology_8h" startline="74">CacheInfo::level</references>
+        <references refid="structCacheTopology_1a312d10896e318962d7a948eb04aaddd0" compoundref="system__topology_8h" startline="84">CacheTopology::levels</references>
+        <references refid="structCacheInfo_1a6998f8578822bdc01a41f3a9d695e7ac" compoundref="system__topology_8h" startline="77">CacheInfo::line_size_bytes</references>
+        <references refid="system__topology_8h_1a5a07324805d0e6b5535ccfd66a198a43" compoundref="system__topology_8h" startline="24">MAX_CACHE_LEVELS</references>
+        <references refid="structCacheTopology_1a7d8f011d2962b633861d25e320df4d7b" compoundref="system__topology_8h" startline="83">CacheTopology::num_levels</references>
+        <references refid="system__topology_8c_1ac3c7b781cd07570159767e034c90938a" compoundref="system__topology_8c" startline="50" endline="54">read_file_int</references>
+        <references refid="system__topology_8c_1afa3b302a31c3fe70d5a615a60d3df7f7" compoundref="system__topology_8c" startline="38" endline="48">read_file_string</references>
+        <references refid="structCacheInfo_1aefdbeadd9d601084c823c530a35e4e5c" compoundref="system__topology_8h" startline="79">CacheInfo::shared_by_cores</references>
+        <references refid="structCacheInfo_1af0d7fd2b3b6d58a409f2e91419970a87" compoundref="system__topology_8h" startline="76">CacheInfo::size_kb</references>
+        <references refid="structCacheInfo_1a2d480cc7cf9fcab61720174ffad45770" compoundref="system__topology_8h" startline="75">CacheInfo::type</references>
+        <references refid="structCacheInfo_1a9ad45f782f3a898bbd3848b8a5f52d83" compoundref="system__topology_8h" startline="78">CacheInfo::ways_of_associativity</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a4367943c7d4c62e0865d1171252a6b84" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_cpu</definition>
+        <argsstring>(CPUInfo *cpu)</argsstring>
+        <name>topology_discover_cpu</name>
+        <param>
+          <type><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref> *</type>
+          <declname>cpu</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="303" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="112" bodyend="221" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="303" declcolumn="6"/>
+        <references refid="structCPUInfo_1acfedda3a3d92c0fd6dde00f5757fdf92" compoundref="system__topology_8h" startline="47">CPUInfo::base_freq_mhz</references>
+        <references refid="structCPUInfo_1a56944d65b1cfd32ed417f22613fd3625" compoundref="system__topology_8h" startline="44">CPUInfo::cores_per_socket</references>
+        <references refid="structCPUInfo_1a943858d53173dca145611d8cb192f0ca" compoundref="system__topology_8h" startline="37">CPUInfo::family</references>
+        <references refid="structCPUInfo_1ac41947b54c3a9b315338aee3113b5714" compoundref="system__topology_8h" startline="58">CPUInfo::has_amx</references>
+        <references refid="structCPUInfo_1a7983ac279a57f5d5992248d720452dfe" compoundref="system__topology_8h" startline="61">CPUInfo::has_amx_bf16</references>
+        <references refid="structCPUInfo_1a660af436345a21868c7c6f0160cd7513" compoundref="system__topology_8h" startline="60">CPUInfo::has_amx_int8</references>
+        <references refid="structCPUInfo_1ad5a579994982f5cee575bb9674abd238" compoundref="system__topology_8h" startline="59">CPUInfo::has_amx_tile</references>
+        <references refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" compoundref="cpu__features_8h" startline="26">CPUInfo::has_avx</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structCPUInfo_1a2f0697cf41068e3a7b9acfaa03b72dc1" compoundref="system__topology_8h" startline="57">CPUInfo::has_avx512_bf16</references>
+        <references refid="structCPUInfo_1a17a91fbcd0b73af602d2504a754a1e62" compoundref="system__topology_8h" startline="55">CPUInfo::has_avx512bw</references>
+        <references refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" compoundref="cpu__features_8h" startline="28">CPUInfo::has_avx512f</references>
+        <references refid="structCPUInfo_1ac60a906dc4aaa71a6ca5453d6628fa2e" compoundref="system__topology_8h" startline="56">CPUInfo::has_avx512vl</references>
+        <references refid="system__topology_8c_1af800908eb32ad8a0e9f7886de612b66f" compoundref="system__topology_8c" startline="92" endline="106">has_cpu_flag</references>
+        <references refid="structCPUInfo_1ad3efc23f84451ced9b6085cb036ceb7d" compoundref="system__topology_8h" startline="51">CPUInfo::has_sse4_2</references>
+        <references refid="structCPUInfo_1a2d0f8aabf38b410e7242db59a3ea63ae" compoundref="system__topology_8h" startline="62">CPUInfo::has_vnni</references>
+        <references refid="tokenizer_8h_1a2708c0bbb6f926149707c2c61fe43c3e" compoundref="tokenizer_8h" startline="271">id</references>
+        <references refid="structCPUInfo_1a0a2cdfebf8fbd74229912ed3689e753b" compoundref="system__topology_8h" startline="42">CPUInfo::logical_cores</references>
+        <references refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" compoundref="system__topology_8h" startline="23">MAX_CPUS</references>
+        <references refid="structCPUInfo_1a34e7cc2aa5fd5ec5cf99828837563a61" compoundref="system__topology_8h" startline="48">CPUInfo::max_freq_mhz</references>
+        <references refid="structCPUInfo_1a934706fb3c631457a24c2616c293b20e" compoundref="system__topology_8h" startline="38">CPUInfo::model</references>
+        <references refid="structCPUInfo_1a1bb3083068d81b050ad1b9aedf28e0d1" compoundref="system__topology_8h" startline="35">CPUInfo::model_name</references>
+        <references refid="structCPUInfo_1a20091b580953be0d9a6dde8938545036" compoundref="system__topology_8h" startline="66">CPUInfo::pcie_generation</references>
+        <references refid="structCPUInfo_1aa67080f78191b764515728bdabf55924" compoundref="system__topology_8h" startline="65">CPUInfo::pcie_lanes_total</references>
+        <references refid="structCPUInfo_1a703824b64f9035d0adf5641c9d20527e" compoundref="system__topology_8h" startline="41">CPUInfo::physical_cores</references>
+        <references refid="system__topology_8c_1ac3c7b781cd07570159767e034c90938a" compoundref="system__topology_8c" startline="50" endline="54">read_file_int</references>
+        <references refid="structCPUInfo_1aef5b41cc946c52f34e354c69a66bcde3" compoundref="system__topology_8h" startline="43">CPUInfo::sockets</references>
+        <references refid="structCPUInfo_1a1f7fa60b1c2d20e0eb7bc2f780461ebb" compoundref="system__topology_8h" startline="39">CPUInfo::stepping</references>
+        <references refid="structCPUInfo_1aaf14c11cad59d839d69e7fa7e367dd05" compoundref="system__topology_8h" startline="45">CPUInfo::threads_per_core</references>
+        <references refid="system__topology_8c_1a6d93f41b7303c9e4c21b16e0ce3e858f" compoundref="system__topology_8c" startline="29" endline="36">trim_string</references>
+        <references refid="structCPUInfo_1a49e6a0b2a711e5acbb16ab29ed9da21f" compoundref="system__topology_8h" startline="36">CPUInfo::vendor</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a349f2755a1cb7361bbbe5c729985136d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_memory</definition>
+        <argsstring>(MemoryInfo *mem)</argsstring>
+        <name>topology_discover_memory</name>
+        <param>
+          <type><ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref> *</type>
+          <declname>mem</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="306" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="553" bodyend="717" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="306" declcolumn="6"/>
+        <references refid="structMemoryInfo_1a72adfc47f767bf59141275a7e542f5e2" compoundref="system__topology_8h" startline="124">MemoryInfo::available_mb</references>
+        <references refid="structMemoryInfo_1ac9d849331a689ebbfa4c6e65da74f990" compoundref="system__topology_8h" startline="144">MemoryInfo::bw_test_num_threads</references>
+        <references refid="structMemoryInfo_1af134427563f2d7794d5cb40fe77aac7f" compoundref="system__topology_8h" startline="143">MemoryInfo::bw_test_numa_node</references>
+        <references refid="structMemoryInfo_1acc92d92ac02ffaf28749375c652956e2" compoundref="system__topology_8h" startline="125">MemoryInfo::cached_mb</references>
+        <references refid="structMemoryInfo_1ac20112f20e405d5fafdd560b3535f000" compoundref="system__topology_8h" startline="135">MemoryInfo::channel_config</references>
+        <references refid="structMemoryInfo_1a4a595e517746ef202bb268465dd605b4" compoundref="system__topology_8h" startline="134">MemoryInfo::channels_populated</references>
+        <references refid="structMemorySlot_1af95b0bc9c39a80072ba71c88506125d3" compoundref="system__topology_8h" startline="119">MemorySlot::data_width_bits</references>
+        <references refid="structMemoryInfo_1a58d128299366a3bbd1bef1b86180d2c9" compoundref="system__topology_8h" startline="140">MemoryInfo::estimated_channels</references>
+        <references refid="structMemorySlot_1a6173783f7bdc94d89af5a150e3fdc7b3" compoundref="system__topology_8h" startline="113">MemorySlot::locator</references>
+        <references refid="system__topology_8h_1a653d809668c0f9aed5323a47614f16b5" compoundref="system__topology_8h" startline="27">MAX_MEMORY_SLOTS</references>
+        <references refid="structMemoryInfo_1a3f07269515a43e096aa98be0daa48f46" compoundref="system__topology_8h" startline="139">MemoryInfo::measured_bandwidth_gbs</references>
+        <references refid="structMemoryInfo_1a8cf60ff7368ef5b531d0722edf78b2e2" compoundref="system__topology_8h" startline="148">MemoryInfo::memory_speed_mhz</references>
+        <references refid="structMemoryInfo_1a8ac82d5b5a76eb7a19634cff450bb897" compoundref="system__topology_8h" startline="147">MemoryInfo::memory_type</references>
+        <references refid="structMemoryInfo_1a0ff8aa8993baa2138de40490c4545fff" compoundref="system__topology_8h" startline="133">MemoryInfo::num_channels</references>
+        <references refid="structMemoryInfo_1a2409920ad9ccdec3d75c1d81f1a664d2" compoundref="system__topology_8h" startline="128">MemoryInfo::num_slots</references>
+        <references refid="structMemorySlot_1a8db087de44e502b76946628000b9ce14" compoundref="system__topology_8h" startline="114">MemorySlot::populated</references>
+        <references refid="structMemorySlot_1a9ac221e5878a5d6ce26d7c711fced364" compoundref="system__topology_8h" startline="118">MemorySlot::rank</references>
+        <references refid="system__topology_8c_1a74f7ad14b6c779249df057c693cfada4" compoundref="system__topology_8c" startline="62" endline="75">run_command</references>
+        <references refid="structMemorySlot_1a5c71e7350e86f396ab2912410be1a162" compoundref="system__topology_8h" startline="115">MemorySlot::size_mb</references>
+        <references refid="structMemorySlot_1a2ea9f80423c6a3be54933babf9d1db0f" compoundref="system__topology_8h" startline="112">MemorySlot::slot_number</references>
+        <references refid="structMemoryInfo_1af06394a062088cdac896d705b504ae9b" compoundref="system__topology_8h" startline="130">MemoryInfo::slots</references>
+        <references refid="structMemoryInfo_1ab747a208ec62ee715eb864cfe1daec4d" compoundref="system__topology_8h" startline="129">MemoryInfo::slots_populated</references>
+        <references refid="structMemorySlot_1afed85487a039a8b26e3e1b92453c6f59" compoundref="system__topology_8h" startline="116">MemorySlot::speed_mhz</references>
+        <references refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" compoundref="system__topology_8h" startline="138">MemoryInfo::theoretical_bandwidth_gbs</references>
+        <references refid="system__topology_8c_1a089e974347ad9291cc98080f85392a57" compoundref="system__topology_8c" startline="523" endline="547">topology_estimate_channels_from_bandwidth</references>
+        <references refid="system__topology_8c_1a7e083b9d0fb7a63db6e505f64a3237ce" compoundref="system__topology_8c" startline="427" endline="514">topology_measure_memory_bandwidth_ex</references>
+        <references refid="structMemoryInfo_1a53dbc361ce7012951ceff084c52b17b9" compoundref="system__topology_8h" startline="123">MemoryInfo::total_mb</references>
+        <references refid="system__topology_8c_1a6d93f41b7303c9e4c21b16e0ce3e858f" compoundref="system__topology_8c" startline="29" endline="36">trim_string</references>
+        <references refid="structMemorySlot_1a2356cb4cf76513cf5ef48c8c2732b5aa" compoundref="system__topology_8h" startline="117">MemorySlot::type</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a8d1095a0656548a8adae0cf8ad6a59cd" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_network</definition>
+        <argsstring>(NetworkTopology *net)</argsstring>
+        <name>topology_discover_network</name>
+        <param>
+          <type><ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref> *</type>
+          <declname>net</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="308" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="832" bodyend="930" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="308" declcolumn="6"/>
+        <references refid="structNetworkTopology_1adcb93d96209df982a321bc0a16c37637" compoundref="system__topology_8h" startline="222">NetworkTopology::best_interface_idx</references>
+        <references refid="structNetworkInterface_1a63e2fdf290d8a23dc2f92cf28e87e870" compoundref="system__topology_8h" startline="195">NetworkInterface::driver</references>
+        <references refid="structNetworkInterface_1a6aeca68cb500898ceebc5a70b984ed10" compoundref="system__topology_8h" startline="200">NetworkInterface::has_link</references>
+        <references refid="structNetworkTopology_1ac4760fd463a39d60907a0a453846c1e2" compoundref="system__topology_8h" startline="224">NetworkTopology::has_rdma</references>
+        <references refid="structNetworkTopology_1a31ec354a019961b6c7619bd2f71696ca" compoundref="system__topology_8h" startline="219">NetworkTopology::interfaces</references>
+        <references refid="structNetworkInterface_1aa20cea6954f397c45963b6b2af648424" compoundref="system__topology_8h" startline="205">NetworkInterface::is_infiniband</references>
+        <references refid="structNetworkInterface_1a4d1f0f6d6f8e5ba00f06945274ac913b" compoundref="system__topology_8h" startline="199">NetworkInterface::is_up</references>
+        <references refid="structNetworkInterface_1ac8dc723c11bc1dec2ae9e5f1cdd23a6f" compoundref="system__topology_8h" startline="208">NetworkInterface::mac_address</references>
+        <references refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" compoundref="system__topology_8h" startline="223">NetworkTopology::max_bandwidth_gbs</references>
+        <references refid="system__topology_8h_1ab44d92c45e9155a2b343f0372630ec35" compoundref="system__topology_8h" startline="25">MAX_NICS</references>
+        <references refid="structNetworkInterface_1aa5b7cc8f6a3d7e752041f23e84231e5b" compoundref="system__topology_8h" startline="209">NetworkInterface::mtu</references>
+        <references refid="structNetworkInterface_1a260f76fbda4cab4180579f1bf506bf76" compoundref="system__topology_8h" startline="194">NetworkInterface::name</references>
+        <references refid="structNetworkTopology_1a7a5a3efd266abd1e16b70d230996ff2a" compoundref="system__topology_8h" startline="218">NetworkTopology::num_interfaces</references>
+        <references refid="structNetworkInterface_1a5c06474416d85a879cf5ae151eaff925" compoundref="system__topology_8h" startline="196">NetworkInterface::pci_address</references>
+        <references refid="system__topology_8c_1ac3c7b781cd07570159767e034c90938a" compoundref="system__topology_8c" startline="50" endline="54">read_file_int</references>
+        <references refid="system__topology_8c_1afa3b302a31c3fe70d5a615a60d3df7f7" compoundref="system__topology_8c" startline="38" endline="48">read_file_string</references>
+        <references refid="structNetworkInterface_1a9d513cd66a61a93b6b09cd3ab6cfe923" compoundref="system__topology_8h" startline="198">NetworkInterface::speed_mbps</references>
+        <references refid="structNetworkInterface_1a3a7b2f85e17f8e861ea160f94ade4a46" compoundref="system__topology_8h" startline="203">NetworkInterface::supports_rdma</references>
+        <references refid="structNetworkInterface_1a943270da345cf36912ed3ec3a957e15c" compoundref="system__topology_8h" startline="204">NetworkInterface::supports_roce</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1afd3ae767003bf9070768199caa3f7ee1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_numa</definition>
+        <argsstring>(NUMATopology *numa)</argsstring>
+        <name>topology_discover_numa</name>
+        <param>
+          <type><ref refid="structNUMATopology" kindref="compound">NUMATopology</ref> *</type>
+          <declname>numa</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="305" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="303" bodyend="389" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="305" declcolumn="6"/>
+        <references refid="structNUMANode_1a0c71fe04154d6a80d08829e547f5145d" compoundref="system__topology_8h" startline="96">NUMANode::cpu_list</references>
+        <references refid="structNUMATopology_1a2a61e03ff57dd6feb35b92d1e03c0cdd" compoundref="system__topology_8h" startline="104">NUMATopology::distances</references>
+        <references refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" compoundref="utf8_8c" startline="215">end</references>
+        <references refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" compoundref="system__topology_8h" startline="23">MAX_CPUS</references>
+        <references refid="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" compoundref="system__topology_8h" startline="22">MAX_NUMA_NODES</references>
+        <references refid="structNUMANode_1abe328366c0632dadc801508c6bbc44df" compoundref="system__topology_8h" startline="95">NUMANode::memory_free_mb</references>
+        <references refid="structNUMANode_1ad207fd0ff088689dc91e40729dc9c60a" compoundref="system__topology_8h" startline="94">NUMANode::memory_total_mb</references>
+        <references refid="structNUMANode_1a11cae96c43efc187a78bb509aa86355b" compoundref="system__topology_8h" startline="93">NUMANode::node_id</references>
+        <references refid="structNUMATopology_1a4f4876ca34eed1e6c7732e611a13a674" compoundref="system__topology_8h" startline="102">NUMATopology::nodes</references>
+        <references refid="structNUMANode_1aad2dccb35d57507ce243031012618337" compoundref="system__topology_8h" startline="97">NUMANode::num_cpus</references>
+        <references refid="structNUMATopology_1ab0befa19cd4b9b08a68d901f301e9de7" compoundref="system__topology_8h" startline="101">NUMATopology::num_nodes</references>
+        <references refid="system__topology_8c_1afa3b302a31c3fe70d5a615a60d3df7f7" compoundref="system__topology_8c" startline="38" endline="48">read_file_string</references>
+        <references refid="utf8_8c_1a61eb63d26b2fa6c2971603ceccffb14b" compoundref="utf8_8c" startline="214">start</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a3e80c10682d58f63c4fa70b98e6a7dfb" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_discover_pcie</definition>
+        <argsstring>(PCIeTopology *pcie)</argsstring>
+        <name>topology_discover_pcie</name>
+        <param>
+          <type><ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref> *</type>
+          <declname>pcie</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="307" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="730" bodyend="826" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="307" declcolumn="6"/>
+        <references refid="structPCIeDevice_1afc8e2ec8cb06bb20fd879836155ad92a" compoundref="system__topology_8h" startline="169">PCIeDevice::bandwidth_gbs</references>
+        <references refid="structPCIeDevice_1ae2b77fabb6cbd4700ce8cff006bdf2ab" compoundref="system__topology_8h" startline="170">PCIeDevice::bandwidth_max_gbs</references>
+        <references refid="structPCIeDevice_1a3c9a5d7185811db52d5443d767c155e7" compoundref="system__topology_8h" startline="160">PCIeDevice::bus</references>
+        <references refid="structPCIeDevice_1a97e23b1ccdb120c47d9fef6beb9b050b" compoundref="system__topology_8h" startline="161">PCIeDevice::device</references>
+        <references refid="structPCIeDevice_1a7179511c6502936e503a2ff80dcf464d" compoundref="system__topology_8h" startline="157">PCIeDevice::device_name</references>
+        <references refid="structPCIeTopology_1a8abdf84a7b22a1bd888b4d50efc10e8c" compoundref="system__topology_8h" startline="179">PCIeTopology::devices</references>
+        <references refid="structPCIeDevice_1a492fb416b29956d0442ec47c57c3f091" compoundref="system__topology_8h" startline="162">PCIeDevice::function</references>
+        <references refid="structPCIeDevice_1ae033008e7db3ee6fb53a892836d93cf0" compoundref="system__topology_8h" startline="172">PCIeDevice::is_gpu</references>
+        <references refid="structPCIeDevice_1afc1f0a1bb21313d965608d9dac1f2ab4" compoundref="system__topology_8h" startline="173">PCIeDevice::is_nic</references>
+        <references refid="structPCIeDevice_1a3abe79544a7e4bac54aa643d784ed815" compoundref="system__topology_8h" startline="174">PCIeDevice::is_nvme</references>
+        <references refid="structPCIeDevice_1adccc4e7aa824d93f3b046cb67e5fbf5b" compoundref="system__topology_8h" startline="166">PCIeDevice::link_speed</references>
+        <references refid="structPCIeDevice_1acd83cab295bf599ca7f3d1e8d6268094" compoundref="system__topology_8h" startline="167">PCIeDevice::link_speed_max</references>
+        <references refid="structPCIeDevice_1a8119bb375e580a3302f3110f689fc213" compoundref="system__topology_8h" startline="164">PCIeDevice::link_width</references>
+        <references refid="structPCIeDevice_1adca9565208f9aefc3cee61726d1a86de" compoundref="system__topology_8h" startline="165">PCIeDevice::link_width_max</references>
+        <references refid="system__topology_8h_1aeb96e2b430111e055cfe76293dbf2258" compoundref="system__topology_8h" startline="26">MAX_PCIE_DEVICES</references>
+        <references refid="structPCIeTopology_1ac42eaf6c16f881a6098cf8e443503936" compoundref="system__topology_8h" startline="178">PCIeTopology::num_devices</references>
+        <references refid="system__topology_8c_1adfd7a4ea82a4bee21021195cf398e284" compoundref="system__topology_8c" startline="723" endline="728">pcie_bandwidth_gbs</references>
+        <references refid="system__topology_8c_1a74f7ad14b6c779249df057c693cfada4" compoundref="system__topology_8c" startline="62" endline="75">run_command</references>
+        <references refid="structPCIeTopology_1ad6202b8874dbca1e0fdd88dc9a899203" compoundref="system__topology_8h" startline="182">PCIeTopology::total_lanes_used</references>
+        <referencedby refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" compoundref="system__topology_8c" startline="979" endline="1004">topology_discover</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1ae541edad293faa847014c35c8e6411a5" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>float</type>
+        <definition>float topology_estimate_memory_bandwidth</definition>
+        <argsstring>(const MemoryInfo *mem)</argsstring>
+        <name>topology_estimate_memory_bandwidth</name>
+        <param>
+          <type>const <ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref> *</type>
+          <declname>mem</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="330" column="7" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="1116" bodyend="1118" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="330" declcolumn="7"/>
+        <references refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" compoundref="system__topology_8h" startline="138">MemoryInfo::theoretical_bandwidth_gbs</references>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1ab165ff3667f6ee7cca36f51b5a6bad20" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>float</type>
+        <definition>float topology_estimate_network_training_time</definition>
+        <argsstring>(const NetworkTopology *net, uint64_t model_size_mb)</argsstring>
+        <name>topology_estimate_network_training_time</name>
+        <param>
+          <type>const <ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref> *</type>
+          <declname>net</declname>
+        </param>
+        <param>
+          <type>uint64_t</type>
+          <declname>model_size_mb</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="331" column="7" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="1120" bodyend="1128" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="331" declcolumn="7"/>
+        <references refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" compoundref="system__topology_8h" startline="223">NetworkTopology::max_bandwidth_gbs</references>
+        <referencedby refid="system__topology_8h_1a4d42196463c5ba39847e24ebe52bfbad" compoundref="show__config_8c" startline="584" endline="647">topology_print_distributed_potential</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1ac739fbe17c86f1c7e9da9c6ad2a8b176" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int topology_generate_recommendations</definition>
+        <argsstring>(const SystemTopology *topo, RecommendationList *recs)</argsstring>
+        <name>topology_generate_recommendations</name>
+        <param>
+          <type>const <ref refid="structSystemTopology" kindref="compound">SystemTopology</ref> *</type>
+          <declname>topo</declname>
+        </param>
+        <param>
+          <type><ref refid="structRecommendationList" kindref="compound">RecommendationList</ref> *</type>
+          <declname>recs</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="312" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/system_topology.c" bodystart="1010" bodyend="1110" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="312" declcolumn="6"/>
+        <references refid="structRecommendation_1ad4009263d6f5d6e3feeab261f071beaf" compoundref="system__topology_8h" startline="287">Recommendation::action</references>
+        <references refid="structSystemTopology_1afe211eb662869fd63bc5191d0fde7086" compoundref="system__topology_8h" startline="253">SystemTopology::affinity</references>
+        <references refid="structAffinityInfo_1ad7c543698d7fa66a65b006a8e16e5368" compoundref="system__topology_8h" startline="235">AffinityInfo::affinity_set</references>
+        <references refid="structRecommendation_1aa8cbf25679d19f8407ac276b25c1b1bf" compoundref="system__topology_8h" startline="284">Recommendation::category</references>
+        <references refid="structMemoryInfo_1a4a595e517746ef202bb268465dd605b4" compoundref="system__topology_8h" startline="134">MemoryInfo::channels_populated</references>
+        <references refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" compoundref="system__topology_8h" startline="247">SystemTopology::cpu</references>
+        <references refid="structRecommendation_1ac691a32118bd2279bf9536d183329119" compoundref="system__topology_8h" startline="286">Recommendation::description</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structNetworkTopology_1ac4760fd463a39d60907a0a453846c1e2" compoundref="system__topology_8h" startline="224">NetworkTopology::has_rdma</references>
+        <references refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" compoundref="system__topology_8h" startline="223">NetworkTopology::max_bandwidth_gbs</references>
+        <references refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" compoundref="system__topology_8h" startline="250">SystemTopology::memory</references>
+        <references refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" compoundref="system__topology_8h" startline="252">SystemTopology::network</references>
+        <references refid="structNetworkTopology_1a7a5a3efd266abd1e16b70d230996ff2a" compoundref="system__topology_8h" startline="218">NetworkTopology::num_interfaces</references>
+        <references refid="structNUMATopology_1ab0befa19cd4b9b08a68d901f301e9de7" compoundref="system__topology_8h" startline="101">NUMATopology::num_nodes</references>
+        <references refid="structRecommendationList_1a07a86874728786aa76e45da00a7f5af9" compoundref="system__topology_8h" startline="291">RecommendationList::num_recommendations</references>
+        <references refid="structMemoryInfo_1a2409920ad9ccdec3d75c1d81f1a664d2" compoundref="system__topology_8h" startline="128">MemoryInfo::num_slots</references>
+        <references refid="structSystemTopology_1a614df36f023f6261b3819210d15a5fe7" compoundref="system__topology_8h" startline="249">SystemTopology::numa</references>
+        <references refid="structRecommendation_1a2dea715a398d739605559094647c11eb" compoundref="system__topology_8h" startline="283">Recommendation::priority</references>
+        <references refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b" compoundref="system__topology_8h" startline="276">REC_CATEGORY_AFFINITY</references>
+        <references refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e" compoundref="system__topology_8h" startline="274">REC_CATEGORY_CPU</references>
+        <references refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a86e1aa77256345474354d36dade4c2cc" compoundref="system__topology_8h" startline="273">REC_CATEGORY_MEMORY</references>
+        <references refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba" compoundref="system__topology_8h" startline="275">REC_CATEGORY_NETWORK</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ae2b3a4412e439de7cd932d5c9c239628" compoundref="system__topology_8h" startline="268">REC_PRIORITY_HIGH</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69aff18fa78a746a2cfe6521f96f2985d0d" compoundref="system__topology_8h" startline="266">REC_PRIORITY_LOW</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ac060aa16ba5ff6de278ec1a69c992740" compoundref="system__topology_8h" startline="267">REC_PRIORITY_MEDIUM</references>
+        <references refid="structRecommendationList_1a63246ddf4369acfa638cf19f1de2cf3e" compoundref="system__topology_8h" startline="292">RecommendationList::recommendations</references>
+        <references refid="structMemoryInfo_1ab747a208ec62ee715eb864cfe1daec4d" compoundref="system__topology_8h" startline="129">MemoryInfo::slots_populated</references>
+        <references refid="structRecommendation_1ab10fd7bc5c1c6eee44e39a537f53cc51" compoundref="system__topology_8h" startline="285">Recommendation::title</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1ab03a6d20880e7f93998b361c0036ea44" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_affinity</definition>
+        <argsstring>(const AffinityInfo *aff)</argsstring>
+        <name>topology_print_affinity</name>
+        <param>
+          <type>const <ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref> *</type>
+          <declname>aff</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="323" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="528" bodyend="543" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="323" declcolumn="6"/>
+        <references refid="structAffinityInfo_1ad7c543698d7fa66a65b006a8e16e5368" compoundref="system__topology_8h" startline="235">AffinityInfo::affinity_set</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structAffinityInfo_1a335a14b8b3b93f722ef8e2b6455122f5" compoundref="system__topology_8h" startline="232">AffinityInfo::omp_num_threads</references>
+        <references refid="structAffinityInfo_1ac336f376702b1b1724111b291c9fac84" compoundref="system__topology_8h" startline="234">AffinityInfo::omp_places</references>
+        <references refid="structAffinityInfo_1aed549054fb9376cc874f3d8d710d1e89" compoundref="system__topology_8h" startline="233">AffinityInfo::omp_proc_bind</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1aa89d156e8491ad3112f448c5918b21e2" compoundref="show__config_8c" startline="91" endline="93">print_warning</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1afbc559e029cc2c0fddd0a1dac9b1be20" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_cache</definition>
+        <argsstring>(const CacheTopology *cache, int logical_cores)</argsstring>
+        <name>topology_print_cache</name>
+        <param>
+          <type>const <ref refid="structCacheTopology" kindref="compound">CacheTopology</ref> *</type>
+          <declname>cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>logical_cores</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="318" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="169" bodyend="211" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="318" declcolumn="6"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="structCacheInfo_1a2bbafb632144b03c4ac4d74fea63b438" compoundref="system__topology_8h" startline="74">CacheInfo::level</references>
+        <references refid="structCacheTopology_1a312d10896e318962d7a948eb04aaddd0" compoundref="system__topology_8h" startline="84">CacheTopology::levels</references>
+        <references refid="structCacheTopology_1a7d8f011d2962b633861d25e320df4d7b" compoundref="system__topology_8h" startline="83">CacheTopology::num_levels</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structCacheInfo_1aefdbeadd9d601084c823c530a35e4e5c" compoundref="system__topology_8h" startline="79">CacheInfo::shared_by_cores</references>
+        <references refid="structCacheInfo_1af0d7fd2b3b6d58a409f2e91419970a87" compoundref="system__topology_8h" startline="76">CacheInfo::size_kb</references>
+        <references refid="structCacheInfo_1a2d480cc7cf9fcab61720174ffad45770" compoundref="system__topology_8h" startline="75">CacheInfo::type</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a621b3bfcacc31268f4aad1bd39ecb3a2" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_cpu</definition>
+        <argsstring>(const CPUInfo *cpu)</argsstring>
+        <name>topology_print_cpu</name>
+        <param>
+          <type>const <ref refid="structCPUInfo" kindref="compound">CPUInfo</ref> *</type>
+          <declname>cpu</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="317" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="103" bodyend="167" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="317" declcolumn="6"/>
+        <references refid="structCPUInfo_1acfedda3a3d92c0fd6dde00f5757fdf92" compoundref="system__topology_8h" startline="47">CPUInfo::base_freq_mhz</references>
+        <references refid="show__config_8c_1a26cdbb1a00213c810caccf21cd33a631" compoundref="show__config_8c" startline="21">BOLD</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structCPUInfo_1ac41947b54c3a9b315338aee3113b5714" compoundref="system__topology_8h" startline="58">CPUInfo::has_amx</references>
+        <references refid="structCPUInfo_1a7983ac279a57f5d5992248d720452dfe" compoundref="system__topology_8h" startline="61">CPUInfo::has_amx_bf16</references>
+        <references refid="structCPUInfo_1a660af436345a21868c7c6f0160cd7513" compoundref="system__topology_8h" startline="60">CPUInfo::has_amx_int8</references>
+        <references refid="structCPUInfo_1a6981442ec8c03e3486d68e5011cbe02c" compoundref="cpu__features_8h" startline="26">CPUInfo::has_avx</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structCPUInfo_1a2f0697cf41068e3a7b9acfaa03b72dc1" compoundref="system__topology_8h" startline="57">CPUInfo::has_avx512_bf16</references>
+        <references refid="structCPUInfo_1a17a91fbcd0b73af602d2504a754a1e62" compoundref="system__topology_8h" startline="55">CPUInfo::has_avx512bw</references>
+        <references refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" compoundref="cpu__features_8h" startline="28">CPUInfo::has_avx512f</references>
+        <references refid="structCPUInfo_1ac60a906dc4aaa71a6ca5453d6628fa2e" compoundref="system__topology_8h" startline="56">CPUInfo::has_avx512vl</references>
+        <references refid="structCPUInfo_1ad3efc23f84451ced9b6085cb036ceb7d" compoundref="system__topology_8h" startline="51">CPUInfo::has_sse4_2</references>
+        <references refid="structCPUInfo_1a2d0f8aabf38b410e7242db59a3ea63ae" compoundref="system__topology_8h" startline="62">CPUInfo::has_vnni</references>
+        <references refid="structCPUInfo_1a0a2cdfebf8fbd74229912ed3689e753b" compoundref="system__topology_8h" startline="42">CPUInfo::logical_cores</references>
+        <references refid="structCPUInfo_1a34e7cc2aa5fd5ec5cf99828837563a61" compoundref="system__topology_8h" startline="48">CPUInfo::max_freq_mhz</references>
+        <references refid="structCPUInfo_1a1bb3083068d81b050ad1b9aedf28e0d1" compoundref="system__topology_8h" startline="35">CPUInfo::model_name</references>
+        <references refid="structCPUInfo_1a20091b580953be0d9a6dde8938545036" compoundref="system__topology_8h" startline="66">CPUInfo::pcie_generation</references>
+        <references refid="structCPUInfo_1aa67080f78191b764515728bdabf55924" compoundref="system__topology_8h" startline="65">CPUInfo::pcie_lanes_total</references>
+        <references refid="structCPUInfo_1a703824b64f9035d0adf5641c9d20527e" compoundref="system__topology_8h" startline="41">CPUInfo::physical_cores</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1aa89d156e8491ad3112f448c5918b21e2" compoundref="show__config_8c" startline="91" endline="93">print_warning</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structCPUInfo_1aef5b41cc946c52f34e354c69a66bcde3" compoundref="system__topology_8h" startline="43">CPUInfo::sockets</references>
+        <references refid="structCPUInfo_1aaf14c11cad59d839d69e7fa7e367dd05" compoundref="system__topology_8h" startline="45">CPUInfo::threads_per_core</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a4d42196463c5ba39847e24ebe52bfbad" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_distributed_potential</definition>
+        <argsstring>(const SystemTopology *topo)</argsstring>
+        <name>topology_print_distributed_potential</name>
+        <param>
+          <type>const <ref refid="structSystemTopology" kindref="compound">SystemTopology</ref> *</type>
+          <declname>topo</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="327" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="584" bodyend="647" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="327" declcolumn="6"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" compoundref="system__topology_8h" startline="247">SystemTopology::cpu</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="show__config_8c_1a38ce831d1f0763a0f8a382f9d761f64d" compoundref="show__config_8c" startline="56" endline="63">format_bandwidth</references>
+        <references refid="show__config_8c_1ad43efc8d1d3c186a3e8471bc7c71b72a" compoundref="show__config_8c" startline="45" endline="54">format_size</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structCPUInfo_1a5392c3ca44cc97b171ee980e48408e03" compoundref="cpu__features_8h" startline="27">CPUInfo::has_avx2</references>
+        <references refid="structCPUInfo_1a72c59fe4c03be35b475dd733bd17860c" compoundref="cpu__features_8h" startline="28">CPUInfo::has_avx512f</references>
+        <references refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" compoundref="system__topology_8h" startline="223">NetworkTopology::max_bandwidth_gbs</references>
+        <references refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" compoundref="system__topology_8h" startline="250">SystemTopology::memory</references>
+        <references refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" compoundref="system__topology_8h" startline="252">SystemTopology::network</references>
+        <references refid="structCPUInfo_1a703824b64f9035d0adf5641c9d20527e" compoundref="system__topology_8h" startline="41">CPUInfo::physical_cores</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1a8d23feea868a983c8c2b661e1e16972f" compoundref="show__config_8c" startline="24">RED</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" compoundref="system__topology_8h" startline="138">MemoryInfo::theoretical_bandwidth_gbs</references>
+        <references refid="system__topology_8h_1ab165ff3667f6ee7cca36f51b5a6bad20" compoundref="system__topology_8c" startline="1120" endline="1128">topology_estimate_network_training_time</references>
+        <references refid="structMemoryInfo_1a53dbc361ce7012951ceff084c52b17b9" compoundref="system__topology_8h" startline="123">MemoryInfo::total_mb</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a274dcedf2b6259112dff57aa23f55d15" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_memory</definition>
+        <argsstring>(const MemoryInfo *mem)</argsstring>
+        <name>topology_print_memory</name>
+        <param>
+          <type>const <ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref> *</type>
+          <declname>mem</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="320" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="292" bodyend="393" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="320" declcolumn="6"/>
+        <references refid="structMemoryInfo_1a72adfc47f767bf59141275a7e542f5e2" compoundref="system__topology_8h" startline="124">MemoryInfo::available_mb</references>
+        <references refid="show__config_8c_1a26cdbb1a00213c810caccf21cd33a631" compoundref="show__config_8c" startline="21">BOLD</references>
+        <references refid="structMemoryInfo_1ac9d849331a689ebbfa4c6e65da74f990" compoundref="system__topology_8h" startline="144">MemoryInfo::bw_test_num_threads</references>
+        <references refid="structMemoryInfo_1af134427563f2d7794d5cb40fe77aac7f" compoundref="system__topology_8h" startline="143">MemoryInfo::bw_test_numa_node</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="structMemoryInfo_1ac20112f20e405d5fafdd560b3535f000" compoundref="system__topology_8h" startline="135">MemoryInfo::channel_config</references>
+        <references refid="structMemoryInfo_1a4a595e517746ef202bb268465dd605b4" compoundref="system__topology_8h" startline="134">MemoryInfo::channels_populated</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="show__config_8c_1a38ce831d1f0763a0f8a382f9d761f64d" compoundref="show__config_8c" startline="56" endline="63">format_bandwidth</references>
+        <references refid="show__config_8c_1ad43efc8d1d3c186a3e8471bc7c71b72a" compoundref="show__config_8c" startline="45" endline="54">format_size</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structMemorySlot_1a6173783f7bdc94d89af5a150e3fdc7b3" compoundref="system__topology_8h" startline="113">MemorySlot::locator</references>
+        <references refid="structMemoryInfo_1a3f07269515a43e096aa98be0daa48f46" compoundref="system__topology_8h" startline="139">MemoryInfo::measured_bandwidth_gbs</references>
+        <references refid="structMemoryInfo_1a8cf60ff7368ef5b531d0722edf78b2e2" compoundref="system__topology_8h" startline="148">MemoryInfo::memory_speed_mhz</references>
+        <references refid="structMemoryInfo_1a8ac82d5b5a76eb7a19634cff450bb897" compoundref="system__topology_8h" startline="147">MemoryInfo::memory_type</references>
+        <references refid="structMemoryInfo_1a2409920ad9ccdec3d75c1d81f1a664d2" compoundref="system__topology_8h" startline="128">MemoryInfo::num_slots</references>
+        <references refid="structMemorySlot_1a8db087de44e502b76946628000b9ce14" compoundref="system__topology_8h" startline="114">MemorySlot::populated</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1aa89d156e8491ad3112f448c5918b21e2" compoundref="show__config_8c" startline="91" endline="93">print_warning</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structMemorySlot_1a5c71e7350e86f396ab2912410be1a162" compoundref="system__topology_8h" startline="115">MemorySlot::size_mb</references>
+        <references refid="structMemoryInfo_1af06394a062088cdac896d705b504ae9b" compoundref="system__topology_8h" startline="130">MemoryInfo::slots</references>
+        <references refid="structMemoryInfo_1ab747a208ec62ee715eb864cfe1daec4d" compoundref="system__topology_8h" startline="129">MemoryInfo::slots_populated</references>
+        <references refid="structMemorySlot_1afed85487a039a8b26e3e1b92453c6f59" compoundref="system__topology_8h" startline="116">MemorySlot::speed_mhz</references>
+        <references refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" compoundref="system__topology_8h" startline="138">MemoryInfo::theoretical_bandwidth_gbs</references>
+        <references refid="structMemoryInfo_1a53dbc361ce7012951ceff084c52b17b9" compoundref="system__topology_8h" startline="123">MemoryInfo::total_mb</references>
+        <references refid="structMemorySlot_1a2356cb4cf76513cf5ef48c8c2732b5aa" compoundref="system__topology_8h" startline="117">MemorySlot::type</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a440e3e819b2e718bf7ea8513f33b1f30" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_network</definition>
+        <argsstring>(const NetworkTopology *net)</argsstring>
+        <name>topology_print_network</name>
+        <param>
+          <type>const <ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref> *</type>
+          <declname>net</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="322" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="458" bodyend="526" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="322" declcolumn="6"/>
+        <references refid="show__config_8c_1a26cdbb1a00213c810caccf21cd33a631" compoundref="show__config_8c" startline="21">BOLD</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="structNetworkInterface_1a63e2fdf290d8a23dc2f92cf28e87e870" compoundref="system__topology_8h" startline="195">NetworkInterface::driver</references>
+        <references refid="show__config_8c_1a38ce831d1f0763a0f8a382f9d761f64d" compoundref="show__config_8c" startline="56" endline="63">format_bandwidth</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structNetworkInterface_1a6aeca68cb500898ceebc5a70b984ed10" compoundref="system__topology_8h" startline="200">NetworkInterface::has_link</references>
+        <references refid="structNetworkTopology_1ac4760fd463a39d60907a0a453846c1e2" compoundref="system__topology_8h" startline="224">NetworkTopology::has_rdma</references>
+        <references refid="structNetworkTopology_1a31ec354a019961b6c7619bd2f71696ca" compoundref="system__topology_8h" startline="219">NetworkTopology::interfaces</references>
+        <references refid="structNetworkInterface_1aa20cea6954f397c45963b6b2af648424" compoundref="system__topology_8h" startline="205">NetworkInterface::is_infiniband</references>
+        <references refid="structNetworkInterface_1a4d1f0f6d6f8e5ba00f06945274ac913b" compoundref="system__topology_8h" startline="199">NetworkInterface::is_up</references>
+        <references refid="show__config_8c_1a6f699060902f800f12aaae150f3a708e" compoundref="show__config_8c" startline="28">MAGENTA</references>
+        <references refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" compoundref="system__topology_8h" startline="223">NetworkTopology::max_bandwidth_gbs</references>
+        <references refid="structNetworkInterface_1a260f76fbda4cab4180579f1bf506bf76" compoundref="system__topology_8h" startline="194">NetworkInterface::name</references>
+        <references refid="structNetworkTopology_1a7a5a3efd266abd1e16b70d230996ff2a" compoundref="system__topology_8h" startline="218">NetworkTopology::num_interfaces</references>
+        <references refid="show__config_8c_1a1ad1f845f9555efa12973c1d8df3cf1d" compoundref="show__config_8c" startline="95" endline="97">print_ok</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1aa89d156e8491ad3112f448c5918b21e2" compoundref="show__config_8c" startline="91" endline="93">print_warning</references>
+        <references refid="show__config_8c_1a8d23feea868a983c8c2b661e1e16972f" compoundref="show__config_8c" startline="24">RED</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structNetworkInterface_1a9d513cd66a61a93b6b09cd3ab6cfe923" compoundref="system__topology_8h" startline="198">NetworkInterface::speed_mbps</references>
+        <references refid="structNetworkInterface_1a3a7b2f85e17f8e861ea160f94ade4a46" compoundref="system__topology_8h" startline="203">NetworkInterface::supports_rdma</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a581eb0fabf70e820ff545c69554999b0" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_numa</definition>
+        <argsstring>(const NUMATopology *numa, int sockets)</argsstring>
+        <name>topology_print_numa</name>
+        <param>
+          <type>const <ref refid="structNUMATopology" kindref="compound">NUMATopology</ref> *</type>
+          <declname>numa</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>sockets</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="319" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="213" bodyend="290" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="319" declcolumn="6"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="structNUMANode_1a0c71fe04154d6a80d08829e547f5145d" compoundref="system__topology_8h" startline="96">NUMANode::cpu_list</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="structNUMATopology_1a2a61e03ff57dd6feb35b92d1e03c0cdd" compoundref="system__topology_8h" startline="104">NUMATopology::distances</references>
+        <references refid="show__config_8c_1ad43efc8d1d3c186a3e8471bc7c71b72a" compoundref="show__config_8c" startline="45" endline="54">format_size</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structNUMANode_1ad207fd0ff088689dc91e40729dc9c60a" compoundref="system__topology_8h" startline="94">NUMANode::memory_total_mb</references>
+        <references refid="structNUMANode_1a11cae96c43efc187a78bb509aa86355b" compoundref="system__topology_8h" startline="93">NUMANode::node_id</references>
+        <references refid="structNUMATopology_1a4f4876ca34eed1e6c7732e611a13a674" compoundref="system__topology_8h" startline="102">NUMATopology::nodes</references>
+        <references refid="structNUMANode_1aad2dccb35d57507ce243031012618337" compoundref="system__topology_8h" startline="97">NUMANode::num_cpus</references>
+        <references refid="structNUMATopology_1ab0befa19cd4b9b08a68d901f301e9de7" compoundref="system__topology_8h" startline="101">NUMATopology::num_nodes</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1a50fd172a7f98da1b9a2882645fc7ecb3" compoundref="show__config_8c" startline="78" endline="89">print_tree_item</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1a49b1de1d6444775ae1462fc35c1c990e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_pcie</definition>
+        <argsstring>(const PCIeTopology *pcie)</argsstring>
+        <name>topology_print_pcie</name>
+        <param>
+          <type>const <ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref> *</type>
+          <declname>pcie</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="321" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="395" bodyend="456" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="321" declcolumn="6"/>
+        <references refid="structPCIeDevice_1afc8e2ec8cb06bb20fd879836155ad92a" compoundref="system__topology_8h" startline="169">PCIeDevice::bandwidth_gbs</references>
+        <references refid="show__config_8c_1a26cdbb1a00213c810caccf21cd33a631" compoundref="show__config_8c" startline="21">BOLD</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="structPCIeDevice_1a7179511c6502936e503a2ff80dcf464d" compoundref="system__topology_8h" startline="157">PCIeDevice::device_name</references>
+        <references refid="structPCIeTopology_1a8abdf84a7b22a1bd888b4d50efc10e8c" compoundref="system__topology_8h" startline="179">PCIeTopology::devices</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="show__config_8c_1a38ce831d1f0763a0f8a382f9d761f64d" compoundref="show__config_8c" startline="56" endline="63">format_bandwidth</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structPCIeDevice_1ae033008e7db3ee6fb53a892836d93cf0" compoundref="system__topology_8h" startline="172">PCIeDevice::is_gpu</references>
+        <references refid="structPCIeDevice_1afc1f0a1bb21313d965608d9dac1f2ab4" compoundref="system__topology_8h" startline="173">PCIeDevice::is_nic</references>
+        <references refid="structPCIeDevice_1a3abe79544a7e4bac54aa643d784ed815" compoundref="system__topology_8h" startline="174">PCIeDevice::is_nvme</references>
+        <references refid="structPCIeDevice_1adccc4e7aa824d93f3b046cb67e5fbf5b" compoundref="system__topology_8h" startline="166">PCIeDevice::link_speed</references>
+        <references refid="structPCIeDevice_1acd83cab295bf599ca7f3d1e8d6268094" compoundref="system__topology_8h" startline="167">PCIeDevice::link_speed_max</references>
+        <references refid="structPCIeDevice_1a8119bb375e580a3302f3110f689fc213" compoundref="system__topology_8h" startline="164">PCIeDevice::link_width</references>
+        <references refid="structPCIeDevice_1adca9565208f9aefc3cee61726d1a86de" compoundref="system__topology_8h" startline="165">PCIeDevice::link_width_max</references>
+        <references refid="show__config_8c_1a6f699060902f800f12aaae150f3a708e" compoundref="show__config_8c" startline="28">MAGENTA</references>
+        <references refid="structPCIeTopology_1ac42eaf6c16f881a6098cf8e443503936" compoundref="system__topology_8h" startline="178">PCIeTopology::num_devices</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1adaa69e0d4a8c8c3b9e50adcd45db083b" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_recommendations</definition>
+        <argsstring>(const RecommendationList *recs)</argsstring>
+        <name>topology_print_recommendations</name>
+        <param>
+          <type>const <ref refid="structRecommendationList" kindref="compound">RecommendationList</ref> *</type>
+          <declname>recs</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="324" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="545" bodyend="582" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="324" declcolumn="6"/>
+        <references refid="structRecommendation_1ad4009263d6f5d6e3feeab261f071beaf" compoundref="system__topology_8h" startline="287">Recommendation::action</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="show__config_8c_1ad243f93c16bc4c1d3e0a13b84421d760" compoundref="show__config_8c" startline="29">CYAN</references>
+        <references refid="structRecommendation_1ac691a32118bd2279bf9536d183329119" compoundref="system__topology_8h" startline="286">Recommendation::description</references>
+        <references refid="show__config_8c_1acfbc006ea433ad708fdee3e82996e721" compoundref="show__config_8c" startline="25">GREEN</references>
+        <references refid="structRecommendationList_1a07a86874728786aa76e45da00a7f5af9" compoundref="system__topology_8h" startline="291">RecommendationList::num_recommendations</references>
+        <references refid="show__config_8c_1a1ad1f845f9555efa12973c1d8df3cf1d" compoundref="show__config_8c" startline="95" endline="97">print_ok</references>
+        <references refid="show__config_8c_1a5ad74591e35c618d722ab994172697ce" compoundref="show__config_8c" startline="73" endline="76">print_section</references>
+        <references refid="structRecommendation_1a2dea715a398d739605559094647c11eb" compoundref="system__topology_8h" startline="283">Recommendation::priority</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ad2c44c068f9a309b584934d165738405" compoundref="system__topology_8h" startline="269">REC_PRIORITY_CRITICAL</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ae2b3a4412e439de7cd932d5c9c239628" compoundref="system__topology_8h" startline="268">REC_PRIORITY_HIGH</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69aff18fa78a746a2cfe6521f96f2985d0d" compoundref="system__topology_8h" startline="266">REC_PRIORITY_LOW</references>
+        <references refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ac060aa16ba5ff6de278ec1a69c992740" compoundref="system__topology_8h" startline="267">REC_PRIORITY_MEDIUM</references>
+        <references refid="structRecommendationList_1a63246ddf4369acfa638cf19f1de2cf3e" compoundref="system__topology_8h" startline="292">RecommendationList::recommendations</references>
+        <references refid="show__config_8c_1a8d23feea868a983c8c2b661e1e16972f" compoundref="show__config_8c" startline="24">RED</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structRecommendation_1ab10fd7bc5c1c6eee44e39a537f53cc51" compoundref="system__topology_8h" startline="285">Recommendation::title</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" compoundref="show__config_8c" startline="649" endline="674">topology_print_summary</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void topology_print_summary</definition>
+        <argsstring>(const SystemTopology *topo)</argsstring>
+        <name>topology_print_summary</name>
+        <param>
+          <type>const <ref refid="structSystemTopology" kindref="compound">SystemTopology</ref> *</type>
+          <declname>topo</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" line="316" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/show_config.c" bodystart="649" bodyend="674" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h" declline="316" declcolumn="6"/>
+        <references refid="structSystemTopology_1afe211eb662869fd63bc5191d0fde7086" compoundref="system__topology_8h" startline="253">SystemTopology::affinity</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <references refid="structSystemTopology_1a5987f9ac86ee94f588a8fcfaf85d2cf7" compoundref="system__topology_8h" startline="248">SystemTopology::cache</references>
+        <references refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" compoundref="system__topology_8h" startline="247">SystemTopology::cpu</references>
+        <references refid="show__config_8c_1ac25189db92959bff3c6c2adf4c34b50a" compoundref="show__config_8c" startline="22">DIM</references>
+        <references refid="structSystemTopology_1aeb78a0d10978d57768a6d03e4a94497b" compoundref="system__topology_8h" startline="256">SystemTopology::has_root_access</references>
+        <references refid="structSystemTopology_1a8c3a908fdf3d9b0c50e3346a66f68a13" compoundref="system__topology_8h" startline="257">SystemTopology::hostname</references>
+        <references refid="structSystemTopology_1aea0398c023b6251b7e490f65c74edc73" compoundref="system__topology_8h" startline="258">SystemTopology::kernel_version</references>
+        <references refid="structCPUInfo_1a0a2cdfebf8fbd74229912ed3689e753b" compoundref="system__topology_8h" startline="42">CPUInfo::logical_cores</references>
+        <references refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" compoundref="system__topology_8h" startline="250">SystemTopology::memory</references>
+        <references refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" compoundref="system__topology_8h" startline="252">SystemTopology::network</references>
+        <references refid="structSystemTopology_1a614df36f023f6261b3819210d15a5fe7" compoundref="system__topology_8h" startline="249">SystemTopology::numa</references>
+        <references refid="structSystemTopology_1a9dcefa468bbc7aaceb4d0a8cab2d3a31" compoundref="system__topology_8h" startline="251">SystemTopology::pcie</references>
+        <references refid="show__config_8c_1ae982fbde8b0c5efdf8fdbff3afb2267f" compoundref="show__config_8c" startline="65" endline="71">print_header</references>
+        <references refid="show__config_8c_1ab702106cf3b3e96750b6845ded4e0299" compoundref="show__config_8c" startline="20">RESET</references>
+        <references refid="structCPUInfo_1aef5b41cc946c52f34e354c69a66bcde3" compoundref="system__topology_8h" startline="43">CPUInfo::sockets</references>
+        <references refid="system__topology_8h_1ac739fbe17c86f1c7e9da9c6ad2a8b176" compoundref="system__topology_8c" startline="1010" endline="1110">topology_generate_recommendations</references>
+        <references refid="show__config_8c_1ab03a6d20880e7f93998b361c0036ea44" compoundref="show__config_8c" startline="528" endline="543">topology_print_affinity</references>
+        <references refid="show__config_8c_1afbc559e029cc2c0fddd0a1dac9b1be20" compoundref="show__config_8c" startline="169" endline="211">topology_print_cache</references>
+        <references refid="show__config_8c_1a621b3bfcacc31268f4aad1bd39ecb3a2" compoundref="show__config_8c" startline="103" endline="167">topology_print_cpu</references>
+        <references refid="show__config_8c_1a4d42196463c5ba39847e24ebe52bfbad" compoundref="show__config_8c" startline="584" endline="647">topology_print_distributed_potential</references>
+        <references refid="show__config_8c_1a274dcedf2b6259112dff57aa23f55d15" compoundref="show__config_8c" startline="292" endline="393">topology_print_memory</references>
+        <references refid="show__config_8c_1a440e3e819b2e718bf7ea8513f33b1f30" compoundref="show__config_8c" startline="458" endline="526">topology_print_network</references>
+        <references refid="show__config_8c_1a581eb0fabf70e820ff545c69554999b0" compoundref="show__config_8c" startline="213" endline="290">topology_print_numa</references>
+        <references refid="show__config_8c_1a49b1de1d6444775ae1462fc35c1c990e" compoundref="show__config_8c" startline="395" endline="456">topology_print_pcie</references>
+        <references refid="show__config_8c_1adaa69e0d4a8c8c3b9e50adcd45db083b" compoundref="show__config_8c" startline="545" endline="582">topology_print_recommendations</references>
+        <references refid="show__config_8c_1abf681265909adf3d3e8116c93c0ba179" compoundref="show__config_8c" startline="26">YELLOW</references>
+        <referencedby refid="show__config_8c_1a0ddf1224851353fc92bfbff6f499fa97" compoundref="show__config_8c" startline="680" endline="710">main</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>system_topology.h<sp/>-<sp/>System<sp/>hardware<sp/>topology<sp/>discovery<sp/>for<sp/>distributed<sp/>training</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Probes<sp/>CPU,<sp/>memory,<sp/>NUMA,<sp/>PCIe,<sp/>and<sp/>network<sp/>configuration<sp/>to<sp/>provide</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>recommendations<sp/>for<sp/>optimal<sp/>distributed<sp/>training<sp/>setup.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>SYSTEM_TOPOLOGY_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSTEM_TOPOLOGY_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdbool.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Constants</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_NUMA_NODES<sp/><sp/><sp/><sp/><sp/><sp/>8</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23" refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_CPUS<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>256</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24" refid="system__topology_8h_1a5a07324805d0e6b5535ccfd66a198a43" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_CACHE_LEVELS<sp/><sp/><sp/><sp/>4</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25" refid="system__topology_8h_1ab44d92c45e9155a2b343f0372630ec35" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_NICS<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>8</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26" refid="system__topology_8h_1aeb96e2b430111e055cfe76293dbf2258" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_PCIE_DEVICES<sp/><sp/><sp/><sp/>32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27" refid="system__topology_8h_1a653d809668c0f9aed5323a47614f16b5" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_MEMORY_SLOTS<sp/><sp/><sp/><sp/>16</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28" refid="system__topology_8h_1a58ce36916c399104e18d32ff090f21c6" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_STR_LEN<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>256</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight><highlight class="comment">//<sp/>CPU<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="35" refid="structCPUInfo_1a1bb3083068d81b050ad1b9aedf28e0d1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>model_name[<ref refid="system__topology_8h_1a58ce36916c399104e18d32ff090f21c6" kindref="member">MAX_STR_LEN</ref>];</highlight></codeline>
+<codeline lineno="36" refid="structCPUInfo_1a49e6a0b2a711e5acbb16ab29ed9da21f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>vendor[64];</highlight></codeline>
+<codeline lineno="37" refid="structCPUInfo_1a943858d53173dca145611d8cb192f0ca" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a943858d53173dca145611d8cb192f0ca" kindref="member">family</ref>;</highlight></codeline>
+<codeline lineno="38" refid="structCPUInfo_1a934706fb3c631457a24c2616c293b20e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a934706fb3c631457a24c2616c293b20e" kindref="member">model</ref>;</highlight></codeline>
+<codeline lineno="39" refid="structCPUInfo_1a1f7fa60b1c2d20e0eb7bc2f780461ebb" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a1f7fa60b1c2d20e0eb7bc2f780461ebb" kindref="member">stepping</ref>;</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight></codeline>
+<codeline lineno="41" refid="structCPUInfo_1a703824b64f9035d0adf5641c9d20527e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a703824b64f9035d0adf5641c9d20527e" kindref="member">physical_cores</ref>;</highlight></codeline>
+<codeline lineno="42" refid="structCPUInfo_1a0a2cdfebf8fbd74229912ed3689e753b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a0a2cdfebf8fbd74229912ed3689e753b" kindref="member">logical_cores</ref>;</highlight></codeline>
+<codeline lineno="43" refid="structCPUInfo_1aef5b41cc946c52f34e354c69a66bcde3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1aef5b41cc946c52f34e354c69a66bcde3" kindref="member">sockets</ref>;</highlight></codeline>
+<codeline lineno="44" refid="structCPUInfo_1a56944d65b1cfd32ed417f22613fd3625" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a56944d65b1cfd32ed417f22613fd3625" kindref="member">cores_per_socket</ref>;</highlight></codeline>
+<codeline lineno="45" refid="structCPUInfo_1aaf14c11cad59d839d69e7fa7e367dd05" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1aaf14c11cad59d839d69e7fa7e367dd05" kindref="member">threads_per_core</ref>;</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight></codeline>
+<codeline lineno="47" refid="structCPUInfo_1acfedda3a3d92c0fd6dde00f5757fdf92" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1acfedda3a3d92c0fd6dde00f5757fdf92" kindref="member">base_freq_mhz</ref>;</highlight></codeline>
+<codeline lineno="48" refid="structCPUInfo_1a34e7cc2aa5fd5ec5cf99828837563a61" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a34e7cc2aa5fd5ec5cf99828837563a61" kindref="member">max_freq_mhz</ref>;</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>SIMD<sp/>capabilities</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51" refid="structCPUInfo_1ad3efc23f84451ced9b6085cb036ceb7d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ad3efc23f84451ced9b6085cb036ceb7d" kindref="member">has_sse4_2</ref>;</highlight></codeline>
+<codeline lineno="52" refid="structCPUInfo_1ac02376e5e445112e00ec31ff39f0bd17" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ac02376e5e445112e00ec31ff39f0bd17" kindref="member">has_avx</ref>;</highlight></codeline>
+<codeline lineno="53" refid="structCPUInfo_1ade0ca8a679c8ba6761283507550f2b84" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ade0ca8a679c8ba6761283507550f2b84" kindref="member">has_avx2</ref>;</highlight></codeline>
+<codeline lineno="54" refid="structCPUInfo_1aabf53af233c0f5d4692beb98fa2c2434" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1aabf53af233c0f5d4692beb98fa2c2434" kindref="member">has_avx512f</ref>;</highlight></codeline>
+<codeline lineno="55" refid="structCPUInfo_1a17a91fbcd0b73af602d2504a754a1e62" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a17a91fbcd0b73af602d2504a754a1e62" kindref="member">has_avx512bw</ref>;</highlight></codeline>
+<codeline lineno="56" refid="structCPUInfo_1ac60a906dc4aaa71a6ca5453d6628fa2e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ac60a906dc4aaa71a6ca5453d6628fa2e" kindref="member">has_avx512vl</ref>;</highlight></codeline>
+<codeline lineno="57" refid="structCPUInfo_1a2f0697cf41068e3a7b9acfaa03b72dc1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a2f0697cf41068e3a7b9acfaa03b72dc1" kindref="member">has_avx512_bf16</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX-512<sp/>BF16<sp/>instructions</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="58" refid="structCPUInfo_1ac41947b54c3a9b315338aee3113b5714" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ac41947b54c3a9b315338aee3113b5714" kindref="member">has_amx</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Intel<sp/>AMX<sp/>(any<sp/>variant)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59" refid="structCPUInfo_1ad5a579994982f5cee575bb9674abd238" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1ad5a579994982f5cee575bb9674abd238" kindref="member">has_amx_tile</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AMX<sp/>tile<sp/>operations</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60" refid="structCPUInfo_1a660af436345a21868c7c6f0160cd7513" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a660af436345a21868c7c6f0160cd7513" kindref="member">has_amx_int8</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AMX<sp/>INT8<sp/>matrix<sp/>multiply</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="61" refid="structCPUInfo_1a7983ac279a57f5d5992248d720452dfe" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a7983ac279a57f5d5992248d720452dfe" kindref="member">has_amx_bf16</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AMX<sp/>BF16<sp/>matrix<sp/>multiply</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62" refid="structCPUInfo_1a2d0f8aabf38b410e7242db59a3ea63ae" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo_1a2d0f8aabf38b410e7242db59a3ea63ae" kindref="member">has_vnni</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Vector<sp/>Neural<sp/>Network<sp/>Instructions</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="63"><highlight class="normal"></highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>PCIe<sp/>lanes<sp/>(from<sp/>CPU)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65" refid="structCPUInfo_1aa67080f78191b764515728bdabf55924" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1aa67080f78191b764515728bdabf55924" kindref="member">pcie_lanes_total</ref>;</highlight></codeline>
+<codeline lineno="66" refid="structCPUInfo_1a20091b580953be0d9a6dde8938545036" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCPUInfo_1a20091b580953be0d9a6dde8938545036" kindref="member">pcie_generation</ref>;</highlight></codeline>
+<codeline lineno="67"><highlight class="normal">}<sp/><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref>;</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Cache<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="73" refid="structCacheInfo" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="74" refid="structCacheInfo_1a2bbafb632144b03c4ac4d74fea63b438" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCacheInfo_1a2bbafb632144b03c4ac4d74fea63b438" kindref="member">level</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>L1,<sp/>L2,<sp/>L3</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="75" refid="structCacheInfo_1a2d480cc7cf9fcab61720174ffad45770" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>type[16];<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;Data&quot;,<sp/>&quot;Instruction&quot;,<sp/>&quot;Unified&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76" refid="structCacheInfo_1af0d7fd2b3b6d58a409f2e91419970a87" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCacheInfo_1af0d7fd2b3b6d58a409f2e91419970a87" kindref="member">size_kb</ref>;</highlight></codeline>
+<codeline lineno="77" refid="structCacheInfo_1a6998f8578822bdc01a41f3a9d695e7ac" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCacheInfo_1a6998f8578822bdc01a41f3a9d695e7ac" kindref="member">line_size_bytes</ref>;</highlight></codeline>
+<codeline lineno="78" refid="structCacheInfo_1a9ad45f782f3a898bbd3848b8a5f52d83" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCacheInfo_1a9ad45f782f3a898bbd3848b8a5f52d83" kindref="member">ways_of_associativity</ref>;</highlight></codeline>
+<codeline lineno="79" refid="structCacheInfo_1aefdbeadd9d601084c823c530a35e4e5c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="structCacheInfo_1aefdbeadd9d601084c823c530a35e4e5c" kindref="member">shared_by_cores</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>How<sp/>many<sp/>cores<sp/>share<sp/>this<sp/>cache</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal">}<sp/><ref refid="structCacheInfo" kindref="compound">CacheInfo</ref>;</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight></codeline>
+<codeline lineno="82" refid="structCacheTopology" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="83" refid="structCacheTopology_1a7d8f011d2962b633861d25e320df4d7b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCacheTopology_1a7d8f011d2962b633861d25e320df4d7b" kindref="member">num_levels</ref>;</highlight></codeline>
+<codeline lineno="84" refid="structCacheTopology_1a312d10896e318962d7a948eb04aaddd0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCacheInfo" kindref="compound">CacheInfo</ref><sp/>levels[<ref refid="system__topology_8h_1a5a07324805d0e6b5535ccfd66a198a43" kindref="member">MAX_CACHE_LEVELS</ref>];</highlight></codeline>
+<codeline lineno="85" refid="structCacheTopology_1aad6fb272149cb50628325bed91adfa37" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCacheTopology_1aad6fb272149cb50628325bed91adfa37" kindref="member">l3_total_kb</ref>;<sp/><sp/></highlight><highlight class="comment">//<sp/>Total<sp/>L3<sp/>across<sp/>all<sp/>sockets</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal">}<sp/><ref refid="structCacheTopology" kindref="compound">CacheTopology</ref>;</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"></highlight></codeline>
+<codeline lineno="88"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="89"><highlight class="normal"></highlight><highlight class="comment">//<sp/>NUMA<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight></codeline>
+<codeline lineno="92" refid="structNUMANode" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="93" refid="structNUMANode_1a11cae96c43efc187a78bb509aa86355b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNUMANode_1a11cae96c43efc187a78bb509aa86355b" kindref="member">node_id</ref>;</highlight></codeline>
+<codeline lineno="94" refid="structNUMANode_1ad207fd0ff088689dc91e40729dc9c60a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structNUMANode_1ad207fd0ff088689dc91e40729dc9c60a" kindref="member">memory_total_mb</ref>;</highlight></codeline>
+<codeline lineno="95" refid="structNUMANode_1abe328366c0632dadc801508c6bbc44df" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structNUMANode_1abe328366c0632dadc801508c6bbc44df" kindref="member">memory_free_mb</ref>;</highlight></codeline>
+<codeline lineno="96" refid="structNUMANode_1a0c71fe04154d6a80d08829e547f5145d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/>cpu_list[<ref refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" kindref="member">MAX_CPUS</ref>];</highlight></codeline>
+<codeline lineno="97" refid="structNUMANode_1aad2dccb35d57507ce243031012618337" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNUMANode_1aad2dccb35d57507ce243031012618337" kindref="member">num_cpus</ref>;</highlight></codeline>
+<codeline lineno="98"><highlight class="normal">}<sp/><ref refid="structNUMANode" kindref="compound">NUMANode</ref>;</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"></highlight></codeline>
+<codeline lineno="100" refid="structNUMATopology" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="101" refid="structNUMATopology_1ab0befa19cd4b9b08a68d901f301e9de7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNUMATopology_1ab0befa19cd4b9b08a68d901f301e9de7" kindref="member">num_nodes</ref>;</highlight></codeline>
+<codeline lineno="102" refid="structNUMATopology_1a4f4876ca34eed1e6c7732e611a13a674" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structNUMANode" kindref="compound">NUMANode</ref><sp/>nodes[<ref refid="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" kindref="member">MAX_NUMA_NODES</ref>];</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Inter-node<sp/>distances<sp/>(for<sp/>NUMA-aware<sp/>allocation)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="104" refid="structNUMATopology_1a2a61e03ff57dd6feb35b92d1e03c0cdd" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/>distances[<ref refid="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" kindref="member">MAX_NUMA_NODES</ref>][<ref refid="system__topology_8h_1a5f98c1cce60eca018b6a3adc59298f90" kindref="member">MAX_NUMA_NODES</ref>];</highlight></codeline>
+<codeline lineno="105"><highlight class="normal">}<sp/><ref refid="structNUMATopology" kindref="compound">NUMATopology</ref>;</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"></highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Memory<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight></codeline>
+<codeline lineno="111" refid="structMemorySlot" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="112" refid="structMemorySlot_1a2ea9f80423c6a3be54933babf9d1db0f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemorySlot_1a2ea9f80423c6a3be54933babf9d1db0f" kindref="member">slot_number</ref>;</highlight></codeline>
+<codeline lineno="113" refid="structMemorySlot_1a6173783f7bdc94d89af5a150e3fdc7b3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>locator[64];<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;DIMM_A1&quot;,<sp/>&quot;P1-DIMMA1&quot;,<sp/>etc.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="114" refid="structMemorySlot_1a8db087de44e502b76946628000b9ce14" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structMemorySlot_1a8db087de44e502b76946628000b9ce14" kindref="member">populated</ref>;</highlight></codeline>
+<codeline lineno="115" refid="structMemorySlot_1a5c71e7350e86f396ab2912410be1a162" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structMemorySlot_1a5c71e7350e86f396ab2912410be1a162" kindref="member">size_mb</ref>;</highlight></codeline>
+<codeline lineno="116" refid="structMemorySlot_1afed85487a039a8b26e3e1b92453c6f59" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemorySlot_1afed85487a039a8b26e3e1b92453c6f59" kindref="member">speed_mhz</ref>;</highlight></codeline>
+<codeline lineno="117" refid="structMemorySlot_1a2356cb4cf76513cf5ef48c8c2732b5aa" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>type[32];<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;DDR4&quot;,<sp/>&quot;DDR5&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="118" refid="structMemorySlot_1a9ac221e5878a5d6ce26d7c711fced364" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemorySlot_1a9ac221e5878a5d6ce26d7c711fced364" kindref="member">rank</ref>;</highlight></codeline>
+<codeline lineno="119" refid="structMemorySlot_1af95b0bc9c39a80072ba71c88506125d3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemorySlot_1af95b0bc9c39a80072ba71c88506125d3" kindref="member">data_width_bits</ref>;</highlight></codeline>
+<codeline lineno="120"><highlight class="normal">}<sp/><ref refid="structMemorySlot" kindref="compound">MemorySlot</ref>;</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"></highlight></codeline>
+<codeline lineno="122" refid="structMemoryInfo" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="123" refid="structMemoryInfo_1a53dbc361ce7012951ceff084c52b17b9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structMemoryInfo_1a53dbc361ce7012951ceff084c52b17b9" kindref="member">total_mb</ref>;</highlight></codeline>
+<codeline lineno="124" refid="structMemoryInfo_1a72adfc47f767bf59141275a7e542f5e2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structMemoryInfo_1a72adfc47f767bf59141275a7e542f5e2" kindref="member">available_mb</ref>;</highlight></codeline>
+<codeline lineno="125" refid="structMemoryInfo_1acc92d92ac02ffaf28749375c652956e2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structMemoryInfo_1acc92d92ac02ffaf28749375c652956e2" kindref="member">cached_mb</ref>;</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>DIMM<sp/>configuration<sp/>(requires<sp/>dmidecode/root)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128" refid="structMemoryInfo_1a2409920ad9ccdec3d75c1d81f1a664d2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a2409920ad9ccdec3d75c1d81f1a664d2" kindref="member">num_slots</ref>;</highlight></codeline>
+<codeline lineno="129" refid="structMemoryInfo_1ab747a208ec62ee715eb864cfe1daec4d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1ab747a208ec62ee715eb864cfe1daec4d" kindref="member">slots_populated</ref>;</highlight></codeline>
+<codeline lineno="130" refid="structMemoryInfo_1af06394a062088cdac896d705b504ae9b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structMemorySlot" kindref="compound">MemorySlot</ref><sp/><sp/>slots[<ref refid="system__topology_8h_1a653d809668c0f9aed5323a47614f16b5" kindref="member">MAX_MEMORY_SLOTS</ref>];</highlight></codeline>
+<codeline lineno="131"><highlight class="normal"></highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Channel<sp/>configuration</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133" refid="structMemoryInfo_1a0ff8aa8993baa2138de40490c4545fff" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a0ff8aa8993baa2138de40490c4545fff" kindref="member">num_channels</ref>;</highlight></codeline>
+<codeline lineno="134" refid="structMemoryInfo_1a4a595e517746ef202bb268465dd605b4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a4a595e517746ef202bb268465dd605b4" kindref="member">channels_populated</ref>;</highlight></codeline>
+<codeline lineno="135" refid="structMemoryInfo_1ac20112f20e405d5fafdd560b3535f000" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>channel_config[64];<sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;Dual-channel&quot;,<sp/>&quot;Quad-channel&quot;,<sp/>etc.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Theoretical<sp/>bandwidth</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="138" refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a558d233f4cd92a4c8fcde4e49da7db9d" kindref="member">theoretical_bandwidth_gbs</ref>;</highlight></codeline>
+<codeline lineno="139" refid="structMemoryInfo_1a3f07269515a43e096aa98be0daa48f46" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a3f07269515a43e096aa98be0daa48f46" kindref="member">measured_bandwidth_gbs</ref>;<sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>From<sp/>actual<sp/>benchmark</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="140" refid="structMemoryInfo_1a58d128299366a3bbd1bef1b86180d2c9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a58d128299366a3bbd1bef1b86180d2c9" kindref="member">estimated_channels</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Inferred<sp/>from<sp/>measured<sp/>bandwidth</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="141"><highlight class="normal"></highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Benchmark<sp/>details<sp/>(for<sp/>transparency)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="143" refid="structMemoryInfo_1af134427563f2d7794d5cb40fe77aac7f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1af134427563f2d7794d5cb40fe77aac7f" kindref="member">bw_test_numa_node</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Which<sp/>NUMA<sp/>node<sp/>was<sp/>tested</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="144" refid="structMemoryInfo_1ac9d849331a689ebbfa4c6e65da74f990" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1ac9d849331a689ebbfa4c6e65da74f990" kindref="member">bw_test_num_threads</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>How<sp/>many<sp/>threads<sp/>used</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Memory<sp/>type<sp/>detected</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="147" refid="structMemoryInfo_1a8ac82d5b5a76eb7a19634cff450bb897" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>memory_type[32];</highlight></codeline>
+<codeline lineno="148" refid="structMemoryInfo_1a8cf60ff7368ef5b531d0722edf78b2e2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo_1a8cf60ff7368ef5b531d0722edf78b2e2" kindref="member">memory_speed_mhz</ref>;</highlight></codeline>
+<codeline lineno="149"><highlight class="normal">}<sp/><ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref>;</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"></highlight></codeline>
+<codeline lineno="151"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="152"><highlight class="normal"></highlight><highlight class="comment">//<sp/>PCIe<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="153"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"></highlight></codeline>
+<codeline lineno="155" refid="structPCIeDevice" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="156" refid="structPCIeDevice_1a3acd9044981a0acf21e4bbad490782b0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>slot_id[32];</highlight></codeline>
+<codeline lineno="157" refid="structPCIeDevice_1a7179511c6502936e503a2ff80dcf464d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>device_name[<ref refid="system__topology_8h_1a58ce36916c399104e18d32ff090f21c6" kindref="member">MAX_STR_LEN</ref>];</highlight></codeline>
+<codeline lineno="158" refid="structPCIeDevice_1ad0ee5cdc2f18d4a309e541766e95a5e6" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>vendor[64];</highlight></codeline>
+<codeline lineno="159" refid="structPCIeDevice_1a8dbbcf7fbfc94195d0832c48ae5c4fd0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1a8dbbcf7fbfc94195d0832c48ae5c4fd0" kindref="member">domain</ref>;</highlight></codeline>
+<codeline lineno="160" refid="structPCIeDevice_1a3c9a5d7185811db52d5443d767c155e7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1a3c9a5d7185811db52d5443d767c155e7" kindref="member">bus</ref>;</highlight></codeline>
+<codeline lineno="161" refid="structPCIeDevice_1a97e23b1ccdb120c47d9fef6beb9b050b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1a97e23b1ccdb120c47d9fef6beb9b050b" kindref="member">device</ref>;</highlight></codeline>
+<codeline lineno="162" refid="structPCIeDevice_1a492fb416b29956d0442ec47c57c3f091" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">function</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"></highlight></codeline>
+<codeline lineno="164" refid="structPCIeDevice_1a8119bb375e580a3302f3110f689fc213" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1a8119bb375e580a3302f3110f689fc213" kindref="member">link_width</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>x1,<sp/>x4,<sp/>x8,<sp/>x16</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="165" refid="structPCIeDevice_1adca9565208f9aefc3cee61726d1a86de" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1adca9565208f9aefc3cee61726d1a86de" kindref="member">link_width_max</ref>;<sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Maximum<sp/>supported</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166" refid="structPCIeDevice_1adccc4e7aa824d93f3b046cb67e5fbf5b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1adccc4e7aa824d93f3b046cb67e5fbf5b" kindref="member">link_speed</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>PCIe<sp/>generation<sp/>(3,<sp/>4,<sp/>5,<sp/>6)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="167" refid="structPCIeDevice_1acd83cab295bf599ca7f3d1e8d6268094" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1acd83cab295bf599ca7f3d1e8d6268094" kindref="member">link_speed_max</ref>;</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"></highlight></codeline>
+<codeline lineno="169" refid="structPCIeDevice_1afc8e2ec8cb06bb20fd879836155ad92a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1afc8e2ec8cb06bb20fd879836155ad92a" kindref="member">bandwidth_gbs</ref>;<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Current<sp/>bandwidth</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="170" refid="structPCIeDevice_1ae2b77fabb6cbd4700ce8cff006bdf2ab" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1ae2b77fabb6cbd4700ce8cff006bdf2ab" kindref="member">bandwidth_max_gbs</ref>;<sp/></highlight><highlight class="comment">//<sp/>Maximum<sp/>possible</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="171"><highlight class="normal"></highlight></codeline>
+<codeline lineno="172" refid="structPCIeDevice_1ae033008e7db3ee6fb53a892836d93cf0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1ae033008e7db3ee6fb53a892836d93cf0" kindref="member">is_gpu</ref>;</highlight></codeline>
+<codeline lineno="173" refid="structPCIeDevice_1afc1f0a1bb21313d965608d9dac1f2ab4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1afc1f0a1bb21313d965608d9dac1f2ab4" kindref="member">is_nic</ref>;</highlight></codeline>
+<codeline lineno="174" refid="structPCIeDevice_1a3abe79544a7e4bac54aa643d784ed815" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice_1a3abe79544a7e4bac54aa643d784ed815" kindref="member">is_nvme</ref>;</highlight></codeline>
+<codeline lineno="175"><highlight class="normal">}<sp/><ref refid="structPCIeDevice" kindref="compound">PCIeDevice</ref>;</highlight></codeline>
+<codeline lineno="176"><highlight class="normal"></highlight></codeline>
+<codeline lineno="177" refid="structPCIeTopology" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="178" refid="structPCIeTopology_1ac42eaf6c16f881a6098cf8e443503936" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1ac42eaf6c16f881a6098cf8e443503936" kindref="member">num_devices</ref>;</highlight></codeline>
+<codeline lineno="179" refid="structPCIeTopology_1a8abdf84a7b22a1bd888b4d50efc10e8c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structPCIeDevice" kindref="compound">PCIeDevice</ref><sp/><sp/>devices[<ref refid="system__topology_8h_1aeb96e2b430111e055cfe76293dbf2258" kindref="member">MAX_PCIE_DEVICES</ref>];</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"></highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Summary</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="182" refid="structPCIeTopology_1ad6202b8874dbca1e0fdd88dc9a899203" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1ad6202b8874dbca1e0fdd88dc9a899203" kindref="member">total_lanes_used</ref>;</highlight></codeline>
+<codeline lineno="183" refid="structPCIeTopology_1a8fabded9e6dd8d7efb115abfd5d38044" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1a8fabded9e6dd8d7efb115abfd5d38044" kindref="member">total_lanes_available</ref>;</highlight></codeline>
+<codeline lineno="184" refid="structPCIeTopology_1a609de1883e5729bd1a9e658ef6f062fe" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1a609de1883e5729bd1a9e658ef6f062fe" kindref="member">empty_x16_slots</ref>;</highlight></codeline>
+<codeline lineno="185" refid="structPCIeTopology_1a1bee054acd7b3485af38b94205bfd15a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1a1bee054acd7b3485af38b94205bfd15a" kindref="member">empty_x8_slots</ref>;</highlight></codeline>
+<codeline lineno="186" refid="structPCIeTopology_1a63e90e092c8c9aa11e8d664fa2a21afd" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology_1a63e90e092c8c9aa11e8d664fa2a21afd" kindref="member">empty_x4_slots</ref>;</highlight></codeline>
+<codeline lineno="187"><highlight class="normal">}<sp/><ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref>;</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"></highlight></codeline>
+<codeline lineno="189"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="190"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Network<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="191"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="192"><highlight class="normal"></highlight></codeline>
+<codeline lineno="193" refid="structNetworkInterface" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="194" refid="structNetworkInterface_1a260f76fbda4cab4180579f1bf506bf76" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>name[32];<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>eth0,<sp/>enp3s0,<sp/>ib0</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="195" refid="structNetworkInterface_1a63e2fdf290d8a23dc2f92cf28e87e870" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>driver[64];</highlight></codeline>
+<codeline lineno="196" refid="structNetworkInterface_1a5c06474416d85a879cf5ae151eaff925" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>pci_address[32];</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"></highlight></codeline>
+<codeline lineno="198" refid="structNetworkInterface_1a9d513cd66a61a93b6b09cd3ab6cfe923" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint64_t<sp/><ref refid="structNetworkInterface_1a9d513cd66a61a93b6b09cd3ab6cfe923" kindref="member">speed_mbps</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Link<sp/>speed<sp/>in<sp/>Mbps</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="199" refid="structNetworkInterface_1a4d1f0f6d6f8e5ba00f06945274ac913b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a4d1f0f6d6f8e5ba00f06945274ac913b" kindref="member">is_up</ref>;</highlight></codeline>
+<codeline lineno="200" refid="structNetworkInterface_1a6aeca68cb500898ceebc5a70b984ed10" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a6aeca68cb500898ceebc5a70b984ed10" kindref="member">has_link</ref>;</highlight></codeline>
+<codeline lineno="201"><highlight class="normal"></highlight></codeline>
+<codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Capabilities</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="203" refid="structNetworkInterface_1a3a7b2f85e17f8e861ea160f94ade4a46" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a3a7b2f85e17f8e861ea160f94ade4a46" kindref="member">supports_rdma</ref>;<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>RoCE<sp/>or<sp/>InfiniBand</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="204" refid="structNetworkInterface_1a943270da345cf36912ed3ec3a957e15c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a943270da345cf36912ed3ec3a957e15c" kindref="member">supports_roce</ref>;</highlight></codeline>
+<codeline lineno="205" refid="structNetworkInterface_1aa20cea6954f397c45963b6b2af648424" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1aa20cea6954f397c45963b6b2af648424" kindref="member">is_infiniband</ref>;</highlight></codeline>
+<codeline lineno="206" refid="structNetworkInterface_1a84e07456601797298baa97779bbee579" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a84e07456601797298baa97779bbee579" kindref="member">ib_port</ref>;</highlight></codeline>
+<codeline lineno="207"><highlight class="normal"></highlight></codeline>
+<codeline lineno="208" refid="structNetworkInterface_1ac8dc723c11bc1dec2ae9e5f1cdd23a6f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>mac_address[24];</highlight></codeline>
+<codeline lineno="209" refid="structNetworkInterface_1aa5b7cc8f6a3d7e752041f23e84231e5b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1aa5b7cc8f6a3d7e752041f23e84231e5b" kindref="member">mtu</ref>;</highlight></codeline>
+<codeline lineno="210"><highlight class="normal"></highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>PCIe<sp/>info<sp/>for<sp/>this<sp/>NIC</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="212" refid="structNetworkInterface_1a96c5c432b9800d9475c5b71b03d956d4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a96c5c432b9800d9475c5b71b03d956d4" kindref="member">pcie_width</ref>;</highlight></codeline>
+<codeline lineno="213" refid="structNetworkInterface_1a156a7eee11ff7323838f53326e25d730" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1a156a7eee11ff7323838f53326e25d730" kindref="member">pcie_gen</ref>;</highlight></codeline>
+<codeline lineno="214" refid="structNetworkInterface_1ab9e58b0578b858e7b6b56e12bd14d22c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface_1ab9e58b0578b858e7b6b56e12bd14d22c" kindref="member">pcie_bandwidth_gbs</ref>;</highlight></codeline>
+<codeline lineno="215"><highlight class="normal">}<sp/><ref refid="structNetworkInterface" kindref="compound">NetworkInterface</ref>;</highlight></codeline>
+<codeline lineno="216"><highlight class="normal"></highlight></codeline>
+<codeline lineno="217" refid="structNetworkTopology" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="218" refid="structNetworkTopology_1a7a5a3efd266abd1e16b70d230996ff2a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkTopology_1a7a5a3efd266abd1e16b70d230996ff2a" kindref="member">num_interfaces</ref>;</highlight></codeline>
+<codeline lineno="219" refid="structNetworkTopology_1a31ec354a019961b6c7619bd2f71696ca" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structNetworkInterface" kindref="compound">NetworkInterface</ref><sp/><sp/>interfaces[<ref refid="system__topology_8h_1ab44d92c45e9155a2b343f0372630ec35" kindref="member">MAX_NICS</ref>];</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Best<sp/>interface<sp/>for<sp/>distributed<sp/>training</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="222" refid="structNetworkTopology_1adcb93d96209df982a321bc0a16c37637" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkTopology_1adcb93d96209df982a321bc0a16c37637" kindref="member">best_interface_idx</ref>;</highlight></codeline>
+<codeline lineno="223" refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkTopology_1a5f8d19a3f445156a99bef038300d3887" kindref="member">max_bandwidth_gbs</ref>;</highlight></codeline>
+<codeline lineno="224" refid="structNetworkTopology_1ac4760fd463a39d60907a0a453846c1e2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structNetworkTopology_1ac4760fd463a39d60907a0a453846c1e2" kindref="member">has_rdma</ref>;</highlight></codeline>
+<codeline lineno="225"><highlight class="normal">}<sp/><ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref>;</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"></highlight></codeline>
+<codeline lineno="227"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="228"><highlight class="normal"></highlight><highlight class="comment">//<sp/>OpenMP<sp/>/<sp/>Affinity<sp/>Information</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="229"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="230"><highlight class="normal"></highlight></codeline>
+<codeline lineno="231" refid="structAffinityInfo" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="232" refid="structAffinityInfo_1a335a14b8b3b93f722ef8e2b6455122f5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structAffinityInfo_1a335a14b8b3b93f722ef8e2b6455122f5" kindref="member">omp_num_threads</ref>;</highlight></codeline>
+<codeline lineno="233" refid="structAffinityInfo_1aed549054fb9376cc874f3d8d710d1e89" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>omp_proc_bind[32];<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;close&quot;,<sp/>&quot;spread&quot;,<sp/>&quot;master&quot;,<sp/>etc.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="234" refid="structAffinityInfo_1ac336f376702b1b1724111b291c9fac84" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/>omp_places[64];<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>&quot;cores&quot;,<sp/>&quot;threads&quot;,<sp/>&quot;sockets&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="235" refid="structAffinityInfo_1ad7c543698d7fa66a65b006a8e16e5368" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><ref refid="structAffinityInfo_1ad7c543698d7fa66a65b006a8e16e5368" kindref="member">affinity_set</ref>;</highlight></codeline>
+<codeline lineno="236"><highlight class="normal"></highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Current<sp/>process<sp/>affinity</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="238" refid="structAffinityInfo_1a905e3d4bab481748227b9b65665a82fa" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/>affinity_cpus[<ref refid="system__topology_8h_1a87cbc7cff225b4ad63d67d47c21f933f" kindref="member">MAX_CPUS</ref>];</highlight></codeline>
+<codeline lineno="239" refid="structAffinityInfo_1aa8aceed4896f9d850b42199624e74f02" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structAffinityInfo_1aa8aceed4896f9d850b42199624e74f02" kindref="member">num_affinity_cpus</ref>;</highlight></codeline>
+<codeline lineno="240"><highlight class="normal">}<sp/><ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref>;</highlight></codeline>
+<codeline lineno="241"><highlight class="normal"></highlight></codeline>
+<codeline lineno="242"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="243"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Complete<sp/>System<sp/>Topology</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="244"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="245"><highlight class="normal"></highlight></codeline>
+<codeline lineno="246" refid="structSystemTopology" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="247" refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1adc508695d39b4d03b78e2cda88d0f936" kindref="member">cpu</ref>;</highlight></codeline>
+<codeline lineno="248" refid="structSystemTopology_1a5987f9ac86ee94f588a8fcfaf85d2cf7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCacheTopology" kindref="compound">CacheTopology</ref><sp/><sp/><sp/><ref refid="structSystemTopology_1a5987f9ac86ee94f588a8fcfaf85d2cf7" kindref="member">cache</ref>;</highlight></codeline>
+<codeline lineno="249" refid="structSystemTopology_1a614df36f023f6261b3819210d15a5fe7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structNUMATopology" kindref="compound">NUMATopology</ref><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1a614df36f023f6261b3819210d15a5fe7" kindref="member">numa</ref>;</highlight></codeline>
+<codeline lineno="250" refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1ade48f238648fc39edab32fb0b27c71bd" kindref="member">memory</ref>;</highlight></codeline>
+<codeline lineno="251" refid="structSystemTopology_1a9dcefa468bbc7aaceb4d0a8cab2d3a31" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1a9dcefa468bbc7aaceb4d0a8cab2d3a31" kindref="member">pcie</ref>;</highlight></codeline>
+<codeline lineno="252" refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref><sp/><ref refid="structSystemTopology_1acd053af7e490ac86ff6e4d0703daf8dc" kindref="member">network</ref>;</highlight></codeline>
+<codeline lineno="253" refid="structSystemTopology_1afe211eb662869fd63bc5191d0fde7086" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1afe211eb662869fd63bc5191d0fde7086" kindref="member">affinity</ref>;</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"></highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Flags</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="256" refid="structSystemTopology_1aeb78a0d10978d57768a6d03e4a94497b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structSystemTopology_1aeb78a0d10978d57768a6d03e4a94497b" kindref="member">has_root_access</ref>;</highlight></codeline>
+<codeline lineno="257" refid="structSystemTopology_1a8c3a908fdf3d9b0c50e3346a66f68a13" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>hostname[256];</highlight></codeline>
+<codeline lineno="258" refid="structSystemTopology_1aea0398c023b6251b7e490f65c74edc73" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>kernel_version[128];</highlight></codeline>
+<codeline lineno="259"><highlight class="normal">}<sp/><ref refid="structSystemTopology" kindref="compound">SystemTopology</ref>;</highlight></codeline>
+<codeline lineno="260"><highlight class="normal"></highlight></codeline>
+<codeline lineno="261"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="262"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Recommendations</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="263"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="264"><highlight class="normal"></highlight></codeline>
+<codeline lineno="265" refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">enum</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="266" refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69aff18fa78a746a2cfe6521f96f2985d0d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69aff18fa78a746a2cfe6521f96f2985d0d" kindref="member">REC_PRIORITY_LOW</ref>,</highlight></codeline>
+<codeline lineno="267" refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ac060aa16ba5ff6de278ec1a69c992740" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ac060aa16ba5ff6de278ec1a69c992740" kindref="member">REC_PRIORITY_MEDIUM</ref>,</highlight></codeline>
+<codeline lineno="268" refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ae2b3a4412e439de7cd932d5c9c239628" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ae2b3a4412e439de7cd932d5c9c239628" kindref="member">REC_PRIORITY_HIGH</ref>,</highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ad2c44c068f9a309b584934d165738405" kindref="member">REC_PRIORITY_CRITICAL</ref></highlight></codeline>
+<codeline lineno="270" refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69ad2c44c068f9a309b584934d165738405" refkind="member"><highlight class="normal">}<sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69" kindref="member">RecommendationPriority</ref>;</highlight></codeline>
+<codeline lineno="271"><highlight class="normal"></highlight></codeline>
+<codeline lineno="272" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">enum</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="273" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a86e1aa77256345474354d36dade4c2cc" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a86e1aa77256345474354d36dade4c2cc" kindref="member">REC_CATEGORY_MEMORY</ref>,</highlight></codeline>
+<codeline lineno="274" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e" kindref="member">REC_CATEGORY_CPU</ref>,</highlight></codeline>
+<codeline lineno="275" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba" kindref="member">REC_CATEGORY_NETWORK</ref>,</highlight></codeline>
+<codeline lineno="276" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b" kindref="member">REC_CATEGORY_AFFINITY</ref>,</highlight></codeline>
+<codeline lineno="277"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446ab4c62d868d6055729709c1e2b51bf688" kindref="member">REC_CATEGORY_PCIE</ref></highlight></codeline>
+<codeline lineno="278" refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446ab4c62d868d6055729709c1e2b51bf688" refkind="member"><highlight class="normal">}<sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446" kindref="member">RecommendationCategory</ref>;</highlight></codeline>
+<codeline lineno="279"><highlight class="normal"></highlight></codeline>
+<codeline lineno="280" refid="system__topology_8h_1a418478bfd80cdc978000fcd7e8ab9c28" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MAX_RECOMMENDATIONS<sp/>32</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="281"><highlight class="normal"></highlight></codeline>
+<codeline lineno="282" refid="structRecommendation" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="283" refid="structRecommendation_1a2dea715a398d739605559094647c11eb" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1aabe7a1b1ca3c4e61061d2fbc43762a69" kindref="member">RecommendationPriority</ref><sp/><ref refid="structRecommendation_1a2dea715a398d739605559094647c11eb" kindref="member">priority</ref>;</highlight></codeline>
+<codeline lineno="284" refid="structRecommendation_1aa8cbf25679d19f8407ac276b25c1b1bf" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="system__topology_8h_1abc3893de9bbd40dc5a7191b3dedcf446" kindref="member">RecommendationCategory</ref><sp/><ref refid="structRecommendation_1aa8cbf25679d19f8407ac276b25c1b1bf" kindref="member">category</ref>;</highlight></codeline>
+<codeline lineno="285" refid="structRecommendation_1ab10fd7bc5c1c6eee44e39a537f53cc51" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>title[128];</highlight></codeline>
+<codeline lineno="286" refid="structRecommendation_1ac691a32118bd2279bf9536d183329119" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>description[512];</highlight></codeline>
+<codeline lineno="287" refid="structRecommendation_1ad4009263d6f5d6e3feeab261f071beaf" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>action[256];</highlight></codeline>
+<codeline lineno="288"><highlight class="normal">}<sp/><ref refid="structRecommendation" kindref="compound">Recommendation</ref>;</highlight></codeline>
+<codeline lineno="289"><highlight class="normal"></highlight></codeline>
+<codeline lineno="290" refid="structRecommendationList" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="291" refid="structRecommendationList_1a07a86874728786aa76e45da00a7f5af9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structRecommendationList_1a07a86874728786aa76e45da00a7f5af9" kindref="member">num_recommendations</ref>;</highlight></codeline>
+<codeline lineno="292" refid="structRecommendationList_1a63246ddf4369acfa638cf19f1de2cf3e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structRecommendation" kindref="compound">Recommendation</ref><sp/>recommendations[<ref refid="system__topology_8h_1a418478bfd80cdc978000fcd7e8ab9c28" kindref="member">MAX_RECOMMENDATIONS</ref>];</highlight></codeline>
+<codeline lineno="293"><highlight class="normal">}<sp/><ref refid="structRecommendationList" kindref="compound">RecommendationList</ref>;</highlight></codeline>
+<codeline lineno="294"><highlight class="normal"></highlight></codeline>
+<codeline lineno="295"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="296"><highlight class="normal"></highlight><highlight class="comment">//<sp/>API<sp/>Functions</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="297"><highlight class="normal"></highlight><highlight class="comment">//<sp/>═══════════════════════════════════════════════════════════════════════════════</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="298"><highlight class="normal"></highlight></codeline>
+<codeline lineno="299"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Main<sp/>discovery<sp/>function</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="300"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a3fd4135ab056f548986d55e3864316f2" kindref="member">topology_discover</ref>(<ref refid="structSystemTopology" kindref="compound">SystemTopology</ref><sp/>*topo);</highlight></codeline>
+<codeline lineno="301"><highlight class="normal"></highlight></codeline>
+<codeline lineno="302"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Individual<sp/>discovery<sp/>functions</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="303"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a4367943c7d4c62e0865d1171252a6b84" kindref="member">topology_discover_cpu</ref>(<ref refid="structCPUInfo" kindref="compound">CPUInfo</ref><sp/>*cpu);</highlight></codeline>
+<codeline lineno="304"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a6a740276441a137e33d3b11888bfd2da" kindref="member">topology_discover_cache</ref>(<ref refid="structCacheTopology" kindref="compound">CacheTopology</ref><sp/>*cache);</highlight></codeline>
+<codeline lineno="305"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1afd3ae767003bf9070768199caa3f7ee1" kindref="member">topology_discover_numa</ref>(<ref refid="structNUMATopology" kindref="compound">NUMATopology</ref><sp/>*numa);</highlight></codeline>
+<codeline lineno="306"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a349f2755a1cb7361bbbe5c729985136d" kindref="member">topology_discover_memory</ref>(<ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref><sp/>*mem);</highlight></codeline>
+<codeline lineno="307"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a3e80c10682d58f63c4fa70b98e6a7dfb" kindref="member">topology_discover_pcie</ref>(<ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref><sp/>*pcie);</highlight></codeline>
+<codeline lineno="308"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1a8d1095a0656548a8adae0cf8ad6a59cd" kindref="member">topology_discover_network</ref>(<ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref><sp/>*net);</highlight></codeline>
+<codeline lineno="309"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1af347a49445c57e42f3d5edba2039591e" kindref="member">topology_discover_affinity</ref>(<ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref><sp/>*aff);</highlight></codeline>
+<codeline lineno="310"><highlight class="normal"></highlight></codeline>
+<codeline lineno="311"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Generate<sp/>recommendations</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="312"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><sp/><ref refid="system__topology_8h_1ac739fbe17c86f1c7e9da9c6ad2a8b176" kindref="member">topology_generate_recommendations</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structSystemTopology" kindref="compound">SystemTopology</ref><sp/>*topo,</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structRecommendationList" kindref="compound">RecommendationList</ref><sp/>*recs);</highlight></codeline>
+<codeline lineno="314"><highlight class="normal"></highlight></codeline>
+<codeline lineno="315"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Display<sp/>functions</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="316"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1ae2a6ad58442a4e6de7cdfa4aeea1ec02" kindref="member">topology_print_summary</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structSystemTopology" kindref="compound">SystemTopology</ref><sp/>*topo);</highlight></codeline>
+<codeline lineno="317"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a621b3bfcacc31268f4aad1bd39ecb3a2" kindref="member">topology_print_cpu</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCPUInfo" kindref="compound">CPUInfo</ref><sp/>*cpu);</highlight></codeline>
+<codeline lineno="318"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1afbc559e029cc2c0fddd0a1dac9b1be20" kindref="member">topology_print_cache</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCacheTopology" kindref="compound">CacheTopology</ref><sp/>*cache,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>logical_cores);</highlight></codeline>
+<codeline lineno="319"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a581eb0fabf70e820ff545c69554999b0" kindref="member">topology_print_numa</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structNUMATopology" kindref="compound">NUMATopology</ref><sp/>*numa,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>sockets);</highlight></codeline>
+<codeline lineno="320"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a274dcedf2b6259112dff57aa23f55d15" kindref="member">topology_print_memory</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref><sp/>*mem);</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a49b1de1d6444775ae1462fc35c1c990e" kindref="member">topology_print_pcie</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structPCIeTopology" kindref="compound">PCIeTopology</ref><sp/>*pcie);</highlight></codeline>
+<codeline lineno="322"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a440e3e819b2e718bf7ea8513f33b1f30" kindref="member">topology_print_network</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref><sp/>*net);</highlight></codeline>
+<codeline lineno="323"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1ab03a6d20880e7f93998b361c0036ea44" kindref="member">topology_print_affinity</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structAffinityInfo" kindref="compound">AffinityInfo</ref><sp/>*aff);</highlight></codeline>
+<codeline lineno="324"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1adaa69e0d4a8c8c3b9e50adcd45db083b" kindref="member">topology_print_recommendations</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structRecommendationList" kindref="compound">RecommendationList</ref><sp/>*recs);</highlight></codeline>
+<codeline lineno="325"><highlight class="normal"></highlight></codeline>
+<codeline lineno="326"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Distributed<sp/>training<sp/>info</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="327"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1a4d42196463c5ba39847e24ebe52bfbad" kindref="member">topology_print_distributed_potential</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structSystemTopology" kindref="compound">SystemTopology</ref><sp/>*topo);</highlight></codeline>
+<codeline lineno="328"><highlight class="normal"></highlight></codeline>
+<codeline lineno="329"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Utility</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="330"><highlight class="normal"></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1ae541edad293faa847014c35c8e6411a5" kindref="member">topology_estimate_memory_bandwidth</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structMemoryInfo" kindref="compound">MemoryInfo</ref><sp/>*mem);</highlight></codeline>
+<codeline lineno="331"><highlight class="normal"></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="system__topology_8h_1ab165ff3667f6ee7cca36f51b5a6bad20" kindref="member">topology_estimate_network_training_time</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structNetworkTopology" kindref="compound">NetworkTopology</ref><sp/>*net,</highlight></codeline>
+<codeline lineno="332"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint64_t<sp/>model_size_mb);</highlight></codeline>
+<codeline lineno="333"><highlight class="normal"></highlight></codeline>
+<codeline lineno="334"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="335"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="336"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="337"><highlight class="normal"></highlight></codeline>
+<codeline lineno="338"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">//<sp/>SYSTEM_TOPOLOGY_H</highlight><highlight class="normal"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/system_topology.h"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 780">
+  <defs>
+    <linearGradient id="fwdGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <marker id="fwdArrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="fwdArrowDown" markerWidth="7" markerHeight="10" refX="3.5" refY="9" orient="auto">
+      <polygon points="0 0, 3.5 10, 7 0" fill="#ffb400"/>
+    </marker>
+    <marker id="skipArrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="780" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="30" font-family="Inter, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">Forward &amp; Backward Pass Data Flow</text>
+  <text x="450" y="50" font-family="Inter, sans-serif" font-size="12" fill="#707070" text-anchor="middle">C-Kernel-Engine Pre-LN Transformer Layer</text>
+
+  <!-- Legend -->
+  <g transform="translate(280, 70)">
+    <line x1="0" y1="0" x2="40" y2="0" stroke="#ffb400" stroke-width="3" marker-end="url(#fwdArrow)"/>
+    <text x="55" y="5" font-family="Inter, sans-serif" font-size="11" fill="#ffb400">Forward</text>
+    <line x1="140" y1="0" x2="180" y2="0" stroke="#47b475" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#skipArrow)"/>
+    <text x="195" y="5" font-family="Inter, sans-serif" font-size="11" fill="#47b475">Residual</text>
+    <rect x="280" y="-8" width="50" height="16" rx="3" fill="#1a3d2a"/>
+    <text x="305" y="4" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Backward</text>
+  </g>
+
+  <!-- ==================== SELF-ATTENTION BLOCK ==================== -->
+  <rect x="60" y="100" width="380" height="230" rx="8" fill="none" stroke="#404040" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="70" y="118" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#606060">Self-Attention Block</text>
+
+  <!-- Input x -->
+  <g transform="translate(80, 140)">
+    <rect width="70" height="45" rx="5" fill="#2a2a2a" stroke="#606060" stroke-width="2" filter="url(#shadow)"/>
+    <text x="35" y="20" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#a0a0a0" text-anchor="middle">x</text>
+    <text x="35" y="35" font-family="monospace" font-size="9" fill="#505050" text-anchor="middle">[T, D]</text>
+  </g>
+
+  <!-- RMSNorm 1 -->
+  <g transform="translate(180, 135)">
+    <rect width="80" height="55" rx="5" fill="#2a2a2a" stroke="url(#fwdGrad)" stroke-width="2" filter="url(#shadow)"/>
+    <text x="40" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffb400" text-anchor="middle">RMSNorm</text>
+    <text x="40" y="32" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">save: rstd</text>
+    <rect x="8" y="40" width="64" height="12" rx="2" fill="#1a3d2a"/>
+    <text x="40" y="49" font-family="Inter, sans-serif" font-size="7" fill="#47b475" text-anchor="middle">d_x, d_γ</text>
+  </g>
+
+  <!-- Attention (combined box) -->
+  <g transform="translate(290, 135)">
+    <rect width="130" height="55" rx="5" fill="#2a2a2a" stroke="url(#fwdGrad)" stroke-width="2" filter="url(#shadow)"/>
+    <text x="65" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffb400" text-anchor="middle">QKV → Attn → O</text>
+    <text x="65" y="32" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">save: Q,K,V,scores</text>
+    <rect x="8" y="40" width="114" height="12" rx="2" fill="#1a3d2a"/>
+    <text x="65" y="49" font-family="Inter, sans-serif" font-size="7" fill="#47b475" text-anchor="middle">d_Wq,Wk,Wv,Wo</text>
+  </g>
+
+  <!-- Forward arrows for attention block -->
+  <line x1="150" y1="162" x2="175" y2="162" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrow)"/>
+  <line x1="260" y1="162" x2="285" y2="162" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrow)"/>
+
+  <!-- Add 1 (circle) -->
+  <g transform="translate(340, 220)">
+    <circle cx="15" cy="15" r="16" fill="#2a2a2a" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <text x="15" y="20" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#47b475" text-anchor="middle">+</text>
+  </g>
+
+  <!-- Arrow from Attention to Add -->
+  <line x1="355" y1="190" x2="355" y2="215" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrowDown)"/>
+
+  <!-- Residual 1: x to Add1 -->
+  <path d="M 115 185 L 115 235 L 320 235" fill="none" stroke="#47b475" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#skipArrow)"/>
+  <text x="200" y="248" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">x + Attn(RMSNorm(x))</text>
+
+  <!-- h1 output -->
+  <g transform="translate(320, 280)">
+    <rect width="70" height="40" rx="5" fill="#2a2a2a" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <text x="35" y="17" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">h1</text>
+    <text x="35" y="32" font-family="monospace" font-size="9" fill="#505050" text-anchor="middle">[T, D]</text>
+  </g>
+
+  <!-- Arrow from Add1 to h1 -->
+  <line x1="355" y1="251" x2="355" y2="275" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrowDown)"/>
+
+  <!-- ==================== MLP BLOCK ==================== -->
+  <rect x="460" y="100" width="380" height="230" rx="8" fill="none" stroke="#404040" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="470" y="118" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#606060">MLP Block</text>
+
+  <!-- Arrow from h1 to MLP block -->
+  <path d="M 390 300 L 450 300 L 450 162 L 480 162" fill="none" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrow)"/>
+
+  <!-- RMSNorm 2 -->
+  <g transform="translate(485, 135)">
+    <rect width="80" height="55" rx="5" fill="#2a2a2a" stroke="url(#fwdGrad)" stroke-width="2" filter="url(#shadow)"/>
+    <text x="40" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffb400" text-anchor="middle">RMSNorm</text>
+    <text x="40" y="32" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">save: rstd</text>
+    <rect x="8" y="40" width="64" height="12" rx="2" fill="#1a3d2a"/>
+    <text x="40" y="49" font-family="Inter, sans-serif" font-size="7" fill="#47b475" text-anchor="middle">d_h1, d_γ</text>
+  </g>
+
+  <!-- MLP (combined box) -->
+  <g transform="translate(595, 135)">
+    <rect width="130" height="55" rx="5" fill="#2a2a2a" stroke="url(#fwdGrad)" stroke-width="2" filter="url(#shadow)"/>
+    <text x="65" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffb400" text-anchor="middle">FC1 → SwiGLU → FC2</text>
+    <text x="65" y="32" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">save: fc1, gate</text>
+    <rect x="8" y="40" width="114" height="12" rx="2" fill="#1a3d2a"/>
+    <text x="65" y="49" font-family="Inter, sans-serif" font-size="7" fill="#47b475" text-anchor="middle">d_W1,d_W2</text>
+  </g>
+
+  <!-- Forward arrows for MLP block -->
+  <line x1="565" y1="162" x2="590" y2="162" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrow)"/>
+
+  <!-- Add 2 (circle) -->
+  <g transform="translate(645, 220)">
+    <circle cx="15" cy="15" r="16" fill="#2a2a2a" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <text x="15" y="20" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#47b475" text-anchor="middle">+</text>
+  </g>
+
+  <!-- Arrow from MLP to Add2 -->
+  <line x1="660" y1="190" x2="660" y2="215" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrowDown)"/>
+
+  <!-- Residual 2: h1 to Add2 -->
+  <path d="M 450 300 L 450 235 L 625 235" fill="none" stroke="#47b475" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#skipArrow)"/>
+  <text x="530" y="248" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">h1 + MLP(RMSNorm(h1))</text>
+
+  <!-- Output -->
+  <g transform="translate(625, 280)">
+    <rect width="70" height="40" rx="5" fill="#2a2a2a" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <text x="35" y="17" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">output</text>
+    <text x="35" y="32" font-family="monospace" font-size="9" fill="#505050" text-anchor="middle">[T, D]</text>
+  </g>
+
+  <!-- Arrow from Add2 to Output -->
+  <line x1="660" y1="251" x2="660" y2="275" stroke="#ffb400" stroke-width="2" marker-end="url(#fwdArrowDown)"/>
+
+  <!-- ==================== EQUATIONS ==================== -->
+  <g transform="translate(50, 360)">
+    <rect width="800" height="80" rx="8" fill="#1a1a2a" stroke="#3a3a5a" stroke-width="1"/>
+    <text x="400" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#a0a0c0" text-anchor="middle">Pre-LN Transformer Equations</text>
+    <text x="200" y="50" font-family="monospace" font-size="11" fill="#c0c0e0" text-anchor="middle">h1 = x + Attention(RMSNorm(x))</text>
+    <text x="600" y="50" font-family="monospace" font-size="11" fill="#c0c0e0" text-anchor="middle">out = h1 + MLP(RMSNorm(h1))</text>
+    <text x="400" y="70" font-family="Inter, sans-serif" font-size="10" fill="#707090" text-anchor="middle">Residual connections preserve gradient flow and enable deep networks</text>
+  </g>
+
+  <!-- ==================== BACKWARD PASS ==================== -->
+  <g transform="translate(50, 460)">
+    <rect width="800" height="170" rx="10" fill="#1a2d3d" stroke="#07adf8" stroke-width="2"/>
+    <text x="400" y="25" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#07adf8" text-anchor="middle">Backward Pass</text>
+
+    <!-- Backward flow diagram -->
+    <text x="400" y="50" font-family="Inter, sans-serif" font-size="10" fill="#5090b0" text-anchor="middle">Gradient flows in reverse, splitting at each residual Add:</text>
+
+    <g transform="translate(100, 65)">
+      <text x="0" y="0" font-family="monospace" font-size="10" fill="#70b0d0">d_out</text>
+      <text x="60" y="0" font-family="Inter, sans-serif" font-size="10" fill="#5090b0">→ splits at Add2 →</text>
+      <text x="190" y="0" font-family="monospace" font-size="10" fill="#70b0d0">d_mlp + d_h1_residual</text>
+    </g>
+
+    <g transform="translate(100, 85)">
+      <text x="0" y="0" font-family="monospace" font-size="10" fill="#70b0d0">d_h1</text>
+      <text x="60" y="0" font-family="Inter, sans-serif" font-size="10" fill="#5090b0">→ splits at Add1 →</text>
+      <text x="190" y="0" font-family="monospace" font-size="10" fill="#70b0d0">d_attn + d_x_residual</text>
+    </g>
+
+    <text x="400" y="120" font-family="Inter, sans-serif" font-size="11" fill="#3fc1fa" text-anchor="middle">Each kernel computes gradients using saved forward activations:</text>
+
+    <g transform="translate(80, 135)">
+      <rect x="0" y="0" width="180" height="25" rx="4" fill="#1a3d2a"/>
+      <text x="90" y="17" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">d_W (weights) for SGD update</text>
+    </g>
+    <g transform="translate(280, 135)">
+      <rect x="0" y="0" width="180" height="25" rx="4" fill="#1a3d2a"/>
+      <text x="90" y="17" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">d_γ (RMSNorm scales)</text>
+    </g>
+    <g transform="translate(480, 135)">
+      <rect x="0" y="0" width="180" height="25" rx="4" fill="#1a3d2a"/>
+      <text x="90" y="17" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">d_input (for next layer)</text>
+    </g>
+  </g>
+
+  <!-- ==================== ARCHITECTURE VARIANTS ==================== -->
+  <g transform="translate(50, 645)">
+    <rect width="800" height="120" rx="10" fill="#2a1a1a" stroke="#c04040" stroke-width="1"/>
+    <text x="400" y="22" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#e07070" text-anchor="middle">Architecture Variants: The Key is the Clean Skip Path</text>
+
+    <!-- Pre-LN column -->
+    <g transform="translate(30, 40)">
+      <rect x="0" y="0" width="230" height="65" rx="5" fill="#1a2d1a" stroke="#47b475" stroke-width="1"/>
+      <text x="115" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#47b475" text-anchor="middle">Pre-LN (GPT-2, LLaMA, SmolLM)</text>
+      <text x="115" y="35" font-family="monospace" font-size="9" fill="#90c090" text-anchor="middle">out = x + F(Norm(x))</text>
+      <text x="115" y="52" font-family="Inter, sans-serif" font-size="8" fill="#609060" text-anchor="middle">RMSNorm or LayerNorm BEFORE sublayer</text>
+    </g>
+
+    <!-- Post-LN column -->
+    <g transform="translate(285, 40)">
+      <rect x="0" y="0" width="230" height="65" rx="5" fill="#2d2a1a" stroke="#b0a040" stroke-width="1"/>
+      <text x="115" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#c0b050" text-anchor="middle">Post-LN (OLMo 2, some variants)</text>
+      <text x="115" y="35" font-family="monospace" font-size="9" fill="#d0c080" text-anchor="middle">out = Norm(x + F(x))</text>
+      <text x="115" y="52" font-family="Inter, sans-serif" font-size="8" fill="#908050" text-anchor="middle">Norm AFTER residual add</text>
+    </g>
+
+    <!-- BERT warning column -->
+    <g transform="translate(540, 40)">
+      <rect x="0" y="0" width="230" height="65" rx="5" fill="#2d1a1a" stroke="#c04040" stroke-width="1"/>
+      <text x="115" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#e06060" text-anchor="middle">BERT (Original Post-LN)</text>
+      <text x="115" y="35" font-family="monospace" font-size="9" fill="#c08080" text-anchor="middle">Norm wraps residual path</text>
+      <text x="115" y="52" font-family="Inter, sans-serif" font-size="8" fill="#905050" text-anchor="middle">Gradient must flow through Norm</text>
+    </g>
+
+    <text x="400" y="115" font-family="Inter, sans-serif" font-size="10" fill="#a08080" text-anchor="middle">Modern architectures ensure a clean skip path for gradient flow - whether Pre-LN or Post-LN, the residual is never blocked.</text>
+  </g>
+
+</svg>

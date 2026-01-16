@@ -1,0 +1,666 @@
+<!-- TITLE: GGUF to Bump -->
+<!-- NAV: quantization -->
+
+<h1>GGUF to Bump Allocator</h1>
+
+<p>This document explains how C-Kernel-Engine handles quantized weights from GGUF files (llama.cpp format) and converts them to our bump allocator layout for efficient inference and training.</p>
+
+<div class="alert alert-info">
+    <span class="alert-icon">&#128214;</span>
+    <div>
+        <strong>Prerequisites:</strong> For quantization fundamentals (why quantize, block formats, grouping), see <a href="quantization.html">Quantization Deep Dive</a>. For step-by-step byte-level GGUF parsing, see <a href="gguf-conversion.html">GGUF Conversion Guide</a>.
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <span class="alert-icon">&#128161;</span>
+    <div>
+        <strong>Key Insight:</strong> We don't dequantize weights at load time. We keep them quantized in memory and dequantize on-the-fly during GEMM operations. This saves 4x memory for Q4_K models.
+    </div>
+</div>
+
+<h2>Why Quantization Matters</h2>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <div class="stat-number">4x</div>
+        <div class="stat-label">Memory Reduction</div>
+        <p>Q4_K uses ~4.5 bits/weight vs 32 bits for FP32</p>
+    </div>
+    <div class="card card-green">
+        <div class="stat-number">2x</div>
+        <div class="stat-label">Bandwidth Savings</div>
+        <p>Less data to move from DRAM = faster inference</p>
+    </div>
+    <div class="card card-blue">
+        <div class="stat-number">&lt;1%</div>
+        <div class="stat-label">Quality Loss</div>
+        <p>Q4_K_M preserves model quality remarkably well</p>
+    </div>
+</div>
+
+<h2>GGUF File Format Overview</h2>
+
+<p>GGUF (GGML Universal Format) is llama.cpp's binary format for storing quantized models. Understanding it is essential for our conversion pipeline.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 400" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="30" text-anchor="middle" fill="#ffb400" font-size="18" font-weight="bold">GGUF File Structure</text>
+
+        <!-- Magic Header -->
+        <rect x="50" y="60" width="700" height="50" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" rx="4"/>
+        <text x="70" y="90" fill="#fff" font-size="14" font-family="monospace">Magic: "GGUF" (4 bytes)</text>
+        <text x="250" y="90" fill="#b0b0b0" font-size="14" font-family="monospace">Version: u32</text>
+        <text x="400" y="90" fill="#b0b0b0" font-size="14" font-family="monospace">n_tensors: u64</text>
+        <text x="580" y="90" fill="#b0b0b0" font-size="14" font-family="monospace">n_kv: u64</text>
+
+        <!-- Metadata Section -->
+        <rect x="50" y="120" width="700" height="80" fill="#323232" stroke="#47b475" stroke-width="2" rx="4"/>
+        <text x="70" y="145" fill="#47b475" font-size="14" font-weight="bold">Metadata (Key-Value Pairs)</text>
+        <text x="70" y="170" fill="#b0b0b0" font-size="12" font-family="monospace">llama.block_count: 32</text>
+        <text x="250" y="170" fill="#b0b0b0" font-size="12" font-family="monospace">llama.embedding_length: 4096</text>
+        <text x="500" y="170" fill="#b0b0b0" font-size="12" font-family="monospace">llama.attention.head_count: 32</text>
+        <text x="70" y="190" fill="#b0b0b0" font-size="12" font-family="monospace">llama.rope.freq_base: 10000.0</text>
+        <text x="300" y="190" fill="#b0b0b0" font-size="12" font-family="monospace">llama.norm_rms_eps: 1e-5</text>
+
+        <!-- Tensor Info Section -->
+        <rect x="50" y="210" width="700" height="80" fill="#323232" stroke="#07adf8" stroke-width="2" rx="4"/>
+        <text x="70" y="235" fill="#07adf8" font-size="14" font-weight="bold">Tensor Info (Headers Only - No Data)</text>
+        <text x="70" y="260" fill="#b0b0b0" font-size="12" font-family="monospace">name: "blk.0.attn_q.weight"  dims: [4096, 4096]  type: Q4_K  offset: 0x1000</text>
+        <text x="70" y="280" fill="#b0b0b0" font-size="12" font-family="monospace">name: "blk.0.attn_k.weight"  dims: [4096, 1024]  type: Q4_K  offset: 0x801000</text>
+
+        <!-- Alignment Padding -->
+        <rect x="50" y="300" width="700" height="30" fill="#454545" stroke="#808080" stroke-width="1" rx="4"/>
+        <text x="400" y="320" text-anchor="middle" fill="#808080" font-size="12">Alignment Padding (to 32-byte boundary)</text>
+
+        <!-- Tensor Data Section -->
+        <rect x="50" y="340" width="700" height="50" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" rx="4"/>
+        <text x="70" y="365" fill="#ffb400" font-size="14" font-weight="bold">Tensor Data (Quantized Blocks)</text>
+        <text x="350" y="365" fill="#b0b0b0" font-size="12" font-family="monospace">block_q4_K[...] for each tensor</text>
+    </svg>
+</div>
+
+<h2>Q4_K Block Structure</h2>
+
+<p>Q4_K is a "K-quant" format with nested scales. Each super-block contains 256 weights organized into 8 sub-blocks of 32 weights each. This two-level scaling provides better accuracy than simple 4-bit quantization.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 500" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="30" text-anchor="middle" fill="#ffb400" font-size="18" font-weight="bold">Q4_K Super-Block: 144 bytes = 256 weights</text>
+
+        <!-- Super-block header -->
+        <rect x="50" y="60" width="80" height="60" fill="#ffb400" stroke="#fff" stroke-width="2" rx="4"/>
+        <text x="90" y="85" text-anchor="middle" fill="#2a2a2a" font-size="12" font-weight="bold">d</text>
+        <text x="90" y="105" text-anchor="middle" fill="#2a2a2a" font-size="10">FP16</text>
+        <text x="90" y="115" text-anchor="middle" fill="#2a2a2a" font-size="10">2 bytes</text>
+
+        <rect x="140" y="60" width="80" height="60" fill="#47b475" stroke="#fff" stroke-width="2" rx="4"/>
+        <text x="180" y="85" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">dmin</text>
+        <text x="180" y="105" text-anchor="middle" fill="#fff" font-size="10">FP16</text>
+        <text x="180" y="115" text-anchor="middle" fill="#fff" font-size="10">2 bytes</text>
+
+        <rect x="230" y="60" width="160" height="60" fill="#07adf8" stroke="#fff" stroke-width="2" rx="4"/>
+        <text x="310" y="85" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">scales[12]</text>
+        <text x="310" y="105" text-anchor="middle" fill="#fff" font-size="10">8 scales + 8 mins</text>
+        <text x="310" y="115" text-anchor="middle" fill="#fff" font-size="10">6-bit packed</text>
+
+        <!-- Quantized weights -->
+        <rect x="400" y="60" width="350" height="60" fill="#323232" stroke="#ffb400" stroke-width="2" rx="4"/>
+        <text x="575" y="85" text-anchor="middle" fill="#ffb400" font-size="12" font-weight="bold">qs[128]</text>
+        <text x="575" y="105" text-anchor="middle" fill="#b0b0b0" font-size="10">256 x 4-bit weights</text>
+        <text x="575" y="115" text-anchor="middle" fill="#b0b0b0" font-size="10">2 per byte = 128 bytes</text>
+
+        <!-- Arrow showing structure -->
+        <line x1="400" y1="140" x2="400" y2="170" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Sub-blocks -->
+        <text x="400" y="190" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">8 Sub-blocks (32 weights each)</text>
+
+        <!-- Sub-block detail -->
+        <g transform="translate(50, 210)">
+            <rect x="0" y="0" width="85" height="50" fill="#454545" stroke="#ffb400" stroke-width="1" rx="4"/>
+            <text x="42" y="20" text-anchor="middle" fill="#ffb400" font-size="11" font-weight="bold">Sub 0</text>
+            <text x="42" y="38" text-anchor="middle" fill="#b0b0b0" font-size="9">16 bytes</text>
+        </g>
+        <g transform="translate(140, 210)">
+            <rect x="0" y="0" width="85" height="50" fill="#454545" stroke="#47b475" stroke-width="1" rx="4"/>
+            <text x="42" y="20" text-anchor="middle" fill="#47b475" font-size="11" font-weight="bold">Sub 1</text>
+            <text x="42" y="38" text-anchor="middle" fill="#b0b0b0" font-size="9">16 bytes</text>
+        </g>
+        <g transform="translate(230, 210)">
+            <rect x="0" y="0" width="85" height="50" fill="#454545" stroke="#07adf8" stroke-width="1" rx="4"/>
+            <text x="42" y="20" text-anchor="middle" fill="#07adf8" font-size="11" font-weight="bold">Sub 2</text>
+            <text x="42" y="38" text-anchor="middle" fill="#b0b0b0" font-size="9">16 bytes</text>
+        </g>
+        <text x="350" y="240" fill="#808080" font-size="20">...</text>
+        <g transform="translate(400, 210)">
+            <rect x="0" y="0" width="85" height="50" fill="#454545" stroke="#ffb400" stroke-width="1" rx="4"/>
+            <text x="42" y="20" text-anchor="middle" fill="#ffb400" font-size="11" font-weight="bold">Sub 7</text>
+            <text x="42" y="38" text-anchor="middle" fill="#b0b0b0" font-size="9">16 bytes</text>
+        </g>
+
+        <!-- Dequantization formula -->
+        <rect x="50" y="290" width="700" height="90" fill="#1a1a1a" stroke="#ffb400" stroke-width="2" rx="4"/>
+        <text x="70" y="315" fill="#ffb400" font-size="14" font-weight="bold">Dequantization Formula:</text>
+        <text x="70" y="345" fill="#fff" font-size="16" font-family="monospace">w_fp32 = (q - 8) * d * sc[sub] + dmin * m[sub]</text>
+        <text x="70" y="370" fill="#b0b0b0" font-size="12">Where: q = 4-bit value (0-15), sc = sub-block scale, m = sub-block min</text>
+
+        <!-- Byte breakdown -->
+        <text x="400" y="410" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Total: 2 + 2 + 12 + 128 = 144 bytes for 256 weights = 4.5 bits/weight</text>
+
+        <!-- Memory comparison -->
+        <g transform="translate(100, 430)">
+            <rect x="0" y="0" width="150" height="40" fill="#47b475" rx="4"/>
+            <text x="75" y="25" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Q4_K: 144 bytes</text>
+        </g>
+        <text x="280" y="455" fill="#fff" font-size="14">vs</text>
+        <g transform="translate(320, 430)">
+            <rect x="0" y="0" width="200" height="40" fill="#e74c3c" rx="4"/>
+            <text x="100" y="25" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">FP32: 1024 bytes (7x more)</text>
+        </g>
+
+        <!-- Arrow marker definition -->
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+            </marker>
+        </defs>
+    </svg>
+</div>
+
+<h2>Scale Unpacking (The Tricky Part)</h2>
+
+<p>The 12-byte <code>scales</code> array packs 8 scales and 8 mins in 6-bit format. Unpacking requires careful bit manipulation:</p>
+
+<div class="card">
+    <h3>6-bit Packed Layout</h3>
+    <pre><code>// scales[12] = 96 bits = 16 x 6-bit values
+// First 8 values: scales (sc[0..7])
+// Last 8 values: mins (m[0..7])
+
+// Unpacking sc[0..7] from bytes 0-5:
+sc[0] = scales[0] & 0x3F;                              // bits 0-5 of byte 0
+sc[1] = (scales[0] >> 6) | ((scales[1] & 0x0F) << 2);  // bits 6-7 of byte 0, bits 0-3 of byte 1
+sc[2] = (scales[1] >> 4) | ((scales[2] & 0x03) << 4);  // bits 4-7 of byte 1, bits 0-1 of byte 2
+sc[3] = scales[2] >> 2;                                // bits 2-7 of byte 2
+// ... pattern repeats for sc[4..7] using bytes 3-5
+
+// Unpacking m[0..7] from bytes 6-11:
+// Same pattern as scales</code></pre>
+</div>
+
+<h2>GGUF to Bump Conversion Pipeline</h2>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 550" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="30" text-anchor="middle" fill="#ffb400" font-size="18" font-weight="bold">GGUF to Bump Allocator Conversion</text>
+
+        <!-- Step 1: Parse GGUF -->
+        <rect x="50" y="60" width="200" height="80" fill="#323232" stroke="#ffb400" stroke-width="2" rx="8"/>
+        <text x="150" y="85" text-anchor="middle" fill="#ffb400" font-size="14" font-weight="bold">1. Parse GGUF</text>
+        <text x="150" y="105" text-anchor="middle" fill="#b0b0b0" font-size="11">Read magic, version</text>
+        <text x="150" y="120" text-anchor="middle" fill="#b0b0b0" font-size="11">Extract metadata</text>
+        <text x="150" y="135" text-anchor="middle" fill="#b0b0b0" font-size="11">Build tensor index</text>
+
+        <!-- Arrow -->
+        <line x1="250" y1="100" x2="300" y2="100" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Step 2: Validate -->
+        <rect x="300" y="60" width="200" height="80" fill="#323232" stroke="#47b475" stroke-width="2" rx="8"/>
+        <text x="400" y="85" text-anchor="middle" fill="#47b475" font-size="14" font-weight="bold">2. Validate Shapes</text>
+        <text x="400" y="105" text-anchor="middle" fill="#b0b0b0" font-size="11">Check tensor dims</text>
+        <text x="400" y="120" text-anchor="middle" fill="#b0b0b0" font-size="11">Verify Q4_K alignment</text>
+        <text x="400" y="135" text-anchor="middle" fill="#b0b0b0" font-size="11">(ne0 % 256 == 0)</text>
+
+        <!-- Arrow -->
+        <line x1="500" y1="100" x2="550" y2="100" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Step 3: Build dtype table -->
+        <rect x="550" y="60" width="200" height="80" fill="#323232" stroke="#07adf8" stroke-width="2" rx="8"/>
+        <text x="650" y="85" text-anchor="middle" fill="#07adf8" font-size="14" font-weight="bold">3. Build Dtype Table</text>
+        <text x="650" y="105" text-anchor="middle" fill="#b0b0b0" font-size="11">Per-tensor type codes</text>
+        <text x="650" y="120" text-anchor="middle" fill="#b0b0b0" font-size="11">Q4_K=6, Q6_K=7, FP32=0</text>
+        <text x="650" y="135" text-anchor="middle" fill="#b0b0b0" font-size="11">Enables mixed precision</text>
+
+        <!-- Arrow down -->
+        <line x1="650" y1="140" x2="650" y2="180" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Step 4: Write bump header -->
+        <rect x="450" y="190" width="300" height="100" fill="#2a2a2a" stroke="#ffb400" stroke-width="3" rx="8"/>
+        <text x="600" y="215" text-anchor="middle" fill="#ffb400" font-size="14" font-weight="bold">4. Write Bump Header (128 bytes)</text>
+        <text x="480" y="240" fill="#b0b0b0" font-size="10" font-family="monospace">"BUMPWGT3" version=3</text>
+        <text x="480" y="255" fill="#b0b0b0" font-size="10" font-family="monospace">num_layers, vocab_size, embed_dim</text>
+        <text x="480" y="270" fill="#b0b0b0" font-size="10" font-family="monospace">context_len, num_heads, head_dim</text>
+        <text x="480" y="285" fill="#b0b0b0" font-size="10" font-family="monospace">SHA-256 checksum (32 bytes)</text>
+
+        <!-- Arrow down -->
+        <line x1="600" y1="290" x2="600" y2="330" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Step 5: Copy tensor data -->
+        <rect x="50" y="340" width="700" height="120" fill="#323232" stroke="#47b475" stroke-width="2" rx="8"/>
+        <text x="400" y="365" text-anchor="middle" fill="#47b475" font-size="14" font-weight="bold">5. Stream Tensor Data (No Dequantization!)</text>
+
+        <!-- Data flow boxes -->
+        <rect x="80" y="385" width="120" height="55" fill="#454545" rx="4"/>
+        <text x="140" y="405" text-anchor="middle" fill="#ffb400" font-size="11" font-weight="bold">token_embd</text>
+        <text x="140" y="425" text-anchor="middle" fill="#b0b0b0" font-size="9">Q4_K blocks</text>
+
+        <rect x="220" y="385" width="120" height="55" fill="#454545" rx="4"/>
+        <text x="280" y="405" text-anchor="middle" fill="#07adf8" font-size="11" font-weight="bold">Layer 0</text>
+        <text x="280" y="425" text-anchor="middle" fill="#b0b0b0" font-size="9">Q/K/V/O + MLP</text>
+
+        <text x="370" y="415" fill="#808080" font-size="20">...</text>
+
+        <rect x="410" y="385" width="120" height="55" fill="#454545" rx="4"/>
+        <text x="470" y="405" text-anchor="middle" fill="#07adf8" font-size="11" font-weight="bold">Layer N-1</text>
+        <text x="470" y="425" text-anchor="middle" fill="#b0b0b0" font-size="9">Q/K/V/O + MLP</text>
+
+        <rect x="550" y="385" width="120" height="55" fill="#454545" rx="4"/>
+        <text x="610" y="405" text-anchor="middle" fill="#47b475" font-size="11" font-weight="bold">output_norm</text>
+        <text x="610" y="425" text-anchor="middle" fill="#b0b0b0" font-size="9">FP32 gamma</text>
+
+        <!-- Output -->
+        <rect x="250" y="480" width="300" height="50" fill="#ffb400" stroke="#fff" stroke-width="2" rx="8"/>
+        <text x="400" y="510" text-anchor="middle" fill="#2a2a2a" font-size="14" font-weight="bold">weights.bump (ready for inference)</text>
+    </svg>
+</div>
+
+<h2>Bump File Header Format</h2>
+
+<p>The bump allocator uses a 128-byte header that contains all model configuration needed at runtime:</p>
+
+<div class="card">
+<pre><code>// Bump Header Structure (128 bytes total)
+// ========================================
+
+Offset  Size    Field                   Description
+------  ----    -----                   -----------
+0x00    8       magic                   "BUMPWGT3" (8 chars)
+0x08    4       version                 3 (current version)
+0x0C    4       model_type              1 = decoder-only LLM
+0x10    4       num_layers              Number of transformer layers
+0x14    4       vocab_size              Vocabulary size
+0x18    4       embed_dim               Hidden dimension (hidden_size)
+0x1C    4       context_len             Max sequence length
+0x20    4       num_heads               Number of attention heads
+0x24    4       head_dim                Per-head dimension (embed_dim / num_heads)
+0x28    8       aligned_embed_dim       64-byte aligned embed dim
+0x30    8       aligned_head_dim        64-byte aligned head dim
+0x38    8       aligned_context         64-byte aligned context length
+0x40    32      checksum                SHA-256 of payload (after header)
+0x60    32      reserved                Future use (zeros)</code></pre>
+</div>
+
+<h3>Why Aligned Dimensions?</h3>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Cache Line Alignment</h3>
+        <p>Modern CPUs fetch data in 64-byte cache lines. Misaligned access causes:</p>
+        <ul>
+            <li>Two cache line fetches instead of one</li>
+            <li>Cache line splitting penalties</li>
+            <li>Reduced SIMD throughput</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX-512 Requirements</h3>
+        <p>AVX-512 processes 16 floats (64 bytes) per instruction:</p>
+        <ul>
+            <li>Aligned loads: <code>_mm512_load_ps</code> (fast)</li>
+            <li>Unaligned loads: <code>_mm512_loadu_ps</code> (slower)</li>
+            <li>Padding zeros don't affect results</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Per-Layer Weight Layout</h2>
+
+<p>Each transformer layer's weights are stored contiguously in the bump file:</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 400" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="30" text-anchor="middle" fill="#ffb400" font-size="16" font-weight="bold">Per-Layer Weight Layout in Bump File</text>
+
+        <!-- Layer container -->
+        <rect x="30" y="50" width="740" height="330" fill="#2a2a2a" stroke="#ffb400" stroke-width="2" rx="8"/>
+        <text x="50" y="75" fill="#ffb400" font-size="14" font-weight="bold">Layer N</text>
+
+        <!-- Normalization -->
+        <rect x="50" y="90" width="150" height="50" fill="#47b475" rx="4"/>
+        <text x="125" y="115" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">ln1_gamma</text>
+        <text x="125" y="130" text-anchor="middle" fill="#fff" font-size="9">FP32 [embed_dim]</text>
+
+        <rect x="210" y="90" width="150" height="50" fill="#47b475" rx="4"/>
+        <text x="285" y="115" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">ln2_gamma</text>
+        <text x="285" y="130" text-anchor="middle" fill="#fff" font-size="9">FP32 [embed_dim]</text>
+
+        <!-- Attention weights -->
+        <text x="50" y="165" fill="#07adf8" font-size="12" font-weight="bold">Attention Projections (Q4_K):</text>
+
+        <rect x="50" y="175" width="100" height="45" fill="#07adf8" rx="4"/>
+        <text x="100" y="195" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Wq</text>
+        <text x="100" y="210" text-anchor="middle" fill="#fff" font-size="8">[E x E]</text>
+
+        <rect x="160" y="175" width="60" height="45" fill="#454545" rx="4"/>
+        <text x="190" y="200" text-anchor="middle" fill="#b0b0b0" font-size="9">bq=0</text>
+
+        <rect x="230" y="175" width="100" height="45" fill="#07adf8" rx="4"/>
+        <text x="280" y="195" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Wk</text>
+        <text x="280" y="210" text-anchor="middle" fill="#fff" font-size="8">[E x kv]</text>
+
+        <rect x="340" y="175" width="60" height="45" fill="#454545" rx="4"/>
+        <text x="370" y="200" text-anchor="middle" fill="#b0b0b0" font-size="9">bk=0</text>
+
+        <rect x="410" y="175" width="100" height="45" fill="#07adf8" rx="4"/>
+        <text x="460" y="195" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Wv</text>
+        <text x="460" y="210" text-anchor="middle" fill="#fff" font-size="8">[E x kv]</text>
+
+        <rect x="520" y="175" width="60" height="45" fill="#454545" rx="4"/>
+        <text x="550" y="200" text-anchor="middle" fill="#b0b0b0" font-size="9">bv=0</text>
+
+        <rect x="590" y="175" width="100" height="45" fill="#07adf8" rx="4"/>
+        <text x="640" y="195" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Wo</text>
+        <text x="640" y="210" text-anchor="middle" fill="#fff" font-size="8">[E x E]</text>
+
+        <rect x="700" y="175" width="60" height="45" fill="#454545" rx="4"/>
+        <text x="730" y="200" text-anchor="middle" fill="#b0b0b0" font-size="9">bo=0</text>
+
+        <!-- MLP weights -->
+        <text x="50" y="250" fill="#ffb400" font-size="12" font-weight="bold">MLP Projections (Q4_K):</text>
+
+        <rect x="50" y="260" width="150" height="45" fill="#ffb400" rx="4"/>
+        <text x="125" y="280" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">W_gate</text>
+        <text x="125" y="295" text-anchor="middle" fill="#2a2a2a" font-size="8">[E x intermediate]</text>
+
+        <rect x="210" y="260" width="150" height="45" fill="#ffb400" rx="4"/>
+        <text x="285" y="280" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">W_up</text>
+        <text x="285" y="295" text-anchor="middle" fill="#2a2a2a" font-size="8">[E x intermediate]</text>
+
+        <rect x="370" y="260" width="80" height="45" fill="#454545" rx="4"/>
+        <text x="410" y="285" text-anchor="middle" fill="#b0b0b0" font-size="9">b1=0</text>
+
+        <rect x="460" y="260" width="150" height="45" fill="#ffb400" rx="4"/>
+        <text x="535" y="280" text-anchor="middle" fill="#2a2a2a" font-size="10" font-weight="bold">W_down</text>
+        <text x="535" y="295" text-anchor="middle" fill="#2a2a2a" font-size="8">[intermediate x E]</text>
+
+        <rect x="620" y="260" width="80" height="45" fill="#454545" rx="4"/>
+        <text x="660" y="285" text-anchor="middle" fill="#b0b0b0" font-size="9">b2=0</text>
+
+        <!-- Legend -->
+        <rect x="50" y="320" width="15" height="15" fill="#07adf8"/>
+        <text x="75" y="332" fill="#b0b0b0" font-size="10">Q4_K quantized</text>
+
+        <rect x="200" y="320" width="15" height="15" fill="#47b475"/>
+        <text x="225" y="332" fill="#b0b0b0" font-size="10">FP32 (norms)</text>
+
+        <rect x="350" y="320" width="15" height="15" fill="#454545"/>
+        <text x="375" y="332" fill="#b0b0b0" font-size="10">Zero bias placeholders</text>
+
+        <text x="550" y="332" fill="#808080" font-size="10">E = embed_dim, kv = num_kv_heads * head_dim</text>
+    </svg>
+</div>
+
+<h2>Dequantization Kernels</h2>
+
+<p>At inference time, we dequantize weights on-the-fly during GEMM operations. This trades compute for memory bandwidth - a good trade on modern CPUs where memory is the bottleneck.</p>
+
+<div class="card">
+    <h3>Q4_K Dequantization (Scalar Reference)</h3>
+<pre><code>void dequant_q4_k_block(const block_q4_K *block, float *output) {
+    const float d = fp16_to_fp32(block->d);
+    const float dmin = fp16_to_fp32(block->dmin);
+
+    // Unpack 6-bit scales and mins
+    uint8_t sc[8], m[8];
+    unpack_q4_k_scales(block->scales, sc, m);
+
+    // Process 8 sub-blocks of 32 weights each
+    for (int sub = 0; sub < 8; sub++) {
+        const float scale = d * (float)sc[sub];
+        const float min_val = dmin * (float)m[sub];
+
+        const uint8_t *qs = &block->qs[sub * 16];
+        float *out = &output[sub * 32];
+
+        for (int i = 0; i < 16; i++) {
+            const uint8_t packed = qs[i];
+            const int8_t q0 = (packed & 0x0F) - 8;  // Lower nibble
+            const int8_t q1 = (packed >> 4) - 8;    // Upper nibble
+
+            out[2*i + 0] = scale * (float)q0 + min_val;
+            out[2*i + 1] = scale * (float)q1 + min_val;
+        }
+    }
+}</code></pre>
+</div>
+
+<h3>AVX-512 Optimized Dequantization</h3>
+
+<div class="card">
+<pre><code>static inline void dequant_q4_k_subblock_avx512(
+    const uint8_t *qs,      // 16 bytes = 32 x 4-bit weights
+    float scale,            // d * sc[sub]
+    float min_val,          // dmin * m[sub]
+    __m512 *out0,           // Output: weights 0-15
+    __m512 *out1)           // Output: weights 16-31
+{
+    const __m512 vscale = _mm512_set1_ps(scale);
+    const __m512 vmin = _mm512_set1_ps(min_val);
+    const __m512i offset = _mm512_set1_epi32(8);
+    const __m512i mask_lo = _mm512_set1_epi32(0x0F);
+
+    // Load 16 bytes, expand to 32-bit integers
+    __m128i packed = _mm_loadu_si128((const __m128i *)qs);
+    __m512i bytes = _mm512_cvtepu8_epi32(packed);
+
+    // Extract lower nibbles: (byte & 0x0F) - 8
+    __m512i lo = _mm512_and_epi32(bytes, mask_lo);
+    lo = _mm512_sub_epi32(lo, offset);
+
+    // Extract upper nibbles: (byte >> 4) - 8
+    __m512i hi = _mm512_srli_epi32(bytes, 4);
+    hi = _mm512_sub_epi32(hi, offset);
+
+    // Convert to float, scale, add min: FMA!
+    *out0 = _mm512_fmadd_ps(_mm512_cvtepi32_ps(lo), vscale, vmin);
+    *out1 = _mm512_fmadd_ps(_mm512_cvtepi32_ps(hi), vscale, vmin);
+}</code></pre>
+</div>
+
+<h2>Make Commands</h2>
+
+<p>Use these commands to work with GGUF files:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Command</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>make test-quant</code></td>
+            <td>Run quantization kernel tests (dequant + q4/q8 gemm)</td>
+        </tr>
+        <tr>
+            <td><code>make gguf-inspect GGUF=path</code></td>
+            <td>Inspect GGUF tensor dtypes (what is quantized?)</td>
+        </tr>
+        <tr>
+            <td><code>make gguf-list GGUF=path</code></td>
+            <td>List all GGUF tensors (name/type/shape)</td>
+        </tr>
+        <tr>
+            <td><code>make gguf-to-bump GGUF=path</code></td>
+            <td>Convert GGUF to bump weights (outputs to GGUF_OUT/)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Example Usage</h3>
+
+<div class="card">
+<pre><code># Inspect a GGUF file to see what's quantized
+make gguf-inspect GGUF=models/qwen2.5-3b-instruct-q4_k_m.gguf
+
+# Output:
+# [gguf] version=3 arch=llama tensors=291 kv=26 alignment=32
+# [gguf] tensor types:
+#   -      Q4_K:   225 tensors, bytes=1.71 GiB
+#   -        F32:    66 tensors, bytes=48.05 MiB
+# [gguf] key tensors:
+#   - token_embd.weight: Q4_K dims=(3584, 151936)
+#   - blk.0.attn_q.weight: Q4_K dims=(3584, 3584)
+
+# Convert to bump format
+make gguf-to-bump GGUF=models/qwen2.5-3b-instruct-q4_k_m.gguf
+
+# Output files:
+#   GGUF_OUT/weights.bump     - Quantized weights
+#   GGUF_OUT/config.json      - HuggingFace-style config</code></pre>
+</div>
+
+<h2>Quantization Format Comparison</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Format</th>
+            <th>Block Size</th>
+            <th>Bytes/Block</th>
+            <th>Bits/Weight</th>
+            <th>Quality</th>
+            <th>Use Case</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>FP32</code></td>
+            <td>1</td>
+            <td>4</td>
+            <td>32.0</td>
+            <td>Baseline</td>
+            <td>Training, norms</td>
+        </tr>
+        <tr>
+            <td><code>FP16</code></td>
+            <td>1</td>
+            <td>2</td>
+            <td>16.0</td>
+            <td>~Same</td>
+            <td>GPU inference</td>
+        </tr>
+        <tr>
+            <td><code>Q8_0</code></td>
+            <td>32</td>
+            <td>34</td>
+            <td>8.5</td>
+            <td>Excellent</td>
+            <td>Activations</td>
+        </tr>
+        <tr>
+            <td><code>Q4_0</code></td>
+            <td>32</td>
+            <td>18</td>
+            <td>4.5</td>
+            <td>Good</td>
+            <td>Simple quant</td>
+        </tr>
+        <tr>
+            <td><strong><code>Q4_K</code></strong></td>
+            <td>256</td>
+            <td>144</td>
+            <td><strong>4.5</strong></td>
+            <td><strong>Very Good</strong></td>
+            <td><strong>Weights (primary)</strong></td>
+        </tr>
+        <tr>
+            <td><code>Q6_K</code></td>
+            <td>256</td>
+            <td>210</td>
+            <td>6.6</td>
+            <td>Excellent</td>
+            <td>Quality-sensitive</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert alert-success">
+    <span class="alert-icon">&#9989;</span>
+    <div>
+        <strong>Recommendation:</strong> Use Q4_K_M models for the best balance of quality and memory savings. The "M" in Q4_K_M means "medium" quantization - it keeps more precision in attention layers.
+    </div>
+</div>
+
+<h2>Integration with Bump Allocator</h2>
+
+<p>The bump allocator loads weights once at startup and keeps them in memory. The key insight is that quantized weights stay quantized - we never allocate space for dequantized FP32 weights.</p>
+
+<div class="img-container">
+    <svg viewBox="0 0 800 300" style="max-width: 100%; background: #1a1a1a; border-radius: 8px;">
+        <!-- Title -->
+        <text x="400" y="30" text-anchor="middle" fill="#ffb400" font-size="16" font-weight="bold">Memory Layout: Quantized Weights + FP32 Activations</text>
+
+        <!-- Memory bar -->
+        <rect x="50" y="60" width="700" height="80" fill="#323232" stroke="#ffb400" stroke-width="2" rx="4"/>
+
+        <!-- Weights section (Q4_K) -->
+        <rect x="55" y="65" width="400" height="70" fill="#07adf8" rx="2"/>
+        <text x="255" y="100" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Quantized Weights (Q4_K)</text>
+        <text x="255" y="120" text-anchor="middle" fill="#fff" font-size="11">~1.7 GB for 7B model</text>
+
+        <!-- Activations section (FP32) -->
+        <rect x="460" y="65" width="285" height="70" fill="#47b475" rx="2"/>
+        <text x="602" y="100" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Activations (FP32)</text>
+        <text x="602" y="120" text-anchor="middle" fill="#fff" font-size="11">Reused per layer</text>
+
+        <!-- Comparison -->
+        <text x="400" y="180" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Memory Comparison (7B Model)</text>
+
+        <!-- FP32 bar -->
+        <rect x="50" y="200" width="700" height="30" fill="#e74c3c" rx="4"/>
+        <text x="400" y="220" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">FP32 Weights: ~28 GB</text>
+
+        <!-- Q4_K bar -->
+        <rect x="50" y="240" width="175" height="30" fill="#07adf8" rx="4"/>
+        <text x="137" y="260" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Q4_K: ~3.5 GB</text>
+
+        <!-- Savings label -->
+        <text x="400" y="280" text-anchor="middle" fill="#47b475" font-size="14" font-weight="bold">8x memory reduction!</text>
+    </svg>
+</div>
+
+<h2>Source Files</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>scripts/convert_gguf_to_bump.py</code></td>
+            <td>GGUF to bump conversion tool</td>
+        </tr>
+        <tr>
+            <td><code>include/ckernel_quant.h</code></td>
+            <td>Block structures (block_q4_K, etc.)</td>
+        </tr>
+        <tr>
+            <td><code>src/kernels/dequant_kernels.c</code></td>
+            <td>Dequantization implementations</td>
+        </tr>
+        <tr>
+            <td><code>include/ckernel_dtype.h</code></td>
+            <td>Data type enums and utilities</td>
+        </tr>
+    </tbody>
+</table>

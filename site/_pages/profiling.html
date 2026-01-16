@@ -1,0 +1,402 @@
+<!-- TITLE: Profiling -->
+<!-- NAV: profiling -->
+
+<h1>Profiling Guide</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Measure, Don't Guess</strong><br>
+        This page covers memory and compute profiling for C-Kernel-Engine. Always profile before optimizing.
+    </div>
+</div>
+
+<nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+        <li><a href="#memory-profiling">Memory Profiling (Valgrind)</a></li>
+        <li><a href="#heap-profiling">Heap Profiling (Massif)</a></li>
+        <li><a href="#cpu-profiling">CPU Profiling (perf)</a></li>
+        <li><a href="#flamegraphs">Flamegraphs</a></li>
+        <li><a href="#cache-profiling">Cache Profiling (Cachegrind)</a></li>
+        <li><a href="#quick-reference">Quick Reference</a></li>
+    </ul>
+</nav>
+
+<h2 id="memory-profiling">Memory Profiling with Valgrind</h2>
+
+<p>Valgrind's <code>memcheck</code> tool detects memory errors: leaks, use-after-free, uninitialized reads, and buffer overflows.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Install Valgrind</h3>
+    <pre># Ubuntu/Debian
+sudo apt install valgrind
+
+# Fedora/RHEL
+sudo dnf install valgrind
+
+# Arch
+sudo pacman -S valgrind</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Basic Memory Check</h3>
+    <pre># Build with debug symbols (required for line numbers)
+make clean
+CFLAGS="-O0 -g" make
+
+# Run memcheck on the tiny model
+valgrind --leak-check=full \
+         --show-leak-kinds=all \
+         --track-origins=yes \
+         ./build/tiny_model \
+           --model-weights build/tiny_weights.bin \
+           --tokens build/tiny_tokens.bin \
+           --out-logits build/tiny_logits.bin</pre>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Actual Output from C-Kernel-Engine</h3>
+    <pre># Real output from: make profile-memory
+==537520== HEAP SUMMARY:
+==537520==     in use at exit: 8 bytes in 1 blocks
+==537520==   total heap usage: 11 allocs, 10 frees, 2,144,864 bytes allocated
+
+==537520== LEAK SUMMARY:
+==537520==    definitely lost: 0 bytes in 0 blocks
+==537520==    indirectly lost: 0 bytes in 0 blocks
+==537520==      possibly lost: 0 bytes in 0 blocks
+==537520==    still reachable: 0 bytes in 0 blocks
+==537520==         suppressed: 8 bytes in 1 blocks  # OpenMP internal
+
+==537520== ERROR SUMMARY: 0 errors from 0 contexts</pre>
+    <p><strong>Key observations:</strong></p>
+    <ul>
+        <li><strong>11 allocs, 10 frees</strong> - The 1 remaining is OpenMP internal (suppressed)</li>
+        <li><strong>2MB allocated</strong> - Our bump allocator buffer, properly freed</li>
+        <li><strong>0 definitely lost</strong> - No memory leaks!</li>
+    </ul>
+    <p><strong>Red flags:</strong> "definitely lost", "Invalid read/write", "Conditional jump depends on uninitialised value"</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Valgrind Options Explained</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Option</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>--leak-check=full</code></td><td>Show where each leak was allocated</td></tr>
+            <tr><td><code>--show-leak-kinds=all</code></td><td>Include "still reachable" (our bump buffer)</td></tr>
+            <tr><td><code>--track-origins=yes</code></td><td>Track where uninitialized values came from</td></tr>
+            <tr><td><code>--error-exitcode=1</code></td><td>Exit with 1 if errors found (for CI)</td></tr>
+            <tr><td><code>--suppressions=file</code></td><td>Ignore known false positives</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<h2 id="heap-profiling">Heap Profiling with Massif</h2>
+
+<p>Massif tracks memory usage over time, showing allocation patterns and peak usage.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Capture Heap Profile</h3>
+    <pre># Run with massif
+valgrind --tool=massif \
+         --pages-as-heap=yes \
+         --massif-out-file=massif.out \
+         ./build/tiny_model \
+           --model-weights build/tiny_weights.bin \
+           --tokens build/tiny_tokens.bin \
+           --out-logits build/tiny_logits.bin
+
+# Visualize with ms_print
+ms_print massif.out</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example Massif Output</h3>
+    <pre>    MB
+4.194^                                                       #
+     |                                                       #
+     |                                                       #
+     |                                                       #
+     |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
+     |@                                                     @#
+     |@                                                     @#
+     |@                                                     @#
+   0 +------------------------------------------------------->
+     0                                                   100ms
+
+# With bump allocator: one flat line (single allocation at startup)
+# Bad pattern: sawtooth (repeated malloc/free) or stairs (leaks)</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">GUI Visualization with Massif-Visualizer</h3>
+    <pre># Install
+sudo apt install massif-visualizer
+
+# Open profile
+massif-visualizer massif.out</pre>
+    <p>Shows interactive graphs with allocation call stacks.</p>
+</div>
+
+<h2 id="cpu-profiling">CPU Profiling with perf</h2>
+
+<p><code>perf</code> is the Linux profiler. It samples the CPU to find where time is spent.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Install perf</h3>
+    <pre># Ubuntu/Debian
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+
+# Fedora/RHEL
+sudo dnf install perf
+
+# Enable for non-root users
+echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Record and Report</h3>
+    <pre># Build with frame pointers for accurate call stacks
+CFLAGS="-O3 -fno-omit-frame-pointer -g" make clean all
+
+# Record profile (run your workload)
+perf record -g -F 99 ./build/tiny_model \
+  --model-weights build/tiny_weights.bin \
+  --tokens build/tiny_tokens.bin \
+  --out-logits build/tiny_logits.bin
+
+# View top functions
+perf report --stdio --sort=overhead
+
+# Interactive TUI
+perf report</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example perf report Output</h3>
+    <pre># Overhead  Command    Shared Object       Symbol
+# ........  .........  ..................  ............................
+    42.15%  tiny_model libckernel_engine   [.] gemm_forward
+    18.23%  tiny_model libckernel_engine   [.] attention_forward_...
+    12.07%  tiny_model libckernel_engine   [.] rmsnorm_forward
+     8.45%  tiny_model libckernel_engine   [.] swiglu_forward
+     6.21%  tiny_model libc.so.6           [.] __memcpy_avx512
+     ...</pre>
+    <p><strong>What to look for:</strong> GEMM should dominate. If other kernels are high, they may need optimization.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Useful perf Commands</h3>
+    <pre># Count hardware events (cache misses, branch mispredicts)
+perf stat -e cache-misses,cache-references,branches,branch-misses \
+  ./build/tiny_model ...
+
+# Per-function stats
+perf annotate gemm_forward
+
+# Compare two runs
+perf diff perf.data.old perf.data</pre>
+</div>
+
+<h2 id="flamegraphs">Flamegraphs</h2>
+
+<p>Flamegraphs visualize profiling data as interactive SVGs. Width = time spent.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Install FlameGraph Tools</h3>
+    <pre># Clone Brendan Gregg's FlameGraph repo
+git clone https://github.com/brendangregg/FlameGraph.git
+export PATH=$PATH:$(pwd)/FlameGraph</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Generate CPU Flamegraph</h3>
+    <pre># Record with perf
+perf record -g -F 99 ./build/tiny_model \
+  --model-weights build/tiny_weights.bin \
+  --tokens build/tiny_tokens.bin \
+  --out-logits build/tiny_logits.bin
+
+# Convert to flamegraph
+perf script | stackcollapse-perf.pl | flamegraph.pl > cpu_flame.svg
+
+# Open in browser
+firefox cpu_flame.svg</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Reading Flamegraphs</h3>
+    <ul>
+        <li><strong>Y-axis:</strong> Call stack depth (bottom = entry point, top = leaf functions)</li>
+        <li><strong>X-axis:</strong> Time spent (wider = more time)</li>
+        <li><strong>Colors:</strong> Random, just for visual distinction</li>
+        <li><strong>Click:</strong> Zoom into a function</li>
+        <li><strong>Search:</strong> Ctrl+F to highlight functions</li>
+    </ul>
+    <p><strong>What to look for:</strong> Wide plateaus at the top indicate hot functions to optimize.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Memory Allocation Flamegraph</h3>
+    <pre># Record malloc/free calls
+perf record -e 'probe:malloc' -e 'probe:free' -g ./build/tiny_model ...
+
+# With bump allocator, this should be nearly empty!
+# (Just one mmap at startup)</pre>
+</div>
+
+<h2 id="cache-profiling">Cache Profiling with Cachegrind</h2>
+
+<p>Cachegrind simulates CPU cache behavior to find cache-unfriendly code.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Run Cachegrind</h3>
+    <pre># Profile cache behavior
+valgrind --tool=cachegrind \
+         --cachegrind-out-file=cachegrind.out \
+         ./build/tiny_model \
+           --model-weights build/tiny_weights.bin \
+           --tokens build/tiny_tokens.bin \
+           --out-logits build/tiny_logits.bin
+
+# Annotate source code with cache stats
+cg_annotate cachegrind.out src/kernels/gemm_kernels.c</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Understanding Cache Stats</h3>
+    <pre>--------------------------------------------------------------------------------
+I1 cache:         32,768 B, 64 B, 8-way associative
+D1 cache:         32,768 B, 64 B, 8-way associative
+LL cache:         8,388,608 B, 64 B, 16-way associative
+--------------------------------------------------------------------------------
+        Ir          I1mr        ILmr          Dr          D1mr        DLmr
+--------------------------------------------------------------------------------
+ 1,234,567,890      12,345       1,234   456,789,012     2,345,678     123,456
+
+# Key metrics:
+# D1mr = L1 data cache read misses
+# DLmr = Last-level cache read misses (goes to RAM - expensive!)
+# Lower is better</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Per-Function Cache Analysis</h3>
+    <pre># Sort by L1 data misses
+cg_annotate --sort=D1mr cachegrind.out
+
+# Annotate specific source file
+cg_annotate cachegrind.out --auto=yes src/kernels/gemm_kernels.c</pre>
+    <p><strong>What to look for:</strong> High cache miss rates in inner loops indicate poor memory access patterns (consider tiling, prefetching).</p>
+</div>
+
+<h2 id="quick-reference">Quick Reference</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Makefile Targets</h3>
+    <pre># Add these to your workflow
+make profile-memory   # Valgrind memcheck
+make profile-heap     # Massif heap profile
+make profile-cpu      # perf record + report
+make flamegraph       # Generate SVG flamegraph</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Profiling Cheatsheet</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Goal</th><th>Tool</th><th>Command</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Find memory leaks</td>
+                <td>Valgrind</td>
+                <td><code>valgrind --leak-check=full ./binary</code></td>
+            </tr>
+            <tr>
+                <td>Track heap over time</td>
+                <td>Massif</td>
+                <td><code>valgrind --tool=massif ./binary</code></td>
+            </tr>
+            <tr>
+                <td>Find hot functions</td>
+                <td>perf</td>
+                <td><code>perf record -g ./binary && perf report</code></td>
+            </tr>
+            <tr>
+                <td>Visualize call stacks</td>
+                <td>Flamegraph</td>
+                <td><code>perf script | stackcollapse-perf.pl | flamegraph.pl</code></td>
+            </tr>
+            <tr>
+                <td>Find cache misses</td>
+                <td>Cachegrind</td>
+                <td><code>valgrind --tool=cachegrind ./binary</code></td>
+            </tr>
+            <tr>
+                <td>Count CPU events</td>
+                <td>perf stat</td>
+                <td><code>perf stat -e cache-misses,cycles ./binary</code></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Build Flags for Profiling</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Purpose</th><th>CFLAGS</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Valgrind (accurate line numbers)</td>
+                <td><code>-O0 -g</code></td>
+            </tr>
+            <tr>
+                <td>perf (with frame pointers)</td>
+                <td><code>-O3 -fno-omit-frame-pointer -g</code></td>
+            </tr>
+            <tr>
+                <td>Production + debug symbols</td>
+                <td><code>-O3 -g</code></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">C-Kernel-Engine Profiling Tips</h3>
+    <ul>
+        <li><strong>Bump allocator:</strong> Valgrind should show one "still reachable" block (our mmap'd buffer)</li>
+        <li><strong>No mallocs in hot path:</strong> Memory allocation flamegraph should be nearly empty</li>
+        <li><strong>GEMM dominates:</strong> In perf, <code>gemm_forward</code> should be 40-60% of time</li>
+        <li><strong>Low cache misses:</strong> Cachegrind DLmr should be < 1% for well-tiled GEMM</li>
+        <li><strong>Huge pages:</strong> Check <code>/proc/PID/smaps</code> for <code>AnonHugePages</code> usage</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">CI Integration</h3>
+    <pre># .github/workflows/profiling.yml
+- name: Memory check
+  run: |
+    make CFLAGS="-O0 -g"
+    valgrind --error-exitcode=1 --leak-check=full \
+      ./build/tiny_model --model-weights ... --tokens ...</pre>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="https://valgrind.org/docs/manual/manual.html" target="_blank">Valgrind Manual</a></li>
+    <li><a href="https://www.brendangregg.com/flamegraphs.html" target="_blank">Brendan Gregg's Flamegraph Page</a></li>
+    <li><a href="https://perf.wiki.kernel.org/index.php/Tutorial" target="_blank">perf Wiki Tutorial</a></li>
+    <li><a href="memory-safety.html">Memory Safety</a> - Our bump allocator design</li>
+</ul>

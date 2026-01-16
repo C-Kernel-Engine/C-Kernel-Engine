@@ -1,0 +1,208 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="vision__kernels_8c" kind="file" language="C++">
+    <compoundname>vision_kernels.c</compoundname>
+    <includes local="no">string.h</includes>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <incdepgraph>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="2">
+        <label>string.h</label>
+      </node>
+      <node id="1">
+        <label>vision_kernels.c</label>
+        <link refid="vision__kernels_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="vision__kernels_8c_1a86aec042bcceb0bd8955f0daf0d986c4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void im2patch</definition>
+        <argsstring>(const float *image, float *patches, int C, int H, int W, int P)</argsstring>
+        <name>im2patch</name>
+        <param>
+          <type>const float *</type>
+          <declname>image</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>patches</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>H</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>P</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>im2patch: Transforms an image into a sequence of flattened patches.</para>
+<para>Image Layout: [C, H, W] (Row-major: W is fastest moving) Output Layout: [num_patches, C * P * P]</para>
+<para>num_patches = (H/P) * (W/P) P = patch_size </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/vision_kernels.c" line="14" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/vision_kernels.c" bodystart="14" bodyend="47"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+      </memberdef>
+      <memberdef kind="function" id="vision__kernels_8c_1a3ffa58aab7da5c6e77096ad19385329a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void patch2im</definition>
+        <argsstring>(const float *d_patches, float *d_image, int C, int H, int W, int P)</argsstring>
+        <name>patch2im</name>
+        <param>
+          <type>const float *</type>
+          <declname>d_patches</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>d_image</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>H</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>P</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>patch2im: Accumulates gradients from patches back into the image. (Backward pass)</para>
+<para>d_patches: [num_patches, C * P * P] d_image: [C, H, W] (Accumulated) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/vision_kernels.c" line="55" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/vision_kernels.c" bodystart="55" bodyend="88"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="5"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>im2patch:<sp/>Transforms<sp/>an<sp/>image<sp/>into<sp/>a<sp/>sequence<sp/>of<sp/>flattened<sp/>patches.</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/></highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>Image<sp/>Layout:<sp/>[C,<sp/>H,<sp/>W]<sp/>(Row-major:<sp/>W<sp/>is<sp/>fastest<sp/>moving)</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>Output<sp/>Layout:<sp/>[num_patches,<sp/>C<sp/>*<sp/>P<sp/>*<sp/>P]</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/></highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/>num_patches<sp/>=<sp/>(H/P)<sp/>*<sp/>(W/P)</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>P<sp/>=<sp/>patch_size</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14" refid="ckernel__engine_8h_1a86aec042bcceb0bd8955f0daf0d986c4" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="vision__kernels_8c_1a86aec042bcceb0bd8955f0daf0d986c4" kindref="member">im2patch</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*image,<sp/></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*patches,<sp/></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>H,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>W,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>P)<sp/></highlight></codeline>
+<codeline lineno="17"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_patches_h<sp/>=<sp/>H<sp/>/<sp/>P;</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_patches_w<sp/>=<sp/>W<sp/>/<sp/>P;</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>patch_dim<sp/>=<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref><sp/>*<sp/>P<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>ph,<sp/>pw:<sp/>patch<sp/>grid<sp/>coordinates</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ph<sp/>=<sp/>0;<sp/>ph<sp/>&lt;<sp/>num_patches_h;<sp/>++ph)<sp/>{</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pw<sp/>=<sp/>0;<sp/>pw<sp/>&lt;<sp/>num_patches_w;<sp/>++pw)<sp/>{</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>patch_idx<sp/>=<sp/>ph<sp/>*<sp/>num_patches_w<sp/>+<sp/>pw;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dst_patch<sp/>=<sp/>patches<sp/>+<sp/>(size_t)patch_idx<sp/>*<sp/>patch_dim;</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>For<sp/>each<sp/>patch,<sp/>grab<sp/>pixels<sp/>from<sp/>all<sp/>channels</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>0;<sp/>c<sp/>&lt;<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>;<sp/>++c)<sp/>{</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>py<sp/>=<sp/>0;<sp/>py<sp/>&lt;<sp/>P;<sp/>++py)<sp/>{</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>y<sp/>=<sp/>ph<sp/>*<sp/>P<sp/>+<sp/>py;</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>x<sp/>=<sp/>pw<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Input<sp/>row<sp/>start<sp/>in<sp/>the<sp/>image</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*src_row<sp/>=<sp/>image<sp/>+<sp/>(size_t)c<sp/>*<sp/>H<sp/>*<sp/>W<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)y<sp/>*<sp/>W<sp/>+<sp/>x;</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Destination<sp/>row<sp/>in<sp/>the<sp/>flattened<sp/>patch<sp/>sequence</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dst_row<sp/>=<sp/>dst_patch<sp/>+<sp/>(size_t)c<sp/>*<sp/>P<sp/>*<sp/>P<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)py<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Copy<sp/>P<sp/>pixels<sp/>(one<sp/>row<sp/>of<sp/>the<sp/>patch)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memcpy(dst_row,<sp/>src_row,<sp/>P<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="47"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="49"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="50"><highlight class="comment"><sp/>*<sp/>patch2im:<sp/>Accumulates<sp/>gradients<sp/>from<sp/>patches<sp/>back<sp/>into<sp/>the<sp/>image.<sp/>(Backward<sp/>pass)</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/></highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*<sp/>d_patches:<sp/>[num_patches,<sp/>C<sp/>*<sp/>P<sp/>*<sp/>P]</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>d_image:<sp/>[C,<sp/>H,<sp/>W]<sp/>(Accumulated)</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55" refid="ckernel__engine_8h_1a3ffa58aab7da5c6e77096ad19385329a" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="vision__kernels_8c_1a3ffa58aab7da5c6e77096ad19385329a" kindref="member">patch2im</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_patches,<sp/></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_image,<sp/></highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>H,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>W,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>P)<sp/></highlight></codeline>
+<codeline lineno="58"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_patches_h<sp/>=<sp/>H<sp/>/<sp/>P;</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_patches_w<sp/>=<sp/>W<sp/>/<sp/>P;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>patch_dim<sp/>=<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref><sp/>*<sp/>P<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Zero<sp/>out<sp/>the<sp/>image<sp/>first<sp/>as<sp/>we<sp/>are<sp/>accumulating<sp/>gradients</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/>memset(d_image,<sp/>0,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref><sp/>*<sp/>H<sp/>*<sp/>W<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ph<sp/>=<sp/>0;<sp/>ph<sp/>&lt;<sp/>num_patches_h;<sp/>++ph)<sp/>{</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pw<sp/>=<sp/>0;<sp/>pw<sp/>&lt;<sp/>num_patches_w;<sp/>++pw)<sp/>{</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>patch_idx<sp/>=<sp/>ph<sp/>*<sp/>num_patches_w<sp/>+<sp/>pw;</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*src_patch<sp/>=<sp/>d_patches<sp/>+<sp/>(size_t)patch_idx<sp/>*<sp/>patch_dim;</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"></highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>0;<sp/>c<sp/>&lt;<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>;<sp/>++c)<sp/>{</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>py<sp/>=<sp/>0;<sp/>py<sp/>&lt;<sp/>P;<sp/>++py)<sp/>{</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>y<sp/>=<sp/>ph<sp/>*<sp/>P<sp/>+<sp/>py;</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>x<sp/>=<sp/>pw<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dst_row<sp/>=<sp/>d_image<sp/>+<sp/>(size_t)c<sp/>*<sp/>H<sp/>*<sp/>W<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)y<sp/>*<sp/>W<sp/>+<sp/>x;</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*src_row<sp/>=<sp/>src_patch<sp/>+<sp/>(size_t)c<sp/>*<sp/>P<sp/>*<sp/>P<sp/>+<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)py<sp/>*<sp/>P;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Add<sp/>the<sp/>patch<sp/>gradient<sp/>to<sp/>the<sp/>image<sp/>gradient</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>px<sp/>=<sp/>0;<sp/>px<sp/>&lt;<sp/>P;<sp/>++px)<sp/>{</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dst_row[px]<sp/>+=<sp/>src_row[px];</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="88"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/vision_kernels.c"/>
+  </compounddef>
+</doxygen>

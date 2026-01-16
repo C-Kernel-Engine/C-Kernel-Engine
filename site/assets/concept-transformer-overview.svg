@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700">
+  <defs>
+    <marker id="arrowT" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <linearGradient id="layerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#323232"/>
+      <stop offset="100%" style="stop-color:#3a3a3a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="700" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="35" font-family="Inter, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">Decoder-Only Transformer Architecture</text>
+  <text x="450" y="55" font-family="Inter, sans-serif" font-size="12" fill="#707070" text-anchor="middle">(Llama, GPT, Mistral style)</text>
+
+  <!-- Input tokens -->
+  <g transform="translate(50, 80)">
+    <rect x="0" y="0" width="120" height="50" rx="4" fill="#2a2a2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="60" y="20" font-family="Inter, sans-serif" font-size="11" fill="#07adf8" text-anchor="middle">Input Tokens</text>
+    <text x="60" y="38" font-family="monospace" font-size="10" fill="#707070" text-anchor="middle">[T] int ids</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="110" y1="135" x2="110" y2="160" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowT)"/>
+
+  <!-- Token Embedding -->
+  <g transform="translate(50, 170)">
+    <rect x="0" y="0" width="120" height="60" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="60" y="22" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">Token Embedding</text>
+    <text x="60" y="40" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">E[vocab, D]</text>
+    <text x="60" y="52" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">lookup: id → vec</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="110" y1="235" x2="110" y2="260" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowT)"/>
+
+  <!-- Decoder Layer Block (expanded) -->
+  <g transform="translate(200, 80)">
+    <!-- Main layer box -->
+    <rect x="0" y="0" width="480" height="520" rx="8" fill="url(#layerGrad)" stroke="#ffb400" stroke-width="2"/>
+    <text x="240" y="25" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400" text-anchor="middle">Decoder Layer × N</text>
+    <text x="240" y="42" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">(num_hidden_layers times)</text>
+
+    <!-- Input to layer -->
+    <text x="30" y="75" font-family="monospace" font-size="10" fill="#07adf8">input [T, D]</text>
+
+    <!-- RMSNorm 1 -->
+    <g transform="translate(30, 90)">
+      <rect x="0" y="0" width="140" height="45" rx="4" fill="#2a2a2a" stroke="#9b59b6" stroke-width="1.5"/>
+      <text x="70" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#9b59b6" text-anchor="middle">RMSNorm</text>
+      <text x="70" y="35" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">gamma[D]</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="100" y1="140" x2="100" y2="160" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowT)"/>
+
+    <!-- Attention Block -->
+    <g transform="translate(30, 165)">
+      <rect x="0" y="0" width="420" height="120" rx="6" fill="#2a2a2a" stroke="#07adf8" stroke-width="1.5"/>
+      <text x="210" y="18" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#07adf8" text-anchor="middle">Self-Attention</text>
+
+      <!-- QKV Projection -->
+      <g transform="translate(15, 30)">
+        <rect x="0" y="0" width="80" height="40" rx="3" fill="#323232" stroke="#454545"/>
+        <text x="40" y="18" font-family="Inter, sans-serif" font-size="9" fill="#b0b0b0" text-anchor="middle">Q, K, V</text>
+        <text x="40" y="32" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">Projection</text>
+      </g>
+
+      <!-- RoPE -->
+      <g transform="translate(105, 30)">
+        <rect x="0" y="0" width="70" height="40" rx="3" fill="#323232" stroke="#e74c3c"/>
+        <text x="35" y="18" font-family="Inter, sans-serif" font-size="9" fill="#e74c3c" text-anchor="middle">RoPE</text>
+        <text x="35" y="32" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">on Q, K</text>
+      </g>
+
+      <!-- Attention Compute -->
+      <g transform="translate(185, 30)">
+        <rect x="0" y="0" width="100" height="40" rx="3" fill="#323232" stroke="#ffb400"/>
+        <text x="50" y="18" font-family="Inter, sans-serif" font-size="9" fill="#ffb400" text-anchor="middle">QK^T / √d</text>
+        <text x="50" y="32" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">+ causal mask</text>
+      </g>
+
+      <!-- Softmax -->
+      <g transform="translate(295, 30)">
+        <rect x="0" y="0" width="60" height="40" rx="3" fill="#323232" stroke="#47b475"/>
+        <text x="30" y="18" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Softmax</text>
+        <text x="30" y="32" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">× V</text>
+      </g>
+
+      <!-- Output Proj -->
+      <g transform="translate(365, 30)">
+        <rect x="0" y="0" width="40" height="40" rx="3" fill="#323232" stroke="#454545"/>
+        <text x="20" y="18" font-family="Inter, sans-serif" font-size="9" fill="#b0b0b0" text-anchor="middle">W_o</text>
+        <text x="20" y="32" font-family="monospace" font-size="7" fill="#707070" text-anchor="middle">proj</text>
+      </g>
+
+      <!-- GQA note -->
+      <text x="210" y="95" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">num_heads Q, num_kv_heads K/V (GQA)</text>
+      <text x="210" y="110" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">head_dim = hidden_size / num_heads</text>
+    </g>
+
+    <!-- Residual connection 1 -->
+    <g transform="translate(30, 290)">
+      <circle cx="210" cy="15" r="12" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="210" y="19" font-family="monospace" font-size="14" fill="#ffb400" text-anchor="middle">+</text>
+      <text x="260" y="19" font-family="Inter, sans-serif" font-size="9" fill="#707070">residual</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="240" y1="320" x2="240" y2="340" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowT)"/>
+
+    <!-- RMSNorm 2 -->
+    <g transform="translate(170, 345)">
+      <rect x="0" y="0" width="140" height="45" rx="4" fill="#2a2a2a" stroke="#9b59b6" stroke-width="1.5"/>
+      <text x="70" y="18" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#9b59b6" text-anchor="middle">RMSNorm</text>
+      <text x="70" y="35" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">gamma[D]</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="240" y1="395" x2="240" y2="410" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowT)"/>
+
+    <!-- MLP Block -->
+    <g transform="translate(100, 415)">
+      <rect x="0" y="0" width="280" height="55" rx="6" fill="#2a2a2a" stroke="#1abc9c" stroke-width="1.5"/>
+      <text x="140" y="18" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1abc9c" text-anchor="middle">MLP (SwiGLU)</text>
+      <text x="140" y="35" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">gate, up: [D → intermediate]  down: [intermediate → D]</text>
+      <text x="140" y="48" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">Swish(x·W_gate) ⊙ (x·W_up) → W_down</text>
+    </g>
+
+    <!-- Residual connection 2 -->
+    <g transform="translate(30, 475)">
+      <circle cx="210" cy="15" r="12" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+      <text x="210" y="19" font-family="monospace" font-size="14" fill="#ffb400" text-anchor="middle">+</text>
+      <text x="260" y="19" font-family="Inter, sans-serif" font-size="9" fill="#707070">residual</text>
+    </g>
+
+    <!-- Output -->
+    <text x="30" y="510" font-family="monospace" font-size="10" fill="#47b475">output [T, D]</text>
+  </g>
+
+  <!-- Arrow from layer to final norm -->
+  <line x1="440" y1="605" x2="440" y2="625" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowT)"/>
+
+  <!-- Final RMSNorm -->
+  <g transform="translate(370, 630)">
+    <rect x="0" y="0" width="140" height="40" rx="4" fill="#323232" stroke="#9b59b6" stroke-width="2"/>
+    <text x="70" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#9b59b6" text-anchor="middle">Final RMSNorm</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="440" y1="675" x2="550" y2="675" stroke="#ffb400" stroke-width="2"/>
+  <line x1="550" y1="675" x2="550" y2="640" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowT)"/>
+
+  <!-- LM Head -->
+  <g transform="translate(700, 600)">
+    <rect x="0" y="0" width="140" height="70" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="70" y="22" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">LM Head</text>
+    <text x="70" y="40" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">hidden @ E.T</text>
+    <text x="70" y="55" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">[T, D] → [T, vocab]</text>
+  </g>
+
+  <!-- Weight tying indicator -->
+  <path d="M 110,230 L 110,250 L 30,250 L 30,680 L 695,680 L 695,640" fill="none" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5"/>
+  <text x="360" y="695" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">weight tying: E = LM_head.W</text>
+
+  <!-- Output logits -->
+  <g transform="translate(750, 510)">
+    <rect x="0" y="0" width="100" height="50" rx="4" fill="#1a3d2a" stroke="#47b475"/>
+    <text x="50" y="20" font-family="Inter, sans-serif" font-size="11" fill="#47b475" text-anchor="middle">Logits</text>
+    <text x="50" y="38" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">[T, vocab]</text>
+  </g>
+  <line x1="770" y1="595" x2="770" y2="565" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowT)"/>
+
+  <!-- Config annotations on right side -->
+  <g transform="translate(710, 80)">
+    <rect x="0" y="0" width="170" height="180" rx="4" fill="#2a2a2a" stroke="#454545"/>
+    <text x="85" y="20" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Config Fields</text>
+    <text x="10" y="42" font-family="monospace" font-size="9" fill="#707070">hidden_size: D</text>
+    <text x="10" y="58" font-family="monospace" font-size="9" fill="#707070">num_hidden_layers: N</text>
+    <text x="10" y="74" font-family="monospace" font-size="9" fill="#707070">num_attention_heads</text>
+    <text x="10" y="90" font-family="monospace" font-size="9" fill="#707070">num_key_value_heads</text>
+    <text x="10" y="106" font-family="monospace" font-size="9" fill="#707070">intermediate_size</text>
+    <text x="10" y="122" font-family="monospace" font-size="9" fill="#707070">vocab_size</text>
+    <text x="10" y="138" font-family="monospace" font-size="9" fill="#707070">rope_theta</text>
+    <text x="10" y="154" font-family="monospace" font-size="9" fill="#707070">rms_norm_eps</text>
+    <text x="10" y="170" font-family="monospace" font-size="9" fill="#707070">max_position_embeddings</text>
+  </g>
+</svg>

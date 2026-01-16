@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280">
+  <defs>
+    <marker id="arrow2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="400" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">LayerNorm: Layer Normalization</text>
+
+  <!-- Input vector -->
+  <g transform="translate(20, 70)">
+    <text x="35" y="-10" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Input x</text>
+    <rect x="0" y="0" width="70" height="100" rx="4" fill="#2a2a2a" stroke="#454545"/>
+    <text x="35" y="25" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">x₁</text>
+    <text x="35" y="50" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">x₂...xₙ</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="100" y1="120" x2="130" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Mean calculation -->
+  <g transform="translate(140, 80)">
+    <rect x="0" y="0" width="100" height="80" rx="6" fill="#323232" stroke="#07adf8" stroke-width="2"/>
+    <text x="50" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#07adf8" text-anchor="middle">Mean</text>
+    <text x="50" y="50" font-family="monospace" font-size="12" fill="#b0b0b0" text-anchor="middle">μ = Σxᵢ/n</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="250" y1="120" x2="280" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Subtract mean -->
+  <g transform="translate(290, 85)">
+    <circle cx="30" cy="35" r="28" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="30" y="40" font-family="monospace" font-size="16" fill="#ffb400" text-anchor="middle">x-μ</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="360" y1="120" x2="390" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Variance calculation -->
+  <g transform="translate(400, 80)">
+    <rect x="0" y="0" width="100" height="80" rx="6" fill="#323232" stroke="#07adf8" stroke-width="2"/>
+    <text x="50" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#07adf8" text-anchor="middle">Variance</text>
+    <text x="50" y="50" font-family="monospace" font-size="11" fill="#b0b0b0" text-anchor="middle">σ²=Σ(x-μ)²/n</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="510" y1="120" x2="540" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Normalize -->
+  <g transform="translate(550, 85)">
+    <circle cx="30" cy="35" r="28" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="30" y="32" font-family="monospace" font-size="12" fill="#ffb400" text-anchor="middle">x-μ</text>
+    <line x1="10" y1="42" x2="50" y2="42" stroke="#ffb400" stroke-width="1"/>
+    <text x="30" y="56" font-family="monospace" font-size="10" fill="#ffb400" text-anchor="middle">√σ²+ε</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="620" y1="120" x2="650" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Scale and shift -->
+  <g transform="translate(660, 80)">
+    <rect x="0" y="0" width="60" height="80" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="30" y="30" font-family="monospace" font-size="14" fill="#47b475" text-anchor="middle">×γ</text>
+    <text x="30" y="55" font-family="monospace" font-size="14" fill="#47b475" text-anchor="middle">+β</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="730" y1="120" x2="755" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Output -->
+  <g transform="translate(760, 70)">
+    <text x="20" y="-10" font-family="Inter, sans-serif" font-size="11" fill="#47b475" text-anchor="middle">Out</text>
+    <rect x="0" y="0" width="35" height="100" rx="4" fill="#1a3d2a" stroke="#47b475"/>
+    <text x="17" y="55" font-family="monospace" font-size="10" fill="#47b475" text-anchor="middle">y</text>
+  </g>
+
+  <!-- Formula at bottom -->
+  <rect x="150" y="200" width="500" height="60" rx="6" fill="#2a2a2a" stroke="#454545"/>
+  <text x="400" y="225" font-family="monospace" font-size="14" fill="#ffb400" text-anchor="middle">y = γ · (x - μ) / √(σ² + ε) + β</text>
+  <text x="400" y="248" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Full normalization with learnable scale (γ) and shift (β) parameters</text>
+</svg>

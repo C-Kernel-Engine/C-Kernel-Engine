@@ -1,0 +1,168 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="loss__kernels__bf16_8c" kind="file" language="C++">
+    <compoundname>loss_kernels_bf16.c</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes refid="bf16__utils_8h" local="yes">bf16_utils.h</includes>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <incdepgraph>
+      <node id="7">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="8">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>loss_kernels_bf16.c</label>
+        <link refid="loss__kernels__bf16_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>bf16_utils.h</label>
+        <link refid="bf16__utils_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="6">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="loss__kernels__bf16_8c_1a5fd08bdc0a631b4ec761b1e99085ebb9" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void softmax_cross_entropy_loss_bf16</definition>
+        <argsstring>(const uint16_t *logits, const int32_t *targets, int tokens, int vocab_size, uint16_t *d_logits, float *loss_out, float *scratch_logits, float *scratch_d_logits)</argsstring>
+        <name>softmax_cross_entropy_loss_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>logits</declname>
+        </param>
+        <param>
+          <type>const int32_t *</type>
+          <declname>targets</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>vocab_size</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>d_logits</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>loss_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_logits</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_logits</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/loss_kernels_bf16.c" line="11" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/loss_kernels_bf16.c" bodystart="11" bodyend="34"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="ckernel__engine_8h_1aed0168fe0364ab17b0d9dd02b1ac3ffa" compoundref="loss__kernels_8c" startline="5" endline="59">softmax_cross_entropy_loss</references>
+        <references refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" compoundref="true__bpe_8h" startline="169">vocab_size</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="bf16__utils_8h" kindref="compound">bf16_utils.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>BF16<sp/>softmax<sp/>cross-entropy<sp/>loss<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>scratch_logits,<sp/>scratch_d_logits:<sp/>each<sp/>[tokens<sp/>*<sp/>vocab_size]<sp/>floats</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11" refid="ckernel__engine_8h_1a5fd08bdc0a631b4ec761b1e99085ebb9" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="loss__kernels__bf16_8c_1a5fd08bdc0a631b4ec761b1e99085ebb9" kindref="member">softmax_cross_entropy_loss_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*logits,</highlight></codeline>
+<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>int32_t<sp/>*targets,</highlight></codeline>
+<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>,</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_logits,</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*loss_out,</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_logits,</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_logits)</highlight></codeline>
+<codeline lineno="19"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!logits<sp/>||<sp/>!targets<sp/>||<sp/>!d_logits<sp/>||<sp/>tokens<sp/>&lt;=<sp/>0<sp/>||<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref><sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(loss_out)<sp/>*loss_out<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_logits<sp/>||<sp/>!scratch_d_logits)<sp/>{</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(loss_out)<sp/>*loss_out<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>count<sp/>=<sp/>(size_t)tokens<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)<ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(logits,<sp/>scratch_logits,<sp/>count);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1aed0168fe0364ab17b0d9dd02b1ac3ffa" kindref="member">softmax_cross_entropy_loss</ref>(scratch_logits,<sp/>targets,<sp/>tokens,<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>,<sp/>scratch_d_logits,<sp/>loss_out);</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_d_logits,<sp/>d_logits,<sp/>count);</highlight></codeline>
+<codeline lineno="34"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/loss_kernels_bf16.c"/>
+  </compounddef>
+</doxygen>

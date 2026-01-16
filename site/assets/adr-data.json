@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "project": "C-Kernel-Engine",
+    "version": "IR v4",
+    "lastUpdated": "2025-01"
+  },
+  "adrs": [
+    {
+      "id": "001",
+      "title": "IR v4 Pipeline Split (Graph → Lowered → Layout)",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "design",
+      "supersedes": ["IR v2", "IR v3"],
+      "related": ["002", "003", "004", "005"],
+      "context": "Previous IR versions conflated several concerns. IR v2 combined lowering and memory planning into a single phase. IR v3 had clean layout but hardcoded architecture knowledge in Python. We needed a design that separates concerns for maintainability.",
+      "decision": "Split the IR pipeline into three distinct phases: (1) Graph IR - architecture-agnostic, abstract operations like Embed, GEMM, Attention; (2) Lowered IR - mode-specific (prefill/decode), concrete kernel function names; (3) Layout - byte offsets, 64-byte alignment, canary markers.",
+      "consequences": {
+        "benefits": [
+          "Each phase can be tested and debugged independently",
+          "Adding a new execution mode only requires a new lowering pass",
+          "Layout is deterministic and can be visualized",
+          "Graph IR can be exported for tooling"
+        ],
+        "costs": [
+          "Three-phase pipeline is more complex than single-pass",
+          "More intermediate artifacts (graph.json, lowered.json, layout.json)",
+          "Phases must stay in sync as kernels evolve"
+        ]
+      },
+      "pipeline": [
+        {"name": "GRAPH IR", "subtitle": "High-level", "desc": "Abstract ops: Embed, GEMM, Attention. No kernels, no offsets, no modes", "color": "purple"},
+        {"name": "LOWERED IR", "subtitle": "Per-mode", "desc": "Concrete kernels selected. prefill: gemm_blocked_parallel_bf16, decode: gemm_1x1_bf16", "color": "orange"},
+        {"name": "LAYOUT", "subtitle": "Memory plan", "desc": "Byte offsets, 64B alignment. Canary markers for debug", "color": "green"},
+        {"name": "CODEGEN", "subtitle": "Output", "desc": "Emit C code with real kernel calls. model.c, model.h, layout.json", "color": "blue"}
+      ]
+    },
+    {
+      "id": "002",
+      "title": "Templates as Canonical Architecture Source",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "design",
+      "supersedes": ["Hardcoded Python in build_ir_v3.py"],
+      "related": ["001", "006"],
+      "context": "In IR v3, model architecture knowledge was embedded directly in Python code. This made it difficult to add support for new architectures, understand model structure at a glance, and validate implementations against HuggingFace.",
+      "decision": "Templates (YAML) are the canonical definition of model architectures. The IR is a compiled artifact derived from templates + config.json. Each supported architecture has a YAML template in templates/ directory.",
+      "consequences": {
+        "benefits": [
+          "Human-readable: model architecture visible at a glance",
+          "Single source of truth: no duplicate architecture logic",
+          "Easy to extend: new architectures = new YAML file",
+          "Can diff templates against HuggingFace implementations"
+        ],
+        "costs": [
+          "YAML parsing adds a dependency",
+          "Template syntax needs documentation",
+          "Template validation logic required"
+        ]
+      },
+      "codeExample": "# templates/qwen2.yaml\nname: qwen2\nconfig_mapping:\n  hidden_size: embed_dim\n  num_attention_heads: num_heads\n\nlayers:\n  - name: decoder_layers\n    repeat: \"{{num_layers}}\"\n    ops:\n      - {name: pre_attn_norm, op: RMSNorm}\n      - {name: qkv_proj, op: GEMM}\n      - {name: attention, op: Attention}"
+    },
+    {
+      "id": "003",
+      "title": "Mode-Specific Lowering (Prefill/Decode/Backward)",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "performance",
+      "supersedes": [],
+      "related": ["001", "005"],
+      "context": "Transformer inference has fundamentally different execution patterns: Prefill processes entire prompt (T tokens, large buffers), Decode generates one token at a time (T=1, KV cache reused), Backward computes gradients for training. Each mode has different buffer sizes, access patterns, and optimal kernels.",
+      "decision": "Allocate separate activation buffers for each execution mode. Weights are shared, but working memory is mode-specific. Lower Graph IR into per-mode programs with appropriate buffer sizes and kernel selections.",
+      "consequences": {
+        "benefits": [
+          "Decode mode uses ~2000x less working memory",
+          "Smaller buffers fit in L2/L3 cache during decode",
+          "Different kernels optimized for each mode",
+          "No runtime branching inside kernels"
+        ],
+        "costs": [
+          "Extra allocation for decode buffers (but small)",
+          "Separate forward functions per mode",
+          "Layout must plan for all modes"
+        ]
+      },
+      "metrics": {
+        "prefill_layer_input": "2048 * 896 * 2 = 3.5 MB",
+        "decode_layer_input": "1 * 896 * 2 = 1.75 KB",
+        "ratio": "2048x smaller"
+      }
+    },
+    {
+      "id": "004",
+      "title": "Deterministic Layout + Canaries for Debug",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "design",
+      "supersedes": ["IR v2 dynamic allocation"],
+      "related": ["001", "003"],
+      "context": "Buffer overflows in GEMM/attention are common and hard to diagnose. IR v2 used dynamic allocation, making memory bugs non-reproducible. We needed deterministic layout for debugging and visualization tools.",
+      "decision": "All tensor offsets computed at codegen time and baked into generated C code. 64-byte alignment for AVX-512 cache line optimization. Insert 64-byte canary markers (0xDEADBEEF pattern) between tensors in debug builds. Export memory_layout.json for tooling.",
+      "consequences": {
+        "benefits": [
+          "Reproducible: same offsets every run",
+          "Early detection: canary violations caught immediately",
+          "Visualization: memory layout can be rendered graphically",
+          "No malloc overhead: single allocation, no fragmentation"
+        ],
+        "costs": [
+          "Memory overhead: canaries add ~64B per tensor (negligible)",
+          "Verification cost: canary checks add latency (debug only)",
+          "Rigidity: cannot resize tensors at runtime"
+        ]
+      },
+      "codeExample": "// Generated code\n#define OFFSET_EMBED_WEIGHT  64\n#define OFFSET_LAYER_0_WQ    1606720\n#define CANARY_0             272629824\n\nbool verify_canaries(Model *m) {\n    uint64_t *c = (uint64_t*)(m->base + CANARY_0);\n    return c[0] == 0xDEADBEEFDEADBEEFULL;\n}"
+    },
+    {
+      "id": "005",
+      "title": "Kernel Selection Happens in Lowering",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "performance",
+      "supersedes": [],
+      "related": ["001", "003"],
+      "context": "Multiple kernel variants exist for each operation: GEMM has serial, parallel, 1x1 (decode) versions; Attention has batch, single-query, GQA/MHA variants. Runtime kernel selection adds branching overhead.",
+      "decision": "Graph IR uses abstract operation names. Lowering phase resolves these to concrete kernel function names based on execution mode and shape analysis. Generated code has no runtime kernel dispatch.",
+      "consequences": {
+        "benefits": [
+          "No runtime branching for kernel selection",
+          "Mode-specific code paths are explicit and testable",
+          "Clear traceability: can see exactly which kernel is used",
+          "Easier testing: test each kernel variant in isolation"
+        ],
+        "costs": [
+          "Separate generated functions per mode",
+          "Changing kernel requires regenerating code",
+          "Must keep kernel registry in sync with src/kernels/"
+        ]
+      },
+      "kernelExamples": {
+        "GEMM_prefill_large": "gemm_blocked_parallel_bf16",
+        "GEMM_prefill_small": "gemm_blocked_serial_bf16",
+        "GEMM_decode": "gemm_1x1_bf16",
+        "Attention_prefill_gqa": "attention_forward_causal_head_major_gqa_bf16",
+        "Attention_decode": "attention_decode_single_query_bf16"
+      }
+    },
+    {
+      "id": "006",
+      "title": "Weights Map from HuggingFace Names via Template",
+      "status": "accepted",
+      "date": "2025-01",
+      "category": "design",
+      "supersedes": ["Hardcoded LLAMA_WEIGHT_MAP"],
+      "related": ["002"],
+      "context": "HuggingFace models use inconsistent naming conventions across architectures. Llama uses model.layers.0.self_attn.q_proj.weight, GPT-2 uses transformer.h.0.attn.c_attn.weight (combined QKV). Weight names must map correctly when loading safetensors.",
+      "decision": "Weight name mapping defined in architecture templates (YAML). Bidirectional mapping between HuggingFace names and internal names. Layer index placeholder {i} expanded for per-layer weights. At codegen, validate all mapped weights exist in safetensors header.",
+      "consequences": {
+        "benefits": [
+          "New architectures added by writing templates, not code",
+          "Explicit, version-controlled weight mappings",
+          "Generated code includes weight offset table with both names",
+          "Validation catches missing weights at codegen time"
+        ],
+        "costs": [
+          "Each architecture needs a template",
+          "Need regex-like expansion for {i} placeholders"
+        ]
+      },
+      "codeExample": "weight_mapping:\n  \"model.embed_tokens.weight\": \"embed.weight\"\n  \"model.layers.{i}.self_attn.q_proj.weight\": \"layers.{i}.attn.wq\"\n  \"model.layers.{i}.mlp.gate_proj.weight\": \"layers.{i}.mlp.gate\"\n  \"model.norm.weight\": \"final_norm.gamma\""
+    }
+  ]
+}

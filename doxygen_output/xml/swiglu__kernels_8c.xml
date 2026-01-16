@@ -1,0 +1,681 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="swiglu__kernels_8c" kind="file" language="C++">
+    <compoundname>swiglu_kernels.c</compoundname>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <includes local="no">math.h</includes>
+    <includes local="no">stddef.h</includes>
+    <incdepgraph>
+      <node id="6">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>swiglu_kernels.c</label>
+        <link refid="swiglu__kernels_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="8">
+        <label>math.h</label>
+      </node>
+      <node id="5">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="swiglu__kernels_8c_1a2d1ada314dda9d7788371a08067917d6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void swiglu_backward</definition>
+        <argsstring>(const float *input, const float *d_output, float *d_input, int tokens, int dim)</argsstring>
+        <name>swiglu_backward</name>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>d_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>d_input</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" line="192" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" bodystart="192" bodyend="301"/>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
+        <references refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" compoundref="sigmoid__kernels_8c" startline="11" endline="14">sigmoid_scalar</references>
+        <references refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" compoundref="v6__simple_8c" startline="159" endline="163">silu</references>
+        <referencedby refid="ckernel__orchestration_8h_1a1b75acba52e39a2063646dc1dff62ef4" compoundref="ckernel__orchestration_8c" startline="2645" endline="2785">ck_layer_backward_rmsnorm_swiglu</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="swiglu__kernels_8c_1a771ec9e8b054416576cf1788ea8d3747" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void swiglu_backward_exact</definition>
+        <argsstring>(const float *input, const float *d_output, float *d_input, int tokens, int dim)</argsstring>
+        <name>swiglu_backward_exact</name>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>d_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>d_input</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" line="334" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" bodystart="334" bodyend="366"/>
+        <references refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" compoundref="sigmoid__kernels_8c" startline="11" endline="14">sigmoid_scalar</references>
+        <references refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" compoundref="v6__simple_8c" startline="159" endline="163">silu</references>
+      </memberdef>
+      <memberdef kind="function" id="swiglu__kernels_8c_1a26369aa07808fb6aae4502d54a1ba650" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void swiglu_forward</definition>
+        <argsstring>(const float *input, float *output, int tokens, int dim)</argsstring>
+        <name>swiglu_forward</name>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" line="111" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" bodystart="111" bodyend="182"/>
+        <references refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278">__attribute__</references>
+        <references refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" compoundref="sigmoid__kernels_8c" startline="11" endline="14">sigmoid_scalar</references>
+        <references refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" compoundref="v6__simple_8c" startline="159" endline="163">silu</references>
+        <referencedby refid="ckernel__orchestration_8h_1a2e894b79792aaf694427446c1d89fab8" compoundref="ckernel__orchestration_8c" startline="920" endline="940">ck_mlp_swiglu_forward</referencedby>
+        <referencedby refid="ckernel__orchestration_8c_1a9be0b5aaccd3e66b10a9ec0505ae8877" compoundref="ckernel__orchestration_8c" startline="557" endline="577">ck_mlp_swiglu_forward_q4_k</referencedby>
+        <referencedby refid="ckernel__orchestration_8c_1a7310a1f37d7ebf7dfde9380c5e19812b" compoundref="ckernel__orchestration_8c" startline="603" endline="636">ck_mlp_swiglu_forward_q4_k_q8_k</referencedby>
+        <referencedby refid="ckernel__orchestration_8c_1ad6aa365279862f31a7bd98385374a268" compoundref="ckernel__orchestration_8c" startline="1776" endline="1823">ck_mlp_swiglu_forward_q4_k_q8_k_prefill</referencedby>
+        <referencedby refid="ckernel__orchestration_8c_1a3754c7725e77065577179096b396c075" compoundref="ckernel__orchestration_8c" startline="579" endline="601">ck_mlp_swiglu_forward_quant</referencedby>
+        <referencedby refid="ckernel__orchestration_8c_1ac841f4e0a273b07808cc036a715b742e" compoundref="ckernel__orchestration_8c" startline="942" endline="962">ck_mlp_swiglu_forward_ref</referencedby>
+        <referencedby refid="ck__parity__api_8h_1a70dc56b85050454040a47b2dc4e0f37f" compoundref="ck__parity__api_8c" startline="580" endline="585">ck_test_swiglu</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a1f366f5af792066942b1a20c0a0f9da6" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4405" endline="4569">model_layer_0_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ae297e4193654fc2efb7c2a061abbd011" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="211" endline="370">model_layer_0_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1acfb20c426ec8f5dc5da0789edc75bfaa" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6095" endline="6259">model_layer_10_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a661840b34b3c7fe7294744ba1afc1260" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1851" endline="2010">model_layer_10_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a5e1f0a349cf4e88d7509898aa5d8a01f" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6264" endline="6428">model_layer_11_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ab3bccf37e22bd2b9d6adeee5b200f314" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2015" endline="2174">model_layer_11_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ad6b9507a08b19cc75f96fad91006c0ed" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6433" endline="6597">model_layer_12_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a65eb204362bf7d29997a96596b5d3b3e" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2179" endline="2338">model_layer_12_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a18fa95a4df0baaf38dd65457476bbbf4" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6602" endline="6766">model_layer_13_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a0b1cb2a65db4b80edc31b1cb24c56402" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2343" endline="2502">model_layer_13_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a9f228497fa96b61a72d4cff046cea846" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6771" endline="6935">model_layer_14_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a8af3b4543e6f1e5b0e76f5671d48030e" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2507" endline="2666">model_layer_14_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a25338df066600a2ac04ea7f0e7711699" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="6940" endline="7104">model_layer_15_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1acd9a163e1be831fad8879f3fa896482b" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2671" endline="2830">model_layer_15_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a69ae07093bb093c082cb51c907507299" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7109" endline="7273">model_layer_16_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a7e6e8e16542ece0a5cdde92e8096ef49" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2835" endline="2994">model_layer_16_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1adbe6709e5df039baccfa634eb6ac050b" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7278" endline="7442">model_layer_17_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a11428e9f23a9e321a1f3e75a08a018be" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="2999" endline="3158">model_layer_17_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ac6f6f068e3bb01662aff8b5f9a681513" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7447" endline="7611">model_layer_18_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a2ef8bd680264619273689144a6d0b5ce" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3163" endline="3322">model_layer_18_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a94f4f65438d8c9135b60d9258afd3da3" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7616" endline="7780">model_layer_19_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1af157e6ff8eea1a199d44fdeca58c21e0" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3327" endline="3486">model_layer_19_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a85e2f991eb27ea9be883da6e63ade47d" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4574" endline="4738">model_layer_1_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1aed6c7c2ea709d2b2512053e5b7b35070" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="375" endline="534">model_layer_1_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a914835e2c63edb80a747bb6738001993" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7785" endline="7949">model_layer_20_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1aabfbca4483b7b996ec5d20e90db7a8ef" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3491" endline="3650">model_layer_20_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ac317190e986bc4f4671deeecdef0de7e" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="7954" endline="8118">model_layer_21_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a7931e369ff238102f1551c7495777e9d" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3655" endline="3814">model_layer_21_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a25e7d7546613054921220ee3264b0b07" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="8123" endline="8287">model_layer_22_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a2de339e18e60a7acdea6c5946c3622d1" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3819" endline="3978">model_layer_22_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1aed91b24984a5d65762e7f985e102028d" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="8292" endline="8456">model_layer_23_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ac17c5fd8760c9814358301a5f6d472c4" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="3983" endline="4142">model_layer_23_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1af3d58f9b984d05b753b0771fd71c3cba" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4743" endline="4907">model_layer_2_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1af8f0fc56f0f14b7d4568f3b94997d062" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="539" endline="698">model_layer_2_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a1c9785b07c2e2f9f6ef11c078c40172a" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4912" endline="5076">model_layer_3_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a91f1fd56517ea08a87dc94391c3400b6" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="703" endline="862">model_layer_3_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a80bd35ece57ab4651af7852b72eb4712" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5081" endline="5245">model_layer_4_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a51778090a9920f0a739041e9dc0ca9fc" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="867" endline="1026">model_layer_4_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1acba22172dabb4da8b3d848444f2fd364" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5250" endline="5414">model_layer_5_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ac51fd793592539c0e5cd3c88ef0662aa" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1031" endline="1190">model_layer_5_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a1b45e9164ebe7d307fd201567a10ef41" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5419" endline="5583">model_layer_6_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1afd072f83e4f14e9c324bb41500746beb" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1195" endline="1354">model_layer_6_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ab70d618edaf131d06ed3efa0eab989dc" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5588" endline="5752">model_layer_7_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a3ccffdacf50ebbd982fff268651a2c0e" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1359" endline="1518">model_layer_7_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a2fa0ffc8295865ecf0b19fcb2ce566ae" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5757" endline="5921">model_layer_8_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a254adaead0beb36acee84c1a0d3dea5f" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1523" endline="1682">model_layer_8_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1afd4a0ad91d058028c6438774b207fd4a" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5926" endline="6090">model_layer_9_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1afa7ed236a766adfaeeffa865ab2cfdc1" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1687" endline="1846">model_layer_9_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a54e2aba39375fd8df03520d41ee5acff" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="4645" endline="4777">qwen2_0_5b_decode_layer_0_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a171746e628c6a4bf197f2181af543218" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="211" endline="367">qwen2_0_5b_decode_layer_0_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aa0bfb039a5a1afb4fd62a43ebb7ad301" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6015" endline="6147">qwen2_0_5b_decode_layer_10_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1acb27ef597f4dc56d696223ba6372d7ce" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1821" endline="1977">qwen2_0_5b_decode_layer_10_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aa9166f047b7ada2d386eac689ef31419" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6152" endline="6284">qwen2_0_5b_decode_layer_11_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ac90cd859393f39e428cce865ec2188dc" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1982" endline="2138">qwen2_0_5b_decode_layer_11_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ad89e323da33b437a25165146f833729d" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6289" endline="6421">qwen2_0_5b_decode_layer_12_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aacde96713e00bce85ab0bde7d42de330" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2143" endline="2299">qwen2_0_5b_decode_layer_12_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a46e8ab1cf411726801b26420aac39739" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6426" endline="6558">qwen2_0_5b_decode_layer_13_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a890f64e775615580dea63c21a92aea9e" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2304" endline="2460">qwen2_0_5b_decode_layer_13_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ac6941604b963d32d12a2decde4a314ab" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6563" endline="6695">qwen2_0_5b_decode_layer_14_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aca32a7724796c4a33662c75aefc4a279" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2465" endline="2621">qwen2_0_5b_decode_layer_14_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ac7d801497f0acb9ab9d768b7e1aae354" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6700" endline="6832">qwen2_0_5b_decode_layer_15_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a6c2eaf257e03badbd3a20de75a3abcf9" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2626" endline="2782">qwen2_0_5b_decode_layer_15_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a103089856415dfa7dcf06968b94a55ee" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6837" endline="6969">qwen2_0_5b_decode_layer_16_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ab7ced70f12249b755683167f3b0c90ae" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2787" endline="2943">qwen2_0_5b_decode_layer_16_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1af4965781519800b167fc9327121bda48" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6974" endline="7106">qwen2_0_5b_decode_layer_17_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a7c592ce07fe74de77383c9a3483ab57a" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="2948" endline="3104">qwen2_0_5b_decode_layer_17_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a0cfd0d104b622b5158f9add5c66330c8" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7111" endline="7243">qwen2_0_5b_decode_layer_18_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a0015fda5f11a03c15f3e6a550764b9bb" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3109" endline="3265">qwen2_0_5b_decode_layer_18_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a56a1e6ed9c95375f32c056ef84069326" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7248" endline="7380">qwen2_0_5b_decode_layer_19_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a4918799abb50e59394bedb6a4eb24df9" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3270" endline="3426">qwen2_0_5b_decode_layer_19_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aba2af8c43c7107b610b68eef1dca2b04" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="4782" endline="4914">qwen2_0_5b_decode_layer_1_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a039257c70cad72866b0746bbb4f1c350" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="372" endline="528">qwen2_0_5b_decode_layer_1_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aeaf49aa2bfc261099c4d7c003a8ea439" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7385" endline="7517">qwen2_0_5b_decode_layer_20_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a168af438bba2c00fa0050a11e2356b07" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3431" endline="3587">qwen2_0_5b_decode_layer_20_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aa1affed3de5ec1317dfc6f04b9b2c275" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7522" endline="7654">qwen2_0_5b_decode_layer_21_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a965f26b121416e026a65907dfaa31890" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3592" endline="3748">qwen2_0_5b_decode_layer_21_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aa81a07e508590695da2e91794a06369a" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7659" endline="7791">qwen2_0_5b_decode_layer_22_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a7c83f54f04117dda01a7330bb5d64957" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3753" endline="3909">qwen2_0_5b_decode_layer_22_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ab0aae69c5e861cc4454dff9eb8fbf4a7" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="7796" endline="7928">qwen2_0_5b_decode_layer_23_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ae1d31ab0bc0cd814eea5b83a0b4d402e" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="3914" endline="4070">qwen2_0_5b_decode_layer_23_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a72ca7233113b8ab2acbadc710514f3cc" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="4919" endline="5051">qwen2_0_5b_decode_layer_2_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a034cdc8377df0f98e07d145a070719a9" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="533" endline="689">qwen2_0_5b_decode_layer_2_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a0510fee3ff5d11afcae9436c01636ebc" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5056" endline="5188">qwen2_0_5b_decode_layer_3_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a8275313f441df29aaf8cc025f738219c" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="694" endline="850">qwen2_0_5b_decode_layer_3_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a2e2fb61b2ebf43787122c2da6123000c" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5193" endline="5325">qwen2_0_5b_decode_layer_4_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a99fc8e09353baa31a987e6aa1455a22f" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="855" endline="1011">qwen2_0_5b_decode_layer_4_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a4635cf15568c9489b890a02404ba8d10" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5330" endline="5462">qwen2_0_5b_decode_layer_5_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ac07272621e6537d40ee3589dfb184e3c" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1016" endline="1172">qwen2_0_5b_decode_layer_5_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a5afc869eed344be9cbe243da013e412e" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5467" endline="5599">qwen2_0_5b_decode_layer_6_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a3c07c499fb3e44c69cb88becccdfaccb" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1177" endline="1333">qwen2_0_5b_decode_layer_6_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a603e2dd5bd6b367a59a0d877038b6acd" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5604" endline="5736">qwen2_0_5b_decode_layer_7_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a35233ccb3fa421240553b1c69a61ecf3" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1338" endline="1494">qwen2_0_5b_decode_layer_7_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a40fd2085b4a6972bdd956e1080459611" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5741" endline="5873">qwen2_0_5b_decode_layer_8_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a04b2f4fbbf4b58951807d9abc141ffd8" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1499" endline="1655">qwen2_0_5b_decode_layer_8_prefill</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a9cdc13ab71c3c11ffd53fbb205b1c423" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5878" endline="6010">qwen2_0_5b_decode_layer_9_decode</referencedby>
+        <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1ade51006189c7b3239a944a6a6a9b0502" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="1660" endline="1816">qwen2_0_5b_decode_layer_9_prefill</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="swiglu__kernels_8c_1a102617ea5d170076dc9e1d6ac167617c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void swiglu_forward_exact</definition>
+        <argsstring>(const float *input, float *output, int tokens, int dim)</argsstring>
+        <name>swiglu_forward_exact</name>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>dim</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" line="308" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c" bodystart="308" bodyend="331"/>
+        <references refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" compoundref="sigmoid__kernels_8c" startline="11" endline="14">sigmoid_scalar</references>
+        <references refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" compoundref="v6__simple_8c" startline="159" endline="163">silu</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;math.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>||<sp/>defined(__AVX2__)<sp/>||<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="comment">//<sp/>============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Fast<sp/>exp<sp/>approximation<sp/>for<sp/>SIMD</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="comment">//<sp/>============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="comment">//<sp/>AVX-512<sp/>fast<sp/>exp<sp/>approximation</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>__m512<sp/>exp512_fast(__m512<sp/>x)<sp/>{</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Clamp<sp/>to<sp/>avoid<sp/>overflow/underflow</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/>x<sp/>=<sp/>_mm512_max_ps(x,<sp/>_mm512_set1_ps(-88.0f));</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/>x<sp/>=<sp/>_mm512_min_ps(x,<sp/>_mm512_set1_ps(88.0f));</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>exp(x)<sp/>=<sp/>2^(x<sp/>*<sp/>log2(e))</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>log2e<sp/>=<sp/>_mm512_set1_ps(1.4426950408889634f);</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>z<sp/>=<sp/>_mm512_mul_ps(x,<sp/>log2e);</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Split<sp/>into<sp/>integer<sp/>and<sp/>fractional<sp/>parts</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>zf<sp/>=<sp/>_mm512_roundscale_ps(z,<sp/>_MM_FROUND_TO_NEAREST_INT);</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>f<sp/>=<sp/>_mm512_sub_ps(z,<sp/>zf);</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Polynomial<sp/>for<sp/>2^f,<sp/>f<sp/>in<sp/>[-0.5,<sp/>0.5]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c0<sp/>=<sp/>_mm512_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c1<sp/>=<sp/>_mm512_set1_ps(0.6931471805599453f);</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c2<sp/>=<sp/>_mm512_set1_ps(0.2402265069591007f);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c3<sp/>=<sp/>_mm512_set1_ps(0.05550410866482158f);</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c4<sp/>=<sp/>_mm512_set1_ps(0.009618129107628478f);</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>poly<sp/>=<sp/>_mm512_fmadd_ps(f,<sp/>c4,<sp/>c3);</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm512_fmadd_ps(f,<sp/>poly,<sp/>c2);</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm512_fmadd_ps(f,<sp/>poly,<sp/>c1);</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm512_fmadd_ps(f,<sp/>poly,<sp/>c0);</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Scale<sp/>by<sp/>2^n</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512i<sp/>zi<sp/>=<sp/>_mm512_cvtps_epi32(zf);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/>zi<sp/>=<sp/>_mm512_add_epi32(zi,<sp/>_mm512_set1_epi32(127));</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/>zi<sp/>=<sp/>_mm512_slli_epi32(zi,<sp/>23);</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>scale<sp/>=<sp/>_mm512_castsi512_ps(zi);</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"></highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm512_mul_ps(poly,<sp/>scale);</highlight></codeline>
+<codeline lineno="47"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"></highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight><highlight class="comment">//<sp/>AVX-512<sp/>sigmoid:<sp/>1<sp/>/<sp/>(1<sp/>+<sp/>exp(-x))</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>__m512<sp/>sigmoid512_fast(__m512<sp/>x)<sp/>{</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>neg_x<sp/>=<sp/>_mm512_sub_ps(_mm512_setzero_ps(),<sp/>x);</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>exp_neg<sp/>=<sp/>exp512_fast(neg_x);</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>one<sp/>=<sp/>_mm512_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm512_div_ps(one,<sp/>_mm512_add_ps(one,<sp/>exp_neg));</highlight></codeline>
+<codeline lineno="55"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight></codeline>
+<codeline lineno="58"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX2__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight><highlight class="comment">//<sp/>AVX2<sp/>fast<sp/>exp<sp/>approximation<sp/>(needs<sp/>FMA<sp/>and<sp/>integer<sp/>ops)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>__m256<sp/>exp256_fast(__m256<sp/>x)<sp/>{</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Clamp</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/>x<sp/>=<sp/>_mm256_max_ps(x,<sp/>_mm256_set1_ps(-88.0f));</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/>x<sp/>=<sp/>_mm256_min_ps(x,<sp/>_mm256_set1_ps(88.0f));</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"></highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>exp(x)<sp/>=<sp/>2^(x<sp/>*<sp/>log2(e))</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>log2e<sp/>=<sp/>_mm256_set1_ps(1.4426950408889634f);</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>z<sp/>=<sp/>_mm256_mul_ps(x,<sp/>log2e);</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Round<sp/>to<sp/>nearest<sp/>integer</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>zf<sp/>=<sp/>_mm256_round_ps(z,<sp/>_MM_FROUND_TO_NEAREST_INT<sp/>|<sp/>_MM_FROUND_NO_EXC);</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>f<sp/>=<sp/>_mm256_sub_ps(z,<sp/>zf);</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Polynomial<sp/>for<sp/>2^f</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>c0<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>c1<sp/>=<sp/>_mm256_set1_ps(0.6931471805599453f);</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>c2<sp/>=<sp/>_mm256_set1_ps(0.2402265069591007f);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>c3<sp/>=<sp/>_mm256_set1_ps(0.05550410866482158f);</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m256<sp/>c4<sp/>=<sp/>_mm256_set1_ps(0.009618129107628478f);</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>poly<sp/>=<sp/>_mm256_fmadd_ps(f,<sp/>c4,<sp/>c3);</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm256_fmadd_ps(f,<sp/>poly,<sp/>c2);</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm256_fmadd_ps(f,<sp/>poly,<sp/>c1);</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/>poly<sp/>=<sp/>_mm256_fmadd_ps(f,<sp/>poly,<sp/>c0);</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Scale<sp/>by<sp/>2^n</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256i<sp/>zi<sp/>=<sp/>_mm256_cvtps_epi32(zf);</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/>zi<sp/>=<sp/>_mm256_add_epi32(zi,<sp/>_mm256_set1_epi32(127));</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/>zi<sp/>=<sp/>_mm256_slli_epi32(zi,<sp/>23);</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>scale<sp/>=<sp/>_mm256_castsi256_ps(zi);</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"></highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm256_mul_ps(poly,<sp/>scale);</highlight></codeline>
+<codeline lineno="92"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"></highlight></codeline>
+<codeline lineno="94"><highlight class="normal"></highlight><highlight class="comment">//<sp/>AVX2<sp/>sigmoid</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="95"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>__m256<sp/>sigmoid256_fast(__m256<sp/>x)<sp/>{</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>neg_x<sp/>=<sp/>_mm256_sub_ps(_mm256_setzero_ps(),<sp/>x);</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>exp_neg<sp/>=<sp/>exp256_fast(neg_x);</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/>__m256<sp/>one<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>_mm256_div_ps(one,<sp/>_mm256_add_ps(one,<sp/>exp_neg));</highlight></codeline>
+<codeline lineno="100"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="102"><highlight class="normal"></highlight></codeline>
+<codeline lineno="103"><highlight class="normal"></highlight><highlight class="comment">//<sp/>SwiGLU<sp/>forward:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="104"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Input<sp/>layout<sp/>per<sp/>token:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="105"><highlight class="normal"></highlight><highlight class="comment">//<sp/><sp/><sp/>gate:<sp/><sp/>input[t][0..D-1]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"></highlight><highlight class="comment">//<sp/><sp/><sp/>value:<sp/>input[t][D..2D-1]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Output:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"></highlight><highlight class="comment">//<sp/><sp/><sp/>y[t][d]<sp/>=<sp/>silu(gate[t][d])<sp/>*<sp/>value[t][d]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight><highlight class="comment">//<sp/>where<sp/>silu(x)<sp/>=<sp/>x<sp/>*<sp/>sigmoid(x).</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="111" refid="ckernel__engine_8h_1a26369aa07808fb6aae4502d54a1ba650" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="swiglu__kernels_8c_1a26369aa07808fb6aae4502d54a1ba650" kindref="member">swiglu_forward</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dim)</highlight></codeline>
+<codeline lineno="115"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T<sp/>=<sp/>tokens;</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>dim;</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*out_row<sp/>=<sp/>output<sp/>+<sp/>(size_t)t<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"></highlight></codeline>
+<codeline lineno="124"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX-512:<sp/>Process<sp/>16<sp/>floats<sp/>at<sp/>a<sp/>time</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>16<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>a<sp/>=<sp/>_mm512_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>b<sp/>=<sp/>_mm512_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="129"><highlight class="normal"></highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>s<sp/>=<sp/>sigmoid512_fast(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm512_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>y<sp/>=<sp/>_mm512_mul_ps(<ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>,<sp/>b);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>y<sp/>=<sp/>silu(a)<sp/>*<sp/>b</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(&amp;out_row[d],<sp/>y);</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX2__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX2:<sp/>Process<sp/>8<sp/>floats<sp/>at<sp/>a<sp/>time</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>8<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>a<sp/>=<sp/>_mm256_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>b<sp/>=<sp/>_mm256_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="141"><highlight class="normal"></highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s<sp/>=<sp/>sigmoid256_fast(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm256_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>y<sp/>=<sp/>_mm256_mul_ps(<ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>,<sp/>b);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>y<sp/>=<sp/>silu(a)<sp/>*<sp/>b</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;out_row[d],<sp/>y);</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX1:<sp/>Vectorize<sp/>arithmetic,<sp/>use<sp/>scalar<sp/>sigmoid</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"></highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>8<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>a<sp/>=<sp/>_mm256_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>b<sp/>=<sp/>_mm256_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="156"><highlight class="normal"></highlight></codeline>
+<codeline lineno="157"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>sigmoid<sp/>scalarly</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_store_ps(a_arr,<sp/>a);</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>8;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>s_arr[j]<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a_arr[j]);</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s<sp/>=<sp/>_mm256_load_ps(s_arr);</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"></highlight></codeline>
+<codeline lineno="164"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm256_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>y<sp/>=<sp/>_mm256_mul_ps(<ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>,<sp/>b);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>y<sp/>=<sp/>silu(a)<sp/>*<sp/>b</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166"><highlight class="normal"></highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;out_row[d],<sp/>y);</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="170"><highlight class="normal"></highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Scalar<sp/>fallback<sp/>for<sp/>remaining<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>&lt;<sp/>D;<sp/>++d)<sp/>{</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a<sp/>=<sp/>row[d];<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>row[D<sp/>+<sp/>d];<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="175"><highlight class="normal"></highlight></codeline>
+<codeline lineno="176"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>a<sp/>*<sp/>s;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="178"><highlight class="normal"></highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_row[d]<sp/>=<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>*<sp/>b;</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="182"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"></highlight></codeline>
+<codeline lineno="184"><highlight class="normal"></highlight><highlight class="comment">//<sp/>SwiGLU<sp/>backward:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="185"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Given<sp/>dY,<sp/>X<sp/>(gate+value),<sp/>compute<sp/>dX<sp/>in<sp/>same<sp/>layout<sp/>[gate_grad,<sp/>value_grad].</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="186"><highlight class="normal"></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="187"><highlight class="normal"></highlight><highlight class="comment">//<sp/>y<sp/>=<sp/>b<sp/>*<sp/>silu(a),<sp/>where<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>s,<sp/>s<sp/>=<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="188"><highlight class="normal"></highlight><highlight class="comment">//<sp/>dy/da<sp/>=<sp/>b<sp/>*<sp/>silu&apos;(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="189"><highlight class="normal"></highlight><highlight class="comment">//<sp/>dy/db<sp/>=<sp/>silu(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="190"><highlight class="normal"></highlight><highlight class="comment">//</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="191"><highlight class="normal"></highlight><highlight class="comment">//<sp/>silu&apos;(a)<sp/>=<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s<sp/>*<sp/>(1<sp/>-<sp/>s)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="192" refid="ckernel__engine_8h_1a2d1ada314dda9d7788371a08067917d6" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="swiglu__kernels_8c_1a2d1ada314dda9d7788371a08067917d6" kindref="member">swiglu_backward</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_output,</highlight></codeline>
+<codeline lineno="194"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_input,</highlight></codeline>
+<codeline lineno="195"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dim)</highlight></codeline>
+<codeline lineno="197"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="198"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T<sp/>=<sp/>tokens;</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>dim;</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"></highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="203"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dy_row<sp/>=<sp/>d_output<sp/>+<sp/>(size_t)t<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dx_row<sp/>=<sp/>d_input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="206"><highlight class="normal"></highlight></codeline>
+<codeline lineno="207"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="208"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX-512:<sp/>Process<sp/>16<sp/>floats<sp/>at<sp/>a<sp/>time</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="209"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>one<sp/>=<sp/>_mm512_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>16<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>a<sp/>=<sp/>_mm512_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="212"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>b<sp/>=<sp/>_mm512_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>dy<sp/>=<sp/>_mm512_loadu_ps(&amp;dy_row[d]);</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"></highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>s<sp/>=<sp/>sigmoid512_fast(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm512_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>s</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>s_prime<sp/>=<sp/>_mm512_mul_ps(s,<sp/>_mm512_sub_ps(one,<sp/>s));<sp/></highlight><highlight class="comment">//<sp/>s<sp/>*<sp/>(1<sp/>-<sp/>s)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>silu_prime<sp/>=<sp/>_mm512_fmadd_ps(a,<sp/>s_prime,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s_prime</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="219"><highlight class="normal"></highlight></codeline>
+<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dA<sp/>=<sp/>dy<sp/>*<sp/>b<sp/>*<sp/>silu_prime</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>dA<sp/>=<sp/>_mm512_mul_ps(dy,<sp/>_mm512_mul_ps(b,<sp/>silu_prime));</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dB<sp/>=<sp/>dy<sp/>*<sp/>silu</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>dB<sp/>=<sp/>_mm512_mul_ps(dy,<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>);</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"></highlight></codeline>
+<codeline lineno="225"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(&amp;dx_row[d],<sp/>dA);</highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(&amp;dx_row[D<sp/>+<sp/>d],<sp/>dB);</highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX2__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="229"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX2:<sp/>Process<sp/>8<sp/>floats<sp/>at<sp/>a<sp/>time</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="230"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>one<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="231"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>8<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="232"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>a<sp/>=<sp/>_mm256_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="233"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>b<sp/>=<sp/>_mm256_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="234"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dy<sp/>=<sp/>_mm256_loadu_ps(&amp;dy_row[d]);</highlight></codeline>
+<codeline lineno="235"><highlight class="normal"></highlight></codeline>
+<codeline lineno="236"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s<sp/>=<sp/>sigmoid256_fast(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm256_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>s</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="238"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s_prime<sp/>=<sp/>_mm256_mul_ps(s,<sp/>_mm256_sub_ps(one,<sp/>s));<sp/></highlight><highlight class="comment">//<sp/>s<sp/>*<sp/>(1<sp/>-<sp/>s)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="239"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>silu_prime<sp/>=<sp/>_mm256_fmadd_ps(a,<sp/>s_prime,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s_prime</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="240"><highlight class="normal"></highlight></codeline>
+<codeline lineno="241"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dA<sp/>=<sp/>dy<sp/>*<sp/>b<sp/>*<sp/>silu_prime</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="242"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dA<sp/>=<sp/>_mm256_mul_ps(dy,<sp/>_mm256_mul_ps(b,<sp/>silu_prime));</highlight></codeline>
+<codeline lineno="243"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dB<sp/>=<sp/>dy<sp/>*<sp/>silu</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dB<sp/>=<sp/>_mm256_mul_ps(dy,<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>);</highlight></codeline>
+<codeline lineno="245"><highlight class="normal"></highlight></codeline>
+<codeline lineno="246"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;dx_row[d],<sp/>dA);</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;dx_row[D<sp/>+<sp/>d],<sp/>dB);</highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="249"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="250"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>AVX1:<sp/>Vectorize<sp/>arithmetic,<sp/>use<sp/>scalar<sp/>sigmoid</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="251"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>one<sp/>=<sp/>_mm256_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="252"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s_arr[8]<sp/><ref refid="tokenizer_8h_1a42cef42021e2391865cfbed2c2ee5278" kindref="member">__attribute__</ref>((aligned(32)));</highlight></codeline>
+<codeline lineno="254"><highlight class="normal"></highlight></codeline>
+<codeline lineno="255"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>+<sp/>8<sp/>&lt;=<sp/>D;<sp/>d<sp/>+=<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>a<sp/>=<sp/>_mm256_loadu_ps(&amp;row[d]);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="257"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>b<sp/>=<sp/>_mm256_loadu_ps(&amp;row[D<sp/>+<sp/>d]);<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="258"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dy<sp/>=<sp/>_mm256_loadu_ps(&amp;dy_row[d]);</highlight></codeline>
+<codeline lineno="259"><highlight class="normal"></highlight></codeline>
+<codeline lineno="260"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>sigmoid<sp/>scalarly</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="261"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_store_ps(a_arr,<sp/>a);</highlight></codeline>
+<codeline lineno="262"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>8;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="263"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>s_arr[j]<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a_arr[j]);</highlight></codeline>
+<codeline lineno="264"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="265"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s<sp/>=<sp/>_mm256_load_ps(s_arr);</highlight></codeline>
+<codeline lineno="266"><highlight class="normal"></highlight></codeline>
+<codeline lineno="267"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>_mm256_mul_ps(a,<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>s</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="268"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>s_prime<sp/>=<sp/>_mm256_mul_ps(s,<sp/>_mm256_sub_ps(one,<sp/>s));<sp/></highlight><highlight class="comment">//<sp/>s<sp/>*<sp/>(1<sp/>-<sp/>s)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="269"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu_prime<sp/>=<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s_prime<sp/>(no<sp/>FMA<sp/>in<sp/>AVX1)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="270"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>a_s_prime<sp/>=<sp/>_mm256_mul_ps(a,<sp/>s_prime);</highlight></codeline>
+<codeline lineno="271"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>silu_prime<sp/>=<sp/>_mm256_add_ps(s,<sp/>a_s_prime);</highlight></codeline>
+<codeline lineno="272"><highlight class="normal"></highlight></codeline>
+<codeline lineno="273"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dA<sp/>=<sp/>dy<sp/>*<sp/>b<sp/>*<sp/>silu_prime</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="274"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dA<sp/>=<sp/>_mm256_mul_ps(dy,<sp/>_mm256_mul_ps(b,<sp/>silu_prime));</highlight></codeline>
+<codeline lineno="275"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>dB<sp/>=<sp/>dy<sp/>*<sp/>silu</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="276"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256<sp/>dB<sp/>=<sp/>_mm256_mul_ps(dy,<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>);</highlight></codeline>
+<codeline lineno="277"><highlight class="normal"></highlight></codeline>
+<codeline lineno="278"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;dx_row[d],<sp/>dA);</highlight></codeline>
+<codeline lineno="279"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_ps(&amp;dx_row[D<sp/>+<sp/>d],<sp/>dB);</highlight></codeline>
+<codeline lineno="280"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="281"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="282"><highlight class="normal"></highlight></codeline>
+<codeline lineno="283"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Scalar<sp/>fallback<sp/>for<sp/>remaining<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="284"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>d<sp/>&lt;<sp/>D;<sp/>++d)<sp/>{</highlight></codeline>
+<codeline lineno="285"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a<sp/>=<sp/>row[d];<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="286"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>row[D<sp/>+<sp/>d];<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="287"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dy<sp/>=<sp/>dy_row[d];</highlight></codeline>
+<codeline lineno="288"><highlight class="normal"></highlight></codeline>
+<codeline lineno="289"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="290"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>a<sp/>*<sp/>s;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="291"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s_prime<sp/>=<sp/>s<sp/>*<sp/>(1.0f<sp/>-<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid&apos;(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="292"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>silu_prime<sp/>=<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s_prime;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu&apos;(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="293"><highlight class="normal"></highlight></codeline>
+<codeline lineno="294"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dA<sp/>=<sp/>dy<sp/>*<sp/>b<sp/>*<sp/>silu_prime;</highlight></codeline>
+<codeline lineno="295"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dB<sp/>=<sp/>dy<sp/>*<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>;</highlight></codeline>
+<codeline lineno="296"><highlight class="normal"></highlight></codeline>
+<codeline lineno="297"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dx_row[d]<sp/>=<sp/>dA;</highlight></codeline>
+<codeline lineno="298"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dx_row[D<sp/>+<sp/>d]<sp/>=<sp/>dB;</highlight></codeline>
+<codeline lineno="299"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="300"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="301"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="302"><highlight class="normal"></highlight></codeline>
+<codeline lineno="303"><highlight class="normal"></highlight><highlight class="comment">//<sp/>============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="304"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Exact<sp/>versions<sp/>using<sp/>standard<sp/>library<sp/>expf<sp/>(slower<sp/>but<sp/>accurate)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="305"><highlight class="normal"></highlight><highlight class="comment">//<sp/>============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="306"><highlight class="normal"></highlight></codeline>
+<codeline lineno="307"><highlight class="normal"></highlight><highlight class="comment">//<sp/>SwiGLU<sp/>forward<sp/>(exact<sp/>version<sp/>using<sp/>standard<sp/>library<sp/>sigmoid_scalar)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="308" refid="ckernel__engine_8h_1a102617ea5d170076dc9e1d6ac167617c" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="swiglu__kernels_8c_1a102617ea5d170076dc9e1d6ac167617c" kindref="member">swiglu_forward_exact</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="309"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="310"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="311"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dim)</highlight></codeline>
+<codeline lineno="312"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="313"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T<sp/>=<sp/>tokens;</highlight></codeline>
+<codeline lineno="314"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>dim;</highlight></codeline>
+<codeline lineno="315"><highlight class="normal"></highlight></codeline>
+<codeline lineno="316"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="317"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="318"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*out_row<sp/>=<sp/>output<sp/>+<sp/>(size_t)t<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="319"><highlight class="normal"></highlight></codeline>
+<codeline lineno="320"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d<sp/>=<sp/>0;<sp/>d<sp/>&lt;<sp/>D;<sp/>++d)<sp/>{</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a<sp/>=<sp/>row[d];<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="322"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>row[D<sp/>+<sp/>d];<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="323"><highlight class="normal"></highlight></codeline>
+<codeline lineno="324"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>standard<sp/>library<sp/>expf<sp/>via<sp/>sigmoid_scalar</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="325"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)<sp/>=<sp/>1/(1+expf(-a))</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="326"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>a<sp/>*<sp/>s;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)<sp/>=<sp/>a<sp/>*<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="327"><highlight class="normal"></highlight></codeline>
+<codeline lineno="328"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>out_row[d]<sp/>=<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>*<sp/>b;</highlight></codeline>
+<codeline lineno="329"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="330"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="331"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="332"><highlight class="normal"></highlight></codeline>
+<codeline lineno="333"><highlight class="normal"></highlight><highlight class="comment">//<sp/>SwiGLU<sp/>backward<sp/>(exact<sp/>version<sp/>using<sp/>standard<sp/>library<sp/>sigmoid_scalar)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="334" refid="ckernel__engine_8h_1a771ec9e8b054416576cf1788ea8d3747" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="swiglu__kernels_8c_1a771ec9e8b054416576cf1788ea8d3747" kindref="member">swiglu_backward_exact</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="335"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_output,</highlight></codeline>
+<codeline lineno="336"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_input,</highlight></codeline>
+<codeline lineno="337"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="338"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dim)</highlight></codeline>
+<codeline lineno="339"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="340"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T<sp/>=<sp/>tokens;</highlight></codeline>
+<codeline lineno="341"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>dim;</highlight></codeline>
+<codeline lineno="342"><highlight class="normal"></highlight></codeline>
+<codeline lineno="343"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="344"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="345"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dy_row<sp/>=<sp/>d_output<sp/>+<sp/>(size_t)t<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="346"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dx_row<sp/>=<sp/>d_input<sp/>+<sp/>(size_t)t<sp/>*<sp/>(2<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="347"><highlight class="normal"></highlight></codeline>
+<codeline lineno="348"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d<sp/>=<sp/>0;<sp/>d<sp/>&lt;<sp/>D;<sp/>++d)<sp/>{</highlight></codeline>
+<codeline lineno="349"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>a<sp/>=<sp/>row[d];<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>gate</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="350"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>b<sp/>=<sp/>row[D<sp/>+<sp/>d];<sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="351"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dy<sp/>=<sp/>dy_row[d];</highlight></codeline>
+<codeline lineno="352"><highlight class="normal"></highlight></codeline>
+<codeline lineno="353"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>standard<sp/>library<sp/>expf<sp/>via<sp/>sigmoid_scalar</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="354"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s<sp/>=<sp/><ref refid="ckernel__engine_8h_1aaa76ef661048368434b452a237bc3669" kindref="member">sigmoid_scalar</ref>(a);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="355"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref><sp/>=<sp/>a<sp/>*<sp/>s;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="356"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>s_prime<sp/>=<sp/>s<sp/>*<sp/>(1.0f<sp/>-<sp/>s);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>sigmoid&apos;(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="357"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>silu_prime<sp/>=<sp/>s<sp/>+<sp/>a<sp/>*<sp/>s_prime;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>silu&apos;(a)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="358"><highlight class="normal"></highlight></codeline>
+<codeline lineno="359"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dA<sp/>=<sp/>dy<sp/>*<sp/>b<sp/>*<sp/>silu_prime;</highlight></codeline>
+<codeline lineno="360"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>dB<sp/>=<sp/>dy<sp/>*<sp/><ref refid="v6__simple_8c_1a49cac1d218fc2817ed1f679a37f25f41" kindref="member">silu</ref>;</highlight></codeline>
+<codeline lineno="361"><highlight class="normal"></highlight></codeline>
+<codeline lineno="362"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dx_row[d]<sp/>=<sp/>dA;</highlight></codeline>
+<codeline lineno="363"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dx_row[D<sp/>+<sp/>d]<sp/>=<sp/>dB;</highlight></codeline>
+<codeline lineno="364"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="365"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="366"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/swiglu_kernels.c"/>
+  </compounddef>
+</doxygen>

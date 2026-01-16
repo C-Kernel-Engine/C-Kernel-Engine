@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550">
+  <defs>
+    <marker id="arrowR" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="550" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">RoPE: Rotary Position Embedding - Deep Dive</text>
+
+  <!-- Section 1: The Problem -->
+  <g transform="translate(30, 60)">
+    <rect x="0" y="0" width="260" height="140" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="130" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#e74c3c" text-anchor="middle">The Problem</text>
+    <text x="15" y="45" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Attention is position-agnostic:</text>
+    <text x="15" y="62" font-family="monospace" font-size="9" fill="#707070">score(q, k) = q · k</text>
+    <text x="15" y="82" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">"The cat sat" = "sat The cat"</text>
+    <text x="15" y="100" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Same score regardless of position!</text>
+    <text x="15" y="125" font-family="Inter, sans-serif" font-size="10" fill="#707070">Need to inject position information.</text>
+  </g>
+
+  <!-- Section 2: The Insight -->
+  <g transform="translate(310, 60)">
+    <rect x="0" y="0" width="280" height="140" rx="6" fill="#2a2a2a" stroke="#47b475"/>
+    <text x="140" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#47b475" text-anchor="middle">The RoPE Insight</text>
+    <text x="15" y="45" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Encode position by rotating vectors:</text>
+    <text x="15" y="65" font-family="monospace" font-size="10" fill="#ffb400">q_m = rotate(q, m * theta)</text>
+    <text x="15" y="82" font-family="monospace" font-size="10" fill="#ffb400">k_n = rotate(k, n * theta)</text>
+    <text x="15" y="105" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">When computing attention:</text>
+    <text x="15" y="122" font-family="monospace" font-size="10" fill="#47b475">q_m · k_n = f(q, k, m-n)</text>
+    <text x="15" y="135" font-family="Inter, sans-serif" font-size="9" fill="#707070">Only relative position (m-n) matters!</text>
+  </g>
+
+  <!-- Section 3: rope_theta explained -->
+  <g transform="translate(610, 60)">
+    <rect x="0" y="0" width="260" height="140" rx="6" fill="#2a2a2a" stroke="#ffb400"/>
+    <text x="130" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">rope_theta</text>
+    <text x="15" y="45" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Base frequency for rotations:</text>
+    <text x="15" y="65" font-family="monospace" font-size="9" fill="#707070">theta_i = rope_theta ^ (-2i/d)</text>
+    <text x="15" y="88" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Default: 10,000</text>
+    <text x="15" y="105" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0">Llama 3.1: 500,000 (128K ctx)</text>
+    <text x="15" y="125" font-family="Inter, sans-serif" font-size="9" fill="#47b475">Higher = slower rotation = longer context</text>
+  </g>
+
+  <!-- Main diagram: Rotation visualization -->
+  <g transform="translate(50, 220)">
+    <rect x="0" y="0" width="350" height="300" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="175" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#07adf8" text-anchor="middle">2D Rotation per Dimension Pair</text>
+
+    <!-- Coordinate system -->
+    <line x1="175" y1="280" x2="175" y2="60" stroke="#454545" stroke-width="1"/>
+    <line x1="40" y1="170" x2="310" y2="170" stroke="#454545" stroke-width="1"/>
+    <text x="315" y="175" font-family="monospace" font-size="10" fill="#707070">x[2i]</text>
+    <text x="165" y="55" font-family="monospace" font-size="10" fill="#707070">x[2i+1]</text>
+
+    <!-- Original vector -->
+    <line x1="175" y1="170" x2="280" y2="100" stroke="#07adf8" stroke-width="3" marker-end="url(#arrowR)"/>
+    <text x="285" y="95" font-family="monospace" font-size="10" fill="#07adf8">(x, y)</text>
+    <text x="245" y="145" font-family="Inter, sans-serif" font-size="9" fill="#07adf8">original</text>
+
+    <!-- Rotated vector position 1 -->
+    <line x1="175" y1="170" x2="240" y2="75" stroke="#47b475" stroke-width="2" marker-end="url(#arrowR)"/>
+    <text x="245" y="70" font-family="monospace" font-size="9" fill="#47b475">pos=1</text>
+
+    <!-- Rotated vector position 5 -->
+    <line x1="175" y1="170" x2="120" y2="80" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowR)"/>
+    <text x="100" y="75" font-family="monospace" font-size="9" fill="#e74c3c">pos=5</text>
+
+    <!-- Rotation arc -->
+    <path d="M 230,130 A 60,60 0 0 0 200,90" fill="none" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="4"/>
+    <text x="220" y="105" font-family="monospace" font-size="10" fill="#ffb400">m·θ</text>
+
+    <!-- Formula box -->
+    <rect x="20" y="220" width="310" height="65" rx="4" fill="#323232"/>
+    <text x="175" y="242" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">x'[2i]   = x[2i]·cos(mθ) - x[2i+1]·sin(mθ)</text>
+    <text x="175" y="262" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">x'[2i+1] = x[2i]·sin(mθ) + x[2i+1]·cos(mθ)</text>
+    <text x="175" y="278" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">m = position, θ = theta_i for this pair</text>
+  </g>
+
+  <!-- Frequency decay visualization -->
+  <g transform="translate(430, 220)">
+    <rect x="0" y="0" width="430" height="150" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="215" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#9b59b6" text-anchor="middle">Frequency Decay Across Dimensions</text>
+
+    <!-- Graph area -->
+    <rect x="50" y="40" width="360" height="90" rx="2" fill="#323232"/>
+
+    <!-- Y axis labels -->
+    <text x="45" y="50" font-family="monospace" font-size="8" fill="#707070" text-anchor="end">fast</text>
+    <text x="45" y="125" font-family="monospace" font-size="8" fill="#707070" text-anchor="end">slow</text>
+
+    <!-- X axis labels -->
+    <text x="55" y="140" font-family="monospace" font-size="8" fill="#707070">0</text>
+    <text x="215" y="140" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">d/2</text>
+    <text x="400" y="140" font-family="monospace" font-size="8" fill="#707070" text-anchor="end">d</text>
+    <text x="215" y="148" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">dimension pair index (i)</text>
+
+    <!-- Decay curve -->
+    <path d="M 55,50 Q 100,55 150,70 Q 200,85 250,100 Q 300,110 350,118 Q 380,122 405,125" fill="none" stroke="#9b59b6" stroke-width="2.5"/>
+
+    <!-- Annotations -->
+    <circle cx="70" cy="52" r="4" fill="#47b475"/>
+    <text x="80" y="56" font-family="Inter, sans-serif" font-size="8" fill="#47b475">high freq: local patterns</text>
+
+    <circle cx="380" cy="120" r="4" fill="#e74c3c"/>
+    <text x="300" y="115" font-family="Inter, sans-serif" font-size="8" fill="#e74c3c">low freq: global patterns</text>
+  </g>
+
+  <!-- Where RoPE fits -->
+  <g transform="translate(430, 385)">
+    <rect x="0" y="0" width="430" height="135" rx="6" fill="#2a2a2a" stroke="#07adf8"/>
+    <text x="215" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#07adf8" text-anchor="middle">Where RoPE Fits in Attention</text>
+
+    <!-- Flow diagram -->
+    <g transform="translate(20, 45)">
+      <!-- Input -->
+      <rect x="0" y="0" width="50" height="30" rx="3" fill="#323232" stroke="#454545"/>
+      <text x="25" y="20" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">x</text>
+
+      <line x1="55" y1="15" x2="75" y2="15" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowR)"/>
+
+      <!-- QKV proj -->
+      <rect x="80" y="0" width="60" height="30" rx="3" fill="#323232" stroke="#454545"/>
+      <text x="110" y="20" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">Q,K,V</text>
+
+      <line x1="145" y1="15" x2="165" y2="15" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowR)"/>
+
+      <!-- RoPE (highlighted) -->
+      <rect x="170" y="-5" width="70" height="40" rx="3" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+      <text x="205" y="12" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#47b475" text-anchor="middle">RoPE</text>
+      <text x="205" y="26" font-family="monospace" font-size="8" fill="#707070" text-anchor="middle">on Q, K</text>
+
+      <line x1="245" y1="15" x2="265" y2="15" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowR)"/>
+
+      <!-- Attention -->
+      <rect x="270" y="0" width="60" height="30" rx="3" fill="#323232" stroke="#ffb400"/>
+      <text x="300" y="20" font-family="monospace" font-size="9" fill="#ffb400" text-anchor="middle">QK^T</text>
+
+      <line x1="335" y1="15" x2="355" y2="15" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrowR)"/>
+
+      <!-- Output -->
+      <rect x="360" y="0" width="50" height="30" rx="3" fill="#323232" stroke="#454545"/>
+      <text x="385" y="20" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">out</text>
+    </g>
+
+    <!-- Note -->
+    <text x="215" y="105" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">RoPE is applied to Q and K only (not V)</text>
+    <text x="215" y="120" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Position info injected via rotation before attention</text>
+  </g>
+</svg>

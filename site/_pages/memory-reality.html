@@ -1,0 +1,548 @@
+<!-- TITLE: Memory Reality -->
+<!-- NAV: memory-reality -->
+
+<h1>Memory Reality: What NVIDIA Marketing Won't Tell You</h1>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Hidden Truth About LLM Memory</strong><br>
+        GPU marketing focuses on FLOPS. Real-world LLM inference is dominated by <strong>memory bandwidth and capacity</strong>. This page shows the actual numbers.
+    </div>
+</div>
+
+<h2>Part 1: Activation Memory Per Token</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Memory Writes Per Token (Decode)</h3>
+    <p>For Qwen2-0.5B (hidden_dim=896, intermediate=4864, 24 layers):</p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Operation</th><th>Writes per Layer</th><th>24 Layers Total</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RMSNorm output</td>
+                <td>896 × 4 = 3.5 KB</td>
+                <td>84 KB</td>
+            </tr>
+            <tr>
+                <td>Q, K, V projections</td>
+                <td>3 × 896 × 4 = 10.5 KB</td>
+                <td>252 KB</td>
+            </tr>
+            <tr>
+                <td>Attention output</td>
+                <td>896 × 4 = 3.5 KB</td>
+                <td>84 KB</td>
+            </tr>
+            <tr>
+                <td>O projection</td>
+                <td>896 × 4 = 3.5 KB</td>
+                <td>84 KB</td>
+            </tr>
+            <tr>
+                <td>MLP gate + up</td>
+                <td>2 × 4864 × 4 = 38 KB</td>
+                <td>912 KB</td>
+            </tr>
+            <tr>
+                <td>MLP down</td>
+                <td>896 × 4 = 3.5 KB</td>
+                <td>84 KB</td>
+            </tr>
+            <tr>
+                <td>KV cache (new token)</td>
+                <td>~1 KB</td>
+                <td>24 KB</td>
+            </tr>
+            <tr>
+                <td>Final logits (once)</td>
+                <td>-</td>
+                <td>~600 KB</td>
+            </tr>
+            <tr style="font-weight: bold; background: rgba(255,180,0,0.1);">
+                <td>Total per token</td>
+                <td>~63 KB</td>
+                <td>~2.1 MB</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Key Insight</strong><br>
+        Decode is memory-bandwidth bound. Every token requires ~2 MB of memory traffic through activations alone, plus reading all model weights (~500MB for Qwen2-0.5B).
+    </div>
+</div>
+
+<h2>Part 2: Context Length - The Memory Multiplier</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Elephant in the Room</strong><br>
+        Context length is the <strong>biggest memory factor</strong> that GPU marketing ignores. KV cache grows linearly with context, and it must stay resident for the entire generation.
+    </div>
+</div>
+
+<h3>KV Cache Size Formula</h3>
+
+<div class="card">
+    <pre>
+KV Cache Size = 2 × n_layers × n_kv_heads × head_dim × context_length × bytes_per_element
+
+For Qwen2-0.5B (FP32 KV cache):
+  = 2 × 24 × 2 × 64 × context_length × 4 bytes
+  = 24,576 × context_length bytes
+  = 24 KB per token of context
+
+For Qwen2-0.5B (FP16 KV cache):
+  = 12 KB per token of context
+    </pre>
+</div>
+
+<h3>KV Cache Scaling by Context Length</h3>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Context Length</th><th>KV Cache (FP32)</th><th>KV Cache (FP16)</th><th>Fits in GPU VRAM?</th><th>Fits in CPU RAM?</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>2K tokens</td>
+                <td>48 MB</td>
+                <td>24 MB</td>
+                <td style="color: #47b475;">Yes (80GB)</td>
+                <td style="color: #47b475;">Yes (4TB)</td>
+            </tr>
+            <tr>
+                <td>8K tokens</td>
+                <td>192 MB</td>
+                <td>96 MB</td>
+                <td style="color: #47b475;">Yes</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>32K tokens</td>
+                <td>768 MB</td>
+                <td>384 MB</td>
+                <td style="color: #47b475;">Yes</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>128K tokens</td>
+                <td>3 GB</td>
+                <td>1.5 GB</td>
+                <td style="color: #ffb400;">Tight with model</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>512K tokens</td>
+                <td>12 GB</td>
+                <td>6 GB</td>
+                <td style="color: #ff6b6b;">Leaves little for model</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>1M tokens</td>
+                <td>24 GB</td>
+                <td>12 GB</td>
+                <td style="color: #ff6b6b;">No room for 70B model</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>The Real Problem: Model + KV Cache Must Fit Together</h3>
+
+<div class="card card-accent">
+    <h4 style="margin-top: 0;">70B Model (Llama 3.1 70B with GQA-8)</h4>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Context</th><th>KV Cache (FP16)</th><th>+ Model (140GB)</th><th>Fits H100 (80GB)?</th><th>Fits 2TB Server?</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>8K</td>
+                <td>2.6 GB</td>
+                <td>143 GB</td>
+                <td style="color: #ff6b6b;">No (need 2×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>32K</td>
+                <td>10 GB</td>
+                <td>150 GB</td>
+                <td style="color: #ff6b6b;">No (need 2×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>128K</td>
+                <td>41 GB</td>
+                <td>181 GB</td>
+                <td style="color: #ff6b6b;">No (need 3×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+            <tr>
+                <td>1M</td>
+                <td>320 GB</td>
+                <td>460 GB</td>
+                <td style="color: #ff6b6b;">No (need 6×)</td>
+                <td style="color: #47b475;">Yes</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Accordion: Show the Math -->
+<details style="margin: 20px 0; background: #1a1a2e; border-radius: 8px; border: 1px solid #333;">
+    <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; color: #fbbf24;">
+        📐 Show the Math: 70B KV Cache Calculation
+    </summary>
+    <div style="padding: 0 20px 20px 20px;">
+        <h4 style="color: #4ade80; margin-top: 15px;">Llama 3.1 70B Architecture</h4>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Parameter</th><th>Value</th><th>Explanation</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>n_layers</code></td><td>80</td><td>Number of transformer layers</td></tr>
+                    <tr><td><code>n_attention_heads</code></td><td>64</td><td>Query heads per layer</td></tr>
+                    <tr><td><code>n_kv_heads</code></td><td>8</td><td>KV heads (GQA: 8 groups, each serves 8 Q heads)</td></tr>
+                    <tr><td><code>hidden_dim</code></td><td>8192</td><td>Model hidden dimension</td></tr>
+                    <tr><td><code>head_dim</code></td><td>128</td><td>= hidden_dim / n_attention_heads = 8192/64</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 style="color: #4ade80;">KV Cache Per Token (FP16)</h4>
+        <pre style="background: #0f0f1a; padding: 15px; border-radius: 6px; overflow-x: auto;">
+KV_per_token = 2 × n_layers × n_kv_heads × head_dim × bytes
+             = 2 × 80 × 8 × 128 × 2
+             = 327,680 bytes
+             = <span style="color: #4ade80; font-weight: bold;">320 KB per token</span></pre>
+
+        <h4 style="color: #4ade80;">Scale by Context</h4>
+        <pre style="background: #0f0f1a; padding: 15px; border-radius: 6px; overflow-x: auto;">
+8K context:   8,192 × 320 KB   = 2.62 GB
+32K context:  32,768 × 320 KB  = 10.5 GB
+128K context: 131,072 × 320 KB = 41.9 GB
+1M context:   1,048,576 × 320 KB = 335 GB</pre>
+
+        <h4 style="color: #4ade80;">Why GQA Reduces Memory 8×</h4>
+        <p style="color: #a0a0b0;">Without GQA (Multi-Head Attention), 70B would need 64 KV heads instead of 8:</p>
+        <pre style="background: #0f0f1a; padding: 15px; border-radius: 6px; overflow-x: auto;">
+MHA (64 KV heads): 2.56 MB/token → 128K = 335 GB KV cache
+GQA (8 KV heads):  320 KB/token  → 128K = 42 GB KV cache
+                                          <span style="color: #4ade80;">8× smaller!</span></pre>
+    </div>
+</details>
+
+<h3>KV Cache for Different Model Sizes</h3>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Model</th><th>Parameters</th><th>KV per Token (FP16)</th><th>128K Context KV</th><th>1M Context KV</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Qwen2-0.5B</td>
+                <td>0.5B</td>
+                <td>12 KB</td>
+                <td>1.5 GB</td>
+                <td>12 GB</td>
+            </tr>
+            <tr>
+                <td>Llama-3-8B</td>
+                <td>8B</td>
+                <td>64 KB</td>
+                <td>8 GB</td>
+                <td>64 GB</td>
+            </tr>
+            <tr>
+                <td>Llama-3-70B</td>
+                <td>70B</td>
+                <td>320 KB</td>
+                <td>40 GB</td>
+                <td>320 GB</td>
+            </tr>
+            <tr>
+                <td>Llama-3-405B</td>
+                <td>405B</td>
+                <td>1.2 MB</td>
+                <td>150 GB</td>
+                <td>1.2 TB</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The 405B Reality</strong><br>
+        Llama-3-405B with 1M context needs 1.2 TB just for KV cache. That's 15× the capacity of an H100. No amount of NVLink can solve this - you need <strong>actual memory</strong>, which CPUs have.
+    </div>
+</div>
+
+<h2>Part 3: Prefill vs Decode Memory Patterns</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Decode (1 token at a time)</h3>
+        <p><strong>Memory pattern:</strong> Bandwidth-bound</p>
+        <ul>
+            <li>Read: All model weights (~1GB for 0.5B model)</li>
+            <li>Read: Entire KV cache (grows with context)</li>
+            <li>Write: 1 new K, 1 new V per layer</li>
+            <li>Write: 1 output token logits</li>
+        </ul>
+        <p><strong>Bottleneck:</strong> Memory bandwidth, not compute</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Prefill (N tokens at once)</h3>
+        <p><strong>Memory pattern:</strong> Compute + bandwidth</p>
+        <ul>
+            <li>Read: All model weights (same as decode)</li>
+            <li>Write: N × K, N × V per layer to cache</li>
+            <li>Intermediate: N × hidden_dim per operation</li>
+            <li>Scales with N (context length)</li>
+        </ul>
+        <p><strong>Bottleneck:</strong> Both compute and memory</p>
+    </div>
+</div>
+
+<h3>Prefill Activation Memory (Qwen2-0.5B)</h3>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Prefill Length</th><th>Activation Memory</th><th>+ KV Cache</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>256 tokens</td>
+                <td>~400 MB</td>
+                <td>~6 MB</td>
+            </tr>
+            <tr>
+                <td>1K tokens</td>
+                <td>~1.5 GB</td>
+                <td>~24 MB</td>
+            </tr>
+            <tr>
+                <td>4K tokens</td>
+                <td>~6 GB</td>
+                <td>~96 MB</td>
+            </tr>
+            <tr>
+                <td>16K tokens</td>
+                <td>~24 GB</td>
+                <td>~384 MB</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Prefill vs Decode</strong><br>
+        Prefill processes all input tokens at once (compute-bound). Decode generates tokens one at a time (memory-bound). Long prompts can exceed GPU VRAM even when the model fits.
+    </div>
+</div>
+
+<h2>Part 4: Why FP16 KV Cache Matters for CPUs</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">FP16 KV Cache: Not About Bandwidth, About L3 Residency</h3>
+    <p>The common misconception: "FP16 saves memory bandwidth."</p>
+    <p>The reality: <strong>FP16 doubles context that fits in L3 cache.</strong></p>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>L3 Cache Size</th><th>Max Context (FP32 KV)</th><th>Max Context (FP16 KV)</th><th>Benefit</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>6 MB (laptop)</td>
+                <td>~6K tokens</td>
+                <td>~12K tokens</td>
+                <td>2× more "hot" context</td>
+            </tr>
+            <tr>
+                <td>32 MB (desktop)</td>
+                <td>~32K tokens</td>
+                <td>~64K tokens</td>
+                <td>2× more "hot" context</td>
+            </tr>
+            <tr>
+                <td>128 MB (server)</td>
+                <td>~128K tokens</td>
+                <td>~256K tokens</td>
+                <td>2× more "hot" context</td>
+            </tr>
+            <tr>
+                <td>384 MB (EPYC)</td>
+                <td>~384K tokens</td>
+                <td>~768K tokens</td>
+                <td>2× more "hot" context</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The L3 Cache Insight</strong><br>
+        When KV cache fits in L3 (~100 GB/s bandwidth), decode is fast. When it spills to DRAM (~20-50 GB/s), decode slows 2-5×. FP16 keeps more context in L3, maintaining fast decode for longer contexts.
+    </div>
+</div>
+
+<h2>Part 6: The Complete Picture</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Memory Requirements: Model + KV Cache + Activations</h3>
+    <pre>
+Total Memory = Model Weights + KV Cache + Activation Memory
+
+For 70B model at 128K context (FP16 weights, FP16 KV):
+  Model:       140 GB
+  KV Cache:     40 GB
+  Activations:  10 GB
+  ──────────────────
+  Total:       190 GB
+
+GPU (H100 80GB):  DOESN'T FIT
+GPU (3× H100):    Fits, but $120K+ and NVLink complexity
+
+CPU (2TB server): FITS with 1.8TB headroom
+                  Run 10× concurrent users!
+                  $30K total cost
+    </pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU Memory Crisis Points</h3>
+        <ul>
+            <li><strong>7B + 32K context:</strong> Tight on 24GB consumer GPU</li>
+            <li><strong>13B + 32K context:</strong> Needs 40GB+ GPU</li>
+            <li><strong>70B + 8K context:</strong> Needs 2× 80GB GPUs</li>
+            <li><strong>70B + 128K context:</strong> Needs 3× 80GB GPUs</li>
+            <li><strong>405B + any context:</strong> Needs 8+ GPUs minimum</li>
+        </ul>
+        <p><strong>Pattern:</strong> Every model × context combination hits a wall.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU Memory Advantages</h3>
+        <ul>
+            <li><strong>Capacity:</strong> 2-4 TB per server</li>
+            <li><strong>Cost:</strong> ~$10/GB vs ~$500/GB for HBM</li>
+            <li><strong>No walls:</strong> Just add more RAM</li>
+            <li><strong>Multi-model:</strong> Run many models in same RAM</li>
+            <li><strong>Long context:</strong> 1M+ tokens? No problem.</li>
+        </ul>
+        <p><strong>Pattern:</strong> Memory scales with need, not with GPU count.</p>
+    </div>
+</div>
+
+<h2>Summary: The Numbers Don't Lie</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">What NVIDIA Marketing Says vs Reality</h3>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>Claim</th><th>Marketing</th><th>Reality</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>"GPUs are faster"</td>
+                <td>Higher FLOPS</td>
+                <td>LLM inference is memory-bound, not compute-bound</td>
+            </tr>
+            <tr>
+                <td>"80GB is enough"</td>
+                <td>Fits 40B model</td>
+                <td>70B + long context needs 200GB+</td>
+            </tr>
+            <tr>
+                <td>"Just add more GPUs"</td>
+                <td>Scale with NVLink</td>
+                <td>$40K per GPU, max 8 per node, then Ethernet anyway</td>
+            </tr>
+            <tr>
+                <td>"HBM is fast"</td>
+                <td>3.3 TB/s bandwidth</td>
+                <td>Irrelevant when model doesn't fit (0 × ∞ = 0)</td>
+            </tr>
+            <tr>
+                <td>"Enterprise ready"</td>
+                <td>DGX systems</td>
+                <td>$500K+, still limited by VRAM per model</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Bottom Line</strong><br>
+        Real LLM deployment needs: large models + long context + multiple concurrent users. CPUs provide 10-100× more memory at 10× lower cost. The math is simple: 0 × ∞ = 0. If it doesn't fit, FLOPS don't matter.
+    </div>
+</div>
+
+<h2>Visual Guides</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h4 style="margin-top: 0;">Memory Reality Infographic</h4>
+        <p>GPU vs CPU memory comparison for LLM inference:</p>
+        <a href="../assets/memory-reality-infographic.svg" target="_blank">
+            <img src="../assets/memory-reality-infographic.svg" alt="Memory Reality - GPU vs CPU comparison showing memory capacity, 70B model fit analysis, and cost comparison" style="width: 100%; border-radius: 8px; border: 1px solid #333;">
+        </a>
+        <p style="font-size: 0.9em; color: #888; margin-top: 8px;">Click to view full size</p>
+    </div>
+</div>
+
+<h2>Further Reading</h2>
+
+<ul>
+    <li><a href="scaling.html">Scaling Philosophy</a> - The two first principles</li>
+    <li><a href="developer-guide.html">Developer Guide</a> - How C-Kernel-Engine works</li>
+    <li><a href="profiling.html">Profiling Guide</a> - Measure your actual performance</li>
+</ul>

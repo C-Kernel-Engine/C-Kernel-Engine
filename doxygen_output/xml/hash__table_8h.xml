@@ -1,0 +1,849 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="hash__table_8h" kind="file" language="C++">
+    <compoundname>hash_table.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdbool.h</includes>
+    <includedby refid="tokenizer_8h" local="yes">tokenizer.h</includedby>
+    <includedby refid="true__bpe_8h" local="yes">true_bpe.h</includedby>
+    <includedby refid="hash__table_8c" local="yes">hash_table.c</includedby>
+    <includedby refid="tokenizer_8c" local="yes">tokenizer.c</includedby>
+    <incdepgraph>
+      <node id="4">
+        <label>stdbool.h</label>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>hash_table.h</label>
+        <link refid="hash__table_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="13">
+        <label>test_inference_with_bump_tokenizer.c</label>
+        <link refid="v6_86_2test__inference__with__bump__tokenizer_8c"/>
+      </node>
+      <node id="4">
+        <label>test_tokenizer.c</label>
+        <link refid="test__tokenizer_8c"/>
+      </node>
+      <node id="11">
+        <label>v6.5_inference.c</label>
+        <link refid="v6_85__inference_8c"/>
+      </node>
+      <node id="12">
+        <label>ck_cli_v6.6.c</label>
+        <link refid="ck__cli__v6_86_8c"/>
+      </node>
+      <node id="14">
+        <label>v6.6_inference.c</label>
+        <link refid="v6_86__inference_8c"/>
+      </node>
+      <node id="7">
+        <label>true_bpe.h</label>
+        <link refid="true__bpe_8h"/>
+        <childnode refid="8" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
+        </childnode>
+        <childnode refid="10" relation="include">
+        </childnode>
+        <childnode refid="11" relation="include">
+        </childnode>
+        <childnode refid="12" relation="include">
+        </childnode>
+        <childnode refid="13" relation="include">
+        </childnode>
+        <childnode refid="14" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>tokenizer.c</label>
+        <link refid="tokenizer_8c"/>
+      </node>
+      <node id="8">
+        <label>true_bpe.c</label>
+        <link refid="true__bpe_8c"/>
+      </node>
+      <node id="15">
+        <label>hash_table.c</label>
+        <link refid="hash__table_8c"/>
+      </node>
+      <node id="2">
+        <label>tokenizer.h</label>
+        <link refid="tokenizer_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="9">
+        <label>ck_cli_v6.5.c</label>
+        <link refid="ck__cli__v6_85_8c"/>
+      </node>
+      <node id="1">
+        <label>hash_table.h</label>
+        <link refid="hash__table_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="15" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>ck_cli_v5.c</label>
+        <link refid="ck__cli__v5_8c"/>
+      </node>
+      <node id="6">
+        <label>ck_cli_v6.c</label>
+        <link refid="ck__cli__v6_8c"/>
+      </node>
+      <node id="10">
+        <label>test_inference_with_bump_tokenizer.c</label>
+        <link refid="v6_85_2test__inference__with__bump__tokenizer_8c"/>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structCKTokenizerHashEntry" prot="public">CKTokenizerHashEntry</innerclass>
+    <innerclass refid="structCKTokenizerHashTable" prot="public">CKTokenizerHashTable</innerclass>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="hash__table_8h_1a2591835a5e1dc5e656771c59811d60f9" prot="public" static="no">
+        <name>CK_TOKENIZER_HT_BUCKETS_LARGE</name>
+        <initializer>65536</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="142" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" bodystart="142" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="hash__table_8h_1a02bf78e014e041c6233f26603bf8dcff" prot="public" static="no">
+        <name>CK_TOKENIZER_HT_BUCKETS_MEDIUM</name>
+        <initializer>8192</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="141" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" bodystart="141" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="hash__table_8h_1ad0dfa14a00ae4169b772559ee1d1a2bd" prot="public" static="no">
+        <name>CK_TOKENIZER_HT_BUCKETS_SMALL</name>
+        <initializer>1024</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="140" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" bodystart="140" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="hash__table_8h_1abe397ee99c0f0bd3495a8073f5b88c6d" prot="public" static="no">
+        <name>CK_TOKENIZER_HT_BUCKETS_XL</name>
+        <initializer>262144</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="143" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" bodystart="143" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="typedef">
+      <memberdef kind="typedef" id="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" prot="public" static="no">
+        <type>int(*</type>
+        <definition>typedef int(* CKTokenizerHashCallback) (const char *key, void *value, void *user_data)</definition>
+        <argsstring>)(const char *key, void *value, void *user_data)</argsstring>
+        <name>CKTokenizerHashCallback</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Iterate over all entries.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>callback</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Function to call for each entry </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>user_data</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>User-provided data for callback </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 if all entries processed, non-zero to stop </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="112" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" bodystart="112" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="hash__table_8h_1afe7abb14ee631582c7585b8a67debe1e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_hash_table_clear</definition>
+        <argsstring>(CKTokenizerHashTable *table, bool free_values)</argsstring>
+        <name>ck_tokenizer_hash_table_clear</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_values</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Clear all entries (but keep bucket array).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_values</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, free all value pointers </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="136" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="312" bodyend="328" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="136" declcolumn="6"/>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1ac7d72e1402cc099d9307f86e01099bb2" compoundref="tokenizer_8c" startline="144" endline="161">ck_tokenizer_reset</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a0e16265f47b209eccc74d3b82d56b1c3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>bool</type>
+        <definition>bool ck_tokenizer_hash_table_contains</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key)</argsstring>
+        <name>ck_tokenizer_hash_table_contains</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Check if key exists.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to check </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>true if key exists </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="101" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="268" bodyend="270" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="101" declcolumn="6"/>
+        <references refid="hash__table_8c_1ae526e6690bf6b8d95fd8a127b1b93acc" compoundref="hash__table_8c" startline="198" endline="214">ck_tokenizer_hash_table_lookup</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a65e19011e07f1a22c523261e659a5ce1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_hash_table_count</definition>
+        <argsstring>(CKTokenizerHashTable *table)</argsstring>
+        <name>ck_tokenizer_hash_table_count</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get the number of entries.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of entries </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="92" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="264" bodyend="266" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="92" declcolumn="8"/>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a9844f9fc91f4ac36c8875a54f4db167d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+        <definition>CKTokenizerHashTable* ck_tokenizer_hash_table_create</definition>
+        <argsstring>(size_t bucket_count)</argsstring>
+        <name>ck_tokenizer_hash_table_create</name>
+        <param>
+          <type>size_t</type>
+          <declname>bucket_count</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Create a hash table.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>bucket_count</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of buckets (0 = auto-size) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Newly allocated hash table, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="42" column="22" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="80" bodyend="101" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="42" declcolumn="22"/>
+        <references refid="hash__table_8h_1ad0dfa14a00ae4169b772559ee1d1a2bd" compoundref="hash__table_8h" startline="140">CK_TOKENIZER_HT_BUCKETS_SMALL</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashTable_1a152ddc4a230c3f1c98073cd3c3b48d58" compoundref="hash__table_8h" startline="33">CKTokenizerHashTable::load_factor</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+        <referencedby refid="true__bpe_8c_1a5a78bb4542b285c7f2f1fb0187444544" compoundref="true__bpe_8c" startline="301" endline="354">ck_true_bpe_create</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1af9702d4ef5621d02bcd87a3390c0aefc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_delete</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key, bool free_value)</argsstring>
+        <name>ck_tokenizer_hash_table_delete</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_value</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Delete a key.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to delete </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_value</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, free the value pointer </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 if found and deleted, -1 if not found </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="82" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="235" bodyend="262" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="82" declcolumn="5"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a7a93b1af26ca875e7f75de188d6fc39d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_hash_table_free</definition>
+        <argsstring>(CKTokenizerHashTable *table, bool free_values)</argsstring>
+        <name>ck_tokenizer_hash_table_free</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>bool</type>
+          <declname>free_values</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free a hash table.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table to free </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>free_values</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>If true, also free all value pointers </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="50" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="140" bodyend="156" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="50" declcolumn="6"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="hash__table_8c_1a9bb1b4c9ce9bba82bced8fd7ddb375ad" compoundref="hash__table_8c" startline="131" endline="138">free_entry</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+        <referencedby refid="tokenizer_8c_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="tokenizer_8c" startline="115" endline="141">ck_tokenizer_free</referencedby>
+        <referencedby refid="true__bpe_8c_1a5a78bb4542b285c7f2f1fb0187444544" compoundref="true__bpe_8c" startline="301" endline="354">ck_true_bpe_create</referencedby>
+        <referencedby refid="true__bpe_8c_1a595b35162c872e368792875138226c51" compoundref="true__bpe_8c" startline="356" endline="381">ck_true_bpe_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1ab4009b6a76738c2ad1c3ff4854f20d87" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_insert</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key, void *value)</argsstring>
+        <name>ck_tokenizer_hash_table_insert</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>value</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Insert a key-value pair.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key string </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>value</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Value pointer </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, -1 on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="60" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="158" bodyend="196" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="60" declcolumn="5"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" compoundref="hash__table_8h" startline="32">CKTokenizerHashTable::count</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+        <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="true__bpe_8c_1ac1960ecac16a47716d98aee961070323" compoundref="true__bpe_8c" startline="393" endline="439">ck_true_bpe_add_token</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a9d089f807b84052dfb30b9a390e305f8" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_hash_table_iterate</definition>
+        <argsstring>(CKTokenizerHashTable *table, CKTokenizerHashCallback callback, void *user_data)</argsstring>
+        <name>ck_tokenizer_hash_table_iterate</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type><ref refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" kindref="member">CKTokenizerHashCallback</ref></type>
+          <declname>callback</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>user_data</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="114" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="272" bodyend="291" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="114" declcolumn="5"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1a74ea90a2aeb358e8daa596041a081d12" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_hash_table_keys</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char **out_keys, size_t max_keys)</argsstring>
+        <name>ck_tokenizer_hash_table_keys</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char **</type>
+          <declname>out_keys</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>max_keys</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get all keys as an array.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>out_keys</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output array for keys (must be pre-allocated) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>max_keys</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Maximum keys to write </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of keys written </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="126" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="293" bodyend="310" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="126" declcolumn="8"/>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+      </memberdef>
+      <memberdef kind="function" id="hash__table_8h_1ae526e6690bf6b8d95fd8a127b1b93acc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_tokenizer_hash_table_lookup</definition>
+        <argsstring>(CKTokenizerHashTable *table, const char *key)</argsstring>
+        <name>ck_tokenizer_hash_table_lookup</name>
+        <param>
+          <type><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref> *</type>
+          <declname>table</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>key</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Look up a key.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>table</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Hash table </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>key</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Key to look up </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Value pointer, or NULL if not found </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" line="71" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/hash_table.c" bodystart="198" bodyend="214" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h" declline="71" declcolumn="6"/>
+        <references refid="hash__table_8c_1ad903066c5a6e160332bb1163b9eabbef" compoundref="hash__table_8c" startline="22" endline="24">ck_tokenizer_hash_str</references>
+        <references refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" compoundref="hash__table_8h" startline="30">CKTokenizerHashTable::entries</references>
+        <references refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" compoundref="hash__table_8h" startline="23">CKTokenizerHashEntry::key</references>
+        <references refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" compoundref="hash__table_8h" startline="25">CKTokenizerHashEntry::next</references>
+        <references refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" compoundref="hash__table_8h" startline="31">CKTokenizerHashTable::size</references>
+        <references refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" compoundref="hash__table_8h" startline="24">CKTokenizerHashEntry::value</references>
+        <referencedby refid="tokenizer_8h_1ad6c5fe6b7a2df85a99504e702348a0bb" compoundref="tokenizer_8c" startline="220" endline="238">ck_tokenizer_add_special_token</referencedby>
+        <referencedby refid="tokenizer_8h_1a276dfd23dea6a3a888d21be343086124" compoundref="tokenizer_8c" startline="164" endline="217">ck_tokenizer_add_token</referencedby>
+        <referencedby refid="hash__table_8h_1a0e16265f47b209eccc74d3b82d56b1c3" compoundref="hash__table_8c" startline="268" endline="270">ck_tokenizer_hash_table_contains</referencedby>
+        <referencedby refid="tokenizer_8c_1a18ff60efe6bd542c238441292f7d1833" compoundref="tokenizer_8c" startline="314" endline="318">ck_tokenizer_lookup</referencedby>
+        <referencedby refid="true__bpe_8c_1ae818deba4ff4981c20c903bfffb2fdb6" compoundref="true__bpe_8c" startline="458" endline="494">ck_true_bpe_add_merge_by_tokens</referencedby>
+        <referencedby refid="true__bpe_8c_1ac1960ecac16a47716d98aee961070323" compoundref="true__bpe_8c" startline="393" endline="439">ck_true_bpe_add_token</referencedby>
+        <referencedby refid="true__bpe_8c_1ae74dd1b70452d2e51b83fed3ae67855c" compoundref="true__bpe_8c" startline="541" endline="546">ck_true_bpe_lookup</referencedby>
+        <referencedby refid="tokenizer_8c_1aeec3f3e9fcc1faea770cb1e0e1b65b12" compoundref="tokenizer_8c" startline="338" endline="365">find_longest_match_hash</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Hash<sp/>Table<sp/>-<sp/>Optimized<sp/>with<sp/>AVX-512</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Ported<sp/>from<sp/>HPC_Embeddings<sp/>with<sp/>SIMD-optimized<sp/>string<sp/>comparison.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Uses<sp/>MurmurHash3<sp/>for<sp/>hashing<sp/>and<sp/>supports<sp/>AVX-512<sp/>for<sp/>fast<sp/>lookups.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>By<sp/>Anthony<sp/>Shivakumar</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_TOKENIZER_HASH_TABLE_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HASH_TABLE_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdbool.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Hash<sp/>table<sp/>entry<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="structCKTokenizerHashEntry" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>{</highlight></codeline>
+<codeline lineno="23" refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="structCKTokenizerHashEntry_1a577cb4e16aad79410f9255006f494aa4" kindref="member">key</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Null-terminated<sp/>key<sp/>string<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24" refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="structCKTokenizerHashEntry_1a5636de7cf6ff6ad7fb7d40e500cfa9ff" kindref="member">value</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Associated<sp/>value<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25" refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>*<ref refid="structCKTokenizerHashEntry_1a2ca07dab0e09edf9f60f6e5059bbcb27" kindref="member">next</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Chain<sp/>for<sp/>collisions<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal">}<sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref>;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Hash<sp/>table<sp/>structure<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29" refid="structCKTokenizerHashTable" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="30" refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKTokenizerHashEntry" kindref="compound">CKTokenizerHashEntry</ref><sp/>**<ref refid="structCKTokenizerHashTable_1a94372200d57fbd18f5d6d758c7f20462" kindref="member">entries</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Bucket<sp/>array<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31" refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerHashTable_1a825039346d859bfce1ac75437ee17463" kindref="member">size</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Number<sp/>of<sp/>buckets<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="32" refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerHashTable_1a47467c22f88499e6d80e3ce5679d1cc7" kindref="member">count</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Number<sp/>of<sp/>entries<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33" refid="structCKTokenizerHashTable_1a152ddc4a230c3f1c98073cd3c3b48d58" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerHashTable_1a152ddc4a230c3f1c98073cd3c3b48d58" kindref="member">load_factor</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Max<sp/>load<sp/>factor<sp/>before<sp/>resize<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal">}<sp/><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref>;</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="36"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="37"><highlight class="comment"><sp/>*<sp/>Create<sp/>a<sp/>hash<sp/>table.</highlight></codeline>
+<codeline lineno="38"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="39"><highlight class="comment"><sp/>*<sp/>@param<sp/>bucket_count<sp/><sp/>Number<sp/>of<sp/>buckets<sp/>(0<sp/>=<sp/>auto-size)</highlight></codeline>
+<codeline lineno="40"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Newly<sp/>allocated<sp/>hash<sp/>table,<sp/>or<sp/>NULL<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="41"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*<ref refid="hash__table_8h_1a9844f9fc91f4ac36c8875a54f4db167d" kindref="member">ck_tokenizer_hash_table_create</ref>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>bucket_count);</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="44"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*<sp/>Free<sp/>a<sp/>hash<sp/>table.</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table<sp/>to<sp/>free</highlight></codeline>
+<codeline lineno="48"><highlight class="comment"><sp/>*<sp/>@param<sp/>free_values<sp/><sp/>If<sp/>true,<sp/>also<sp/>free<sp/>all<sp/>value<sp/>pointers</highlight></codeline>
+<codeline lineno="49"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1a7a93b1af26ca875e7f75de188d6fc39d" kindref="member">ck_tokenizer_hash_table_free</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,<sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_values);</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="52"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>Insert<sp/>a<sp/>key-value<sp/>pair.</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="56"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/>Key<sp/>string</highlight></codeline>
+<codeline lineno="57"><highlight class="comment"><sp/>*<sp/>@param<sp/>value<sp/><sp/><sp/>Value<sp/>pointer</highlight></codeline>
+<codeline lineno="58"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="59"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1ab4009b6a76738c2ad1c3ff4854f20d87" kindref="member">ck_tokenizer_hash_table_insert</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*value);</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="64"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*<sp/>Look<sp/>up<sp/>a<sp/>key.</highlight></codeline>
+<codeline lineno="66"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="67"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="68"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/>Key<sp/>to<sp/>look<sp/>up</highlight></codeline>
+<codeline lineno="69"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Value<sp/>pointer,<sp/>or<sp/>NULL<sp/>if<sp/>not<sp/>found</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="hash__table_8h_1ae526e6690bf6b8d95fd8a127b1b93acc" kindref="member">ck_tokenizer_hash_table_lookup</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key);</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="74"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*<sp/>Delete<sp/>a<sp/>key.</highlight></codeline>
+<codeline lineno="76"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="77"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="78"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/>Key<sp/>to<sp/>delete</highlight></codeline>
+<codeline lineno="79"><highlight class="comment"><sp/>*<sp/>@param<sp/>free_value<sp/><sp/>If<sp/>true,<sp/>free<sp/>the<sp/>value<sp/>pointer</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0<sp/>if<sp/>found<sp/>and<sp/>deleted,<sp/>-1<sp/>if<sp/>not<sp/>found</highlight></codeline>
+<codeline lineno="81"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="82"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1af9702d4ef5621d02bcd87a3390c0aefc" kindref="member">ck_tokenizer_hash_table_delete</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_value);</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="86"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="87"><highlight class="comment"><sp/>*<sp/>Get<sp/>the<sp/>number<sp/>of<sp/>entries.</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>entries</highlight></codeline>
+<codeline lineno="91"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="92"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1a65e19011e07f1a22c523261e659a5ce1" kindref="member">ck_tokenizer_hash_table_count</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table);</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="94"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*<sp/>Check<sp/>if<sp/>key<sp/>exists.</highlight></codeline>
+<codeline lineno="96"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="97"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="98"><highlight class="comment"><sp/>*<sp/>@param<sp/>key<sp/><sp/><sp/><sp/><sp/>Key<sp/>to<sp/>check</highlight></codeline>
+<codeline lineno="99"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>true<sp/>if<sp/>key<sp/>exists</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1a0e16265f47b209eccc74d3b82d56b1c3" kindref="member">ck_tokenizer_hash_table_contains</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key);</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="104"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="105"><highlight class="comment"><sp/>*<sp/>Iterate<sp/>over<sp/>all<sp/>entries.</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="108"><highlight class="comment"><sp/>*<sp/>@param<sp/>callback<sp/><sp/>Function<sp/>to<sp/>call<sp/>for<sp/>each<sp/>entry</highlight></codeline>
+<codeline lineno="109"><highlight class="comment"><sp/>*<sp/>@param<sp/>user_data<sp/><sp/>User-provided<sp/>data<sp/>for<sp/>callback</highlight></codeline>
+<codeline lineno="110"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0<sp/>if<sp/>all<sp/>entries<sp/>processed,<sp/>non-zero<sp/>to<sp/>stop</highlight></codeline>
+<codeline lineno="111"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="112" refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/>int<sp/>(*<ref refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" kindref="member">CKTokenizerHashCallback</ref>)(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*key,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*value,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*user_data);</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"></highlight></codeline>
+<codeline lineno="114"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1a9d089f807b84052dfb30b9a390e305f8" kindref="member">ck_tokenizer_hash_table_iterate</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="hash__table_8h_1a91e28540bf80b7e17b1fce517c459468" kindref="member">CKTokenizerHashCallback</ref><sp/>callback,</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*user_data);</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="118"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="119"><highlight class="comment"><sp/>*<sp/>Get<sp/>all<sp/>keys<sp/>as<sp/>an<sp/>array.</highlight></codeline>
+<codeline lineno="120"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="121"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="122"><highlight class="comment"><sp/>*<sp/>@param<sp/>out_keys<sp/><sp/>Output<sp/>array<sp/>for<sp/>keys<sp/>(must<sp/>be<sp/>pre-allocated)</highlight></codeline>
+<codeline lineno="123"><highlight class="comment"><sp/>*<sp/>@param<sp/>max_keys<sp/><sp/>Maximum<sp/>keys<sp/>to<sp/>write</highlight></codeline>
+<codeline lineno="124"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>keys<sp/>written</highlight></codeline>
+<codeline lineno="125"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1a74ea90a2aeb358e8daa596041a081d12" kindref="member">ck_tokenizer_hash_table_keys</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>**out_keys,</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>max_keys);</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="130"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="131"><highlight class="comment"><sp/>*<sp/>Clear<sp/>all<sp/>entries<sp/>(but<sp/>keep<sp/>bucket<sp/>array).</highlight></codeline>
+<codeline lineno="132"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="133"><highlight class="comment"><sp/>*<sp/>@param<sp/>table<sp/><sp/><sp/><sp/><sp/><sp/><sp/>Hash<sp/>table</highlight></codeline>
+<codeline lineno="134"><highlight class="comment"><sp/>*<sp/>@param<sp/>free_values<sp/>If<sp/>true,<sp/>free<sp/>all<sp/>value<sp/>pointers</highlight></codeline>
+<codeline lineno="135"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="hash__table_8h_1afe7abb14ee631582c7585b8a67debe1e" kindref="member">ck_tokenizer_hash_table_clear</ref>(<ref refid="structCKTokenizerHashTable" kindref="compound">CKTokenizerHashTable</ref><sp/>*table,</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">bool</highlight><highlight class="normal"><sp/>free_values);</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Pre-defined<sp/>bucket<sp/>counts<sp/>(prime<sp/>numbers<sp/>for<sp/>good<sp/>distribution)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="140" refid="hash__table_8h_1ad0dfa14a00ae4169b772559ee1d1a2bd" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HT_BUCKETS_SMALL<sp/><sp/><sp/><sp/>1024</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="141" refid="hash__table_8h_1a02bf78e014e041c6233f26603bf8dcff" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HT_BUCKETS_MEDIUM<sp/><sp/><sp/>8192</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="142" refid="hash__table_8h_1a2591835a5e1dc5e656771c59811d60f9" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HT_BUCKETS_LARGE<sp/><sp/><sp/>65536</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="143" refid="hash__table_8h_1abe397ee99c0f0bd3495a8073f5b88c6d" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_HT_BUCKETS_XL<sp/><sp/><sp/><sp/><sp/><sp/>262144</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="146"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="148"><highlight class="normal"></highlight></codeline>
+<codeline lineno="149"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_TOKENIZER_HASH_TABLE_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/hash_table.h"/>
+  </compounddef>
+</doxygen>

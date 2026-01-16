@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" width="900" height="700">
+  <defs>
+    <style>
+      .title { font: bold 24px 'Segoe UI', Arial, sans-serif; fill: #1a1a2e; }
+      .subtitle { font: bold 16px 'Segoe UI', Arial, sans-serif; fill: #16213e; }
+      .label { font: 12px 'Courier New', monospace; fill: #333; }
+      .small-label { font: 10px 'Courier New', monospace; fill: #666; }
+      .bit-text { font: bold 11px 'Courier New', monospace; fill: white; }
+      .bit-num { font: 9px 'Courier New', monospace; fill: #888; }
+      .annotation { font: 11px 'Segoe UI', Arial, sans-serif; fill: #444; }
+      .highlight { font: bold 12px 'Segoe UI', Arial, sans-serif; fill: #e94560; }
+      .code { font: 11px 'Courier New', monospace; fill: #0f3460; }
+    </style>
+    <!-- Gradient for sign bit -->
+    <linearGradient id="signGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e94560"/>
+      <stop offset="100%" style="stop-color:#c73e54"/>
+    </linearGradient>
+    <!-- Gradient for exponent bits -->
+    <linearGradient id="expGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460"/>
+      <stop offset="100%" style="stop-color:#0a2647"/>
+    </linearGradient>
+    <!-- Gradient for mantissa bits (BF16) -->
+    <linearGradient id="mantBf16Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00b4d8"/>
+      <stop offset="100%" style="stop-color:#0077b6"/>
+    </linearGradient>
+    <!-- Gradient for mantissa bits (FP32 lower, to be discarded) -->
+    <linearGradient id="mantDiscardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#adb5bd"/>
+      <stop offset="100%" style="stop-color:#868e96"/>
+    </linearGradient>
+    <!-- Arrow marker -->
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="700" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" class="title">BF16 (Brain Float 16) Format</text>
+  <text x="450" y="58" text-anchor="middle" class="annotation">Upper 16 bits of IEEE-754 FP32 with round-to-nearest-even</text>
+
+  <!-- ===== SECTION 1: Bit Layout Comparison ===== -->
+  <text x="50" y="100" class="subtitle">Bit Layout Comparison</text>
+
+  <!-- FP32 Format -->
+  <text x="50" y="130" class="label">FP32 (32 bits):</text>
+
+  <!-- FP32 bit boxes -->
+  <g transform="translate(50, 140)">
+    <!-- Sign bit (1) -->
+    <rect x="0" y="0" width="25" height="30" rx="3" fill="url(#signGrad)" stroke="#c73e54" stroke-width="1"/>
+    <text x="12.5" y="20" text-anchor="middle" class="bit-text">S</text>
+    <text x="12.5" y="45" text-anchor="middle" class="bit-num">31</text>
+
+    <!-- Exponent bits (8) -->
+    <rect x="25" y="0" width="200" height="30" rx="3" fill="url(#expGrad)" stroke="#0a2647" stroke-width="1"/>
+    <text x="125" y="20" text-anchor="middle" class="bit-text">EXPONENT (8 bits)</text>
+    <text x="30" y="45" text-anchor="start" class="bit-num">30</text>
+    <text x="220" y="45" text-anchor="end" class="bit-num">23</text>
+
+    <!-- Mantissa bits - upper 7 (BF16) -->
+    <rect x="225" y="0" width="175" height="30" rx="3" fill="url(#mantBf16Grad)" stroke="#0077b6" stroke-width="1"/>
+    <text x="312.5" y="20" text-anchor="middle" class="bit-text">MANTISSA (7)</text>
+    <text x="230" y="45" text-anchor="start" class="bit-num">22</text>
+    <text x="395" y="45" text-anchor="end" class="bit-num">16</text>
+
+    <!-- Mantissa bits - lower 16 (discarded in BF16) -->
+    <rect x="400" y="0" width="400" height="30" rx="3" fill="url(#mantDiscardGrad)" stroke="#868e96" stroke-width="1"/>
+    <text x="600" y="20" text-anchor="middle" class="bit-text">MANTISSA (16 bits) - Discarded for BF16</text>
+    <text x="405" y="45" text-anchor="start" class="bit-num">15</text>
+    <text x="795" y="45" text-anchor="end" class="bit-num">0</text>
+
+    <!-- Bracket showing BF16 portion -->
+    <path d="M 0 -8 L 0 -15 L 400 -15 L 400 -8" stroke="#16213e" stroke-width="2" fill="none"/>
+    <text x="200" y="-22" text-anchor="middle" class="highlight">BF16 = Upper 16 bits</text>
+  </g>
+
+  <!-- BF16 Format -->
+  <text x="50" y="225" class="label">BF16 (16 bits):</text>
+
+  <!-- BF16 bit boxes -->
+  <g transform="translate(50, 235)">
+    <!-- Sign bit (1) -->
+    <rect x="0" y="0" width="25" height="30" rx="3" fill="url(#signGrad)" stroke="#c73e54" stroke-width="1"/>
+    <text x="12.5" y="20" text-anchor="middle" class="bit-text">S</text>
+    <text x="12.5" y="45" text-anchor="middle" class="bit-num">15</text>
+
+    <!-- Exponent bits (8) -->
+    <rect x="25" y="0" width="200" height="30" rx="3" fill="url(#expGrad)" stroke="#0a2647" stroke-width="1"/>
+    <text x="125" y="20" text-anchor="middle" class="bit-text">EXPONENT (8 bits)</text>
+    <text x="30" y="45" text-anchor="start" class="bit-num">14</text>
+    <text x="220" y="45" text-anchor="end" class="bit-num">7</text>
+
+    <!-- Mantissa bits (7) -->
+    <rect x="225" y="0" width="175" height="30" rx="3" fill="url(#mantBf16Grad)" stroke="#0077b6" stroke-width="1"/>
+    <text x="312.5" y="20" text-anchor="middle" class="bit-text">MANTISSA (7)</text>
+    <text x="230" y="45" text-anchor="start" class="bit-num">6</text>
+    <text x="395" y="45" text-anchor="end" class="bit-num">0</text>
+  </g>
+
+  <!-- Key insight box -->
+  <rect x="470" y="220" width="380" height="70" rx="5" fill="#e8f4f8" stroke="#00b4d8" stroke-width="1"/>
+  <text x="660" y="242" text-anchor="middle" class="subtitle" fill="#0077b6">Key Insight</text>
+  <text x="480" y="262" class="annotation">Same exponent range as FP32 (10^-38 to 10^38)</text>
+  <text x="480" y="278" class="annotation">Only 7 mantissa bits vs 23 (precision trade-off)</text>
+
+  <!-- ===== SECTION 2: Conversion Process ===== -->
+  <text x="50" y="330" class="subtitle">FP32 to BF16 Conversion (Round-to-Nearest-Even)</text>
+
+  <!-- Example value box -->
+  <rect x="50" y="345" width="800" height="185" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1"/>
+
+  <!-- Step 1: Original FP32 -->
+  <text x="70" y="370" class="label">Step 1: Original FP32 value</text>
+  <g transform="translate(70, 380)">
+    <text x="0" y="0" class="code">float f = 1.00390625f;  // Hex: 0x3F808000</text>
+    <g transform="translate(0, 15)">
+      <rect x="0" y="0" width="16" height="20" fill="url(#signGrad)" stroke="#c73e54"/>
+      <text x="8" y="14" text-anchor="middle" class="small-label" fill="white">0</text>
+      <rect x="16" y="0" width="128" height="20" fill="url(#expGrad)" stroke="#0a2647"/>
+      <text x="80" y="14" text-anchor="middle" class="small-label" fill="white">01111111</text>
+      <rect x="144" y="0" width="112" height="20" fill="url(#mantBf16Grad)" stroke="#0077b6"/>
+      <text x="200" y="14" text-anchor="middle" class="small-label" fill="white">0000001</text>
+      <rect x="256" y="0" width="256" height="20" fill="url(#mantDiscardGrad)" stroke="#868e96"/>
+      <text x="384" y="14" text-anchor="middle" class="small-label" fill="white">0000000000000000</text>
+      <text x="520" y="14" class="small-label">← Bit 16 is LSB of BF16</text>
+    </g>
+  </g>
+
+  <!-- Step 2: Check rounding -->
+  <text x="70" y="435" class="label">Step 2: Determine rounding (check bit 16 = LSB of result)</text>
+  <g transform="translate(70, 445)">
+    <text x="0" y="0" class="code">uint32_t lsb = (0x3F808000 >> 16) &amp; 1 = 0</text>
+    <text x="0" y="18" class="code">rounding_bias = 0x7FFF + lsb = 0x7FFF</text>
+  </g>
+
+  <!-- Step 3: Add rounding bias -->
+  <text x="70" y="485" class="label">Step 3: Add rounding bias and truncate</text>
+  <g transform="translate(70, 495)">
+    <text x="0" y="0" class="code">0x3F808000 + 0x7FFF = 0x3F80FFFF</text>
+    <text x="0" y="18" class="code">0x3F80FFFF >> 16 = 0x3F80</text>
+    <text x="280" y="9" class="annotation">← Result: BF16 = 0x3F80 (1.0f)</text>
+  </g>
+
+  <!-- ===== SECTION 3: Why Round-to-Nearest-Even ===== -->
+  <text x="50" y="560" class="subtitle">Why Round-to-Nearest-Even?</text>
+
+  <rect x="50" y="575" width="380" height="110" rx="5" fill="#fff5f5" stroke="#e94560" stroke-width="1"/>
+  <text x="60" y="595" class="label" fill="#e94560">Simple Truncation (BAD)</text>
+  <text x="60" y="615" class="annotation">• Always rounds DOWN</text>
+  <text x="60" y="633" class="annotation">• Systematic negative bias: -0.5 LSB average</text>
+  <text x="60" y="651" class="annotation">• Errors compound over neural network layers</text>
+  <text x="60" y="669" class="annotation">• Training becomes unstable</text>
+
+  <rect x="470" y="575" width="380" height="110" rx="5" fill="#f0fff4" stroke="#2ecc71" stroke-width="1"/>
+  <text x="480" y="595" class="label" fill="#2ecc71">Round-to-Nearest-Even (GOOD)</text>
+  <text x="480" y="615" class="annotation">• Rounds to closest representable value</text>
+  <text x="480" y="633" class="annotation">• Zero bias on average (errors cancel)</text>
+  <text x="480" y="651" class="annotation">• Ties go to even (banker's rounding)</text>
+  <text x="480" y="669" class="annotation">• Used by IEEE-754, PyTorch, TensorFlow</text>
+
+</svg>

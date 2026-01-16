@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+  <defs>
+    <marker id="arrowG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="520" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="450" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">Grouped Query Attention (GQA)</text>
+  <text x="450" y="50" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Memory-efficient attention with shared K/V heads</text>
+
+  <!-- MHA Section -->
+  <g transform="translate(30, 75)">
+    <rect x="0" y="0" width="260" height="200" rx="6" fill="#2a2a2a" stroke="#e74c3c"/>
+    <text x="130" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#e74c3c" text-anchor="middle">Multi-Head Attention (MHA)</text>
+    <text x="130" y="45" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">num_kv_heads = num_heads</text>
+
+    <!-- Q heads -->
+    <text x="20" y="75" font-family="Inter, sans-serif" font-size="10" fill="#07adf8">Q heads:</text>
+    <rect x="20" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="50" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="80" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="110" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <text x="32" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₀</text>
+    <text x="62" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₁</text>
+    <text x="92" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₂</text>
+    <text x="122" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₃</text>
+
+    <!-- K heads -->
+    <text x="20" y="125" font-family="Inter, sans-serif" font-size="10" fill="#47b475">K heads:</text>
+    <rect x="20" y="135" width="25" height="25" rx="3" fill="#1a3d2a" stroke="#47b475"/>
+    <rect x="50" y="135" width="25" height="25" rx="3" fill="#1a3d2a" stroke="#47b475"/>
+    <rect x="80" y="135" width="25" height="25" rx="3" fill="#1a3d2a" stroke="#47b475"/>
+    <rect x="110" y="135" width="25" height="25" rx="3" fill="#1a3d2a" stroke="#47b475"/>
+    <text x="32" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₀</text>
+    <text x="62" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₁</text>
+    <text x="92" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₂</text>
+    <text x="122" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₃</text>
+
+    <!-- V heads -->
+    <text x="160" y="125" font-family="Inter, sans-serif" font-size="10" fill="#9b59b6">V heads:</text>
+    <rect x="160" y="135" width="25" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6"/>
+    <rect x="190" y="135" width="25" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6"/>
+    <rect x="160" y="165" width="25" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6"/>
+    <rect x="190" y="165" width="25" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6"/>
+    <text x="172" y="152" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₀</text>
+    <text x="202" y="152" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₁</text>
+    <text x="172" y="182" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₂</text>
+    <text x="202" y="182" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₃</text>
+  </g>
+
+  <!-- GQA Section -->
+  <g transform="translate(320, 75)">
+    <rect x="0" y="0" width="260" height="200" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+    <text x="130" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#47b475" text-anchor="middle">Grouped Query Attention (GQA)</text>
+    <text x="130" y="45" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">1 &lt; num_kv_heads &lt; num_heads</text>
+
+    <!-- Q heads -->
+    <text x="20" y="75" font-family="Inter, sans-serif" font-size="10" fill="#07adf8">Q heads:</text>
+    <rect x="20" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="50" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="80" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="110" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <text x="32" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₀</text>
+    <text x="62" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₁</text>
+    <text x="92" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₂</text>
+    <text x="122" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₃</text>
+
+    <!-- K heads (fewer) -->
+    <text x="20" y="125" font-family="Inter, sans-serif" font-size="10" fill="#47b475">K heads (shared):</text>
+    <rect x="35" y="135" width="40" height="25" rx="3" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+    <rect x="95" y="135" width="40" height="25" rx="3" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+    <text x="55" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₀</text>
+    <text x="115" y="152" font-family="monospace" font-size="8" fill="#47b475" text-anchor="middle">K₁</text>
+
+    <!-- V heads (fewer) -->
+    <text x="160" y="125" font-family="Inter, sans-serif" font-size="10" fill="#9b59b6">V heads:</text>
+    <rect x="160" y="135" width="40" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6" stroke-width="2"/>
+    <rect x="205" y="135" width="40" height="25" rx="3" fill="#2d1f3d" stroke="#9b59b6" stroke-width="2"/>
+    <text x="180" y="152" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₀</text>
+    <text x="225" y="152" font-family="monospace" font-size="8" fill="#9b59b6" text-anchor="middle">V₁</text>
+
+    <!-- Sharing lines -->
+    <line x1="32" y1="110" x2="55" y2="135" stroke="#ffb400" stroke-width="1.5"/>
+    <line x1="62" y1="110" x2="55" y2="135" stroke="#ffb400" stroke-width="1.5"/>
+    <line x1="92" y1="110" x2="115" y2="135" stroke="#ffb400" stroke-width="1.5"/>
+    <line x1="122" y1="110" x2="115" y2="135" stroke="#ffb400" stroke-width="1.5"/>
+
+    <text x="130" y="185" font-family="Inter, sans-serif" font-size="9" fill="#ffb400" text-anchor="middle">2 Q heads share 1 K/V pair</text>
+  </g>
+
+  <!-- MQA Section -->
+  <g transform="translate(610, 75)">
+    <rect x="0" y="0" width="260" height="200" rx="6" fill="#2a2a2a" stroke="#9b59b6"/>
+    <text x="130" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#9b59b6" text-anchor="middle">Multi-Query Attention (MQA)</text>
+    <text x="130" y="45" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">num_kv_heads = 1</text>
+
+    <!-- Q heads -->
+    <text x="20" y="75" font-family="Inter, sans-serif" font-size="10" fill="#07adf8">Q heads:</text>
+    <rect x="20" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="50" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="80" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <rect x="110" y="85" width="25" height="25" rx="3" fill="#1a3d4a" stroke="#07adf8"/>
+    <text x="32" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₀</text>
+    <text x="62" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₁</text>
+    <text x="92" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₂</text>
+    <text x="122" y="102" font-family="monospace" font-size="8" fill="#07adf8" text-anchor="middle">Q₃</text>
+
+    <!-- Single K head -->
+    <text x="160" y="75" font-family="Inter, sans-serif" font-size="10" fill="#47b475">K (single):</text>
+    <rect x="175" y="85" width="55" height="30" rx="3" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
+    <text x="202" y="105" font-family="monospace" font-size="10" fill="#47b475" text-anchor="middle">K₀</text>
+
+    <!-- Single V head -->
+    <text x="160" y="135" font-family="Inter, sans-serif" font-size="10" fill="#9b59b6">V (single):</text>
+    <rect x="175" y="145" width="55" height="30" rx="3" fill="#2d1f3d" stroke="#9b59b6" stroke-width="2"/>
+    <text x="202" y="165" font-family="monospace" font-size="10" fill="#9b59b6" text-anchor="middle">V₀</text>
+
+    <!-- All sharing lines -->
+    <line x1="32" y1="110" x2="175" y2="100" stroke="#ffb400" stroke-width="1"/>
+    <line x1="62" y1="110" x2="175" y2="100" stroke="#ffb400" stroke-width="1"/>
+    <line x1="92" y1="110" x2="175" y2="100" stroke="#ffb400" stroke-width="1"/>
+    <line x1="122" y1="110" x2="175" y2="100" stroke="#ffb400" stroke-width="1"/>
+
+    <text x="130" y="185" font-family="Inter, sans-serif" font-size="9" fill="#ffb400" text-anchor="middle">ALL Q heads share 1 K/V pair</text>
+  </g>
+
+  <!-- Memory comparison -->
+  <g transform="translate(30, 295)">
+    <rect x="0" y="0" width="840" height="100" rx="6" fill="#2a2a2a" stroke="#ffb400"/>
+    <text x="420" y="25" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffb400" text-anchor="middle">Memory Comparison (KV Cache per Layer)</text>
+
+    <!-- MHA bar -->
+    <rect x="40" y="45" width="200" height="25" rx="3" fill="#e74c3c"/>
+    <text x="140" y="62" font-family="Inter, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">MHA: 2 × T × H × d</text>
+    <text x="250" y="62" font-family="monospace" font-size="9" fill="#707070">= 100%</text>
+
+    <!-- GQA bar -->
+    <rect x="40" y="75" width="50" height="25" rx="3" fill="#47b475"/>
+    <text x="65" y="92" font-family="Inter, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">GQA</text>
+    <text x="100" y="92" font-family="monospace" font-size="9" fill="#707070">= 25% (with 4:1 ratio)</text>
+
+    <!-- Legend -->
+    <text x="420" y="55" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0" text-anchor="middle">T = sequence length, H = num_heads, d = head_dim</text>
+    <text x="420" y="75" font-family="Inter, sans-serif" font-size="10" fill="#b0b0b0" text-anchor="middle">GQA reduces KV cache by factor of (num_heads / num_kv_heads)</text>
+
+    <!-- MQA bar -->
+    <text x="700" y="62" font-family="Inter, sans-serif" font-size="10" fill="#9b59b6">MQA: 2 × T × 1 × d</text>
+    <text x="700" y="82" font-family="monospace" font-size="9" fill="#707070">minimal KV cache</text>
+  </g>
+
+  <!-- Implementation details -->
+  <g transform="translate(30, 415)">
+    <rect x="0" y="0" width="420" height="90" rx="6" fill="#2a2a2a" stroke="#07adf8"/>
+    <text x="210" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#07adf8" text-anchor="middle">Implementation: Broadcasting K/V</text>
+
+    <text x="20" y="45" font-family="monospace" font-size="9" fill="#b0b0b0">// Repeat K/V heads to match Q heads</text>
+    <text x="20" y="60" font-family="monospace" font-size="9" fill="#ffb400">kv_repeat = num_heads / num_kv_heads;</text>
+    <text x="20" y="75" font-family="monospace" font-size="9" fill="#b0b0b0">K_expanded = repeat(K, kv_repeat);  // broadcast</text>
+  </g>
+
+  <!-- Trade-offs -->
+  <g transform="translate(470, 415)">
+    <rect x="0" y="0" width="400" height="90" rx="6" fill="#2a2a2a" stroke="#47b475"/>
+    <text x="200" y="22" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#47b475" text-anchor="middle">Trade-offs</text>
+
+    <text x="20" y="45" font-family="Inter, sans-serif" font-size="10" fill="#47b475">✓ Less memory = longer sequences</text>
+    <text x="20" y="62" font-family="Inter, sans-serif" font-size="10" fill="#47b475">✓ Faster inference (less KV cache IO)</text>
+    <text x="200" y="45" font-family="Inter, sans-serif" font-size="10" fill="#e74c3c">✗ Slight quality loss vs MHA</text>
+    <text x="200" y="62" font-family="Inter, sans-serif" font-size="10" fill="#707070">  (minimal with good training)</text>
+    <text x="20" y="82" font-family="Inter, sans-serif" font-size="10" fill="#707070">Llama 3: 8 Q heads, 1-2 KV heads per group</text>
+  </g>
+</svg>

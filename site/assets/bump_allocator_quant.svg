@@ -1,0 +1,245 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="memGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2a2a2a"/>
+      <stop offset="100%" style="stop-color:#1a1a1a"/>
+    </linearGradient>
+    <pattern id="stripes" patternUnits="userSpaceOnUse" width="8" height="8">
+      <path d="M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4" stroke="#454545" stroke-width="1"/>
+    </pattern>
+    <marker id="ptr" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#e74c3c"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="24" font-weight="700">Bump Allocator Memory Layout for Quantized Inference</text>
+  <text x="600" y="70" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="14">Separate regions by data type - never mix types within a region</text>
+
+  <!-- ===== Main Memory Block ===== -->
+  <rect x="50" y="100" width="700" height="780" rx="8" fill="url(#memGrad)" stroke="#454545" stroke-width="3"/>
+  <text x="400" y="130" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="18" font-weight="700">Bump Allocator Memory Map</text>
+
+  <!-- Address markers -->
+  <text x="70" y="160" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x0000</text>
+
+  <!-- ===== Region 1: Tensor Headers ===== -->
+  <rect x="80" y="170" width="640" height="80" rx="6" fill="#323232" stroke="#9b59b6" stroke-width="2"/>
+  <text x="400" y="195" text-anchor="middle" fill="#9b59b6" font-family="Inter, sans-serif" font-size="14" font-weight="600">Region 1: Tensor Headers (metadata only)</text>
+
+  <!-- Tensor header boxes -->
+  <g transform="translate(100, 210)">
+    <rect x="0" y="0" width="90" height="30" rx="3" fill="#9b59b6"/>
+    <text x="45" y="20" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="9">tensor[0]</text>
+  </g>
+  <g transform="translate(200, 210)">
+    <rect x="0" y="0" width="90" height="30" rx="3" fill="#9b59b6"/>
+    <text x="45" y="20" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="9">tensor[1]</text>
+  </g>
+  <g transform="translate(300, 210)">
+    <rect x="0" y="0" width="90" height="30" rx="3" fill="#9b59b6"/>
+    <text x="45" y="20" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="9">tensor[2]</text>
+  </g>
+  <text x="430" y="230" fill="#808080" font-family="Inter, sans-serif" font-size="14">...</text>
+
+  <!-- Pointer lines from headers -->
+  <line x1="145" y1="240" x2="145" y2="290" stroke="#e74c3c" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ptr)"/>
+  <line x1="245" y1="240" x2="245" y2="430" stroke="#e74c3c" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ptr)"/>
+  <line x1="345" y1="240" x2="345" y2="570" stroke="#e74c3c" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ptr)"/>
+
+  <!-- Address marker -->
+  <text x="70" y="275" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x1000</text>
+
+  <!-- ===== Region 2: Q4_K Weights ===== -->
+  <rect x="80" y="280" width="640" height="140" rx="6" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+  <text x="400" y="305" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="14" font-weight="600">Region 2: Quantized Weights (Q4_K) - Read Only</text>
+
+  <!-- Q4_K blocks -->
+  <g transform="translate(100, 320)">
+    <rect x="0" y="0" width="80" height="80" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+    <rect x="5" y="5" width="70" height="20" rx="2" fill="#9b59b6"/>
+    <text x="40" y="18" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">d, dmin</text>
+    <rect x="5" y="28" width="70" height="15" rx="2" fill="#07adf8"/>
+    <text x="40" y="39" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">scales[12]</text>
+    <rect x="5" y="46" width="70" height="30" rx="2" fill="#e5a200"/>
+    <text x="40" y="65" text-anchor="middle" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="7">qs[128]</text>
+  </g>
+  <g transform="translate(190, 320)">
+    <rect x="0" y="0" width="80" height="80" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+    <rect x="5" y="5" width="70" height="20" rx="2" fill="#9b59b6"/>
+    <text x="40" y="18" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">d, dmin</text>
+    <rect x="5" y="28" width="70" height="15" rx="2" fill="#07adf8"/>
+    <text x="40" y="39" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">scales[12]</text>
+    <rect x="5" y="46" width="70" height="30" rx="2" fill="#e5a200"/>
+    <text x="40" y="65" text-anchor="middle" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="7">qs[128]</text>
+  </g>
+  <g transform="translate(280, 320)">
+    <rect x="0" y="0" width="80" height="80" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+    <rect x="5" y="5" width="70" height="20" rx="2" fill="#9b59b6"/>
+    <rect x="5" y="28" width="70" height="15" rx="2" fill="#07adf8"/>
+    <rect x="5" y="46" width="70" height="30" rx="2" fill="#e5a200"/>
+  </g>
+  <text x="400" y="370" fill="#808080" font-family="Inter, sans-serif" font-size="18">...</text>
+  <g transform="translate(450, 320)">
+    <rect x="0" y="0" width="80" height="80" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+    <rect x="5" y="5" width="70" height="20" rx="2" fill="#9b59b6"/>
+    <rect x="5" y="28" width="70" height="15" rx="2" fill="#07adf8"/>
+    <rect x="5" y="46" width="70" height="30" rx="2" fill="#e5a200"/>
+  </g>
+
+  <!-- Size annotation -->
+  <rect x="560" y="325" width="140" height="70" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1"/>
+  <text x="630" y="350" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="11" font-weight="600">Layer Weights</text>
+  <text x="630" y="370" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="9">4096 x 4096 = 16M</text>
+  <text x="630" y="385" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="9">Q4_K: ~9.4 MB</text>
+
+  <!-- Address marker -->
+  <text x="70" y="445" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x9A0000</text>
+
+  <!-- ===== Region 3: BF16 Weights (for dequant cache) ===== -->
+  <rect x="80" y="430" width="640" height="100" rx="6" fill="#323232" stroke="#07adf8" stroke-width="2"/>
+  <text x="400" y="455" text-anchor="middle" fill="#07adf8" font-family="Inter, sans-serif" font-size="14" font-weight="600">Region 3: Dequantized Cache (BF16) - Hot Weights</text>
+
+  <!-- BF16 blocks -->
+  <g transform="translate(100, 470)">
+    <rect x="0" y="0" width="500" height="45" rx="4" fill="#07adf8" opacity="0.3" stroke="#07adf8" stroke-width="1"/>
+    <text x="250" y="28" text-anchor="middle" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="11">BF16 dequantized weights (optional, for hot layers)</text>
+  </g>
+
+  <!-- Size annotation -->
+  <rect x="560" y="475" width="140" height="40" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1"/>
+  <text x="630" y="500" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="9">FP32: 64 MB per layer</text>
+
+  <!-- Address marker -->
+  <text x="70" y="555" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x4000000</text>
+
+  <!-- ===== Region 4: FP32 Activations ===== -->
+  <rect x="80" y="540" width="640" height="130" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+  <text x="400" y="565" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="14" font-weight="600">Region 4: Activations (FP32) - Always Full Precision</text>
+
+  <!-- Activation buffers -->
+  <g transform="translate(100, 580)">
+    <rect x="0" y="0" width="280" height="35" rx="4" fill="#47b475"/>
+    <text x="140" y="22" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="10">float[batch × seq × embed]</text>
+  </g>
+  <g transform="translate(100, 620)">
+    <rect x="0" y="0" width="280" height="35" rx="4" fill="#47b475" opacity="0.6"/>
+    <text x="140" y="22" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="10">float[batch × seq × embed] (double buf)</text>
+  </g>
+
+  <!-- Size annotation -->
+  <rect x="410" y="590" width="180" height="55" rx="4" fill="#2a2a2a" stroke="#47b475" stroke-width="1"/>
+  <text x="500" y="612" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="10" font-weight="600">Why FP32 Activations?</text>
+  <text x="500" y="630" text-anchor="middle" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="9">Preserves quality, no calibration</text>
+
+  <!-- Address marker -->
+  <text x="70" y="695" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x6000000</text>
+
+  <!-- ===== Region 5: Scratch Space ===== -->
+  <rect x="80" y="680" width="640" height="80" rx="6" fill="#323232" stroke="#808080" stroke-width="2"/>
+  <text x="400" y="705" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="14" font-weight="600">Region 5: Scratch Space (FP32) - Temporary Buffers</text>
+
+  <g transform="translate(100, 720)">
+    <rect x="0" y="0" width="150" height="25" rx="3" fill="url(#stripes)" stroke="#808080" stroke-width="1"/>
+    <text x="75" y="17" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="9">attention scores</text>
+  </g>
+  <g transform="translate(260, 720)">
+    <rect x="0" y="0" width="150" height="25" rx="3" fill="url(#stripes)" stroke="#808080" stroke-width="1"/>
+    <text x="75" y="17" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="9">intermediate MLP</text>
+  </g>
+  <g transform="translate(420, 720)">
+    <rect x="0" y="0" width="150" height="25" rx="3" fill="url(#stripes)" stroke="#808080" stroke-width="1"/>
+    <text x="75" y="17" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="9">softmax temp</text>
+  </g>
+
+  <!-- Address marker -->
+  <text x="70" y="785" fill="#808080" font-family="JetBrains Mono, monospace" font-size="10">0x7000000</text>
+
+  <!-- Free space -->
+  <rect x="80" y="770" width="640" height="90" rx="6" fill="#1a1a1a" stroke="#454545" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="400" y="820" text-anchor="middle" fill="#454545" font-family="Inter, sans-serif" font-size="14">Free Space (grows upward)</text>
+
+  <!-- ===== Right Side: Code and Principles ===== -->
+
+  <!-- Tensor struct -->
+  <rect x="780" y="100" width="390" height="200" rx="8" fill="#2a2a2a" stroke="#9b59b6" stroke-width="2"/>
+  <text x="975" y="130" text-anchor="middle" fill="#9b59b6" font-family="Inter, sans-serif" font-size="14" font-weight="700">Tensor Structure</text>
+
+  <text x="800" y="160" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="11">typedef struct {</text>
+  <text x="820" y="180" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">ggml_type type;      <tspan fill="#808080">// Q4_K, BF16, etc</tspan></text>
+  <text x="820" y="198" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">uint32_t ne[4];      <tspan fill="#808080">// dimensions</tspan></text>
+  <text x="820" y="216" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">size_t nb[4];        <tspan fill="#808080">// strides</tspan></text>
+  <text x="820" y="234" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">size_t block_size;   <tspan fill="#808080">// 32 or 256</tspan></text>
+  <text x="820" y="252" fill="#e74c3c" font-family="JetBrains Mono, monospace" font-size="10">void* data;          <tspan fill="#808080">// → bump alloc</tspan></text>
+  <text x="800" y="270" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="11">} tensor;</text>
+
+  <!-- Allocation function -->
+  <rect x="780" y="320" width="390" height="160" rx="8" fill="#2a2a2a" stroke="#ffb400" stroke-width="2"/>
+  <text x="975" y="350" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="14" font-weight="700">Size Calculation</text>
+
+  <text x="800" y="380" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="10">size_t tensor_bytes(type, n) {</text>
+  <text x="810" y="400" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="9">  switch(type) {</text>
+  <text x="810" y="418" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="9">    FP32:  return n * 4;</text>
+  <text x="810" y="436" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="9">    BF16:  return n * 2;</text>
+  <text x="810" y="454" fill="#ffb400" font-family="JetBrains Mono, monospace" font-size="9">    Q4_K:  return (n/256)*144;</text>
+  <text x="810" y="472" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="9">  }</text>
+  <text x="800" y="490" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="10">}</text>
+
+  <!-- Key Principles -->
+  <rect x="780" y="500" width="390" height="220" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+  <text x="975" y="530" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="14" font-weight="700">Key Principles</text>
+
+  <g transform="translate(800, 550)">
+    <circle cx="10" cy="8" r="6" fill="#47b475"/>
+    <text x="10" y="12" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="10" font-weight="700">1</text>
+    <text x="25" y="12" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="11" font-weight="600">Never mix types in same region</text>
+    <text x="25" y="28" fill="#808080" font-family="Inter, sans-serif" font-size="10">Prevents type confusion, enables SIMD</text>
+  </g>
+
+  <g transform="translate(800, 600)">
+    <circle cx="10" cy="8" r="6" fill="#47b475"/>
+    <text x="10" y="12" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="10" font-weight="700">2</text>
+    <text x="25" y="12" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="11" font-weight="600">Weights read-only after load</text>
+    <text x="25" y="28" fill="#808080" font-family="Inter, sans-serif" font-size="10">Can be mmap'd, shared across processes</text>
+  </g>
+
+  <g transform="translate(800, 650)">
+    <circle cx="10" cy="8" r="6" fill="#47b475"/>
+    <text x="10" y="12" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="10" font-weight="700">3</text>
+    <text x="25" y="12" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="11" font-weight="600">Activations always FP32</text>
+    <text x="25" y="28" fill="#808080" font-family="Inter, sans-serif" font-size="10">Quality preserved, no calibration needed</text>
+  </g>
+
+  <g transform="translate(800, 700)">
+    <circle cx="10" cy="8" r="6" fill="#47b475"/>
+    <text x="10" y="12" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="10" font-weight="700">4</text>
+    <text x="25" y="12" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="11" font-weight="600">Scratch reused per layer</text>
+    <text x="25" y="28" fill="#808080" font-family="Inter, sans-serif" font-size="10">Single allocation, watermark reset</text>
+  </g>
+
+  <!-- Memory savings box -->
+  <rect x="780" y="740" width="390" height="120" rx="8" fill="#2a2a2a" stroke="#e74c3c" stroke-width="2"/>
+  <text x="975" y="770" text-anchor="middle" fill="#e74c3c" font-family="Inter, sans-serif" font-size="14" font-weight="700">Memory Savings: 7B Model</text>
+
+  <text x="800" y="800" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">FP32 weights:   <tspan fill="#e74c3c" font-weight="600">28 GB</tspan></text>
+  <text x="800" y="820" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">Q4_K weights:   <tspan fill="#47b475" font-weight="600">~4 GB</tspan> (7x smaller)</text>
+  <text x="800" y="840" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">+ Activations:  <tspan fill="#808080">~500 MB</tspan> (per batch)</text>
+
+  <!-- Legend at bottom -->
+  <rect x="50" y="880" width="700" height="25" rx="4" fill="#2a2a2a"/>
+  <rect x="70" y="887" width="12" height="12" rx="2" fill="#9b59b6"/>
+  <text x="90" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Headers</text>
+  <rect x="150" y="887" width="12" height="12" rx="2" fill="#ffb400"/>
+  <text x="170" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Q4_K Weights</text>
+  <rect x="260" y="887" width="12" height="12" rx="2" fill="#07adf8"/>
+  <text x="280" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">BF16 Cache</text>
+  <rect x="360" y="887" width="12" height="12" rx="2" fill="#47b475"/>
+  <text x="380" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">FP32 Activations</text>
+  <rect x="480" y="887" width="12" height="12" rx="2" fill="url(#stripes)" stroke="#808080"/>
+  <text x="500" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Scratch</text>
+  <line x1="570" y1="893" x2="600" y2="893" stroke="#e74c3c" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="610" y="898" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Pointer</text>
+</svg>

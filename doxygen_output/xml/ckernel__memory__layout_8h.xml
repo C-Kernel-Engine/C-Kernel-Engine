@@ -1,0 +1,809 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ckernel__memory__layout_8h" kind="file" language="C++">
+    <compoundname>ckernel_memory_layout.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <incdepgraph>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>ckernel_memory_layout.h</label>
+        <link refid="ckernel__memory__layout_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <innerclass refid="structCKLayerGradOffsets" prot="public">CKLayerGradOffsets</innerclass>
+    <innerclass refid="structCKLayerOffsets" prot="public">CKLayerOffsets</innerclass>
+    <innerclass refid="structCKModel" prot="public">CKModel</innerclass>
+    <innerclass refid="structCKSection" prot="public">CKSection</innerclass>
+    <innerclass refid="structCKSectionConfig" prot="public">CKSectionConfig</innerclass>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1a452e44b0d33892f36e77c590eba38daf" prot="public" static="no">
+        <name>CK_CACHE_LINE</name>
+        <initializer>64ULL           /* CPU cache line */</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="48" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="48" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1a35b79f7b661f83a89e63ee704117d053" prot="public" static="no">
+        <name>CK_GRAD</name>
+        <param><defname>model</defname></param>
+        <param><defname>section</defname></param>
+        <param><defname>layer</defname></param>
+        <initializer>(&amp;(model)-&gt;sections[section].grads[layer])</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="331" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="331" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1aba136a9c872b1032356fc97e8a863909" prot="public" static="no">
+        <name>CK_HUGE_1GB</name>
+        <initializer>(1ULL &lt;&lt; 30)    /* 1GB hugepage (NUMA optimal) */</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="50" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="50" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1ad8aec518dbda9e1ffdcb5388f61c3bca" prot="public" static="no">
+        <name>CK_HUGE_2MB</name>
+        <initializer>(2ULL &lt;&lt; 20)    /* 2MB hugepage */</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="49" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="49" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1ab71d40d0a04a0bdda4dd754953078d00" prot="public" static="no">
+        <name>CK_LAYER</name>
+        <param><defname>model</defname></param>
+        <param><defname>section</defname></param>
+        <param><defname>layer</defname></param>
+        <initializer>(&amp;(model)-&gt;sections[section].layers[layer])</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="330" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="330" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1aed689667a597546f4ca76393d018eb06" prot="public" static="no">
+        <name>CK_PTR</name>
+        <param><defname>model</defname></param>
+        <param><defname>offset</defname></param>
+        <initializer>((float*)((char*)(model)-&gt;base + (offset)))</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="329" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="329" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ckernel__memory__layout_8h_1ae4fcfb595850676b0e59177879acef97" prot="public" static="no">
+        <name>CK_SIMD_ALIGN</name>
+        <initializer>64ULL           /* AVX-512 alignment */</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="51" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="51" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="enum">
+      <memberdef kind="enum" id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efe" prot="public" static="no" strong="no">
+        <type></type>
+        <name>CKFusionFlags</name>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db" prot="public">
+          <name>CK_FUSE_NONE</name>
+          <initializer>= 0</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21" prot="public">
+          <name>CK_FUSE_EMBED_NORM</name>
+          <initializer>= 1 &lt;&lt; 0</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9" prot="public">
+          <name>CK_FUSE_NORM_QKV</name>
+          <initializer>= 1 &lt;&lt; 1</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959" prot="public">
+          <name>CK_FUSE_QKV_ROPE</name>
+          <initializer>= 1 &lt;&lt; 2</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce" prot="public">
+          <name>CK_FUSE_ATTN_PROJ</name>
+          <initializer>= 1 &lt;&lt; 3</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca" prot="public">
+          <name>CK_FUSE_NORM_MLP</name>
+          <initializer>= 1 &lt;&lt; 4</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02" prot="public">
+          <name>CK_FUSE_MLP_GATE_UP</name>
+          <initializer>= 1 &lt;&lt; 5</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2" prot="public">
+          <name>CK_FUSE_MLP_ACT_DOWN</name>
+          <initializer>= 1 &lt;&lt; 6</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea784a02f46d179bd5baf2ae6c9b628a7a" prot="public">
+          <name>CK_FUSE_ADD_NORM</name>
+          <initializer>= 1 &lt;&lt; 7</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db" prot="public">
+          <name>CK_FUSE_NONE</name>
+          <initializer>= 0</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21" prot="public">
+          <name>CK_FUSE_EMBED_NORM</name>
+          <initializer>= 1 &lt;&lt; 0</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9" prot="public">
+          <name>CK_FUSE_NORM_QKV</name>
+          <initializer>= 1 &lt;&lt; 1</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959" prot="public">
+          <name>CK_FUSE_QKV_ROPE</name>
+          <initializer>= 1 &lt;&lt; 2</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce" prot="public">
+          <name>CK_FUSE_ATTN_PROJ</name>
+          <initializer>= 1 &lt;&lt; 3</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca" prot="public">
+          <name>CK_FUSE_NORM_MLP</name>
+          <initializer>= 1 &lt;&lt; 4</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02" prot="public">
+          <name>CK_FUSE_MLP_GATE_UP</name>
+          <initializer>= 1 &lt;&lt; 5</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2" prot="public">
+          <name>CK_FUSE_MLP_ACT_DOWN</name>
+          <initializer>= 1 &lt;&lt; 6</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <enumvalue id="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea6a3bb26ab9dcc8bb90714a3c77250997" prot="public">
+          <name>CK_FUSE_RESIDUAL_NORM</name>
+          <initializer>= 1 &lt;&lt; 7</initializer>
+          <briefdescription>
+          </briefdescription>
+          <detaileddescription>
+          </detaileddescription>
+        </enumvalue>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="269" column="1" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" bodystart="269" bodyend="279"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ckernel__memory__layout_8h_1a27e838b35bf29a1fa749490d9e7fdd38" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_memory_allocate</definition>
+        <argsstring>(CKModel *model, int use_hugepages)</argsstring>
+        <name>ck_memory_allocate</name>
+        <param>
+          <type><ref refid="structCKModel" kindref="compound">CKModel</ref> *</type>
+          <declname>model</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>use_hugepages</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate the planned memory.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>model</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Model with planned offsets </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>use_hugepages</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>0=regular malloc, 1=2MB hugepages, 2=1GB hugepages </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, -1 on failure </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="313" column="5" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" declline="313" declcolumn="5"/>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__memory__layout_8h_1ad32d33988f932adf3a059635aac8c79c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_memory_free</definition>
+        <argsstring>(CKModel *model)</argsstring>
+        <name>ck_memory_free</name>
+        <param>
+          <type><ref refid="structCKModel" kindref="compound">CKModel</ref> *</type>
+          <declname>model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free the model memory.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>model</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Model to free </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="320" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" declline="320" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__memory__layout_8h_1a73c5439888aa533ee2b15697fac6f8e0" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_memory_plan</definition>
+        <argsstring>(const CKSectionConfig *sections, int num_sections, int mode, uint32_t fusion_flags, CKModel *out_model)</argsstring>
+        <name>ck_memory_plan</name>
+        <param>
+          <type>const <ref refid="structCKSectionConfig" kindref="compound">CKSectionConfig</ref> *</type>
+          <declname>sections</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_sections</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>mode</declname>
+        </param>
+        <param>
+          <type>uint32_t</type>
+          <declname>fusion_flags</declname>
+        </param>
+        <param>
+          <type><ref refid="structCKModel" kindref="compound">CKModel</ref> *</type>
+          <declname>out_model</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Plan memory layout for a model.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>sections</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Array of section configs </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_sections</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of sections </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>mode</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>0=inference, 1=training (includes gradients) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>fusion_flags</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Which operations to fuse </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>out_model</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output: model with all offsets computed </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Total bytes needed (0 on error) </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" line="300" column="8" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h" declline="300" declcolumn="8"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Single-Arena Memory Layout for CPU-Optimized Inference &amp; Training. </para>
+    </briefdescription>
+    <detaileddescription>
+<sect2 id="ckernel__memory__layout_8h_1autotoc_md0">
+<title>PHILOSOPHY:</title>
+<para>The CPU doesn&apos;t care if data is a weight or activation - it just needs sequential memory access. This design:</para>
+<para><orderedlist>
+<listitem><para>ONE contiguous allocation (hugepage-backed)</para>
+</listitem><listitem><para>ALL offsets from single base pointer</para>
+</listitem><listitem><para>Weights and activations INTERLEAVED in execution order</para>
+</listitem><listitem><para>Fusion = same offset (skip write, read directly)</para>
+</listitem><listitem><para>No fusion = stride over (memory allocated but unused)</para>
+</listitem></orderedlist>
+</para>
+<para>BENEFITS:<itemizedlist>
+<listitem><para>No malloc/free at runtime = no corruption, no double-free</para>
+</listitem><listitem><para>Prefetch layer N+1 while computing layer N (different DRAM bank)</para>
+</listitem><listitem><para>NUMA-aware: 1GB hugepages map to different memory channels</para>
+</listitem><listitem><para>Offset arithmetic only, no pointer chasing</para>
+</listitem></itemizedlist>
+</para>
+</sect2>
+<sect2 id="ckernel__memory__layout_8h_1autotoc_md1">
+<title>FUSION EXAMPLE:</title>
+<para>Without fusion: rmsnorm writes to ln1_output (offset 1000) qkv_project reads from ln1_output (offset 1000)</para>
+<para>With fusion (rmsnorm + qkv fused): fused kernel reads from input, writes directly to q/k/v ln1_output memory (offset 1000) is SKIPPED but still allocated CPU prefetch streams over it, no penalty </para>
+</sect2>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>ckernel_memory_layout.h</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Single-Arena<sp/>Memory<sp/>Layout<sp/>for<sp/>CPU-Optimized<sp/>Inference<sp/>&amp;<sp/>Training</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>PHILOSOPHY:</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>-----------</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>The<sp/>CPU<sp/>doesn&apos;t<sp/>care<sp/>if<sp/>data<sp/>is<sp/>a<sp/>weight<sp/>or<sp/>activation<sp/>-<sp/>it<sp/>just<sp/>needs</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>sequential<sp/>memory<sp/>access.<sp/>This<sp/>design:</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>1.<sp/>ONE<sp/>contiguous<sp/>allocation<sp/>(hugepage-backed)</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/>2.<sp/>ALL<sp/>offsets<sp/>from<sp/>single<sp/>base<sp/>pointer</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>3.<sp/>Weights<sp/>and<sp/>activations<sp/>INTERLEAVED<sp/>in<sp/>execution<sp/>order</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/>4.<sp/>Fusion<sp/>=<sp/>same<sp/>offset<sp/>(skip<sp/>write,<sp/>read<sp/>directly)</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/>5.<sp/>No<sp/>fusion<sp/>=<sp/>stride<sp/>over<sp/>(memory<sp/>allocated<sp/>but<sp/>unused)</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*<sp/>BENEFITS:</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*<sp/>-<sp/>No<sp/>malloc/free<sp/>at<sp/>runtime<sp/>=<sp/>no<sp/>corruption,<sp/>no<sp/>double-free</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*<sp/>-<sp/>Prefetch<sp/>layer<sp/>N+1<sp/>while<sp/>computing<sp/>layer<sp/>N<sp/>(different<sp/>DRAM<sp/>bank)</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*<sp/>-<sp/>NUMA-aware:<sp/>1GB<sp/>hugepages<sp/>map<sp/>to<sp/>different<sp/>memory<sp/>channels</highlight></codeline>
+<codeline lineno="20"><highlight class="comment"><sp/>*<sp/>-<sp/>Offset<sp/>arithmetic<sp/>only,<sp/>no<sp/>pointer<sp/>chasing</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*<sp/>FUSION<sp/>EXAMPLE:</highlight></codeline>
+<codeline lineno="23"><highlight class="comment"><sp/>*<sp/>---------------</highlight></codeline>
+<codeline lineno="24"><highlight class="comment"><sp/>*<sp/>Without<sp/>fusion:</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/><sp/><sp/>rmsnorm<sp/>writes<sp/>to<sp/>ln1_output<sp/>(offset<sp/>1000)</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/><sp/><sp/>qkv_project<sp/>reads<sp/>from<sp/>ln1_output<sp/>(offset<sp/>1000)</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*<sp/>With<sp/>fusion<sp/>(rmsnorm<sp/>+<sp/>qkv<sp/>fused):</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*<sp/><sp/><sp/>fused<sp/>kernel<sp/>reads<sp/>from<sp/>input,<sp/>writes<sp/>directly<sp/>to<sp/>q/k/v</highlight></codeline>
+<codeline lineno="30"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ln1_output<sp/>memory<sp/>(offset<sp/>1000)<sp/>is<sp/>SKIPPED<sp/>but<sp/>still<sp/>allocated</highlight></codeline>
+<codeline lineno="31"><highlight class="comment"><sp/>*<sp/><sp/><sp/>CPU<sp/>prefetch<sp/>streams<sp/>over<sp/>it,<sp/>no<sp/>penalty</highlight></codeline>
+<codeline lineno="32"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CKERNEL_MEMORY_LAYOUT_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CKERNEL_MEMORY_LAYOUT_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight></codeline>
+<codeline lineno="44"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*<sp/>ALIGNMENT<sp/>CONSTANTS</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"></highlight></codeline>
+<codeline lineno="48" refid="ckernel__memory__layout_8h_1a452e44b0d33892f36e77c590eba38daf" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_CACHE_LINE<sp/><sp/><sp/><sp/><sp/><sp/><sp/>64ULL<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>CPU<sp/>cache<sp/>line<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="49" refid="ckernel__memory__layout_8h_1ad8aec518dbda9e1ffdcb5388f61c3bca" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_HUGE_2MB<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(2ULL<sp/>&lt;&lt;<sp/>20)<sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>2MB<sp/>hugepage<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50" refid="ckernel__memory__layout_8h_1aba136a9c872b1032356fc97e8a863909" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_HUGE_1GB<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(1ULL<sp/>&lt;&lt;<sp/>30)<sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>1GB<sp/>hugepage<sp/>(NUMA<sp/>optimal)<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51" refid="ckernel__memory__layout_8h_1ae4fcfb595850676b0e59177879acef97" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_SIMD_ALIGN<sp/><sp/><sp/><sp/><sp/><sp/><sp/>64ULL<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>AVX-512<sp/>alignment<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"></highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*<sp/>SECTION<sp/>CONFIG<sp/>(each<sp/>section<sp/>=<sp/>encoder/decoder/vision/audio)</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="56"><highlight class="comment"><sp/>*<sp/>Multi-modal<sp/>models<sp/>have<sp/>multiple<sp/>sections.<sp/>Each<sp/>section<sp/>has<sp/>its<sp/>own<sp/>config</highlight></codeline>
+<codeline lineno="57"><highlight class="comment"><sp/>*<sp/>but<sp/>shares<sp/>the<sp/>SAME<sp/>memory<sp/>arena.<sp/>Bridges<sp/>connect<sp/>sections.</highlight></codeline>
+<codeline lineno="58"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight></codeline>
+<codeline lineno="60" refid="structCKSectionConfig" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Model<sp/>dimensions<sp/>for<sp/>this<sp/>section<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62" refid="structCKSectionConfig_1acc666f5160d9139f4e59567c7eb0ad83" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1acc666f5160d9139f4e59567c7eb0ad83" kindref="member">embed_dim</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>hidden_size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="63" refid="structCKSectionConfig_1a5699e7a171a5d55594e936b8f9adf5d4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a5699e7a171a5d55594e936b8f9adf5d4" kindref="member">num_heads</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>attention<sp/>heads<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="64" refid="structCKSectionConfig_1a39652ec04ab2531ba520a9c0738eafa4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a39652ec04ab2531ba520a9c0738eafa4" kindref="member">num_kv_heads</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>key-value<sp/>heads<sp/>(GQA)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65" refid="structCKSectionConfig_1a70a85143350acb4f082fd2664728e7e9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a70a85143350acb4f082fd2664728e7e9" kindref="member">head_dim</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>embed_dim<sp/>/<sp/>num_heads<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="66" refid="structCKSectionConfig_1a754d226bbafb22421965678394c0920c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a754d226bbafb22421965678394c0920c" kindref="member">intermediate_dim</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>MLP<sp/>hidden<sp/>size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="67" refid="structCKSectionConfig_1aeb21ad93633c6b7fba562f4882706e22" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1aeb21ad93633c6b7fba562f4882706e22" kindref="member">num_layers</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>transformer<sp/>layers<sp/>in<sp/>this<sp/>section<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="68" refid="structCKSectionConfig_1a2dc3bafd010bc86e6879784f37c2cf26" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a2dc3bafd010bc86e6879784f37c2cf26" kindref="member">vocab_size</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>only<sp/>for<sp/>sections<sp/>with<sp/>embeddings<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="69" refid="structCKSectionConfig_1a817bec49fb3f194acfc02ae60597121c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a817bec49fb3f194acfc02ae60597121c" kindref="member">max_seq_len</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>context<sp/>window<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Computed<sp/>alignments<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72" refid="structCKSectionConfig_1adb98840ee192100731d7c970794be581" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1adb98840ee192100731d7c970794be581" kindref="member">aligned_embed</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>embed_dim<sp/>aligned<sp/>to<sp/>SIMD<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="73" refid="structCKSectionConfig_1ac248115abce1c49956194ac4c4ad4be4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1ac248115abce1c49956194ac4c4ad4be4" kindref="member">aligned_head</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>head_dim<sp/>aligned<sp/>to<sp/>SIMD<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="74" refid="structCKSectionConfig_1a00a231463e2b815a98384b93f5173853" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig_1a00a231463e2b815a98384b93f5173853" kindref="member">aligned_intermediate</ref>;<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>intermediate<sp/>aligned<sp/>to<sp/>SIMD<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="75"><highlight class="normal">}<sp/><ref refid="structCKSectionConfig" kindref="compound">CKSectionConfig</ref>;</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="78"><highlight class="comment"><sp/>*<sp/>LAYER<sp/>OFFSETS<sp/>-<sp/>Weights<sp/>and<sp/>Activations<sp/>INTERLEAVED<sp/>in<sp/>execution<sp/>order</highlight></codeline>
+<codeline lineno="79"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*<sp/>Pattern:<sp/>weight<sp/>-&gt;<sp/>activation<sp/>-&gt;<sp/>weight<sp/>-&gt;<sp/>activation<sp/>...</highlight></codeline>
+<codeline lineno="81"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>the<sp/>KEY<sp/>insight:<sp/>CPU<sp/>streams<sp/>through<sp/>memory<sp/>sequentially.</highlight></codeline>
+<codeline lineno="82"><highlight class="comment"><sp/>*<sp/>Whether<sp/>fused<sp/>or<sp/>not,<sp/>data<sp/>is<sp/>laid<sp/>out<sp/>in<sp/>the<sp/>order<sp/>it&apos;s<sp/>needed.</highlight></codeline>
+<codeline lineno="83"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85" refid="structCKLayerOffsets" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>PRE-ATTENTION<sp/>NORM<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="87" refid="structCKLayerOffsets_1add4d6c9bc9613cc07927b17102f37e10" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1add4d6c9bc9613cc07927b17102f37e10" kindref="member">ln1_gamma</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="88" refid="structCKLayerOffsets_1af0086d39bd3384211d2c8c9815ffbe0e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1af0086d39bd3384211d2c8c9815ffbe0e" kindref="member">ln1_beta</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>(optional,<sp/>some<sp/>use<sp/>RMSNorm)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="89" refid="structCKLayerOffsets_1a92a708efcc92dd583046bb1ee5345490" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a92a708efcc92dd583046bb1ee5345490" kindref="member">ln1_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"></highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>QKV<sp/>PROJECTION<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="92" refid="structCKLayerOffsets_1aa18340ca5083c6eccacbb26dab4e6149" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1aa18340ca5083c6eccacbb26dab4e6149" kindref="member">wq</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>num_heads<sp/>*<sp/>head_dim]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="93" refid="structCKLayerOffsets_1aa048d99178bf06e2687283cc506dc579" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1aa048d99178bf06e2687283cc506dc579" kindref="member">wk</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>num_kv_heads<sp/>*<sp/>head_dim]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="94" refid="structCKLayerOffsets_1ae669bb44d0a9022b6748f450b56f78b2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1ae669bb44d0a9022b6748f450b56f78b2" kindref="member">wv</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>num_kv_heads<sp/>*<sp/>head_dim]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="95" refid="structCKLayerOffsets_1a13f7bd9b925dd8d55fb6cfa885e8b7d7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a13f7bd9b925dd8d55fb6cfa885e8b7d7" kindref="member">bq</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_heads<sp/>*<sp/>head_dim]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="96" refid="structCKLayerOffsets_1a5c8f69d516fc4fb0b25cb6dc839ef298" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a5c8f69d516fc4fb0b25cb6dc839ef298" kindref="member">bk</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_kv_heads<sp/>*<sp/>head_dim]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="97" refid="structCKLayerOffsets_1aed3dcb5b839829cb5f8f9dd2e7128bb8" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1aed3dcb5b839829cb5f8f9dd2e7128bb8" kindref="member">bv</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_kv_heads<sp/>*<sp/>head_dim]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="98" refid="structCKLayerOffsets_1a599bdd7039ffc353f5302c9c6fa287b4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a599bdd7039ffc353f5302c9c6fa287b4" kindref="member">q</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="99" refid="structCKLayerOffsets_1a4394bd2a46480cc9ad149128ba576354" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a4394bd2a46480cc9ad149128ba576354" kindref="member">k</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_kv_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="100" refid="structCKLayerOffsets_1a21dedb037033c59edb5c355268bbbad5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a21dedb037033c59edb5c355268bbbad5" kindref="member">v</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_kv_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>ROPE<sp/>(if<sp/>applicable)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="103" refid="structCKLayerOffsets_1ab14ce44efa1d300b3dd913e03dfb7aca" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1ab14ce44efa1d300b3dd913e03dfb7aca" kindref="member">q_rope</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="104" refid="structCKLayerOffsets_1a64c73d47605788fdbb876ddd52456db6" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a64c73d47605788fdbb876ddd52456db6" kindref="member">k_rope</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_kv_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="105"><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>ATTENTION<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="107" refid="structCKLayerOffsets_1a6f8340c9cf6ae1cba00764e4e14dda26" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a6f8340c9cf6ae1cba00764e4e14dda26" kindref="member">attn_scores</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_heads,<sp/>tokens,<sp/>tokens]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="108" refid="structCKLayerOffsets_1a66f717f2874057bf925c4e97a57079a7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a66f717f2874057bf925c4e97a57079a7" kindref="member">attn_probs</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_heads,<sp/>tokens,<sp/>tokens]<sp/>activation<sp/>(after<sp/>softmax)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="109" refid="structCKLayerOffsets_1af31ef2ca40d94908315c2313a00f7280" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1af31ef2ca40d94908315c2313a00f7280" kindref="member">attn_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>num_heads,<sp/>head_dim]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>OUTPUT<sp/>PROJECTION<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="112" refid="structCKLayerOffsets_1a5a50122740389c57c4c993f2aa470e4c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a5a50122740389c57c4c993f2aa470e4c" kindref="member">wo</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[num_heads<sp/>*<sp/>head_dim,<sp/>embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="113" refid="structCKLayerOffsets_1acbef001bd55a355dc8b99710a795aae1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1acbef001bd55a355dc8b99710a795aae1" kindref="member">bo</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="114" refid="structCKLayerOffsets_1a4b9708d80f644d75e1fcbb65b08263fd" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a4b9708d80f644d75e1fcbb65b08263fd" kindref="member">proj_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>RESIDUAL<sp/>1<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="117" refid="structCKLayerOffsets_1a7f509afe9bdecb527e6e89c457420d74" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a7f509afe9bdecb527e6e89c457420d74" kindref="member">residual1</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>POST-ATTENTION<sp/>NORM<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="120" refid="structCKLayerOffsets_1a4bb907fd60ba2d980d91b4af199671ce" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a4bb907fd60ba2d980d91b4af199671ce" kindref="member">ln2_gamma</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="121" refid="structCKLayerOffsets_1a9607911e3c407aeddf4bb009ad3101f2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a9607911e3c407aeddf4bb009ad3101f2" kindref="member">ln2_beta</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="122" refid="structCKLayerOffsets_1a0f018f2bb9ee6f55108ef52d8170d97e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a0f018f2bb9ee6f55108ef52d8170d97e" kindref="member">ln2_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="123"><highlight class="normal"></highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>MLP<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="125" refid="structCKLayerOffsets_1a78fb56ffbb566fc773fe57f780fcc8e1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a78fb56ffbb566fc773fe57f780fcc8e1" kindref="member">mlp_gate_w</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>intermediate]<sp/>weight<sp/>(gated<sp/>MLP)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="126" refid="structCKLayerOffsets_1a739a0a65834a09b12385f0926eaca8c0" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a739a0a65834a09b12385f0926eaca8c0" kindref="member">mlp_up_w</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>intermediate]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="127" refid="structCKLayerOffsets_1ac7127f697830c21ef69125b971440854" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1ac7127f697830c21ef69125b971440854" kindref="member">mlp_down_w</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[intermediate,<sp/>embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128" refid="structCKLayerOffsets_1a52f48fdcdf2b539423f0313b5cab029e" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a52f48fdcdf2b539423f0313b5cab029e" kindref="member">mlp_gate_b</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[intermediate]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="129" refid="structCKLayerOffsets_1a78a51878c488cab9e9a4f9d9cd5bcfc1" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a78a51878c488cab9e9a4f9d9cd5bcfc1" kindref="member">mlp_up_b</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[intermediate]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="130" refid="structCKLayerOffsets_1a4f2f21241cc69041cc62d5ae1c9f8c14" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a4f2f21241cc69041cc62d5ae1c9f8c14" kindref="member">mlp_down_b</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>bias<sp/>(optional)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="131" refid="structCKLayerOffsets_1acae9991119923d264ecb138ebecbf8d7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1acae9991119923d264ecb138ebecbf8d7" kindref="member">mlp_gate_out</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>intermediate]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="132" refid="structCKLayerOffsets_1acdefc34ebe3606234e42b059b810f0c7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1acdefc34ebe3606234e42b059b810f0c7" kindref="member">mlp_up_out</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>intermediate]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133" refid="structCKLayerOffsets_1af6000f2aff58810114cbd110c77402e5" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1af6000f2aff58810114cbd110c77402e5" kindref="member">mlp_act_out</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>intermediate]<sp/>activation<sp/>(after<sp/>SiLU/GELU)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="134" refid="structCKLayerOffsets_1a10218069303bec4b99fa47a715b31918" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a10218069303bec4b99fa47a715b31918" kindref="member">mlp_down_out</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="135"><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>RESIDUAL<sp/>2<sp/>(layer<sp/>output)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137" refid="structCKLayerOffsets_1a6fd8badc08ea9608d7f9700c5ef28201" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a6fd8badc08ea9608d7f9700c5ef28201" kindref="member">residual2</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>=<sp/>layer<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>KV<sp/>CACHE<sp/>(decode<sp/>mode)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="140" refid="structCKLayerOffsets_1a83b9fd6e0ebf4a7a69f2c9a01389a18a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1a83b9fd6e0ebf4a7a69f2c9a01389a18a" kindref="member">k_cache</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>num_kv_heads,<sp/>head_dim]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="141" refid="structCKLayerOffsets_1ae06fcbd942baee6eb8503aae98d1ce9a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerOffsets_1ae06fcbd942baee6eb8503aae98d1ce9a" kindref="member">v_cache</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>num_kv_heads,<sp/>head_dim]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="142"><highlight class="normal"></highlight></codeline>
+<codeline lineno="143"><highlight class="normal">}<sp/><ref refid="structCKLayerOffsets" kindref="compound">CKLayerOffsets</ref>;</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="146"><highlight class="comment"><sp/>*<sp/>GRADIENT<sp/>OFFSETS<sp/>-<sp/>Same<sp/>pattern,<sp/>follows<sp/>forward<sp/>offsets</highlight></codeline>
+<codeline lineno="147"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="148"><highlight class="comment"><sp/>*<sp/>For<sp/>training:<sp/>gradients<sp/>laid<sp/>out<sp/>AFTER<sp/>forward<sp/>activations.</highlight></codeline>
+<codeline lineno="149"><highlight class="comment"><sp/>*<sp/>Same<sp/>interleaved<sp/>pattern:<sp/>d_weight,<sp/>d_activation,<sp/>d_weight,<sp/>d_activation...</highlight></codeline>
+<codeline lineno="150"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="151"><highlight class="normal"></highlight></codeline>
+<codeline lineno="152" refid="structCKLayerGradOffsets" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Gradients<sp/>mirror<sp/>forward<sp/>structure<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="154" refid="structCKLayerGradOffsets_1ab9c4e6448de597832b17d239f2508a25" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1ab9c4e6448de597832b17d239f2508a25" kindref="member">d_ln1_gamma</ref>;</highlight></codeline>
+<codeline lineno="155" refid="structCKLayerGradOffsets_1a09f74e154441a54bddb99ab67a961235" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a09f74e154441a54bddb99ab67a961235" kindref="member">d_ln1_beta</ref>;</highlight></codeline>
+<codeline lineno="156" refid="structCKLayerGradOffsets_1a5cbb9e13cf5e308e488a5cd8500ce91a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a5cbb9e13cf5e308e488a5cd8500ce91a" kindref="member">d_ln1_output</ref>;</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight></codeline>
+<codeline lineno="158" refid="structCKLayerGradOffsets_1ada5e0bec439bedbacce85db5a7ecebde" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_wq,<sp/><ref refid="structCKLayerGradOffsets_1ada5e0bec439bedbacce85db5a7ecebde" kindref="member">d_wk</ref>,<sp/>d_wv;</highlight></codeline>
+<codeline lineno="159" refid="structCKLayerGradOffsets_1aacb4c327c1d7816d8c2bc927e22fb1df" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_bq,<sp/><ref refid="structCKLayerGradOffsets_1aacb4c327c1d7816d8c2bc927e22fb1df" kindref="member">d_bk</ref>,<sp/>d_bv;</highlight></codeline>
+<codeline lineno="160" refid="structCKLayerGradOffsets_1af0ff713ac09310725fe0e8025f446280" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_q,<sp/><ref refid="structCKLayerGradOffsets_1af0ff713ac09310725fe0e8025f446280" kindref="member">d_k</ref>,<sp/>d_v;</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"></highlight></codeline>
+<codeline lineno="162" refid="structCKLayerGradOffsets_1adb3cdd15a030bb3684a4f06ad3e71c60" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1adb3cdd15a030bb3684a4f06ad3e71c60" kindref="member">d_attn_scores</ref>;</highlight></codeline>
+<codeline lineno="163" refid="structCKLayerGradOffsets_1a53ad485527d5607bbca6766b0f4727bb" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a53ad485527d5607bbca6766b0f4727bb" kindref="member">d_attn_output</ref>;</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165" refid="structCKLayerGradOffsets_1ae3e95857036311e4cad538f1ce2497f9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_wo,<sp/><ref refid="structCKLayerGradOffsets_1ae3e95857036311e4cad538f1ce2497f9" kindref="member">d_bo</ref>;</highlight></codeline>
+<codeline lineno="166" refid="structCKLayerGradOffsets_1a77782eb0da25172587b5cc4ddbcfd686" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a77782eb0da25172587b5cc4ddbcfd686" kindref="member">d_proj_output</ref>;</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"></highlight></codeline>
+<codeline lineno="168" refid="structCKLayerGradOffsets_1a7e9c08251f4d98a050352f2a69c32955" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_ln2_gamma,<sp/><ref refid="structCKLayerGradOffsets_1a7e9c08251f4d98a050352f2a69c32955" kindref="member">d_ln2_beta</ref>;</highlight></codeline>
+<codeline lineno="169" refid="structCKLayerGradOffsets_1aea96deb7ae068b65e7f674dd283d5a4f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1aea96deb7ae068b65e7f674dd283d5a4f" kindref="member">d_ln2_output</ref>;</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"></highlight></codeline>
+<codeline lineno="171" refid="structCKLayerGradOffsets_1ab65305acd1000ed560e8fbfa77e6a5c4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_mlp_gate_w,<sp/>d_mlp_up_w,<sp/><ref refid="structCKLayerGradOffsets_1ab65305acd1000ed560e8fbfa77e6a5c4" kindref="member">d_mlp_down_w</ref>;</highlight></codeline>
+<codeline lineno="172" refid="structCKLayerGradOffsets_1a00bd2969b569fa381be440e4e6f9cb4a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>d_mlp_gate_out,<sp/>d_mlp_up_out,<sp/><ref refid="structCKLayerGradOffsets_1a00bd2969b569fa381be440e4e6f9cb4a" kindref="member">d_mlp_down_out</ref>;</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"></highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Adam<sp/>optimizer<sp/>state<sp/>(m<sp/>and<sp/>v)<sp/>-<sp/>also<sp/>in<sp/>same<sp/>arena<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="175" refid="structCKLayerGradOffsets_1a74e5a33425000ab5ca9b5e36edfa96b3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a74e5a33425000ab5ca9b5e36edfa96b3" kindref="member">m_ln1_gamma</ref>,<sp/>v_ln1_gamma;</highlight></codeline>
+<codeline lineno="176" refid="structCKLayerGradOffsets_1a0a648a4351c960b008fd79a147bdfff2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a0a648a4351c960b008fd79a147bdfff2" kindref="member">m_wq</ref>,<sp/>v_wq;</highlight></codeline>
+<codeline lineno="177" refid="structCKLayerGradOffsets_1a22e21f41e2a46966632669d02fc0721d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a22e21f41e2a46966632669d02fc0721d" kindref="member">m_wk</ref>,<sp/>v_wk;</highlight></codeline>
+<codeline lineno="178" refid="structCKLayerGradOffsets_1af63821f25445571fda408336d3afb2bf" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1af63821f25445571fda408336d3afb2bf" kindref="member">m_wv</ref>,<sp/>v_wv;</highlight></codeline>
+<codeline lineno="179" refid="structCKLayerGradOffsets_1a298c68b6ec8832481837dd00c3a6fbdf" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a298c68b6ec8832481837dd00c3a6fbdf" kindref="member">m_wo</ref>,<sp/>v_wo;</highlight></codeline>
+<codeline lineno="180" refid="structCKLayerGradOffsets_1a7a5042460e9f41237cf3ae49199f540d" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a7a5042460e9f41237cf3ae49199f540d" kindref="member">m_ln2_gamma</ref>,<sp/>v_ln2_gamma;</highlight></codeline>
+<codeline lineno="181" refid="structCKLayerGradOffsets_1aadc8ed73084b7ef326d481c2b6240b98" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1aadc8ed73084b7ef326d481c2b6240b98" kindref="member">m_mlp_gate</ref>,<sp/>v_mlp_gate;</highlight></codeline>
+<codeline lineno="182" refid="structCKLayerGradOffsets_1afef9636288a7b686f3b8ec2569352838" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1afef9636288a7b686f3b8ec2569352838" kindref="member">m_mlp_up</ref>,<sp/>v_mlp_up;</highlight></codeline>
+<codeline lineno="183" refid="structCKLayerGradOffsets_1a82753a3f1720cb7fdad8ef3576354a72" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKLayerGradOffsets_1a82753a3f1720cb7fdad8ef3576354a72" kindref="member">m_mlp_down</ref>,<sp/>v_mlp_down;</highlight></codeline>
+<codeline lineno="184"><highlight class="normal"></highlight></codeline>
+<codeline lineno="185"><highlight class="normal">}<sp/><ref refid="structCKLayerGradOffsets" kindref="compound">CKLayerGradOffsets</ref>;</highlight></codeline>
+<codeline lineno="186"><highlight class="normal"></highlight></codeline>
+<codeline lineno="187"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="188"><highlight class="comment"><sp/>*<sp/>SECTION<sp/>-<sp/>A<sp/>complete<sp/>encoder/decoder/vision/audio<sp/>module</highlight></codeline>
+<codeline lineno="189"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="190"><highlight class="comment"><sp/>*<sp/>Each<sp/>section<sp/>has:</highlight></codeline>
+<codeline lineno="191"><highlight class="comment"><sp/>*<sp/>-<sp/>Its<sp/>own<sp/>config<sp/>(embed_dim,<sp/>heads,<sp/>etc.)</highlight></codeline>
+<codeline lineno="192"><highlight class="comment"><sp/>*<sp/>-<sp/>Embedding<sp/>layer<sp/>(optional<sp/>-<sp/>only<sp/>first<sp/>section<sp/>usually)</highlight></codeline>
+<codeline lineno="193"><highlight class="comment"><sp/>*<sp/>-<sp/>N<sp/>transformer<sp/>layers</highlight></codeline>
+<codeline lineno="194"><highlight class="comment"><sp/>*<sp/>-<sp/>Bridge<sp/>to<sp/>next<sp/>section<sp/>(optional)</highlight></codeline>
+<codeline lineno="195"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="196"><highlight class="normal"></highlight></codeline>
+<codeline lineno="197" refid="structCKSection" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="198" refid="structCKSection_1ac6da7ff6bd601c3b82ea4a5cebced72c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKSectionConfig" kindref="compound">CKSectionConfig</ref><sp/><ref refid="structCKSection_1ac6da7ff6bd601c3b82ea4a5cebced72c" kindref="member">config</ref>;</highlight></codeline>
+<codeline lineno="199"><highlight class="normal"></highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>EMBEDDINGS<sp/>(optional)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="201" refid="structCKSection_1ada852daa4974ccedece03be2d141d1b2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1ada852daa4974ccedece03be2d141d1b2" kindref="member">token_embed</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[vocab,<sp/>embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="202" refid="structCKSection_1a09e2a195e9cfb48f0256523565e73fe7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a09e2a195e9cfb48f0256523565e73fe7" kindref="member">pos_embed</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>embed]<sp/>weight<sp/>(if<sp/>absolute)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="203" refid="structCKSection_1a66b301cef7e5239b28cc6b37437d3ed7" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a66b301cef7e5239b28cc6b37437d3ed7" kindref="member">embed_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="204"><highlight class="normal"></highlight></codeline>
+<codeline lineno="205"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>TRANSFORMER<sp/>LAYERS<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="206" refid="structCKSection_1ad5514ab0802d55a8c9890b563467f25b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1ad5514ab0802d55a8c9890b563467f25b" kindref="member">num_layers</ref>;</highlight></codeline>
+<codeline lineno="207" refid="structCKSection_1a0651f7c9b1f55618e1ed1285fc803eab" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKLayerOffsets" kindref="compound">CKLayerOffsets</ref><sp/>*<ref refid="structCKSection_1a0651f7c9b1f55618e1ed1285fc803eab" kindref="member">layers</ref>;<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Array<sp/>of<sp/>per-layer<sp/>offsets<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="208" refid="structCKSection_1a35e472c769329becfef44c2bd7bcd8c8" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKLayerGradOffsets" kindref="compound">CKLayerGradOffsets</ref><sp/>*<ref refid="structCKSection_1a35e472c769329becfef44c2bd7bcd8c8" kindref="member">grads</ref>;<sp/><sp/></highlight><highlight class="comment">/*<sp/>Array<sp/>of<sp/>per-layer<sp/>gradient<sp/>offsets<sp/>(training)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="209"><highlight class="normal"></highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>FINAL<sp/>NORM<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="211" refid="structCKSection_1a0dd3ee6e1e4f7b5e36cb36a95a87dcd3" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a0dd3ee6e1e4f7b5e36cb36a95a87dcd3" kindref="member">final_ln_gamma</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="212" refid="structCKSection_1aaccfd552f51b90a5aa47a76b0e4be4aa" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1aaccfd552f51b90a5aa47a76b0e4be4aa" kindref="member">final_ln_beta</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="213" refid="structCKSection_1aac276147ba6022404e73010f3ecd203b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1aac276147ba6022404e73010f3ecd203b" kindref="member">final_ln_output</ref>;<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="214"><highlight class="normal"></highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>OUTPUT<sp/>HEAD<sp/>(optional)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="216" refid="structCKSection_1a6bf4783cf0480cfc58c2f5f94a493e52" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a6bf4783cf0480cfc58c2f5f94a493e52" kindref="member">lm_head</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[embed,<sp/>vocab]<sp/>weight<sp/>(may<sp/>tie<sp/>with<sp/>token_embed)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="217" refid="structCKSection_1ade03ada595b6909fbb58a548d29a2b65" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1ade03ada595b6909fbb58a548d29a2b65" kindref="member">logits</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>vocab]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="218"><highlight class="normal"></highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>BRIDGE<sp/>TO<sp/>NEXT<sp/>SECTION<sp/>(optional)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="220" refid="structCKSection_1aeefc8b6cfe54401ea7adf601307f85ca" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1aeefc8b6cfe54401ea7adf601307f85ca" kindref="member">bridge_proj_w</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[this_embed,<sp/>next_embed]<sp/>weight<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="221" refid="structCKSection_1a970402cf9743b507254e92ecdb06b224" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a970402cf9743b507254e92ecdb06b224" kindref="member">bridge_proj_b</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[next_embed]<sp/>bias<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="222" refid="structCKSection_1a3a361b1dadf1ae460375452d6b090d84" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1a3a361b1dadf1ae460375452d6b090d84" kindref="member">bridge_output</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[tokens,<sp/>next_embed]<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="223"><highlight class="normal"></highlight></codeline>
+<codeline lineno="224"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>SECTION<sp/>BOUNDARIES<sp/>(for<sp/>NUMA<sp/>planning)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="225" refid="structCKSection_1add9ec57d8f21293d2bf65a94a128fc9f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1add9ec57d8f21293d2bf65a94a128fc9f" kindref="member">section_start</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Byte<sp/>offset<sp/>where<sp/>this<sp/>section<sp/>starts<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="226" refid="structCKSection_1ae6657035787375ea5e3ea2c5b28f7161" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKSection_1ae6657035787375ea5e3ea2c5b28f7161" kindref="member">section_end</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Byte<sp/>offset<sp/>where<sp/>this<sp/>section<sp/>ends<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="227"><highlight class="normal"></highlight></codeline>
+<codeline lineno="228"><highlight class="normal">}<sp/><ref refid="structCKSection" kindref="compound">CKSection</ref>;</highlight></codeline>
+<codeline lineno="229"><highlight class="normal"></highlight></codeline>
+<codeline lineno="230"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="231"><highlight class="comment"><sp/>*<sp/>MODEL<sp/>-<sp/>The<sp/>complete<sp/>multi-section<sp/>model</highlight></codeline>
+<codeline lineno="232"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="233"><highlight class="comment"><sp/>*<sp/>ONE<sp/>allocation.<sp/>ONE<sp/>base<sp/>pointer.<sp/>ALL<sp/>offsets<sp/>relative<sp/>to<sp/>base.</highlight></codeline>
+<codeline lineno="234"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="235"><highlight class="normal"></highlight></codeline>
+<codeline lineno="236" refid="structCKModel" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="237"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>MEMORY<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="238" refid="structCKModel_1a159f37ead73ec53796773938896ad8c8" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="structCKModel_1a159f37ead73ec53796773938896ad8c8" kindref="member">base</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>THE<sp/>one<sp/>and<sp/>only<sp/>allocation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="239" refid="structCKModel_1a04a3c244c47624526756feab33715e83" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a04a3c244c47624526756feab33715e83" kindref="member">total_bytes</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Total<sp/>allocated<sp/>size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="240" refid="structCKModel_1ad6fd0c1ac4e7a733759b86b3ff1ae0fa" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1ad6fd0c1ac4e7a733759b86b3ff1ae0fa" kindref="member">weight_bytes</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Bytes<sp/>used<sp/>for<sp/>weights<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="241" refid="structCKModel_1aca3677590515480ee313d29adad814fb" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1aca3677590515480ee313d29adad814fb" kindref="member">activation_bytes</ref>;<sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Bytes<sp/>used<sp/>for<sp/>activations<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="242" refid="structCKModel_1a5e10579eb6d5d28cabce344d328b3c7a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a5e10579eb6d5d28cabce344d328b3c7a" kindref="member">grad_bytes</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Bytes<sp/>used<sp/>for<sp/>gradients<sp/>(0<sp/>if<sp/>inference)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="243"><highlight class="normal"></highlight></codeline>
+<codeline lineno="244"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>SECTIONS<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="245" refid="structCKModel_1a1743953a890cd83255850e11bbe651a4" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a1743953a890cd83255850e11bbe651a4" kindref="member">num_sections</ref>;</highlight></codeline>
+<codeline lineno="246" refid="structCKModel_1ab7a4ebc13bcb370c4dbb36f3357af03a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKSection" kindref="compound">CKSection</ref><sp/>*<ref refid="structCKModel_1ab7a4ebc13bcb370c4dbb36f3357af03a" kindref="member">sections</ref>;</highlight></codeline>
+<codeline lineno="247"><highlight class="normal"></highlight></codeline>
+<codeline lineno="248"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>GLOBAL<sp/>BUFFERS<sp/>(shared<sp/>across<sp/>sections)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="249" refid="structCKModel_1aae295251889deebf6fbf7c9e79503406" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1aae295251889deebf6fbf7c9e79503406" kindref="member">rope_cos</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>head_dim]<sp/>RoPE<sp/>cosine<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="250" refid="structCKModel_1a1dadf82f8c8432157affc51f20060036" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a1dadf82f8c8432157affc51f20060036" kindref="member">rope_sin</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>head_dim]<sp/>RoPE<sp/>sine<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="251" refid="structCKModel_1a1bc7df42afc06c33d2be8474cf75942b" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a1bc7df42afc06c33d2be8474cf75942b" kindref="member">causal_mask</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>[max_seq,<sp/>max_seq]<sp/>attention<sp/>mask<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="252"><highlight class="normal"></highlight></codeline>
+<codeline lineno="253"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>FUSION<sp/>FLAGS<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="254" refid="structCKModel_1a2f32be944ddd75f746ac27532bff6851" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/>uint32_t<sp/><ref refid="structCKModel_1a2f32be944ddd75f746ac27532bff6851" kindref="member">fusion_flags</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Bitmask<sp/>of<sp/>enabled<sp/>fusions<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="255"><highlight class="normal"></highlight></codeline>
+<codeline lineno="256"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>===<sp/>RUNTIME<sp/>STATE<sp/>(not<sp/>offsets,<sp/>actual<sp/>values)<sp/>===<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="257" refid="structCKModel_1aeb95a6d38bdc2c75a2c482e92b4e5e80" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1aeb95a6d38bdc2c75a2c482e92b4e5e80" kindref="member">current_seq_len</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Tokens<sp/>processed<sp/>so<sp/>far<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="258" refid="structCKModel_1a139ab3cacb7c652d47bf8fcb0f2d4826" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="structCKModel_1a139ab3cacb7c652d47bf8fcb0f2d4826" kindref="member">batch_size</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Always<sp/>1<sp/>for<sp/>now<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="259"><highlight class="normal"></highlight></codeline>
+<codeline lineno="260"><highlight class="normal">}<sp/><ref refid="structCKModel" kindref="compound">CKModel</ref>;</highlight></codeline>
+<codeline lineno="261"><highlight class="normal"></highlight></codeline>
+<codeline lineno="262"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="263"><highlight class="comment"><sp/>*<sp/>FUSION<sp/>FLAGS</highlight></codeline>
+<codeline lineno="264"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="265"><highlight class="comment"><sp/>*<sp/>When<sp/>a<sp/>fusion<sp/>is<sp/>enabled,<sp/>the<sp/>intermediate<sp/>activation<sp/>is<sp/>SKIPPED.</highlight></codeline>
+<codeline lineno="266"><highlight class="comment"><sp/>*<sp/>Memory<sp/>is<sp/>still<sp/>allocated<sp/>(for<sp/>consistency),<sp/>but<sp/>kernel<sp/>reads/writes<sp/>bypass<sp/>it.</highlight></codeline>
+<codeline lineno="267"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="268"><highlight class="normal"></highlight></codeline>
+<codeline lineno="269" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efe" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">enum</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="270" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db" kindref="member">CK_FUSE_NONE</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>0,</highlight></codeline>
+<codeline lineno="271" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21" kindref="member">CK_FUSE_EMBED_NORM</ref><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>0,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>embed<sp/>+<sp/>first<sp/>layernorm<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="272" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9" kindref="member">CK_FUSE_NORM_QKV</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>1,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>layernorm<sp/>+<sp/>qkv<sp/>projection<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="273" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959" kindref="member">CK_FUSE_QKV_ROPE</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>2,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>qkv<sp/>projection<sp/>+<sp/>rope<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="274" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce" kindref="member">CK_FUSE_ATTN_PROJ</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>3,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>attention<sp/>+<sp/>output<sp/>projection<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="275" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca" kindref="member">CK_FUSE_NORM_MLP</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>4,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>layernorm<sp/>+<sp/>mlp<sp/>gate/up<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="276" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02" kindref="member">CK_FUSE_MLP_GATE_UP</ref><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>5,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>gate<sp/>and<sp/>up<sp/>projections<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="277" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2" kindref="member">CK_FUSE_MLP_ACT_DOWN</ref><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>6,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>activation<sp/>+<sp/>down<sp/>projection<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="278" refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea784a02f46d179bd5baf2ae6c9b628a7a" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efea784a02f46d179bd5baf2ae6c9b628a7a" kindref="member">CK_FUSE_ADD_NORM</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>=<sp/>1<sp/>&lt;&lt;<sp/>7,<sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>residual<sp/>add<sp/>+<sp/>layernorm<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="279"><highlight class="normal">}<sp/><ref refid="ckernel__memory__layout_8h_1aff5ee31d19be80e3bc7d00f0506f8efe" kindref="member">CKFusionFlags</ref>;</highlight></codeline>
+<codeline lineno="280"><highlight class="normal"></highlight></codeline>
+<codeline lineno="281"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="282"><highlight class="comment"><sp/>*<sp/>MEMORY<sp/>PLANNING<sp/>API</highlight></codeline>
+<codeline lineno="283"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="284"><highlight class="comment"><sp/>*<sp/>Two-pass<sp/>allocation:</highlight></codeline>
+<codeline lineno="285"><highlight class="comment"><sp/>*<sp/>1.<sp/>Dry<sp/>run:<sp/>compute<sp/>all<sp/>offsets,<sp/>calculate<sp/>total<sp/>size</highlight></codeline>
+<codeline lineno="286"><highlight class="comment"><sp/>*<sp/>2.<sp/>Allocate:<sp/>single<sp/>hugepage-backed<sp/>mmap</highlight></codeline>
+<codeline lineno="287"><highlight class="comment"><sp/>*<sp/>3.<sp/>Return<sp/>model<sp/>with<sp/>all<sp/>offsets<sp/>filled<sp/>in</highlight></codeline>
+<codeline lineno="288"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="289"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="290"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="291"><highlight class="comment"><sp/>*<sp/>Plan<sp/>memory<sp/>layout<sp/>for<sp/>a<sp/>model.</highlight></codeline>
+<codeline lineno="292"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="293"><highlight class="comment"><sp/>*<sp/>@param<sp/>sections<sp/><sp/><sp/><sp/><sp/><sp/>Array<sp/>of<sp/>section<sp/>configs</highlight></codeline>
+<codeline lineno="294"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_sections<sp/><sp/>Number<sp/>of<sp/>sections</highlight></codeline>
+<codeline lineno="295"><highlight class="comment"><sp/>*<sp/>@param<sp/>mode<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0=inference,<sp/>1=training<sp/>(includes<sp/>gradients)</highlight></codeline>
+<codeline lineno="296"><highlight class="comment"><sp/>*<sp/>@param<sp/>fusion_flags<sp/><sp/>Which<sp/>operations<sp/>to<sp/>fuse</highlight></codeline>
+<codeline lineno="297"><highlight class="comment"><sp/>*<sp/>@param<sp/>out_model<sp/><sp/><sp/><sp/><sp/>Output:<sp/>model<sp/>with<sp/>all<sp/>offsets<sp/>computed</highlight></codeline>
+<codeline lineno="298"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Total<sp/>bytes<sp/>needed<sp/>(0<sp/>on<sp/>error)</highlight></codeline>
+<codeline lineno="299"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="300" refid="ckernel__memory__layout_8h_1a73c5439888aa533ee2b15697fac6f8e0" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="ckernel__memory__layout_8h_1a73c5439888aa533ee2b15697fac6f8e0" kindref="member">ck_memory_plan</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structCKSectionConfig" kindref="compound">CKSectionConfig</ref><sp/>*sections,</highlight></codeline>
+<codeline lineno="301"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_sections,</highlight></codeline>
+<codeline lineno="302"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>mode,</highlight></codeline>
+<codeline lineno="303"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint32_t<sp/>fusion_flags,</highlight></codeline>
+<codeline lineno="304"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKModel" kindref="compound">CKModel</ref><sp/>*out_model);</highlight></codeline>
+<codeline lineno="305"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="306"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="307"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>the<sp/>planned<sp/>memory.</highlight></codeline>
+<codeline lineno="308"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="309"><highlight class="comment"><sp/>*<sp/>@param<sp/>model<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Model<sp/>with<sp/>planned<sp/>offsets</highlight></codeline>
+<codeline lineno="310"><highlight class="comment"><sp/>*<sp/>@param<sp/>use_hugepages<sp/>0=regular<sp/>malloc,<sp/>1=2MB<sp/>hugepages,<sp/>2=1GB<sp/>hugepages</highlight></codeline>
+<codeline lineno="311"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>failure</highlight></codeline>
+<codeline lineno="312"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="313" refid="ckernel__memory__layout_8h_1a27e838b35bf29a1fa749490d9e7fdd38" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__memory__layout_8h_1a27e838b35bf29a1fa749490d9e7fdd38" kindref="member">ck_memory_allocate</ref>(<ref refid="structCKModel" kindref="compound">CKModel</ref><sp/>*model,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>use_hugepages);</highlight></codeline>
+<codeline lineno="314"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="315"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="316"><highlight class="comment"><sp/>*<sp/>Free<sp/>the<sp/>model<sp/>memory.</highlight></codeline>
+<codeline lineno="317"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="318"><highlight class="comment"><sp/>*<sp/>@param<sp/>model<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Model<sp/>to<sp/>free</highlight></codeline>
+<codeline lineno="319"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="320" refid="ckernel__memory__layout_8h_1ad32d33988f932adf3a059635aac8c79c" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__memory__layout_8h_1ad32d33988f932adf3a059635aac8c79c" kindref="member">ck_memory_free</ref>(<ref refid="structCKModel" kindref="compound">CKModel</ref><sp/>*model);</highlight></codeline>
+<codeline lineno="321"><highlight class="normal"></highlight></codeline>
+<codeline lineno="322"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="323"><highlight class="comment"><sp/>*<sp/>ACCESSOR<sp/>MACROS</highlight></codeline>
+<codeline lineno="324"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="325"><highlight class="comment"><sp/>*<sp/>All<sp/>access<sp/>is:<sp/>(float*)(model-&gt;base<sp/>+<sp/>offset)</highlight></codeline>
+<codeline lineno="326"><highlight class="comment"><sp/>*<sp/>These<sp/>macros<sp/>make<sp/>it<sp/>cleaner.</highlight></codeline>
+<codeline lineno="327"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="328"><highlight class="normal"></highlight></codeline>
+<codeline lineno="329" refid="ckernel__memory__layout_8h_1aed689667a597546f4ca76393d018eb06" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_PTR(model,<sp/>offset)<sp/>((float*)((char*)(model)-&gt;base<sp/>+<sp/>(offset)))</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="330" refid="ckernel__memory__layout_8h_1ab71d40d0a04a0bdda4dd754953078d00" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_LAYER(model,<sp/>section,<sp/>layer)<sp/>(&amp;(model)-&gt;sections[section].layers[layer])</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="331" refid="ckernel__memory__layout_8h_1a35b79f7b661f83a89e63ee704117d053" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_GRAD(model,<sp/>section,<sp/>layer)<sp/>(&amp;(model)-&gt;sections[section].grads[layer])</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="332"><highlight class="normal"></highlight></codeline>
+<codeline lineno="333"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Example<sp/>usage:</highlight></codeline>
+<codeline lineno="334"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="335"><highlight class="comment"><sp/>*<sp/><sp/><sp/>CKModel<sp/>model;</highlight></codeline>
+<codeline lineno="336"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_memory_plan(&amp;config,<sp/>1,<sp/>0,<sp/>CK_FUSE_NORM_QKV,<sp/>&amp;model);</highlight></codeline>
+<codeline lineno="337"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_memory_allocate(&amp;model,<sp/>1);<sp/><sp/>//<sp/>2MB<sp/>hugepages</highlight></codeline>
+<codeline lineno="338"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="339"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>Access<sp/>layer<sp/>5<sp/>Q<sp/>weights:</highlight></codeline>
+<codeline lineno="340"><highlight class="comment"><sp/>*<sp/><sp/><sp/>float<sp/>*wq<sp/>=<sp/>CK_PTR(&amp;model,<sp/>CK_LAYER(&amp;model,<sp/>0,<sp/>5)-&gt;wq);</highlight></codeline>
+<codeline lineno="341"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="342"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>Access<sp/>layer<sp/>5<sp/>Q<sp/>activation:</highlight></codeline>
+<codeline lineno="343"><highlight class="comment"><sp/>*<sp/><sp/><sp/>float<sp/>*q<sp/>=<sp/>CK_PTR(&amp;model,<sp/>CK_LAYER(&amp;model,<sp/>0,<sp/>5)-&gt;q);</highlight></codeline>
+<codeline lineno="344"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="345"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>With<sp/>fusion<sp/>(CK_FUSE_NORM_QKV),<sp/>the<sp/>kernel<sp/>skips<sp/>ln1_output</highlight></codeline>
+<codeline lineno="346"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>and<sp/>writes<sp/>directly<sp/>to<sp/>q/k/v.<sp/>The<sp/>ln1_output<sp/>memory<sp/>exists</highlight></codeline>
+<codeline lineno="347"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>but<sp/>is<sp/>never<sp/>touched<sp/>-<sp/>CPU<sp/>prefetch<sp/>streams<sp/>over<sp/>it.</highlight></codeline>
+<codeline lineno="348"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="349"><highlight class="normal"></highlight></codeline>
+<codeline lineno="350"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="351"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="352"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="353"><highlight class="normal"></highlight></codeline>
+<codeline lineno="354"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_MEMORY_LAYOUT_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_memory_layout.h"/>
+  </compounddef>
+</doxygen>

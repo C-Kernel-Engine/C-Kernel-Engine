@@ -1,0 +1,118 @@
+<svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6b7280"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#22c55e"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#1a1a2e"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" fill="#e2e8f0" font-family="system-ui" font-size="20" font-weight="bold">Kernel Registry: How It All Fits Together</text>
+
+  <!-- Input: config.json -->
+  <rect x="30" y="70" width="140" height="60" rx="8" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="2"/>
+  <text x="100" y="95" text-anchor="middle" fill="#93c5fd" font-family="monospace" font-size="12">config.json</text>
+  <text x="100" y="115" text-anchor="middle" fill="#60a5fa" font-family="system-ui" font-size="10">HuggingFace</text>
+
+  <!-- Arrow to IR -->
+  <path d="M170,100 L210,100" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- IR Graph -->
+  <rect x="220" y="70" width="140" height="60" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="290" y="95" text-anchor="middle" fill="#c4b5fd" font-family="monospace" font-size="12">CKIRGraph</text>
+  <text x="290" y="115" text-anchor="middle" fill="#a78bfa" font-family="system-ui" font-size="10">Operations + Shapes</text>
+
+  <!-- Registry Box (main) -->
+  <rect x="400" y="60" width="470" height="200" rx="12" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="2"/>
+  <text x="635" y="85" text-anchor="middle" fill="#86efac" font-family="system-ui" font-size="14" font-weight="bold">CK KERNEL REGISTRY</text>
+
+  <!-- CKKernelSpec -->
+  <rect x="420" y="100" width="200" height="70" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="520" y="120" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="11" font-weight="bold">CKKernelSpec[]</text>
+  <text x="430" y="140" fill="#94a3b8" font-family="monospace" font-size="9">name: "rmsnorm"</text>
+  <text x="430" y="152" fill="#94a3b8" font-family="monospace" font-size="9">forward: rmsnorm_forward</text>
+  <text x="430" y="164" fill="#94a3b8" font-family="monospace" font-size="9">sources: [rmsnorm_kernels.c]</text>
+
+  <!-- CKBufferSpec -->
+  <rect x="420" y="180" width="200" height="70" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="520" y="200" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="11" font-weight="bold">CKBufferSpec[]</text>
+  <text x="430" y="220" fill="#94a3b8" font-family="monospace" font-size="9">name: "q"</text>
+  <text x="430" y="232" fill="#94a3b8" font-family="monospace" font-size="9">shape: [heads, T, head_dim]</text>
+  <text x="430" y="244" fill="#94a3b8" font-family="monospace" font-size="9">role: OUTPUT, dtype: F32</text>
+
+  <!-- CKPlanStep -->
+  <rect x="640" y="100" width="210" height="70" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="745" y="120" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="11" font-weight="bold">CKPlanStep[]</text>
+  <text x="650" y="140" fill="#94a3b8" font-family="monospace" font-size="9">{"rmsnorm", NULL}</text>
+  <text x="650" y="152" fill="#94a3b8" font-family="monospace" font-size="9">{"qkv_project", NULL}</text>
+  <text x="650" y="164" fill="#94a3b8" font-family="monospace" font-size="9">{"rope", "rope_theta>0"}</text>
+
+  <!-- Tested Kernels -->
+  <rect x="640" y="180" width="210" height="70" rx="6" fill="#22c55e" opacity="0.2" stroke="#22c55e" stroke-width="1"/>
+  <text x="745" y="200" text-anchor="middle" fill="#86efac" font-family="monospace" font-size="11" font-weight="bold">Tested Kernel Sources</text>
+  <text x="650" y="220" fill="#86efac" font-family="monospace" font-size="9">src/kernels/rmsnorm_kernels.c</text>
+  <text x="650" y="232" fill="#86efac" font-family="monospace" font-size="9">src/kernels/attention_kernels.c</text>
+  <text x="650" y="244" fill="#86efac" font-family="monospace" font-size="9">src/kernels/swiglu_kernels.c</text>
+
+  <!-- Arrow from IR to Registry -->
+  <path d="M360,100 L400,100" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Codegen box -->
+  <rect x="220" y="290" width="180" height="80" rx="8" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="2"/>
+  <text x="310" y="320" text-anchor="middle" fill="#fcd34d" font-family="monospace" font-size="12" font-weight="bold">ck_codegen_emit</text>
+  <text x="310" y="340" text-anchor="middle" fill="#fbbf24" font-family="system-ui" font-size="10">1. Iterate plan steps</text>
+  <text x="310" y="355" text-anchor="middle" fill="#fbbf24" font-family="system-ui" font-size="10">2. Lookup kernel specs</text>
+
+  <!-- Arrow from Registry to Codegen -->
+  <path d="M520,260 L520,280 L400,280 L400,290" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="470" y="275" fill="#86efac" font-family="system-ui" font-size="9">lookup</text>
+
+  <!-- Bump Allocator -->
+  <rect x="420" y="290" width="180" height="80" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="510" y="320" text-anchor="middle" fill="#c4b5fd" font-family="monospace" font-size="12" font-weight="bold">Bump Allocator</text>
+  <text x="510" y="340" text-anchor="middle" fill="#a78bfa" font-family="system-ui" font-size="10">3. Resolve buffer shapes</text>
+  <text x="510" y="355" text-anchor="middle" fill="#a78bfa" font-family="system-ui" font-size="10">4. Compute offsets</text>
+
+  <!-- Arrow from Registry to Bump -->
+  <path d="M620,260 L620,280 L600,280 L600,290" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="630" y="275" fill="#86efac" font-family="system-ui" font-size="9">shapes</text>
+
+  <!-- Source Emitter -->
+  <rect x="620" y="290" width="180" height="80" rx="8" fill="#ec4899" opacity="0.2" stroke="#ec4899" stroke-width="2"/>
+  <text x="710" y="320" text-anchor="middle" fill="#f9a8d4" font-family="monospace" font-size="12" font-weight="bold">Source Emitter</text>
+  <text x="710" y="340" text-anchor="middle" fill="#f472b6" font-family="system-ui" font-size="10">5. Emit kernel sources</text>
+  <text x="710" y="355" text-anchor="middle" fill="#f472b6" font-family="system-ui" font-size="10">6. Emit function calls</text>
+
+  <!-- Arrow from Registry to Source -->
+  <path d="M745,260 L745,290" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="760" y="275" fill="#86efac" font-family="system-ui" font-size="9">sources[]</text>
+
+  <!-- Output: model.c -->
+  <rect x="380" y="410" width="300" height="70" rx="8" fill="#22c55e" opacity="0.2" stroke="#22c55e" stroke-width="2"/>
+  <text x="530" y="435" text-anchor="middle" fill="#86efac" font-family="monospace" font-size="14" font-weight="bold">generated_model.c</text>
+  <text x="530" y="455" text-anchor="middle" fill="#4ade80" font-family="system-ui" font-size="11">Standalone C with tested kernels embedded</text>
+  <text x="530" y="470" text-anchor="middle" fill="#4ade80" font-family="system-ui" font-size="10">gcc -O3 -mavx512f model.c -o model</text>
+
+  <!-- Arrows to output -->
+  <path d="M310,370 L310,400 L380,420" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M510,370 L510,410" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M710,370 L710,400 L680,420" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Legend -->
+  <rect x="30" y="400" width="15" height="15" rx="2" fill="#22c55e" opacity="0.3" stroke="#22c55e"/>
+  <text x="50" y="412" fill="#94a3b8" font-family="system-ui" font-size="10">Single Source of Truth</text>
+
+  <rect x="30" y="420" width="15" height="15" rx="2" fill="#f59e0b" opacity="0.3" stroke="#f59e0b"/>
+  <text x="50" y="432" fill="#94a3b8" font-family="system-ui" font-size="10">Codegen Pipeline</text>
+
+  <rect x="30" y="440" width="15" height="15" rx="2" fill="#8b5cf6" opacity="0.3" stroke="#8b5cf6"/>
+  <text x="50" y="452" fill="#94a3b8" font-family="system-ui" font-size="10">Memory Layout</text>
+
+  <rect x="30" y="460" width="15" height="15" rx="2" fill="#3b82f6" opacity="0.3" stroke="#3b82f6"/>
+  <text x="50" y="472" fill="#94a3b8" font-family="system-ui" font-size="10">Input/Output</text>
+</svg>

@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420">
+  <defs>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4a90d9"/>
+      <stop offset="100%" style="stop-color:#6ab0f3"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#9b59b6"/>
+      <stop offset="100%" style="stop-color:#bb77d4"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity="0.4"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="420" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="500" y="35" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">C-Kernel-Engine Pipeline</text>
+  <text x="500" y="55" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#666" text-anchor="middle">From Config to Running Model</text>
+
+  <!-- Phase Labels -->
+  <text x="270" y="85" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#ffb400" text-anchor="middle" font-weight="600">CODE GENERATION</text>
+  <text x="730" y="85" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#47b475" text-anchor="middle" font-weight="600">RUNTIME</text>
+
+  <!-- Divider line -->
+  <line x1="500" y1="75" x2="500" y2="380" stroke="#333" stroke-width="2" stroke-dasharray="5,5"/>
+
+  <!-- Stage 1: Config -->
+  <g transform="translate(40, 100)">
+    <rect width="130" height="140" rx="10" fill="#252525" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#amberGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">1. CONFIG</text>
+
+    <!-- File icon -->
+    <rect x="45" y="45" width="40" height="50" rx="4" fill="#2a2a2a" stroke="#555"/>
+    <rect x="45" y="45" width="40" height="12" rx="2" fill="#ffb400" opacity="0.3"/>
+    <text x="65" y="75" font-family="monospace" font-size="8" fill="#888" text-anchor="middle">.json</text>
+
+    <text x="65" y="110" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">HuggingFace-style</text>
+    <text x="65" y="125" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">config.json</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="175" y1="170" x2="205" y2="170" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Stage 2: Parse -->
+  <g transform="translate(210, 100)">
+    <rect width="130" height="140" rx="10" fill="#252525" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#amberGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">2. PARSE</text>
+
+    <!-- Gear icon representation -->
+    <circle cx="65" cy="70" r="20" fill="none" stroke="#ffb400" stroke-width="2" opacity="0.6"/>
+    <circle cx="65" cy="70" r="10" fill="#ffb400" opacity="0.3"/>
+    <text x="65" y="74" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#ffb400" text-anchor="middle">IR</text>
+
+    <text x="65" y="105" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">Build Intermediate</text>
+    <text x="65" y="118" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">Representation</text>
+    <text x="65" y="133" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">CKIRGraph</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <line x1="345" y1="170" x2="375" y2="170" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Stage 3: Generate -->
+  <g transform="translate(380, 100)">
+    <rect width="130" height="140" rx="10" fill="#252525" stroke="#ffb400" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#amberGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">3. GENERATE</text>
+
+    <!-- Code file icon -->
+    <rect x="40" y="45" width="50" height="55" rx="4" fill="#2a2a2a" stroke="#555"/>
+    <text x="65" y="60" font-family="monospace" font-size="7" fill="#47b475">void</text>
+    <text x="65" y="70" font-family="monospace" font-size="7" fill="#ffb400">fwd()</text>
+    <text x="65" y="80" font-family="monospace" font-size="7" fill="#47b475">void</text>
+    <text x="65" y="90" font-family="monospace" font-size="7" fill="#ffb400">bwd()</text>
+
+    <text x="65" y="115" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">Emit clean C code</text>
+    <text x="65" y="128" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <!-- Arrow 3 (crossing the divider) -->
+  <line x1="515" y1="170" x2="555" y2="170" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 4: Weights -->
+  <g transform="translate(560, 100)">
+    <rect width="130" height="140" rx="10" fill="#252525" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#greenGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">4. WEIGHTS</text>
+
+    <!-- Stack of weight files -->
+    <rect x="35" y="50" width="60" height="15" rx="3" fill="#3d6b4f" stroke="#47b475"/>
+    <text x="65" y="61" font-family="monospace" font-size="7" fill="#5cc98a" text-anchor="middle">safetensors</text>
+    <rect x="38" y="68" width="54" height="15" rx="3" fill="#3d6b4f" stroke="#47b475"/>
+    <text x="65" y="79" font-family="monospace" font-size="7" fill="#5cc98a" text-anchor="middle">GGML</text>
+    <rect x="41" y="86" width="48" height="15" rx="3" fill="#3d6b4f" stroke="#47b475"/>
+    <text x="65" y="97" font-family="monospace" font-size="7" fill="#5cc98a" text-anchor="middle">.pt</text>
+
+    <text x="65" y="115" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">Convert to bump</text>
+    <text x="65" y="128" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">allocator format</text>
+  </g>
+
+  <!-- Arrow 4 -->
+  <line x1="695" y1="170" x2="725" y2="170" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 5: Compile -->
+  <g transform="translate(730, 100)">
+    <rect width="130" height="140" rx="10" fill="#252525" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#greenGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">5. COMPILE</text>
+
+    <!-- Terminal icon -->
+    <rect x="30" y="45" width="70" height="50" rx="5" fill="#1a1a1a" stroke="#47b475"/>
+    <text x="37" y="60" font-family="monospace" font-size="8" fill="#47b475">$</text>
+    <text x="45" y="60" font-family="monospace" font-size="7" fill="#888">gcc -O3</text>
+    <text x="37" y="72" font-family="monospace" font-size="7" fill="#888">-mavx512f</text>
+    <text x="37" y="84" font-family="monospace" font-size="7" fill="#5cc98a">model.c</text>
+
+    <text x="65" y="110" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">x86-64 / ARM</text>
+    <text x="65" y="123" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#aaa" text-anchor="middle">AVX / AVX-512</text>
+    <text x="65" y="136" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">AMX coming soon</text>
+  </g>
+
+  <!-- Arrow 5 (curved down) -->
+  <path d="M 860 170 Q 920 170 920 220 Q 920 270 860 270" fill="none" stroke="#47b475" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 6: Run -->
+  <g transform="translate(730, 260)">
+    <rect width="130" height="130" rx="10" fill="#1f3d2a" stroke="#47b475" stroke-width="3" filter="url(#shadow)"/>
+    <rect width="130" height="32" rx="10" fill="url(#greenGrad)"/>
+    <text x="65" y="21" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#1a1a1a" text-anchor="middle">6. RUN</text>
+
+    <!-- Play icon -->
+    <polygon points="55,55 55,95 85,75" fill="#47b475" opacity="0.8"/>
+
+    <text x="65" y="110" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#5cc98a" text-anchor="middle" font-weight="600">Inference</text>
+    <text x="65" y="125" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#5cc98a" text-anchor="middle" font-weight="600">+ Training</text>
+  </g>
+
+  <!-- Bottom info boxes -->
+  <g transform="translate(40, 280)">
+    <rect width="200" height="90" rx="8" fill="#252525" stroke="#444" filter="url(#shadow)"/>
+    <text x="100" y="20" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#ffb400" text-anchor="middle" font-weight="600">Supported Configs</text>
+    <text x="100" y="40" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#888" text-anchor="middle">Llama, Mistral, SmolLM, Qwen</text>
+    <text x="100" y="55" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#888" text-anchor="middle">Any HuggingFace decoder-only</text>
+    <text x="100" y="75" font-family="monospace" font-size="8" fill="#555" text-anchor="middle">RoPE, GQA, SwiGLU, RMSNorm</text>
+  </g>
+
+  <g transform="translate(260, 280)">
+    <rect width="200" height="90" rx="8" fill="#252525" stroke="#444" filter="url(#shadow)"/>
+    <text x="100" y="20" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#ffb400" text-anchor="middle" font-weight="600">Generated Output</text>
+    <text x="100" y="40" font-family="monospace" font-size="9" fill="#888" text-anchor="middle">forward_layer_N()</text>
+    <text x="100" y="55" font-family="monospace" font-size="9" fill="#888" text-anchor="middle">backward_layer_N()</text>
+    <text x="100" y="70" font-family="monospace" font-size="9" fill="#888" text-anchor="middle">alloc_buffers()</text>
+    <text x="100" y="85" font-family="Inter, system-ui, sans-serif" font-size="8" fill="#555" text-anchor="middle">+ Full gradient computation</text>
+  </g>
+
+  <g transform="translate(480, 280)">
+    <rect width="200" height="90" rx="8" fill="#1a3d2a" stroke="#47b475" filter="url(#shadow)"/>
+    <text x="100" y="20" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#47b475" text-anchor="middle" font-weight="600">PyTorch Parity</text>
+    <text x="100" y="42" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">Every kernel tested against</text>
+    <text x="100" y="57" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">PyTorch autograd</text>
+    <text x="100" y="78" font-family="monospace" font-size="10" fill="#47b475" text-anchor="middle" font-weight="600">max diff &lt; 1e-5</text>
+  </g>
+
+  <!-- Version/phase indicator -->
+  <g transform="translate(880, 390)">
+    <rect width="100" height="22" rx="11" fill="#332200" stroke="#ffb400"/>
+    <text x="50" y="15" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#ffb400" text-anchor="middle" font-weight="600">Phase 1: Active</text>
+  </g>
+</svg>

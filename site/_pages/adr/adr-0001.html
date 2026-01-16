@@ -1,0 +1,131 @@
+<!-- TITLE: ADR-0001 Graph IR + Lowered IR + Layout -->
+<!-- NAV: adr -->
+
+<h1>ADR-0001: Graph IR + Lowered IR + Layout Split</h1>
+
+<div class="card">
+    <table>
+        <tr><td><strong>Status</strong></td><td><span class="badge badge-success">Accepted</span></td></tr>
+        <tr><td><strong>Date</strong></td><td>2025-01</td></tr>
+        <tr><td><strong>Supersedes</strong></td><td>IR v2 monolithic approach, IR v3 all-in-one codegen</td></tr>
+    </table>
+</div>
+
+<h2>Context</h2>
+
+<p>Previous IR versions conflated several concerns:</p>
+
+<ul>
+    <li><strong>IR v2</strong>: Combined lowering and memory planning into a single phase, making it hard to add new execution modes (prefill vs decode) or debug memory issues.</li>
+    <li><strong>IR v3</strong>: Had clean layout but hardcoded architecture knowledge into the code generator itself, making it rigid.</li>
+</ul>
+
+<p>We needed a design that separates concerns for maintainability while keeping the deterministic, debuggable properties of v3.</p>
+
+<h2>Decision</h2>
+
+<p>Split the IR pipeline into three distinct phases:</p>
+
+<h3>1. Graph IR (High-level)</h3>
+<ul>
+    <li>Architecture-agnostic representation of the model</li>
+    <li>Nodes are abstract operations: <code>Embed</code>, <code>RMSNorm</code>, <code>GEMM</code>, <code>Attention</code>, <code>SwiGLU</code>, <code>Add</code></li>
+    <li>Edges represent data dependencies (tensor flows)</li>
+    <li>Shape information attached to each tensor edge</li>
+    <li>No kernel selection, no memory offsets, no mode-specific logic</li>
+</ul>
+
+<pre><code class="language-python">
+# Example Graph IR node
+{
+    "id": "layer_0_attn_qkv",
+    "op": "GEMM",
+    "inputs": ["layer_0_norm_out"],
+    "outputs": ["layer_0_q", "layer_0_k", "layer_0_v"],
+    "params": {
+        "M": "num_tokens",
+        "N": 896,
+        "K": 896
+    }
+}
+</code></pre>
+
+<h3>2. Lowered IR (Mode-specific)</h3>
+<ul>
+    <li>Resolves abstract ops to concrete kernel calls</li>
+    <li>Separate IR for each execution mode: prefill, decode, backward</li>
+    <li>Contains exact kernel function names and parameter orders</li>
+    <li>Allocates mode-specific temporary buffers</li>
+</ul>
+
+<pre><code class="language-python">
+# Example Lowered IR node (prefill mode)
+{
+    "id": "layer_0_attn_q_proj",
+    "kernel": "gemm_blocked_serial_bf16",
+    "args": [
+        {"tensor": "layer_0_norm_out", "role": "A"},
+        {"tensor": "weights.layer_0.wq", "role": "B"},
+        {"value": "NULL", "role": "bias"},
+        {"tensor": "layer_0_q", "role": "C"},
+        {"value": "num_tokens", "role": "M"},
+        {"value": 896, "role": "N"},
+        {"value": 896, "role": "K"}
+    ]
+}
+</code></pre>
+
+<h3>3. Layout (Memory Planning)</h3>
+<ul>
+    <li>Computes deterministic byte offsets for every tensor</li>
+    <li>64-byte alignment for SIMD (AVX-512)</li>
+    <li>Inserts canary markers between tensors for debugging</li>
+    <li>Groups tensors: weights (read-only), activations (read-write), KV cache</li>
+    <li>Single contiguous memory allocation</li>
+</ul>
+
+<pre><code class="language-python">
+# Example Layout output
+{
+    "total_bytes": 1073741824,
+    "regions": {
+        "weights": {"start": 64, "size": 512000000},
+        "activations": {"start": 512000064, "size": 100000000},
+        "kv_cache": {"start": 612000064, "size": 400000000}
+    },
+    "tensors": {
+        "weights.layer_0.wq": {"offset": 1024, "size": 1605632},
+        "layer_0_q": {"offset": 512001024, "size": 57344}
+    }
+}
+</code></pre>
+
+<h2>Consequences</h2>
+
+<h3>Benefits</h3>
+<ul>
+    <li><strong>Maintainability</strong>: Each phase can be tested and debugged independently</li>
+    <li><strong>Flexibility</strong>: Adding a new execution mode only requires a new lowering pass</li>
+    <li><strong>Debuggability</strong>: Layout is deterministic and can be visualized</li>
+    <li><strong>Tooling</strong>: Graph IR can be exported for visualization tools</li>
+</ul>
+
+<h3>Costs</h3>
+<ul>
+    <li><strong>Complexity</strong>: Three-phase pipeline is more complex than single-pass</li>
+    <li><strong>Intermediate artifacts</strong>: More files to manage (graph.json, lowered.json, layout.json)</li>
+</ul>
+
+<h3>Risks</h3>
+<ul>
+    <li>Information loss between phases if interfaces aren't complete</li>
+    <li>Need to ensure phases stay in sync as kernels evolve</li>
+</ul>
+
+<h2>Related ADRs</h2>
+<ul>
+    <li><a href="adr-0002.html">ADR-0002</a>: Templates generate Graph IR</li>
+    <li><a href="adr-0003.html">ADR-0003</a>: Mode-specific buffers in lowering</li>
+    <li><a href="adr-0004.html">ADR-0004</a>: Layout determinism and canaries</li>
+    <li><a href="adr-0005.html">ADR-0005</a>: Kernel selection in lowering</li>
+</ul>

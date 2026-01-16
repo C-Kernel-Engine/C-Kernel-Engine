@@ -1,0 +1,632 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="memory__pool_8h" kind="file" language="C++">
+    <compoundname>memory_pool.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includedby refid="tokenizer_8h" local="yes">tokenizer.h</includedby>
+    <includedby refid="memory__pool_8c" local="yes">memory_pool.c</includedby>
+    <incdepgraph>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>memory_pool.h</label>
+        <link refid="memory__pool_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="4">
+        <label>test_tokenizer.c</label>
+        <link refid="test__tokenizer_8c"/>
+      </node>
+      <node id="5">
+        <label>tokenizer.c</label>
+        <link refid="tokenizer_8c"/>
+      </node>
+      <node id="2">
+        <label>tokenizer.h</label>
+        <link refid="tokenizer_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="1">
+        <label>memory_pool.h</label>
+        <link refid="memory__pool_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>memory_pool.c</label>
+        <link refid="memory__pool_8c"/>
+      </node>
+      <node id="3">
+        <label>ck_cli_v5.c</label>
+        <link refid="ck__cli__v5_8c"/>
+      </node>
+      <node id="6">
+        <label>ck_cli_v6.c</label>
+        <link refid="ck__cli__v6_8c"/>
+      </node>
+    </invincdepgraph>
+    <innerclass refid="structCKTokenizerMemPool" prot="public">CKTokenizerMemPool</innerclass>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="memory__pool_8h_1aa5ce7f1fa9a83f1c16395844b71055c7" prot="public" static="no">
+        <name>CK_TOKENIZER_POOL_BLOCK_SIZE</name>
+        <initializer>(1024 * 1024)</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="24" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" bodystart="24" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="memory__pool_8h_1a1b453cc7c2a6a5bf213af21d487878be" prot="public" static="no">
+        <name>CK_TOKENIZER_POOL_DEFAULT_SIZE</name>
+        <initializer>(16 * 1024 * 1024)</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="21" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" bodystart="21" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="memory__pool_8h_1ac13764c18fca9d95046a4fbc977cb7f4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_tokenizer_mempool_alloc</definition>
+        <argsstring>(CKTokenizerMemPool *pool, size_t size)</argsstring>
+        <name>ck_tokenizer_mempool_alloc</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>size</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate from pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to allocate from </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>size</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Size in bytes </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Pointer to allocated memory, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="57" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="41" bodyend="56" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="57" declcolumn="6"/>
+        <references refid="memory__pool_8c_1a11253de42680a321ded636e9e3e0bb2c" compoundref="memory__pool_8c" startline="37" endline="39">align_up</references>
+        <references refid="structCKTokenizerMemPool_1a7126722d51826b28f178cf9e441d289c" compoundref="memory__pool_8h" startline="31">CKTokenizerMemPool::alignment</references>
+        <references refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" compoundref="memory__pool_8h" startline="28">CKTokenizerMemPool::memory</references>
+        <references refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" compoundref="memory__pool_8h" startline="29">CKTokenizerMemPool::size</references>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+        <referencedby refid="memory__pool_8h_1a04860d1d28aa36dd1e09f4c1fcdfe025" compoundref="memory__pool_8c" startline="93" endline="111">ck_tokenizer_mempool_strndup</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a49b9bffa4f585a5b3b6205607188c0b1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_tokenizer_mempool_alloc_aligned</definition>
+        <argsstring>(CKTokenizerMemPool *pool, size_t size, size_t align)</argsstring>
+        <name>ck_tokenizer_mempool_alloc_aligned</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>size</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>align</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate aligned memory from pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to allocate from </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>size</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Size in bytes </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>align</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Alignment (must be power of 2) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Pointer to allocated memory, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="67" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="58" bodyend="84" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="67" declcolumn="6"/>
+        <references refid="memory__pool_8c_1a11253de42680a321ded636e9e3e0bb2c" compoundref="memory__pool_8c" startline="37" endline="39">align_up</references>
+        <references refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" compoundref="memory__pool_8h" startline="28">CKTokenizerMemPool::memory</references>
+        <references refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" compoundref="memory__pool_8h" startline="29">CKTokenizerMemPool::size</references>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1ae90aceeac43f19cde359ec888fe26686" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_mempool_alloc_count</definition>
+        <argsstring>(CKTokenizerMemPool *pool)</argsstring>
+        <name>ck_tokenizer_mempool_alloc_count</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get allocation count.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to query </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of allocations </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="117" column="8" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="117" declcolumn="8"/>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a8235172a28dfe58996c66c23d36bc8cb" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_mempool_available</definition>
+        <argsstring>(CKTokenizerMemPool *pool)</argsstring>
+        <name>ck_tokenizer_mempool_available</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get available bytes in pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to query </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of bytes available </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="109" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="123" bodyend="128" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="109" declcolumn="8"/>
+        <references refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" compoundref="memory__pool_8h" startline="29">CKTokenizerMemPool::size</references>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a8825ca1a45f75b31e9a24a25856eca88" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_mempool_free</definition>
+        <argsstring>(CKTokenizerMemPool *pool)</argsstring>
+        <name>ck_tokenizer_mempool_free</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free a memory pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to free </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="48" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="28" bodyend="35" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="48" declcolumn="6"/>
+        <references refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" compoundref="memory__pool_8h" startline="28">CKTokenizerMemPool::memory</references>
+        <references refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" compoundref="memory__pool_8h" startline="29">CKTokenizerMemPool::size</references>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+        <referencedby refid="tokenizer_8c_1adcfcdd58b3b91d043d6974b35aea1ad4" compoundref="tokenizer_8c" startline="115" endline="141">ck_tokenizer_free</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a77ee8ee512daf30f49d730096d202ac5" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_tokenizer_mempool_init</definition>
+        <argsstring>(CKTokenizerMemPool *pool, size_t size)</argsstring>
+        <name>ck_tokenizer_mempool_init</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>size</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Initialize a memory pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to initialize </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>size</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool size in bytes (0 = use default) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, -1 on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="41" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="11" bodyend="26" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="41" declcolumn="5"/>
+        <references refid="structCKTokenizerMemPool_1a7126722d51826b28f178cf9e441d289c" compoundref="memory__pool_8h" startline="31">CKTokenizerMemPool::alignment</references>
+        <references refid="memory__pool_8h_1a1b453cc7c2a6a5bf213af21d487878be" compoundref="memory__pool_8h" startline="21">CK_TOKENIZER_POOL_DEFAULT_SIZE</references>
+        <references refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" compoundref="memory__pool_8h" startline="28">CKTokenizerMemPool::memory</references>
+        <references refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" compoundref="memory__pool_8h" startline="29">CKTokenizerMemPool::size</references>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+        <referencedby refid="tokenizer_8c_1a467368361e22ac83de3e6c24b5b76f16" compoundref="tokenizer_8c" startline="64" endline="112">ck_tokenizer_create</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a27649dad355b3debdf76b54aa983c58f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_tokenizer_mempool_reset</definition>
+        <argsstring>(CKTokenizerMemPool *pool)</argsstring>
+        <name>ck_tokenizer_mempool_reset</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Reset pool (mark all memory as free).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to reset </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="93" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="113" bodyend="117" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="93" declcolumn="6"/>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a08371ebc6b399af6459b9f397d584498" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>char *</type>
+        <definition>char* ck_tokenizer_mempool_strdup</definition>
+        <argsstring>(CKTokenizerMemPool *pool, const char *str)</argsstring>
+        <name>ck_tokenizer_mempool_strdup</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>str</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate and copy string (strdup equivalent).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to allocate from </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>str</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>String to copy </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Pointer to copied string, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="76" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="86" bodyend="91" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="76" declcolumn="6"/>
+        <references refid="memory__pool_8c_1a04860d1d28aa36dd1e09f4c1fcdfe025" compoundref="memory__pool_8c" startline="93" endline="111">ck_tokenizer_mempool_strndup</references>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a04860d1d28aa36dd1e09f4c1fcdfe025" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>char *</type>
+        <definition>char* ck_tokenizer_mempool_strndup</definition>
+        <argsstring>(CKTokenizerMemPool *pool, const char *str, int len)</argsstring>
+        <name>ck_tokenizer_mempool_strndup</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>str</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>len</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate and copy string with length.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to allocate from </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>str</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>String to copy </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>len</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Length to copy (-1 for null-terminated) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Pointer to copied string, or NULL on error </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="86" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="93" bodyend="111" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="86" declcolumn="6"/>
+        <references refid="memory__pool_8c_1ac13764c18fca9d95046a4fbc977cb7f4" compoundref="memory__pool_8c" startline="41" endline="56">ck_tokenizer_mempool_alloc</references>
+        <referencedby refid="memory__pool_8h_1a08371ebc6b399af6459b9f397d584498" compoundref="memory__pool_8c" startline="86" endline="91">ck_tokenizer_mempool_strdup</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="memory__pool_8h_1a85478de26879bfe01081c3f24b3f43bf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>size_t</type>
+        <definition>size_t ck_tokenizer_mempool_used</definition>
+        <argsstring>(CKTokenizerMemPool *pool)</argsstring>
+        <name>ck_tokenizer_mempool_used</name>
+        <param>
+          <type><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref> *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get used bytes in pool.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pool to query </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Number of bytes used </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" line="101" column="8" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/tokenizer/memory_pool.c" bodystart="119" bodyend="121" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h" declline="101" declcolumn="8"/>
+        <references refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" compoundref="memory__pool_8h" startline="30">CKTokenizerMemPool::used</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Memory<sp/>Pool<sp/>-<sp/>Thread-safe<sp/>allocator</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Ported<sp/>from<sp/>HPC_Embeddings<sp/>for<sp/>use<sp/>in<sp/>C-Kernel-Engine.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Provides<sp/>fast<sp/>allocations<sp/>with<sp/>optional<sp/>thread<sp/>safety.</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>By<sp/>Anthony<sp/>Shivakumar</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_TOKENIZER_MEMPOOL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_MEMPOOL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Default<sp/>pool<sp/>size:<sp/>16MB<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21" refid="memory__pool_8h_1a1b453cc7c2a6a5bf213af21d487878be" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_POOL_DEFAULT_SIZE<sp/>(16<sp/>*<sp/>1024<sp/>*<sp/>1024)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Block<sp/>size:<sp/>1MB<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24" refid="memory__pool_8h_1aa5ce7f1fa9a83f1c16395844b71055c7" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_TOKENIZER_POOL_BLOCK_SIZE<sp/>(1024<sp/>*<sp/>1024)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Memory<sp/>pool<sp/>structure<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27" refid="structCKTokenizerMemPool" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>{</highlight></codeline>
+<codeline lineno="28" refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="structCKTokenizerMemPool_1a8a2ca8e09bc485f1600935ec73697294" kindref="member">memory</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Pool<sp/>memory<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29" refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerMemPool_1a8fbf4d3abd94543c4609336fc9762239" kindref="member">size</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Total<sp/>pool<sp/>size<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="30" refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerMemPool_1a390bbe0c2c3c9c2dcc7f5fc14d8c587f" kindref="member">used</ref>;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Bytes<sp/>used<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31" refid="structCKTokenizerMemPool_1a7126722d51826b28f178cf9e441d289c" refkind="member"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="structCKTokenizerMemPool_1a7126722d51826b28f178cf9e441d289c" kindref="member">alignment</ref>;<sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Allocation<sp/>alignment<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal">}<sp/><ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref>;</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="34"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="35"><highlight class="comment"><sp/>*<sp/>Initialize<sp/>a<sp/>memory<sp/>pool.</highlight></codeline>
+<codeline lineno="36"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="37"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>initialize</highlight></codeline>
+<codeline lineno="38"><highlight class="comment"><sp/>*<sp/>@param<sp/>size<sp/><sp/><sp/><sp/><sp/>Pool<sp/>size<sp/>in<sp/>bytes<sp/>(0<sp/>=<sp/>use<sp/>default)</highlight></codeline>
+<codeline lineno="39"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>0<sp/>on<sp/>success,<sp/>-1<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="40"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1a77ee8ee512daf30f49d730096d202ac5" kindref="member">ck_tokenizer_mempool_init</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="43"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="44"><highlight class="comment"><sp/>*<sp/>Free<sp/>a<sp/>memory<sp/>pool.</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>free</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1a8825ca1a45f75b31e9a24a25856eca88" kindref="member">ck_tokenizer_mempool_free</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="50"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>from<sp/>pool.</highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>allocate<sp/>from</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*<sp/>@param<sp/>size<sp/><sp/><sp/><sp/><sp/>Size<sp/>in<sp/>bytes</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Pointer<sp/>to<sp/>allocated<sp/>memory,<sp/>or<sp/>NULL<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="56"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="memory__pool_8h_1ac13764c18fca9d95046a4fbc977cb7f4" kindref="member">ck_tokenizer_mempool_alloc</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size);</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="59"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="60"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>aligned<sp/>memory<sp/>from<sp/>pool.</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="62"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>allocate<sp/>from</highlight></codeline>
+<codeline lineno="63"><highlight class="comment"><sp/>*<sp/>@param<sp/>size<sp/><sp/><sp/><sp/><sp/>Size<sp/>in<sp/>bytes</highlight></codeline>
+<codeline lineno="64"><highlight class="comment"><sp/>*<sp/>@param<sp/>align<sp/><sp/><sp/><sp/>Alignment<sp/>(must<sp/>be<sp/>power<sp/>of<sp/>2)</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Pointer<sp/>to<sp/>allocated<sp/>memory,<sp/>or<sp/>NULL<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="66"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="memory__pool_8h_1a49b9bffa4f585a5b3b6205607188c0b1" kindref="member">ck_tokenizer_mempool_alloc_aligned</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>size,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>align);</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="69"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>and<sp/>copy<sp/>string<sp/>(strdup<sp/>equivalent).</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>allocate<sp/>from</highlight></codeline>
+<codeline lineno="73"><highlight class="comment"><sp/>*<sp/>@param<sp/>str<sp/><sp/><sp/><sp/><sp/><sp/>String<sp/>to<sp/>copy</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Pointer<sp/>to<sp/>copied<sp/>string,<sp/>or<sp/>NULL<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="memory__pool_8h_1a08371ebc6b399af6459b9f397d584498" kindref="member">ck_tokenizer_mempool_strdup</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*str);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="78"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="79"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>and<sp/>copy<sp/>string<sp/>with<sp/>length.</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="81"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>allocate<sp/>from</highlight></codeline>
+<codeline lineno="82"><highlight class="comment"><sp/>*<sp/>@param<sp/>str<sp/><sp/><sp/><sp/><sp/><sp/>String<sp/>to<sp/>copy</highlight></codeline>
+<codeline lineno="83"><highlight class="comment"><sp/>*<sp/>@param<sp/>len<sp/><sp/><sp/><sp/><sp/><sp/>Length<sp/>to<sp/>copy<sp/>(-1<sp/>for<sp/>null-terminated)</highlight></codeline>
+<codeline lineno="84"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Pointer<sp/>to<sp/>copied<sp/>string,<sp/>or<sp/>NULL<sp/>on<sp/>error</highlight></codeline>
+<codeline lineno="85"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="memory__pool_8h_1a04860d1d28aa36dd1e09f4c1fcdfe025" kindref="member">ck_tokenizer_mempool_strndup</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*str,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len);</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="88"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*<sp/>Reset<sp/>pool<sp/>(mark<sp/>all<sp/>memory<sp/>as<sp/>free).</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="91"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>reset</highlight></codeline>
+<codeline lineno="92"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="93"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1a27649dad355b3debdf76b54aa983c58f" kindref="member">ck_tokenizer_mempool_reset</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="95"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="96"><highlight class="comment"><sp/>*<sp/>Get<sp/>used<sp/>bytes<sp/>in<sp/>pool.</highlight></codeline>
+<codeline lineno="97"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="98"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>query</highlight></codeline>
+<codeline lineno="99"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>bytes<sp/>used</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1a85478de26879bfe01081c3f24b3f43bf" kindref="member">ck_tokenizer_mempool_used</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="103"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="104"><highlight class="comment"><sp/>*<sp/>Get<sp/>available<sp/>bytes<sp/>in<sp/>pool.</highlight></codeline>
+<codeline lineno="105"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>query</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>bytes<sp/>available</highlight></codeline>
+<codeline lineno="108"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1a8235172a28dfe58996c66c23d36bc8cb" kindref="member">ck_tokenizer_mempool_available</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="111"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="112"><highlight class="comment"><sp/>*<sp/>Get<sp/>allocation<sp/>count.</highlight></codeline>
+<codeline lineno="113"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="114"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/><sp/><sp/><sp/>Pool<sp/>to<sp/>query</highlight></codeline>
+<codeline lineno="115"><highlight class="comment"><sp/>*<sp/>@return<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>allocations</highlight></codeline>
+<codeline lineno="116"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="117" refid="memory__pool_8h_1ae90aceeac43f19cde359ec888fe26686" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/><ref refid="memory__pool_8h_1ae90aceeac43f19cde359ec888fe26686" kindref="member">ck_tokenizer_mempool_alloc_count</ref>(<ref refid="structCKTokenizerMemPool" kindref="compound">CKTokenizerMemPool</ref><sp/>*pool);</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="120"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="122"><highlight class="normal"></highlight></codeline>
+<codeline lineno="123"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_TOKENIZER_MEMPOOL_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/tokenizer/memory_pool.h"/>
+  </compounddef>
+</doxygen>

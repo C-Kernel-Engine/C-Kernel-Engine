@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1400" height="1600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1976d2"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#388e3c"/>
+    </marker>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1976d2"/>
+      <stop offset="100%" style="stop-color:#42a5f5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1600" fill="#fafafa"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="1400" height="70" fill="url(#headerGrad)"/>
+  <text x="700" y="35" text-anchor="middle" font-size="28" font-weight="bold" fill="white">
+    IR v2 Pipeline: From HuggingFace to C Runtime
+  </text>
+  <text x="700" y="58" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.9)">
+    C-Kernel-Engine Intermediate Representation Format
+  </text>
+
+  <!-- Legend -->
+  <rect x="30" y="90" width="280" height="140" fill="white" stroke="#ddd" rx="8" filter="drop-shadow(2px 2px 3px rgba(0,0,0,0.1))"/>
+  <text x="45" y="115" font-size="14" font-weight="bold" fill="#333">Legend</text>
+  <rect x="45" y="130" width="24" height="18" fill="#e3f2fd" stroke="#1976d2" rx="3"/>
+  <text x="80" y="144" font-size="12" fill="#333">Input File (external)</text>
+  <rect x="45" y="155" width="24" height="18" fill="#fff3e0" stroke="#f57c00" rx="3"/>
+  <text x="80" y="169" font-size="12" fill="#333">Config File (you write)</text>
+  <rect x="45" y="180" width="24" height="18" fill="#e8f5e9" stroke="#388e3c" rx="3"/>
+  <text x="80" y="194" font-size="12" fill="#333">Generated Output</text>
+  <rect x="45" y="205" width="24" height="18" fill="#f3e5f5" stroke="#7b1fa2" rx="3"/>
+  <text x="80" y="219" font-size="12" fill="#333">Python Script (compiler)</text>
+
+  <!-- ==================== SECTION 1: INPUT FILES ==================== -->
+  <text x="700" y="280" text-anchor="middle" font-size="20" font-weight="bold" fill="#1976d2">
+    1. INPUT FILES
+  </text>
+  <line x1="200" y1="290" x2="1200" y2="290" stroke="#1976d2" stroke-width="2"/>
+
+  <!-- HuggingFace config.json -->
+  <rect x="100" y="320" width="300" height="180" fill="#e3f2fd" stroke="#1976d2" rx="8" stroke-width="2"/>
+  <text x="250" y="350" text-anchor="middle" font-size="14" font-weight="bold" fill="#1976d2">config.json</text>
+  <text x="250" y="370" text-anchor="middle" font-size="11" fill="#666">(from HuggingFace)</text>
+  <text x="120" y="400" font-size="11" font-family="monospace" fill="#333">{</text>
+  <text x="130" y="418" font-size="11" font-family="monospace" fill="#333">"hidden_size": 896,</text>
+  <text x="130" y="436" font-size="11" font-family="monospace" fill="#333">"vocab_size": 151936,</text>
+  <text x="130" y="454" font-size="11" font-family="monospace" fill="#333">"num_attention_heads": 14,</text>
+  <text x="130" y="472" font-size="11" font-family="monospace" fill="#333">"num_hidden_layers": 24</text>
+  <text x="120" y="490" font-size="11" font-family="monospace" fill="#333">}</text>
+
+  <!-- global_buffers.json -->
+  <rect x="450" y="320" width="300" height="180" fill="#fff3e0" stroke="#f57c00" rx="8" stroke-width="2"/>
+  <text x="600" y="350" text-anchor="middle" font-size="14" font-weight="bold" fill="#e65100">global_buffers.json</text>
+  <text x="600" y="370" text-anchor="middle" font-size="11" fill="#666">(kernel_maps/)</text>
+  <text x="470" y="400" font-size="10" font-family="monospace" fill="#333">{"buffers": [</text>
+  <text x="480" y="418" font-size="10" font-family="monospace" fill="#333">{"name": "token_emb",</text>
+  <text x="490" y="436" font-size="10" font-family="monospace" fill="#333">"shape": [{"dim":"vocab"},</text>
+  <text x="520" y="454" font-size="10" font-family="monospace" fill="#333">{"dim":"aligned_embed"}]},</text>
+  <text x="480" y="472" font-size="10" font-family="monospace" fill="#333">{"name": "logits", ...}</text>
+  <text x="470" y="490" font-size="10" font-family="monospace" fill="#333">]}</text>
+
+  <!-- decoder_layer_plan.json -->
+  <rect x="800" y="320" width="300" height="180" fill="#fff3e0" stroke="#f57c00" rx="8" stroke-width="2"/>
+  <text x="950" y="350" text-anchor="middle" font-size="14" font-weight="bold" fill="#e65100">decoder_layer_plan.json</text>
+  <text x="950" y="370" text-anchor="middle" font-size="11" fill="#666">(kernel_maps/)</text>
+  <text x="820" y="400" font-size="10" font-family="monospace" fill="#333">{"steps": [</text>
+  <text x="830" y="418" font-size="10" font-family="monospace" fill="#333">{"kernel": "rmsnorm",</text>
+  <text x="840" y="436" font-size="10" font-family="monospace" fill="#333">"bind": {"in":"input",...}},</text>
+  <text x="830" y="454" font-size="10" font-family="monospace" fill="#333">{"kernel": "qkv_project",...},</text>
+  <text x="830" y="472" font-size="10" font-family="monospace" fill="#333">{"kernel": "attention",...}</text>
+  <text x="820" y="490" font-size="10" font-family="monospace" fill="#333">]}</text>
+
+  <!-- Arrows down to compiler -->
+  <line x1="250" y1="500" x2="250" y2="560" stroke="#1976d2" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="600" y1="500" x2="600" y2="560" stroke="#f57c00" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="950" y1="500" x2="950" y2="560" stroke="#f57c00" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ==================== SECTION 2: COMPILER ==================== -->
+  <text x="700" y="550" text-anchor="middle" font-size="20" font-weight="bold" fill="#7b1fa2">
+    2. COMPILER
+  </text>
+  <line x1="200" y1="560" x2="1200" y2="560" stroke="#7b1fa2" stroke-width="2"/>
+
+  <!-- build_ir_v2.py -->
+  <rect x="350" y="590" width="500" height="200" fill="#f3e5f5" stroke="#7b1fa2" rx="8" stroke-width="2"/>
+  <text x="600" y="620" text-anchor="middle" font-size="16" font-weight="bold" fill="#7b1fa2">scripts/build_ir_v2.py</text>
+
+  <rect x="380" y="640" width="140" height="60" fill="white" stroke="#9c27b0" rx="5"/>
+  <text x="450" y="665" text-anchor="middle" font-size="11" font-weight="bold">1. Parse Config</text>
+  <text x="450" y="680" text-anchor="middle" font-size="9" fill="#666">Extract dimensions</text>
+  <text x="450" y="692" text-anchor="middle" font-size="9" fill="#666">from HF config</text>
+
+  <line x1="520" y1="670" x2="555" y2="670" stroke="#7b1fa2" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="560" y="640" width="140" height="60" fill="white" stroke="#9c27b0" rx="5"/>
+  <text x="630" y="665" text-anchor="middle" font-size="11" font-weight="bold">2. Build Dims</text>
+  <text x="630" y="680" text-anchor="middle" font-size="9" fill="#666">CK_DIM mapping:</text>
+  <text x="630" y="692" text-anchor="middle" font-size="9" fill="#666">"vocab"→10</text>
+
+  <line x1="700" y1="670" x2="730" y2="670" stroke="#7b1fa2" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="380" y="715" width="140" height="60" fill="white" stroke="#9c27b0" rx="5"/>
+  <text x="450" y="740" text-anchor="middle" font-size="11" font-weight="bold">3. Load Buffers</text>
+  <text x="450" y="755" text-anchor="middle" font-size="9" fill="#666">global_buffers.json</text>
+  <text x="450" y="767" text-anchor="middle" font-size="9" fill="#666">+ layer buffers</text>
+
+  <line x1="520" y1="745" x2="555" y2="745" stroke="#7b1fa2" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <rect x="560" y="715" width="140" height="60" fill="white" stroke="#9c27b0" rx="5"/>
+  <text x="630" y="740" text-anchor="middle" font-size="11" font-weight="bold">4. Plan Nodes</text>
+  <text x="630" y="755" text-anchor="middle" font-size="9" fill="#666">decoder_layer_plan</text>
+  <text x="630" y="767" text-anchor="middle" font-size="9" fill="#666">× num_layers</text>
+
+  <!-- Output arrow -->
+  <line x1="600" y1="790" x2="600" y2="850" stroke="#388e3c" stroke-width="3" marker-end="url(#arrow-green)"/>
+
+  <!-- ==================== SECTION 3: IR OUTPUT ==================== -->
+  <text x="700" y="840" text-anchor="middle" font-size="20" font-weight="bold" fill="#388e3c">
+    3. IR v2 OUTPUT
+  </text>
+  <line x1="200" y1="850" x2="1200" y2="850" stroke="#388e3c" stroke-width="2"/>
+
+  <!-- ir_v2.json structure -->
+  <rect x="150" y="880" width="900" height="320" fill="#e8f5e9" stroke="#388e3c" rx="8" stroke-width="2"/>
+  <text x="600" y="910" text-anchor="middle" font-size="16" font-weight="bold" fill="#2e7d32">ir_v2.json</text>
+
+  <!-- dimensions box -->
+  <rect x="170" y="930" width="200" height="120" fill="white" stroke="#4caf50" rx="5"/>
+  <text x="270" y="955" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">dimensions[]</text>
+  <text x="180" y="980" font-size="10" font-family="monospace">{id:0, name:"tokens"}</text>
+  <text x="180" y="998" font-size="10" font-family="monospace">{id:1, name:"embed",</text>
+  <text x="190" y="1012" font-size="10" font-family="monospace">value:896}</text>
+  <text x="180" y="1030" font-size="10" font-family="monospace">{id:10, name:"vocab",</text>
+  <text x="190" y="1044" font-size="10" font-family="monospace">value:151936}</text>
+
+  <!-- buffers box -->
+  <rect x="390" y="930" width="260" height="120" fill="white" stroke="#4caf50" rx="5"/>
+  <text x="520" y="955" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">buffers[]</text>
+  <text x="400" y="980" font-size="10" font-family="monospace">{name:"token_emb",</text>
+  <text x="410" y="998" font-size="10" font-family="monospace">role:"weight",</text>
+  <text x="410" y="1016" font-size="10" font-family="monospace">shape:[{dim:10},{dim:2}]}</text>
+  <text x="400" y="1034" font-size="10" font-family="monospace">// dim:10 = vocab = 151936</text>
+
+  <!-- nodes box -->
+  <rect x="670" y="930" width="360" height="120" fill="white" stroke="#4caf50" rx="5"/>
+  <text x="850" y="955" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">nodes[]</text>
+  <text x="680" y="980" font-size="10" font-family="monospace">{layer:0, op:"rmsnorm",</text>
+  <text x="690" y="998" font-size="10" font-family="monospace">kernel:"rmsnorm_forward",</text>
+  <text x="690" y="1016" font-size="10" font-family="monospace">bindings:[{arg:"input", buffer:"input"},</text>
+  <text x="720" y="1034" font-size="10" font-family="monospace">{arg:"gamma", buffer:"ln1_gamma"}]}</text>
+
+  <!-- How dim:10 resolves -->
+  <rect x="170" y="1060" width="860" height="70" fill="#c8e6c9" stroke="#388e3c" rx="5"/>
+  <text x="600" y="1085" text-anchor="middle" font-size="13" font-weight="bold" fill="#1b5e20">
+    HOW DIMENSIONS RESOLVE
+  </text>
+  <text x="600" y="1110" text-anchor="middle" font-size="12" font-family="monospace" fill="#333">
+    shape[{dim:10}] → dimensions[10] → {name:"vocab", value:151936} → 151936 elements
+  </text>
+
+  <!-- config box -->
+  <rect x="170" y="1140" width="400" height="50" fill="white" stroke="#4caf50" rx="5"/>
+  <text x="370" y="1165" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">config{}</text>
+  <text x="180" y="1180" font-size="10" font-family="monospace">hidden_size:896, vocab_size:151936, num_layers:24</text>
+
+  <!-- notes box -->
+  <rect x="590" y="1140" width="440" height="50" fill="white" stroke="#4caf50" rx="5"/>
+  <text x="810" y="1165" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">notes[]</text>
+  <text x="600" y="1180" font-size="10" font-family="monospace">"dim:10 → dimensions[10] → 'vocab' → 151936"</text>
+
+  <!-- Arrow to C code -->
+  <line x1="600" y1="1200" x2="600" y2="1260" stroke="#388e3c" stroke-width="3" marker-end="url(#arrow-green)"/>
+
+  <!-- ==================== SECTION 4: CODE GEN ==================== -->
+  <text x="700" y="1250" text-anchor="middle" font-size="20" font-weight="bold" fill="#388e3c">
+    4. CODE GENERATION
+  </text>
+  <line x1="200" y1="1260" x2="1200" y2="1260" stroke="#388e3c" stroke-width="2"/>
+
+  <!-- ck_ir_v2_demo -->
+  <rect x="350" y="1290" width="500" height="80" fill="#f3e5f5" stroke="#7b1fa2" rx="8" stroke-width="2"/>
+  <text x="600" y="1320" text-anchor="middle" font-size="14" font-weight="bold" fill="#7b1fa2">ck_ir_v2_demo</text>
+  <text x="600" y="1345" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">
+    ./build/ck_ir_v2_demo --ir build/ir_v2.json --emit build/generated_v2.c
+  </text>
+
+  <line x1="600" y1="1370" x2="600" y2="1410" stroke="#388e3c" stroke-width="3" marker-end="url(#arrow-green)"/>
+
+  <!-- generated_v2.c -->
+  <rect x="250" y="1420" width="700" height="140" fill="#e8f5e9" stroke="#388e3c" rx="8" stroke-width="2"/>
+  <text x="600" y="1450" text-anchor="middle" font-size="16" font-weight="bold" fill="#2e7d32">generated_v2.c</text>
+  <text x="270" y="1480" font-size="11" font-family="monospace" fill="#333">static const CKV2BufferLayout ck_v2_buffers[] = {</text>
+  <text x="280" y="1498" font-size="11" font-family="monospace" fill="#333">{ 0, 272269312, 0 },  /* token_emb: 151936 × 896 × 2 bytes */</text>
+  <text x="280" y="1516" font-size="11" font-family="monospace" fill="#333">{ 272269312, 469762048, 1 },  /* embedded_input */</text>
+  <text x="280" y="1534" font-size="11" font-family="monospace" fill="#333">...</text>
+  <text x="270" y="1552" font-size="11" font-family="monospace" fill="#333">};</text>
+
+  <!-- Footer -->
+  <text x="700" y="1585" text-anchor="middle" font-size="11" fill="#666">
+    C-Kernel-Engine IR v2 Pipeline | See docs/04-ir-v2-format.md for details
+  </text>
+
+</svg>

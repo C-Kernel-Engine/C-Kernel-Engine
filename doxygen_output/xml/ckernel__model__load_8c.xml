@@ -1,0 +1,346 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ckernel__model__load_8c" kind="file" language="C++">
+    <compoundname>ckernel_model_load.c</compoundname>
+    <includes refid="ckernel__model_8h" local="yes">ckernel_model.h</includes>
+    <includes local="no">errno.h</includes>
+    <includes local="no">stdio.h</includes>
+    <includes local="no">stdlib.h</includes>
+    <includes local="no">string.h</includes>
+    <incdepgraph>
+      <node id="2">
+        <label>ckernel_model.h</label>
+        <link refid="ckernel__model_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="8">
+        <label>stdlib.h</label>
+      </node>
+      <node id="7">
+        <label>errno.h</label>
+      </node>
+      <node id="6">
+        <label>stddef.h</label>
+      </node>
+      <node id="3">
+        <label>ckernel_ir.h</label>
+        <link refid="ckernel__ir_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="9">
+        <label>string.h</label>
+      </node>
+      <node id="1">
+        <label>ckernel_model_load.c</label>
+        <link refid="ckernel__model__load_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>stdio.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ckernel__model__load_8c_1a408dbae8dc539ddfe04ee35f35c9257d" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_model_load_weights_flat</definition>
+        <argsstring>(TransformerModel *m, const char *path)</argsstring>
+        <name>ck_model_load_weights_flat</name>
+        <param>
+          <type><ref refid="structTransformerModel" kindref="compound">TransformerModel</ref> *</type>
+          <declname>m</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>path</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Load weights from a single flat binary file into model-&gt;memory_base.</para>
+<para>Expected layout in the file (float32, little-endian), in the same order as layout_transformer_from_ir assigns weight offsets:</para>
+<para>1) Token embeddings [vocab_size × hidden_size] 2) Pos embeddings [context_window × hidden_size] 3) For each layer L = 0..num_layers-1:<itemizedlist>
+<listitem><para>LN1 gamma [hidden_size]</para>
+</listitem><listitem><para>LN1 beta [hidden_size]</para>
+</listitem><listitem><para>QKV weight [hidden_size × 3*hidden_size]</para>
+</listitem><listitem><para>QKV bias [3*hidden_size]</para>
+</listitem><listitem><para>Attn proj W [hidden_size × hidden_size]</para>
+</listitem><listitem><para>Attn proj b [hidden_size]</para>
+</listitem><listitem><para>FC1 weight [hidden_size × intermediate_size]</para>
+</listitem><listitem><para>FC1 bias [intermediate_size]</para>
+</listitem><listitem><para>FC2 weight [intermediate_size × hidden_size]</para>
+</listitem><listitem><para>FC2 bias [hidden_size] 4) Final LN gamma [hidden_size] 5) Final LN beta [hidden_size] 6) LM head weight [vocab_size × hidden_size]</para>
+</listitem></itemizedlist>
+</para>
+<para>Activation buffers (embedded_input_offset, final_output_offset, logits_offset) are NOT populated by this loader.</para>
+<para>Returns 0 on success, non-zero on failure. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c" line="24" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c" bodystart="24" bodyend="186"/>
+        <references refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" compoundref="ckernel__model_8h" startline="29">CKLayerLayout::attn_proj_bias_offset</references>
+        <references refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" compoundref="ckernel__model_8h" startline="28">CKLayerLayout::attn_proj_weight_offset</references>
+        <references refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" compoundref="ckernel__model_8h" startline="39">TransformerModel::cfg</references>
+        <references refid="structCKModelConfig_1a18a327829d25405e92ba46a79009b89f" compoundref="ckernel__ir_8h" startline="30">CKModelConfig::context_window</references>
+        <references refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" compoundref="ckernel__model_8h" startline="32">CKLayerLayout::fc1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" compoundref="ckernel__model_8h" startline="31">CKLayerLayout::fc1_weight_offset</references>
+        <references refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" compoundref="ckernel__model_8h" startline="35">CKLayerLayout::fc2_bias_offset</references>
+        <references refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" compoundref="ckernel__model_8h" startline="34">CKLayerLayout::fc2_weight_offset</references>
+        <references refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" compoundref="ckernel__model_8h" startline="54">TransformerModel::final_ln_bias_offset</references>
+        <references refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" compoundref="ckernel__model_8h" startline="53">TransformerModel::final_ln_weight_offset</references>
+        <references refid="structCKModelConfig_1afd04ffe4db48600b90f32904c49d73af" compoundref="ckernel__ir_8h" startline="25">CKModelConfig::hidden_size</references>
+        <references refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" compoundref="ck__model__api_8h" startline="37">CKModelConfig::intermediate_size</references>
+        <references refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" compoundref="ckernel__model_8h" startline="61">TransformerModel::layers</references>
+        <references refid="structTransformerModel_1a04378052961669504042e717e3219736" compoundref="ckernel__model_8h" startline="57">TransformerModel::lm_head_weight_offset</references>
+        <references refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" compoundref="ckernel__model_8h" startline="23">CKLayerLayout::ln1_bias_offset</references>
+        <references refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" compoundref="ckernel__model_8h" startline="22">CKLayerLayout::ln1_weight_offset</references>
+        <references refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" compoundref="ckernel__model_8h" startline="42">TransformerModel::memory_base</references>
+        <references refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" compoundref="ck__model__api_8h" startline="38">CKModelConfig::num_layers</references>
+        <references refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" compoundref="ckernel__model_8h" startline="49">TransformerModel::pos_emb_offset</references>
+        <references refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" compoundref="ckernel__model_8h" startline="26">CKLayerLayout::qkv_bias_offset</references>
+        <references refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" compoundref="ckernel__model_8h" startline="25">CKLayerLayout::qkv_weight_offset</references>
+        <references refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" compoundref="ckernel__model__load_8c" startline="8" endline="22">read_floats</references>
+        <references refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" compoundref="ckernel__model_8h" startline="48">TransformerModel::token_emb_offset</references>
+        <references refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" compoundref="ck__model__api_8h" startline="39">CKModelConfig::vocab_size</references>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>static int read_floats</definition>
+        <argsstring>(FILE *f, float *dst, size_t count)</argsstring>
+        <name>read_floats</name>
+        <param>
+          <type>FILE *</type>
+          <declname>f</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>dst</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>count</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c" line="8" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c" bodystart="8" bodyend="22"/>
+        <referencedby refid="ckernel__model_8h_1a408dbae8dc539ddfe04ee35f35c9257d" compoundref="ckernel__model__load_8c" startline="24" endline="186">ck_model_load_weights_flat</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__model_8h" kindref="compound">ckernel_model.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;errno.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight></codeline>
+<codeline lineno="8" refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(FILE<sp/>*f,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dst,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>count)</highlight></codeline>
+<codeline lineno="9"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="10"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>fread(dst,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">),<sp/>count,<sp/>f);</highlight></codeline>
+<codeline lineno="11"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(n<sp/>!=<sp/>count)<sp/>{</highlight></codeline>
+<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(ferror(f))<sp/>{</highlight></codeline>
+<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;ck_model_load_weights_flat:<sp/>fread<sp/>error:<sp/>%s\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
+<codeline lineno="14"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>strerror(errno));</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;ck_model_load_weights_flat:<sp/>unexpected<sp/>EOF<sp/>(wanted<sp/>%zu<sp/>floats,<sp/>got<sp/>%zu)\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>count,<sp/>n);</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="22"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24" refid="ckernel__model_8h_1a408dbae8dc539ddfe04ee35f35c9257d" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__model__load_8c_1a408dbae8dc539ddfe04ee35f35c9257d" kindref="member">ck_model_load_weights_flat</ref>(<ref refid="structTransformerModel" kindref="compound">TransformerModel</ref><sp/>*m,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*path)</highlight></codeline>
+<codeline lineno="25"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!m<sp/>||<sp/>!m-&gt;<ref refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" kindref="member">memory_base</ref><sp/>||<sp/>!path)<sp/>{</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;ck_model_load_weights_flat:<sp/>invalid<sp/>arguments\n&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE<sp/>*f<sp/>=<sp/>fopen(path,<sp/></highlight><highlight class="stringliteral">&quot;rb&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!f)<sp/>{</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;ck_model_load_weights_flat:<sp/>failed<sp/>to<sp/>open<sp/>%s:<sp/>%s\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>path,<sp/>strerror(errno));</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>magic[8];</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fread(magic,<sp/>1,<sp/>8,<sp/>f)<sp/>==<sp/>8)<sp/>{</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(memcmp(magic,<sp/></highlight><highlight class="stringliteral">&quot;BUMPWGT2&quot;</highlight><highlight class="normal">,<sp/>8)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fseek(f,<sp/>128,<sp/>SEEK_SET)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(memcmp(magic,<sp/></highlight><highlight class="stringliteral">&quot;BUMPWGT3&quot;</highlight><highlight class="normal">,<sp/>8)<sp/>==<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fseek(f,<sp/>128,<sp/>SEEK_SET)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint32_t<sp/>dtype_len<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fread(&amp;dtype_len,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(uint32_t),<sp/>1,<sp/>f)<sp/>!=<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fseek(f,<sp/>(</highlight><highlight class="keywordtype">long</highlight><highlight class="normal">)dtype_len,<sp/>SEEK_CUR)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fseek(f,<sp/>0,<sp/>SEEK_SET)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/>}<sp/></highlight><highlight class="keywordflow">else</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(fseek(f,<sp/>0,<sp/>SEEK_SET)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>L<sp/><sp/><sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>.<ref refid="structCKModelConfig_1a01453afe2f69986d9ca04a10f7b9d0a4" kindref="member">num_layers</ref>;</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>H<sp/><sp/><sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>.<ref refid="structCKModelConfig_1afd04ffe4db48600b90f32904c49d73af" kindref="member">hidden_size</ref>;</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>Hff<sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>.<ref refid="structCKModelConfig_1a2da9b0b988ccf3b7117a611da5984d34" kindref="member">intermediate_size</ref>;</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>V<sp/><sp/><sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>.<ref refid="structCKModelConfig_1ad2b6c5944307859fe26f4d915d089027" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T<sp/><sp/><sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1af6538865812c32df1cbd785b2d40e370" kindref="member">cfg</ref>.<ref refid="structCKModelConfig_1a18a327829d25405e92ba46a79009b89f" kindref="member">context_window</ref>;</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(L<sp/>&lt;=<sp/>0<sp/>||<sp/>H<sp/>&lt;=<sp/>0<sp/>||<sp/>Hff<sp/>&lt;=<sp/>0<sp/>||<sp/>V<sp/>&lt;=<sp/>0<sp/>||<sp/>T<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;ck_model_load_weights_flat:<sp/>invalid<sp/>model<sp/>cfg<sp/>(L=%d,<sp/>H=%d,<sp/>Hff=%d,<sp/>V=%d,<sp/>T=%d)\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>L,<sp/>H,<sp/>Hff,<sp/>V,<sp/>T);</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/>uint8_t<sp/>*base<sp/>=<sp/>m-&gt;<ref refid="structTransformerModel_1a955d1efe9f4e9e8bedca00a5a85a5d18" kindref="member">memory_base</ref>;</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>1)<sp/>Token<sp/>embeddings<sp/>[V<sp/>×<sp/>H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>m-&gt;<ref refid="structTransformerModel_1a5e14c6be5365203ff62022d605db1672" kindref="member">token_emb_offset</ref>),</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)V<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"></highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>2)<sp/>Positional<sp/>embeddings<sp/>[T<sp/>×<sp/>H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>m-&gt;<ref refid="structTransformerModel_1a79f34fccbab0e1d127d521b03df5b327" kindref="member">pos_emb_offset</ref>),</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)T<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"></highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>3)<sp/>Per-layer<sp/>weights<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>layer<sp/>=<sp/>0;<sp/>layer<sp/>&lt;<sp/>L;<sp/>++layer)<sp/>{</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKLayerLayout" kindref="compound">CKLayerLayout</ref><sp/>*Lyt<sp/>=<sp/>&amp;m-&gt;<ref refid="structTransformerModel_1aac7b4631a17af2e961d211f4bcccb134" kindref="member">layers</ref>[layer];</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"></highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>LN1<sp/>gamma<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1a88394643f188ea8b549cfc62b84c69a3" kindref="member">ln1_weight_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>LN1<sp/>beta<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1ac37e13c1afa44111c2b2f1b38bdab7de" kindref="member">ln1_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"></highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>QKV<sp/>weight<sp/>[H<sp/>×<sp/>3H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1aa04c864979d24512fe185bd224f2e851" kindref="member">qkv_weight_offset</ref>),</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)(3<sp/>*<sp/>H))<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>QKV<sp/>bias<sp/>[3H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1a284fb7cde23a33d443234aeb3d34f1aa" kindref="member">qkv_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)(3<sp/>*<sp/>H))<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"></highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Attention<sp/>proj<sp/>weight<sp/>[H<sp/>×<sp/>H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1ace90b671a13ec6e8cb08fac170a25038" kindref="member">attn_proj_weight_offset</ref>),</highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="131"><highlight class="normal"></highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Attention<sp/>proj<sp/>bias<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1aaece9ea1e0a761b00bdce132c24aa6a0" kindref="member">attn_proj_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC1<sp/>weight<sp/>[H<sp/>×<sp/>Hff]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1a3a1977e0da6a02b0ac3c589fd26a8387" kindref="member">fc1_weight_offset</ref>),</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)Hff)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC1<sp/>bias<sp/>[Hff]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1a38798910bd66aeaa0eb43aa696197c10" kindref="member">fc1_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)Hff)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"></highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC2<sp/>weight<sp/>[Hff<sp/>×<sp/>H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1a361610425e7a88f29595253c4b6f833d" kindref="member">fc2_weight_offset</ref>),</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)Hff<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC2<sp/>bias<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>Lyt-&gt;<ref refid="structCKLayerLayout_1accc0cc61e693a25dfa5e140f91534dc6" kindref="member">fc2_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>4)<sp/>Final<sp/>LN<sp/>gamma<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>m-&gt;<ref refid="structTransformerModel_1a08ba885dfade40a3910ffba35076a1a3" kindref="member">final_ln_weight_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"></highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>5)<sp/>Final<sp/>LN<sp/>beta<sp/>[H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="172"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>m-&gt;<ref refid="structTransformerModel_1a4a924d843ebdc352caa809c1f72b1838" kindref="member">final_ln_bias_offset</ref>),<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="176"><highlight class="normal"></highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>6)<sp/>LM<sp/>head<sp/>weight<sp/>[V<sp/>×<sp/>H]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__model__load_8c_1a691b1787a9c074fee7219cad5b2f22a4" kindref="member">read_floats</ref>(f,<sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)(base<sp/>+<sp/>m-&gt;<ref refid="structTransformerModel_1a04378052961669504042e717e3219736" kindref="member">lm_head_weight_offset</ref>),</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)V<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)H)<sp/>!=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"></highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="186"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_model_load.c"/>
+  </compounddef>
+</doxygen>

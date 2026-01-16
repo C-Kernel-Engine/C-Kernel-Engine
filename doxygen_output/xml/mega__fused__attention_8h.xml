@@ -1,0 +1,907 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="mega__fused__attention_8h" kind="file" language="C++">
+    <compoundname>mega_fused_attention.h</compoundname>
+    <includes local="no">stdint.h</includes>
+    <incdepgraph>
+      <node id="1">
+        <label>mega_fused_attention.h</label>
+        <link refid="mega__fused__attention_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="mega__fused__attention_8h_1af5a9a3482344942ff204ca604ac1715b" prot="public" static="no">
+        <name>MEGA_FUSE_KV_TILE</name>
+        <initializer>64</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="34" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" bodystart="34" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="mega__fused__attention_8h_1abddf5082728f226c8888fc95c14b7e24" prot="public" static="no">
+        <name>MEGA_FUSE_Q_TILE</name>
+        <initializer>64</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="30" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" bodystart="30" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="mega__fused__attention_8h_1a78cea35e8b996807df22a050b01c3471" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fuse_get_optimal_tiles</definition>
+        <argsstring>(int *q_tile, int *kv_tile, int head_dim)</argsstring>
+        <name>mega_fuse_get_optimal_tiles</name>
+        <param>
+          <type>int *</type>
+          <declname>q_tile</declname>
+        </param>
+        <param>
+          <type>int *</type>
+          <declname>kv_tile</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <briefdescription>
+<para>Get optimal tile sizes for current CPU. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="177" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="177" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="mega__fused__attention_8h_1a37f0664c9146b0e5a80624fdaffbb1f5" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fuse_report_stats</definition>
+        <argsstring>(int hidden, int num_layers, int seq_len)</argsstring>
+        <name>mega_fuse_report_stats</name>
+        <param>
+          <type>int</type>
+          <declname>hidden</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_layers</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>seq_len</declname>
+        </param>
+        <briefdescription>
+<para>Report memory savings from mega-fusion. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="186" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="186" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="mega__fused__attention_8h_1aeeb0cc88f51b1af24d80deeea9bae2b4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fuse_rmsnorm_qkv</definition>
+        <argsstring>(float *q_out, float *k_out, float *v_out, const float *input, const float *gamma, const float *W_qkv, const float *b_qkv, int hidden, int num_heads, int num_kv_heads, int head_dim, float eps)</argsstring>
+        <name>mega_fuse_rmsnorm_qkv</name>
+        <param>
+          <type>float *</type>
+          <declname>q_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>k_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>v_out</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>gamma</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>b_qkv</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>hidden</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+<para>Phase 1: Fused RMSNorm + QKV (intermediates in registers) </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Simpler step: Just fuse RMSNorm with QKV projection. Q/K/V stay in stack buffers, not DRAM. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="135" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="135" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="mega__fused__attention_8h_1a45deca0f8d6b12dd912c6b76dd49d80c" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fuse_rmsnorm_qkv_rope</definition>
+        <argsstring>(float *q_out, float *k_out, float *v_out, const float *input, const float *gamma, const float *W_qkv, const float *b_qkv, const float *rope_cos, const float *rope_sin, int pos, int hidden, int num_heads, int num_kv_heads, int head_dim, int max_seq, float eps)</argsstring>
+        <name>mega_fuse_rmsnorm_qkv_rope</name>
+        <param>
+          <type>float *</type>
+          <declname>q_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>k_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>v_out</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>gamma</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>b_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_cos</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_sin</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>hidden</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>max_seq</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+<para>Phase 2: Fused RMSNorm + QKV + RoPE. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Q/K stay in output buffers, RoPE applied in-place. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="155" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="155" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="mega__fused__attention_8h_1a626ea4f03fa804f5db76618f0bcfb9a1" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fused_attention_decode</definition>
+        <argsstring>(float *output, const float *input, const float *residual, const float *W_qkv, const float *b_qkv, const float *W_o, const float *b_o, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int hidden, int num_heads, int num_kv_heads, int head_dim, int max_seq, float eps)</argsstring>
+        <name>mega_fused_attention_decode</name>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>residual</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>b_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_o</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>b_o</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>kv_cache_k</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>kv_cache_v</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_cos</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_sin</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>hidden</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>max_seq</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+<para>Mega-fused attention for decode mode (single token) </para>
+        </briefdescription>
+        <detaileddescription>
+<para>This is the &quot;holy grail&quot; - all operations fused, no intermediates to DRAM.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>output</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output [hidden] - single DRAM write </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>input</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input [hidden] - single DRAM read </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>residual</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Residual input [hidden] - read for residual add </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W_qkv</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>QKV weight matrix [3*hidden, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>b_qkv</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>QKV bias [3*hidden] (or NULL) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W_o</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output projection weight [hidden, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>b_o</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output bias [hidden] (or NULL) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>kv_cache_k</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>KV cache for K [seq, hidden_kv] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>kv_cache_v</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>KV cache for V [seq, hidden_kv] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>rope_cos</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RoPE cos [max_seq, head_dim/2] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>rope_sin</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RoPE sin [max_seq, head_dim/2] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>pos</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Current position in sequence </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>hidden</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Model hidden dimension </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of attention heads </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_kv_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of KV heads (for GQA) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>head_dim</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Head dimension </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>max_seq</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Maximum sequence length (for RoPE) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>eps</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RMSNorm epsilon </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="65" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="65" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="mega__fused__attention_8h_1ab29476f695d711722430d9a03ad2072e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mega_fused_attention_prefill</definition>
+        <argsstring>(float *output, const float *input, const float *residual, const float *W_qkv, const float *W_o, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int start_pos, int tokens, int total_kv_len, int hidden, int num_heads, int num_kv_heads, int head_dim, int max_seq, float eps)</argsstring>
+        <name>mega_fused_attention_prefill</name>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>residual</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_qkv</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>W_o</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>kv_cache_k</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>kv_cache_v</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_cos</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>rope_sin</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>start_pos</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>total_kv_len</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>hidden</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>max_seq</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+<para>Mega-fused attention for prefill mode (multiple tokens) </para>
+        </briefdescription>
+        <detaileddescription>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>output</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output [tokens, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>input</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input [tokens, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>residual</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Residual input [tokens, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W_qkv</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>QKV weight matrix [3*hidden, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>W_o</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output projection weight [hidden, hidden] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>kv_cache_k</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>KV cache for K [seq, hidden_kv] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>kv_cache_v</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>KV cache for V [seq, hidden_kv] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>rope_cos</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RoPE cos [max_seq, head_dim/2] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>rope_sin</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RoPE sin [max_seq, head_dim/2] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>start_pos</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Starting position in KV cache </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>tokens</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of tokens to process </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>total_kv_len</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Total KV cache length </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>hidden</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Model hidden dimension </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of attention heads </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_kv_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of KV heads </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>head_dim</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Head dimension </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>max_seq</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Maximum sequence length </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>eps</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RMSNorm epsilon </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" line="108" column="6" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h" declline="108" declcolumn="6"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Mega-Fused Attention Kernel. </para>
+    </briefdescription>
+    <detaileddescription>
+<para>Holy grail fusion: RMSNorm → QKV → RoPE → Flash Attention → OutProj</para>
+<para>All intermediates stay in registers/L1/L2. Single DRAM round-trip.</para>
+<para>Memory Reduction: Before: ~32KB intermediates per layer (stack/heap) After: ~8KB total (input + output only) Reduction: 4-5× per layer, ~100× for full model</para>
+<para>Performance Target: Move from memory-bound to compute-bound Expected speedup: 5-10× for attention-heavy workloads </para>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>mega_fused_attention.h</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Mega-Fused<sp/>Attention<sp/>Kernel</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Holy<sp/>grail<sp/>fusion:<sp/>RMSNorm<sp/>→<sp/>QKV<sp/>→<sp/>RoPE<sp/>→<sp/>Flash<sp/>Attention<sp/>→<sp/>OutProj</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>All<sp/>intermediates<sp/>stay<sp/>in<sp/>registers/L1/L2.<sp/>Single<sp/>DRAM<sp/>round-trip.</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>Memory<sp/>Reduction:</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Before:<sp/>~32KB<sp/>intermediates<sp/>per<sp/>layer<sp/>(stack/heap)</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/><sp/><sp/>After:<sp/><sp/>~8KB<sp/>total<sp/>(input<sp/>+<sp/>output<sp/>only)</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Reduction:<sp/>4-5×<sp/>per<sp/>layer,<sp/>~100×<sp/>for<sp/>full<sp/>model</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/>Performance<sp/>Target:</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Move<sp/>from<sp/>memory-bound<sp/>to<sp/>compute-bound</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Expected<sp/>speedup:<sp/>5-10×<sp/>for<sp/>attention-heavy<sp/>workloads</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>MEGA_FUSED_ATTENTION_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MEGA_FUSED_ATTENTION_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="comment">/*============================================================================</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/>Configuration</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*============================================================================*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Tile<sp/>sizes<sp/>for<sp/>streaming<sp/>through<sp/>cache<sp/>hierarchy<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>MEGA_FUSE_Q_TILE</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="30" refid="mega__fused__attention_8h_1abddf5082728f226c8888fc95c14b7e24" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MEGA_FUSE_Q_TILE<sp/>64</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>MEGA_FUSE_KV_TILE</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="34" refid="mega__fused__attention_8h_1af5a9a3482344942ff204ca604ac1715b" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MEGA_FUSE_KV_TILE<sp/>64</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="comment">/*============================================================================</highlight></codeline>
+<codeline lineno="38"><highlight class="comment"><sp/>*<sp/>Mega-Fused<sp/>Attention<sp/>API</highlight></codeline>
+<codeline lineno="39"><highlight class="comment"><sp/>*============================================================================*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="41"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="42"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Mega-fused<sp/>attention<sp/>for<sp/>decode<sp/>mode<sp/>(single<sp/>token)</highlight></codeline>
+<codeline lineno="43"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="44"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>the<sp/>&quot;holy<sp/>grail&quot;<sp/>-<sp/>all<sp/>operations<sp/>fused,<sp/>no<sp/>intermediates<sp/>to<sp/>DRAM.</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*<sp/>@param<sp/>output<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Output<sp/>[hidden]<sp/>-<sp/>single<sp/>DRAM<sp/>write</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*<sp/>@param<sp/>input<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Input<sp/>[hidden]<sp/>-<sp/>single<sp/>DRAM<sp/>read</highlight></codeline>
+<codeline lineno="48"><highlight class="comment"><sp/>*<sp/>@param<sp/>residual<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Residual<sp/>input<sp/>[hidden]<sp/>-<sp/>read<sp/>for<sp/>residual<sp/>add</highlight></codeline>
+<codeline lineno="49"><highlight class="comment"><sp/>*<sp/>@param<sp/>W_qkv<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>QKV<sp/>weight<sp/>matrix<sp/>[3*hidden,<sp/>hidden]</highlight></codeline>
+<codeline lineno="50"><highlight class="comment"><sp/>*<sp/>@param<sp/>b_qkv<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>QKV<sp/>bias<sp/>[3*hidden]<sp/>(or<sp/>NULL)</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/>@param<sp/>W_o<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Output<sp/>projection<sp/>weight<sp/>[hidden,<sp/>hidden]</highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*<sp/>@param<sp/>b_o<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Output<sp/>bias<sp/>[hidden]<sp/>(or<sp/>NULL)</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>@param<sp/>kv_cache_k<sp/><sp/><sp/><sp/><sp/><sp/><sp/>KV<sp/>cache<sp/>for<sp/>K<sp/>[seq,<sp/>hidden_kv]</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*<sp/>@param<sp/>kv_cache_v<sp/><sp/><sp/><sp/><sp/><sp/><sp/>KV<sp/>cache<sp/>for<sp/>V<sp/>[seq,<sp/>hidden_kv]</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*<sp/>@param<sp/>rope_cos<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RoPE<sp/>cos<sp/>[max_seq,<sp/>head_dim/2]</highlight></codeline>
+<codeline lineno="56"><highlight class="comment"><sp/>*<sp/>@param<sp/>rope_sin<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RoPE<sp/>sin<sp/>[max_seq,<sp/>head_dim/2]</highlight></codeline>
+<codeline lineno="57"><highlight class="comment"><sp/>*<sp/>@param<sp/>pos<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Current<sp/>position<sp/>in<sp/>sequence</highlight></codeline>
+<codeline lineno="58"><highlight class="comment"><sp/>*<sp/>@param<sp/>hidden<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Model<sp/>hidden<sp/>dimension</highlight></codeline>
+<codeline lineno="59"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_heads<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>attention<sp/>heads</highlight></codeline>
+<codeline lineno="60"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_kv_heads<sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>KV<sp/>heads<sp/>(for<sp/>GQA)</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*<sp/>@param<sp/>head_dim<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Head<sp/>dimension</highlight></codeline>
+<codeline lineno="62"><highlight class="comment"><sp/>*<sp/>@param<sp/>max_seq<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Maximum<sp/>sequence<sp/>length<sp/>(for<sp/>RoPE)</highlight></codeline>
+<codeline lineno="63"><highlight class="comment"><sp/>*<sp/>@param<sp/>eps<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RMSNorm<sp/>epsilon</highlight></codeline>
+<codeline lineno="64"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65" refid="mega__fused__attention_8h_1a626ea4f03fa804f5db76618f0bcfb9a1" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1a626ea4f03fa804f5db76618f0bcfb9a1" kindref="member">mega_fused_attention_decode</ref>(</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*residual,</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_qkv,</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b_qkv,</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_o,</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b_o,</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*kv_cache_k,</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*kv_cache_v,</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_cos,</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_sin,</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos,</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hidden,</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_seq,</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps</highlight></codeline>
+<codeline lineno="84"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="86"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="87"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Mega-fused<sp/>attention<sp/>for<sp/>prefill<sp/>mode<sp/>(multiple<sp/>tokens)</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*<sp/>@param<sp/>output<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Output<sp/>[tokens,<sp/>hidden]</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*<sp/>@param<sp/>input<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Input<sp/>[tokens,<sp/>hidden]</highlight></codeline>
+<codeline lineno="91"><highlight class="comment"><sp/>*<sp/>@param<sp/>residual<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Residual<sp/>input<sp/>[tokens,<sp/>hidden]</highlight></codeline>
+<codeline lineno="92"><highlight class="comment"><sp/>*<sp/>@param<sp/>W_qkv<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>QKV<sp/>weight<sp/>matrix<sp/>[3*hidden,<sp/>hidden]</highlight></codeline>
+<codeline lineno="93"><highlight class="comment"><sp/>*<sp/>@param<sp/>W_o<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Output<sp/>projection<sp/>weight<sp/>[hidden,<sp/>hidden]</highlight></codeline>
+<codeline lineno="94"><highlight class="comment"><sp/>*<sp/>@param<sp/>kv_cache_k<sp/><sp/><sp/><sp/><sp/><sp/><sp/>KV<sp/>cache<sp/>for<sp/>K<sp/>[seq,<sp/>hidden_kv]</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*<sp/>@param<sp/>kv_cache_v<sp/><sp/><sp/><sp/><sp/><sp/><sp/>KV<sp/>cache<sp/>for<sp/>V<sp/>[seq,<sp/>hidden_kv]</highlight></codeline>
+<codeline lineno="96"><highlight class="comment"><sp/>*<sp/>@param<sp/>rope_cos<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RoPE<sp/>cos<sp/>[max_seq,<sp/>head_dim/2]</highlight></codeline>
+<codeline lineno="97"><highlight class="comment"><sp/>*<sp/>@param<sp/>rope_sin<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RoPE<sp/>sin<sp/>[max_seq,<sp/>head_dim/2]</highlight></codeline>
+<codeline lineno="98"><highlight class="comment"><sp/>*<sp/>@param<sp/>start_pos<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Starting<sp/>position<sp/>in<sp/>KV<sp/>cache</highlight></codeline>
+<codeline lineno="99"><highlight class="comment"><sp/>*<sp/>@param<sp/>tokens<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>tokens<sp/>to<sp/>process</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*<sp/>@param<sp/>total_kv_len<sp/><sp/><sp/><sp/><sp/>Total<sp/>KV<sp/>cache<sp/>length</highlight></codeline>
+<codeline lineno="101"><highlight class="comment"><sp/>*<sp/>@param<sp/>hidden<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Model<sp/>hidden<sp/>dimension</highlight></codeline>
+<codeline lineno="102"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_heads<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>attention<sp/>heads</highlight></codeline>
+<codeline lineno="103"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_kv_heads<sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>KV<sp/>heads</highlight></codeline>
+<codeline lineno="104"><highlight class="comment"><sp/>*<sp/>@param<sp/>head_dim<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Head<sp/>dimension</highlight></codeline>
+<codeline lineno="105"><highlight class="comment"><sp/>*<sp/>@param<sp/>max_seq<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Maximum<sp/>sequence<sp/>length</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*<sp/>@param<sp/>eps<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RMSNorm<sp/>epsilon</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="108" refid="mega__fused__attention_8h_1ab29476f695d711722430d9a03ad2072e" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1ab29476f695d711722430d9a03ad2072e" kindref="member">mega_fused_attention_prefill</ref>(</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*residual,</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_qkv,</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_o,</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*kv_cache_k,</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*kv_cache_v,</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_cos,</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_sin,</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>start_pos,</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>total_kv_len,</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hidden,</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_seq,</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps</highlight></codeline>
+<codeline lineno="127"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="128"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="129"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="130"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Phase<sp/>1:<sp/>Fused<sp/>RMSNorm<sp/>+<sp/>QKV<sp/>(intermediates<sp/>in<sp/>registers)</highlight></codeline>
+<codeline lineno="131"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="132"><highlight class="comment"><sp/>*<sp/>Simpler<sp/>step:<sp/>Just<sp/>fuse<sp/>RMSNorm<sp/>with<sp/>QKV<sp/>projection.</highlight></codeline>
+<codeline lineno="133"><highlight class="comment"><sp/>*<sp/>Q/K/V<sp/>stay<sp/>in<sp/>stack<sp/>buffers,<sp/>not<sp/>DRAM.</highlight></codeline>
+<codeline lineno="134"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="135" refid="mega__fused__attention_8h_1aeeb0cc88f51b1af24d80deeea9bae2b4" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1aeeb0cc88f51b1af24d80deeea9bae2b4" kindref="member">mega_fuse_rmsnorm_qkv</ref>(</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*q_out,<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>[num_heads<sp/>*<sp/>head_dim]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k_out,<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>[num_kv_heads<sp/>*<sp/>head_dim]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*v_out,<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>[num_kv_heads<sp/>*<sp/>head_dim]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>[hidden]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*gamma,<sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>[hidden]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_qkv,</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b_qkv,</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hidden,</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps</highlight></codeline>
+<codeline lineno="148"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="150"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="151"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Phase<sp/>2:<sp/>Fused<sp/>RMSNorm<sp/>+<sp/>QKV<sp/>+<sp/>RoPE</highlight></codeline>
+<codeline lineno="152"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="153"><highlight class="comment"><sp/>*<sp/>Q/K<sp/>stay<sp/>in<sp/>output<sp/>buffers,<sp/>RoPE<sp/>applied<sp/>in-place.</highlight></codeline>
+<codeline lineno="154"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="155" refid="mega__fused__attention_8h_1a45deca0f8d6b12dd912c6b76dd49d80c" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1a45deca0f8d6b12dd912c6b76dd49d80c" kindref="member">mega_fuse_rmsnorm_qkv_rope</ref>(</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*q_out,</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k_out,</highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*v_out,</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*gamma,</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*W_qkv,</highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b_qkv,</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_cos,</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rope_sin,</highlight></codeline>
+<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos,</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hidden,</highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>max_seq,</highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps</highlight></codeline>
+<codeline lineno="172"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="173"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="174"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="175"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Get<sp/>optimal<sp/>tile<sp/>sizes<sp/>for<sp/>current<sp/>CPU</highlight></codeline>
+<codeline lineno="176"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="177" refid="mega__fused__attention_8h_1a78cea35e8b996807df22a050b01c3471" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1a78cea35e8b996807df22a050b01c3471" kindref="member">mega_fuse_get_optimal_tiles</ref>(</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>*q_tile,<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Output:<sp/>Q<sp/>tile<sp/>size</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>*kv_tile,<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Output:<sp/>KV<sp/>tile<sp/>size</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim</highlight></codeline>
+<codeline lineno="181"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="183"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="184"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Report<sp/>memory<sp/>savings<sp/>from<sp/>mega-fusion</highlight></codeline>
+<codeline lineno="185"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="186" refid="mega__fused__attention_8h_1a37f0664c9146b0e5a80624fdaffbb1f5" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mega__fused__attention_8h_1a37f0664c9146b0e5a80624fdaffbb1f5" kindref="member">mega_fuse_report_stats</ref>(</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>hidden,</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_layers,</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>seq_len</highlight></codeline>
+<codeline lineno="190"><highlight class="normal">);</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"></highlight></codeline>
+<codeline lineno="192"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>MEGA_FUSED_ATTENTION_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/mega_fused_attention.h"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,407 @@
+<!-- TITLE: Getting Started -->
+<!-- NAV: quickstart -->
+
+<h1>Getting Started</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Quick Start Guide</strong><br>
+        This page covers installation, building, and running C-Kernel-Engine from source.
+    </div>
+</div>
+
+<nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#building">Building</a></li>
+        <li><a href="#make-targets">Make Targets Reference</a></li>
+        <li><a href="#prefill-decode">Prefill + Decode (KV Cache)</a></li>
+        <li><a href="#first-run">Your First Run</a></li>
+        <li><a href="#training-parity">Training Parity Test</a></li>
+        <li><a href="#profiling-quick">Quick Profiling</a></li>
+    </ul>
+</nav>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Required</h3>
+    <pre># C compiler with OpenMP support
+sudo apt install build-essential
+
+# Python 3 with NumPy and PyTorch (for parity tests)
+pip install numpy torch</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Optional (for profiling)</h3>
+    <pre># Valgrind (memory profiling)
+sudo apt install valgrind
+
+# perf (CPU profiling)
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+
+# Enable perf for non-root users
+echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+
+# FlameGraph (visualization) - clone to ~/Programs
+git clone https://github.com/brendangregg/FlameGraph.git ~/Programs/FlameGraph</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Optional (for documentation)</h3>
+    <pre># Doxygen (API docs generation)
+sudo apt install doxygen</pre>
+</div>
+
+<h2 id="building">Building</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Basic Build</h3>
+    <pre># Clone the repository
+git clone https://github.com/antshiv/C-Kernel-Engine.git
+cd C-Kernel-Engine
+
+# Build the main library
+make
+
+# Build the IR + codegen tool (HF config.json -> generated C)
+make build/ck_ir_demo
+
+# Optional: build the orchestrator CLI ("ck")
+make ck-cli</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Build Options</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>CC</code></td><td>gcc</td><td>C compiler</td></tr>
+            <tr><td><code>AVX_FLAGS</code></td><td>auto-detected</td><td>SIMD flags (-mavx512f, -mavx2, -mavx, or empty)</td></tr>
+            <tr><td><code>CFLAGS</code></td><td>-O3 -fPIC -fopenmp -Wall</td><td>Compiler flags</td></tr>
+        </tbody>
+    </table>
+    <pre># Build without SIMD (scalar reference implementation)
+make AVX_FLAGS=
+
+# Force AVX2
+make AVX_FLAGS="-mavx2"
+
+# Debug build with symbols
+make CFLAGS="-O0 -g -fPIC -fopenmp -Wall"</pre>
+</div>
+
+<h2 id="make-targets">Make Targets Reference</h2>
+
+<h3>Building</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Target</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>make</code> or <code>make all</code></td>
+                <td>Build the main library (<code>build/libckernel_engine.so</code>)</td>
+            </tr>
+            <tr>
+                <td><code>make build/ck_ir_demo</code></td>
+                <td>Build the IR + codegen tool</td>
+            </tr>
+            <tr>
+                <td><code>make ck-cli</code></td>
+                <td>Build the orchestrator CLI (<code>build/ck</code>)</td>
+            </tr>
+            <tr>
+                <td><code>make test-libs</code></td>
+                <td>Build per-kernel shared libraries for Python tests</td>
+            </tr>
+            <tr>
+                <td><code>make clean</code></td>
+                <td>Remove all built files in <code>build/</code></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>Testing</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Target</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>make test</code></td>
+                <td>Run all Python kernel unit tests (GELU, RMSNorm, Attention, etc.)</td>
+            </tr>
+            <tr>
+                <td><code>make test-bf16</code></td>
+                <td>Run BF16 kernel unit tests (skips on unsupported CPUs)</td>
+            </tr>
+            <tr>
+                <td><code>make tests-list</code></td>
+                <td>Print the full list of Python kernel tests</td>
+            </tr>
+            <tr>
+                <td><code>make test-quick</code></td>
+                <td>Quick comprehensive tests (&lt;1 min) - tiny models, basic configs</td>
+            </tr>
+            <tr>
+                <td><code>make test-full</code></td>
+                <td>Full comprehensive tests (5-10 min) - GQA, medium, deep, wide models</td>
+            </tr>
+            <tr>
+                <td><code>make test-stress</code></td>
+                <td>Stress tests (10+ min) - convergence and overfit tests</td>
+            </tr>
+            <tr>
+                <td><code>make all-tests</code></td>
+                <td>Run kernel tests + layer parity + tiny parity (safe defaults)</td>
+            </tr>
+            <tr>
+                <td><code>make layer-parity</code></td>
+                <td>Test single decoder layer forward pass vs PyTorch</td>
+            </tr>
+            <tr>
+                <td><code>make tiny-parity</code></td>
+                <td>Test full model training parity vs PyTorch</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>End-to-End</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Target</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>make tiny-e2e</code></td>
+                <td>Generate random weights/tokens, run tiny model forward pass</td>
+            </tr>
+            <tr>
+                <td><code>make tiny-train</code></td>
+                <td>Generate random data, run forward + backward + SGD update</td>
+            </tr>
+            <tr>
+                <td><code>make small-e2e</code></td>
+                <td>Same as tiny-e2e but with ~10MB model</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>Code Generation</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Target</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>make ck</code></td>
+                <td>Run IR demo with default config, print forward/backward IR</td>
+            </tr>
+            <tr>
+                <td><code>make emit CONFIG=path OUT=path</code></td>
+                <td>Generate C runtime from config JSON</td>
+            </tr>
+            <tr>
+                <td><code>make gen-specs</code></td>
+                <td>Regenerate kernel specs from kernel_maps/*.json</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3>Profiling</h3>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr><th>Target</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>make profile-memory</code></td>
+                <td>Run Valgrind memcheck - detect memory leaks</td>
+            </tr>
+            <tr>
+                <td><code>make profile-heap</code></td>
+                <td>Run Valgrind massif - track heap usage over time</td>
+            </tr>
+            <tr>
+                <td><code>make profile-cpu</code></td>
+                <td>Run perf record - CPU profiling</td>
+            </tr>
+            <tr>
+                <td><code>make profile-cache</code></td>
+                <td>Run Valgrind cachegrind - cache miss analysis</td>
+            </tr>
+            <tr>
+                <td><code>make flamegraph</code></td>
+                <td>Generate SVG flamegraph from perf data</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2 id="prefill-decode">Prefill + Decode (KV Cache)</h2>
+
+<p>For autoregressive inference, the generated runtime supports a fast <strong>prefill → decode</strong> mode using a per-layer KV cache.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Generate a <code>libmodel.so</code> (library mode)</h3>
+    <pre># Generate a model runtime with an exported C ABI (dlopen/ctypes)
+./build/ck_ir_demo path/to/config.json --emit build/model.c --emit-lib
+
+# Compile into a self-contained shared library (link kernel sources from the manifest)
+cc -O3 -fPIC -fopenmp -shared -Iinclude -o build/libmodel.so build/model.c $(cat build/model.c.kernels) -lm</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Inference Call Sequence</h3>
+    <pre># 1) Init weights
+ck_model_init("weights.bump");
+
+# 2) Enable KV cache (inference-only)
+ck_model_kv_cache_enable(context_window);
+
+# 3) Prefill prompt (full forward once)
+ck_model_embed_tokens(prompt_tokens, n);
+ck_model_forward(NULL);
+
+# 4) Decode tokens (one token per step, uses KV cache)
+ck_model_decode(next_token, NULL);</pre>
+    <p>Training/backprop uses the full forward+backward path and does not use KV-cache decode.</p>
+</div>
+
+<h2 id="first-run">Your First Run</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Step 1: Build Everything</h3>
+    <pre>make all test-libs</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 2: Run Kernel Tests</h3>
+    <pre>make test</pre>
+    <p>This runs Python unit tests comparing each kernel (GELU, RMSNorm, Attention, etc.) against PyTorch reference implementations. You should see output like:</p>
+    <pre>Running unittest/test_gelu.py
+Testing GELU forward...  OK
+Testing GELU backward... OK
+...
+All Python kernel tests completed.</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 3: Run End-to-End</h3>
+    <pre>make tiny-e2e</pre>
+    <p>This:</p>
+    <ol>
+        <li>Generates a config for a tiny model (64 hidden, 2 layers, 256 vocab)</li>
+        <li>Generates random weights and input tokens</li>
+        <li>Runs the codegen to produce C code</li>
+        <li>Compiles and runs forward pass</li>
+        <li>Outputs logits to <code>build/tiny_logits.bin</code></li>
+    </ol>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 4: Run Codegen Demo</h3>
+    <pre>make ck</pre>
+    <p>This shows the IR (Intermediate Representation) that the engine generates:</p>
+    <pre>=== Forward IR ===
+CKIRGraph: layers=2, hidden_size=64 ...
+  L0 N0 RMSNORM       outputs=[L0:N0:0]   inputs=[IN]
+  L0 N1 LINEAR_QKV    outputs=[L0:N1:0]   inputs=[L0:N0]
+  L0 N2 ROPE          outputs=[L0:N2:0]   inputs=[L0:N1]
+  L0 N3 ATTENTION     outputs=[L0:N3:0]   inputs=[L0:N2]
+  ...</pre>
+</div>
+
+<h2 id="training-parity">Training Parity Test</h2>
+
+<p>The ultimate test: verify that our C kernels produce the same gradients and weight updates as PyTorch.</p>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Run Training Parity</h3>
+    <pre>make tiny-parity</pre>
+    <p>This runs training steps in both C and PyTorch, comparing:</p>
+    <ul>
+        <li>Forward pass outputs (logits)</li>
+        <li>Loss values (cross-entropy)</li>
+        <li>Gradients (backward pass)</li>
+        <li>Updated weights after SGD step</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Expected Output</h3>
+    <pre>$ make tiny-parity
+...
+Step 0: C loss=10.2345, PyTorch loss=10.2345, diff=1.2e-06
+Step 1: C loss=9.8765, PyTorch loss=9.8765, diff=1.1e-06
+...
+Max weight diff: 1.2e-05
+PASS: Training parity verified!</pre>
+</div>
+
+<h2 id="profiling-quick">Quick Profiling</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Memory Check</h3>
+    <pre>make profile-memory</pre>
+    <p>With our bump allocator, you should see:</p>
+    <pre>LEAK SUMMARY:
+   definitely lost: 0 bytes in 0 blocks  &lt;-- Clean!</pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">CPU Profile + Flamegraph</h3>
+    <pre># Enable perf first (one-time)
+echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+
+# Run profiler
+make profile-cpu
+
+# Generate flamegraph
+make flamegraph
+
+# View in browser
+firefox build/flamegraph.svg</pre>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">What to Expect in Profile</h3>
+    <p>For a transformer model:</p>
+    <ul>
+        <li><strong>Short context (64 tokens):</strong> GEMM dominates (~95%) - matrix multiply is the bottleneck</li>
+        <li><strong>Long context (4K+ tokens):</strong> Attention dominates - O(n²) attention scaling takes over</li>
+    </ul>
+    <p>This is normal and expected behavior for transformer architectures.</p>
+</div>
+
+<h2>Next Steps</h2>
+
+<ul>
+    <li><a href="architecture.html">Architecture Overview</a> - Understand the system design</li>
+    <li><a href="kernels.html">Kernel Reference</a> - All available kernels</li>
+    <li><a href="codegen.html">Code Generation</a> - How IR becomes C code</li>
+    <li><a href="pytorch-parity.html">PyTorch Parity</a> - Detailed parity testing</li>
+    <li><a href="profiling.html">Profiling Guide</a> - Advanced profiling techniques</li>
+</ul>

@@ -1,0 +1,293 @@
+<!-- TITLE: Architecture Decisions -->
+<!-- NAV: decisions -->
+
+<style>
+/* Collapsible ADR Styling - Dark Mode */
+details.adr {
+    background: var(--dark-card, #323232);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--grey, #454545);
+    overflow: hidden;
+}
+
+details.adr[open] {
+    border-color: var(--orange, #ffb400);
+    box-shadow: var(--shadow-md);
+}
+
+details.adr summary {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--dark-lighter, #363636) 0%, var(--dark-card, #323232) 100%);
+    border-bottom: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-weight: 600;
+    color: var(--orange, #ffb400);
+    list-style: none;
+}
+
+details.adr summary::-webkit-details-marker {
+    display: none;
+}
+
+details.adr summary::before {
+    content: "▶";
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+    color: var(--orange, #ffb400);
+}
+
+details.adr[open] summary::before {
+    transform: rotate(90deg);
+}
+
+details.adr[open] summary {
+    border-bottom: 2px solid var(--orange, #ffb400);
+    background: linear-gradient(135deg, var(--grey, #454545) 0%, var(--dark-lighter, #363636) 100%);
+}
+
+details.adr summary .adr-title {
+    flex: 1;
+}
+
+details.adr summary .adr-status {
+    font-size: 0.85rem;
+}
+
+details.adr .adr-content {
+    padding: 1.5rem;
+    background: var(--dark-card, #323232);
+}
+
+.adr-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    background: var(--dark-lighter, #363636);
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+    .adr-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .grid-2 { grid-template-columns: 1fr; }
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Dark mode cards inside ADRs */
+details.adr .card {
+    background: var(--dark-lighter, #363636);
+    border-color: var(--grey, #454545);
+}
+
+/* Alert boxes in dark mode */
+details.adr .alert-success {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: #22c55e;
+}
+
+details.adr .alert-warning {
+    background: rgba(255, 180, 0, 0.1);
+    border-color: var(--orange, #ffb400);
+}
+
+/* Code blocks in ADRs */
+details.adr pre {
+    background: var(--code-bg, #1a1a1a);
+    border: 1px solid var(--grey, #454545);
+}
+
+/* Pagination buttons - dark mode */
+.adr-page-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--grey, #454545);
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--dark-card, #323232);
+    color: var(--text-secondary, #b0b0b0);
+    transition: all 0.2s ease;
+}
+
+.adr-page-btn:hover:not(:disabled) {
+    background: var(--grey, #454545);
+    color: var(--white, #fff);
+}
+
+.adr-page-btn.active {
+    background: rgba(255, 180, 0, 0.2);
+    border-color: var(--orange, #ffb400);
+    color: var(--orange, #ffb400);
+}
+
+.adr-page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Search and filter inputs - dark mode */
+#adr-search, #adr-category, #adr-status {
+    background: var(--dark-card, #323232);
+    color: var(--text-primary, #f5f5f5);
+    border-color: var(--grey, #454545);
+}
+
+#adr-search::placeholder {
+    color: var(--text-muted, #808080);
+}
+
+/* Pipeline Flowchart - Dark Mode */
+.pipeline-flowchart {
+    background: var(--dark-card, #323232);
+    border: 1px solid var(--grey, #454545);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.pipeline-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text-muted, #808080);
+    margin-bottom: 1rem;
+}
+
+.pipeline-input {
+    background: var(--dark-lighter, #363636);
+    border: 1px solid var(--grey, #454545);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+}
+
+.pipeline-input code {
+    background: var(--code-bg, #1a1a1a);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--orange, #ffb400);
+}
+
+.pipeline-arrow {
+    color: var(--text-muted, #808080);
+    font-size: 1.2rem;
+    margin: 0.5rem 0;
+}
+
+.pipeline-stage {
+    background: var(--dark-lighter, #363636);
+    border: 1px solid var(--grey, #454545);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin: 0 auto;
+    max-width: 500px;
+    text-align: left;
+}
+
+.stage-header {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.stage-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted, #808080);
+    margin-bottom: 0.5rem;
+}
+
+.stage-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #b0b0b0);
+}
+
+/* Consequences Grid - Dark Mode */
+.consequences-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+    .consequences-grid { grid-template-columns: 1fr; }
+}
+
+.consequence-card {
+    background: var(--dark-lighter, #363636);
+    border: 1px solid var(--grey, #454545);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.consequence-card.benefit {
+    border-left: 3px solid #22c55e;
+}
+
+.consequence-card.cost {
+    border-left: 3px solid #ef4444;
+}
+
+.consequence-card h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+}
+
+.consequence-card.benefit h4 { color: #4ade80; }
+.consequence-card.cost h4 { color: #f87171; }
+
+.consequence-card ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.consequence-card li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary, #b0b0b0);
+}
+</style>
+
+<!-- ADR Container - JavaScript will render content here -->
+<div id="adr-container">
+    <div style="text-align: center; padding: 2rem; color: #64748b;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite; margin-bottom: 1rem;">
+            <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32"/>
+        </svg>
+        <p>Loading Architecture Decision Records...</p>
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<!-- Load the ADR Renderer -->
+<script src="assets/adr-renderer.js"></script>

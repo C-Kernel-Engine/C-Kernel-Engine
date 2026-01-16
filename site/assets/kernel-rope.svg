@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 400">
+  <defs>
+    <marker id="arrow5" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="850" height="400" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="425" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">RoPE: Rotary Position Embedding</text>
+
+  <!-- Input Q/K vectors -->
+  <g transform="translate(30, 70)">
+    <text x="40" y="-10" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Q or K</text>
+    <rect x="0" y="0" width="80" height="100" rx="4" fill="#2a2a2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="40" y="25" font-family="monospace" font-size="10" fill="#07adf8" text-anchor="middle">[H,T,d]</text>
+    <text x="40" y="50" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">d pairs:</text>
+    <text x="40" y="70" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">(x₀,x₁)</text>
+    <text x="40" y="85" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">(x₂,x₃)...</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="120" y1="120" x2="160" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow5)"/>
+
+  <!-- Split into pairs -->
+  <g transform="translate(170, 60)">
+    <rect x="0" y="0" width="100" height="120" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="50" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">Reshape</text>
+    <text x="50" y="50" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">to pairs</text>
+    <text x="50" y="75" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">[H,T,d/2,2]</text>
+    <text x="50" y="100" font-family="monospace" font-size="9" fill="#707070" text-anchor="middle">(xᵢ, xᵢ₊₁)</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="280" y1="120" x2="320" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow5)"/>
+
+  <!-- Position-dependent rotation -->
+  <g transform="translate(330, 50)">
+    <rect x="0" y="0" width="200" height="140" rx="6" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="100" y="25" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">2D Rotation per Pair</text>
+
+    <!-- Rotation matrix visualization -->
+    <text x="100" y="55" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">θₘ = m · θᵢ</text>
+    <text x="100" y="75" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">θᵢ = 10000^(-2i/d)</text>
+
+    <!-- Matrix -->
+    <text x="35" y="100" font-family="monospace" font-size="9" fill="#07adf8" text-anchor="middle">cos θₘ</text>
+    <text x="85" y="100" font-family="monospace" font-size="9" fill="#e74c3c" text-anchor="middle">-sin θₘ</text>
+    <text x="135" y="100" font-family="monospace" font-size="9" fill="#e74c3c" text-anchor="middle">sin θₘ</text>
+    <text x="175" y="100" font-family="monospace" font-size="9" fill="#07adf8" text-anchor="middle">cos θₘ</text>
+
+    <!-- Brackets -->
+    <text x="15" y="100" font-family="monospace" font-size="16" fill="#707070">[</text>
+    <text x="195" y="100" font-family="monospace" font-size="16" fill="#707070">]</text>
+
+    <text x="100" y="125" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">m = position, i = pair index</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="540" y1="120" x2="580" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow5)"/>
+
+  <!-- Apply rotation -->
+  <g transform="translate(590, 70)">
+    <rect x="0" y="0" width="120" height="100" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="60" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">Rotate</text>
+    <text x="60" y="50" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">x' = x·cos - y·sin</text>
+    <text x="60" y="70" font-family="monospace" font-size="9" fill="#b0b0b0" text-anchor="middle">y' = x·sin + y·cos</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="720" y1="120" x2="760" y2="120" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow5)"/>
+
+  <!-- Output -->
+  <g transform="translate(770, 70)">
+    <text x="35" y="-10" font-family="Inter, sans-serif" font-size="11" fill="#47b475" text-anchor="middle">Q' or K'</text>
+    <rect x="0" y="0" width="70" height="100" rx="4" fill="#1a3d2a" stroke="#47b475"/>
+    <text x="35" y="35" font-family="monospace" font-size="10" fill="#47b475" text-anchor="middle">[H,T,d]</text>
+    <text x="35" y="60" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">Position</text>
+    <text x="35" y="75" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">encoded</text>
+  </g>
+
+  <!-- Rotation visualization -->
+  <g transform="translate(50, 210)">
+    <rect x="0" y="0" width="180" height="150" rx="4" fill="#2a2a2a" stroke="#454545"/>
+    <text x="90" y="20" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">2D Rotation Visualization</text>
+
+    <!-- Axes -->
+    <line x1="90" y1="130" x2="90" y2="40" stroke="#454545" stroke-width="1"/>
+    <line x1="20" y1="90" x2="160" y2="90" stroke="#454545" stroke-width="1"/>
+
+    <!-- Original vector -->
+    <line x1="90" y1="90" x2="140" y2="60" stroke="#07adf8" stroke-width="2" marker-end="url(#arrow5)"/>
+    <text x="145" y="55" font-family="monospace" font-size="9" fill="#07adf8">(x,y)</text>
+
+    <!-- Rotated vector -->
+    <line x1="90" y1="90" x2="60" y2="50" stroke="#47b475" stroke-width="2" marker-end="url(#arrow5)"/>
+    <text x="45" y="45" font-family="monospace" font-size="9" fill="#47b475">(x',y')</text>
+
+    <!-- Rotation arc -->
+    <path d="M 115,75 A 30,30 0 0 0 80,65" fill="none" stroke="#ffb400" stroke-width="1" stroke-dasharray="3"/>
+    <text x="105" y="65" font-family="monospace" font-size="9" fill="#ffb400">θₘ</text>
+  </g>
+
+  <!-- Key insight -->
+  <g transform="translate(250, 210)">
+    <rect x="0" y="0" width="250" height="150" rx="6" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+    <text x="125" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Key Properties</text>
+
+    <text x="20" y="50" font-family="Inter, sans-serif" font-size="10" fill="#47b475">Relative position encoding:</text>
+    <text x="20" y="70" font-family="monospace" font-size="9" fill="#b0b0b0">q'ᵐ · k'ⁿ = f(xq, xk, m-n)</text>
+
+    <text x="20" y="95" font-family="Inter, sans-serif" font-size="10" fill="#47b475">Decay with distance:</text>
+    <text x="20" y="115" font-family="Inter, sans-serif" font-size="9" fill="#707070">Attention naturally decays for</text>
+    <text x="20" y="130" font-family="Inter, sans-serif" font-size="9" fill="#707070">distant tokens (no extra bias)</text>
+  </g>
+
+  <!-- Formulas -->
+  <g transform="translate(520, 210)">
+    <rect x="0" y="0" width="300" height="150" rx="6" fill="#2a2a2a" stroke="#454545"/>
+    <text x="150" y="22" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Forward & Backward</text>
+
+    <text x="15" y="45" font-family="Inter, sans-serif" font-size="10" fill="#07adf8">Forward:</text>
+    <text x="15" y="62" font-family="monospace" font-size="10" fill="#b0b0b0">x'₂ᵢ = x₂ᵢ·cos(mθᵢ) - x₂ᵢ₊₁·sin(mθᵢ)</text>
+    <text x="15" y="79" font-family="monospace" font-size="10" fill="#b0b0b0">x'₂ᵢ₊₁ = x₂ᵢ·sin(mθᵢ) + x₂ᵢ₊₁·cos(mθᵢ)</text>
+
+    <text x="15" y="105" font-family="Inter, sans-serif" font-size="10" fill="#e74c3c">Backward (rotate by -θ):</text>
+    <text x="15" y="122" font-family="monospace" font-size="10" fill="#b0b0b0">∂L/∂x₂ᵢ = ∂L/∂x'₂ᵢ·cos + ∂L/∂x'₂ᵢ₊₁·sin</text>
+    <text x="15" y="139" font-family="monospace" font-size="10" fill="#b0b0b0">∂L/∂x₂ᵢ₊₁ = -∂L/∂x'₂ᵢ·sin + ∂L/∂x'₂ᵢ₊₁·cos</text>
+  </g>
+
+  <!-- Base frequency note -->
+  <text x="425" y="385" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">θ base = 10000 (configurable via rope_theta), frequencies decrease for higher dimension pairs</text>
+</svg>

@@ -1,0 +1,154 @@
+<!-- TITLE: ADR-0003 Mode-Specific Buffers -->
+<!-- NAV: adr -->
+
+<h1>ADR-0003: Mode-Specific Buffers (Prefill/Decode/Backward)</h1>
+
+<div class="card">
+    <table>
+        <tr><td><strong>Status</strong></td><td><span class="badge badge-success">Accepted</span></td></tr>
+        <tr><td><strong>Date</strong></td><td>2025-01</td></tr>
+        <tr><td><strong>Related</strong></td><td><a href="adr-0001.html">ADR-0001</a>, <a href="adr-0005.html">ADR-0005</a></td></tr>
+    </table>
+</div>
+
+<h2>Context</h2>
+
+<p>Transformer inference has fundamentally different execution patterns:</p>
+
+<ul>
+    <li><strong>Prefill</strong>: Process entire prompt at once (T tokens, T can be large)</li>
+    <li><strong>Decode</strong>: Generate one token at a time (T=1, KV cache reused)</li>
+    <li><strong>Backward</strong>: Compute gradients for training/fine-tuning</li>
+</ul>
+
+<p>Each mode has different:</p>
+<ul>
+    <li><strong>Buffer sizes</strong>: Prefill needs [max_seq_len, dim], decode needs [1, dim]</li>
+    <li><strong>Access patterns</strong>: Prefill is parallel, decode is sequential</li>
+    <li><strong>Kernel variants</strong>: Decode can use specialized single-token kernels</li>
+</ul>
+
+<h2>Decision</h2>
+
+<p><strong>Allocate separate activation buffers for each execution mode.</strong> Weights are shared, but working memory is mode-specific.</p>
+
+<h3>Memory Layout</h3>
+
+<pre><code class="language-plaintext">
+┌─────────────────────────────────────────────────────────────┐
+│                     Single Allocation                        │
+├──────────────────────────────────────────────────────────────┤
+│ Header (64B)  │ Magic, version, canary offsets              │
+├──────────────────────────────────────────────────────────────┤
+│ Weights       │ Read-only, shared across all modes           │
+│ (R/O)         │ Loaded once from .safetensors/.bump          │
+├──────────────────────────────────────────────────────────────┤
+│ KV Cache      │ Persistent across decode steps               │
+│               │ Size: [num_layers, 2, max_seq, kv_dim]       │
+├──────────────────────────────────────────────────────────────┤
+│ Prefill       │ Activations for [max_seq, embed_dim]         │
+│ Buffers       │ Larger buffers for parallel processing       │
+├──────────────────────────────────────────────────────────────┤
+│ Decode        │ Activations for [1, embed_dim]               │
+│ Buffers       │ Smaller, cache-friendly buffers              │
+├──────────────────────────────────────────────────────────────┤
+│ Backward      │ (Optional) Gradient buffers, activation      │
+│ Buffers       │ cache for backprop                           │
+└──────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<h3>Buffer Naming Convention</h3>
+
+<pre><code class="language-c">
+// Prefill buffers (large, for batch processing)
+size_t prefill_layer_0_q;       // [max_seq, num_heads * head_dim]
+size_t prefill_layer_0_attn_out; // [max_seq, embed_dim]
+
+// Decode buffers (small, for single token)
+size_t decode_layer_0_q;        // [1, num_heads * head_dim]
+size_t decode_layer_0_attn_out; // [1, embed_dim]
+
+// KV cache (shared, grows during decode)
+size_t kv_layer_0_k;            // [max_seq, num_kv_heads * head_dim]
+size_t kv_layer_0_v;            // [max_seq, num_kv_heads * head_dim]
+</code></pre>
+
+<h3>Mode Selection at Runtime</h3>
+
+<pre><code class="language-c">
+typedef enum {
+    MODE_PREFILL,
+    MODE_DECODE,
+    MODE_BACKWARD
+} ExecutionMode;
+
+void model_forward(Model *model, int *tokens, int num_tokens, ExecutionMode mode) {
+    if (mode == MODE_PREFILL) {
+        // Use prefill buffers and batch-optimized kernels
+        prefill_forward(model, tokens, num_tokens);
+    } else if (mode == MODE_DECODE) {
+        // Use decode buffers and single-token kernels
+        decode_forward(model, tokens[0]);
+    }
+}
+</code></pre>
+
+<h2>Consequences</h2>
+
+<h3>Benefits</h3>
+<ul>
+    <li><strong>Memory efficiency</strong>: Decode mode uses much less working memory</li>
+    <li><strong>Cache locality</strong>: Smaller buffers fit in L2/L3 cache during decode</li>
+    <li><strong>Kernel specialization</strong>: Different kernels for different modes</li>
+    <li><strong>No runtime branching</strong>: Mode determined at call site, not inside kernels</li>
+</ul>
+
+<h3>Costs</h3>
+<ul>
+    <li><strong>Memory overhead</strong>: Extra allocation for decode buffers (but small)</li>
+    <li><strong>Code duplication</strong>: Separate forward functions per mode</li>
+    <li><strong>Complexity</strong>: Layout must plan for all modes</li>
+</ul>
+
+<h2>Buffer Size Comparison</h2>
+
+<p>For Qwen2-0.5B (embed_dim=896, max_seq=2048):</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Buffer</th>
+            <th>Prefill Size</th>
+            <th>Decode Size</th>
+            <th>Ratio</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>layer_input</td>
+            <td>2048 * 896 * 2 = 3.5 MB</td>
+            <td>1 * 896 * 2 = 1.75 KB</td>
+            <td>2048x</td>
+        </tr>
+        <tr>
+            <td>attn_scores</td>
+            <td>14 * 2048 * 2048 * 4 = 224 MB</td>
+            <td>14 * 1 * 2048 * 4 = 112 KB</td>
+            <td>2048x</td>
+        </tr>
+        <tr>
+            <td>Q projection</td>
+            <td>2048 * 896 * 2 = 3.5 MB</td>
+            <td>1 * 896 * 2 = 1.75 KB</td>
+            <td>2048x</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>Decode buffers are ~2000x smaller, enabling better cache utilization.</p>
+
+<h2>Related ADRs</h2>
+<ul>
+    <li><a href="adr-0001.html">ADR-0001</a>: Buffer allocation happens in layout phase</li>
+    <li><a href="adr-0005.html">ADR-0005</a>: Kernel selection based on mode</li>
+</ul>

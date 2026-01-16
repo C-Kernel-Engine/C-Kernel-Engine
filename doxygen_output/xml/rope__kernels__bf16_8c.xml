@@ -1,0 +1,452 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="rope__kernels__bf16_8c" kind="file" language="C++">
+    <compoundname>rope_kernels_bf16.c</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes refid="bf16__utils_8h" local="yes">bf16_utils.h</includes>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <incdepgraph>
+      <node id="1">
+        <label>rope_kernels_bf16.c</label>
+        <link refid="rope__kernels__bf16_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="8">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="3">
+        <label>bf16_utils.h</label>
+        <link refid="bf16__utils_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="5">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stddef.h</label>
+      </node>
+      <node id="6">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="rope__kernels__bf16_8c_1a427b44289a22738ebe432b0440b3ebb5" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void rope_backward_bf16</definition>
+        <argsstring>(const uint16_t *d_out, uint16_t *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_d_out, float *scratch_d_x)</argsstring>
+        <name>rope_backward_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>d_out</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>d_x</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>cos_cache</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>sin_cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos_offset</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_x</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" line="38" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" bodystart="38" bodyend="58"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="ckernel__engine_8h_1af248ca325f0a6837ed9bfd3d34552c00" compoundref="rope__kernels_8c" startline="200" endline="296">rope_backward</references>
+        <referencedby refid="ckernel__engine_8h_1a64771ad8165a00174288ba287a799ccf" compoundref="rope__kernels__bf16_8c" startline="89" endline="114">rope_backward_qk_bf16</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="rope__kernels__bf16_8c_1a64771ad8165a00174288ba287a799ccf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void rope_backward_qk_bf16</definition>
+        <argsstring>(const uint16_t *d_q_out, const uint16_t *d_k_out, uint16_t *d_q, uint16_t *d_k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_dq_out, float *scratch_dq, float *scratch_dk_out, float *scratch_dk)</argsstring>
+        <name>rope_backward_qk_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>d_q_out</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>d_k_out</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>d_q</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>d_k</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>cos_cache</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>sin_cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos_offset</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_dq_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_dq</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_dk_out</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_dk</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" line="89" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" bodystart="89" bodyend="114"/>
+        <references refid="rope__kernels__bf16_8c_1a427b44289a22738ebe432b0440b3ebb5" compoundref="rope__kernels__bf16_8c" startline="38" endline="58">rope_backward_bf16</references>
+      </memberdef>
+      <memberdef kind="function" id="rope__kernels__bf16_8c_1aa0dd19a90e07b0190fefaccbb39412cc" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void rope_forward_bf16</definition>
+        <argsstring>(uint16_t *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch)</argsstring>
+        <name>rope_forward_bf16</name>
+        <param>
+          <type>uint16_t *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>cos_cache</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>sin_cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos_offset</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" line="14" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" bodystart="14" bodyend="32"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="ckernel__engine_8h_1a371dd522b2b7ce9064f35215f1551c28" compoundref="rope__kernels_8c" startline="155" endline="171">rope_forward</references>
+        <referencedby refid="ckernel__engine_8h_1adb1b1464a7e234c8743347c430044623" compoundref="rope__kernels__bf16_8c" startline="65" endline="84">rope_forward_qk_bf16</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="rope__kernels__bf16_8c_1adb1b1464a7e234c8743347c430044623" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void rope_forward_qk_bf16</definition>
+        <argsstring>(uint16_t *q, uint16_t *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_q, float *scratch_k)</argsstring>
+        <name>rope_forward_qk_bf16</name>
+        <param>
+          <type>uint16_t *</type>
+          <declname>q</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>k</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>cos_cache</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>sin_cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_head_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>pos_offset</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_q</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_k</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" line="65" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c" bodystart="65" bodyend="84"/>
+        <references refid="rope__kernels__bf16_8c_1aa0dd19a90e07b0190fefaccbb39412cc" compoundref="rope__kernels__bf16_8c" startline="14" endline="32">rope_forward_bf16</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="bf16__utils_8h" kindref="compound">bf16_utils.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Suppress<sp/>false<sp/>positive<sp/>warnings<sp/>about<sp/>uninitialized<sp/>variables</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>push</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>ignored<sp/>&quot;-Wmaybe-uninitialized&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/>BF16<sp/>RoPE<sp/>forward<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffer.</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>scratch:<sp/>[num_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>aligned_head_dim]<sp/>floats</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14" refid="ckernel__engine_8h_1aa0dd19a90e07b0190fefaccbb39412cc" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="rope__kernels__bf16_8c_1aa0dd19a90e07b0190fefaccbb39412cc" kindref="member">rope_forward_bf16</ref>(uint16_t<sp/>*x,</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*cos_cache,</highlight></codeline>
+<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*sin_cache,</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens,</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim,</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos_offset,</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch)</highlight></codeline>
+<codeline lineno="23"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>total<sp/>=<sp/>(size_t)num_heads<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)num_tokens<sp/>*<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(x,<sp/>scratch,<sp/>total);</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a371dd522b2b7ce9064f35215f1551c28" kindref="member">rope_forward</ref>(scratch,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset);</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch,<sp/>x,<sp/>total);</highlight></codeline>
+<codeline lineno="32"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="35"><highlight class="comment"><sp/>*<sp/>BF16<sp/>RoPE<sp/>backward<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="36"><highlight class="comment"><sp/>*<sp/>scratch_d_out,<sp/>scratch_d_x:<sp/>each<sp/>[num_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>aligned_head_dim]<sp/>floats</highlight></codeline>
+<codeline lineno="37"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38" refid="ckernel__engine_8h_1a427b44289a22738ebe432b0440b3ebb5" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="rope__kernels__bf16_8c_1a427b44289a22738ebe432b0440b3ebb5" kindref="member">rope_backward_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_out,</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_x,</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*cos_cache,</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*sin_cache,</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens,</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim,</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos_offset,</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_out,</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_x)</highlight></codeline>
+<codeline lineno="49"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_d_out<sp/>||<sp/>!scratch_d_x)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>total<sp/>=<sp/>(size_t)num_heads<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)num_tokens<sp/>*<sp/>(size_t)aligned_head_dim;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"></highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_out,<sp/>scratch_d_out,<sp/>total);</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1af248ca325f0a6837ed9bfd3d34552c00" kindref="member">rope_backward</ref>(scratch_d_out,<sp/>scratch_d_x,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset);</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_d_x,<sp/>d_x,<sp/>total);</highlight></codeline>
+<codeline lineno="58"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*<sp/>BF16<sp/>RoPE<sp/>forward<sp/>for<sp/>Q<sp/>and<sp/>K<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="62"><highlight class="comment"><sp/>*<sp/>scratch_q:<sp/>[num_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>aligned_head_dim]<sp/>floats</highlight></codeline>
+<codeline lineno="63"><highlight class="comment"><sp/>*<sp/>scratch_k:<sp/>[num_kv_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>aligned_head_dim]<sp/>floats</highlight></codeline>
+<codeline lineno="64"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65" refid="ckernel__engine_8h_1adb1b1464a7e234c8743347c430044623" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="rope__kernels__bf16_8c_1adb1b1464a7e234c8743347c430044623" kindref="member">rope_forward_qk_bf16</ref>(uint16_t<sp/>*q,</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*k,</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*cos_cache,</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*sin_cache,</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens,</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim,</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos_offset,</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_q,</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_k)</highlight></codeline>
+<codeline lineno="77"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!q<sp/>||<sp/>!k)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"></highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="rope__kernels__bf16_8c_1aa0dd19a90e07b0190fefaccbb39412cc" kindref="member">rope_forward_bf16</ref>(q,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset,<sp/>scratch_q);</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="rope__kernels__bf16_8c_1aa0dd19a90e07b0190fefaccbb39412cc" kindref="member">rope_forward_bf16</ref>(k,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_kv_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset,<sp/>scratch_k);</highlight></codeline>
+<codeline lineno="84"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="87"><highlight class="comment"><sp/>*<sp/>BF16<sp/>RoPE<sp/>backward<sp/>for<sp/>Q<sp/>and<sp/>K<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="89" refid="ckernel__engine_8h_1a64771ad8165a00174288ba287a799ccf" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="rope__kernels__bf16_8c_1a64771ad8165a00174288ba287a799ccf" kindref="member">rope_backward_qk_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_q_out,</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_k_out,</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_q,</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_k,</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*cos_cache,</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*sin_cache,</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens,</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_head_dim,</highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>pos_offset,</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_dq_out,</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_dq,</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_dk_out,</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_dk)</highlight></codeline>
+<codeline lineno="105"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!d_q_out<sp/>||<sp/>!d_k_out<sp/>||<sp/>!d_q<sp/>||<sp/>!d_k)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="rope__kernels__bf16_8c_1a427b44289a22738ebe432b0440b3ebb5" kindref="member">rope_backward_bf16</ref>(d_q_out,<sp/>d_q,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset,</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>scratch_dq_out,<sp/>scratch_dq);</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="rope__kernels__bf16_8c_1a427b44289a22738ebe432b0440b3ebb5" kindref="member">rope_backward_bf16</ref>(d_k_out,<sp/>d_k,<sp/>cos_cache,<sp/>sin_cache,</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_kv_heads,<sp/>num_tokens,<sp/>head_dim,<sp/>aligned_head_dim,<sp/>pos_offset,</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>scratch_dk_out,<sp/>scratch_dk);</highlight></codeline>
+<codeline lineno="114"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>pop</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels_bf16.c"/>
+  </compounddef>
+</doxygen>

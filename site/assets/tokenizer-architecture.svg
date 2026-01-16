@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e599f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#da77f2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="vocabGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#74c0fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4dabf7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="processGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#69db7c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#40c057;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="outputGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffd43b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fab005;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#51cf66"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#0d1b2a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#fff" text-anchor="middle">C-Kernel Tokenizer Architecture</text>
+  <text x="600" y="75" font-family="Arial, sans-serif" font-size="14" fill="#888" text-anchor="middle">High-performance BPE/WordPiece tokenizer with Trie-based longest-match</text>
+
+  <!-- Stage 1: Input -->
+  <g transform="translate(50, 120)">
+    <rect width="1100" height="80" rx="12" fill="url(#inputGrad)" opacity="0.15" stroke="#e599f7" stroke-width="2"/>
+    <text x="550" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#e599f7" text-anchor="middle">STAGE 1: INPUT</text>
+    <text x="550" y="55" font-family="Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle">"hello world! How are you today?"</text>
+    <text x="550" y="75" font-family="Arial, sans-serif" font-size="11" fill="#aaa" text-anchor="middle">UTF-8 encoded text bytes</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <path d="M600,215 L600,235" stroke="#e599f7" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 2: Vocabulary (Hash + Trie) -->
+  <g transform="translate(50, 250)">
+    <rect width="1100" height="120" rx="12" fill="url(#vocabGrad)" opacity="0.1" stroke="#74c0fc" stroke-width="2"/>
+    <text x="550" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#74c0fc" text-anchor="middle">STAGE 2: VOCABULARY LOOKUP</text>
+
+    <!-- Split visualization -->
+    <g transform="translate(30, 45)">
+      <!-- Hash Table side -->
+      <rect x="0" y="0" width="500" height="65" rx="8" fill="#1e3a5f" stroke="#74c0fc"/>
+      <text x="250" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc" text-anchor="middle">Hash Table (O(n×k))</text>
+      <text x="10" y="42" font-family="monospace" font-size="11" fill="#aaa">"hello" → MurmurHash3 → bucket → strcmp → id=100</text>
+      <text x="10" y="58" font-family="monospace" font-size="10" fill="#666">Used for exact lookups, stores full TokenInfo</text>
+    </g>
+
+    <g transform="translate(570, 45)">
+      <!-- Trie side -->
+      <rect x="0" y="0" width="500" height="65" rx="8" fill="#1e3a5f" stroke="#51cf66"/>
+      <text x="250" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#51cf66" text-anchor="middle">Trie (O(k)) - PREFERRED</text>
+      <text x="10" y="42" font-family="monospace" font-size="11" fill="#aaa">Traverse: h→e→l→l→o→✓ found id=100</text>
+      <text x="10" y="58" font-family="monospace" font-size="10" fill="#666">Longest-match in single pass, no string copying</text>
+    </g>
+  </g>
+
+  <!-- Arrow 2 -->
+  <path d="M600,385 L600,405" stroke="#74c0fc" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 3: Longest-Match Algorithm -->
+  <g transform="translate(50, 420)">
+    <rect width="1100" height="140" rx="12" fill="url(#processGrad)" opacity="0.1" stroke="#51cf66" stroke-width="2"/>
+    <text x="550" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#51cf66" text-anchor="middle">STAGE 3: LONGEST-MATCH TOKENIZATION</text>
+
+    <g transform="translate(50, 50)">
+      <!-- Algorithm steps -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="300" height="80" rx="8" fill="#1a2f1e" stroke="#51cf66"/>
+        <text x="150" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#51cf66" text-anchor="middle">Old: Hash Table Approach</text>
+        <text x="10" y="40" font-family="monospace" font-size="10" fill="#aaa">for len = 64 to 1:</text>
+        <text x="25" y="55" font-family="monospace" font-size="10" fill="#aaa">  copy text[pos:pos+len]</text>
+        <text x="25" y="70" font-family="monospace" font-size="10" fill="#aaa">  hash + lookup + compare</text>
+        <text x="200" y="75" font-family="Arial, sans-serif" font-size="10" fill="#ff6b6b">O(n×k) - SLOW!</text>
+      </g>
+
+      <g transform="translate(400, 0)">
+        <rect x="0" y="0" width="300" height="80" rx="8" fill="#1a2f1e" stroke="#51cf66"/>
+        <text x="150" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#51cf66" text-anchor="middle">New: Trie Approach (DEFAULT)</text>
+        <text x="10" y="40" font-family="monospace" font-size="10" fill="#aaa">node = root</text>
+        <text x="10" y="55" font-family="monospace" font-size="10" fill="#aaa">while child exists:</text>
+        <text x="25" y="70" font-family="monospace" font-size="10" fill="#aaa">  node = child(char)</text>
+        <text x="200" y="75" font-family="Arial, sans-serif" font-size="10" fill="#51cf66">O(k) - FAST!</text>
+      </g>
+
+      <g transform="translate(800, 0)">
+        <rect x="0" y="0" width="250" height="80" rx="8" fill="#1a2f1e" stroke="#ffd43b"/>
+        <text x="125" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffd43b" text-anchor="middle">Speedup</text>
+        <text x="125" y="50" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffd43b" text-anchor="middle">43.6x</text>
+        <text x="125" y="75" font-family="Arial, sans-serif" font-size="10" fill="#aaa">faster with trie</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Arrow 3 -->
+  <path d="M600,575 L600,595" stroke="#51cf66" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Stage 4: Output -->
+  <g transform="translate(50, 610)">
+    <rect width="1100" height="120" rx="12" fill="url(#outputGrad)" opacity="0.1" stroke="#ffd43b" stroke-width="2"/>
+    <text x="550" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffd43b" text-anchor="middle">STAGE 4: OUTPUT</text>
+
+    <g transform="translate(50, 50)">
+      <!-- Token IDs -->
+      <rect x="0" y="0" width="200" height="60" rx="8" fill="#2d2d1e" stroke="#ffd43b"/>
+      <text x="100" y="20" font-family="Arial, sans-serif" font-size="11" fill="#ffd43b" text-anchor="middle">Token IDs (int32)</text>
+      <text x="100" y="45" font-family="monospace" font-size="16" fill="#fff">[100, 101, 256, 89, 42, ...]</text>
+    </g>
+
+    <!-- Arrow -->
+    <path d="M270,30 L330,30" stroke="#ffd43b" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+    <!-- Tokens -->
+    <g transform="translate(350, 0)">
+      <rect x="0" y="0" width="200" height="60" rx="8" fill="#2d2d1e" stroke="#ffd43b"/>
+      <text x="100" y="20" font-family="Arial, sans-serif" font-size="11" fill="#ffd43b" text-anchor="middle">Token Strings</text>
+      <text x="100" y="45" font-family="monospace" font-size="12" fill="#fff">["hello", "world", "!", ...]</text>
+    </g>
+
+    <!-- Arrow -->
+    <path d="M620,30 L680,30" stroke="#ffd43b" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+    <!-- Decoded -->
+    <g transform="translate(700, 0)">
+      <rect x="0" y="0" width="200" height="60" rx="8" fill="#2d2d1e" stroke="#ffd43b"/>
+      <text x="100" y="20" font-family="Arial, sans-serif" font-size="11" fill="#ffd43b" text-anchor="middle">Decoded (optional)</text>
+      <text x="100" y="45" font-family="monospace" font-size="12" fill="#fff">"hello world! how are..."</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <rect x="50" y="755" width="1100" height="2" fill="#333"/>
+  <text x="600" y="778" font-family="Arial, sans-serif" font-size="11" fill="#555" text-anchor="middle">Supports: BPE (GPT-2, LLaMA, Qwen), WordPiece (BERT), SentencePiece | UTF-8 Multilingual | Configurable BOS/EOS</text>
+</svg>

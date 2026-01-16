@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 380">
+  <defs>
+    <marker id="arrow4" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="850" height="380" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="425" y="30" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffb400" text-anchor="middle">Scaled Dot-Product Attention</text>
+
+  <!-- Q, K, V inputs -->
+  <g transform="translate(30, 70)">
+    <rect x="0" y="0" width="60" height="80" rx="4" fill="#323232" stroke="#07adf8" stroke-width="2"/>
+    <text x="30" y="35" font-family="monospace" font-size="18" fill="#07adf8" text-anchor="middle">Q</text>
+    <text x="30" y="55" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">[H,T,d]</text>
+  </g>
+  <g transform="translate(30, 165)">
+    <rect x="0" y="0" width="60" height="80" rx="4" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="30" y="35" font-family="monospace" font-size="18" fill="#47b475" text-anchor="middle">K</text>
+    <text x="30" y="55" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">[H,T,d]</text>
+  </g>
+  <g transform="translate(30, 260)">
+    <rect x="0" y="0" width="60" height="80" rx="4" fill="#323232" stroke="#e74c3c" stroke-width="2"/>
+    <text x="30" y="35" font-family="monospace" font-size="18" fill="#e74c3c" text-anchor="middle">V</text>
+    <text x="30" y="55" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">[H,T,d]</text>
+  </g>
+
+  <!-- Arrows from Q and K -->
+  <line x1="100" y1="110" x2="160" y2="140" stroke="#07adf8" stroke-width="2" marker-end="url(#arrow4)"/>
+  <line x1="100" y1="205" x2="160" y2="175" stroke="#47b475" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- MatMul Q*K^T -->
+  <g transform="translate(170, 120)">
+    <rect x="0" y="0" width="100" height="80" rx="6" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="50" y="30" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">MatMul</text>
+    <text x="50" y="55" font-family="monospace" font-size="14" fill="#b0b0b0" text-anchor="middle">Q × Kᵀ</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="280" y1="160" x2="320" y2="160" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- Scale -->
+  <g transform="translate(330, 130)">
+    <circle cx="30" cy="30" r="28" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="30" y="27" font-family="monospace" font-size="11" fill="#ffb400" text-anchor="middle">÷√dₖ</text>
+    <text x="30" y="43" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">scale</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="395" y1="160" x2="430" y2="160" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- Mask (optional) -->
+  <g transform="translate(440, 120)">
+    <rect x="0" y="0" width="80" height="80" rx="6" fill="#323232" stroke="#707070" stroke-width="2" stroke-dasharray="4"/>
+    <text x="40" y="35" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Causal</text>
+    <text x="40" y="55" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Mask</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="530" y1="160" x2="565" y2="160" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- Softmax -->
+  <g transform="translate(575, 120)">
+    <rect x="0" y="0" width="90" height="80" rx="6" fill="#323232" stroke="#47b475" stroke-width="2"/>
+    <text x="45" y="35" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#47b475" text-anchor="middle">Softmax</text>
+    <text x="45" y="55" font-family="monospace" font-size="10" fill="#b0b0b0" text-anchor="middle">row-wise</text>
+  </g>
+
+  <!-- Arrow from V -->
+  <path d="M 100,300 L 700,300 L 700,200" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- Arrow from Softmax -->
+  <line x1="675" y1="160" x2="700" y2="160" stroke="#47b475" stroke-width="2"/>
+
+  <!-- Final MatMul -->
+  <g transform="translate(710, 120)">
+    <rect x="0" y="0" width="90" height="80" rx="6" fill="#323232" stroke="#ffb400" stroke-width="2"/>
+    <text x="45" y="30" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400" text-anchor="middle">MatMul</text>
+    <text x="45" y="55" font-family="monospace" font-size="14" fill="#b0b0b0" text-anchor="middle">× V</text>
+  </g>
+
+  <!-- Output arrow and box -->
+  <line x1="755" y1="80" x2="755" y2="115" stroke="#ffb400" stroke-width="2"/>
+  <g transform="translate(720, 45)">
+    <rect x="0" y="0" width="70" height="35" rx="4" fill="#1a3d2a" stroke="#47b475"/>
+    <text x="35" y="22" font-family="Inter, sans-serif" font-size="11" fill="#47b475" text-anchor="middle">Output</text>
+  </g>
+
+  <!-- Attention weights visualization -->
+  <g transform="translate(575, 210)">
+    <text x="45" y="0" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Attention Weights</text>
+    <rect x="0" y="10" width="90" height="70" rx="4" fill="#2a2a2a" stroke="#454545"/>
+    <!-- Causal mask pattern -->
+    <rect x="5" y="15" width="12" height="12" fill="#47b475" opacity="0.8"/>
+    <rect x="5" y="30" width="12" height="12" fill="#47b475" opacity="0.5"/>
+    <rect x="20" y="30" width="12" height="12" fill="#47b475" opacity="0.8"/>
+    <rect x="5" y="45" width="12" height="12" fill="#47b475" opacity="0.3"/>
+    <rect x="20" y="45" width="12" height="12" fill="#47b475" opacity="0.4"/>
+    <rect x="35" y="45" width="12" height="12" fill="#47b475" opacity="0.8"/>
+    <rect x="5" y="60" width="12" height="12" fill="#47b475" opacity="0.2"/>
+    <rect x="20" y="60" width="12" height="12" fill="#47b475" opacity="0.3"/>
+    <rect x="35" y="60" width="12" height="12" fill="#47b475" opacity="0.3"/>
+    <rect x="50" y="60" width="12" height="12" fill="#47b475" opacity="0.7"/>
+    <!-- Masked region -->
+    <rect x="50" y="15" width="35" height="57" fill="#454545" opacity="0.5"/>
+    <text x="68" y="45" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">-∞</text>
+  </g>
+
+  <!-- Formulas -->
+  <rect x="30" y="320" width="790" height="50" rx="6" fill="#2a2a2a" stroke="#454545"/>
+  <text x="425" y="342" font-family="monospace" font-size="13" fill="#ffb400" text-anchor="middle">Attention(Q,K,V) = softmax(QKᵀ/√dₖ + mask) · V</text>
+  <text x="425" y="360" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">GQA: K,V have fewer heads → broadcast to match Q heads</text>
+</svg>

@@ -1,0 +1,194 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="backend__native_8c" kind="file" language="C++">
+    <compoundname>backend_native.c</compoundname>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <incdepgraph>
+      <node id="6">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="7">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="1">
+        <label>backend_native.c</label>
+        <link refid="backend__native_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stddef.h</label>
+      </node>
+      <node id="5">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="backend__native_8c_1a6c6a2e37aa74b6f118d94eb08debcff3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type><ref refid="structCKMathBackend" kindref="compound">CKMathBackend</ref></type>
+        <definition>CKMathBackend ckernel_backend_native</definition>
+        <argsstring>(void)</argsstring>
+        <name>ckernel_backend_native</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Obtain the built-in native backend (single-node CPU, C + intrinsics). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/backend_native.c" line="39" column="15" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/backend_native.c" bodystart="39" bodyend="44"/>
+        <references refid="backend__native_8c_1a9008610196b2d6750454c58f87a6cc78" compoundref="backend__native_8c" startline="18" endline="37">ckernel_sgemm_native</references>
+        <references refid="structCKMathBackend_1a7e59ba4baa9c776241287338a219d9c4" compoundref="ckernel__engine_8h" startline="26">CKMathBackend::sgemm</references>
+      </memberdef>
+      <memberdef kind="function" id="backend__native_8c_1a9008610196b2d6750454c58f87a6cc78" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>static void ckernel_sgemm_native</definition>
+        <argsstring>(int M, int N, int K, const float *A, int lda, const float *B, int ldb, const float *bias, float *C, int ldc)</argsstring>
+        <name>ckernel_sgemm_native</name>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>A</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>lda</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>B</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>ldb</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>ldc</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Native GEMM backend that directly reuses the C-Transformer GEMM kernel.</para>
+<para>Layout assumptions (identical to C-Transformer/main.c):<itemizedlist>
+<listitem><para>A: [M x K], row-major, A(i,k) = A[i*K + k]</para>
+</listitem><listitem><para>B: [N x K], row-major, B(j,k) = B[j*K + k]</para>
+</listitem><listitem><para>C: [M x N], row-major, <ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C(i,j)</ref> = C[i*N + j]</para>
+</listitem></itemizedlist>
+</para>
+<para>This is a straight copy of gemm_blocked_serial with a thin wrapper to match the <ref refid="structCKMathBackend_1a7e59ba4baa9c776241287338a219d9c4" kindref="member">CKMathBackend.sgemm</ref> signature. It is intentionally minimal. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/backend_native.c" line="18" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/backend_native.c" bodystart="18" bodyend="37"/>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <referencedby refid="ckernel__engine_8h_1a6c6a2e37aa74b6f118d94eb08debcff3" compoundref="backend__native_8c" startline="39" endline="44">ckernel_backend_native</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Native<sp/>GEMM<sp/>backend<sp/>that<sp/>directly<sp/>reuses<sp/>the<sp/>C-Transformer<sp/>GEMM<sp/>kernel.</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Layout<sp/>assumptions<sp/>(identical<sp/>to<sp/>C-Transformer/main.c):</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>A:<sp/>[M<sp/>x<sp/>K],<sp/>row-major,<sp/><sp/><sp/><sp/><sp/><sp/><sp/>A(i,k)<sp/>=<sp/>A[i*K<sp/>+<sp/>k]</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>B:<sp/>[N<sp/>x<sp/>K],<sp/>row-major,<sp/><sp/><sp/><sp/><sp/><sp/><sp/>B(j,k)<sp/>=<sp/>B[j*K<sp/>+<sp/>k]</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>C:<sp/>[M<sp/>x<sp/>N],<sp/>row-major,<sp/><sp/><sp/><sp/><sp/><sp/><sp/>C(i,j)<sp/>=<sp/>C[i*N<sp/>+<sp/>j]</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>a<sp/>straight<sp/>copy<sp/>of<sp/>gemm_blocked_serial<sp/>with<sp/>a<sp/>thin<sp/>wrapper<sp/>to<sp/>match</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>the<sp/>CKMathBackend.sgemm<sp/>signature.<sp/>It<sp/>is<sp/>intentionally<sp/>minimal.</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Thin<sp/>wrapper<sp/>matching<sp/>CKMathBackend.sgemm.<sp/>For<sp/>now<sp/>we<sp/>deliberately<sp/>assume</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="comment">//<sp/>lda<sp/>=<sp/>K,<sp/>ldb<sp/>=<sp/>K,<sp/>ldc<sp/>=<sp/>N<sp/>(the<sp/>dense<sp/>LLM<sp/>layouts)<sp/>and<sp/>ignore<sp/>the<sp/>lda/ldb/ldc</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="comment">//<sp/>parameters<sp/>to<sp/>keep<sp/>the<sp/>implementation<sp/>identical<sp/>to<sp/>the<sp/>original<sp/>kernel.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18" refid="backend__native_8c_1a9008610196b2d6750454c58f87a6cc78" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="backend__native_8c_1a9008610196b2d6750454c58f87a6cc78" kindref="member">ckernel_sgemm_native</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K,</highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*A,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>lda,</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*B,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ldb,</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ldc)</highlight></codeline>
+<codeline lineno="23"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Honor<sp/>caller-provided<sp/>strides<sp/>so<sp/>padded<sp/>matrices<sp/>still<sp/>compute<sp/>correctly.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>M;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*a_row<sp/>=<sp/>A<sp/>+<sp/>(size_t)i<sp/>*<sp/>lda;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*c_row<sp/>=<sp/><ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref><sp/>+<sp/>(size_t)i<sp/>*<sp/>ldc;</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>N;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>sum<sp/>=<sp/>bias<sp/>?<sp/>bias[j]<sp/>:<sp/>0.0f;</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*b_row<sp/>=<sp/>B<sp/>+<sp/>(size_t)j<sp/>*<sp/>ldb;</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k<sp/>=<sp/>0;<sp/>k<sp/>&lt;<sp/>K;<sp/>++k)<sp/>{</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>sum<sp/>+=<sp/>a_row[k]<sp/>*<sp/>b_row[k];</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>c_row[j]<sp/>=<sp/>sum;</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="37"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight></codeline>
+<codeline lineno="39" refid="ckernel__engine_8h_1a6c6a2e37aa74b6f118d94eb08debcff3" refkind="member"><highlight class="normal"><ref refid="structCKMathBackend" kindref="compound">CKMathBackend</ref><sp/><ref refid="backend__native_8c_1a6c6a2e37aa74b6f118d94eb08debcff3" kindref="member">ckernel_backend_native</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="40"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structCKMathBackend" kindref="compound">CKMathBackend</ref><sp/>b;</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/>b.<ref refid="structCKMathBackend_1a7e59ba4baa9c776241287338a219d9c4" kindref="member">sgemm</ref><sp/>=<sp/>&amp;<ref refid="backend__native_8c_1a9008610196b2d6750454c58f87a6cc78" kindref="member">ckernel_sgemm_native</ref>;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>b;</highlight></codeline>
+<codeline lineno="44"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/backend_native.c"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,535 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="mlp__kernels__bf16_8c" kind="file" language="C++">
+    <compoundname>mlp_kernels_bf16.c</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">math.h</includes>
+    <includes refid="bf16__utils_8h" local="yes">bf16_utils.h</includes>
+    <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <incdepgraph>
+      <node id="8">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="9" relation="include">
+        </childnode>
+      </node>
+      <node id="9">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdint.h</label>
+      </node>
+      <node id="5">
+        <label>bf16_utils.h</label>
+        <link refid="bf16__utils_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="6">
+        <label>ckernel_engine.h</label>
+        <link refid="ckernel__engine_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="7" relation="include">
+        </childnode>
+        <childnode refid="8" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>mlp_kernels_bf16.c</label>
+        <link refid="mlp__kernels__bf16_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>math.h</label>
+      </node>
+      <node id="7">
+        <label>cpu_features.h</label>
+        <link refid="cpu__features_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>float</type>
+        <definition>static float gelu_scalar</definition>
+        <argsstring>(float x)</argsstring>
+        <name>gelu_scalar</name>
+        <param>
+          <type>float</type>
+          <declname>x</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" line="35" column="21" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" bodystart="35" bodyend="41"/>
+        <referencedby refid="ckernel__engine_8h_1a438bc1007a50b9f34b24e7ffa6ac1f87" compoundref="mlp__kernels__bf16_8c" startline="81" endline="165">mlp_token_parallel_bf16</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a7868409a450b9bbedc3b923e64c1c800" compoundref="mlp__kernels__bf16_8c" startline="176" endline="229">mlp_token_parallel_bf16_fp32act</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemm_bf16_fp32out</definition>
+        <argsstring>(const uint16_t *A, const uint16_t *B, const float *bias, float *C, int M, int N, int K)</argsstring>
+        <name>gemm_bf16_fp32out</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>A</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>B</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>C</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>N</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Optimized BF16 MLP Kernels</para>
+<para>Uses direct BF16 GEMM instead of converting to FP32. Layout: input[T,D] -&gt; fc1[T,4D] -&gt; GELU -&gt; fc2[T,D]</para>
+<para>All functions use caller-provided scratch buffers (no internal malloc). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" line="30" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_bf16.c" bodystart="291" bodyend="343" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" declline="30" declcolumn="13"/>
+        <references refid="bf16__utils_8h_1a314c3970fd5e2770d19b1bb49aefcf94" compoundref="bf16__utils_8h" startline="38" endline="46">bf16_to_float</references>
+        <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
+        <referencedby refid="ckernel__engine_8h_1a438bc1007a50b9f34b24e7ffa6ac1f87" compoundref="mlp__kernels__bf16_8c" startline="81" endline="165">mlp_token_parallel_bf16</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a7868409a450b9bbedc3b923e64c1c800" compoundref="mlp__kernels__bf16_8c" startline="176" endline="229">mlp_token_parallel_bf16_fp32act</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="mlp__kernels__bf16_8c_1a438bc1007a50b9f34b24e7ffa6ac1f87" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mlp_token_parallel_bf16</definition>
+        <argsstring>(const uint16_t *input, const uint16_t *W_fc1, const uint16_t *b_fc1, const uint16_t *W_fc2, const uint16_t *b_fc2, float *fc1_output, float *output, int T, int aligned_dim, int num_threads, float *scratch_bias1_f, float *scratch_bias2_f, uint16_t *scratch_fc1_bf16)</argsstring>
+        <name>mlp_token_parallel_bf16</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>W_fc1</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>b_fc1</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>W_fc2</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>b_fc2</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>fc1_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>T</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_threads</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_bias1_f</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_bias2_f</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>scratch_fc1_bf16</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Optimized MLP Forward (BF16 weights, FP32 activations)</para>
+<para>Caller-provided scratch buffers: scratch_bias1_f: [4*D] floats scratch_bias2_f: [D] floats scratch_fc1_bf16: [T * 4*D] uint16_t (BF16) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" line="81" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" bodystart="81" bodyend="165"/>
+        <references refid="bf16__utils_8h_1a314c3970fd5e2770d19b1bb49aefcf94" compoundref="bf16__utils_8h" startline="38" endline="46">bf16_to_float</references>
+        <references refid="bf16__utils_8h_1a174b16a92b3a5972230d7519fc0c5aa3" compoundref="bf16__utils_8h" startline="90" endline="103">float_to_bf16</references>
+        <references refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" compoundref="mlp__kernels__bf16_8c" startline="35" endline="41">gelu_scalar</references>
+        <references refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" compoundref="gemm__kernels__bf16_8c" startline="291" endline="343">gemm_bf16_fp32out</references>
+      </memberdef>
+      <memberdef kind="function" id="mlp__kernels__bf16_8c_1a7868409a450b9bbedc3b923e64c1c800" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void mlp_token_parallel_bf16_fp32act</definition>
+        <argsstring>(const uint16_t *input, const uint16_t *W_fc1, const uint16_t *b_fc1, const uint16_t *W_fc2, const uint16_t *b_fc2, float *fc1_output, float *output, int T, int aligned_dim, int num_threads, float *scratch_input_f, float *scratch_bias1_f, float *scratch_bias2_f, uint16_t *scratch_fc1_bf16)</argsstring>
+        <name>mlp_token_parallel_bf16_fp32act</name>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>W_fc1</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>b_fc1</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>W_fc2</declname>
+        </param>
+        <param>
+          <type>const uint16_t *</type>
+          <declname>b_fc2</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>fc1_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>T</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_dim</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_threads</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_input_f</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_bias1_f</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_bias2_f</declname>
+        </param>
+        <param>
+          <type>uint16_t *</type>
+          <declname>scratch_fc1_bf16</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Alternative: Fully FP32 activations throughout</para>
+<para>Caller-provided scratch buffers: scratch_input_f: [T * D] floats scratch_bias1_f: [4*D] floats scratch_bias2_f: [D] floats scratch_fc1_bf16: [T * 4*D] uint16_t (BF16) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" line="176" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c" bodystart="176" bodyend="229"/>
+        <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
+        <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
+        <references refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" compoundref="mlp__kernels__bf16_8c" startline="35" endline="41">gelu_scalar</references>
+        <references refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" compoundref="gemm__kernels__bf16_8c" startline="291" endline="343">gemm_bf16_fp32out</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>Optimized<sp/>BF16<sp/>MLP<sp/>Kernels</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>Uses<sp/>direct<sp/>BF16<sp/>GEMM<sp/>instead<sp/>of<sp/>converting<sp/>to<sp/>FP32.</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Layout:<sp/>input[T,D]<sp/>-&gt;<sp/>fc1[T,4D]<sp/>-&gt;<sp/>GELU<sp/>-&gt;<sp/>fc2[T,D]</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>All<sp/>functions<sp/>use<sp/>caller-provided<sp/>scratch<sp/>buffers<sp/>(no<sp/>internal<sp/>malloc).</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;math.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;omp.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="bf16__utils_8h" kindref="compound">bf16_utils.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Suppress<sp/>false<sp/>positive<sp/>warnings<sp/>about<sp/>uninitialized<sp/>variables</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>push</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>ignored<sp/>&quot;-Wmaybe-uninitialized&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Forward<sp/>declaration<sp/>of<sp/>optimized<sp/>BF16<sp/>GEMM<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" kindref="member">gemm_bf16_fp32out</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*A,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*B,</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" kindref="member">C</ref>,</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>N,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K);</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>GELU<sp/>activation:<sp/>0.5<sp/>*<sp/>x<sp/>*<sp/>(1<sp/>+<sp/>tanh(sqrt(2/pi)<sp/>*<sp/>(x<sp/>+<sp/>0.044715<sp/>*<sp/>x^3)))<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35" refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/><ref refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" kindref="member">gelu_scalar</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>x)</highlight></codeline>
+<codeline lineno="36"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>c<sp/>=<sp/>0.7978845608f;<sp/><sp/></highlight><highlight class="comment">/*<sp/>sqrt(2/pi)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>k<sp/>=<sp/>0.044715f;</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>x3<sp/>=<sp/>x<sp/>*<sp/>x<sp/>*<sp/>x;</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0.5f<sp/>*<sp/>x<sp/>*<sp/>(1.0f<sp/>+<sp/>tanhf(c<sp/>*<sp/>(x<sp/>+<sp/>k<sp/>*<sp/>x3)));</highlight></codeline>
+<codeline lineno="41"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="44"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Vectorized<sp/>GELU<sp/>using<sp/>polynomial<sp/>approximation<sp/>of<sp/>tanh<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="45"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/>__m512<sp/>gelu_avx512(__m512<sp/>x)</highlight></codeline>
+<codeline lineno="46"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>c<sp/>=<sp/>_mm512_set1_ps(0.7978845608f);</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>k<sp/>=<sp/>_mm512_set1_ps(0.044715f);</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>half<sp/>=<sp/>_mm512_set1_ps(0.5f);</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>__m512<sp/>one<sp/>=<sp/>_mm512_set1_ps(1.0f);</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>x2<sp/>=<sp/>_mm512_mul_ps(x,<sp/>x);</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>x3<sp/>=<sp/>_mm512_mul_ps(x2,<sp/>x);</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"></highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>inner<sp/>=<sp/>_mm512_fmadd_ps(k,<sp/>x3,<sp/>x);</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/>inner<sp/>=<sp/>_mm512_mul_ps(c,<sp/>inner);</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>inner2<sp/>=<sp/>_mm512_mul_ps(inner,<sp/>inner);</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>num<sp/>=<sp/>_mm512_add_ps(_mm512_set1_ps(27.0f),<sp/>inner2);</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>den<sp/>=<sp/>_mm512_fmadd_ps(_mm512_set1_ps(9.0f),<sp/>inner2,<sp/>_mm512_set1_ps(27.0f));</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>tanh_approx<sp/>=<sp/>_mm512_mul_ps(inner,<sp/>_mm512_div_ps(num,<sp/>den));</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/>tanh_approx<sp/>=<sp/>_mm512_min_ps(tanh_approx,<sp/>one);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/>tanh_approx<sp/>=<sp/>_mm512_max_ps(tanh_approx,<sp/>_mm512_set1_ps(-1.0f));</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/>__m512<sp/>result<sp/>=<sp/>_mm512_add_ps(one,<sp/>tanh_approx);</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/>result<sp/>=<sp/>_mm512_mul_ps(half,<sp/>_mm512_mul_ps(x,<sp/>result));</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"></highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>result;</highlight></codeline>
+<codeline lineno="70"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="71"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="73"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*<sp/>Optimized<sp/>MLP<sp/>Forward<sp/>(BF16<sp/>weights,<sp/>FP32<sp/>activations)</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="76"><highlight class="comment"><sp/>*<sp/>Caller-provided<sp/>scratch<sp/>buffers:</highlight></codeline>
+<codeline lineno="77"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_bias1_f:<sp/>[4*D]<sp/>floats</highlight></codeline>
+<codeline lineno="78"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_bias2_f:<sp/>[D]<sp/>floats</highlight></codeline>
+<codeline lineno="79"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_fc1_bf16:<sp/>[T<sp/>*<sp/>4*D]<sp/>uint16_t<sp/>(BF16)</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="81" refid="ckernel__engine_8h_1a438bc1007a50b9f34b24e7ffa6ac1f87" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mlp__kernels__bf16_8c_1a438bc1007a50b9f34b24e7ffa6ac1f87" kindref="member">mlp_token_parallel_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*W_fc1,</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*b_fc1,</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*W_fc2,</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*b_fc2,</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*fc1_output,</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T,</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_dim,</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_threads,</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_bias1_f,</highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_bias2_f,</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*scratch_fc1_bf16)</highlight></codeline>
+<codeline lineno="94"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="95"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input<sp/>||<sp/>!W_fc1<sp/>||<sp/>!b_fc1<sp/>||<sp/>!W_fc2<sp/>||<sp/>!b_fc2<sp/>||<sp/>!fc1_output<sp/>||<sp/>!output)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="96"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_bias1_f<sp/>||<sp/>!scratch_bias2_f<sp/>||<sp/>!scratch_fc1_bf16)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"></highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)num_threads;</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>aligned_dim;</highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>fourD<sp/>=<sp/>4<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Convert<sp/>biases<sp/>to<sp/>FP32<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>fourD;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>scratch_bias1_f[i]<sp/>=<sp/><ref refid="bf16__utils_8h_1a314c3970fd5e2770d19b1bb49aefcf94" kindref="member">bf16_to_float</ref>(b_fc1[i]);</highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>D;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>scratch_bias2_f[i]<sp/>=<sp/><ref refid="bf16__utils_8h_1a314c3970fd5e2770d19b1bb49aefcf94" kindref="member">bf16_to_float</ref>(b_fc2[i]);</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="109"><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC1:<sp/>[T,<sp/>D]<sp/>x<sp/>[4D,<sp/>D].T<sp/>-&gt;<sp/>[T,<sp/>4D]<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" kindref="member">gemm_bf16_fp32out</ref>(input,<sp/>W_fc1,<sp/>scratch_bias1_f,<sp/>fc1_output,<sp/>T,<sp/>fourD,<sp/>D);</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"></highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>GELU<sp/>activation<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="114"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>fc1_output<sp/>+<sp/>(size_t)t<sp/>*<sp/>fourD;</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;=<sp/>fourD<sp/>-<sp/>16;<sp/>j<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>x<sp/>=<sp/>_mm512_loadu_ps(row<sp/>+<sp/>j);</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(row<sp/>+<sp/>j,<sp/>gelu_avx512(x));</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;<sp/>fourD;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>row[j]<sp/>=<sp/><ref refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" kindref="member">gelu_scalar</ref>(row[j]);</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="127"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/>fourD;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fc1_output[t<sp/>*<sp/>fourD<sp/>+<sp/>j]<sp/>=<sp/><ref refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" kindref="member">gelu_scalar</ref>(fc1_output[t<sp/>*<sp/>fourD<sp/>+<sp/>j]);</highlight></codeline>
+<codeline lineno="131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="134"><highlight class="normal"></highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Convert<sp/>FP32<sp/>activations<sp/>to<sp/>BF16<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*src<sp/>=<sp/>fc1_output<sp/>+<sp/>(size_t)t<sp/>*<sp/>fourD;</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*dst<sp/>=<sp/>scratch_fc1_bf16<sp/>+<sp/>(size_t)t<sp/>*<sp/>fourD;</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;=<sp/>fourD<sp/>-<sp/>16;<sp/>j<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>fp32<sp/>=<sp/>_mm512_loadu_ps(src<sp/>+<sp/>j);</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>as_int<sp/>=<sp/>_mm512_castps_si512(fp32);</highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>lsb<sp/>=<sp/>_mm512_srli_epi32(as_int,<sp/>16);</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>lsb<sp/>=<sp/>_mm512_and_si512(lsb,<sp/>_mm512_set1_epi32(1));</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>rounding<sp/>=<sp/>_mm512_add_epi32(_mm512_set1_epi32(0x7FFF),<sp/>lsb);</highlight></codeline>
+<codeline lineno="148"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>rounded<sp/>=<sp/>_mm512_add_epi32(as_int,<sp/>rounding);</highlight></codeline>
+<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512i<sp/>shifted<sp/>=<sp/>_mm512_srli_epi32(rounded,<sp/>16);</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m256i<sp/>bf16<sp/>=<sp/>_mm512_cvtepi32_epi16(shifted);</highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm256_storeu_si256((__m256i<sp/>*)(dst<sp/>+<sp/>j),<sp/>bf16);</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;<sp/>fourD;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>dst[j]<sp/>=<sp/><ref refid="bf16__utils_8h_1a174b16a92b3a5972230d7519fc0c5aa3" kindref="member">float_to_bf16</ref>(src[j]);</highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>(size_t)T<sp/>*<sp/>fourD;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>scratch_fc1_bf16[i]<sp/>=<sp/><ref refid="bf16__utils_8h_1a174b16a92b3a5972230d7519fc0c5aa3" kindref="member">float_to_bf16</ref>(fc1_output[i]);</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="162"><highlight class="normal"></highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC2:<sp/>BF16<sp/>GEMM<sp/>with<sp/>FP32<sp/>output<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="164"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" kindref="member">gemm_bf16_fp32out</ref>(scratch_fc1_bf16,<sp/>W_fc2,<sp/>scratch_bias2_f,<sp/>output,<sp/>T,<sp/>D,<sp/>fourD);</highlight></codeline>
+<codeline lineno="165"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="166"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="167"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="168"><highlight class="comment"><sp/>*<sp/>Alternative:<sp/>Fully<sp/>FP32<sp/>activations<sp/>throughout</highlight></codeline>
+<codeline lineno="169"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="170"><highlight class="comment"><sp/>*<sp/>Caller-provided<sp/>scratch<sp/>buffers:</highlight></codeline>
+<codeline lineno="171"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_input_f:<sp/>[T<sp/>*<sp/>D]<sp/>floats</highlight></codeline>
+<codeline lineno="172"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_bias1_f:<sp/>[4*D]<sp/>floats</highlight></codeline>
+<codeline lineno="173"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_bias2_f:<sp/>[D]<sp/>floats</highlight></codeline>
+<codeline lineno="174"><highlight class="comment"><sp/>*<sp/><sp/><sp/>scratch_fc1_bf16:<sp/>[T<sp/>*<sp/>4*D]<sp/>uint16_t<sp/>(BF16)</highlight></codeline>
+<codeline lineno="175"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="176" refid="ckernel__engine_8h_1a7868409a450b9bbedc3b923e64c1c800" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="mlp__kernels__bf16_8c_1a7868409a450b9bbedc3b923e64c1c800" kindref="member">mlp_token_parallel_bf16_fp32act</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*W_fc1,</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*b_fc1,</highlight></codeline>
+<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*W_fc2,</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*b_fc2,</highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*fc1_output,</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>T,</highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_dim,</highlight></codeline>
+<codeline lineno="185"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_threads,</highlight></codeline>
+<codeline lineno="186"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_input_f,</highlight></codeline>
+<codeline lineno="187"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_bias1_f,</highlight></codeline>
+<codeline lineno="188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_bias2_f,</highlight></codeline>
+<codeline lineno="189"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*scratch_fc1_bf16)</highlight></codeline>
+<codeline lineno="190"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="191"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input<sp/>||<sp/>!W_fc1<sp/>||<sp/>!b_fc1<sp/>||<sp/>!W_fc2<sp/>||<sp/>!b_fc2<sp/>||<sp/>!fc1_output<sp/>||<sp/>!output)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="192"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_input_f<sp/>||<sp/>!scratch_bias1_f<sp/>||<sp/>!scratch_bias2_f<sp/>||<sp/>!scratch_fc1_bf16)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="193"><highlight class="normal"></highlight></codeline>
+<codeline lineno="194"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)num_threads;</highlight></codeline>
+<codeline lineno="195"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>D<sp/>=<sp/>aligned_dim;</highlight></codeline>
+<codeline lineno="196"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>fourD<sp/>=<sp/>4<sp/>*<sp/>D;</highlight></codeline>
+<codeline lineno="197"><highlight class="normal"></highlight></codeline>
+<codeline lineno="198"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Convert<sp/>input<sp/>and<sp/>biases<sp/>to<sp/>FP32<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="199"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>scratch_input_f,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)T<sp/>*<sp/>D);</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(b_fc1,<sp/>scratch_bias1_f,<sp/>fourD);</highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(b_fc2,<sp/>scratch_bias2_f,<sp/>D);</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"></highlight></codeline>
+<codeline lineno="203"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>FC1<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="204"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" kindref="member">gemm_bf16_fp32out</ref>(input,<sp/>W_fc1,<sp/>scratch_bias1_f,<sp/>fc1_output,<sp/>T,<sp/>fourD,<sp/>D);</highlight></codeline>
+<codeline lineno="205"><highlight class="normal"></highlight></codeline>
+<codeline lineno="206"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>GELU<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="207"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="208"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="209"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>t<sp/>=<sp/>0;<sp/>t<sp/>&lt;<sp/>T;<sp/>++t)<sp/>{</highlight></codeline>
+<codeline lineno="210"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*row<sp/>=<sp/>fc1_output<sp/>+<sp/>(size_t)t<sp/>*<sp/>fourD;</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="212"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;=<sp/>fourD<sp/>-<sp/>16;<sp/>j<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="213"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m512<sp/>x<sp/>=<sp/>_mm512_loadu_ps(row<sp/>+<sp/>j);</highlight></codeline>
+<codeline lineno="214"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm512_storeu_ps(row<sp/>+<sp/>j,<sp/>gelu_avx512(x));</highlight></codeline>
+<codeline lineno="215"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="216"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(;<sp/>j<sp/>&lt;<sp/>fourD;<sp/>++j)<sp/>{</highlight></codeline>
+<codeline lineno="217"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>row[j]<sp/>=<sp/><ref refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" kindref="member">gelu_scalar</ref>(row[j]);</highlight></codeline>
+<codeline lineno="218"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="219"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="221"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>(size_t)T<sp/>*<sp/>fourD;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="222"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fc1_output[i]<sp/>=<sp/><ref refid="mlp__kernels__bf16_8c_1a27c361a6bca1a4eb302dcecfc2d4b53c" kindref="member">gelu_scalar</ref>(fc1_output[i]);</highlight></codeline>
+<codeline lineno="223"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="224"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="225"><highlight class="normal"></highlight></codeline>
+<codeline lineno="226"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Convert<sp/>fc1_output<sp/>to<sp/>BF16<sp/>for<sp/>FC2<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="227"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(fc1_output,<sp/>scratch_fc1_bf16,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)T<sp/>*<sp/>fourD);</highlight></codeline>
+<codeline lineno="228"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="mlp__kernels__bf16_8c_1a8647bb8c6a9a965a92e1c98330f237af" kindref="member">gemm_bf16_fp32out</ref>(scratch_fc1_bf16,<sp/>W_fc2,<sp/>scratch_bias2_f,<sp/>output,<sp/>T,<sp/>D,<sp/>fourD);</highlight></codeline>
+<codeline lineno="229"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="230"><highlight class="normal"></highlight></codeline>
+<codeline lineno="231"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>pop</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/mlp_kernels_bf16.c"/>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,198 @@
+<!-- TITLE: ADR-0006 Weights Map via Template -->
+<!-- NAV: adr -->
+
+<h1>ADR-0006: Weights Map from HuggingFace Names via Template</h1>
+
+<div class="card">
+    <table>
+        <tr><td><strong>Status</strong></td><td><span class="badge badge-success">Accepted</span></td></tr>
+        <tr><td><strong>Date</strong></td><td>2025-01</td></tr>
+        <tr><td><strong>Related</strong></td><td><a href="adr-0002.html">ADR-0002</a></td></tr>
+    </table>
+</div>
+
+<h2>Context</h2>
+
+<p>HuggingFace models use inconsistent naming conventions across architectures:</p>
+
+<pre><code class="language-plaintext">
+# Llama
+model.layers.0.self_attn.q_proj.weight
+model.layers.0.self_attn.k_proj.weight
+
+# GPT-2
+transformer.h.0.attn.c_attn.weight  (combined QKV!)
+
+# Qwen2
+model.layers.0.self_attn.q_proj.weight
+
+# Mistral (same as Llama but different intermediate names)
+model.layers.0.mlp.gate_proj.weight
+</code></pre>
+
+<p>Previous approaches:</p>
+<ul>
+    <li><strong>IR v2</strong>: Hardcoded weight name transformations in Python</li>
+    <li><strong>IR v3</strong>: Assumed specific naming in <code>LLAMA_WEIGHT_MAP</code></li>
+</ul>
+
+<p>Both approaches break when encountering new architectures or variations.</p>
+
+<h2>Decision</h2>
+
+<p><strong>Weight name mapping is defined in architecture templates.</strong> Each template includes a bidirectional mapping between HuggingFace names and internal names.</p>
+
+<h3>Template Weight Mapping</h3>
+
+<pre><code class="language-yaml">
+# templates/qwen2.yaml
+weight_mapping:
+  # Format: "HuggingFace name pattern" : "internal name pattern"
+  # {i} is replaced with layer index
+
+  # Embeddings
+  "model.embed_tokens.weight": "embed.weight"
+
+  # Attention weights
+  "model.layers.{i}.self_attn.q_proj.weight": "layers.{i}.attn.wq"
+  "model.layers.{i}.self_attn.k_proj.weight": "layers.{i}.attn.wk"
+  "model.layers.{i}.self_attn.v_proj.weight": "layers.{i}.attn.wv"
+  "model.layers.{i}.self_attn.o_proj.weight": "layers.{i}.attn.wo"
+
+  # MLP weights
+  "model.layers.{i}.mlp.gate_proj.weight": "layers.{i}.mlp.gate"
+  "model.layers.{i}.mlp.up_proj.weight": "layers.{i}.mlp.up"
+  "model.layers.{i}.mlp.down_proj.weight": "layers.{i}.mlp.down"
+
+  # Normalization
+  "model.layers.{i}.input_layernorm.weight": "layers.{i}.ln1.gamma"
+  "model.layers.{i}.post_attention_layernorm.weight": "layers.{i}.ln2.gamma"
+  "model.norm.weight": "final_norm.gamma"
+
+  # LM head
+  "lm_head.weight": "lm_head.weight"
+</code></pre>
+
+<h3>Weight Loading Process</h3>
+
+<pre><code class="language-python">
+def load_weights(safetensors_path, template, layout):
+    """Load weights from safetensors using template mapping."""
+    mapping = template["weight_mapping"]
+    num_layers = template["config"]["num_layers"]
+
+    with safe_open(safetensors_path, framework="numpy") as f:
+        for hf_pattern, internal_pattern in mapping.items():
+            if "{i}" in hf_pattern:
+                # Layer-specific weight
+                for i in range(num_layers):
+                    hf_name = hf_pattern.replace("{i}", str(i))
+                    internal_name = internal_pattern.replace("{i}", str(i))
+                    tensor = f.get_tensor(hf_name)
+                    offset = layout["tensors"][internal_name]["offset"]
+                    copy_to_blob(tensor, blob, offset)
+            else:
+                # Global weight
+                tensor = f.get_tensor(hf_pattern)
+                offset = layout["tensors"][internal_pattern]["offset"]
+                copy_to_blob(tensor, blob, offset)
+</code></pre>
+
+<h3>Validation</h3>
+
+<p>At codegen time, validate that all expected weights exist in safetensors:</p>
+
+<pre><code class="language-python">
+def validate_weight_mapping(safetensors_header, template):
+    """Ensure all required weights are present."""
+    mapping = template["weight_mapping"]
+    available = set(safetensors_header.keys())
+    required = set()
+
+    for hf_pattern in mapping.keys():
+        if "{i}" in hf_pattern:
+            for i in range(template["config"]["num_layers"]):
+                required.add(hf_pattern.replace("{i}", str(i)))
+        else:
+            required.add(hf_pattern)
+
+    missing = required - available
+    if missing:
+        raise ValueError(f"Missing weights: {missing}")
+
+    extra = available - required
+    if extra:
+        print(f"Warning: Unused weights in safetensors: {extra}")
+</code></pre>
+
+<h3>Generated Weight Offset Table</h3>
+
+<p>Codegen emits a compile-time lookup table:</p>
+
+<pre><code class="language-c">
+// Generated from template weight_mapping + layout
+typedef struct {
+    const char *hf_name;    // For debugging
+    const char *internal;   // For debugging
+    size_t offset;          // Byte offset in blob
+    size_t size;            // Size in bytes
+} WeightEntry;
+
+static const WeightEntry WEIGHT_TABLE[] = {
+    {"model.embed_tokens.weight", "embed.weight", 64, 272629760},
+    {"model.layers.0.self_attn.q_proj.weight", "layers.0.attn.wq", 272629888, 1605632},
+    {"model.layers.0.self_attn.k_proj.weight", "layers.0.attn.wk", 274235584, 229376},
+    // ...
+};
+</code></pre>
+
+<h2>Consequences</h2>
+
+<h3>Benefits</h3>
+<ul>
+    <li><strong>Architecture-agnostic</strong>: Add new models by adding templates</li>
+    <li><strong>Explicit mapping</strong>: Clear documentation of name transformations</li>
+    <li><strong>Validation</strong>: Catch missing/extra weights at codegen time</li>
+    <li><strong>Debugging</strong>: Both names preserved in generated code</li>
+</ul>
+
+<h3>Costs</h3>
+<ul>
+    <li><strong>Template maintenance</strong>: Each architecture needs a template</li>
+    <li><strong>Pattern matching</strong>: Need regex-like expansion for <code>{i}</code></li>
+</ul>
+
+<h2>Special Cases</h2>
+
+<h3>Weight Tying</h3>
+
+<p>Some models share embed and lm_head weights:</p>
+
+<pre><code class="language-yaml">
+weight_mapping:
+  "model.embed_tokens.weight": "embed.weight"
+  "lm_head.weight": "embed.weight"  # Alias to same internal name
+
+weight_tying:
+  - ["embed.weight", "lm_head.weight"]
+</code></pre>
+
+<h3>Combined Weights (GPT-2 style)</h3>
+
+<p>Some models concatenate QKV into one tensor:</p>
+
+<pre><code class="language-yaml">
+weight_mapping:
+  "transformer.h.{i}.attn.c_attn.weight":
+    split: [q, k, v]  # Split along axis 0
+    targets:
+      - "layers.{i}.attn.wq"
+      - "layers.{i}.attn.wk"
+      - "layers.{i}.attn.wv"
+</code></pre>
+
+<h2>Related ADRs</h2>
+<ul>
+    <li><a href="adr-0002.html">ADR-0002</a>: Templates define architecture</li>
+    <li><a href="adr-0004.html">ADR-0004</a>: Layout determines weight offsets</li>
+</ul>

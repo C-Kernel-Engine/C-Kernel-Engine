@@ -1,0 +1,382 @@
+<!-- TITLE: GEMM Memory Layout -->
+<!-- NAV: concepts -->
+
+<h1>GEMM Memory Layout & Offset Calculation</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Understanding Weight Storage</strong><br>
+        This page explains how weight matrices are stored in memory and why the layout matters for performance. Critical for debugging quantization bugs and understanding kernel behavior.
+    </div>
+</div>
+
+<h2>GEMM vs GEMV</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;"><span class="badge badge-amber">GEMM</span> General Matrix Multiply</h3>
+        <p><strong>C = A × B</strong> where both A and B are matrices.</p>
+        <ul>
+            <li><strong>Use case:</strong> Prefill (batch processing multiple tokens)</li>
+            <li><strong>Dimensions:</strong> A[M, K] × B[K, N] = C[M, N]</li>
+            <li><strong>Example:</strong> 32 tokens × embedding → 32 outputs</li>
+        </ul>
+        <pre style="margin-top: 1rem;"><code>// Prefill: M tokens at once
+gemm(activations[32, 896], weights[896, 4864], output[32, 4864])</code></pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;"><span class="badge badge-indigo">GEMV</span> General Matrix-Vector Multiply</h3>
+        <p><strong>y = A × x</strong> where x is a vector (M=1).</p>
+        <ul>
+            <li><strong>Use case:</strong> Decode (one token at a time)</li>
+            <li><strong>Dimensions:</strong> A[1, K] × B[K, N] = C[1, N]</li>
+            <li><strong>Example:</strong> 1 token × embedding → 1 output</li>
+        </ul>
+        <pre style="margin-top: 1rem;"><code>// Decode: 1 token at a time
+gemv(activation[1, 896], weights[896, 4864], output[1, 4864])</code></pre>
+    </div>
+</div>
+
+<h2>Layout Notation: NN, NT, TN, TT</h2>
+
+<p>The two-letter suffix indicates how matrices A and B are stored in memory:</p>
+
+<table>
+    <tr>
+        <th>Layout</th>
+        <th>Matrix A</th>
+        <th>Matrix B</th>
+        <th>Use Case</th>
+    </tr>
+    <tr>
+        <td><code>gemm_nn</code></td>
+        <td><strong>N</strong>ormal [M, K]</td>
+        <td><strong>N</strong>ormal [K, N]</td>
+        <td>Textbook layout (rarely used)</td>
+    </tr>
+    <tr>
+        <td><code>gemm_nt</code></td>
+        <td><strong>N</strong>ormal [M, K]</td>
+        <td><strong>T</strong>ransposed [N, K]</td>
+        <td><span class="badge badge-green">Inference standard</span></td>
+    </tr>
+    <tr>
+        <td><code>gemm_tn</code></td>
+        <td><strong>T</strong>ransposed [K, M]</td>
+        <td><strong>N</strong>ormal [K, N]</td>
+        <td>Gradient computation</td>
+    </tr>
+    <tr>
+        <td><code>gemm_tt</code></td>
+        <td><strong>T</strong>ransposed [K, M]</td>
+        <td><strong>T</strong>ransposed [N, K]</td>
+        <td>Specialized cases</td>
+    </tr>
+</table>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Why NT for Inference?</strong><br>
+        With <code>gemm_nt</code>, each output neuron's weights are contiguous in memory. Computing one output reads sequential bytes (stride=1). With <code>gemm_nn</code>, you'd hop across rows (stride=N) causing cache misses.
+    </div>
+</div>
+
+<h2>Memory Layout Visualization</h2>
+
+<div class="img-container svg-viewer" data-title="Weight Memory Layout & Offset Calculation">
+    <img src="assets/weight_memory_layout.svg" alt="Weight Memory Layout Diagram showing NN vs NT layouts, quantized block structure, and offset calculations">
+</div>
+
+<h2>Normal vs Transposed Storage</h2>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #e74c3c;">
+        <h3 style="margin-top: 0; color: #e74c3c;">gemm_nn: W[K][N] - Bad Cache</h3>
+        <p>Weights stored with <strong>input dimension as row index</strong>.</p>
+        <pre><code>// Memory layout for 896→4864 linear
+W[0][0], W[0][1], W[0][2], ..., W[0][4863]  // Input 0 to all outputs
+W[1][0], W[1][1], W[1][2], ..., W[1][4863]  // Input 1 to all outputs
+...
+W[895][0], W[895][1], ..., W[895][4863]    // Input 895 to all outputs</code></pre>
+        <p style="margin-top: 1rem;"><strong>Problem:</strong> To compute output[0], need W[0][0], W[1][0], W[2][0]... - stride of 4864 elements between reads!</p>
+    </div>
+    <div class="card card-green" style="border-left: 4px solid #27ae60;">
+        <h3 style="margin-top: 0; color: #27ae60;">gemm_nt: W[N][K] - Good Cache</h3>
+        <p>Weights stored with <strong>output dimension as row index</strong>.</p>
+        <pre><code>// Memory layout for 896→4864 linear
+W[0][0], W[0][1], W[0][2], ..., W[0][895]   // All inputs → Output 0
+W[1][0], W[1][1], W[1][2], ..., W[1][895]   // All inputs → Output 1
+...
+W[4863][0], W[4863][1], ..., W[4863][895]  // All inputs → Output 4863</code></pre>
+        <p style="margin-top: 1rem;"><strong>Benefit:</strong> To compute output[0], read W[0][0], W[0][1], W[0][2]... - sequential memory access!</p>
+    </div>
+</div>
+
+<h2>Quantized Block Structure</h2>
+
+<p>Quantized formats store weights in blocks with a scale factor. The block structure affects offset calculations.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Q8_0 Block Example (34 bytes per block)</h3>
+    <pre><code>struct block_q8_0 {
+    ggml_fp16_t d;      // 2 bytes: FP16 scale factor
+    int8_t qs[32];      // 32 bytes: 32 quantized weights
+};  // Total: 34 bytes for 32 weights
+
+// Dequantization: weight[i] = qs[i] * d</code></pre>
+</div>
+
+<h3>Quantization Format Reference</h3>
+
+<table>
+    <tr>
+        <th>Format</th>
+        <th>Block Size</th>
+        <th>Bytes/Block</th>
+        <th>Bits/Weight</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td><code>Q8_0</code></td>
+        <td>32</td>
+        <td>34</td>
+        <td>8.5</td>
+        <td>8-bit quantization with FP16 scale</td>
+    </tr>
+    <tr>
+        <td><code>Q5_0</code></td>
+        <td>32</td>
+        <td>22</td>
+        <td>5.5</td>
+        <td>5-bit with packed high bits + scale</td>
+    </tr>
+    <tr>
+        <td><code>Q4_0</code></td>
+        <td>32</td>
+        <td>18</td>
+        <td>4.5</td>
+        <td>4-bit quantization with scale</td>
+    </tr>
+    <tr>
+        <td><code>Q4_K</code></td>
+        <td>256</td>
+        <td>144</td>
+        <td>4.5</td>
+        <td>K-quant: super-blocks with sub-scales</td>
+    </tr>
+    <tr>
+        <td><code>Q6_K</code></td>
+        <td>256</td>
+        <td>210</td>
+        <td>6.5</td>
+        <td>K-quant: higher precision super-blocks</td>
+    </tr>
+    <tr>
+        <td><code>FP32</code></td>
+        <td>1</td>
+        <td>4</td>
+        <td>32</td>
+        <td>Full precision (no quantization)</td>
+    </tr>
+    <tr>
+        <td><code>BF16</code></td>
+        <td>1</td>
+        <td>2</td>
+        <td>16</td>
+        <td>Brain float (8-bit mantissa)</td>
+    </tr>
+</table>
+
+<h2>Offset Calculation</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Critical Formula</h3>
+    <p>For quantized weights, the offset to row <code>n</code> is:</p>
+    <pre style="background: #1a1a2e; padding: 1.5rem; border-radius: 6px;"><code style="color: #f8f8f2;">row_offset = n × (K / block_size) × bytes_per_block
+
+// Example: Q8_0 weights, K=896, accessing row 5
+blocks_per_row = 896 / 32 = 28 blocks
+row_bytes = 28 × 34 = 952 bytes
+row_5_offset = 5 × 952 = 4760 bytes</code></pre>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">C Implementation</h3>
+        <pre><code>size_t get_weight_row_offset(
+    int n,              // output neuron index
+    int K,              // input dimension
+    int block_size,     // e.g., 32 for Q8_0
+    int bytes_per_block // e.g., 34 for Q8_0
+) {
+    int blocks = K / block_size;
+    return (size_t)n * blocks * bytes_per_block;
+}</code></pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Python Implementation</h3>
+        <pre><code>def get_weight_row_offset(
+    n: int,              # output neuron index
+    K: int,              # input dimension
+    block_size: int,     # e.g., 32 for Q8_0
+    bytes_per_block: int # e.g., 34 for Q8_0
+) -> int:
+    blocks = K // block_size
+    return n * blocks * bytes_per_block</code></pre>
+    </div>
+</div>
+
+<h2>Row Bytes by Format (K=896)</h2>
+
+<table>
+    <tr>
+        <th>Format</th>
+        <th>Calculation</th>
+        <th>Row Bytes</th>
+    </tr>
+    <tr>
+        <td><code>Q8_0</code></td>
+        <td>(896/32) × 34 = 28 × 34</td>
+        <td><strong>952</strong></td>
+    </tr>
+    <tr>
+        <td><code>Q5_0</code></td>
+        <td>(896/32) × 22 = 28 × 22</td>
+        <td><strong>616</strong></td>
+    </tr>
+    <tr>
+        <td><code>Q4_0</code></td>
+        <td>(896/32) × 18 = 28 × 18</td>
+        <td><strong>504</strong></td>
+    </tr>
+    <tr>
+        <td><code>Q4_K</code></td>
+        <td>(896/256) × 144 = 3.5 × 144</td>
+        <td><strong>504*</strong></td>
+    </tr>
+    <tr>
+        <td><code>Q6_K</code></td>
+        <td>(896/256) × 210 = 3.5 × 210</td>
+        <td><strong>735*</strong></td>
+    </tr>
+    <tr>
+        <td><code>FP32</code></td>
+        <td>896 × 4</td>
+        <td><strong>3584</strong></td>
+    </tr>
+</table>
+
+<p style="color: var(--text-muted); font-size: 0.9rem;">* K-quants require K aligned to 256; 896 = 3.5 super-blocks (handled with partial blocks)</p>
+
+<h2>Critical Bug: Row Stride Mismatch</h2>
+
+<div class="alert alert-danger" style="background: rgba(231, 76, 60, 0.15); border: 1px solid #e74c3c;">
+    <div class="alert-icon" style="color: #e74c3c;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </div>
+    <div>
+        <strong>Common Bug: Mismatched Row Stride</strong><br>
+        If the code generator calculates a different row stride than the kernel expects, tokens beyond the first will read garbage memory, producing NaN/inf outputs.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border: 2px solid #27ae60;">
+        <h3 style="margin-top: 0; color: #27ae60;">Correct</h3>
+        <pre><code>// Generator and kernel agree
+row_bytes = (K/32) × 34 = 952
+
+Token 0: offset 0
+Token 1: offset 952     ✓ Kernel reads here
+Token 2: offset 1904    ✓ Kernel reads here</code></pre>
+    </div>
+    <div class="card" style="border: 2px solid #e74c3c;">
+        <h3 style="margin-top: 0; color: #e74c3c;">Bug (Extra +1)</h3>
+        <pre><code>// Generator adds spurious +1
+row_bytes = (K/32 + 1) × 34 = 986
+
+Token 0: offset 0
+Token 1: offset 986     ✗ Kernel expects 952!
+Token 2: offset 1972    ✗ Kernel expects 1904!</code></pre>
+    </div>
+</div>
+
+<p style="margin-top: 1rem;"><strong>Symptom:</strong> First token works fine, but all subsequent tokens produce NaN or garbage. The validation system in codegen catches this by verifying dimensions align to block sizes.</p>
+
+<h2>Kernel Naming Convention</h2>
+
+<p>C-Kernel-Engine kernel names follow this pattern:</p>
+
+<pre style="background: #1a1a2e; padding: 1rem; border-radius: 6px;"><code style="color: #f8f8f2;">gemm_nt_q5_0_q8_0
+│    │  │     │
+│    │  │     └─ Activation quantization (Q8_0)
+│    │  └─────── Weight quantization (Q5_0)
+│    └────────── Layout: A=Normal, B=Transposed
+└─────────────── Operation type (GEMM)</code></pre>
+
+<h3>Common Kernel Examples</h3>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Weights</th>
+        <th>Activations</th>
+        <th>Use Case</th>
+    </tr>
+    <tr>
+        <td><code>gemm_nt_q5_0</code></td>
+        <td>Q5_0</td>
+        <td>FP32</td>
+        <td>Standard decode (single token)</td>
+    </tr>
+    <tr>
+        <td><code>gemm_nt_q5_0_q8_0</code></td>
+        <td>Q5_0</td>
+        <td>Q8_0</td>
+        <td>INT8 batch prefill (faster)</td>
+    </tr>
+    <tr>
+        <td><code>gemm_nt_q4_k</code></td>
+        <td>Q4_K</td>
+        <td>FP32</td>
+        <td>K-quant decode</td>
+    </tr>
+    <tr>
+        <td><code>gemm_nt_q6_k</code></td>
+        <td>Q6_K</td>
+        <td>FP32</td>
+        <td>Higher precision K-quant</td>
+    </tr>
+    <tr>
+        <td><code>gemm_blocked_serial_bf16</code></td>
+        <td>BF16</td>
+        <td>BF16</td>
+        <td>Brain float training</td>
+    </tr>
+</table>
+
+<h2>Related Documentation</h2>
+
+<div class="grid grid-3">
+    <div class="card">
+        <h3 style="margin-top: 0;">Quantization Guide</h3>
+        <p>Deep dive into all quantization formats and their trade-offs.</p>
+        <a href="quantization.html" class="btn btn-sm">Read More →</a>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">GEMM Optimization</h3>
+        <p>Performance tuning and SIMD optimization for GEMM kernels.</p>
+        <a href="gemm-optimization.html" class="btn btn-sm">Read More →</a>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Codegen Pipeline</h3>
+        <p>How the IR system generates optimized C code.</p>
+        <a href="codegen.html" class="btn btn-sm">Read More →</a>
+    </div>
+</div>

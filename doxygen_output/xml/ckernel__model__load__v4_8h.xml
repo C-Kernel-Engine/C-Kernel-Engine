@@ -1,0 +1,114 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ckernel__model__load__v4_8h" kind="file" language="C++">
+    <compoundname>ckernel_model_load_v4.h</compoundname>
+    <includedby refid="ckernel__model__load__v4_8c" local="yes">ckernel_model_load_v4.c</includedby>
+    <invincdepgraph>
+      <node id="1">
+        <label>ckernel_model_load_v4.h</label>
+        <link refid="ckernel__model__load__v4_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>ckernel_model_load_v4.c</label>
+        <link refid="ckernel__model__load__v4_8c"/>
+      </node>
+    </invincdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ckernel__model__load__v4_8h_1a216e94b7cc4499f2199a523bb2621022" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_load_weights_manifest_v4</definition>
+        <argsstring>(void *base, const char *weights_path, const char *manifest_path)</argsstring>
+        <name>ck_load_weights_manifest_v4</name>
+        <param>
+          <type>void *</type>
+          <declname>base</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>weights_path</declname>
+        </param>
+        <param>
+          <type>const char *</type>
+          <declname>manifest_path</declname>
+        </param>
+        <briefdescription>
+<para>Load BUMPWGT4 weights into a v4 model buffer using a manifest map. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>The manifest format is line-based: name|dtype|file_offset|size|runtime_offset Offsets/sizes accept decimal or hex (0x...).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>base</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Base pointer for the generated model buffer. </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>weights_path</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Path to BUMPWGT4 weights file. </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>manifest_path</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Path to weights_manifest.map emitted by build_ir_v4.py. </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>0 on success, non-zero on error. </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model_load_v4.h" line="20" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v4_legacy/ckernel_model_load_v4.c" bodystart="24" bodyend="122" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model_load_v4.h" declline="20" declcolumn="5"/>
+        <references refid="ckernel__model__load__v4_8c_1a67e84fc401bf37b246b7e4a1501ccdf6" compoundref="ckernel__model__load__v4_8c" startline="13">COPY_CHUNK</references>
+        <references refid="ckernel__model__load__v4_8c_1aff189f41b88c0561326386ce8f84c57d" compoundref="ckernel__model__load__v4_8c" startline="12">MANIFEST_LINE_MAX</references>
+        <references refid="ckernel__model__load__v4_8c_1a44cc26d37aa57ab8f15f876824ae2f09" compoundref="ckernel__model__load__v4_8c" startline="19" endline="22">parse_u64</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#ifndef<sp/>CKERNEL_MODEL_LOAD_V4_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CKERNEL_MODEL_LOAD_V4_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="8"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Load<sp/>BUMPWGT4<sp/>weights<sp/>into<sp/>a<sp/>v4<sp/>model<sp/>buffer<sp/>using<sp/>a<sp/>manifest<sp/>map.</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/>The<sp/>manifest<sp/>format<sp/>is<sp/>line-based:</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/><sp/><sp/>name|dtype|file_offset|size|runtime_offset</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/>Offsets/sizes<sp/>accept<sp/>decimal<sp/>or<sp/>hex<sp/>(0x...).</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/>@param<sp/>base<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Base<sp/>pointer<sp/>for<sp/>the<sp/>generated<sp/>model<sp/>buffer.</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*<sp/>@param<sp/>weights_path<sp/><sp/><sp/>Path<sp/>to<sp/>BUMPWGT4<sp/>weights<sp/>file.</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*<sp/>@param<sp/>manifest_path<sp/><sp/>Path<sp/>to<sp/>weights_manifest.map<sp/>emitted<sp/>by<sp/>build_ir_v4.py.</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*<sp/>@return<sp/>0<sp/>on<sp/>success,<sp/>non-zero<sp/>on<sp/>error.</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__model__load__v4_8h_1a216e94b7cc4499f2199a523bb2621022" kindref="member">ck_load_weights_manifest_v4</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*base,</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*weights_path,</highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*manifest_path);</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_MODEL_LOAD_V4_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_model_load_v4.h"/>
+  </compounddef>
+</doxygen>

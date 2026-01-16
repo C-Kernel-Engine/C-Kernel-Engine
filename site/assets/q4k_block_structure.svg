@@ -1,0 +1,251 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 950">
+  <defs>
+    <linearGradient id="blockGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#363636"/>
+      <stop offset="100%" style="stop-color:#2a2a2a"/>
+    </linearGradient>
+    <linearGradient id="cacheGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#2d8a50"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="950" fill="#1a1a1a"/>
+
+  <!-- Title -->
+  <text x="700" y="40" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="26" font-weight="700">Q4_K Block Structure: Nested Scales (256 Weights)</text>
+
+  <!-- Subtitle -->
+  <text x="700" y="70" text-anchor="middle" fill="#808080" font-family="Inter, sans-serif" font-size="14">144 bytes per 256 weights = 4.5 bits per weight | Cache-Optimal Two-Level Hierarchy</text>
+
+  <!-- ===== C Struct Definition ===== -->
+  <rect x="50" y="90" width="380" height="140" rx="8" fill="#232323" stroke="#9b59b6" stroke-width="2"/>
+  <text x="240" y="115" text-anchor="middle" fill="#9b59b6" font-family="Inter, sans-serif" font-size="13" font-weight="700">C Structure (block_q4_K)</text>
+  <text x="70" y="140" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="11">typedef struct {</text>
+  <text x="90" y="158" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">ggml_half d;        <tspan fill="#808080">// 2B: super-scale</tspan></text>
+  <text x="90" y="174" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">ggml_half dmin;     <tspan fill="#808080">// 2B: super-min</tspan></text>
+  <text x="90" y="190" fill="#ffb400" font-family="JetBrains Mono, monospace" font-size="10">uint8_t scales[12]; <tspan fill="#808080">// 12B: 6-bit packed</tspan></text>
+  <text x="90" y="206" fill="#e5a200" font-family="JetBrains Mono, monospace" font-size="10">uint8_t qs[128];    <tspan fill="#808080">// 128B: 4-bit weights</tspan></text>
+  <text x="70" y="222" fill="#47b475" font-family="JetBrains Mono, monospace" font-size="11">} block_q4_K;       <tspan fill="#808080">// = 144 bytes</tspan></text>
+
+  <!-- ===== 6-bit Packing Detail ===== -->
+  <rect x="450" y="90" width="460" height="140" rx="8" fill="#232323" stroke="#07adf8" stroke-width="2"/>
+  <text x="680" y="115" text-anchor="middle" fill="#07adf8" font-family="Inter, sans-serif" font-size="13" font-weight="700">scales[12] Packing: 16 x 6-bit Values</text>
+
+  <text x="470" y="140" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">8 sub-blocks x 2 values (scale + min) = 16 values</text>
+  <text x="470" y="158" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">16 values x 6 bits = 96 bits = 12 bytes</text>
+
+  <rect x="470" y="170" width="420" height="45" rx="4" fill="#2a2a2a" stroke="#07adf8" stroke-width="1"/>
+  <text x="680" y="188" text-anchor="middle" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">scales[12] contains:</text>
+  <text x="680" y="205" text-anchor="middle" fill="#f5f5f5" font-family="JetBrains Mono, monospace" font-size="9">8 x sub_scale[6-bit] + 8 x sub_min[6-bit]</text>
+
+  <!-- ===== Cache Optimization ===== -->
+  <rect x="930" y="90" width="420" height="140" rx="8" fill="url(#cacheGrad)" stroke="#47b475" stroke-width="2"/>
+  <text x="1140" y="115" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="13" font-weight="700">Why Cache-Optimal?</text>
+
+  <text x="950" y="140" fill="#ffffff" font-family="Inter, sans-serif" font-size="11">1. Load 16-byte header ONCE into L1</text>
+  <text x="950" y="160" fill="#ffffff" font-family="Inter, sans-serif" font-size="11">2. Process 8 sub-blocks (256 weights)</text>
+  <text x="950" y="180" fill="#ffffff" font-family="Inter, sans-serif" font-size="11">3. Header stays HOT - reused 256 times!</text>
+
+  <text x="950" y="200" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="10" font-weight="600">Overhead comparison:</text>
+  <text x="950" y="210" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="9">Q4_0: 256 weights x 2B/32 = 16B header</text>
+  <text x="950" y="220" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="9">Q4_K: 256 weights = 16B header (same!)</text>
+
+  <!-- ===== Super Block Header ===== -->
+  <rect x="50" y="250" width="1300" height="110" rx="8" fill="url(#blockGrad)" stroke="#9b59b6" stroke-width="3"/>
+  <text x="700" y="275" text-anchor="middle" fill="#9b59b6" font-family="Inter, sans-serif" font-size="16" font-weight="700">Super-Block Header (16 bytes) - KEEP THIS HOT IN L1 CACHE</text>
+
+  <!-- d (scale) -->
+  <rect x="80" y="295" width="140" height="50" rx="4" fill="#9b59b6"/>
+  <text x="150" y="318" text-anchor="middle" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600">d (FP16)</text>
+  <text x="150" y="335" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="10">2 bytes - global scale</text>
+
+  <!-- dmin (minimum) -->
+  <rect x="240" y="295" width="140" height="50" rx="4" fill="#9b59b6"/>
+  <text x="310" y="318" text-anchor="middle" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600">dmin (FP16)</text>
+  <text x="310" y="335" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="10">2 bytes - global min</text>
+
+  <!-- scales[12] -->
+  <rect x="400" y="295" width="940" height="50" rx="4" fill="#07adf8"/>
+  <text x="1090" y="315" text-anchor="middle" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">scales[12] - Sub-block scales &amp; mins (6-bit each, packed into 12 bytes)</text>
+  <text x="1090" y="335" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="10">8 sub-block scales + 8 sub-block mins = 16 x 6-bit = 96 bits = 12 bytes</text>
+
+  <!-- Scale boxes inside -->
+  <g transform="translate(420, 300)">
+    <rect x="0" y="0" width="40" height="22" rx="2" fill="#0596d6"/>
+    <text x="20" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">sc0</text>
+    <rect x="45" y="0" width="40" height="22" rx="2" fill="#0596d6"/>
+    <text x="65" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">sc1</text>
+    <rect x="90" y="0" width="40" height="22" rx="2" fill="#0596d6"/>
+    <text x="110" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">sc2</text>
+    <text x="150" y="14" fill="#fff" font-family="Inter, sans-serif" font-size="10">...</text>
+    <rect x="170" y="0" width="40" height="22" rx="2" fill="#0596d6"/>
+    <text x="190" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">sc7</text>
+    <text x="225" y="14" fill="#fff" font-family="Inter, sans-serif" font-size="10">|</text>
+    <rect x="240" y="0" width="40" height="22" rx="2" fill="#8e44ad"/>
+    <text x="260" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">m0</text>
+    <rect x="285" y="0" width="40" height="22" rx="2" fill="#8e44ad"/>
+    <text x="305" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">m1</text>
+    <text x="345" y="14" fill="#fff" font-family="Inter, sans-serif" font-size="10">...</text>
+    <rect x="365" y="0" width="40" height="22" rx="2" fill="#8e44ad"/>
+    <text x="385" y="14" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">m7</text>
+  </g>
+
+  <!-- ===== Quantized Weights ===== -->
+  <rect x="50" y="380" width="1300" height="90" rx="8" fill="url(#blockGrad)" stroke="#ffb400" stroke-width="3"/>
+  <text x="700" y="405" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="16" font-weight="700">qs[128] - Quantized Weights (128 bytes = 256 x 4-bit nibbles)</text>
+
+  <!-- Weight nibble boxes -->
+  <g transform="translate(80, 420)">
+    <rect x="0" y="0" width="70" height="35" rx="3" fill="#e5a200"/>
+    <text x="35" y="15" text-anchor="middle" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="9" font-weight="600">w0|w1</text>
+    <text x="35" y="28" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="8">1 byte</text>
+  </g>
+  <g transform="translate(160, 420)">
+    <rect x="0" y="0" width="70" height="35" rx="3" fill="#e5a200"/>
+    <text x="35" y="15" text-anchor="middle" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="9" font-weight="600">w2|w3</text>
+    <text x="35" y="28" text-anchor="middle" fill="#1a1a1a" font-family="Inter, sans-serif" font-size="8">1 byte</text>
+  </g>
+  <text x="260" y="445" fill="#808080" font-family="Inter, sans-serif" font-size="16">...</text>
+  <g transform="translate(300, 420)">
+    <rect x="0" y="0" width="90" height="35" rx="3" fill="#e5a200"/>
+    <text x="45" y="22" text-anchor="middle" fill="#1a1a1a" font-family="JetBrains Mono, monospace" font-size="9" font-weight="600">w254|w255</text>
+  </g>
+
+  <!-- Nibble detail -->
+  <rect x="450" y="418" width="240" height="40" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+  <text x="570" y="435" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="11" font-weight="600">Nibble Packing (4-bit each)</text>
+  <text x="570" y="452" text-anchor="middle" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">byte = (w_hi &lt;&lt; 4) | (w_lo &amp; 0xF)</text>
+
+  <!-- q range -->
+  <rect x="710" y="418" width="180" height="40" rx="4" fill="#2a2a2a" stroke="#ffb400" stroke-width="1"/>
+  <text x="800" y="435" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="11" font-weight="600">q value range</text>
+  <text x="800" y="452" text-anchor="middle" fill="#b0b0b0" font-family="JetBrains Mono, monospace" font-size="10">0-15 (4 bits)</text>
+
+  <!-- Total bytes -->
+  <rect x="910" y="418" width="180" height="40" rx="4" fill="#47b475"/>
+  <text x="1000" y="435" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="11" font-weight="600">Total: 144 bytes</text>
+  <text x="1000" y="452" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="10">16 header + 128 weights</text>
+
+  <!-- ===== Two-Level Hierarchy ===== -->
+  <text x="700" y="510" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="18" font-weight="700">Two-Level Scaling Hierarchy</text>
+
+  <!-- Hierarchy diagram -->
+  <rect x="50" y="530" width="650" height="200" rx="8" fill="#232323" stroke="#454545" stroke-width="2"/>
+
+  <!-- Super-block level -->
+  <rect x="80" y="555" width="200" height="60" rx="6" fill="#9b59b6"/>
+  <text x="180" y="580" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="12" font-weight="600">Super-block (256 weights)</text>
+  <text x="180" y="600" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="10">d=FP16, dmin=FP16</text>
+
+  <!-- Arrow down -->
+  <line x1="180" y1="620" x2="180" y2="650" stroke="#ffb400" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="200" y="640" fill="#ffb400" font-family="Inter, sans-serif" font-size="10">x 8</text>
+
+  <!-- Sub-block level -->
+  <g transform="translate(70, 660)">
+    <rect x="0" y="0" width="75" height="50" rx="4" fill="#07adf8"/>
+    <text x="37" y="20" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="9" font-weight="600">Sub-blk 0</text>
+    <text x="37" y="35" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">32 wts</text>
+    <text x="37" y="48" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">sc[0],m[0]</text>
+  </g>
+  <g transform="translate(155, 660)">
+    <rect x="0" y="0" width="75" height="50" rx="4" fill="#07adf8"/>
+    <text x="37" y="20" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="9" font-weight="600">Sub-blk 1</text>
+    <text x="37" y="35" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">32 wts</text>
+    <text x="37" y="48" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">sc[1],m[1]</text>
+  </g>
+  <text x="255" y="690" fill="#808080" font-family="Inter, sans-serif" font-size="14">...</text>
+  <g transform="translate(280, 660)">
+    <rect x="0" y="0" width="75" height="50" rx="4" fill="#07adf8"/>
+    <text x="37" y="20" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="9" font-weight="600">Sub-blk 7</text>
+    <text x="37" y="35" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="8">32 wts</text>
+    <text x="37" y="48" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="7">sc[7],m[7]</text>
+  </g>
+
+  <!-- Effective scale formula -->
+  <rect x="400" y="555" width="280" height="155" rx="6" fill="#2a2a2a" stroke="#47b475" stroke-width="2"/>
+  <text x="540" y="580" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="13" font-weight="700">Effective Scale Computation</text>
+  <text x="420" y="605" fill="#f5f5f5" font-family="JetBrains Mono, monospace" font-size="10">eff_scale = d * sc[i]</text>
+  <text x="420" y="625" fill="#f5f5f5" font-family="JetBrains Mono, monospace" font-size="10">eff_min   = dmin * m[i]</text>
+  <text x="420" y="655" fill="#808080" font-family="Inter, sans-serif" font-size="10">Where:</text>
+  <text x="420" y="675" fill="#9b59b6" font-family="JetBrains Mono, monospace" font-size="9">d, dmin = FP16 (super-block)</text>
+  <text x="420" y="695" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="9">sc[i], m[i] = 6-bit (sub-block)</text>
+
+  <!-- ===== Dequantization Formula ===== -->
+  <rect x="720" y="530" width="630" height="200" rx="8" fill="#232323" stroke="#47b475" stroke-width="2"/>
+  <text x="1035" y="560" text-anchor="middle" fill="#47b475" font-family="Inter, sans-serif" font-size="16" font-weight="700">Dequantization Formula</text>
+
+  <!-- Main formula -->
+  <rect x="750" y="575" width="570" height="50" rx="4" fill="#2a2a2a"/>
+  <text x="1035" y="605" text-anchor="middle" fill="#f5f5f5" font-family="JetBrains Mono, monospace" font-size="14">w_fp32 = q * (d * sc[i]) + (dmin * m[i])</text>
+
+  <!-- Formula breakdown -->
+  <text x="750" y="650" fill="#e5a200" font-family="JetBrains Mono, monospace" font-size="11">q</text>
+  <text x="770" y="650" fill="#808080" font-family="Inter, sans-serif" font-size="11">= 4-bit weight (0-15)</text>
+
+  <text x="750" y="675" fill="#9b59b6" font-family="JetBrains Mono, monospace" font-size="11">d * sc[i]</text>
+  <text x="840" y="675" fill="#808080" font-family="Inter, sans-serif" font-size="11">= effective scale (FP16 x 6-bit)</text>
+
+  <text x="750" y="700" fill="#9b59b6" font-family="JetBrains Mono, monospace" font-size="11">dmin * m[i]</text>
+  <text x="860" y="700" fill="#808080" font-family="Inter, sans-serif" font-size="11">= effective minimum (FP16 x 6-bit)</text>
+
+  <rect x="1050" y="640" width="280" height="75" rx="4" fill="#47b475"/>
+  <text x="1190" y="665" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="12" font-weight="600">Dequantized in registers only!</text>
+  <text x="1190" y="685" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="10">Never written to RAM</text>
+  <text x="1190" y="705" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="10">FMA directly with activations</text>
+
+  <!-- ===== Processing Flow ===== -->
+  <rect x="50" y="750" width="650" height="180" rx="8" fill="#232323" stroke="#ffb400" stroke-width="2"/>
+  <text x="375" y="780" text-anchor="middle" fill="#ffb400" font-family="Inter, sans-serif" font-size="14" font-weight="700">Cache-Optimal Processing Flow</text>
+
+  <text x="80" y="810" fill="#47b475" font-family="Inter, sans-serif" font-size="12" font-weight="600">1.</text>
+  <text x="100" y="810" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">Load 16-byte header into L1 cache (d, dmin, scales[12])</text>
+
+  <text x="80" y="835" fill="#47b475" font-family="Inter, sans-serif" font-size="12" font-weight="600">2.</text>
+  <text x="100" y="835" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">For each sub-block i = 0..7:</text>
+
+  <text x="120" y="858" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">a. Extract 6-bit sc[i], m[i] from header (ALREADY IN L1!)</text>
+  <text x="120" y="878" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">b. Compute: eff_scale = d * sc[i], eff_min = dmin * m[i]</text>
+  <text x="120" y="898" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">c. Dequant 32 weights: w = q * eff_scale + eff_min</text>
+  <text x="120" y="918" fill="#07adf8" font-family="JetBrains Mono, monospace" font-size="10">d. FMA with activations (fused kernel)</text>
+
+  <!-- ===== Comparison Box ===== -->
+  <rect x="720" y="750" width="630" height="180" rx="8" fill="#232323" stroke="#9b59b6" stroke-width="2"/>
+  <text x="1035" y="780" text-anchor="middle" fill="#9b59b6" font-family="Inter, sans-serif" font-size="14" font-weight="700">Why Q4_K Beats Q4_0 (Same 4.5 bpw!)</text>
+
+  <text x="750" y="810" fill="#ffb400" font-family="Inter, sans-serif" font-size="12" font-weight="600">Q4_0 (Simple):</text>
+  <text x="750" y="830" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">32 weights + 1 FP16 scale = 18 bytes</text>
+  <text x="750" y="850" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">One scale for ALL 32 weights - limited precision</text>
+
+  <text x="750" y="880" fill="#47b475" font-family="Inter, sans-serif" font-size="12" font-weight="600">Q4_K (Hierarchical):</text>
+  <text x="750" y="900" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">256 weights + 16B header = 144 bytes (same bpw!)</text>
+  <text x="750" y="920" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="11">Two-level scaling adapts to both global AND local variation</text>
+
+  <!-- Winner badge -->
+  <rect x="1150" y="800" width="180" height="110" rx="8" fill="#47b475"/>
+  <text x="1240" y="830" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="14" font-weight="700">Q4_K Wins!</text>
+  <text x="1240" y="855" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="10">Same size as Q4_0</text>
+  <text x="1240" y="875" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="10">Better quality</text>
+  <text x="1240" y="895" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-size="10">Cache-optimal</text>
+
+  <!-- Legend -->
+  <g transform="translate(50, 15)">
+    <rect x="0" y="0" width="450" height="25" rx="4" fill="#2a2a2a"/>
+    <rect x="10" y="5" width="15" height="15" rx="2" fill="#9b59b6"/>
+    <text x="32" y="17" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Super-block (d, dmin)</text>
+    <rect x="140" y="5" width="15" height="15" rx="2" fill="#07adf8"/>
+    <text x="162" y="17" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Sub-block (6-bit)</text>
+    <rect x="260" y="5" width="15" height="15" rx="2" fill="#ffb400"/>
+    <text x="282" y="17" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Weights (4-bit)</text>
+    <rect x="360" y="5" width="15" height="15" rx="2" fill="#47b475"/>
+    <text x="382" y="17" fill="#b0b0b0" font-family="Inter, sans-serif" font-size="10">Cache/Result</text>
+  </g>
+</svg>

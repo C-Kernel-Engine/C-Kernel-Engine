@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C-Kernel-Engine Documentation</title>
+    <style>
+        :root {
+            --bg-color-deep: #111827;
+            --bg-color-medium: #1f2937;
+            --bg-color-light: #374151;
+            --border-color: #4b5563;
+            --text-color-main: #d1d5db;
+            --text-color-head: #f9fafb;
+            --accent-color-blue: #60a5fa;
+        }
+        body {
+            background-color: var(--bg-color-deep);
+            color: var(--text-color-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+        aside {
+            width: 250px;
+            background-color: var(--bg-color-deep);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            color: var(--text-color-head);
+            font-size: 1.2rem;
+        }
+        nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+        }
+        nav li {
+            margin-bottom: 0.5rem;
+        }
+        nav a {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: var(--text-color-main);
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        nav a:hover, nav a.active {
+            background-color: var(--bg-color-light);
+            color: var(--text-color-head);
+        }
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+        .content-section {
+            display: none;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .content-section.active {
+            display: block;
+        }
+        h2 {
+            color: var(--text-color-head);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .svg-container {
+            background-color: var(--bg-color-deep);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <aside>
+        <div class="sidebar-header">C-Kernel-Engine</div>
+        <nav id="nav-menu">
+            <ul>
+                <li><a href="#overview" class="nav-link active" data-target="overview">Overview</a></li>
+                <li><a href="#architecture" class="nav-link" data-target="architecture">Architecture</a></li>
+                <li><a href="#ir-codegen" class="nav-link" data-target="ir-codegen">IR & Codegen</a></li>
+                <li><a href="ir-v2-format.html">IR v2 Format ↗</a></li>
+                <li><a href="doxygen_output/html/index.html" target="_blank">API Reference ↗</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <div id="overview" class="content-section active">
+            <h2>Overview</h2>
+            <p>C-Kernel-Engine is a high-performance, model-agnostic inference engine for Transformer models, written in pure C with AVX-512 optimizations.</p>
+            <p>It treats model architecture as data, compiling a configuration file into a specialized C runtime.</p>
+        </div>
+
+        <div id="architecture" class="content-section">
+            <h2>Kernel Architecture</h2>
+            <p>The engine uses a three-layer architecture to separate threading logic from pure mathematical kernels.</p>
+            <div class="svg-container">
+                <svg width="600" height="400" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+                        </linearGradient>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af" />
+                        </marker>
+                    </defs>
+                    
+                    <!-- Orchestrator Layer -->
+                    <rect x="100" y="50" width="400" height="80" rx="8" fill="url(#grad1)" />
+                    <text x="300" y="85" font-family="sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">Layer 3: Orchestrators</text>
+                    <text x="300" y="110" font-family="sans-serif" font-size="14" fill="#e5e7eb" text-anchor="middle">Manages Threads & Data Flow</text>
+
+                    <!-- Arrow -->
+                    <line x1="300" y1="130" x2="300" y2="170" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Kernel Layer -->
+                    <rect x="100" y="170" width="400" height="80" rx="8" fill="url(#grad2)" />
+                    <text x="300" y="205" font-family="sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">Layer 1: Core Kernels</text>
+                    <text x="300" y="230" font-family="sans-serif" font-size="14" fill="#e5e7eb" text-anchor="middle">Single-Threaded, AVX-512 Optimized</text>
+                </svg>
+            </div>
+        </div>
+
+        <div id="ir-codegen" class="content-section">
+            <h2>IR & Codegen Pipeline</h2>
+            <p>Models are defined in JSON, parsed into an Intermediate Representation (IR), and compiled into C code.</p>
+        </div>
+    </main>
+
+    <script>
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('.content-section');
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                if(link.getAttribute('target') === '_blank') return;
+                e.preventDefault();
+                const targetId = link.getAttribute('data-target');
+                
+                sections.forEach(section => section.classList.remove('active'));
+                navLinks.forEach(l => l.classList.remove('active'));
+
+                document.getElementById(targetId).classList.add('active');
+                link.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

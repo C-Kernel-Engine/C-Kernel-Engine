@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1400" height="800" viewBox="0 0 1400 800" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0a0e27;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#1a1f3a;stop-opacity:1" />
+        </linearGradient>
+        
+        <linearGradient id="titleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#4fc3f7" />
+            <stop offset="50%" style="stop-color:#29b6f6" />
+            <stop offset="100%" style="stop-color:#0288d1" />
+        </linearGradient>
+        
+        <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4fc3f7"/>
+        </marker>
+        
+        <style type="text/css">
+            <![CDATA[
+                text {
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    fill: #e0e0e0;
+                }
+                
+                .title {
+                    font-size: 48px;
+                    font-weight: bold;
+                    fill: url(#titleGradient);
+                }
+                
+                .subtitle {
+                    font-size: 24px;
+                    fill: #81d4fa;
+                }
+                
+                .section-title {
+                    font-size: 32px;
+                    fill: #4fc3f7;
+                    font-weight: bold;
+                }
+                
+                .body-text {
+                    font-size: 18px;
+                    fill: #b0bec5;
+                }
+                
+                .highlight {
+                    font-size: 20px;
+                    fill: #4fc3f7;
+                    font-weight: bold;
+                }
+                
+                .code {
+                    font-family: 'Courier New', monospace;
+                    font-size: 16px;
+                    fill: #81d4fa;
+                }
+            ]]>
+        </style>
+    </defs>
+    
+    <!-- Background -->
+    <rect width="100%" height="100%" fill="url(#bgGradient)"/>
+    
+    <!-- Title Section -->
+    <rect x="50" y="50" width="1300" height="120" rx="20" fill="rgba(10, 14, 39, 0.7)" stroke="#4fc3f7" stroke-width="2"/>
+    <text x="700" y="90" text-anchor="middle" class="title">C-Kernel-Engine Architecture</text>
+    <text x="700" y="130" text-anchor="middle" class="subtitle">High-Performance LLM Kernel Library in C</text>
+    
+    <!-- Main Architecture Diagram -->
+    <g transform="translate(100, 200)">
+        <!-- Pipeline Flow -->
+        <rect x="0" y="0" width="1200" height="500" rx="20" fill="rgba(15, 23, 42, 0.5)" stroke="#4fc3f7" stroke-width="2"/>
+        
+        <!-- Phase 1: Input -->
+        <rect x="50" y="50" width="200" height="100" rx="15" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="150" y="95" text-anchor="middle" class="section-title">Input</text>
+        <text x="150" y="120" text-anchor="middle" class="body-text">config.json</text>
+        <text x="150" y="140" text-anchor="middle" class="body-text">Model Parameters</text>
+        
+        <!-- Phase 2: IR Generation -->
+        <rect x="300" y="50" width="200" height="100" rx="15" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="400" y="95" text-anchor="middle" class="section-title">IR Generation</text>
+        <text x="400" y="120" text-anchor="middle" class="body-text">CKIRGraph</text>
+        <text x="400" y="140" text-anchor="middle" class="body-text">Graph Construction</text>
+        
+        <!-- Phase 3: Memory Planning -->
+        <rect x="550" y="50" width="200" height="100" rx="15" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="650" y="95" text-anchor="middle" class="section-title">Memory Planning</text>
+        <text x="650" y="120" text-anchor="middle" class="body-text">Layout Optimization</text>
+        <text x="650" y="140" text-anchor="middle" class="body-text">Cache Efficiency</text>
+        
+        <!-- Phase 4: Code Generation -->
+        <rect x="800" y="50" width="200" height="100" rx="15" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="900" y="95" text-anchor="middle" class="section-title">Code Generation</text>
+        <text x="900" y="120" text-anchor="middle" class="body-text">ai.c Runtime</text>
+        <text x="900" y="140" text-anchor="middle" class="body-text">Standalone Binary</text>
+        
+        <!-- Phase 5: Execution -->
+        <rect x="1050" y="50" width="150" height="100" rx="15" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="1125" y="95" text-anchor="middle" class="section-title">Execution</text>
+        <text x="1125" y="120" text-anchor="middle" class="body-text">CPU/AVX</text>
+        <text x="1125" y="140" text-anchor="middle" class="body-text">Optimized Kernels</text>
+        
+        <!-- Arrows connecting phases -->
+        <path d="M250,100 L280,100" stroke="#4fc3f7" stroke-width="3" marker-end="url(#arrow)"/>
+        <path d="M500,100 L530,100" stroke="#4fc3f7" stroke-width="3" marker-end="url(#arrow)"/>
+        <path d="M750,100 L780,100" stroke="#4fc3f7" stroke-width="3" marker-end="url(#arrow)"/>
+        <path d="M1000,100 L1030,100" stroke="#4fc3f7" stroke-width="3" marker-end="url(#arrow)"/>
+        
+        <!-- Website Metaphor Section -->
+        <rect x="50" y="200" width="1150" height="250" rx="15" fill="rgba(10, 14, 39, 0.4)" stroke="#81d4fa" stroke-width="2"/>
+        <text x="625" y="240" text-anchor="middle" class="section-title">Website Metaphor: LLM as Web Page</text>
+        
+        <!-- Header Section -->
+        <rect x="100" y="260" width="250" height="80" rx="10" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="225" y="295" text-anchor="middle" class="body-text" fill="#81d4fa">Header</text>
+        <text x="225" y="315" text-anchor="middle" class="body-text" fill="#b0bec5">Embeddings</text>
+        <text x="225" y="335" text-anchor="middle" class="body-text" fill="#b0bec5">Positional Encoding</text>
+        
+        <!-- Block Section (Repeated) -->
+        <rect x="400" y="260" width="300" height="80" rx="10" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="550" y="295" text-anchor="middle" class="body-text" fill="#81d4fa">Block × L</text>
+        <text x="550" y="315" text-anchor="middle" class="body-text" fill="#b0bec5">Transformer Layers</text>
+        <text x="550" y="335" text-anchor="middle" class="body-text" fill="#b0bec5">(Repeated L times)</text>
+        
+        <!-- Footer Section -->
+        <rect x="750" y="260" width="250" height="80" rx="10" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="875" y="295" text-anchor="middle" class="body-text" fill="#81d4fa">Footer</text>
+        <text x="875" y="315" text-anchor="middle" class="body-text" fill="#b0bec5">Final Layer Norm</text>
+        <text x="875" y="335" text-anchor="middle" class="body-text" fill="#b0bec5">Language Head</text>
+        
+        <!-- Kernel Shapes Legend -->
+        <rect x="50" y="480" width="1150" height="100" rx="10" fill="rgba(10, 14, 39, 0.4)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="625" y="515" text-anchor="middle" class="section-title">Core Kernel Shapes</text>
+        
+        <!-- GEMM Projections -->
+        <rect x="100" y="530" width="250" height="60" rx="8" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="225" y="555" text-anchor="middle" class="body-text" fill="#81d4fa">🔷 GEMM Projections</text>
+        <text x="225" y="575" text-anchor="middle" class="code">[T,D] × [D,kD] + bias</text>
+        
+        <!-- Attention Scores -->
+        <rect x="400" y="530" width="250" height="60" rx="8" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="525" y="555" text-anchor="middle" class="body-text" fill="#81d4fa">🔸 Attention Scores</text>
+        <text x="525" y="575" text-anchor="middle" class="code">[T,d] × [d,T] → [T,T]</text>
+        
+        <!-- Score-Value Apply -->
+        <rect x="700" y="530" width="250" height="60" rx="8" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="825" y="555" text-anchor="middle" class="body-text" fill="#81d4fa">🔹 Score-Value Apply</text>
+        <text x="825" y="575" text-anchor="middle" class="code">[T,T] × [T,d] → [T,d]</text>
+        
+        <!-- Backward GEMMs -->
+        <rect x="1000" y="530" width="250" height="60" rx="8" fill="rgba(20, 30, 50, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+        <text x="1125" y="555" text-anchor="middle" class="body-text" fill="#81d4fa">🔶 Backward GEMMs</text>
+        <text x="1125" y="575" text-anchor="middle" class="code">[D,T] × [T,kD] → [D,kD]</text>
+    </g>
+    
+    <!-- Performance Highlights -->
+    <rect x="100" y="650" width="1200" height="80" rx="15" fill="rgba(10, 14, 39, 0.6)" stroke="#4fc3f7" stroke-width="2"/>
+    <text x="700" y="700" text-anchor="middle" class="highlight">⚡ Optimized for Transformer Workloads | 🎯 Focused Kernel Set | 🚀 Aggressive CPU Tuning</text>
+    
+    <!-- Footer -->
+    <rect x="100" y="720" width="1200" height="40" rx="10" fill="rgba(10, 14, 39, 0.7)" stroke="#4fc3f7" stroke-width="1"/>
+    <text x="700" y="750" text-anchor="middle" class="body-text">C-Kernel-Engine | High-Performance LLM Kernels in C</text>
+</svg>

@@ -1,0 +1,138 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ckernel__alloc_8h" kind="file" language="C++">
+    <compoundname>ckernel_alloc.h</compoundname>
+    <includes local="no">stddef.h</includes>
+    <includedby refid="ckernel__alloc_8c" local="yes">ckernel_alloc.c</includedby>
+    <includedby refid="ckernel__alloc__v6_8c" local="yes">ckernel_alloc_v6.c</includedby>
+    <includedby refid="ckernel__alloc__v6_85_8c" local="yes">ckernel_alloc_v6.5.c</includedby>
+    <includedby refid="ckernel__alloc__v6_86_8c" local="yes">ckernel_alloc_v6.6.c</includedby>
+    <incdepgraph>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>ckernel_alloc.h</label>
+        <link refid="ckernel__alloc_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="2">
+        <label>ckernel_alloc.c</label>
+        <link refid="ckernel__alloc_8c"/>
+      </node>
+      <node id="4">
+        <label>ckernel_alloc_v6.5.c</label>
+        <link refid="ckernel__alloc__v6_85_8c"/>
+      </node>
+      <node id="5">
+        <label>ckernel_alloc_v6.6.c</label>
+        <link refid="ckernel__alloc__v6_86_8c"/>
+      </node>
+      <node id="3">
+        <label>ckernel_alloc_v6.c</label>
+        <link refid="ckernel__alloc__v6_8c"/>
+      </node>
+      <node id="1">
+        <label>ckernel_alloc.h</label>
+        <link refid="ckernel__alloc_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+    </invincdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ckernel__alloc_8h_1a11a682ae32301dd05465e77d7dd4e37e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void *</type>
+        <definition>void* ck_huge_alloc</definition>
+        <argsstring>(size_t bytes)</argsstring>
+        <name>ck_huge_alloc</name>
+        <param>
+          <type>size_t</type>
+          <declname>bytes</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Allocate a large, contiguous memory region for model weights/activations.</para>
+<para>Implementation strategy:<itemizedlist>
+<listitem><para>Try to allocate 2MB-aligned memory backed by huge pages where possible.</para>
+</listitem><listitem><para>Fall back to aligned_alloc + madvise(MADV_HUGEPAGE) when explicit huge pages are not available.</para>
+</listitem></itemizedlist>
+</para>
+<para>Returns NULL on failure. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_alloc.h" line="16" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_alloc.c" bodystart="67" bodyend="99" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_alloc.h" declline="16" declcolumn="6"/>
+        <references refid="ckernel__alloc_8c_1a19108c1ddea653d46840daefcf542bb5" compoundref="ckernel__alloc_8c" startline="28" endline="32">align_up_bytes</references>
+        <references refid="ckernel__alloc_8c_1af40ff2d14fdebba00915237c11b490c8" compoundref="ckernel__alloc_8c" startline="15">HUGE_PAGE_SIZE</references>
+        <references refid="ckernel__alloc_8c_1a78d026646faf03ea83ff458d93f99b6a" compoundref="ckernel__alloc_8c" startline="34" endline="48">record_allocation</references>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__alloc_8h_1af814a916b578d2824aa0e9ec230ea166" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_huge_free</definition>
+        <argsstring>(void *ptr, size_t bytes)</argsstring>
+        <name>ck_huge_free</name>
+        <param>
+          <type>void *</type>
+          <declname>ptr</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>bytes</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Free memory allocated by ck_huge_alloc.</para>
+<para>The bytes parameter should be the same size passed to ck_huge_alloc. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_alloc.h" line="23" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_alloc.c" bodystart="101" bodyend="121" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_alloc.h" declline="23" declcolumn="6"/>
+        <references refid="ckernel__alloc_8c_1a1e5036eee15a005216b507a534db66b6" compoundref="ckernel__alloc_8c" startline="50" endline="65">detach_allocation</references>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="preprocessor">#ifndef<sp/>CKERNEL_ALLOC_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CKERNEL_ALLOC_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="6"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>Allocate<sp/>a<sp/>large,<sp/>contiguous<sp/>memory<sp/>region<sp/>for<sp/>model<sp/>weights/activations.</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>Implementation<sp/>strategy:</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Try<sp/>to<sp/>allocate<sp/>2MB-aligned<sp/>memory<sp/>backed<sp/>by<sp/>huge<sp/>pages<sp/>where<sp/>possible.</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/><sp/>-<sp/>Fall<sp/>back<sp/>to<sp/>aligned_alloc<sp/>+<sp/>madvise(MADV_HUGEPAGE)<sp/>when<sp/>explicit</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/>huge<sp/>pages<sp/>are<sp/>not<sp/>available.</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/>Returns<sp/>NULL<sp/>on<sp/>failure.</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*<ref refid="ckernel__alloc_8h_1a11a682ae32301dd05465e77d7dd4e37e" kindref="member">ck_huge_alloc</ref>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>bytes);</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="18"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*<sp/>Free<sp/>memory<sp/>allocated<sp/>by<sp/>ck_huge_alloc.</highlight></codeline>
+<codeline lineno="20"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*<sp/>The<sp/>bytes<sp/>parameter<sp/>should<sp/>be<sp/>the<sp/>same<sp/>size<sp/>passed<sp/>to<sp/>ck_huge_alloc.</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__alloc_8h_1af814a916b578d2824aa0e9ec230ea166" kindref="member">ck_huge_free</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*ptr,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>bytes);</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CKERNEL_ALLOC_H<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ckernel_alloc.h"/>
+  </compounddef>
+</doxygen>
