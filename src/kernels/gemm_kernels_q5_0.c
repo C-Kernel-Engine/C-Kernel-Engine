@@ -190,6 +190,169 @@ void gemv_q5_0_avx512(float *y,
 #endif
 
 /* ============================================================================
+ * AVX2 Implementation (Haswell+, 256-bit integer operations)
+ *
+ * AVX2 provides true 256-bit integer operations that AVX lacks.
+ * This implementation uses:
+ *   - _mm256_cvtepi8_epi32: Sign-extend 8 bytes to 8 int32s (AVX2)
+ *   - _mm256_fmadd_ps: Fused multiply-add (FMA3, available with AVX2)
+ *   - 256-bit integer shuffles and masks
+ *
+ * Processing: 32 weights per block, 8 at a time with AVX2 registers
+ * ============================================================================ */
+
+#if defined(__AVX2__) && !defined(__AVX512F__)
+
+/* Helper: AVX2 horizontal sum of 8 floats */
+static inline float hsum_avx2(__m256 v) {
+    __m128 lo = _mm256_castps256_ps128(v);
+    __m128 hi = _mm256_extractf128_ps(v, 1);
+    lo = _mm_add_ps(lo, hi);  /* 4 floats */
+    __m128 shuf = _mm_shuffle_ps(lo, lo, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 sums = _mm_add_ps(lo, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+
+/**
+ * @brief Matrix-vector multiply with Q5_0 weights (AVX2 optimized)
+ *
+ * Uses AVX2 256-bit integer operations for efficient dequantization.
+ * Processes 8 weights at a time with full 256-bit registers.
+ */
+void gemv_q5_0_avx2(float *y,
+                    const void *W,
+                    const float *x,
+                    int M, int K)
+{
+    const block_q5_0 *blocks = (const block_q5_0 *)W;
+    const int blocks_per_row = K / QK5_0;  /* QK5_0 = 32 */
+
+    for (int row = 0; row < M; row++) {
+        __m256 acc = _mm256_setzero_ps();
+
+        for (int b = 0; b < blocks_per_row; b++) {
+            const block_q5_0 *block = &blocks[row * blocks_per_row + b];
+            const float d = CK_FP16_TO_FP32(block->d);
+            const __m256 vscale = _mm256_set1_ps(d);
+            const float *xp = &x[b * QK5_0];
+
+            /* Get high bits as 32-bit integer */
+            uint32_t qh;
+            memcpy(&qh, block->qh, sizeof(qh));
+
+            /* Q5_0 layout: 32 weights per block
+             * - Weights 0-15: low nibbles of qs[0-15], high bit from qh[0-15]
+             * - Weights 16-31: high nibbles of qs[0-15], high bit from qh[16-31]
+             *
+             * Process in 4 groups of 8 for AVX2:
+             */
+
+            /* Group 0: weights 0-7 (low nibbles of qs[0-7], high bits qh[0-7]) */
+            {
+                __m128i qs8 = _mm_loadl_epi64((const __m128i *)block->qs);
+                __m128i lo = _mm_and_si128(qs8, _mm_set1_epi8(0x0F));
+
+                /* Build high bits for weights 0-7 */
+                int8_t hb[8];
+                for (int i = 0; i < 8; i++) {
+                    hb[i] = ((qh >> i) << 4) & 0x10;
+                }
+                __m128i hi = _mm_loadl_epi64((const __m128i *)hb);
+
+                /* Combine and subtract offset to get signed values */
+                __m128i q5 = _mm_or_si128(lo, hi);
+                __m128i offset = _mm_set1_epi8(16);
+                __m128i q5_signed = _mm_sub_epi8(q5, offset);
+
+                /* Sign-extend to 32-bit and convert to float (AVX2) */
+                __m256i q32 = _mm256_cvtepi8_epi32(q5_signed);
+                __m256 wf = _mm256_cvtepi32_ps(q32);
+                wf = _mm256_mul_ps(wf, vscale);
+
+                /* Load input and accumulate */
+                __m256 xv = _mm256_loadu_ps(&xp[0]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 1: weights 8-15 (low nibbles of qs[8-15], high bits qh[8-15]) */
+            {
+                __m128i qs8 = _mm_loadl_epi64((const __m128i *)(block->qs + 8));
+                __m128i lo = _mm_and_si128(qs8, _mm_set1_epi8(0x0F));
+
+                int8_t hb[8];
+                for (int i = 0; i < 8; i++) {
+                    hb[i] = ((qh >> (8 + i)) << 4) & 0x10;
+                }
+                __m128i hi = _mm_loadl_epi64((const __m128i *)hb);
+
+                __m128i q5 = _mm_or_si128(lo, hi);
+                __m128i offset = _mm_set1_epi8(16);
+                __m128i q5_signed = _mm_sub_epi8(q5, offset);
+
+                __m256i q32 = _mm256_cvtepi8_epi32(q5_signed);
+                __m256 wf = _mm256_cvtepi32_ps(q32);
+                wf = _mm256_mul_ps(wf, vscale);
+
+                __m256 xv = _mm256_loadu_ps(&xp[8]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 2: weights 16-23 (high nibbles of qs[0-7], high bits qh[16-23]) */
+            {
+                __m128i qs8 = _mm_loadl_epi64((const __m128i *)block->qs);
+                __m128i hi_nib = _mm_and_si128(_mm_srli_epi16(qs8, 4), _mm_set1_epi8(0x0F));
+
+                /* High bits for weights 16-23 come from qh bits 16-23 */
+                int8_t hb[8];
+                for (int i = 0; i < 8; i++) {
+                    hb[i] = ((qh >> (16 + i)) & 1) << 4;
+                }
+                __m128i hi = _mm_loadl_epi64((const __m128i *)hb);
+
+                __m128i q5 = _mm_or_si128(hi_nib, hi);
+                __m128i offset = _mm_set1_epi8(16);
+                __m128i q5_signed = _mm_sub_epi8(q5, offset);
+
+                __m256i q32 = _mm256_cvtepi8_epi32(q5_signed);
+                __m256 wf = _mm256_cvtepi32_ps(q32);
+                wf = _mm256_mul_ps(wf, vscale);
+
+                __m256 xv = _mm256_loadu_ps(&xp[16]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 3: weights 24-31 (high nibbles of qs[8-15], high bits qh[24-31]) */
+            {
+                __m128i qs8 = _mm_loadl_epi64((const __m128i *)(block->qs + 8));
+                __m128i hi_nib = _mm_and_si128(_mm_srli_epi16(qs8, 4), _mm_set1_epi8(0x0F));
+
+                int8_t hb[8];
+                for (int i = 0; i < 8; i++) {
+                    hb[i] = ((qh >> (24 + i)) & 1) << 4;
+                }
+                __m128i hi = _mm_loadl_epi64((const __m128i *)hb);
+
+                __m128i q5 = _mm_or_si128(hi_nib, hi);
+                __m128i offset = _mm_set1_epi8(16);
+                __m128i q5_signed = _mm_sub_epi8(q5, offset);
+
+                __m256i q32 = _mm256_cvtepi8_epi32(q5_signed);
+                __m256 wf = _mm256_cvtepi32_ps(q32);
+                wf = _mm256_mul_ps(wf, vscale);
+
+                __m256 xv = _mm256_loadu_ps(&xp[24]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+        }
+
+        y[row] = hsum_avx2(acc);
+    }
+}
+#endif /* __AVX2__ && !__AVX512F__ */
+
+/* ============================================================================
  * AVX Implementation with True SIMD Dequantization
  *
  * Q5_0 format: 32 weights per block
@@ -207,7 +370,7 @@ void gemv_q5_0_avx512(float *y,
  *   3. Convert to float and scale
  * ============================================================================ */
 
-#if defined(__AVX__) && !defined(__AVX512F__)
+#if defined(__AVX__) && !defined(__AVX2__) && !defined(__AVX512F__)
 
 /* Helper: Extract low nibbles from 16 packed bytes to 16 bytes */
 static inline __m128i extract_low_nibbles(__m128i packed) {
@@ -377,11 +540,12 @@ void gemv_q5_0(float *y,
                const float *x,
                int M, int K)
 {
-// TODO: Implement gemv_q5_0_avx2 for better AVX2 performance
-// For now, AVX2 falls back to AVX (backward compatible)
+// Dispatch order: AVX512 > AVX2 > AVX > SSE > ref
 #if defined(__AVX512F__)
     gemv_q5_0_avx512(y, W, x, M, K);
-#elif defined(__AVX__) || defined(__AVX2__)
+#elif defined(__AVX2__)
+    gemv_q5_0_avx2(y, W, x, M, K);
+#elif defined(__AVX__)
     gemv_q5_0_avx(y, W, x, M, K);
 #elif defined(__SSE4_1__)
     gemv_q5_0_sse_v2(y, W, x, M, K);
