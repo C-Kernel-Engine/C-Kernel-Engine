@@ -890,7 +890,6 @@
         </nav>
     </header>
     <main>
-
 <div class="container">
   <h1>Test Report</h1>
   <p class="lead">
@@ -1271,7 +1270,7 @@
   </div>
 
   <p>
-    View the <a href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/actions/workflows/nightly.yml">GitHub Actions workflow</a>
+    View the <a href="https://github.com/antshiv/C-Kernel-Engine/actions/workflows/nightly.yml">GitHub Actions workflow</a>
     for detailed logs.
   </p>
 </div>
@@ -1296,9 +1295,10 @@ function loadResults() {
     document.getElementById('results-content').classList.add('active');
   })
   .catch(err => {
+    console.error('Fetch error:', err);
     document.getElementById('loading-state').classList.remove('active');
     document.getElementById('error-state').classList.add('active');
-    document.getElementById('error-message').textContent = 'Failed to load results: ' + err;
+    document.getElementById('error-message').textContent = 'Failed to load: ' + (err.message || err);
   });
 }
 
