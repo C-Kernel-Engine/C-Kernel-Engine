@@ -126,51 +126,44 @@ $(document).ready(function(){initNavTree('loss__kernels__bf16_8c_source.html',''
 <div class="contents">
 <a href="loss__kernels__bf16_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;<span class="preprocessor">#include &lt;stddef.h&gt;</span></div>
 <div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;<span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
-<div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;<span class="preprocessor">#include &lt;stdlib.h&gt;</span></div>
-<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160; </div>
-<div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="bf16__utils_8h.html">bf16_utils.h</a>&quot;</span></div>
-<div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="ckernel__engine_8h.html">ckernel_engine.h</a>&quot;</span></div>
-<div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160; </div>
-<div class="line"><a name="l00008"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a5e87177162b6dd565515e53e56dcd0f5">    8</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="loss__kernels__bf16_8c.html#a5e87177162b6dd565515e53e56dcd0f5">softmax_cross_entropy_loss_bf16</a>(<span class="keyword">const</span> uint16_t *logits,</div>
-<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;                                     <span class="keyword">const</span> int32_t *targets,</div>
-<div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160;                                     <span class="keywordtype">int</span> tokens,</div>
-<div class="line"><a name="l00011"></a><span class="lineno">   11</span>&#160;                                     <span class="keywordtype">int</span> <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
-<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;                                     uint16_t *d_logits,</div>
-<div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;                                     <span class="keywordtype">float</span> *loss_out)</div>
-<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;{</div>
-<div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;    <span class="keywordflow">if</span> (!logits || !targets || !d_logits || tokens &lt;= 0 || <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
-<div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;        <span class="keywordflow">if</span> (loss_out) {</div>
-<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;            *loss_out = 0.0f;</div>
-<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;        }</div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;    }</div>
-<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160; </div>
-<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;    <span class="keywordtype">float</span> *logits_f = (<span class="keywordtype">float</span> *)malloc(count * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;    <span class="keywordtype">float</span> *d_logits_f = (<span class="keywordtype">float</span> *)malloc(count * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;    <span class="keywordflow">if</span> (!logits_f || !d_logits_f) {</div>
-<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;        free(logits_f);</div>
-<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;        free(d_logits_f);</div>
-<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;        <span class="keywordflow">if</span> (loss_out) {</div>
-<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;            *loss_out = 0.0f;</div>
-<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;        }</div>
-<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;    }</div>
-<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160; </div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(logits, logits_f, count);</div>
-<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;    <a class="code" href="ckernel__engine_8h.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">softmax_cross_entropy_loss</a>(logits_f, targets, tokens, <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, d_logits_f, loss_out);</div>
-<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(d_logits_f, d_logits, count);</div>
-<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160; </div>
-<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;    free(logits_f);</div>
-<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;    free(d_logits_f);</div>
-<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;}</div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160; </div>
+<div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160; </div>
+<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="bf16__utils_8h.html">bf16_utils.h</a>&quot;</span></div>
+<div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="ckernel__engine_8h.html">ckernel_engine.h</a>&quot;</span></div>
+<div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160; </div>
+<div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;<span class="comment">/*</span></div>
+<div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;<span class="comment"> * BF16 softmax cross-entropy loss with caller-provided scratch buffers.</span></div>
+<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;<span class="comment"> * scratch_logits, scratch_d_logits: each [tokens * vocab_size] floats</span></div>
+<div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00011"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a5fd08bdc0a631b4ec761b1e99085ebb9">   11</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="loss__kernels__bf16_8c.html#a5fd08bdc0a631b4ec761b1e99085ebb9">softmax_cross_entropy_loss_bf16</a>(<span class="keyword">const</span> uint16_t *logits,</div>
+<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;                                     <span class="keyword">const</span> int32_t *targets,</div>
+<div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;                                     <span class="keywordtype">int</span> tokens,</div>
+<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;                                     <span class="keywordtype">int</span> <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
+<div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;                                     uint16_t *d_logits,</div>
+<div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;                                     <span class="keywordtype">float</span> *loss_out,</div>
+<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;                                     <span class="keywordtype">float</span> *scratch_logits,</div>
+<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;                                     <span class="keywordtype">float</span> *scratch_d_logits)</div>
+<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;{</div>
+<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;    <span class="keywordflow">if</span> (!logits || !targets || !d_logits || tokens &lt;= 0 || <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
+<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;        <span class="keywordflow">if</span> (loss_out) *loss_out = 0.0f;</div>
+<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;    }</div>
+<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;    <span class="keywordflow">if</span> (!scratch_logits || !scratch_d_logits) {</div>
+<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;        <span class="keywordflow">if</span> (loss_out) *loss_out = 0.0f;</div>
+<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;        <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;    }</div>
+<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160; </div>
+<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
+<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160; </div>
+<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(logits, scratch_logits, count);</div>
+<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;    <a class="code" href="ckernel__engine_8h.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">softmax_cross_entropy_loss</a>(scratch_logits, targets, tokens, <a class="code" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, scratch_d_logits, loss_out);</div>
+<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_logits, d_logits, count);</div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;}</div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aed0168fe0364ab17b0d9dd02b1ac3ffa"><div class="ttname"><a href="ckernel__engine_8h.html#aed0168fe0364ab17b0d9dd02b1ac3ffa">softmax_cross_entropy_loss</a></div><div class="ttdeci">void softmax_cross_entropy_loss(const float *logits, const int32_t *targets, int tokens, int vocab_size, float *d_logits, float *loss_out)</div><div class="ttdef"><b>Definition:</b> <a href="loss__kernels_8c_source.html#l00005">loss_kernels.c:5</a></div></div>
-<div class="ttc" id="aloss__kernels__bf16_8c_html_a5e87177162b6dd565515e53e56dcd0f5"><div class="ttname"><a href="loss__kernels__bf16_8c.html#a5e87177162b6dd565515e53e56dcd0f5">softmax_cross_entropy_loss_bf16</a></div><div class="ttdeci">void softmax_cross_entropy_loss_bf16(const uint16_t *logits, const int32_t *targets, int tokens, int vocab_size, uint16_t *d_logits, float *loss_out)</div><div class="ttdef"><b>Definition:</b> <a href="loss__kernels__bf16_8c_source.html#l00008">loss_kernels_bf16.c:8</a></div></div>
+<div class="ttc" id="aloss__kernels__bf16_8c_html_a5fd08bdc0a631b4ec761b1e99085ebb9"><div class="ttname"><a href="loss__kernels__bf16_8c.html#a5fd08bdc0a631b4ec761b1e99085ebb9">softmax_cross_entropy_loss_bf16</a></div><div class="ttdeci">void softmax_cross_entropy_loss_bf16(const uint16_t *logits, const int32_t *targets, int tokens, int vocab_size, uint16_t *d_logits, float *loss_out, float *scratch_logits, float *scratch_d_logits)</div><div class="ttdef"><b>Definition:</b> <a href="loss__kernels__bf16_8c_source.html#l00011">loss_kernels_bf16.c:11</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition:</b> <a href="true__bpe_8h_source.html#l00169">true_bpe.h:169</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->

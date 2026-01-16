@@ -1130,7 +1130,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-15 11:22</span>
+        <span class="folder-updated">Updated: 2026-01-16 07:49</span>
     </div>
     <pre class="tree-output">
 .
@@ -1148,6 +1148,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- benchmarks
 |   |-- bench_gemm_vs_onednn.c
 |   |-- bench_gemm_vs_pytorch.py
+|   |-- bench_parallel_gemv.c
 |   |-- compare_gemm.py
 |   |-- perf_flash_attn_micro.c
 |   |-- perf_gemm_micro.c
@@ -1898,7 +1899,11 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- research
 |   `-- AI -&gt; /home/antshiv/Documents/AI/
 |-- Screenshots
-|   `-- Screenshot 2026-01-13 at 16-09-58 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-13 at 16-09-58 TestReport C-Kernel-Engine.png
+|   |-- Screenshot-2026-01-16_06-29.png
+|   |-- Screenshot 2026-01-16 at 06-58-32 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-16 at 07-06-34 TestReport C-Kernel-Engine.png
+|   `-- Screenshot 2026-01-16 at 07-09-51 TestReport C-Kernel-Engine.png
 |-- scripts
 |   |-- test
 |   |   |-- compare_perf_results.py
@@ -1969,6 +1974,31 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- training_config.py
 |   |   |-- v6_5_ir_lowering.py
 |   |   `-- verify_test_bug.py
+|   |-- v6.6
+|   |   |-- v3
+|   |   |-- v4
+|   |   |-- build_ir_v6_6.py
+|   |   |-- ck_model_smoke_v6_6.py
+|   |   |-- ck_run_v6_6.py
+|   |   |-- codegen_v6_6.py
+|   |   |-- codegen_v6_6.py.old_fp32_only
+|   |   |-- convert_any_gguf_v6_6.py
+|   |   |-- convert_any_gguf_v6_6.sh
+|   |   |-- convert_any_model_v6_6.sh
+|   |   |-- convert_gguf_to_bump_v6_6.py
+|   |   |-- convert_hf_to_bump.py
+|   |   |-- convert_hf_to_bump_v6_6.py
+|   |   |-- fusion_patterns.py
+|   |   |-- inspect_weights_v6_6.py
+|   |   |-- parallel_planner.py
+|   |   |-- profile_inference.py
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
+|   |   |-- q4_k_quantize.py
+|   |   |-- quant_types.py
+|   |   |-- test_kernel_direct.py
+|   |   |-- training_config.py
+|   |   |-- v6_6_ir_lowering.py
+|   |   `-- verify_test_bug.py
 |   |-- add_parallel_decode.sh
 |   |-- analyze_parity.py
 |   |-- benchmark_avx512.sh
@@ -2004,6 +2034,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- download_model_v6.py
 |   |-- extract_gguf_vocab.py
 |   |-- fix_gguf_converter.py
+|   |-- full_integration_testing.sh
 |   |-- fusion_patterns.py
 |   |-- gen_kernel_specs.py
 |   |-- gen_random_bump.py
@@ -2071,6 +2102,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- data_structures
 |   |   `-- tries
 |   |-- kernels
+|   |   |-- fused
 |   |   |-- add_kernels_bf16.c
 |   |   |-- attention_decode_fused.c
 |   |   |-- attention_flash_true.c
@@ -2209,6 +2241,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   `-- v7_v15_roadmap.md
 |   |-- v6.6
 |   |   |-- generated
+|   |   |-- kernel_config
 |   |   |-- scripts
 |   |   |-- test_generated
 |   |   |-- 6.6_prorgess.md
@@ -2221,14 +2254,20 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   |-- ckernel_ir_v6.6.c
 |   |   |-- ck_format.md
 |   |   |-- ck_tokenizer_v6.6.c
+|   |   |-- FUSION_FINDINGS.md
 |   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- MEMORY_BANDWIDTH_ANALYSIS.md
+|   |   |-- PARALLELISM_PLAN.md
+|   |   |-- parallel_orchestration.c
 |   |   |-- profiling.md
 |   |   |-- test_bump_tokenizer.c
 |   |   |-- test_generic_api.c
 |   |   |-- test_inference_with_bump_tokenizer.c
+|   |   |-- TRUE_SIMD_FUSION_PLAN.md
 |   |   |-- v6.6_cli.c
 |   |   |-- v6.6_cli_todo.md
 |   |   |-- v6.6_DEBUGGING_SUMMARY.md
+|   |   |-- V6.6_FUSION_PLAN.md
 |   |   |-- v6.6_GIBBERISH_DEBUGGING_REPORT.md
 |   |   |-- v6.6_inference.c
 |   |   |-- v6.6_pipeline.md
@@ -2257,6 +2296,8 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- cpu_features.c
 |   |-- show_config.c
 |   `-- system_topology.c
+|-- test_results
+|   `-- mega_fused_test_report.json
 |-- tools
 |   |-- cache_analysis.py
 |   |-- ck.c
@@ -2312,7 +2353,10 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_embedding_runtime.py
 |   |-- test_flash_attention.py
 |   |-- test_fused_attention_decode.py
+|   |-- test_fused_attention_mlp.py
+|   |-- test_fused_rmsnorm_qkv.py
 |   |-- test_fused_swiglu_decode.py
+|   |-- test_fusion_benchmark.py
 |   |-- test_gelu.py
 |   |-- test_gemm_batch_int8.py
 |   |-- test_gemm_fused.py
@@ -2330,10 +2374,12 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_layer_weights_parity.py
 |   |-- test_lm_head_litmus.py
 |   |-- test_mega_fused_attention.py
+|   |-- test_mlp_fusion_benchmark.py
 |   |-- test_mlp.py
 |   |-- test_multi_layer_parity.py
 |   |-- test_optimizer.py
 |   |-- test_orchestration_layer.py
+|   |-- test_parallel_gemv.py
 |   |-- test_parity.py
 |   |-- test_pytorch_parity.py
 |   |-- test_q4k_debug.py
@@ -2523,7 +2569,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- valgrind.supp
 `-- VTUNE_GUIDE.md
 
-222 directories, 1166 files
+228 directories, 1206 files
 </pre>
 </div>
 
@@ -2775,7 +2821,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-16</p>
             </div>
         </div>
     </footer>

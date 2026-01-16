@@ -184,6 +184,49 @@ void gemv_q4_k_q8_k_ref(float *y,
     }
 }
 
+/* ============================================================================
+ * PARALLEL VERSIONS (for parallel orchestration)
+ *
+ * These receive ith (thread index) and nth (total threads) from orchestration.
+ * OpenMP lives in orchestration layer, NOT here.
+ *
+ * Naming: *_parallel = receives ith/nth, processes only its portion
+ *         *_ref/_avx  = single-threaded, processes all rows
+ * ============================================================================ */
+
+void gemv_q4_k_q8_k_parallel(float *y,
+                             const void *W,
+                             const void *x_q8,
+                             int M, int K,
+                             int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) {
+        return;
+    }
+    if (ith < 0 || nth <= 0 || ith >= nth) {
+        return;
+    }
+
+    /* Compute row range for this thread */
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) {
+        return;  /* This thread has no work */
+    }
+
+    const block_q4_K *blocks = (const block_q4_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+
+    /* Only process rows [r0, r1) */
+    for (int row = r0; row < r1; ++row) {
+        const block_q4_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        y[row] = dot_q4_k_q8_k_ref(w_row, x, K);
+    }
+}
+
 void gemv_q4_k_q8_k(float *y,
                     const void *W,
                     const void *x_q8,

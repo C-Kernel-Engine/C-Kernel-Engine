@@ -126,8 +126,7 @@ $(document).ready(function(){initNavTree('layernorm__kernels__bf16_8c.html','');
 <div class="title">layernorm_kernels_bf16.c File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &lt;stdlib.h&gt;</code><br />
-<code>#include &lt;stdint.h&gt;</code><br />
+<div class="textblock"><code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>&quot;</code><br />
 </div>
@@ -135,86 +134,16 @@ $(document).ready(function(){initNavTree('layernorm__kernels__bf16_8c.html','');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:aa7946eb3033d476c9c89e3dd89f23bb4"><td class="memItemLeft" align="right" valign="top">static float *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a> (size_t count)</td></tr>
-<tr class="separator:aa7946eb3033d476c9c89e3dd89f23bb4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab9b5d2e5ae35502dbd6249d4aa0187d2"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a> (float *buf)</td></tr>
-<tr class="separator:ab9b5d2e5ae35502dbd6249d4aa0187d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab4fae76462b8dfdda429b265c41ec9f0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#ab4fae76462b8dfdda429b265c41ec9f0">layernorm_backward_kernel_bf16</a> (const uint16_t *d_output, const uint16_t *input, const float *gamma, const float *mean, const float *rstd, uint16_t *d_input, float *d_gamma, float *d_beta, int tokens, int d_model, int aligned_embed_dim)</td></tr>
-<tr class="separator:ab4fae76462b8dfdda429b265c41ec9f0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aed96ddab9e3b51974364c6a5dd5852a6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#aed96ddab9e3b51974364c6a5dd5852a6">layernorm_forward_rolled_slice_bf16</a> (const uint16_t *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, uint16_t *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, int aligned_embed_dim, float eps)</td></tr>
-<tr class="separator:aed96ddab9e3b51974364c6a5dd5852a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b36f606ec3110c6da3844b3633b1aaf"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#a4b36f606ec3110c6da3844b3633b1aaf">layernorm_forward_unrolled_slice_bf16</a> (const uint16_t *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, uint16_t *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</td></tr>
-<tr class="separator:a4b36f606ec3110c6da3844b3633b1aaf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa7733a43d00131cdc95692c34076b02e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#aa7733a43d00131cdc95692c34076b02e">layernorm_backward_kernel_bf16</a> (const uint16_t *d_output, const uint16_t *input, const float *gamma, const float *mean, const float *rstd, uint16_t *d_input, float *d_gamma, float *d_beta, int tokens, int d_model, int aligned_embed_dim, float *scratch_d_output, float *scratch_input, float *scratch_d_input)</td></tr>
+<tr class="separator:aa7733a43d00131cdc95692c34076b02e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af62acc8f81d07c3913e0036ce21e6b76"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#af62acc8f81d07c3913e0036ce21e6b76">layernorm_forward_rolled_slice_bf16</a> (const uint16_t *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, uint16_t *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, int aligned_embed_dim, float eps, float *scratch_input, float *scratch_output)</td></tr>
+<tr class="separator:af62acc8f81d07c3913e0036ce21e6b76"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad8b1ba75e043f61ad20c8be7064a0de0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="layernorm__kernels__bf16_8c.html#ad8b1ba75e043f61ad20c8be7064a0de0">layernorm_forward_unrolled_slice_bf16</a> (const uint16_t *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, uint16_t *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps, float *scratch_input, float *scratch_output)</td></tr>
+<tr class="separator:ad8b1ba75e043f61ad20c8be7064a0de0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
-<a id="aa7946eb3033d476c9c89e3dd89f23bb4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa7946eb3033d476c9c89e3dd89f23bb4">&#9670;&nbsp;</a></span>alloc_float_buffer()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">static float* alloc_float_buffer </td>
-          <td>(</td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>count</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00012">12</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;{</div>
-<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;    <span class="keywordflow">return</span> (<span class="keywordtype">float</span> *)malloc(count * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;}</div>
-</div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00083">layernorm_backward_kernel_bf16()</a>, <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00022">layernorm_forward_rolled_slice_bf16()</a>, and <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00053">layernorm_forward_unrolled_slice_bf16()</a>.</p>
-
-</div>
-</div>
-<a id="ab9b5d2e5ae35502dbd6249d4aa0187d2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab9b5d2e5ae35502dbd6249d4aa0187d2">&#9670;&nbsp;</a></span>free_float_buffer()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">static void free_float_buffer </td>
-          <td>(</td>
-          <td class="paramtype">float *&#160;</td>
-          <td class="paramname"><em>buf</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00017">17</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;{</div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    free(buf);</div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;}</div>
-</div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00083">layernorm_backward_kernel_bf16()</a>, <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00022">layernorm_forward_rolled_slice_bf16()</a>, and <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00053">layernorm_forward_unrolled_slice_bf16()</a>.</p>
-
-</div>
-</div>
-<a id="ab4fae76462b8dfdda429b265c41ec9f0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab4fae76462b8dfdda429b265c41ec9f0">&#9670;&nbsp;</a></span>layernorm_backward_kernel_bf16()</h2>
+<a id="aa7733a43d00131cdc95692c34076b02e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa7733a43d00131cdc95692c34076b02e">&#9670;&nbsp;</a></span>layernorm_backward_kernel_bf16()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -283,7 +212,25 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>aligned_embed_dim</em>&#160;</td>
+          <td class="paramname"><em>aligned_embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_d_output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_d_input</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -293,44 +240,31 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00083">83</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;{</div>
-<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;    <span class="keywordtype">float</span> *d_output_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;    <span class="keywordtype">float</span> *input_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;    <span class="keywordtype">float</span> *d_input_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;    <span class="keywordflow">if</span> (!d_output_f || !input_f || !d_input_f) {</div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_output_f);</div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_input_f);</div>
-<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;    }</div>
-<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160; </div>
-<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, d_output_f, total);</div>
-<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, input_f, total);</div>
-<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160; </div>
-<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a8d349f047d6654b3a351fb62e0b20e87">layernorm_backward_kernel</a>(d_output_f, input_f, gamma, mean, rstd,</div>
-<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;                              d_input_f, d_gamma, d_beta,</div>
-<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;                              tokens, d_model, aligned_embed_dim);</div>
-<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160; </div>
-<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(d_input_f, d_input, total);</div>
-<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160; </div>
-<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_output_f);</div>
-<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_input_f);</div>
-<div class="line"><a name="l00116"></a><span class="lineno">  116</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00068">68</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;{</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;    <span class="keywordflow">if</span> (!scratch_d_output || !scratch_input || !scratch_d_input) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160; </div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160; </div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, total);</div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, total);</div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160; </div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a8d349f047d6654b3a351fb62e0b20e87">layernorm_backward_kernel</a>(scratch_d_output, scratch_input, gamma, mean, rstd,</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;                              scratch_d_input, d_gamma, d_beta,</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;                              tokens, d_model, aligned_embed_dim);</div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160; </div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, total);</div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;}</div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a8d349f047d6654b3a351fb62e0b20e87"><div class="ttname"><a href="ckernel__engine_8h.html#a8d349f047d6654b3a351fb62e0b20e87">layernorm_backward_kernel</a></div><div class="ttdeci">void layernorm_backward_kernel(const float *d_output, const float *input, const float *gamma, const float *mean, const float *rstd, float *d_input, float *d_gamma, float *d_beta, int tokens, int d_model, int aligned_embed_dim)</div><div class="ttdef"><b>Definition:</b> <a href="layernorm__kernels_8c_source.html#l00652">layernorm_kernels.c:652</a></div></div>
-<div class="ttc" id="alayernorm__kernels__bf16_8c_html_aa7946eb3033d476c9c89e3dd89f23bb4"><div class="ttname"><a href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a></div><div class="ttdeci">static float * alloc_float_buffer(size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="layernorm__kernels__bf16_8c_source.html#l00012">layernorm_kernels_bf16.c:12</a></div></div>
-<div class="ttc" id="alayernorm__kernels__bf16_8c_html_ab9b5d2e5ae35502dbd6249d4aa0187d2"><div class="ttname"><a href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a></div><div class="ttdeci">static void free_float_buffer(float *buf)</div><div class="ttdef"><b>Definition:</b> <a href="layernorm__kernels__bf16_8c_source.html#l00017">layernorm_kernels_bf16.c:17</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00012">alloc_float_buffer()</a>, <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00017">free_float_buffer()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00652">layernorm_backward_kernel()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00652">layernorm_backward_kernel()</a>.</p>
 
 </div>
 </div>
-<a id="aed96ddab9e3b51974364c6a5dd5852a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aed96ddab9e3b51974364c6a5dd5852a6">&#9670;&nbsp;</a></span>layernorm_forward_rolled_slice_bf16()</h2>
+<a id="af62acc8f81d07c3913e0036ce21e6b76"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af62acc8f81d07c3913e0036ce21e6b76">&#9670;&nbsp;</a></span>layernorm_forward_rolled_slice_bf16()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -393,7 +327,19 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">float&#160;</td>
-          <td class="paramname"><em>eps</em>&#160;</td>
+          <td class="paramname"><em>eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_output</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -403,35 +349,26 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00022">22</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;{</div>
-<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_tokens_in_slice * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;    <span class="keywordtype">float</span> *input_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;    <span class="keywordtype">float</span> *output_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;    <span class="keywordflow">if</span> (!input_f || !output_f) {</div>
-<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(output_f);</div>
-<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;    }</div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160; </div>
-<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input_slice_base, input_f, total);</div>
-<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;    <a class="code" href="ckernel__engine_8h.html#ace47573bf5278260d2652f4fb069bb9e">layernorm_forward_rolled_slice</a>(input_f, gamma, beta,</div>
-<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;                                   output_f, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;                                   num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
-<div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160; </div>
-<div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(output_f, output_slice_base, total);</div>
-<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160; </div>
-<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(output_f);</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00014">14</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;{</div>
+<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_output) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160; </div>
+<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_tokens_in_slice * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160; </div>
+<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input_slice_base, scratch_input, total);</div>
+<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;    <a class="code" href="ckernel__engine_8h.html#ace47573bf5278260d2652f4fb069bb9e">layernorm_forward_rolled_slice</a>(scratch_input, gamma, beta,</div>
+<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;                                   scratch_output, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;                                   num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
+<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_output, output_slice_base, total);</div>
+<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;}</div>
 <div class="ttc" id="ackernel__engine_8h_html_ace47573bf5278260d2652f4fb069bb9e"><div class="ttname"><a href="ckernel__engine_8h.html#ace47573bf5278260d2652f4fb069bb9e">layernorm_forward_rolled_slice</a></div><div class="ttdeci">void layernorm_forward_rolled_slice(const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition:</b> <a href="layernorm__kernels_8c_source.html#l00258">layernorm_kernels.c:258</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00012">alloc_float_buffer()</a>, <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00017">free_float_buffer()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00258">layernorm_forward_rolled_slice()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00258">layernorm_forward_rolled_slice()</a>.</p>
 
 </div>
 </div>
-<a id="a4b36f606ec3110c6da3844b3633b1aaf"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4b36f606ec3110c6da3844b3633b1aaf">&#9670;&nbsp;</a></span>layernorm_forward_unrolled_slice_bf16()</h2>
+<a id="ad8b1ba75e043f61ad20c8be7064a0de0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad8b1ba75e043f61ad20c8be7064a0de0">&#9670;&nbsp;</a></span>layernorm_forward_unrolled_slice_bf16()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -488,7 +425,19 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">float&#160;</td>
-          <td class="paramname"><em>eps</em>&#160;</td>
+          <td class="paramname"><em>eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_output</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -498,30 +447,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00053">53</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;{</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_tokens_in_slice * (<span class="keywordtype">size_t</span>)d_model;</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;    <span class="keywordtype">float</span> *input_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;    <span class="keywordtype">float</span> *output_f = <a class="code" href="layernorm__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    <span class="keywordflow">if</span> (!input_f || !output_f) {</div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;        <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(output_f);</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;    }</div>
-<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160; </div>
-<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input_slice_base, input_f, total);</div>
-<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;    <a class="code" href="ckernel__engine_8h.html#afd2e784d7b2b3ac7eb93e6f87c091fae">layernorm_forward_unrolled_slice</a>(input_f, gamma, beta,</div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;                                     output_f, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;                                     num_tokens_in_slice, d_model, eps);</div>
-<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160; </div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(output_f, output_slice_base, total);</div>
-<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160; </div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(input_f);</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    <a class="code" href="layernorm__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(output_f);</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00041">41</a> of file <a class="el" href="layernorm__kernels__bf16_8c_source.html">layernorm_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;{</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_output) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160; </div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_tokens_in_slice * (<span class="keywordtype">size_t</span>)d_model;</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160; </div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input_slice_base, scratch_input, total);</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;    <a class="code" href="ckernel__engine_8h.html#afd2e784d7b2b3ac7eb93e6f87c091fae">layernorm_forward_unrolled_slice</a>(scratch_input, gamma, beta,</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;                                     scratch_output, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;                                     num_tokens_in_slice, d_model, eps);</div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_output, output_slice_base, total);</div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;}</div>
 <div class="ttc" id="ackernel__engine_8h_html_afd2e784d7b2b3ac7eb93e6f87c091fae"><div class="ttname"><a href="ckernel__engine_8h.html#afd2e784d7b2b3ac7eb93e6f87c091fae">layernorm_forward_unrolled_slice</a></div><div class="ttdeci">void layernorm_forward_unrolled_slice(const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</div><div class="ttdef"><b>Definition:</b> <a href="layernorm__kernels_8c_source.html#l00582">layernorm_kernels.c:582</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00012">alloc_float_buffer()</a>, <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00017">free_float_buffer()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00582">layernorm_forward_unrolled_slice()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00582">layernorm_forward_unrolled_slice()</a>.</p>
 
 </div>
 </div>

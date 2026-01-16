@@ -37,5 +37,11 @@ var v6_86_2generated_2ck_kernel_inference_8h =
     [ "QWEN2_0_5B_DECODE_FOOTER", "v6_86_2generated_2ck-kernel-inference_8h.html#a3ebd7b368696bd871314c7aa13419e5c", null ],
     [ "QWEN2_0_5B_DECODE_GLOBALS", "v6_86_2generated_2ck-kernel-inference_8h.html#aa5b2654a519630b930ac4e4bc9b9fded", null ],
     [ "QWEN2_0_5B_DECODE_HEADER", "v6_86_2generated_2ck-kernel-inference_8h.html#aec72447c13cf1fb69e7eaa44905a8a4f", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_W1_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a89125de4579e3b94aefb147d63e4a69f", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_W2_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a142002be5d8701e468dc7ab035033b9c", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_WK_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a35ee22152d4193629c6d1d8a89e971d5", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_WO_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a2e52bbf66a7851a3bdd5d8ec614cc393", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_WQ_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a758e82196ee3ac6f14725b05518b1082", null ],
+    [ "QWEN2_0_5B_DECODE_LAYER_WV_DTYPE", "v6_86_2generated_2ck-kernel-inference_8h.html#a5c2177d7c16a2388e636db83b2e1e216", null ],
     [ "QWEN2_0_5B_DECODE_LAYERS", "v6_86_2generated_2ck-kernel-inference_8h.html#a5679336dfb3a2d4f45c0390e57a8d2b8", null ]
 ];

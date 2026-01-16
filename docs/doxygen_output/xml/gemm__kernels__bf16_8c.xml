@@ -197,15 +197,16 @@
         </briefdescription>
         <detaileddescription>
 <para>Optimized BF16 MLP Kernels</para>
-<para>Uses direct BF16 GEMM instead of converting to FP32. Layout: input[T,D] -&gt; fc1[T,4D] -&gt; GELU -&gt; fc2[T,D] </para>
+<para>Uses direct BF16 GEMM instead of converting to FP32. Layout: input[T,D] -&gt; fc1[T,4D] -&gt; GELU -&gt; fc2[T,D]</para>
+<para>All functions use caller-provided scratch buffers (no internal malloc). </para>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_bf16.c" line="291" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_bf16.c" bodystart="291" bodyend="343"/>
         <references refid="bf16__utils_8h_1a314c3970fd5e2770d19b1bb49aefcf94" compoundref="bf16__utils_8h" startline="38" endline="46">bf16_to_float</references>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
-        <referencedby refid="ckernel__engine_8h_1a488697bbc4656ba8037ab3eb79314e5e" compoundref="mlp__kernels__bf16_8c" startline="85" endline="191">mlp_token_parallel_bf16</referencedby>
-        <referencedby refid="mlp__kernels__bf16_8c_1ad863c8765e72bbaf7d00c2ec7a577fd4" compoundref="mlp__kernels__bf16_8c" startline="198" endline="269">mlp_token_parallel_bf16_fp32act</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a438bc1007a50b9f34b24e7ffa6ac1f87" compoundref="mlp__kernels__bf16_8c" startline="81" endline="165">mlp_token_parallel_bf16</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a7868409a450b9bbedc3b923e64c1c800" compoundref="mlp__kernels__bf16_8c" startline="176" endline="229">mlp_token_parallel_bf16_fp32act</referencedby>
       </memberdef>
       <memberdef kind="function" id="gemm__kernels__bf16_8c_1a9020b3311acc4db83cc7243b3d13d439" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>

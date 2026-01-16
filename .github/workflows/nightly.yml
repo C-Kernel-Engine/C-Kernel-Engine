@@ -22,6 +22,7 @@ on:
         options:
           - all
           - quick
+          - e2e
           - kernels
           - bf16
           - quant
@@ -187,6 +188,29 @@ jobs:
           ls -lh "$GGUF_FILE"
           echo "GGUF_FILE=$GGUF_FILE" >> $GITHUB_ENV
 
+      # E2E Integration Tests - validates full pipeline: kernels → IR → codegen → inference
+      - name: Run E2E Integration Tests
+        run: |
+          echo "=== Running E2E Integration Tests ==="
+          echo "Tests: kernel compilation, IR codegen, parallel codegen, inference"
+
+          # Run full integration test suite
+          make e2e 2>&1 | tee build/e2e_test.log || {
+            echo "::warning::E2E tests had issues - check logs"
+            # Don't fail the build, just warn
+          }
+
+          # Extract results for summary
+          if grep -q "All tests passed" build/e2e_test.log; then
+            echo "E2E_STATUS=passed" >> $GITHUB_ENV
+            echo "✅ E2E Integration Tests: PASSED"
+          else
+            echo "E2E_STATUS=partial" >> $GITHUB_ENV
+            PASSED=$(grep -c "^\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
+            FAILED=$(grep -c "^\[FAIL\]" build/e2e_test.log 2>/dev/null || echo "0")
+            echo "⚠️ E2E Integration Tests: $PASSED passed, $FAILED failed"
+          fi
+
       - name: Run nightly tests (quick for PRs)
         if: github.event_name == 'pull_request'
         run: |
@@ -200,6 +224,31 @@ jobs:
             python scripts/nightly_runner.py --no-fail --json build/nightly_report.json
           elif [ "$CATEGORY" = "quick" ]; then
             python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json
+          elif [ "$CATEGORY" = "e2e" ]; then
+            # Run E2E integration tests only
+            echo "Running E2E integration tests..."
+            make e2e 2>&1 | tee build/e2e_test.log
+
+            # Create report for dashboard
+            if grep -q "All tests passed" build/e2e_test.log; then
+              STATUS="pass"
+              PASSED=$(grep -c "\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
+            else
+              STATUS="fail"
+              PASSED=$(grep -c "\[PASS\]" build/e2e_test.log 2>/dev/null || echo "0")
+            fi
+            FAILED=$(grep -c "\[FAIL\]" build/e2e_test.log 2>/dev/null || echo "0")
+            TOTAL=$((PASSED + FAILED))
+
+            python3 -c "
+          import json
+          with open('build/nightly_report.json', 'w') as f:
+              json.dump({
+                  'summary': {'passed': $PASSED, 'failed': $FAILED, 'total': $TOTAL},
+                  'duration_sec': 0,
+                  'results': [{'name': 'e2e_integration', 'category': 'e2e', 'status': '$STATUS'}]
+              }, f)
+          "
           elif [ "$CATEGORY" = "llamacpp" ]; then
             # Run comprehensive llama.cpp Q4_K parity tests
             echo "Running comprehensive llama.cpp Q4_K parity tests..."

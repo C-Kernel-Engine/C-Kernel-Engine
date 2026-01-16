@@ -531,53 +531,53 @@ $(document).ready(function(){initNavTree('mega__fused__attention__avx_8c_source.
 <div class="line"><a name="l00405"></a><span class="lineno">  405</span>&#160;    <span class="keywordtype">int</span> max_seq,</div>
 <div class="line"><a name="l00406"></a><span class="lineno">  406</span>&#160;    <span class="keywordtype">float</span> eps)</div>
 <div class="line"><a name="l00407"></a><span class="lineno">  407</span>&#160;{</div>
-<div class="line"><a name="l00408"></a><span class="lineno">  408</span>&#160;    <span class="comment">/* Allocate output buffers in L1 - not DRAM! */</span></div>
-<div class="line"><a name="l00409"></a><span class="lineno">  409</span>&#160;    <span class="keywordtype">size_t</span> q_elems = (size_t)num_heads * head_dim;</div>
-<div class="line"><a name="l00410"></a><span class="lineno">  410</span>&#160;    <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * head_dim;</div>
-<div class="line"><a name="l00411"></a><span class="lineno">  411</span>&#160;    <span class="keywordtype">float</span> *q = (<span class="keywordtype">float</span> *)malloc(q_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00412"></a><span class="lineno">  412</span>&#160;    <span class="keywordtype">float</span> *k = (<span class="keywordtype">float</span> *)malloc(kv_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00413"></a><span class="lineno">  413</span>&#160;    <span class="keywordtype">float</span> *v = (<span class="keywordtype">float</span> *)malloc(kv_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00414"></a><span class="lineno">  414</span>&#160;    <span class="keywordtype">float</span> *o = (<span class="keywordtype">float</span> *)malloc(q_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00415"></a><span class="lineno">  415</span>&#160; </div>
-<div class="line"><a name="l00416"></a><span class="lineno">  416</span>&#160;    <span class="comment">/* Phase 1: RMSNorm + QKV (ln1_row in L1 stack) */</span></div>
-<div class="line"><a name="l00417"></a><span class="lineno">  417</span>&#160;    mega_fuse_rmsnorm_qkv_avx(q, k, v, input, NULL, W_qkv, b_qkv,</div>
-<div class="line"><a name="l00418"></a><span class="lineno">  418</span>&#160;                              hidden, num_heads, num_kv_heads, head_dim, eps);</div>
+<div class="line"><a name="l00408"></a><span class="lineno">  408</span>&#160;    <span class="comment">/* Stack-allocated buffers - stay in L1 (no malloc!) */</span></div>
+<div class="line"><a name="l00409"></a><span class="lineno">  409</span>&#160;    <span class="comment">/* Max: 64 heads * 128 dim = 8192 floats = 32KB per buffer */</span></div>
+<div class="line"><a name="l00410"></a><span class="lineno">  410</span>&#160;    <span class="keywordtype">size_t</span> q_elems = (size_t)num_heads * head_dim;</div>
+<div class="line"><a name="l00411"></a><span class="lineno">  411</span>&#160;    <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * head_dim;</div>
+<div class="line"><a name="l00412"></a><span class="lineno">  412</span>&#160; </div>
+<div class="line"><a name="l00413"></a><span class="lineno">  413</span>&#160;    <span class="keywordflow">if</span> (q_elems &gt; 8192 || kv_elems &gt; 8192) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00414"></a><span class="lineno">  414</span>&#160; </div>
+<div class="line"><a name="l00415"></a><span class="lineno">  415</span>&#160;    <span class="keywordtype">float</span> q[8192];</div>
+<div class="line"><a name="l00416"></a><span class="lineno">  416</span>&#160;    <span class="keywordtype">float</span> k[8192];</div>
+<div class="line"><a name="l00417"></a><span class="lineno">  417</span>&#160;    <span class="keywordtype">float</span> v[8192];</div>
+<div class="line"><a name="l00418"></a><span class="lineno">  418</span>&#160;    <span class="keywordtype">float</span> o[8192];</div>
 <div class="line"><a name="l00419"></a><span class="lineno">  419</span>&#160; </div>
-<div class="line"><a name="l00420"></a><span class="lineno">  420</span>&#160;    <span class="comment">/* Phase 2: RoPE in-place (q, k still hot in L1) */</span></div>
-<div class="line"><a name="l00421"></a><span class="lineno">  421</span>&#160;    <a class="code" href="mega__fused__attention__avx_8c.html#a4a4f18b041230f8b2bad59054566a75c">mega_fuse_rope_inplace_avx</a>(q, k, rope_cos, rope_sin, pos,</div>
-<div class="line"><a name="l00422"></a><span class="lineno">  422</span>&#160;                               num_heads, num_kv_heads, head_dim);</div>
+<div class="line"><a name="l00420"></a><span class="lineno">  420</span>&#160;    <span class="comment">/* Phase 1: RMSNorm + QKV (ln1_row in L1 stack) */</span></div>
+<div class="line"><a name="l00421"></a><span class="lineno">  421</span>&#160;    mega_fuse_rmsnorm_qkv_avx(q, k, v, input, NULL, W_qkv, b_qkv,</div>
+<div class="line"><a name="l00422"></a><span class="lineno">  422</span>&#160;                              hidden, num_heads, num_kv_heads, head_dim, eps);</div>
 <div class="line"><a name="l00423"></a><span class="lineno">  423</span>&#160; </div>
-<div class="line"><a name="l00424"></a><span class="lineno">  424</span>&#160;    <span class="comment">/* Write K/V to KV cache (L2) */</span></div>
-<div class="line"><a name="l00425"></a><span class="lineno">  425</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; h++) {</div>
-<div class="line"><a name="l00426"></a><span class="lineno">  426</span>&#160;        memcpy(kv_cache_k + pos * kv_elems + h * head_dim,</div>
-<div class="line"><a name="l00427"></a><span class="lineno">  427</span>&#160;               k + h * head_dim, head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00428"></a><span class="lineno">  428</span>&#160;        memcpy(kv_cache_v + pos * kv_elems + h * head_dim,</div>
-<div class="line"><a name="l00429"></a><span class="lineno">  429</span>&#160;               v + h * head_dim, head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00430"></a><span class="lineno">  430</span>&#160;    }</div>
-<div class="line"><a name="l00431"></a><span class="lineno">  431</span>&#160; </div>
-<div class="line"><a name="l00432"></a><span class="lineno">  432</span>&#160;    <span class="comment">/* Phase 3: Flash Attention (o in L1) */</span></div>
-<div class="line"><a name="l00433"></a><span class="lineno">  433</span>&#160;    mega_fuse_flash_attention_avx(o, q, kv_cache_k, kv_cache_v,</div>
-<div class="line"><a name="l00434"></a><span class="lineno">  434</span>&#160;                                  num_heads, num_kv_heads, pos + 1, head_dim);</div>
+<div class="line"><a name="l00424"></a><span class="lineno">  424</span>&#160;    <span class="comment">/* Phase 2: RoPE in-place (q, k still hot in L1) */</span></div>
+<div class="line"><a name="l00425"></a><span class="lineno">  425</span>&#160;    <a class="code" href="mega__fused__attention__avx_8c.html#a4a4f18b041230f8b2bad59054566a75c">mega_fuse_rope_inplace_avx</a>(q, k, rope_cos, rope_sin, pos,</div>
+<div class="line"><a name="l00426"></a><span class="lineno">  426</span>&#160;                               num_heads, num_kv_heads, head_dim);</div>
+<div class="line"><a name="l00427"></a><span class="lineno">  427</span>&#160; </div>
+<div class="line"><a name="l00428"></a><span class="lineno">  428</span>&#160;    <span class="comment">/* Write K/V to KV cache (L2) */</span></div>
+<div class="line"><a name="l00429"></a><span class="lineno">  429</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; h++) {</div>
+<div class="line"><a name="l00430"></a><span class="lineno">  430</span>&#160;        memcpy(kv_cache_k + pos * kv_elems + h * head_dim,</div>
+<div class="line"><a name="l00431"></a><span class="lineno">  431</span>&#160;               k + h * head_dim, head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><a name="l00432"></a><span class="lineno">  432</span>&#160;        memcpy(kv_cache_v + pos * kv_elems + h * head_dim,</div>
+<div class="line"><a name="l00433"></a><span class="lineno">  433</span>&#160;               v + h * head_dim, head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><a name="l00434"></a><span class="lineno">  434</span>&#160;    }</div>
 <div class="line"><a name="l00435"></a><span class="lineno">  435</span>&#160; </div>
-<div class="line"><a name="l00436"></a><span class="lineno">  436</span>&#160;    <span class="comment">/* Phase 4: Output Projection + Residual (in final store) */</span></div>
-<div class="line"><a name="l00437"></a><span class="lineno">  437</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden; j++) {</div>
-<div class="line"><a name="l00438"></a><span class="lineno">  438</span>&#160;        <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><a name="l00439"></a><span class="lineno">  439</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; h++) {</div>
-<div class="line"><a name="l00440"></a><span class="lineno">  440</span>&#160;            <span class="keyword">const</span> <span class="keywordtype">float</span> *o_h = o + h * head_dim;</div>
-<div class="line"><a name="l00441"></a><span class="lineno">  441</span>&#160;            <span class="keyword">const</span> <span class="keywordtype">float</span> *W_o_h = W_o + h * head_dim * hidden + j * head_dim;</div>
-<div class="line"><a name="l00442"></a><span class="lineno">  442</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; i++) {</div>
-<div class="line"><a name="l00443"></a><span class="lineno">  443</span>&#160;                dot += o_h[i] * W_o_h[i];</div>
-<div class="line"><a name="l00444"></a><span class="lineno">  444</span>&#160;            }</div>
-<div class="line"><a name="l00445"></a><span class="lineno">  445</span>&#160;        }</div>
-<div class="line"><a name="l00446"></a><span class="lineno">  446</span>&#160;        <span class="keywordtype">float</span> proj = dot + (b_o ? b_o[j] : 0.0f);</div>
-<div class="line"><a name="l00447"></a><span class="lineno">  447</span>&#160;        output[j] = proj + residual[j];  <span class="comment">/* Residual add in store! */</span></div>
-<div class="line"><a name="l00448"></a><span class="lineno">  448</span>&#160;    }</div>
-<div class="line"><a name="l00449"></a><span class="lineno">  449</span>&#160; </div>
-<div class="line"><a name="l00450"></a><span class="lineno">  450</span>&#160;    free(q);</div>
-<div class="line"><a name="l00451"></a><span class="lineno">  451</span>&#160;    free(k);</div>
-<div class="line"><a name="l00452"></a><span class="lineno">  452</span>&#160;    free(v);</div>
-<div class="line"><a name="l00453"></a><span class="lineno">  453</span>&#160;    free(o);</div>
-<div class="line"><a name="l00454"></a><span class="lineno">  454</span>&#160; </div>
+<div class="line"><a name="l00436"></a><span class="lineno">  436</span>&#160;    <span class="comment">/* Phase 3: Flash Attention (o in L1) */</span></div>
+<div class="line"><a name="l00437"></a><span class="lineno">  437</span>&#160;    mega_fuse_flash_attention_avx(o, q, kv_cache_k, kv_cache_v,</div>
+<div class="line"><a name="l00438"></a><span class="lineno">  438</span>&#160;                                  num_heads, num_kv_heads, pos + 1, head_dim);</div>
+<div class="line"><a name="l00439"></a><span class="lineno">  439</span>&#160; </div>
+<div class="line"><a name="l00440"></a><span class="lineno">  440</span>&#160;    <span class="comment">/* Phase 4: Output Projection + Residual (in final store) */</span></div>
+<div class="line"><a name="l00441"></a><span class="lineno">  441</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden; j++) {</div>
+<div class="line"><a name="l00442"></a><span class="lineno">  442</span>&#160;        <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><a name="l00443"></a><span class="lineno">  443</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; h++) {</div>
+<div class="line"><a name="l00444"></a><span class="lineno">  444</span>&#160;            <span class="keyword">const</span> <span class="keywordtype">float</span> *o_h = o + h * head_dim;</div>
+<div class="line"><a name="l00445"></a><span class="lineno">  445</span>&#160;            <span class="keyword">const</span> <span class="keywordtype">float</span> *W_o_h = W_o + h * head_dim * hidden + j * head_dim;</div>
+<div class="line"><a name="l00446"></a><span class="lineno">  446</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; i++) {</div>
+<div class="line"><a name="l00447"></a><span class="lineno">  447</span>&#160;                dot += o_h[i] * W_o_h[i];</div>
+<div class="line"><a name="l00448"></a><span class="lineno">  448</span>&#160;            }</div>
+<div class="line"><a name="l00449"></a><span class="lineno">  449</span>&#160;        }</div>
+<div class="line"><a name="l00450"></a><span class="lineno">  450</span>&#160;        <span class="keywordtype">float</span> proj = dot + (b_o ? b_o[j] : 0.0f);</div>
+<div class="line"><a name="l00451"></a><span class="lineno">  451</span>&#160;        output[j] = proj + residual[j];  <span class="comment">/* Residual add in store! */</span></div>
+<div class="line"><a name="l00452"></a><span class="lineno">  452</span>&#160;    }</div>
+<div class="line"><a name="l00453"></a><span class="lineno">  453</span>&#160; </div>
+<div class="line"><a name="l00454"></a><span class="lineno">  454</span>&#160;    <span class="comment">/* No free needed - stack buffers auto-deallocate */</span></div>
 <div class="line"><a name="l00455"></a><span class="lineno">  455</span>&#160;    <span class="comment">/* Total DRAM traffic: 4KB input + 4KB output = 8KB */</span></div>
 <div class="line"><a name="l00456"></a><span class="lineno">  456</span>&#160;}</div>
 <div class="line"><a name="l00457"></a><span class="lineno">  457</span>&#160; </div>

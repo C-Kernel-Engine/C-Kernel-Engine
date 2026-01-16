@@ -1,0 +1,102 @@
+{
+  "version": "6.6",
+  "description": "Parallel kernel variants for v6.6 decode optimization",
+
+  "parallel_variants": {
+    "gemv_q4_k_q8_k": {
+      "parallel_simd": {
+        "function": "gemv_q4_k_q8_k_parallel_simd",
+        "params": ["y", "W", "x_q8", "M", "K", "ith", "nth"],
+        "requires": ["avx"],
+        "speedup": "2.4-3.1x"
+      },
+      "parallel_ref": {
+        "function": "gemv_q4_k_q8_k_parallel",
+        "params": ["y", "W", "x_q8", "M", "K", "ith", "nth"],
+        "requires": [],
+        "speedup": "1.5-2x"
+      },
+      "simd": {
+        "function": "gemv_q4_k_q8_k",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": ["avx"]
+      },
+      "ref": {
+        "function": "gemv_q4_k_q8_k_ref",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": []
+      }
+    },
+
+    "gemv_q6_k_q8_k": {
+      "parallel_simd": {
+        "function": "gemv_q6_k_q8_k_parallel_simd",
+        "params": ["y", "W", "x_q8", "M", "K", "ith", "nth"],
+        "requires": ["avx"],
+        "speedup": "2.4-3x (estimated)"
+      },
+      "parallel_ref": {
+        "function": "gemv_q6_k_q8_k_parallel",
+        "params": ["y", "W", "x_q8", "M", "K", "ith", "nth"],
+        "requires": [],
+        "speedup": "1.5-2x"
+      },
+      "simd": {
+        "function": "gemv_q6_k_q8_k",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": ["avx"]
+      }
+    },
+
+    "gemv_q5_0": {
+      "parallel_simd": {
+        "function": "gemv_q5_0_parallel_simd",
+        "params": ["y", "W", "x", "M", "K", "ith", "nth"],
+        "requires": ["avx"],
+        "speedup": "2-3x (estimated)",
+        "input_dtype": "fp32"
+      },
+      "parallel_ref": {
+        "function": "gemv_q5_0_parallel",
+        "params": ["y", "W", "x", "M", "K", "ith", "nth"],
+        "requires": [],
+        "speedup": "1.5-2x",
+        "input_dtype": "fp32"
+      },
+      "simd": {
+        "function": "gemv_q5_0",
+        "params": ["y", "W", "x", "M", "K"],
+        "requires": ["avx"],
+        "input_dtype": "fp32"
+      }
+    }
+  },
+
+  "selection_priority": ["parallel_simd", "parallel_ref", "simd", "ref"],
+
+  "parallelization_modes": {
+    "decode": {
+      "strategy": "feature_parallel",
+      "variant": "parallel_simd",
+      "num_threads": 4,
+      "wrapper_template": [
+        "#pragma omp parallel num_threads(4)",
+        "{",
+        "    const int ith = omp_get_thread_num();",
+        "    const int nth = omp_get_num_threads();",
+        "    KERNEL_CALL(y, W, x, M, K, ith, nth);",
+        "}"
+      ]
+    },
+    "prefill": {
+      "strategy": "token_parallel",
+      "variant": "simd",
+      "wrapper_template": [
+        "#pragma omp parallel for",
+        "for (int t = 0; t < num_tokens; t++) {",
+        "    KERNEL_CALL(y + t*M, W, x + t*stride, M, K);",
+        "}"
+      ]
+    }
+  }
+}

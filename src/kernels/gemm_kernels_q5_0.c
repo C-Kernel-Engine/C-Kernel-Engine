@@ -391,6 +391,113 @@ void gemv_q5_0(float *y,
 }
 
 /* ============================================================================
+ * PARALLEL VERSIONS (for parallel orchestration)
+ *
+ * These receive ith (thread index) and nth (total threads) from orchestration.
+ * OpenMP lives in orchestration layer, NOT here.
+ * ============================================================================ */
+
+/**
+ * @brief Parallel reference GEMV for Q5_0 × FP32
+ */
+void gemv_q5_0_parallel(float *y,
+                        const void *W,
+                        const float *x,
+                        int M, int K,
+                        int ith, int nth)
+{
+    if (!y || !W || !x || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q5_0 *blocks = (const block_q5_0 *)W;
+    const int blocks_per_row = K / QK5_0;
+
+    for (int row = r0; row < r1; row++) {
+        float sum = 0.0f;
+        for (int b = 0; b < blocks_per_row; b++) {
+            const block_q5_0 *block = &blocks[row * blocks_per_row + b];
+            const float d = CK_FP16_TO_FP32(block->d);
+            const float *xp = &x[b * QK5_0];
+
+            uint32_t qh;
+            memcpy(&qh, block->qh, sizeof(qh));
+
+            for (int j = 0; j < QK5_0 / 2; j++) {
+                const uint8_t packed = block->qs[j];
+                const int lo = (packed & 0x0F);
+                const int hi = (packed >> 4);
+                const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
+                const int xh_1 = ((qh >> (j + 12))) & 0x10;
+                const int w0 = (lo | xh_0) - 16;
+                const int w1 = (hi | xh_1) - 16;
+                sum += d * (w0 * xp[j] + w1 * xp[j + QK5_0/2]);
+            }
+        }
+        y[row] = sum;
+    }
+}
+
+/**
+ * @brief Parallel SIMD GEMV for Q5_0 × FP32 with prefetching
+ */
+void gemv_q5_0_parallel_simd(float *y,
+                              const void *W,
+                              const float *x,
+                              int M, int K,
+                              int ith, int nth)
+{
+    if (!y || !W || !x || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q5_0 *blocks = (const block_q5_0 *)W;
+    const int blocks_per_row = K / QK5_0;
+
+#if defined(__AVX__) || defined(__SSE4_1__)
+    /* Prefetch first few rows */
+    const int PREFETCH_ROWS = 4;
+    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
+        const char *row_ptr = (const char *)(blocks + (r0 + p) * blocks_per_row);
+        _mm_prefetch(row_ptr, _MM_HINT_T0);
+        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
+    }
+
+    for (int row = r0; row < r1; ++row) {
+        /* Prefetch rows ahead */
+        if (row + PREFETCH_ROWS < r1) {
+            const char *prefetch_ptr = (const char *)(blocks + (row + PREFETCH_ROWS) * blocks_per_row);
+            _mm_prefetch(prefetch_ptr, _MM_HINT_T0);
+            _mm_prefetch(prefetch_ptr + 64, _MM_HINT_T0);
+        }
+
+        /* Use SIMD dot product for this row */
+#if defined(__AVX512F__)
+        /* Call single-row AVX512 implementation */
+        gemv_q5_0_avx512(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
+#elif defined(__AVX__)
+        gemv_q5_0_avx(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
+#else
+        gemv_q5_0_sse_v2(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
+#endif
+    }
+#else
+    /* Fallback to reference parallel */
+    gemv_q5_0_parallel(y, W, x, M, K, ith, nth);
+#endif
+}
+
+/* ============================================================================
  * Forward Pass: GEMM Y = W @ X
  * ============================================================================ */
 

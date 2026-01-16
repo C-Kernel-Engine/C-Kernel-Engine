@@ -921,6 +921,36 @@ test-quant: $(LIB_QUANT)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_q6k_kernels.py; \
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_q4_k_quantize.py
 
+# =============================================================================
+# E2E Integration Tests
+# =============================================================================
+# Full end-to-end integration tests: kernel compilation, IR codegen, inference
+# Downloads Qwen/SmolLM if not cached, runs full pipeline validation
+#
+# Usage:
+#   make e2e           - Run full integration tests (uses cached model if available)
+#   make e2e-quick     - Quick test with smallest available model
+#   make e2e-qwen      - Test with Qwen2-0.5B (recommended, ~400MB)
+#   make e2e-smollm    - Test with SmolLM2-360M (~200MB)
+#
+e2e:
+	@echo "========================================"
+	@echo "  CK-Engine E2E Integration Tests"
+	@echo "========================================"
+	@bash scripts/full_integration_testing.sh
+
+e2e-quick:
+	@echo "Running quick E2E test..."
+	@bash scripts/full_integration_testing.sh --quick 2>/dev/null || bash scripts/full_integration_testing.sh
+
+e2e-qwen:
+	@echo "Running E2E test with Qwen2-0.5B..."
+	@$(PYTHON) scripts/v6.5/ck_run_v6_5.py run "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 10
+
+e2e-smollm:
+	@echo "Running E2E test with SmolLM2-360M..."
+	@$(PYTHON) scripts/v6.5/ck_run_v6_5.py run "hf://itlwas/SmolLM2-360M-Q4_K_M-GGUF/smollm2-360m-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 10
+
 unittest:
 	@echo ""
 	@echo "=========================================="
@@ -1220,6 +1250,13 @@ bench_gemm_native:
 	@$(MAKE) --no-print-directory USE_NATIVE=1 USE_MKL= USE_ONEDNN=
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH CK_LIB_PATH=$(BUILD_DIR)/libckernel_engine.so \
 		$(PYTHON) $(PYTHONFLAGS) benchmarks/bench_gemm_vs_pytorch.py
+
+# Benchmark parallel GEMV with OpenMP (tests true parallel speedup)
+bench_parallel_gemv: $(LIB)
+	$(CC) -O3 -qopenmp -Iinclude -o $(BUILD_DIR)/bench_parallel_gemv \
+		benchmarks/bench_parallel_gemv.c -L$(BUILD_DIR) -lckernel_engine -lm \
+		-Wl,-rpath,$(BUILD_DIR)
+	./$(BUILD_DIR)/bench_parallel_gemv
 
 tests-list:
 	@echo ""
@@ -2457,4 +2494,4 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm

@@ -987,6 +987,105 @@ void gemv_q6_k_q8_k(float *y,
 #endif
 }
 
+/* ============================================================================
+ * PARALLEL VERSIONS (for parallel orchestration)
+ *
+ * These receive ith (thread index) and nth (total threads) from orchestration.
+ * OpenMP lives in orchestration layer, NOT here.
+ *
+ * Naming: *_parallel = receives ith/nth, processes only its portion
+ * ============================================================================ */
+
+/**
+ * @brief Parallel reference GEMV for Q6_K × Q8_K
+ *
+ * Caller provides ith (thread index) and nth (total threads).
+ * Each thread processes rows [r0, r1).
+ */
+void gemv_q6_k_q8_k_parallel(float *y,
+                              const void *W,
+                              const void *x_q8,
+                              int M, int K,
+                              int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    /* Compute row range for this thread */
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q6_K *blocks = (const block_q6_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+
+    for (int row = r0; row < r1; ++row) {
+        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
+    }
+}
+
+/**
+ * @brief Parallel SIMD GEMV for Q6_K × Q8_K
+ *
+ * Uses best available SIMD (AVX/SSE) with row prefetching.
+ * Caller provides ith/nth from OpenMP region.
+ */
+void gemv_q6_k_q8_k_parallel_simd(float *y,
+                                   const void *W,
+                                   const void *x_q8,
+                                   int M, int K,
+                                   int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q6_K *blocks = (const block_q6_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+
+#if defined(__AVX__) || defined(__SSSE3__)
+    /* Prefetch first few rows */
+    const int PREFETCH_ROWS = 4;
+    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
+        const char *row_ptr = (const char *)(blocks + (r0 + p) * blocks_per_row);
+        _mm_prefetch(row_ptr, _MM_HINT_T0);
+        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
+    }
+
+    for (int row = r0; row < r1; ++row) {
+        /* Prefetch rows ahead */
+        if (row + PREFETCH_ROWS < r1) {
+            const char *prefetch_ptr = (const char *)(blocks + (row + PREFETCH_ROWS) * blocks_per_row);
+            _mm_prefetch(prefetch_ptr, _MM_HINT_T0);
+            _mm_prefetch(prefetch_ptr + 64, _MM_HINT_T0);
+        }
+
+        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+#if defined(__AVX__)
+        y[row] = dot_q6_k_q8_k_avx(w_row, x, K);
+#else
+        y[row] = dot_q6_k_q8_k_sse(w_row, x, K);
+#endif
+    }
+#else
+    /* Fallback to reference */
+    for (int row = r0; row < r1; ++row) {
+        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
+    }
+#endif
+}
+
 /**
  * @brief GEMM: Y = W @ X^T where W is Q6_K and X is Q8_K
  *

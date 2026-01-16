@@ -134,6 +134,7 @@ $(document).ready(function(){initNavTree('v6_86_2generated_2ck-kernel-inference_
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
+<code>#include &quot;<a class="el" href="ckernel__dtype_8h_source.html">ckernel_dtype.h</a>&quot;</code><br />
 </div>
 <p><a href="v6_86_2generated_2ck-kernel-inference_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
@@ -154,7 +155,7 @@ Data Structures</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="define-members"></a>
 Macros</h2></td></tr>
-<tr class="memitem:a30748c53ae173dc9eef7f8258b029014"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a30748c53ae173dc9eef7f8258b029014">QWEN2_0_5B_DECODE_ACTIVATION_BYTES</a>&#160;&#160;&#160;3256169984ULL</td></tr>
+<tr class="memitem:a30748c53ae173dc9eef7f8258b029014"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a30748c53ae173dc9eef7f8258b029014">QWEN2_0_5B_DECODE_ACTIVATION_BYTES</a>&#160;&#160;&#160;3256082944ULL</td></tr>
 <tr class="separator:a30748c53ae173dc9eef7f8258b029014"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a740d86aa66a19a66306d7cbd96187864"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a740d86aa66a19a66306d7cbd96187864">QWEN2_0_5B_DECODE_CANARY_COUNT</a>&#160;&#160;&#160;566</td></tr>
 <tr class="separator:a740d86aa66a19a66306d7cbd96187864"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -172,7 +173,7 @@ Macros</h2></td></tr>
 <tr class="separator:a431f85d6b77e3ff5dff8d2e640c44108"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a14964adb190d3878216ca547bf61ac50"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a14964adb190d3878216ca547bf61ac50">QWEN2_0_5B_DECODE_LAYER</a>(layer_id)&#160;&#160;&#160;    (&amp;<a class="el" href="v6_86_2test__generated_2ck-kernel-inference_8h.html#a5679336dfb3a2d4f45c0390e57a8d2b8">QWEN2_0_5B_DECODE_LAYERS</a>[layer_id])</td></tr>
 <tr class="separator:a14964adb190d3878216ca547bf61ac50"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaea6c57b15d103ea9a3b1ac50de2ee39"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#aaea6c57b15d103ea9a3b1ac50de2ee39">QWEN2_0_5B_DECODE_LAYER_STRIDE</a>&#160;&#160;&#160;0x0892CC00ULL</td></tr>
+<tr class="memitem:aaea6c57b15d103ea9a3b1ac50de2ee39"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#aaea6c57b15d103ea9a3b1ac50de2ee39">QWEN2_0_5B_DECODE_LAYER_STRIDE</a>&#160;&#160;&#160;0x08A688C0ULL</td></tr>
 <tr class="separator:aaea6c57b15d103ea9a3b1ac50de2ee39"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a623111f3177cba12c1602129bc226f76"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a623111f3177cba12c1602129bc226f76">QWEN2_0_5B_DECODE_MAGIC</a>&#160;&#160;&#160;0x434B454EUL</td></tr>
 <tr class="separator:a623111f3177cba12c1602129bc226f76"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -190,13 +191,13 @@ Macros</h2></td></tr>
 <tr class="separator:a1843318e48412b6aa3a06a35d50eb8e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aff12b46bae31528d8538b89a5633fb72"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#aff12b46bae31528d8538b89a5633fb72">QWEN2_0_5B_DECODE_PTR_BF16</a>(model,  offset)&#160;&#160;&#160;    ((uint16_t*)((char*)(model)-&gt;base + (offset)))</td></tr>
 <tr class="separator:aff12b46bae31528d8538b89a5633fb72"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0f96bb4353442d8a02fac7ed80e94110"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a0f96bb4353442d8a02fac7ed80e94110">QWEN2_0_5B_DECODE_TOTAL_BYTES</a>&#160;&#160;&#160;3573889600ULL</td></tr>
+<tr class="memitem:a0f96bb4353442d8a02fac7ed80e94110"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a0f96bb4353442d8a02fac7ed80e94110">QWEN2_0_5B_DECODE_TOTAL_BYTES</a>&#160;&#160;&#160;3651931008ULL</td></tr>
 <tr class="separator:a0f96bb4353442d8a02fac7ed80e94110"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a697a3626137456c30f6760f2c3727b1a"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a697a3626137456c30f6760f2c3727b1a">QWEN2_0_5B_DECODE_TOTAL_VOCAB_BYTES</a>&#160;&#160;&#160;0</td></tr>
 <tr class="separator:a697a3626137456c30f6760f2c3727b1a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aea3d71993111916b9b08af1fddec38d3"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#aea3d71993111916b9b08af1fddec38d3">QWEN2_0_5B_DECODE_VOCAB_SIZE</a>&#160;&#160;&#160;151936</td></tr>
 <tr class="separator:aea3d71993111916b9b08af1fddec38d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a826825ae895eaf10f127e3a478c08121"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a826825ae895eaf10f127e3a478c08121">QWEN2_0_5B_DECODE_WEIGHT_BYTES</a>&#160;&#160;&#160;317683328ULL</td></tr>
+<tr class="memitem:a826825ae895eaf10f127e3a478c08121"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a826825ae895eaf10f127e3a478c08121">QWEN2_0_5B_DECODE_WEIGHT_BYTES</a>&#160;&#160;&#160;395811776ULL</td></tr>
 <tr class="separator:a826825ae895eaf10f127e3a478c08121"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
@@ -222,12 +223,24 @@ Variables</h2></td></tr>
 <tr class="separator:aa5b2654a519630b930ac4e4bc9b9fded"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aec72447c13cf1fb69e7eaa44905a8a4f"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="structQWEN2__0__5B__DECODEHeaderOffsets.html">QWEN2_0_5B_DECODEHeaderOffsets</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#aec72447c13cf1fb69e7eaa44905a8a4f">QWEN2_0_5B_DECODE_HEADER</a></td></tr>
 <tr class="separator:aec72447c13cf1fb69e7eaa44905a8a4f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a89125de4579e3b94aefb147d63e4a69f"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a89125de4579e3b94aefb147d63e4a69f">QWEN2_0_5B_DECODE_LAYER_W1_DTYPE</a> []</td></tr>
+<tr class="separator:a89125de4579e3b94aefb147d63e4a69f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a142002be5d8701e468dc7ab035033b9c"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a142002be5d8701e468dc7ab035033b9c">QWEN2_0_5B_DECODE_LAYER_W2_DTYPE</a> []</td></tr>
+<tr class="separator:a142002be5d8701e468dc7ab035033b9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a35ee22152d4193629c6d1d8a89e971d5"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a35ee22152d4193629c6d1d8a89e971d5">QWEN2_0_5B_DECODE_LAYER_WK_DTYPE</a> []</td></tr>
+<tr class="separator:a35ee22152d4193629c6d1d8a89e971d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e52bbf66a7851a3bdd5d8ec614cc393"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a2e52bbf66a7851a3bdd5d8ec614cc393">QWEN2_0_5B_DECODE_LAYER_WO_DTYPE</a> []</td></tr>
+<tr class="separator:a2e52bbf66a7851a3bdd5d8ec614cc393"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a758e82196ee3ac6f14725b05518b1082"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a758e82196ee3ac6f14725b05518b1082">QWEN2_0_5B_DECODE_LAYER_WQ_DTYPE</a> []</td></tr>
+<tr class="separator:a758e82196ee3ac6f14725b05518b1082"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c2177d7c16a2388e636db83b2e1e216"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a5c2177d7c16a2388e636db83b2e1e216">QWEN2_0_5B_DECODE_LAYER_WV_DTYPE</a> []</td></tr>
+<tr class="separator:a5c2177d7c16a2388e636db83b2e1e216"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5679336dfb3a2d4f45c0390e57a8d2b8"><td class="memItemLeft" align="right" valign="top">static const <a class="el" href="structQWEN2__0__5B__DECODELayerOffsets.html">QWEN2_0_5B_DECODELayerOffsets</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="v6_86_2generated_2ck-kernel-inference_8h.html#a5679336dfb3a2d4f45c0390e57a8d2b8">QWEN2_0_5B_DECODE_LAYERS</a> [24]</td></tr>
 <tr class="separator:a5679336dfb3a2d4f45c0390e57a8d2b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>AUTO-GENERATED: qwen2_0.5b_decode Memory Layout. </p>
-<p>Generated: 2026-01-12T04:06:36.660353 UTC Total Memory: 3.57 GB</p>
+<p>Generated: 2026-01-15T19:23:13.597715 UTC Total Memory: 3.65 GB</p>
 <p>DO NOT EDIT - Regenerate with build_ir_v3.py </p>
 
 <p class="definition">Definition in file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
@@ -239,7 +252,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define QWEN2_0_5B_DECODE_ACTIVATION_BYTES&#160;&#160;&#160;3256169984ULL</td>
+          <td class="memname">#define QWEN2_0_5B_DECODE_ACTIVATION_BYTES&#160;&#160;&#160;3256082944ULL</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -260,7 +273,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01259">1259</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01289">1289</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -376,7 +389,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01280">1280</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01310">1310</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -387,7 +400,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define QWEN2_0_5B_DECODE_LAYER_STRIDE&#160;&#160;&#160;0x0892CC00ULL</td>
+          <td class="memname">#define QWEN2_0_5B_DECODE_LAYER_STRIDE&#160;&#160;&#160;0x08A688C0ULL</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -518,7 +531,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01274">1274</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01304">1304</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -548,7 +561,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01277">1277</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l01307">1307</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -559,7 +572,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define QWEN2_0_5B_DECODE_TOTAL_BYTES&#160;&#160;&#160;3573889600ULL</td>
+          <td class="memname">#define QWEN2_0_5B_DECODE_TOTAL_BYTES&#160;&#160;&#160;3651931008ULL</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -607,7 +620,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define QWEN2_0_5B_DECODE_WEIGHT_BYTES&#160;&#160;&#160;317683328ULL</td>
+          <td class="memname">#define QWEN2_0_5B_DECODE_WEIGHT_BYTES&#160;&#160;&#160;395811776ULL</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -878,7 +891,7 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00691">691</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00721">721</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -902,13 +915,13 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <b>Initial value:</b><div class="fragment"><div class="line">= {</div>
-<div class="line">    .final_ln_weight = 0xD2FBE080,</div>
-<div class="line">    .final_output = 0xD2FBE300,</div>
+<div class="line">    .final_ln_weight = 0xD7A2A800,</div>
+<div class="line">    .final_output = 0xD7A2B640,</div>
 <div class="line">    .lm_head_weight = 0x00000080,  </div>
-<div class="line">    .logits = 0xD2FBF340,</div>
+<div class="line">    .logits = 0xD7A2C480,</div>
 <div class="line">}</div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00661">661</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00691">691</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -932,11 +945,11 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <b>Initial value:</b><div class="fragment"><div class="line">= {</div>
-<div class="line">    .rope_cos_cache = 0xD30539C0,</div>
-<div class="line">    .rope_sin_cache = 0xD4053A00,</div>
+<div class="line">    .rope_cos_cache = 0xD7AC0B00,</div>
+<div class="line">    .rope_sin_cache = 0xD8AC0B40,</div>
 <div class="line">}</div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00677">677</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00707">707</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>
@@ -961,13 +974,179 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <b>Initial value:</b><div class="fragment"><div class="line">= {</div>
 <div class="line">    .token_emb = 0x00000080,</div>
-<div class="line">    .vocab_offsets = 0x053760C0,</div>
-<div class="line">    .vocab_strings = 0x0538AF40,</div>
-<div class="line">    .vocab_merges = 0x0538AF80,</div>
-<div class="line">    .embedded_input = 0x0538AFC0,</div>
+<div class="line">    .vocab_offsets = 0x089F14C0,</div>
+<div class="line">    .vocab_strings = 0x08A85B00,</div>
+<div class="line">    .vocab_merges = 0x08BFAA80,</div>
+<div class="line">    .embedded_input = 0x08DB6340,</div>
 <div class="line">}</div>
 </div><!-- fragment -->
 <p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00057">57</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a89125de4579e3b94aefb147d63e4a69f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a89125de4579e3b94aefb147d63e4a69f">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_W1_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_W1_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div>
+<div class="line">}</div>
+<div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div><div class="ttdeci">@ CK_DT_Q5_0</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__dtype_8h_source.html#l00044">ckernel_dtype.h:44</a></div></div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00672">672</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a142002be5d8701e468dc7ab035033b9c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a142002be5d8701e468dc7ab035033b9c">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_W2_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_W2_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a></div>
+<div class="line">}</div>
+<div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a2a27336a01bd529878399bcad9ceb10a">CK_DT_Q4_K</a></div><div class="ttdeci">@ CK_DT_Q4_K</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__dtype_8h_source.html#l00040">ckernel_dtype.h:40</a></div></div>
+<div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65aad14a988ad6ac1381e87803ed92be1b5">CK_DT_Q6_K</a></div><div class="ttdeci">@ CK_DT_Q6_K</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__dtype_8h_source.html#l00041">ckernel_dtype.h:41</a></div></div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00676">676</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a35ee22152d4193629c6d1d8a89e971d5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a35ee22152d4193629c6d1d8a89e971d5">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_WK_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_WK_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div>
+<div class="line">}</div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00660">660</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a2e52bbf66a7851a3bdd5d8ec614cc393"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2e52bbf66a7851a3bdd5d8ec614cc393">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_WO_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_WO_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div>
+<div class="line">}</div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00668">668</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a758e82196ee3ac6f14725b05518b1082"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a758e82196ee3ac6f14725b05518b1082">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_WQ_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_WQ_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div>
+<div class="line">}</div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00656">656</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
+
+</div>
+</div>
+<a id="a5c2177d7c16a2388e636db83b2e1e216"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c2177d7c16a2388e636db83b2e1e216">&#9670;&nbsp;</a></span>QWEN2_0_5B_DECODE_LAYER_WV_DTYPE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65">CKDataType</a> QWEN2_0_5B_DECODE_LAYER_WV_DTYPE[]</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">= {</div>
+<div class="line">    <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a>, <a class="code" href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div>
+<div class="line">}</div>
+<div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a4a2a519d2f6b3af38d3780932aea8f3f">CK_DT_Q8_0</a></div><div class="ttdeci">@ CK_DT_Q8_0</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__dtype_8h_source.html#l00042">ckernel_dtype.h:42</a></div></div>
+</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html#l00664">664</a> of file <a class="el" href="v6_86_2generated_2ck-kernel-inference_8h_source.html">v6.6/generated/ck-kernel-inference.h</a>.</p>
 
 </div>
 </div>

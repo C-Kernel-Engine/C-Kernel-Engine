@@ -124,132 +124,132 @@ $(document).ready(function(){initNavTree('rope__kernels__bf16_8c_source.html',''
 <div class="title">rope_kernels_bf16.c</div>  </div>
 </div><!--header-->
 <div class="contents">
-<a href="rope__kernels__bf16_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;<span class="preprocessor">#include &lt;stdlib.h&gt;</span></div>
-<div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;<span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
-<div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160; </div>
-<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="bf16__utils_8h.html">bf16_utils.h</a>&quot;</span></div>
-<div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="ckernel__engine_8h.html">ckernel_engine.h</a>&quot;</span></div>
-<div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160; </div>
-<div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;<span class="comment">// Suppress false positive warnings about uninitialized variables</span></div>
-<div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;<span class="preprocessor">#pragma GCC diagnostic push</span></div>
-<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;<span class="preprocessor">#pragma GCC diagnostic ignored &quot;-Wmaybe-uninitialized&quot;</span></div>
-<div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160; </div>
-<div class="line"><a name="l00011"></a><span class="lineno"><a class="line" href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">   11</a></span>&#160;<span class="keyword">static</span> <span class="keywordtype">float</span> *<a class="code" href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(<span class="keywordtype">size_t</span> count)</div>
-<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;{</div>
-<div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;    <span class="keywordflow">return</span> (<span class="keywordtype">float</span> *)malloc(count * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;}</div>
-<div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160; </div>
-<div class="line"><a name="l00016"></a><span class="lineno"><a class="line" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">   16</a></span>&#160;<span class="keyword">static</span> <span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(<span class="keywordtype">float</span> *buf)</div>
-<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;{</div>
-<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;    free(buf);</div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;}</div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160; </div>
-<div class="line"><a name="l00021"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a241f0f417dcac38a99613c909e6f3a5d">   21</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#a241f0f417dcac38a99613c909e6f3a5d">rope_forward_bf16</a>(uint16_t *x,</div>
-<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;                       <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;                       <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
-<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;                       <span class="keywordtype">int</span> num_heads,</div>
-<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;                       <span class="keywordtype">int</span> num_tokens,</div>
-<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;                       <span class="keywordtype">int</span> head_dim,</div>
-<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;                       <span class="keywordtype">int</span> aligned_head_dim,</div>
-<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;                       <span class="keywordtype">int</span> pos_offset)</div>
-<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;{</div>
-<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
-<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;    <span class="keywordtype">float</span> *tmp = <a class="code" href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;    <span class="keywordflow">if</span> (!tmp) {</div>
-<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;    }</div>
-<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160; </div>
-<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(x, tmp, total);</div>
-<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a371dd522b2b7ce9064f35215f1551c28">rope_forward</a>(tmp, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;                 num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(tmp, x, total);</div>
-<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160; </div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(tmp);</div>
-<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;}</div>
-<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160; </div>
-<div class="line"><a name="l00044"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ad3c7e02c4d88c86823c845ccbf72be6c">   44</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#ad3c7e02c4d88c86823c845ccbf72be6c">rope_backward_bf16</a>(<span class="keyword">const</span> uint16_t *d_out,</div>
-<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;                        uint16_t *d_x,</div>
-<div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;                        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
-<div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;                        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
-<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;                        <span class="keywordtype">int</span> num_heads,</div>
-<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;                        <span class="keywordtype">int</span> num_tokens,</div>
-<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;                        <span class="keywordtype">int</span> head_dim,</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;                        <span class="keywordtype">int</span> aligned_head_dim,</div>
-<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;                        <span class="keywordtype">int</span> pos_offset)</div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;{</div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
-<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;    <span class="keywordtype">float</span> *d_out_f = <a class="code" href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;    <span class="keywordtype">float</span> *d_x_f = <a class="code" href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a>(total);</div>
-<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;    <span class="keywordflow">if</span> (!d_out_f || !d_x_f) {</div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;        <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_out_f);</div>
-<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;        <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_x_f);</div>
-<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    }</div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160; </div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_out, d_out_f, total);</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;    <a class="code" href="ckernel__engine_8h.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(d_out_f, d_x_f, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;                  num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(d_x_f, d_x, total);</div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160; </div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_out_f);</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a>(d_x_f);</div>
-<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;}</div>
-<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160; </div>
-<div class="line"><a name="l00072"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#aac704c77b897a1fbef2f63f7e7de9ef1">   72</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#aac704c77b897a1fbef2f63f7e7de9ef1">rope_forward_qk_bf16</a>(uint16_t *q,</div>
-<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;                          uint16_t *k,</div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;                          <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;                          <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
-<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;                          <span class="keywordtype">int</span> num_heads,</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;                          <span class="keywordtype">int</span> num_kv_heads,</div>
-<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;                          <span class="keywordtype">int</span> num_tokens,</div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;                          <span class="keywordtype">int</span> head_dim,</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;                          <span class="keywordtype">int</span> aligned_head_dim,</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;                          <span class="keywordtype">int</span> pos_offset)</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;{</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    <span class="keywordflow">if</span> (!q || !k) {</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;    }</div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160; </div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#a241f0f417dcac38a99613c909e6f3a5d">rope_forward_bf16</a>(q, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;                      num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#a241f0f417dcac38a99613c909e6f3a5d">rope_forward_bf16</a>(k, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;                      num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;}</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160; </div>
-<div class="line"><a name="l00093"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a76d3e6e058074c51a76a252ab61eb5fa">   93</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#a76d3e6e058074c51a76a252ab61eb5fa">rope_backward_qk_bf16</a>(<span class="keyword">const</span> uint16_t *d_q_out,</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;                           <span class="keyword">const</span> uint16_t *d_k_out,</div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;                           uint16_t *d_q,</div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;                           uint16_t *d_k,</div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;                           <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;                           <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;                           <span class="keywordtype">int</span> num_heads,</div>
-<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;                           <span class="keywordtype">int</span> num_kv_heads,</div>
-<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;                           <span class="keywordtype">int</span> num_tokens,</div>
-<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;                           <span class="keywordtype">int</span> head_dim,</div>
-<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;                           <span class="keywordtype">int</span> aligned_head_dim,</div>
-<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;                           <span class="keywordtype">int</span> pos_offset)</div>
+<a href="rope__kernels__bf16_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;<span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
+<div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160; </div>
+<div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="bf16__utils_8h.html">bf16_utils.h</a>&quot;</span></div>
+<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;<span class="preprocessor">#include &quot;<a class="code" href="ckernel__engine_8h.html">ckernel_engine.h</a>&quot;</span></div>
+<div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160; </div>
+<div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;<span class="comment">// Suppress false positive warnings about uninitialized variables</span></div>
+<div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;<span class="preprocessor">#pragma GCC diagnostic push</span></div>
+<div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;<span class="preprocessor">#pragma GCC diagnostic ignored &quot;-Wmaybe-uninitialized&quot;</span></div>
+<div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160; </div>
+<div class="line"><a name="l00010"></a><span class="lineno">   10</span>&#160;<span class="comment">/*</span></div>
+<div class="line"><a name="l00011"></a><span class="lineno">   11</span>&#160;<span class="comment"> * BF16 RoPE forward with caller-provided scratch buffer.</span></div>
+<div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;<span class="comment"> * scratch: [num_heads * num_tokens * aligned_head_dim] floats</span></div>
+<div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00014"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#aa0dd19a90e07b0190fefaccbb39412cc">   14</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#aa0dd19a90e07b0190fefaccbb39412cc">rope_forward_bf16</a>(uint16_t *x,</div>
+<div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;                       <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
+<div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;                       <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
+<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;                       <span class="keywordtype">int</span> num_heads,</div>
+<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;                       <span class="keywordtype">int</span> num_tokens,</div>
+<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;                       <span class="keywordtype">int</span> head_dim,</div>
+<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;                       <span class="keywordtype">int</span> aligned_head_dim,</div>
+<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;                       <span class="keywordtype">int</span> pos_offset,</div>
+<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;                       <span class="keywordtype">float</span> *scratch)</div>
+<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;{</div>
+<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;    <span class="keywordflow">if</span> (!scratch) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160; </div>
+<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
+<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160; </div>
+<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(x, scratch, total);</div>
+<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a371dd522b2b7ce9064f35215f1551c28">rope_forward</a>(scratch, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;                 num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
+<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch, x, total);</div>
+<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;}</div>
+<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160; </div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;<span class="comment">/*</span></div>
+<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;<span class="comment"> * BF16 RoPE backward with caller-provided scratch buffers.</span></div>
+<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;<span class="comment"> * scratch_d_out, scratch_d_x: each [num_heads * num_tokens * aligned_head_dim] floats</span></div>
+<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00038"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a427b44289a22738ebe432b0440b3ebb5">   38</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#a427b44289a22738ebe432b0440b3ebb5">rope_backward_bf16</a>(<span class="keyword">const</span> uint16_t *d_out,</div>
+<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;                        uint16_t *d_x,</div>
+<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;                        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
+<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;                        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
+<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;                        <span class="keywordtype">int</span> num_heads,</div>
+<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;                        <span class="keywordtype">int</span> num_tokens,</div>
+<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;                        <span class="keywordtype">int</span> head_dim,</div>
+<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;                        <span class="keywordtype">int</span> aligned_head_dim,</div>
+<div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;                        <span class="keywordtype">int</span> pos_offset,</div>
+<div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;                        <span class="keywordtype">float</span> *scratch_d_out,</div>
+<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;                        <span class="keywordtype">float</span> *scratch_d_x)</div>
+<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;{</div>
+<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;    <span class="keywordflow">if</span> (!scratch_d_out || !scratch_d_x) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160; </div>
+<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;    <span class="keywordtype">size_t</span> total = (size_t)num_heads * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)aligned_head_dim;</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160; </div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_out, scratch_d_out, total);</div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;    <a class="code" href="ckernel__engine_8h.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(scratch_d_out, scratch_d_x, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;                  num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_x, d_x, total);</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;}</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160; </div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;<span class="comment">/*</span></div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;<span class="comment"> * BF16 RoPE forward for Q and K with caller-provided scratch buffers.</span></div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;<span class="comment"> * scratch_q: [num_heads * num_tokens * aligned_head_dim] floats</span></div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;<span class="comment"> * scratch_k: [num_kv_heads * num_tokens * aligned_head_dim] floats</span></div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00065"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#adb1b1464a7e234c8743347c430044623">   65</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#adb1b1464a7e234c8743347c430044623">rope_forward_qk_bf16</a>(uint16_t *q,</div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;                          uint16_t *k,</div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;                          <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
+<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;                          <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;                          <span class="keywordtype">int</span> num_heads,</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;                          <span class="keywordtype">int</span> num_kv_heads,</div>
+<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;                          <span class="keywordtype">int</span> num_tokens,</div>
+<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;                          <span class="keywordtype">int</span> head_dim,</div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;                          <span class="keywordtype">int</span> aligned_head_dim,</div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;                          <span class="keywordtype">int</span> pos_offset,</div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;                          <span class="keywordtype">float</span> *scratch_q,</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;                          <span class="keywordtype">float</span> *scratch_k)</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;{</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;    <span class="keywordflow">if</span> (!q || !k) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160; </div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#aa0dd19a90e07b0190fefaccbb39412cc">rope_forward_bf16</a>(q, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;                      num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, scratch_q);</div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#aa0dd19a90e07b0190fefaccbb39412cc">rope_forward_bf16</a>(k, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;                      num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, scratch_k);</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;}</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160; </div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;<span class="comment">/*</span></div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;<span class="comment"> * BF16 RoPE backward for Q and K with caller-provided scratch buffers.</span></div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;<span class="comment"> */</span></div>
+<div class="line"><a name="l00089"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a64771ad8165a00174288ba287a799ccf">   89</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="rope__kernels__bf16_8c.html#a64771ad8165a00174288ba287a799ccf">rope_backward_qk_bf16</a>(<span class="keyword">const</span> uint16_t *d_q_out,</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;                           <span class="keyword">const</span> uint16_t *d_k_out,</div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;                           uint16_t *d_q,</div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;                           uint16_t *d_k,</div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;                           <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_cache,</div>
+<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;                           <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_cache,</div>
+<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;                           <span class="keywordtype">int</span> num_heads,</div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;                           <span class="keywordtype">int</span> num_kv_heads,</div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;                           <span class="keywordtype">int</span> num_tokens,</div>
+<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;                           <span class="keywordtype">int</span> head_dim,</div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;                           <span class="keywordtype">int</span> aligned_head_dim,</div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;                           <span class="keywordtype">int</span> pos_offset,</div>
+<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;                           <span class="keywordtype">float</span> *scratch_dq_out,</div>
+<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;                           <span class="keywordtype">float</span> *scratch_dq,</div>
+<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;                           <span class="keywordtype">float</span> *scratch_dk_out,</div>
+<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;                           <span class="keywordtype">float</span> *scratch_dk)</div>
 <div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;{</div>
-<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;    <span class="keywordflow">if</span> (!d_q_out || !d_k_out || !d_q || !d_k) {</div>
-<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;        <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;    }</div>
-<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160; </div>
-<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#ad3c7e02c4d88c86823c845ccbf72be6c">rope_backward_bf16</a>(d_q_out, d_q, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;                       num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#ad3c7e02c4d88c86823c845ccbf72be6c">rope_backward_bf16</a>(d_k_out, d_k, cos_cache, sin_cache,</div>
-<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;                       num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
+<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;    <span class="keywordflow">if</span> (!d_q_out || !d_k_out || !d_q || !d_k) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160; </div>
+<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#a427b44289a22738ebe432b0440b3ebb5">rope_backward_bf16</a>(d_q_out, d_q, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;                       num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;                       scratch_dq_out, scratch_dq);</div>
+<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;    <a class="code" href="rope__kernels__bf16_8c.html#a427b44289a22738ebe432b0440b3ebb5">rope_backward_bf16</a>(d_k_out, d_k, cos_cache, sin_cache,</div>
+<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;                       num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;                       scratch_dk_out, scratch_dk);</div>
 <div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;}</div>
+<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160; </div>
+<div class="line"><a name="l00116"></a><span class="lineno">  116</span>&#160;<span class="preprocessor">#pragma GCC diagnostic pop</span></div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a371dd522b2b7ce9064f35215f1551c28"><div class="ttname"><a href="ckernel__engine_8h.html#a371dd522b2b7ce9064f35215f1551c28">rope_forward</a></div><div class="ttdeci">void rope_forward(float *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels_8c_source.html#l00155">rope_kernels.c:155</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_af248ca325f0a6837ed9bfd3d34552c00"><div class="ttname"><a href="ckernel__engine_8h.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a></div><div class="ttdeci">void rope_backward(const float *d_out, float *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels_8c_source.html#l00200">rope_kernels.c:200</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_a241f0f417dcac38a99613c909e6f3a5d"><div class="ttname"><a href="rope__kernels__bf16_8c.html#a241f0f417dcac38a99613c909e6f3a5d">rope_forward_bf16</a></div><div class="ttdeci">void rope_forward_bf16(uint16_t *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00021">rope_kernels_bf16.c:21</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_a76d3e6e058074c51a76a252ab61eb5fa"><div class="ttname"><a href="rope__kernels__bf16_8c.html#a76d3e6e058074c51a76a252ab61eb5fa">rope_backward_qk_bf16</a></div><div class="ttdeci">void rope_backward_qk_bf16(const uint16_t *d_q_out, const uint16_t *d_k_out, uint16_t *d_q, uint16_t *d_k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00093">rope_kernels_bf16.c:93</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_aa7946eb3033d476c9c89e3dd89f23bb4"><div class="ttname"><a href="rope__kernels__bf16_8c.html#aa7946eb3033d476c9c89e3dd89f23bb4">alloc_float_buffer</a></div><div class="ttdeci">static float * alloc_float_buffer(size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00011">rope_kernels_bf16.c:11</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_aac704c77b897a1fbef2f63f7e7de9ef1"><div class="ttname"><a href="rope__kernels__bf16_8c.html#aac704c77b897a1fbef2f63f7e7de9ef1">rope_forward_qk_bf16</a></div><div class="ttdeci">void rope_forward_qk_bf16(uint16_t *q, uint16_t *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00072">rope_kernels_bf16.c:72</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_ab9b5d2e5ae35502dbd6249d4aa0187d2"><div class="ttname"><a href="rope__kernels__bf16_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2">free_float_buffer</a></div><div class="ttdeci">static void free_float_buffer(float *buf)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00016">rope_kernels_bf16.c:16</a></div></div>
-<div class="ttc" id="arope__kernels__bf16_8c_html_ad3c7e02c4d88c86823c845ccbf72be6c"><div class="ttname"><a href="rope__kernels__bf16_8c.html#ad3c7e02c4d88c86823c845ccbf72be6c">rope_backward_bf16</a></div><div class="ttdeci">void rope_backward_bf16(const uint16_t *d_out, uint16_t *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00044">rope_kernels_bf16.c:44</a></div></div>
+<div class="ttc" id="arope__kernels__bf16_8c_html_a427b44289a22738ebe432b0440b3ebb5"><div class="ttname"><a href="rope__kernels__bf16_8c.html#a427b44289a22738ebe432b0440b3ebb5">rope_backward_bf16</a></div><div class="ttdeci">void rope_backward_bf16(const uint16_t *d_out, uint16_t *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_d_out, float *scratch_d_x)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00038">rope_kernels_bf16.c:38</a></div></div>
+<div class="ttc" id="arope__kernels__bf16_8c_html_a64771ad8165a00174288ba287a799ccf"><div class="ttname"><a href="rope__kernels__bf16_8c.html#a64771ad8165a00174288ba287a799ccf">rope_backward_qk_bf16</a></div><div class="ttdeci">void rope_backward_qk_bf16(const uint16_t *d_q_out, const uint16_t *d_k_out, uint16_t *d_q, uint16_t *d_k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_dq_out, float *scratch_dq, float *scratch_dk_out, float *scratch_dk)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00089">rope_kernels_bf16.c:89</a></div></div>
+<div class="ttc" id="arope__kernels__bf16_8c_html_aa0dd19a90e07b0190fefaccbb39412cc"><div class="ttname"><a href="rope__kernels__bf16_8c.html#aa0dd19a90e07b0190fefaccbb39412cc">rope_forward_bf16</a></div><div class="ttdeci">void rope_forward_bf16(uint16_t *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00014">rope_kernels_bf16.c:14</a></div></div>
+<div class="ttc" id="arope__kernels__bf16_8c_html_adb1b1464a7e234c8743347c430044623"><div class="ttname"><a href="rope__kernels__bf16_8c.html#adb1b1464a7e234c8743347c430044623">rope_forward_qk_bf16</a></div><div class="ttdeci">void rope_forward_qk_bf16(uint16_t *q, uint16_t *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_q, float *scratch_k)</div><div class="ttdef"><b>Definition:</b> <a href="rope__kernels__bf16_8c_source.html#l00065">rope_kernels_bf16.c:65</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->

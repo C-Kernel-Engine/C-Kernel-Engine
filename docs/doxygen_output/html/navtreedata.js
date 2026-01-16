@@ -51,22 +51,23 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ck__metrics_8h.html#a5d3835a52e6f23831a1348c1ea26efcb",
-"ckernel__codegen_8c.html#a9f6b5ba2373060f9e3c58c05b2deb62f",
-"ckernel__engine_8h.html#a6c6a2e37aa74b6f118d94eb08debcff3",
-"ckernel__ir__v2__lower_8h_source.html",
-"ckernel__orchestration_8c.html#ad677ad79b893d5368132b37424c38f95",
-"gemm__batch__int8_8c.html#a1a3684c8ac558a07b0e8721c29a71403",
-"globals_defs_n.html",
-"rmsnorm__kernels__int4_8c.html#ab9b5d2e5ae35502dbd6249d4aa0187d2",
-"structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b",
-"structCKLayerOptimizerOffsets.html#a14824d8d69c159d9f82752211c99df8f",
-"structCKTrieNode.html#aa55f70549c1823d3325218b0b71a42b8",
-"structblock__q8__K.html",
-"true__bpe_8h.html#a2b7dde9ca7f0e8b68ba08a1a72af47a0",
-"v6_85_2test__generated_2int8__q4k__test_8c.html#a1b45e9164ebe7d307fd201567a10ef41",
-"v6_86_2test__generated_2ck-kernel-inference_8c.html#a83526729f733fbd311a503bf661132b6",
-"v6_86_2test__generated_2qwen2__int8_8c.html#a9cdc13ab71c3c11ffd53fbb205b1c423"
+"ck__features_8h.html#a17c9d197aff83b06de55a7c5ba3371ad",
+"ckernel__codegen_8c.html#a19907ff45ce4075112ea38814eacf709",
+"ckernel__engine_8h.html#a4f024774420774821f805d0742694d02",
+"ckernel__ir__v2__demo_8c.html",
+"ckernel__orchestration_8c.html#a45ad329928b675ddc00ad3d5059335b3",
+"fused__kernels_8h_source.html",
+"gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74",
+"parallel__orchestration_8c.html#a16e02661985307528fd35a40fa83135f",
+"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d",
+"structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e",
+"structCKTokenizer.html#af683cca99ab7ca70c6b680c4a276277b",
+"structTransformerModel.html#a955d1efe9f4e9e8bedca00a5a85a5d18",
+"true__bpe_8c.html#a782d1c06da75ca70c98690a59eeede43",
+"v6_85_2test__generated_2generic__api__test_8c.html#a9c9c6cab7aae0613e1e4936d730e69da",
+"v6_86_2generated_2ck-kernel-inference_8c.html#a103089856415dfa7dcf06968b94a55ee",
+"v6_86_2test__generated_2generic__api__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062",
+"v6__inference_8c.html#aa426a8be646bd381a914fef6ca0c9c4b"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

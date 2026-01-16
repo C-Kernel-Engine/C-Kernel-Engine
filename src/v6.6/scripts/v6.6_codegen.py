@@ -69,8 +69,23 @@ DTYPE_TO_GEMV_Q8_KERNEL = {
     "q5_0": ("gemv_q5_0_q8_0", "q8_0"),  # Q5_0 weights x Q8_0 activations
     "q8_0": ("gemv_q8_0_q8_0", "q8_0"),  # Q8_0 weights x Q8_0 activations
     "q4_k": ("gemv_q4_k_q8_k", "q8_k"),  # Q4_K weights x Q8_K activations
-    # Q6_K: no INT8 kernel exists, falls back to FP32 path
+    "q6_k": ("gemv_q6_k_q8_k", "q8_k"),  # Q6_K weights x Q8_K activations
     # Other formats fall back to FP32 path
+}
+
+# Parallel SIMD kernel variants for decode optimization (v6.6+)
+# These accept (ith, nth) thread parameters for OpenMP parallelization
+# Caller wraps with #pragma omp parallel, kernels split work by rows
+DTYPE_TO_GEMV_Q8_KERNEL_PARALLEL = {
+    "q4_k": ("gemv_q4_k_q8_k_parallel_simd", "q8_k"),  # 2.4-3.1x speedup
+    "q6_k": ("gemv_q6_k_q8_k_parallel_simd", "q8_k"),  # 2.4-3x estimated
+    # Q5_0 uses FP32 input, not Q8 - see DTYPE_TO_GEMV_FP32_KERNEL_PARALLEL
+}
+
+# Parallel GEMV kernels with FP32 input (not INT8)
+# Used for Q5_0 and other formats that don't have INT8 activation kernels
+DTYPE_TO_GEMV_FP32_KERNEL_PARALLEL = {
+    "q5_0": "gemv_q5_0_parallel_simd",  # Q5_0 weights x FP32 input, 2-3x speedup
 }
 
 # Quantization info for INT8 activation buffers
@@ -90,6 +105,27 @@ def get_int8_kernel_info(dtype: str) -> tuple:
     """Get (kernel_name, activation_type) for INT8 activation path."""
     qt = get_quant_type(dtype)
     return DTYPE_TO_GEMV_Q8_KERNEL.get(qt, (None, None))
+
+
+def supports_parallel_decode(dtype: str) -> bool:
+    """Check if dtype has a parallel decode kernel variant."""
+    qt = get_quant_type(dtype)
+    return qt in DTYPE_TO_GEMV_Q8_KERNEL_PARALLEL or qt in DTYPE_TO_GEMV_FP32_KERNEL_PARALLEL
+
+
+def get_parallel_kernel_info(dtype: str) -> tuple:
+    """Get (kernel_name, activation_type, uses_int8) for parallel decode.
+
+    Returns (None, None, False) if no parallel kernel available.
+    """
+    qt = get_quant_type(dtype)
+    if qt in DTYPE_TO_GEMV_Q8_KERNEL_PARALLEL:
+        kernel, act_type = DTYPE_TO_GEMV_Q8_KERNEL_PARALLEL[qt]
+        return (kernel, act_type, True)  # Uses INT8 activations
+    if qt in DTYPE_TO_GEMV_FP32_KERNEL_PARALLEL:
+        kernel = DTYPE_TO_GEMV_FP32_KERNEL_PARALLEL[qt]
+        return (kernel, None, False)  # Uses FP32 activations
+    return (None, None, False)
 
 
 def quant_bytes_for_elements(n: str, act_type: str) -> str:
@@ -253,7 +289,9 @@ def emit_c_source_v66(layout: v3.ModelLayout,
                      emit_debug: bool = False,
                      emit_parity: bool = False,
                      weights_manifest: Optional[Dict] = None,
-                     int8_activations: bool = False) -> None:
+                     int8_activations: bool = False,
+                     parallel_decode: bool = False,
+                     num_threads: int = 4) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
@@ -261,6 +299,8 @@ def emit_c_source_v66(layout: v3.ModelLayout,
         emit_parity: If True, save intermediate buffers to files for comparison with PyTorch.
         weights_manifest: If provided, validate layout against manifest and embed validation table.
         int8_activations: If True, quantize activations to Q8_0 and use gemv_q*_q8_0 kernels.
+        parallel_decode: If True, use parallel GEMV kernels with OpenMP for decode.
+        num_threads: Number of OpenMP threads for parallel decode (default: 4).
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v6.6 codegen only supports prefill/decode (got: {mode})")
@@ -412,6 +452,8 @@ def emit_c_source_v66(layout: v3.ModelLayout,
     add("#include <string.h>")
     add("#include <stdint.h>")
     add("#include <math.h>")
+    if parallel_decode:
+        add("#include <omp.h>")
     add()
     add("#ifdef __linux__")
     add("#include <sys/mman.h>")
@@ -1483,14 +1525,32 @@ def emit_c_source_v66(layout: v3.ModelLayout,
             add("    /* Step 6: Output projection */")
             wo_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(wo_dt, "gemm_blocked_serial")
             use_int8_wo = int8_activations and supports_int8_activation(wo_dt)
+            use_parallel_wo = parallel_decode and supports_parallel_decode(wo_dt)
+
             if use_int8_wo:
                 wo_kernel_int8, wo_act_type = get_int8_kernel_info(wo_dt)
                 wo_quant_func = get_quantize_func(wo_act_type)
-                add(f"    /* WO projection (INT8): {wo_dt.upper()} x {wo_act_type.upper()} -> {wo_kernel_int8} */")
-                add(f"    const size_t attn_q8_bytes = {quant_bytes_for_elements('H * head_dim', wo_act_type)};")
-                add("    uint8_t attn_q8[attn_q8_bytes];")
-                add(f"    {wo_quant_func}(attn_token, attn_q8, H * head_dim);")
-                add(f"    {wo_kernel_int8}(proj_tmp, WO, attn_q8, aligned_embed_dim, H * head_dim);")
+
+                if use_parallel_wo:
+                    # Parallel INT8 path for WO
+                    wo_par_kernel, _, _ = get_parallel_kernel_info(wo_dt)
+                    add(f"    /* WO projection (PARALLEL INT8): {wo_dt.upper()} x {wo_act_type.upper()} -> {wo_par_kernel} */")
+                    add(f"    const size_t attn_q8_bytes = {quant_bytes_for_elements('H * head_dim', wo_act_type)};")
+                    add("    uint8_t attn_q8[attn_q8_bytes];")
+                    add(f"    {wo_quant_func}(attn_token, attn_q8, H * head_dim);")
+                    add(f"    #pragma omp parallel num_threads({num_threads})")
+                    add("    {")
+                    add("        const int ith = omp_get_thread_num();")
+                    add("        const int nth = omp_get_num_threads();")
+                    add(f"        {wo_par_kernel}(proj_tmp, WO, attn_q8, aligned_embed_dim, H * head_dim, ith, nth);")
+                    add("    }")
+                else:
+                    # Serial INT8 path
+                    add(f"    /* WO projection (INT8): {wo_dt.upper()} x {wo_act_type.upper()} -> {wo_kernel_int8} */")
+                    add(f"    const size_t attn_q8_bytes = {quant_bytes_for_elements('H * head_dim', wo_act_type)};")
+                    add("    uint8_t attn_q8[attn_q8_bytes];")
+                    add(f"    {wo_quant_func}(attn_token, attn_q8, H * head_dim);")
+                    add(f"    {wo_kernel_int8}(proj_tmp, WO, attn_q8, aligned_embed_dim, H * head_dim);")
             else:
                 add(f"    /* WO projection: {wo_dt.upper()} -> {wo_kernel} */")
                 add(f"    {wo_kernel}(attn_token, WO, NULL, proj_tmp, 1, aligned_embed_dim, H * head_dim);")
@@ -1531,14 +1591,32 @@ def emit_c_source_v66(layout: v3.ModelLayout,
             w2_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(w2_dt, "gemm_blocked_serial")
 
             use_int8_w1 = int8_activations and supports_int8_activation(w1_dt)
+            use_parallel_w1 = parallel_decode and supports_parallel_decode(w1_dt)
+
             if use_int8_w1:
                 w1_kernel_int8, w1_act_type = get_int8_kernel_info(w1_dt)
                 w1_quant_func = get_quantize_func(w1_act_type)
-                add(f"    /* Gate+Up projection (INT8): {w1_dt.upper()} x {w1_act_type.upper()} -> {w1_kernel_int8} */")
-                add(f"    const size_t ln2_q8_bytes = {quant_bytes_for_elements('aligned_embed_dim', w1_act_type)};")
-                add("    uint8_t ln2_q8[ln2_q8_bytes];")
-                add(f"    {w1_quant_func}(ln2_out, ln2_q8, aligned_embed_dim);")
-                add(f"    {w1_kernel_int8}(fc1_out, W1, ln2_q8, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+
+                if use_parallel_w1:
+                    # Parallel INT8 path: quantize then call parallel kernel
+                    w1_par_kernel, _, _ = get_parallel_kernel_info(w1_dt)
+                    add(f"    /* Gate+Up projection (PARALLEL INT8): {w1_dt.upper()} x {w1_act_type.upper()} -> {w1_par_kernel} */")
+                    add(f"    const size_t ln2_q8_bytes = {quant_bytes_for_elements('aligned_embed_dim', w1_act_type)};")
+                    add("    uint8_t ln2_q8[ln2_q8_bytes];")
+                    add(f"    {w1_quant_func}(ln2_out, ln2_q8, aligned_embed_dim);")
+                    add(f"    #pragma omp parallel num_threads({num_threads})")
+                    add("    {")
+                    add("        const int ith = omp_get_thread_num();")
+                    add("        const int nth = omp_get_num_threads();")
+                    add(f"        {w1_par_kernel}(fc1_out, W1, ln2_q8, 2 * aligned_intermediate_dim, aligned_embed_dim, ith, nth);")
+                    add("    }")
+                else:
+                    # Serial INT8 path
+                    add(f"    /* Gate+Up projection (INT8): {w1_dt.upper()} x {w1_act_type.upper()} -> {w1_kernel_int8} */")
+                    add(f"    const size_t ln2_q8_bytes = {quant_bytes_for_elements('aligned_embed_dim', w1_act_type)};")
+                    add("    uint8_t ln2_q8[ln2_q8_bytes];")
+                    add(f"    {w1_quant_func}(ln2_out, ln2_q8, aligned_embed_dim);")
+                    add(f"    {w1_kernel_int8}(fc1_out, W1, ln2_q8, 2 * aligned_intermediate_dim, aligned_embed_dim);")
             else:
                 add(f"    /* Gate+Up projection: {w1_dt.upper()} -> {w1_kernel} */")
                 add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
@@ -1555,14 +1633,32 @@ def emit_c_source_v66(layout: v3.ModelLayout,
                 add(f'    parity_save_buffer("layer_{layer_id}_swiglu", swiglu_out, aligned_intermediate_dim);')
             add()
             use_int8_w2 = int8_activations and supports_int8_activation(w2_dt)
+            use_parallel_w2 = parallel_decode and supports_parallel_decode(w2_dt)
+
             if use_int8_w2:
                 w2_kernel_int8, w2_act_type = get_int8_kernel_info(w2_dt)
                 w2_quant_func = get_quantize_func(w2_act_type)
-                add(f"    /* Down projection (INT8): {w2_dt.upper()} x {w2_act_type.upper()} -> {w2_kernel_int8} */")
-                add(f"    const size_t swiglu_q8_bytes = {quant_bytes_for_elements('aligned_intermediate_dim', w2_act_type)};")
-                add("    uint8_t swiglu_q8[swiglu_q8_bytes];")
-                add(f"    {w2_quant_func}(swiglu_out, swiglu_q8, aligned_intermediate_dim);")
-                add(f"    {w2_kernel_int8}(mlp_out, W2, swiglu_q8, aligned_embed_dim, aligned_intermediate_dim);")
+
+                if use_parallel_w2:
+                    # Parallel INT8 path: quantize then call parallel kernel
+                    w2_par_kernel, _, _ = get_parallel_kernel_info(w2_dt)
+                    add(f"    /* Down projection (PARALLEL INT8): {w2_dt.upper()} x {w2_act_type.upper()} -> {w2_par_kernel} */")
+                    add(f"    const size_t swiglu_q8_bytes = {quant_bytes_for_elements('aligned_intermediate_dim', w2_act_type)};")
+                    add("    uint8_t swiglu_q8[swiglu_q8_bytes];")
+                    add(f"    {w2_quant_func}(swiglu_out, swiglu_q8, aligned_intermediate_dim);")
+                    add(f"    #pragma omp parallel num_threads({num_threads})")
+                    add("    {")
+                    add("        const int ith = omp_get_thread_num();")
+                    add("        const int nth = omp_get_num_threads();")
+                    add(f"        {w2_par_kernel}(mlp_out, W2, swiglu_q8, aligned_embed_dim, aligned_intermediate_dim, ith, nth);")
+                    add("    }")
+                else:
+                    # Serial INT8 path
+                    add(f"    /* Down projection (INT8): {w2_dt.upper()} x {w2_act_type.upper()} -> {w2_kernel_int8} */")
+                    add(f"    const size_t swiglu_q8_bytes = {quant_bytes_for_elements('aligned_intermediate_dim', w2_act_type)};")
+                    add("    uint8_t swiglu_q8[swiglu_q8_bytes];")
+                    add(f"    {w2_quant_func}(swiglu_out, swiglu_q8, aligned_intermediate_dim);")
+                    add(f"    {w2_kernel_int8}(mlp_out, W2, swiglu_q8, aligned_embed_dim, aligned_intermediate_dim);")
             else:
                 add(f"    /* Down projection: {w2_dt.upper()} -> {w2_kernel} */")
                 add(f"    {w2_kernel}(swiglu_out, W2, NULL, mlp_out, 1, aligned_embed_dim, aligned_intermediate_dim);")
@@ -1840,6 +1936,11 @@ if __name__ == "__main__":
                         help="[Deprecated] Use --activations=int8 instead")
     parser.add_argument("--no-int8-activations", action="store_true",
                         help="[Deprecated] Use --activations=fp32 instead")
+    # Parallel decode options (v6.6+)
+    parser.add_argument("--parallel-decode", action="store_true",
+                        help="Use parallel GEMV kernels with OpenMP for decode (2.4-3x speedup)")
+    parser.add_argument("--num-threads", type=int, default=4,
+                        help="Number of OpenMP threads for parallel decode (default: 4)")
 
     args = parser.parse_args()
 
@@ -1871,6 +1972,10 @@ if __name__ == "__main__":
         with open(args.manifest) as f:
             manifest = json.load(f)
 
+    # Log parallel decode settings
+    if args.parallel_decode:
+        print(f"[CODEGEN] Using parallel decode with {args.num_threads} threads (2.4-3x speedup)")
+
     # Generate code
     emit_c_source_v66(
         layout=layout,
@@ -1880,5 +1985,7 @@ if __name__ == "__main__":
         emit_debug=args.debug,
         emit_parity=args.parity,
         weights_manifest=manifest,
-        int8_activations=use_int8
+        int8_activations=use_int8,
+        parallel_decode=args.parallel_decode,
+        num_threads=args.num_threads
     )

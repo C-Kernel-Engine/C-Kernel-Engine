@@ -8,6 +8,8 @@ var gemm__kernels__q6k__q8k_8c =
     [ "gemv_q6_k_q8_k_avx2", "gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159", null ],
     [ "gemv_q6_k_q8_k_avx512", "gemm__kernels__q6k__q8k_8c.html#add6d884387d931ac5e750a43eff7b5f8", null ],
     [ "gemv_q6_k_q8_k_avx512_vbmi", "gemm__kernels__q6k__q8k_8c.html#a9b4b9fd216a3b8bffd76427109afdd26", null ],
+    [ "gemv_q6_k_q8_k_parallel", "gemm__kernels__q6k__q8k_8c.html#aa7f87aba64d19dce415df9230e8eb0b8", null ],
+    [ "gemv_q6_k_q8_k_parallel_simd", "gemm__kernels__q6k__q8k_8c.html#ae0038e921164892e7a0e7e460b491f76", null ],
     [ "gemv_q6_k_q8_k_ref", "gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9", null ],
     [ "gemv_q6_k_q8_k_sse", "gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f", null ],
     [ "vec_dot_q6_k_q8_k", "gemm__kernels__q6k__q8k_8c.html#a892b783bece286ef3d51dfef42017ac5", null ]

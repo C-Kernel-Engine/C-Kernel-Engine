@@ -968,14 +968,14 @@
 
     .history-chart {
       margin: 2rem 0;
-      padding: 1rem;
+      padding: 1rem 1rem 1.5rem 1rem;
       background: var(--dark-card);
       border-radius: 8px;
     }
     .history-bar {
       display: flex;
       gap: 2px;
-      height: 60px;
+      height: 70px;
       align-items: flex-end;
     }
     .history-day {
@@ -991,6 +991,50 @@
     .history-day.all-pass { background: #48bb78; }
     .history-day.has-fail { background: #f56565; }
     .history-day.no-data { background: var(--grey); }
+
+    /* Legend */
+    .history-legend {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    .legend-dot.pass { background: #48bb78; }
+    .legend-dot.fail { background: #f56565; }
+    .legend-dot.nodata { background: var(--grey); }
+
+    /* Date labels */
+    .history-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+      padding: 0 2px;
+      height: 50px;
+    }
+    .history-label {
+      font-size: 0.7rem;
+      color: #888;
+      transform: rotate(-45deg);
+      transform-origin: left top;
+      white-space: nowrap;
+      position: relative;
+      top: 12px;
+    }
+    .history-labels span {
+      text-align: left;
+    }
 
     .error-msg {
       font-size: 0.85rem;
@@ -1068,9 +1112,20 @@
     <h2>30-Day History</h2>
     <div class="history-chart">
       <div class="history-bar" id="history-bar"></div>
-      <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">
-        <span>30 days ago</span>
-        <span>Today</span>
+      <div class="history-labels" id="history-labels"></div>
+      <div class="history-legend">
+        <div class="legend-item">
+          <span class="legend-dot pass"></span>
+          <span>All passed</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot fail"></span>
+          <span>Some failed</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot nodata"></span>
+          <span>No data</span>
+        </div>
       </div>
     </div>
 
@@ -1192,11 +1247,28 @@
     The nightly test suite runs automatically at 2am UTC every day. It includes:
   </p>
   <ul>
+    <li><strong>E2E Integration Tests</strong>: Full pipeline validation (kernel compile → IR codegen → inference)
+      <ul style="margin-top: 0.5rem; color: var(--text-muted);">
+        <li>Kernel compilation (all SIMD variants)</li>
+        <li>IR codegen validation (generates compilable C code)</li>
+        <li>Parallel decode codegen (OpenMP pragmas for v6.6)</li>
+        <li>Inference verification (prompts model, validates coherent response)</li>
+      </ul>
+    </li>
     <li><strong>Kernel Unit Tests</strong>: Individual kernel parity with PyTorch</li>
     <li><strong>BF16 Tests</strong>: BFloat16 precision tests (when CPU supports it)</li>
     <li><strong>Quantization Tests</strong>: Q4_K, Q6_K quantized kernel tests</li>
     <li><strong>Integration Tests</strong>: Full layer and model parity</li>
   </ul>
+
+  <div class="alert alert-info" style="margin-top: 1rem;">
+    <span class="alert-icon">💡</span>
+    <div>
+      <strong>Run locally:</strong> <code>make e2e</code> runs the full E2E integration test suite.
+      <br>
+      <span style="color: var(--text-muted);">Tests: Qwen2-0.5B or SmolLM2-360M with actual prompt/response verification.</span>
+    </div>
+  </div>
 
   <p>
     View the <a href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/actions/workflows/nightly.yml">GitHub Actions workflow</a>
@@ -1361,7 +1433,9 @@ function toggleSubTests(row, idx) {
 
 function renderHistory(reports) {
   const bar = document.getElementById('history-bar');
+  const labelsContainer = document.getElementById('history-labels');
   bar.innerHTML = '';
+  labelsContainer.innerHTML = '';
 
   // Create 30 days of data
   const days = [];
@@ -1371,12 +1445,16 @@ function renderHistory(reports) {
     const dateStr = date.toISOString().split('T')[0];
     const report = reports.find(r => r.date === dateStr);
     days.push({
-      date: dateStr,
+      date: date,
+      dateStr: dateStr,
       report: report
     });
   }
 
-  days.forEach(day => {
+  // Create label positions (every 5 days and at the end)
+  const labelPositions = [0, 4, 9, 14, 19, 24, 29];
+
+  days.forEach((day, idx) => {
     const div = document.createElement('div');
     div.className = 'history-day';
 
@@ -1390,18 +1468,34 @@ function renderHistory(reports) {
 
       if (failed > 0) {
         div.classList.add('has-fail');
-        div.title = `${day.date}: ${failed} failed / ${total} total`;
+        div.title = `${day.dateStr}: ${failed} failed / ${total} total`;
       } else {
         div.classList.add('all-pass');
-        div.title = `${day.date}: ${passed} passed`;
+        div.title = `${day.dateStr}: ${passed} passed`;
       }
     } else {
       div.classList.add('no-data');
       div.style.height = '10%';
-      div.title = `${day.date}: No data`;
+      div.title = `${day.dateStr}: No data`;
     }
 
     bar.appendChild(div);
+
+    // Add date label every 5 days
+    if (labelPositions.includes(idx)) {
+      const label = document.createElement('span');
+      label.className = 'history-label';
+      // Format: "Jan 2"
+      const month = day.date.toLocaleString('en-US', { month: 'short' });
+      const dayNum = day.date.getDate();
+      label.textContent = `${month} ${dayNum}`;
+      labelsContainer.appendChild(label);
+    } else {
+      // Add spacer for alignment
+      const spacer = document.createElement('span');
+      spacer.style.width = `${100/30}%`;
+      labelsContainer.appendChild(spacer);
+    }
   });
 }
 
@@ -1617,7 +1711,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-16</p>
             </div>
         </div>
     </footer>

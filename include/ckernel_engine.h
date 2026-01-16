@@ -135,6 +135,12 @@ void gemv_q4_0(float *y, const void *W, const float *x, int M, int K);
 void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
 void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
 
+/* Parallel Q5_0 versions - caller provides ith/nth from OpenMP region */
+void gemv_q5_0_parallel(float *y, const void *W, const float *x,
+                        int M, int K, int ith, int nth);
+void gemv_q5_0_parallel_simd(float *y, const void *W, const float *x,
+                              int M, int K, int ith, int nth);
+
 void dequant_q6_k_row(const void *src, float *dst, size_t n_elements);
 
 // Simple quant dequantization (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
@@ -165,6 +171,29 @@ void gemv_q4_k_q8_k(float *y,
                     const void *x_q8,
                     int M, int K);
 
+/* Reference implementation (no SIMD) - for testing/comparison */
+void gemv_q4_k_q8_k_ref(float *y,
+                        const void *W,
+                        const void *x_q8,
+                        int M, int K);
+
+/* Parallel version: receives ith (thread index) and nth (total threads).
+ * OpenMP is at orchestration level, kernel processes only rows [r0, r1). */
+void gemv_q4_k_q8_k_parallel(float *y,
+                             const void *W,
+                             const void *x_q8,
+                             int M, int K,
+                             int ith, int nth);
+
+/* Parallel SIMD version: combines AVX with parallel row splitting.
+ * Includes row-ahead prefetching to hide memory latency (~50-70ns).
+ * This is the fastest option for multi-threaded decode. */
+void gemv_q4_k_q8_k_parallel_simd(float *y,
+                                   const void *W,
+                                   const void *x_q8,
+                                   int M, int K,
+                                   int ith, int nth);
+
 void gemm_q4_k_q8_k(float *Y,
                     const void *W,
                     const void *X_q8,
@@ -183,6 +212,12 @@ void gemv_q6_k_q8_k(float *y,
                     const void *W,
                     const void *x_q8,
                     int M, int K);
+
+/* Parallel Q6_K versions - caller provides ith/nth from OpenMP region */
+void gemv_q6_k_q8_k_parallel(float *y, const void *W, const void *x_q8,
+                              int M, int K, int ith, int nth);
+void gemv_q6_k_q8_k_parallel_simd(float *y, const void *W, const void *x_q8,
+                                   int M, int K, int ith, int nth);
 
 void gemm_q6_k_q8_k(float *Y,
                     const void *W,

@@ -2,15 +2,15 @@
 <doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
   <compounddef id="gelu__kernels__bf16_8c" kind="file" language="C++">
     <compoundname>gelu_kernels_bf16.c</compoundname>
-    <includes local="no">stdlib.h</includes>
     <includes local="no">stdint.h</includes>
+    <includes local="no">string.h</includes>
     <includes refid="bf16__utils_8h" local="yes">bf16_utils.h</includes>
     <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
     <incdepgraph>
       <node id="8">
         <label>ckernel_quant.h</label>
         <link refid="ckernel__quant_8h"/>
-        <childnode refid="3" relation="include">
+        <childnode refid="2" relation="include">
         </childnode>
         <childnode refid="5" relation="include">
         </childnode>
@@ -20,21 +20,18 @@
       <node id="9">
         <label>ckernel_dtype.h</label>
         <link refid="ckernel__dtype_8h"/>
-        <childnode refid="3" relation="include">
+        <childnode refid="2" relation="include">
         </childnode>
         <childnode refid="5" relation="include">
         </childnode>
       </node>
-      <node id="3">
-        <label>stdint.h</label>
-      </node>
       <node id="2">
-        <label>stdlib.h</label>
+        <label>stdint.h</label>
       </node>
       <node id="4">
         <label>bf16_utils.h</label>
         <link refid="bf16__utils_8h"/>
-        <childnode refid="3" relation="include">
+        <childnode refid="2" relation="include">
         </childnode>
         <childnode refid="5" relation="include">
         </childnode>
@@ -44,7 +41,7 @@
         <link refid="ckernel__engine_8h"/>
         <childnode refid="5" relation="include">
         </childnode>
-        <childnode refid="3" relation="include">
+        <childnode refid="2" relation="include">
         </childnode>
         <childnode refid="7" relation="include">
         </childnode>
@@ -53,6 +50,9 @@
       </node>
       <node id="5">
         <label>stddef.h</label>
+      </node>
+      <node id="3">
+        <label>string.h</label>
       </node>
       <node id="1">
         <label>gelu_kernels_bf16.c</label>
@@ -69,57 +69,17 @@
       <node id="7">
         <label>cpu_features.h</label>
         <link refid="cpu__features_8h"/>
-        <childnode refid="3" relation="include">
+        <childnode refid="2" relation="include">
         </childnode>
         <childnode refid="5" relation="include">
         </childnode>
       </node>
     </incdepgraph>
       <sectiondef kind="func">
-      <memberdef kind="function" id="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
-        <type>float *</type>
-        <definition>static float* alloc_float_buffer</definition>
-        <argsstring>(size_t count)</argsstring>
-        <name>alloc_float_buffer</name>
-        <param>
-          <type>size_t</type>
-          <declname>count</declname>
-        </param>
-        <briefdescription>
-        </briefdescription>
-        <detaileddescription>
-        </detaileddescription>
-        <inbodydescription>
-        </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="11" column="14" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="11" bodyend="14"/>
-        <referencedby refid="ckernel__engine_8h_1ac8572265a21098caf2060797cb18a978" compoundref="gelu__kernels__bf16_8c" startline="37" endline="64">gelu_backward_exact_bf16</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a27adb4761d436aeea3317ce0595dc67a" compoundref="gelu__kernels__bf16_8c" startline="66" endline="91">gelu_backward_fast_bf16</referencedby>
-        <referencedby refid="ckernel__engine_8h_1aa64dae6724ac5d649be339cad62126cb" compoundref="gelu__kernels__bf16_8c" startline="21" endline="35">gelu_fast_inplace_bf16</referencedby>
-      </memberdef>
-      <memberdef kind="function" id="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
-        <type>void</type>
-        <definition>static void free_float_buffer</definition>
-        <argsstring>(float *buf)</argsstring>
-        <name>free_float_buffer</name>
-        <param>
-          <type>float *</type>
-          <declname>buf</declname>
-        </param>
-        <briefdescription>
-        </briefdescription>
-        <detaileddescription>
-        </detaileddescription>
-        <inbodydescription>
-        </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="16" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="16" bodyend="19"/>
-        <referencedby refid="ckernel__engine_8h_1ac8572265a21098caf2060797cb18a978" compoundref="gelu__kernels__bf16_8c" startline="37" endline="64">gelu_backward_exact_bf16</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a27adb4761d436aeea3317ce0595dc67a" compoundref="gelu__kernels__bf16_8c" startline="66" endline="91">gelu_backward_fast_bf16</referencedby>
-        <referencedby refid="ckernel__engine_8h_1aa64dae6724ac5d649be339cad62126cb" compoundref="gelu__kernels__bf16_8c" startline="21" endline="35">gelu_fast_inplace_bf16</referencedby>
-      </memberdef>
-      <memberdef kind="function" id="gelu__kernels__bf16_8c_1ac8572265a21098caf2060797cb18a978" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+      <memberdef kind="function" id="gelu__kernels__bf16_8c_1a79b99577c3b4e080aa37e41ffa43c46f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
         <definition>void gelu_backward_exact_bf16</definition>
-        <argsstring>(const uint16_t *input, const uint16_t *d_output, uint16_t *d_input, size_t n)</argsstring>
+        <argsstring>(const uint16_t *input, const uint16_t *d_output, uint16_t *d_input, size_t n, float *scratch_input, float *scratch_d_output, float *scratch_d_input)</argsstring>
         <name>gelu_backward_exact_bf16</name>
         <param>
           <type>const uint16_t *</type>
@@ -137,23 +97,33 @@
           <type>size_t</type>
           <declname>n</declname>
         </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_input</declname>
+        </param>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="37" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="37" bodyend="64"/>
-        <references refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" compoundref="gelu__kernels__bf16_8c" startline="11" endline="14">alloc_float_buffer</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="30" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="30" bodyend="48"/>
         <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
         <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
-        <references refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" compoundref="gelu__kernels__bf16_8c" startline="16" endline="19">free_float_buffer</references>
         <references refid="ckernel__engine_8h_1ac4d3711dee095194f24437af73ad1763" compoundref="gelu__kernels_8c" startline="433" endline="452">gelu_backward_scalar</references>
       </memberdef>
-      <memberdef kind="function" id="gelu__kernels__bf16_8c_1a27adb4761d436aeea3317ce0595dc67a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+      <memberdef kind="function" id="gelu__kernels__bf16_8c_1a6dc372b7ca52037556aaaa6c8aadf642" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
         <definition>void gelu_backward_fast_bf16</definition>
-        <argsstring>(const uint16_t *input, const uint16_t *d_output, uint16_t *d_input, size_t n)</argsstring>
+        <argsstring>(const uint16_t *input, const uint16_t *d_output, uint16_t *d_input, size_t n, float *scratch_input, float *scratch_d_output, float *scratch_d_input)</argsstring>
         <name>gelu_backward_fast_bf16</name>
         <param>
           <type>const uint16_t *</type>
@@ -171,23 +141,33 @@
           <type>size_t</type>
           <declname>n</declname>
         </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_input</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch_d_input</declname>
+        </param>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="66" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="66" bodyend="91"/>
-        <references refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" compoundref="gelu__kernels__bf16_8c" startline="11" endline="14">alloc_float_buffer</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="53" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="53" bodyend="69"/>
         <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
         <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
-        <references refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" compoundref="gelu__kernels__bf16_8c" startline="16" endline="19">free_float_buffer</references>
         <references refid="ckernel__engine_8h_1aeaf518a5239f4588f8c28b05b96d5478" compoundref="gelu__kernels_8c" startline="457" endline="579">gelu_backward_fast</references>
       </memberdef>
-      <memberdef kind="function" id="gelu__kernels__bf16_8c_1aa64dae6724ac5d649be339cad62126cb" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+      <memberdef kind="function" id="gelu__kernels__bf16_8c_1a9f5d586b285fab4efe8b7223748f9d00" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
         <definition>void gelu_fast_inplace_bf16</definition>
-        <argsstring>(uint16_t *data, size_t n)</argsstring>
+        <argsstring>(uint16_t *data, size_t n, float *scratch)</argsstring>
         <name>gelu_fast_inplace_bf16</name>
         <param>
           <type>uint16_t *</type>
@@ -197,17 +177,19 @@
           <type>size_t</type>
           <declname>n</declname>
         </param>
+        <param>
+          <type>float *</type>
+          <declname>scratch</declname>
+        </param>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="21" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="21" bodyend="35"/>
-        <references refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" compoundref="gelu__kernels__bf16_8c" startline="11" endline="14">alloc_float_buffer</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" line="15" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c" bodystart="15" bodyend="24"/>
         <references refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" compoundref="bf16__utils_8h" startline="250" endline="266">bf16_tensor_to_float</references>
         <references refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" compoundref="bf16__utils_8h" startline="271" endline="287">float_tensor_to_bf16</references>
-        <references refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" compoundref="gelu__kernels__bf16_8c" startline="16" endline="19">free_float_buffer</references>
         <references refid="ckernel__engine_8h_1a315f43ac44656b5d77360d9879c5f122" compoundref="gelu__kernels_8c" startline="417" endline="428">gelu_exact_inplace</references>
       </memberdef>
       </sectiondef>
@@ -216,8 +198,8 @@
     <detaileddescription>
     </detaileddescription>
     <programlisting>
-<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="3"><highlight class="normal"></highlight></codeline>
 <codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="bf16__utils_8h" kindref="compound">bf16_utils.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
@@ -226,87 +208,65 @@
 <codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>push</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>GCC<sp/>diagnostic<sp/>ignored<sp/>&quot;-Wmaybe-uninitialized&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="10"><highlight class="normal"></highlight></codeline>
-<codeline lineno="11" refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*<ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>count)</highlight></codeline>
-<codeline lineno="12"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="13"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*)malloc(count<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">));</highlight></codeline>
-<codeline lineno="14"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="15"><highlight class="normal"></highlight></codeline>
-<codeline lineno="16" refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*buf)</highlight></codeline>
-<codeline lineno="17"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/>free(buf);</highlight></codeline>
-<codeline lineno="19"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="20"><highlight class="normal"></highlight></codeline>
-<codeline lineno="21" refid="ckernel__engine_8h_1aa64dae6724ac5d649be339cad62126cb" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1aa64dae6724ac5d649be339cad62126cb" kindref="member">gelu_fast_inplace_bf16</ref>(uint16_t<sp/>*data,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n)</highlight></codeline>
-<codeline lineno="22"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*tmp<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!tmp)<sp/>{</highlight></codeline>
-<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="27"><highlight class="normal"></highlight></codeline>
-<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(data,<sp/>tmp,<sp/>n);</highlight></codeline>
-<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>exact<sp/>version<sp/>to<sp/>avoid<sp/>fast<sp/>tanh<sp/>approximation<sp/>error<sp/>accumulating</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>with<sp/>BF16<sp/>precision<sp/>loss.<sp/>Conversion<sp/>overhead<sp/>dominates<sp/>anyway.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a315f43ac44656b5d77360d9879c5f122" kindref="member">gelu_exact_inplace</ref>(tmp,<sp/>n);</highlight></codeline>
-<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(tmp,<sp/>data,<sp/>n);</highlight></codeline>
-<codeline lineno="33"><highlight class="normal"></highlight></codeline>
-<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(tmp);</highlight></codeline>
-<codeline lineno="35"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="36"><highlight class="normal"></highlight></codeline>
-<codeline lineno="37" refid="ckernel__engine_8h_1ac8572265a21098caf2060797cb18a978" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1ac8572265a21098caf2060797cb18a978" kindref="member">gelu_backward_exact_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
-<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_output,</highlight></codeline>
-<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_input,</highlight></codeline>
-<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n)</highlight></codeline>
-<codeline lineno="41"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_output_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_input_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input_f<sp/>||<sp/>!d_output_f<sp/>||<sp/>!d_input_f)<sp/>{</highlight></codeline>
-<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(input_f);</highlight></codeline>
-<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_output_f);</highlight></codeline>
-<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_input_f);</highlight></codeline>
-<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="51"><highlight class="normal"></highlight></codeline>
-<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>input_f,<sp/>n);</highlight></codeline>
-<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_output,<sp/>d_output_f,<sp/>n);</highlight></codeline>
-<codeline lineno="54"><highlight class="normal"></highlight></codeline>
-<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>scalar<sp/>exact<sp/>version<sp/>to<sp/>avoid<sp/>fast<sp/>tanh<sp/>approximation<sp/>error</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>accumulating<sp/>with<sp/>BF16<sp/>precision<sp/>loss.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1ac4d3711dee095194f24437af73ad1763" kindref="member">gelu_backward_scalar</ref>(input_f,<sp/>d_output_f,<sp/>d_input_f,<sp/>n);</highlight></codeline>
-<codeline lineno="58"><highlight class="normal"></highlight></codeline>
-<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(d_input_f,<sp/>d_input,<sp/>n);</highlight></codeline>
-<codeline lineno="60"><highlight class="normal"></highlight></codeline>
-<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(input_f);</highlight></codeline>
-<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_output_f);</highlight></codeline>
-<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_input_f);</highlight></codeline>
-<codeline lineno="64"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>BF16<sp/>GELU<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffer.</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/>scratch:<sp/>[n]<sp/>floats<sp/>-<sp/>caller<sp/>allocates<sp/>and<sp/>reuses</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15" refid="ckernel__engine_8h_1a9f5d586b285fab4efe8b7223748f9d00" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1a9f5d586b285fab4efe8b7223748f9d00" kindref="member">gelu_fast_inplace_bf16</ref>(uint16_t<sp/>*data,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch)</highlight></codeline>
+<codeline lineno="16"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(data,<sp/>scratch,<sp/>n);</highlight></codeline>
+<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>exact<sp/>version<sp/>to<sp/>avoid<sp/>fast<sp/>tanh<sp/>approximation<sp/>error<sp/>accumulating</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>with<sp/>BF16<sp/>precision<sp/>loss.<sp/>Conversion<sp/>overhead<sp/>dominates<sp/>anyway.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="22"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1a315f43ac44656b5d77360d9879c5f122" kindref="member">gelu_exact_inplace</ref>(scratch,<sp/>n);</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch,<sp/>data,<sp/>n);</highlight></codeline>
+<codeline lineno="24"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/>BF16<sp/>GELU<sp/>backward<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*<sp/>scratch_input,<sp/>scratch_d_output,<sp/>scratch_d_input:<sp/>each<sp/>[n]<sp/>floats</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="30" refid="ckernel__engine_8h_1a79b99577c3b4e080aa37e41ffa43c46f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1a79b99577c3b4e080aa37e41ffa43c46f" kindref="member">gelu_backward_exact_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_output,</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_input,</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n,</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_input,</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_output,</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_input)</highlight></codeline>
+<codeline lineno="37"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_input<sp/>||<sp/>!scratch_d_output<sp/>||<sp/>!scratch_d_input)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>scratch_input,<sp/>n);</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_output,<sp/>scratch_d_output,<sp/>n);</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>scalar<sp/>exact<sp/>version<sp/>to<sp/>avoid<sp/>fast<sp/>tanh<sp/>approximation<sp/>error</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>accumulating<sp/>with<sp/>BF16<sp/>precision<sp/>loss.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1ac4d3711dee095194f24437af73ad1763" kindref="member">gelu_backward_scalar</ref>(scratch_input,<sp/>scratch_d_output,<sp/>scratch_d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_d_input,<sp/>d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="48"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight></codeline>
+<codeline lineno="50"><highlight class="normal"></highlight><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/>BF16<sp/>GELU<sp/>backward<sp/>(fast)<sp/>with<sp/>caller-provided<sp/>scratch<sp/>buffers.</highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="53" refid="ckernel__engine_8h_1a6dc372b7ca52037556aaaa6c8aadf642" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1a6dc372b7ca52037556aaaa6c8aadf642" kindref="member">gelu_backward_fast_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_output,</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_input,</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n,</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_input,</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_output,</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*scratch_d_input)</highlight></codeline>
+<codeline lineno="60"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!scratch_input<sp/>||<sp/>!scratch_d_output<sp/>||<sp/>!scratch_d_input)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"></highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>scratch_input,<sp/>n);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_output,<sp/>scratch_d_output,<sp/>n);</highlight></codeline>
 <codeline lineno="65"><highlight class="normal"></highlight></codeline>
-<codeline lineno="66" refid="ckernel__engine_8h_1a27adb4761d436aeea3317ce0595dc67a" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gelu__kernels__bf16_8c_1a27adb4761d436aeea3317ce0595dc67a" kindref="member">gelu_backward_fast_bf16</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*input,</highlight></codeline>
-<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>uint16_t<sp/>*d_output,</highlight></codeline>
-<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>uint16_t<sp/>*d_input,</highlight></codeline>
-<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>n)</highlight></codeline>
-<codeline lineno="70"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_output_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*d_input_f<sp/>=<sp/><ref refid="gelu__kernels__bf16_8c_1aa7946eb3033d476c9c89e3dd89f23bb4" kindref="member">alloc_float_buffer</ref>(n);</highlight></codeline>
-<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!input_f<sp/>||<sp/>!d_output_f<sp/>||<sp/>!d_input_f)<sp/>{</highlight></codeline>
-<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(input_f);</highlight></codeline>
-<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_output_f);</highlight></codeline>
-<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_input_f);</highlight></codeline>
-<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="80"><highlight class="normal"></highlight></codeline>
-<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(input,<sp/>input_f,<sp/>n);</highlight></codeline>
-<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a94c0b1e3b43eb46dcce37900ed5c1333" kindref="member">bf16_tensor_to_float</ref>(d_output,<sp/>d_output_f,<sp/>n);</highlight></codeline>
-<codeline lineno="83"><highlight class="normal"></highlight></codeline>
-<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1aeaf518a5239f4588f8c28b05b96d5478" kindref="member">gelu_backward_fast</ref>(input_f,<sp/>d_output_f,<sp/>d_input_f,<sp/>n);</highlight></codeline>
-<codeline lineno="85"><highlight class="normal"></highlight></codeline>
-<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(d_input_f,<sp/>d_input,<sp/>n);</highlight></codeline>
-<codeline lineno="87"><highlight class="normal"></highlight></codeline>
-<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(input_f);</highlight></codeline>
-<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_output_f);</highlight></codeline>
-<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gelu__kernels__bf16_8c_1ab9b5d2e5ae35502dbd6249d4aa0187d2" kindref="member">free_float_buffer</ref>(d_input_f);</highlight></codeline>
-<codeline lineno="91"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__engine_8h_1aeaf518a5239f4588f8c28b05b96d5478" kindref="member">gelu_backward_fast</ref>(scratch_input,<sp/>scratch_d_output,<sp/>scratch_d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"></highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="bf16__utils_8h_1a027b5c4dd4c6ce7f656e922fc694e52a" kindref="member">float_tensor_to_bf16</ref>(scratch_d_input,<sp/>d_input,<sp/>n);</highlight></codeline>
+<codeline lineno="69"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gelu_kernels_bf16.c"/>
   </compounddef>

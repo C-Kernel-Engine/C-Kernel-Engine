@@ -346,6 +346,381 @@ void attention_mlp_fused_fp32(
 }
 
 /* ============================================================================
+ * V2: MLP-ONLY FUSED KERNEL with SIMD GEMV
+ *
+ * Key optimizations over v1:
+ * 1. AVX2 SIMD for ALL GEMVs (not just RMSNorm/SwiGLU)
+ * 2. Gate + Up computed TOGETHER (one pass through normed)
+ * 3. Horizontal sums done efficiently
+ *
+ * This isolates the MLP portion for benchmarking.
+ * ============================================================================ */
+
+#ifdef __AVX2__
+/* Inline SIMD GEMV helper - processes one output row */
+static inline float gemv_fp32_row_avx2(
+    const float *row,      /* [K] weight row */
+    const float *x,        /* [K] input vector */
+    int K
+) {
+    __m256 acc = _mm256_setzero_ps();
+    int k = 0;
+
+    for (; k + 7 < K; k += 8) {
+        __m256 vw = _mm256_loadu_ps(row + k);
+        __m256 vx = _mm256_loadu_ps(x + k);
+        acc = _mm256_fmadd_ps(vw, vx, acc);
+    }
+
+    /* Horizontal sum */
+    __m128 vlow = _mm256_castps256_ps128(acc);
+    __m128 vhigh = _mm256_extractf128_ps(acc, 1);
+    vlow = _mm_add_ps(vlow, vhigh);
+    __m128 shuf = _mm_movehdup_ps(vlow);
+    vlow = _mm_add_ps(vlow, shuf);
+    shuf = _mm_movehl_ps(shuf, vlow);
+    vlow = _mm_add_ss(vlow, shuf);
+    float sum = _mm_cvtss_f32(vlow);
+
+    /* Remainder */
+    for (; k < K; k++) {
+        sum += row[k] * x[k];
+    }
+
+    return sum;
+}
+#endif
+
+void mlp_fused_fp32_v2(
+    /* Input (after attention + residual) */
+    const float *hidden_in,       /* [embed_dim] */
+
+    /* RMSNorm */
+    const float *rms_weight,      /* [embed_dim] */
+    float eps,
+
+    /* MLP weights (FP32) */
+    const float *w_gate,          /* [intermediate_dim, embed_dim] */
+    const float *w_up,            /* [intermediate_dim, embed_dim] */
+    const float *w_down,          /* [embed_dim, intermediate_dim] */
+
+    /* Dimensions */
+    int embed_dim,
+    int intermediate_dim,
+
+    /* Output */
+    float *hidden_out             /* [embed_dim] */
+) {
+    /* Stack buffers - sized for typical models */
+    float normed[4096];
+    float swiglu[16384];  /* intermediate_dim */
+
+    if (embed_dim > 4096 || intermediate_dim > 16384) {
+        return; /* TODO: handle larger models */
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 1: RMSNorm (SIMD)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+    float rms_scale = compute_rms_scale_internal(hidden_in, embed_dim, eps);
+
+#ifdef __AVX2__
+    __m256 vscale = _mm256_set1_ps(rms_scale);
+    int i = 0;
+    for (; i + 7 < embed_dim; i += 8) {
+        __m256 vh = _mm256_loadu_ps(hidden_in + i);
+        __m256 vw = _mm256_loadu_ps(rms_weight + i);
+        __m256 vn = _mm256_mul_ps(_mm256_mul_ps(vh, vw), vscale);
+        _mm256_storeu_ps(normed + i, vn);
+    }
+    for (; i < embed_dim; i++) {
+        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;
+    }
+#else
+    for (int i = 0; i < embed_dim; i++) {
+        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;
+    }
+#endif
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 2: Gate + Up projections with TRUE FUSION + SwiGLU
+     *
+     * Key insight: Compute gate[i] and up[i] together, then immediately
+     * apply SwiGLU. This eliminates separate gate_out and up_out buffers.
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+#ifdef __AVX2__
+    for (int j = 0; j < intermediate_dim; j++) {
+        /* Compute gate and up for output j using SIMD GEMV */
+        const float *wg_row = w_gate + j * embed_dim;
+        const float *wu_row = w_up + j * embed_dim;
+
+        __m256 gate_acc = _mm256_setzero_ps();
+        __m256 up_acc = _mm256_setzero_ps();
+
+        int k = 0;
+        for (; k + 7 < embed_dim; k += 8) {
+            __m256 vn = _mm256_loadu_ps(normed + k);
+            __m256 vwg = _mm256_loadu_ps(wg_row + k);
+            __m256 vwu = _mm256_loadu_ps(wu_row + k);
+
+            gate_acc = _mm256_fmadd_ps(vwg, vn, gate_acc);
+            up_acc = _mm256_fmadd_ps(vwu, vn, up_acc);
+        }
+
+        /* Horizontal sums */
+        __m128 glow = _mm256_castps256_ps128(gate_acc);
+        __m128 ghigh = _mm256_extractf128_ps(gate_acc, 1);
+        glow = _mm_add_ps(glow, ghigh);
+        __m128 gshuf = _mm_movehdup_ps(glow);
+        glow = _mm_add_ps(glow, gshuf);
+        gshuf = _mm_movehl_ps(gshuf, glow);
+        glow = _mm_add_ss(glow, gshuf);
+        float gate_val = _mm_cvtss_f32(glow);
+
+        __m128 ulow = _mm256_castps256_ps128(up_acc);
+        __m128 uhigh = _mm256_extractf128_ps(up_acc, 1);
+        ulow = _mm_add_ps(ulow, uhigh);
+        __m128 ushuf = _mm_movehdup_ps(ulow);
+        ulow = _mm_add_ps(ulow, ushuf);
+        ushuf = _mm_movehl_ps(ushuf, ulow);
+        ulow = _mm_add_ss(ulow, ushuf);
+        float up_val = _mm_cvtss_f32(ulow);
+
+        /* Remainder */
+        for (; k < embed_dim; k++) {
+            gate_val += wg_row[k] * normed[k];
+            up_val += wu_row[k] * normed[k];
+        }
+
+        /* Fused SwiGLU: silu(gate) * up */
+        swiglu[j] = silu_scalar(gate_val) * up_val;
+    }
+#else
+    for (int j = 0; j < intermediate_dim; j++) {
+        const float *wg_row = w_gate + j * embed_dim;
+        const float *wu_row = w_up + j * embed_dim;
+        float gate_val = 0.0f, up_val = 0.0f;
+
+        for (int k = 0; k < embed_dim; k++) {
+            gate_val += wg_row[k] * normed[k];
+            up_val += wu_row[k] * normed[k];
+        }
+
+        swiglu[j] = silu_scalar(gate_val) * up_val;
+    }
+#endif
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 3: Down projection + Residual (SIMD GEMV)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+#ifdef __AVX2__
+    for (int j = 0; j < embed_dim; j++) {
+        float sum = gemv_fp32_row_avx2(w_down + j * intermediate_dim, swiglu, intermediate_dim);
+        hidden_out[j] = sum + hidden_in[j];  /* Residual */
+    }
+#else
+    for (int j = 0; j < embed_dim; j++) {
+        float sum = 0.0f;
+        const float *wd_row = w_down + j * intermediate_dim;
+        for (int k = 0; k < intermediate_dim; k++) {
+            sum += wd_row[k] * swiglu[k];
+        }
+        hidden_out[j] = sum + hidden_in[j];
+    }
+#endif
+}
+
+
+/* ============================================================================
+ * V3: MLP with SIMD GEMV but SEQUENTIAL weight access
+ *
+ * Key insight from v2 benchmark: fusing gate+up HURTS performance because
+ * interleaved weight loading destroys cache prefetch patterns.
+ *
+ * v3 approach:
+ * 1. Use SIMD GEMV for all projections
+ * 2. Keep SEQUENTIAL weight access (gate first, then up)
+ * 3. Still fuse SwiGLU immediately after projections
+ *
+ * This should be faster than v2 AND faster than scalar separate.
+ * ============================================================================ */
+
+void mlp_fused_fp32_v3(
+    const float *hidden_in,
+    const float *rms_weight,
+    float eps,
+    const float *w_gate,
+    const float *w_up,
+    const float *w_down,
+    int embed_dim,
+    int intermediate_dim,
+    float *hidden_out
+) {
+    /* Stack buffers */
+    float normed[4096];
+    float gate_out[16384];
+    float swiglu[16384];
+
+    if (embed_dim > 4096 || intermediate_dim > 16384) {
+        return;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 1: RMSNorm (SIMD)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+    float rms_scale = compute_rms_scale_internal(hidden_in, embed_dim, eps);
+
+#ifdef __AVX2__
+    __m256 vscale = _mm256_set1_ps(rms_scale);
+    int i = 0;
+    for (; i + 7 < embed_dim; i += 8) {
+        __m256 vh = _mm256_loadu_ps(hidden_in + i);
+        __m256 vw = _mm256_loadu_ps(rms_weight + i);
+        __m256 vn = _mm256_mul_ps(_mm256_mul_ps(vh, vw), vscale);
+        _mm256_storeu_ps(normed + i, vn);
+    }
+    for (; i < embed_dim; i++) {
+        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;
+    }
+#else
+    for (int i = 0; i < embed_dim; i++) {
+        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;
+    }
+#endif
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 2: Gate projection (SIMD GEMV, sequential weight access)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+#ifdef __AVX2__
+    for (int j = 0; j < intermediate_dim; j++) {
+        gate_out[j] = gemv_fp32_row_avx2(w_gate + j * embed_dim, normed, embed_dim);
+    }
+#else
+    for (int j = 0; j < intermediate_dim; j++) {
+        float sum = 0.0f;
+        const float *wg_row = w_gate + j * embed_dim;
+        for (int k = 0; k < embed_dim; k++) {
+            sum += wg_row[k] * normed[k];
+        }
+        gate_out[j] = sum;
+    }
+#endif
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 3: Up projection + FUSED SwiGLU (SIMD GEMV, sequential access)
+     *
+     * Key: compute up[j], then immediately apply SwiGLU with gate[j].
+     * This avoids storing the full up_out buffer.
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+#ifdef __AVX2__
+    for (int j = 0; j < intermediate_dim; j++) {
+        float up_val = gemv_fp32_row_avx2(w_up + j * embed_dim, normed, embed_dim);
+        /* Fused SwiGLU: silu(gate) * up */
+        swiglu[j] = silu_scalar(gate_out[j]) * up_val;
+    }
+#else
+    for (int j = 0; j < intermediate_dim; j++) {
+        float up_val = 0.0f;
+        const float *wu_row = w_up + j * embed_dim;
+        for (int k = 0; k < embed_dim; k++) {
+            up_val += wu_row[k] * normed[k];
+        }
+        swiglu[j] = silu_scalar(gate_out[j]) * up_val;
+    }
+#endif
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     * STEP 4: Down projection + Residual (SIMD GEMV)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+#ifdef __AVX2__
+    for (int j = 0; j < embed_dim; j++) {
+        float sum = gemv_fp32_row_avx2(w_down + j * intermediate_dim, swiglu, intermediate_dim);
+        hidden_out[j] = sum + hidden_in[j];
+    }
+#else
+    for (int j = 0; j < embed_dim; j++) {
+        float sum = 0.0f;
+        const float *wd_row = w_down + j * intermediate_dim;
+        for (int k = 0; k < intermediate_dim; k++) {
+            sum += wd_row[k] * swiglu[k];
+        }
+        hidden_out[j] = sum + hidden_in[j];
+    }
+#endif
+}
+
+
+/* ============================================================================
+ * SEPARATE MLP (for benchmarking comparison)
+ *
+ * Same operations but as separate function calls.
+ * ============================================================================ */
+
+void mlp_separate_fp32(
+    const float *hidden_in,
+    const float *rms_weight,
+    float eps,
+    const float *w_gate,
+    const float *w_up,
+    const float *w_down,
+    float *normed_buf,        /* [embed_dim] caller-provided */
+    float *gate_buf,          /* [intermediate_dim] caller-provided */
+    float *up_buf,            /* [intermediate_dim] caller-provided */
+    int embed_dim,
+    int intermediate_dim,
+    float *hidden_out
+) {
+    /* Step 1: RMSNorm */
+    float rms_scale = compute_rms_scale_internal(hidden_in, embed_dim, eps);
+    for (int i = 0; i < embed_dim; i++) {
+        normed_buf[i] = hidden_in[i] * rms_weight[i] * rms_scale;
+    }
+
+    /* Step 2: Gate projection */
+    for (int j = 0; j < intermediate_dim; j++) {
+        float sum = 0.0f;
+        const float *wg_row = w_gate + j * embed_dim;
+        for (int k = 0; k < embed_dim; k++) {
+            sum += wg_row[k] * normed_buf[k];
+        }
+        gate_buf[j] = sum;
+    }
+
+    /* Step 3: Up projection */
+    for (int j = 0; j < intermediate_dim; j++) {
+        float sum = 0.0f;
+        const float *wu_row = w_up + j * embed_dim;
+        for (int k = 0; k < embed_dim; k++) {
+            sum += wu_row[k] * normed_buf[k];
+        }
+        up_buf[j] = sum;
+    }
+
+    /* Step 4: SwiGLU */
+    for (int j = 0; j < intermediate_dim; j++) {
+        gate_buf[j] = silu_scalar(gate_buf[j]) * up_buf[j];
+    }
+
+    /* Step 5: Down projection + Residual */
+    for (int j = 0; j < embed_dim; j++) {
+        float sum = 0.0f;
+        const float *wd_row = w_down + j * intermediate_dim;
+        for (int k = 0; k < intermediate_dim; k++) {
+            sum += wd_row[k] * gate_buf[k];
+        }
+        hidden_out[j] = sum + hidden_in[j];
+    }
+}
+
+
+/* ============================================================================
  * Q4_K VERSION: Attention + Output + RMSNorm + MLP with quantized weights
  *
  * All MLP weights are Q4_K quantized.
