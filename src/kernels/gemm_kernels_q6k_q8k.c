@@ -1071,7 +1071,9 @@ void gemv_q6_k_q8_k_parallel_simd(float *y,
         }
 
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-#if defined(__AVX__)
+#if defined(__AVX2__)
+        y[row] = dot_q6_k_q8_k_avx2(w_row, x, K);
+#elif defined(__AVX__)
         y[row] = dot_q6_k_q8_k_avx(w_row, x, K);
 #else
         y[row] = dot_q6_k_q8_k_sse(w_row, x, K);
