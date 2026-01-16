@@ -164,6 +164,99 @@ void gemv_q8_0_avx512(float *y,
 #endif
 
 /* ============================================================================
+ * AVX2 Implementation (Haswell+, 256-bit integer operations)
+ *
+ * Q8_0 format: 32 signed int8 weights per block
+ *   - d: FP16 scale
+ *   - qs: 32 int8 weights
+ *   - Dequant: w = d * q
+ *
+ * AVX2 provides _mm256_cvtepi8_epi32 for efficient 8-to-32 sign extension.
+ * Processes 8 weights at a time with full 256-bit FMA.
+ * ============================================================================ */
+
+#if defined(__AVX2__) && !defined(__AVX512F__)
+
+/* Helper: AVX2 horizontal sum of 8 floats */
+static inline float hsum_avx2_q8(__m256 v) {
+    __m128 lo = _mm256_castps256_ps128(v);
+    __m128 hi = _mm256_extractf128_ps(v, 1);
+    lo = _mm_add_ps(lo, hi);  /* 4 floats */
+    __m128 shuf = _mm_shuffle_ps(lo, lo, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 sums = _mm_add_ps(lo, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+
+/**
+ * @brief Matrix-vector multiply with Q8_0 weights (AVX2 optimized)
+ *
+ * Uses AVX2's _mm256_cvtepi8_epi32 for efficient sign extension.
+ * Processes 8 weights at a time with FMA.
+ */
+void gemv_q8_0_avx2(float *y,
+                    const void *W,
+                    const float *x,
+                    int M, int K)
+{
+    const block_q8_0 *blocks = (const block_q8_0 *)W;
+    const int blocks_per_row = K / QK8_0;  /* QK8_0 = 32 */
+
+    for (int row = 0; row < M; row++) {
+        __m256 acc = _mm256_setzero_ps();
+
+        for (int b = 0; b < blocks_per_row; b++) {
+            const block_q8_0 *block = &blocks[row * blocks_per_row + b];
+            const float d = CK_FP16_TO_FP32(block->d);
+            const __m256 vscale = _mm256_set1_ps(d);
+            const float *xp = &x[b * QK8_0];
+
+            /* Process 32 weights in 4 groups of 8 using AVX2 */
+
+            /* Group 0: weights 0-7 */
+            {
+                __m128i q8 = _mm_loadl_epi64((const __m128i *)&block->qs[0]);
+                __m256i q32 = _mm256_cvtepi8_epi32(q8);
+                __m256 wf = _mm256_mul_ps(_mm256_cvtepi32_ps(q32), vscale);
+                __m256 xv = _mm256_loadu_ps(&xp[0]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 1: weights 8-15 */
+            {
+                __m128i q8 = _mm_loadl_epi64((const __m128i *)&block->qs[8]);
+                __m256i q32 = _mm256_cvtepi8_epi32(q8);
+                __m256 wf = _mm256_mul_ps(_mm256_cvtepi32_ps(q32), vscale);
+                __m256 xv = _mm256_loadu_ps(&xp[8]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 2: weights 16-23 */
+            {
+                __m128i q8 = _mm_loadl_epi64((const __m128i *)&block->qs[16]);
+                __m256i q32 = _mm256_cvtepi8_epi32(q8);
+                __m256 wf = _mm256_mul_ps(_mm256_cvtepi32_ps(q32), vscale);
+                __m256 xv = _mm256_loadu_ps(&xp[16]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+
+            /* Group 3: weights 24-31 */
+            {
+                __m128i q8 = _mm_loadl_epi64((const __m128i *)&block->qs[24]);
+                __m256i q32 = _mm256_cvtepi8_epi32(q8);
+                __m256 wf = _mm256_mul_ps(_mm256_cvtepi32_ps(q32), vscale);
+                __m256 xv = _mm256_loadu_ps(&xp[24]);
+                acc = _mm256_fmadd_ps(wf, xv, acc);
+            }
+        }
+
+        y[row] = hsum_avx2_q8(acc);
+    }
+}
+#endif /* __AVX2__ && !__AVX512F__ */
+
+/* ============================================================================
  * AVX Implementation with True SIMD (256-bit float + 128-bit integer)
  *
  * Q8_0 format: 32 signed int8 weights per block
@@ -175,7 +268,7 @@ void gemv_q8_0_avx512(float *y,
  * We use SSE for integer-to-float conversion and AVX for accumulation.
  * ============================================================================ */
 
-#if defined(__AVX__) && !defined(__AVX512F__)
+#if defined(__AVX__) && !defined(__AVX2__) && !defined(__AVX512F__)
 
 /* Helper: SSE horizontal sum of 4 floats */
 static inline float hsum_sse_q8(__m128 v) {
@@ -385,14 +478,10 @@ void gemv_q8_0(float *y,
                int M, int K)
 {
 // Dispatch order: AVX512 > AVX2 > AVX > SSE > ref
-// TODO: Implement proper gemv_q8_0_avx2 for AVX2 machines
-// For now, AVX2 uses SSE path (more stable at large dimensions)
 #if defined(__AVX512F__)
     gemv_q8_0_avx512(y, W, x, M, K);
 #elif defined(__AVX2__)
-    // AVX2 machines use SSE until proper AVX2 kernel is implemented
-    // (AVX path has precision issues at large dims on AVX2)
-    gemv_q8_0_sse(y, W, x, M, K);
+    gemv_q8_0_avx2(y, W, x, M, K);
 #elif defined(__AVX__)
     gemv_q8_0_avx(y, W, x, M, K);
 #elif defined(__SSE4_1__)
