@@ -277,13 +277,9 @@ jobs:
           echo "Includes: 30+ kernel tests, BF16, quantization, training tests"
           echo ""
 
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "Mode: Quick (PR)"
-            python scripts/nightly_runner.py --quick --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
-          else
-            echo "Mode: Full (main/scheduled)"
-            python scripts/nightly_runner.py --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
-          fi
+          # Always run FULL suite to catch all regressions
+          echo "Mode: Full (all 30+ tests)"
+          python scripts/nightly_runner.py --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
 
           # Show summary
           if [ -f build/nightly_report.json ]; then
