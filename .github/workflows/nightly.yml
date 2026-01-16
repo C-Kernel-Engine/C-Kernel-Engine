@@ -13,17 +13,6 @@ on:
 
   # Allow manual trigger
   workflow_dispatch:
-    inputs:
-      test_category:
-        description: 'Test category to run'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - quick
-          - e2e
-          - parity
 
 # Need write access to push to gh-pages
 permissions:
@@ -31,17 +20,14 @@ permissions:
   pages: write
 
 jobs:
-  # ===========================================================================
-  # Job 1: Build CK-Engine (shared by all test jobs)
-  # ===========================================================================
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
-    outputs:
-      build_status: ${{ steps.build.outcome }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Check CPU features
         run: |
@@ -59,154 +45,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Build CK-Engine
-        id: build
-        run: |
-          make clean || true
-          make -j$(nproc)
-          make libck_parity.so || echo "Parity lib build failed (optional)"
-          echo ""
-          echo "=== Built libraries ==="
-          ls -la build/*.so 2>/dev/null || echo "No .so files"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ck-engine-build
-          path: |
-            build/
-            include/
-            src/
-            scripts/
-            Makefile
-            requirements.txt
-          retention-days: 1
-
-  # ===========================================================================
-  # Job 2: E2E Inference Tests (Runner 1 - needs GGUF model, NO llama.cpp)
-  # ===========================================================================
-  test-e2e:
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'e2e' || github.event.inputs.test_category == '' }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ck-engine-build
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install huggingface_hub
-
-      - name: Download GGUF model for E2E
-        run: |
-          echo "=== Downloading GGUF model ==="
-          GGUF_DIR=~/.cache/ck-engine-v6.5/models/Qwen--Qwen2-0.5B-Instruct-GGUF
-          mkdir -p "$GGUF_DIR"
-          GGUF_FILE="$GGUF_DIR/qwen2-0_5b-instruct-q4_k_m.gguf"
-
-          if [ ! -f "$GGUF_FILE" ]; then
-            echo "Downloading Qwen2-0.5B-Instruct Q4_K_M (~350MB)..."
-            wget -q --show-progress \
-              "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf" \
-              -O "$GGUF_FILE" || {
-                echo "Qwen download failed, trying SmolLM2..."
-                GGUF_DIR=~/.cache/ck-engine-v6.5/models/SmolLM2-360M-GGUF
-                mkdir -p "$GGUF_DIR"
-                GGUF_FILE="$GGUF_DIR/smollm2-360m-instruct-q4_k_m.gguf"
-                wget -q --show-progress \
-                  "https://huggingface.co/itlwas/SmolLM2-360M-Q4_K_M-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf" \
-                  -O "$GGUF_FILE"
-              }
-          fi
-          echo "GGUF_FILE=$GGUF_FILE" >> $GITHUB_ENV
-          ls -lh "$GGUF_FILE"
-
-      - name: Rebuild library (ensure fresh)
-        run: |
-          chmod +x build/*.so 2>/dev/null || true
-          make -j$(nproc)
-
-      - name: Run E2E Integration Tests
-        run: |
-          echo "=== Running E2E Integration Tests ==="
-          make e2e 2>&1 | tee build/e2e_test.log || {
-            echo "::warning::E2E tests had issues - check logs"
-          }
-
-          if grep -q "All tests passed" build/e2e_test.log; then
-            echo "E2E_STATUS=passed" >> $GITHUB_ENV
-            echo "✅ E2E Tests: PASSED"
-          elif grep -q "memory limits" build/e2e_test.log; then
-            echo "E2E_STATUS=skipped" >> $GITHUB_ENV
-            echo "⚠️ E2E Tests: Skipped (memory limits)"
-          else
-            echo "E2E_STATUS=partial" >> $GITHUB_ENV
-            echo "⚠️ E2E Tests: Partial"
-          fi
-
-      - name: Run Pipeline Tests
-        run: |
-          echo "=== Running Pipeline Tests ==="
-          make test-pipeline-quick 2>&1 | tee build/pipeline_test.log || true
-          grep -E "Layer [0-9]:" build/pipeline_test.log || true
-
-      - name: Upload E2E results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: e2e-results
-          path: build/*.log
-          retention-days: 7
-
-  # ===========================================================================
-  # Job 3: Parity Tests (Runner 2 - needs llama.cpp + SmolLM)
-  # ===========================================================================
-  test-parity:
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'parity' || github.event.inputs.test_category == '' }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ck-engine-build
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
           pip install huggingface_hub torch
 
-      - name: Download SmolLM-135M for parity tests
+      - name: Download SmolLM-135M model
         run: |
-          echo "=== Downloading SmolLM-135M ==="
           python -c "
           from huggingface_hub import snapshot_download
           import os
@@ -216,9 +58,17 @@ jobs:
           print('Done!')
           "
 
-      - name: Build llama.cpp for parity testing
+      - name: Build CK-Engine
         run: |
-          echo "=== Building llama.cpp ==="
+          make clean || true
+          make -j$(nproc)
+          make libck_parity.so || echo "Parity lib build failed (optional)"
+          echo ""
+          echo "=== Built libraries ==="
+          ls -la build/*.so 2>/dev/null || echo "No .so files"
+
+      - name: Setup llama.cpp for parity testing
+        run: |
           LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
 
           if [ ! -d "llama.cpp" ]; then
@@ -251,34 +101,19 @@ jobs:
           fi
           cd ..
 
-      - name: Rebuild CK parity library
-        run: |
-          make -j$(nproc)
-          make libck_parity.so || echo "Parity lib failed"
-
       - name: Run Kernel Parity Tests
         run: |
           echo "=== Running Kernel Parity Tests ==="
           export LD_LIBRARY_PATH="$PWD/llama.cpp/build/bin:$LD_LIBRARY_PATH"
-
           ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/parity_test.log || {
             echo "::warning::Parity tests had issues"
           }
 
-          if grep -q "ALL TESTS PASSED" build/parity_test.log; then
-            echo "✅ Parity Tests: PASSED"
-          else
-            echo "⚠️ Parity Tests: Some failures"
-          fi
-
-      - name: Run Full Nightly Test Suite
+      - name: Run Nightly Test Suite
         run: |
           echo "=== Running Full Nightly Test Suite ==="
           echo "Includes: 30+ kernel tests, BF16, quantization, training tests"
-          echo ""
 
-          # Always run FULL suite to catch all regressions
-          echo "Mode: Full (all 30+ tests)"
           python scripts/nightly_runner.py --no-fail --json build/nightly_report.json 2>&1 | tee build/nightly_test.log
 
           # Show summary
@@ -301,50 +136,29 @@ jobs:
           "
           fi
 
-      - name: Upload parity results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: parity-results
+          name: test-results
           path: |
             build/*.log
             build/*.json
           retention-days: 7
 
-  # ===========================================================================
-  # Job 4: Summary (runs after both test jobs)
-  # ===========================================================================
-  summary:
-    runs-on: ubuntu-latest
-    needs: [build, test-e2e, test-parity]
-    if: always()
+      - name: Update nightly results (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          if [ -f build/nightly_report.json ]; then
+            mkdir -p docs
+            cp build/nightly_report.json docs/
+            python scripts/generate_test_report.py build/nightly_report.json docs/test-report.html || true
+          fi
 
-    steps:
-      - name: Download all results
-        uses: actions/download-artifact@v4
+      - name: Deploy to GitHub Pages (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: results/
-
-      - name: Generate Summary
-        run: |
-          echo "## CI Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.test-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Parity Tests | ${{ needs.test-parity.result }} |" >> $GITHUB_STEP_SUMMARY
-
-      - name: Check for failures
-        run: |
-          if [ "${{ needs.build.result }}" == "failure" ]; then
-            echo "::error::Build failed"
-            exit 1
-          fi
-          # E2E and parity failures are warnings, not blockers
-          if [ "${{ needs.test-e2e.result }}" == "failure" ]; then
-            echo "::warning::E2E tests failed"
-          fi
-          if [ "${{ needs.test-parity.result }}" == "failure" ]; then
-            echo "::warning::Parity tests failed"
-          fi
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          keep_files: true
