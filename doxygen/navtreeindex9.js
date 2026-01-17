@@ -1,15 +1,5 @@
 var NAVTREEINDEX9 =
 {
-"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d":[0,0,26,4],
-"structCKKernelSpec.html#aba0f53ce7d166eb16ab0a2cb0973040b":[0,0,26,0],
-"structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[0,0,26,3],
-"structCKLayerBackwardParams.html":[0,0,27],
-"structCKLayerBackwardParams.html#a023a1e75829f8f420e35838f7384c3a3":[0,0,27,19],
-"structCKLayerBackwardParams.html#a0a43398737b3990bce0677aedddd310c":[0,0,27,10],
-"structCKLayerBackwardParams.html#a0b2505938624d2addd57ca43e3f5c685":[0,0,27,6],
-"structCKLayerBackwardParams.html#a0febb76bba354013a9f7c651010c11bf":[0,0,27,39],
-"structCKLayerBackwardParams.html#a1d71a5bb91c011b20ab07a6968ff8a74":[0,0,27,67],
-"structCKLayerBackwardParams.html#a22e6960a2e5ea95a909e825f18d70224":[0,0,27,38],
 "structCKLayerBackwardParams.html#a2409b471e94658eb4c0e54235cb32556":[0,0,27,22],
 "structCKLayerBackwardParams.html#a264bf54cc410085d63f127ebe4f46807":[0,0,27,11],
 "structCKLayerBackwardParams.html#a267b127c20c2f099f1b39e1bb618a2d1":[0,0,27,61],
@@ -249,5 +239,15 @@ var NAVTREEINDEX9 =
 "structCKLayerOffsets.html#a4394bd2a46480cc9ad149128ba576354":[0,0,32,9],
 "structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd":[0,0,32,32],
 "structCKLayerOffsets.html#a4bb907fd60ba2d980d91b4af199671ce":[0,0,32,18],
-"structCKLayerOffsets.html#a4f2f21241cc69041cc62d5ae1c9f8c14":[0,0,32,21]
+"structCKLayerOffsets.html#a4f2f21241cc69041cc62d5ae1c9f8c14":[0,0,32,21],
+"structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e":[0,0,32,24],
+"structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4":[0,0,32,33],
+"structCKLayerOffsets.html#a5a50122740389c57c4c993f2aa470e4c":[0,0,32,40],
+"structCKLayerOffsets.html#a5c8f69d516fc4fb0b25cb6dc839ef298":[0,0,32,4],
+"structCKLayerOffsets.html#a64c73d47605788fdbb876ddd52456db6":[0,0,32,11],
+"structCKLayerOffsets.html#a66f717f2874057bf925c4e97a57079a7":[0,0,32,2],
+"structCKLayerOffsets.html#a6f26daba0ff5fda605b9a751ac2ba2ee":[0,0,32,0],
+"structCKLayerOffsets.html#a6f8340c9cf6ae1cba00764e4e14dda26":[0,0,32,3],
+"structCKLayerOffsets.html#a6fd8badc08ea9608d7f9700c5ef28201":[0,0,32,36],
+"structCKLayerOffsets.html#a739a0a65834a09b12385f0926eaca8c0":[0,0,32,29]
 };

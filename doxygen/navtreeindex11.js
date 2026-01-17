@@ -1,15 +1,5 @@
 var NAVTREEINDEX11 =
 {
-"structCKTokenizer.html#af683cca99ab7ca70c6b680c4a276277b":[0,0,49,18],
-"structCKTokenizerConfig.html":[0,0,50],
-"structCKTokenizerConfig.html#a1c6c52e64b87d70be97a2e9547f950e5":[0,0,50,0],
-"structCKTokenizerConfig.html#a25de8175fe44fc209d958136ce3c669e":[0,0,50,7],
-"structCKTokenizerConfig.html#a61cf1a1974d46e1da99c1c86f43fad4b":[0,0,50,5],
-"structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec":[0,0,50,8],
-"structCKTokenizerConfig.html#ad33c5d657dea175cb8c1ae9fdff33816":[0,0,50,2],
-"structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035":[0,0,50,6],
-"structCKTokenizerConfig.html#adf662a4222984144966097373043a51f":[0,0,50,1],
-"structCKTokenizerConfig.html#af82fde6580003dff44ed719380e61673":[0,0,50,3],
 "structCKTokenizerConfig.html#af8f0acf8af0468b0c852db59df1172bb":[0,0,50,4],
 "structCKTokenizerHashEntry.html":[0,0,51],
 "structCKTokenizerHashEntry.html#a2ca07dab0e09edf9f60f6e5059bbcb27":[0,0,51,1],
@@ -249,5 +239,15 @@ var NAVTREEINDEX11 =
 "structTransformerModel.html#a4a924d843ebdc352caa809c1f72b1838":[0,0,77,3],
 "structTransformerModel.html#a5e14c6be5365203ff62022d605db1672":[0,0,77,12],
 "structTransformerModel.html#a79f34fccbab0e1d127d521b03df5b327":[0,0,77,11],
-"structTransformerModel.html#a920af187f3562257c0fb9c80c05b4582":[0,0,77,7]
+"structTransformerModel.html#a920af187f3562257c0fb9c80c05b4582":[0,0,77,7],
+"structTransformerModel.html#a955d1efe9f4e9e8bedca00a5a85a5d18":[0,0,77,10],
+"structTransformerModel.html#a9fb01acf28cf0c0f53a8b4c416cedd59":[0,0,77,13],
+"structTransformerModel.html#aa1da3a055e1f53a6aa8aa54d380e04d1":[0,0,77,14],
+"structTransformerModel.html#aa4fd42c5214bd3b0adcbc64f82461ee7":[0,0,77,5],
+"structTransformerModel.html#aac7b4631a17af2e961d211f4bcccb134":[0,0,77,6],
+"structTransformerModel.html#adc7918eda6b620de8efa5722b57111f8":[0,0,77,9],
+"structTransformerModel.html#af6538865812c32df1cbd785b2d40e370":[0,0,77,0],
+"structblock__q4__0.html":[0,0,1],
+"structblock__q4__0.html#a10fb3b42900b17eb3524821658b871b9":[0,0,1,0],
+"structblock__q4__0.html#a494b8bced6d0e46eb9b990397dfe2721":[0,0,1,1]
 };
