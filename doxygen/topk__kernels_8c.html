@@ -157,6 +157,15 @@ Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Top-K selection kernels for MoE router dispatch. </p>
+<h1><a class="anchor" id="autotoc_md81"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
 <p>Provides efficient top-K selection from a score vector. Used in Mixture-of-Experts models to select which experts process each token.</p>
 <p>Operations:</p><ul>
 <li>topk_f32: Find top-K indices and values from N scores</li>
@@ -201,72 +210,72 @@ Functions</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Index of maximum value </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00217">217</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  218</span>{</div>
-<div class="line"><span class="lineno">  219</span>    <span class="keywordflow">if</span> (!scores || n &lt;= 0) {</div>
-<div class="line"><span class="lineno">  220</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  221</span>    }</div>
-<div class="line"><span class="lineno">  222</span> </div>
-<div class="line"><span class="lineno">  223</span>    <span class="keywordtype">int</span> max_idx = 0;</div>
-<div class="line"><span class="lineno">  224</span>    <span class="keywordtype">float</span> max_val = scores[0];</div>
-<div class="line"><span class="lineno">  225</span> </div>
-<div class="line"><span class="lineno">  226</span><span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><span class="lineno">  227</span>    <span class="comment">/* AVX-512 vectorized argmax for large arrays */</span></div>
-<div class="line"><span class="lineno">  228</span>    <span class="keywordflow">if</span> (n &gt;= 16) {</div>
-<div class="line"><span class="lineno">  229</span>        __m512 vmax = _mm512_set1_ps(-FLT_MAX);</div>
-<div class="line"><span class="lineno">  230</span>        __m512i vidx = _mm512_setzero_si512();</div>
-<div class="line"><span class="lineno">  231</span>        __m512i vcur_max_idx = _mm512_setzero_si512();</div>
-<div class="line"><span class="lineno">  232</span> </div>
-<div class="line"><span class="lineno">  233</span>        <span class="keywordtype">int</span> i = 0;</div>
-<div class="line"><span class="lineno">  234</span>        <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
-<div class="line"><span class="lineno">  235</span>            __m512 v = _mm512_loadu_ps(&amp;scores[i]);</div>
-<div class="line"><span class="lineno">  236</span>            __m512i cur_idx = _mm512_add_epi32(</div>
-<div class="line"><span class="lineno">  237</span>                _mm512_set1_epi32(i),</div>
-<div class="line"><span class="lineno">  238</span>                _mm512_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)</div>
-<div class="line"><span class="lineno">  239</span>            );</div>
-<div class="line"><span class="lineno">  240</span> </div>
-<div class="line"><span class="lineno">  241</span>            __mmask16 gt_mask = _mm512_cmp_ps_mask(v, vmax, _CMP_GT_OQ);</div>
-<div class="line"><span class="lineno">  242</span>            vmax = _mm512_mask_blend_ps(gt_mask, vmax, v);</div>
-<div class="line"><span class="lineno">  243</span>            vcur_max_idx = _mm512_mask_blend_epi32(gt_mask, vcur_max_idx, cur_idx);</div>
-<div class="line"><span class="lineno">  244</span>        }</div>
-<div class="line"><span class="lineno">  245</span> </div>
-<div class="line"><span class="lineno">  246</span>        <span class="comment">/* Horizontal reduction */</span></div>
-<div class="line"><span class="lineno">  247</span>        <span class="keywordtype">float</span> vals[16];</div>
-<div class="line"><span class="lineno">  248</span>        <span class="keywordtype">int</span> idxs[16];</div>
-<div class="line"><span class="lineno">  249</span>        _mm512_storeu_ps(vals, vmax);</div>
-<div class="line"><span class="lineno">  250</span>        _mm512_storeu_si512(idxs, vcur_max_idx);</div>
-<div class="line"><span class="lineno">  251</span> </div>
-<div class="line"><span class="lineno">  252</span>        max_val = vals[0];</div>
-<div class="line"><span class="lineno">  253</span>        max_idx = idxs[0];</div>
-<div class="line"><span class="lineno">  254</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; 16; j++) {</div>
-<div class="line"><span class="lineno">  255</span>            <span class="keywordflow">if</span> (vals[j] &gt; max_val) {</div>
-<div class="line"><span class="lineno">  256</span>                max_val = vals[j];</div>
-<div class="line"><span class="lineno">  257</span>                max_idx = idxs[j];</div>
-<div class="line"><span class="lineno">  258</span>            }</div>
-<div class="line"><span class="lineno">  259</span>        }</div>
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00226">226</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  227</span>{</div>
+<div class="line"><span class="lineno">  228</span>    <span class="keywordflow">if</span> (!scores || n &lt;= 0) {</div>
+<div class="line"><span class="lineno">  229</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  230</span>    }</div>
+<div class="line"><span class="lineno">  231</span> </div>
+<div class="line"><span class="lineno">  232</span>    <span class="keywordtype">int</span> max_idx = 0;</div>
+<div class="line"><span class="lineno">  233</span>    <span class="keywordtype">float</span> max_val = scores[0];</div>
+<div class="line"><span class="lineno">  234</span> </div>
+<div class="line"><span class="lineno">  235</span><span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><span class="lineno">  236</span>    <span class="comment">/* AVX-512 vectorized argmax for large arrays */</span></div>
+<div class="line"><span class="lineno">  237</span>    <span class="keywordflow">if</span> (n &gt;= 16) {</div>
+<div class="line"><span class="lineno">  238</span>        __m512 vmax = _mm512_set1_ps(-FLT_MAX);</div>
+<div class="line"><span class="lineno">  239</span>        __m512i vidx = _mm512_setzero_si512();</div>
+<div class="line"><span class="lineno">  240</span>        __m512i vcur_max_idx = _mm512_setzero_si512();</div>
+<div class="line"><span class="lineno">  241</span> </div>
+<div class="line"><span class="lineno">  242</span>        <span class="keywordtype">int</span> i = 0;</div>
+<div class="line"><span class="lineno">  243</span>        <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
+<div class="line"><span class="lineno">  244</span>            __m512 v = _mm512_loadu_ps(&amp;scores[i]);</div>
+<div class="line"><span class="lineno">  245</span>            __m512i cur_idx = _mm512_add_epi32(</div>
+<div class="line"><span class="lineno">  246</span>                _mm512_set1_epi32(i),</div>
+<div class="line"><span class="lineno">  247</span>                _mm512_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)</div>
+<div class="line"><span class="lineno">  248</span>            );</div>
+<div class="line"><span class="lineno">  249</span> </div>
+<div class="line"><span class="lineno">  250</span>            __mmask16 gt_mask = _mm512_cmp_ps_mask(v, vmax, _CMP_GT_OQ);</div>
+<div class="line"><span class="lineno">  251</span>            vmax = _mm512_mask_blend_ps(gt_mask, vmax, v);</div>
+<div class="line"><span class="lineno">  252</span>            vcur_max_idx = _mm512_mask_blend_epi32(gt_mask, vcur_max_idx, cur_idx);</div>
+<div class="line"><span class="lineno">  253</span>        }</div>
+<div class="line"><span class="lineno">  254</span> </div>
+<div class="line"><span class="lineno">  255</span>        <span class="comment">/* Horizontal reduction */</span></div>
+<div class="line"><span class="lineno">  256</span>        <span class="keywordtype">float</span> vals[16];</div>
+<div class="line"><span class="lineno">  257</span>        <span class="keywordtype">int</span> idxs[16];</div>
+<div class="line"><span class="lineno">  258</span>        _mm512_storeu_ps(vals, vmax);</div>
+<div class="line"><span class="lineno">  259</span>        _mm512_storeu_si512(idxs, vcur_max_idx);</div>
 <div class="line"><span class="lineno">  260</span> </div>
-<div class="line"><span class="lineno">  261</span>        <span class="comment">/* Handle remainder */</span></div>
-<div class="line"><span class="lineno">  262</span>        <span class="keywordflow">for</span> (; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">  263</span>            <span class="keywordflow">if</span> (scores[i] &gt; max_val) {</div>
-<div class="line"><span class="lineno">  264</span>                max_val = scores[i];</div>
-<div class="line"><span class="lineno">  265</span>                max_idx = i;</div>
-<div class="line"><span class="lineno">  266</span>            }</div>
-<div class="line"><span class="lineno">  267</span>        }</div>
-<div class="line"><span class="lineno">  268</span> </div>
-<div class="line"><span class="lineno">  269</span>        <span class="keywordflow">return</span> max_idx;</div>
-<div class="line"><span class="lineno">  270</span>    }</div>
-<div class="line"><span class="lineno">  271</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  272</span> </div>
-<div class="line"><span class="lineno">  273</span>    <span class="comment">/* Scalar fallback */</span></div>
-<div class="line"><span class="lineno">  274</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">  275</span>        <span class="keywordflow">if</span> (scores[i] &gt; max_val) {</div>
-<div class="line"><span class="lineno">  276</span>            max_val = scores[i];</div>
-<div class="line"><span class="lineno">  277</span>            max_idx = i;</div>
-<div class="line"><span class="lineno">  278</span>        }</div>
+<div class="line"><span class="lineno">  261</span>        max_val = vals[0];</div>
+<div class="line"><span class="lineno">  262</span>        max_idx = idxs[0];</div>
+<div class="line"><span class="lineno">  263</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; 16; j++) {</div>
+<div class="line"><span class="lineno">  264</span>            <span class="keywordflow">if</span> (vals[j] &gt; max_val) {</div>
+<div class="line"><span class="lineno">  265</span>                max_val = vals[j];</div>
+<div class="line"><span class="lineno">  266</span>                max_idx = idxs[j];</div>
+<div class="line"><span class="lineno">  267</span>            }</div>
+<div class="line"><span class="lineno">  268</span>        }</div>
+<div class="line"><span class="lineno">  269</span> </div>
+<div class="line"><span class="lineno">  270</span>        <span class="comment">/* Handle remainder */</span></div>
+<div class="line"><span class="lineno">  271</span>        <span class="keywordflow">for</span> (; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">  272</span>            <span class="keywordflow">if</span> (scores[i] &gt; max_val) {</div>
+<div class="line"><span class="lineno">  273</span>                max_val = scores[i];</div>
+<div class="line"><span class="lineno">  274</span>                max_idx = i;</div>
+<div class="line"><span class="lineno">  275</span>            }</div>
+<div class="line"><span class="lineno">  276</span>        }</div>
+<div class="line"><span class="lineno">  277</span> </div>
+<div class="line"><span class="lineno">  278</span>        <span class="keywordflow">return</span> max_idx;</div>
 <div class="line"><span class="lineno">  279</span>    }</div>
-<div class="line"><span class="lineno">  280</span> </div>
-<div class="line"><span class="lineno">  281</span>    <span class="keywordflow">return</span> max_idx;</div>
-<div class="line"><span class="lineno">  282</span>}</div>
+<div class="line"><span class="lineno">  280</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  281</span> </div>
+<div class="line"><span class="lineno">  282</span>    <span class="comment">/* Scalar fallback */</span></div>
+<div class="line"><span class="lineno">  283</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">  284</span>        <span class="keywordflow">if</span> (scores[i] &gt; max_val) {</div>
+<div class="line"><span class="lineno">  285</span>            max_val = scores[i];</div>
+<div class="line"><span class="lineno">  286</span>            max_idx = i;</div>
+<div class="line"><span class="lineno">  287</span>        }</div>
+<div class="line"><span class="lineno">  288</span>    }</div>
+<div class="line"><span class="lineno">  289</span> </div>
+<div class="line"><span class="lineno">  290</span>    <span class="keywordflow">return</span> max_idx;</div>
+<div class="line"><span class="lineno">  291</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -333,28 +342,28 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00182">182</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  188</span>{</div>
-<div class="line"><span class="lineno">  189</span>    <span class="keywordflow">if</span> (!scores || !indices || num_tokens &lt;= 0 || n_experts &lt;= 0 || k &lt;= 0) {</div>
-<div class="line"><span class="lineno">  190</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  191</span>    }</div>
-<div class="line"><span class="lineno">  192</span> </div>
-<div class="line"><span class="lineno">  193</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; t++) {</div>
-<div class="line"><span class="lineno">  194</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *token_scores = scores + t * n_experts;</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordtype">int</span> *token_indices = indices + t * k;</div>
-<div class="line"><span class="lineno">  196</span> </div>
-<div class="line"><span class="lineno">  197</span>        <span class="keywordflow">if</span> (weights) {</div>
-<div class="line"><span class="lineno">  198</span>            <span class="keywordtype">float</span> *token_weights = weights + t * k;</div>
-<div class="line"><span class="lineno">  199</span>            <a class="code hl_function" href="topk__kernels_8c.html#ae80a999dd7d7242eda4ef1e50e1aa09c">topk_softmax_f32</a>(token_scores, n_experts, k, token_indices, token_weights);</div>
-<div class="line"><span class="lineno">  200</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  201</span>            <a class="code hl_function" href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a>(token_scores, n_experts, k, token_indices, NULL);</div>
-<div class="line"><span class="lineno">  202</span>        }</div>
-<div class="line"><span class="lineno">  203</span>    }</div>
-<div class="line"><span class="lineno">  204</span>}</div>
-<div class="ttc" id="atopk__kernels_8c_html_adcd797bc726d0f95fd659787fad1db52"><div class="ttname"><a href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a></div><div class="ttdeci">void topk_f32(const float *scores, int n, int k, int *indices, float *values)</div><div class="ttdoc">Find top-K indices and values from a score vector.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00040">topk_kernels.c:40</a></div></div>
-<div class="ttc" id="atopk__kernels_8c_html_ae80a999dd7d7242eda4ef1e50e1aa09c"><div class="ttname"><a href="topk__kernels_8c.html#ae80a999dd7d7242eda4ef1e50e1aa09c">topk_softmax_f32</a></div><div class="ttdeci">void topk_softmax_f32(const float *scores, int n, int k, int *indices, float *weights)</div><div class="ttdoc">Find top-K indices with softmax-normalized weights.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00125">topk_kernels.c:125</a></div></div>
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00191">191</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  197</span>{</div>
+<div class="line"><span class="lineno">  198</span>    <span class="keywordflow">if</span> (!scores || !indices || num_tokens &lt;= 0 || n_experts &lt;= 0 || k &lt;= 0) {</div>
+<div class="line"><span class="lineno">  199</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  200</span>    }</div>
+<div class="line"><span class="lineno">  201</span> </div>
+<div class="line"><span class="lineno">  202</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; t++) {</div>
+<div class="line"><span class="lineno">  203</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *token_scores = scores + t * n_experts;</div>
+<div class="line"><span class="lineno">  204</span>        <span class="keywordtype">int</span> *token_indices = indices + t * k;</div>
+<div class="line"><span class="lineno">  205</span> </div>
+<div class="line"><span class="lineno">  206</span>        <span class="keywordflow">if</span> (weights) {</div>
+<div class="line"><span class="lineno">  207</span>            <span class="keywordtype">float</span> *token_weights = weights + t * k;</div>
+<div class="line"><span class="lineno">  208</span>            <a class="code hl_function" href="topk__kernels_8c.html#ae80a999dd7d7242eda4ef1e50e1aa09c">topk_softmax_f32</a>(token_scores, n_experts, k, token_indices, token_weights);</div>
+<div class="line"><span class="lineno">  209</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  210</span>            <a class="code hl_function" href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a>(token_scores, n_experts, k, token_indices, NULL);</div>
+<div class="line"><span class="lineno">  211</span>        }</div>
+<div class="line"><span class="lineno">  212</span>    }</div>
+<div class="line"><span class="lineno">  213</span>}</div>
+<div class="ttc" id="atopk__kernels_8c_html_adcd797bc726d0f95fd659787fad1db52"><div class="ttname"><a href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a></div><div class="ttdeci">void topk_f32(const float *scores, int n, int k, int *indices, float *values)</div><div class="ttdoc">Find top-K indices and values from a score vector.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00049">topk_kernels.c:49</a></div></div>
+<div class="ttc" id="atopk__kernels_8c_html_ae80a999dd7d7242eda4ef1e50e1aa09c"><div class="ttname"><a href="topk__kernels_8c.html#ae80a999dd7d7242eda4ef1e50e1aa09c">topk_softmax_f32</a></div><div class="ttdeci">void topk_softmax_f32(const float *scores, int n, int k, int *indices, float *weights)</div><div class="ttdoc">Find top-K indices with softmax-normalized weights.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00134">topk_kernels.c:134</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00040">topk_f32()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00125">topk_softmax_f32()</a>.</p>
+<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00049">topk_f32()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00134">topk_softmax_f32()</a>.</p>
 
 </div>
 </div>
@@ -414,72 +423,72 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00040">40</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   45</span>{</div>
-<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (!scores || !indices || n &lt;= 0 || k &lt;= 0) {</div>
-<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   48</span>    }</div>
-<div class="line"><span class="lineno">   49</span> </div>
-<div class="line"><span class="lineno">   50</span>    <span class="comment">/* Clamp k to n */</span></div>
-<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">if</span> (k &gt; n) {</div>
-<div class="line"><span class="lineno">   52</span>        k = n;</div>
-<div class="line"><span class="lineno">   53</span>    }</div>
-<div class="line"><span class="lineno">   54</span> </div>
-<div class="line"><span class="lineno">   55</span>    <span class="comment">/* Initialize with first k elements */</span></div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordtype">float</span> local_values[k];</div>
-<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">   58</span>        indices[i] = i;</div>
-<div class="line"><span class="lineno">   59</span>        local_values[i] = scores[i];</div>
-<div class="line"><span class="lineno">   60</span>    }</div>
-<div class="line"><span class="lineno">   61</span> </div>
-<div class="line"><span class="lineno">   62</span>    <span class="comment">/* Find the minimum in our current top-k */</span></div>
-<div class="line"><span class="lineno">   63</span>    <span class="keywordtype">int</span> min_idx = 0;</div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="keywordflow">if</span> (local_values[i] &lt; local_values[min_idx]) {</div>
-<div class="line"><span class="lineno">   66</span>            min_idx = i;</div>
-<div class="line"><span class="lineno">   67</span>        }</div>
-<div class="line"><span class="lineno">   68</span>    }</div>
-<div class="line"><span class="lineno">   69</span> </div>
-<div class="line"><span class="lineno">   70</span>    <span class="comment">/* Scan remaining elements */</span></div>
-<div class="line"><span class="lineno">   71</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = k; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">   72</span>        <span class="keywordflow">if</span> (scores[i] &gt; local_values[min_idx]) {</div>
-<div class="line"><span class="lineno">   73</span>            <span class="comment">/* Replace the minimum */</span></div>
-<div class="line"><span class="lineno">   74</span>            indices[min_idx] = i;</div>
-<div class="line"><span class="lineno">   75</span>            local_values[min_idx] = scores[i];</div>
-<div class="line"><span class="lineno">   76</span> </div>
-<div class="line"><span class="lineno">   77</span>            <span class="comment">/* Find new minimum */</span></div>
-<div class="line"><span class="lineno">   78</span>            min_idx = 0;</div>
-<div class="line"><span class="lineno">   79</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; k; j++) {</div>
-<div class="line"><span class="lineno">   80</span>                <span class="keywordflow">if</span> (local_values[j] &lt; local_values[min_idx]) {</div>
-<div class="line"><span class="lineno">   81</span>                    min_idx = j;</div>
-<div class="line"><span class="lineno">   82</span>                }</div>
-<div class="line"><span class="lineno">   83</span>            }</div>
-<div class="line"><span class="lineno">   84</span>        }</div>
-<div class="line"><span class="lineno">   85</span>    }</div>
-<div class="line"><span class="lineno">   86</span> </div>
-<div class="line"><span class="lineno">   87</span>    <span class="comment">/* Sort results in descending order (simple insertion sort for small k) */</span></div>
-<div class="line"><span class="lineno">   88</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">   89</span>        <span class="keywordtype">float</span> val = local_values[i];</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keywordtype">int</span> idx = indices[i];</div>
-<div class="line"><span class="lineno">   91</span>        <span class="keywordtype">int</span> j = i - 1;</div>
-<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">while</span> (j &gt;= 0 &amp;&amp; local_values[j] &lt; val) {</div>
-<div class="line"><span class="lineno">   93</span>            local_values[j + 1] = local_values[j];</div>
-<div class="line"><span class="lineno">   94</span>            indices[j + 1] = indices[j];</div>
-<div class="line"><span class="lineno">   95</span>            j--;</div>
-<div class="line"><span class="lineno">   96</span>        }</div>
-<div class="line"><span class="lineno">   97</span>        local_values[j + 1] = val;</div>
-<div class="line"><span class="lineno">   98</span>        indices[j + 1] = idx;</div>
-<div class="line"><span class="lineno">   99</span>    }</div>
-<div class="line"><span class="lineno">  100</span> </div>
-<div class="line"><span class="lineno">  101</span>    <span class="comment">/* Copy values if output requested */</span></div>
-<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">if</span> (values) {</div>
-<div class="line"><span class="lineno">  103</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">  104</span>            values[i] = local_values[i];</div>
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00049">49</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   54</span>{</div>
+<div class="line"><span class="lineno">   55</span>    <span class="keywordflow">if</span> (!scores || !indices || n &lt;= 0 || k &lt;= 0) {</div>
+<div class="line"><span class="lineno">   56</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   57</span>    }</div>
+<div class="line"><span class="lineno">   58</span> </div>
+<div class="line"><span class="lineno">   59</span>    <span class="comment">/* Clamp k to n */</span></div>
+<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">if</span> (k &gt; n) {</div>
+<div class="line"><span class="lineno">   61</span>        k = n;</div>
+<div class="line"><span class="lineno">   62</span>    }</div>
+<div class="line"><span class="lineno">   63</span> </div>
+<div class="line"><span class="lineno">   64</span>    <span class="comment">/* Initialize with first k elements */</span></div>
+<div class="line"><span class="lineno">   65</span>    <span class="keywordtype">float</span> local_values[k];</div>
+<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">   67</span>        indices[i] = i;</div>
+<div class="line"><span class="lineno">   68</span>        local_values[i] = scores[i];</div>
+<div class="line"><span class="lineno">   69</span>    }</div>
+<div class="line"><span class="lineno">   70</span> </div>
+<div class="line"><span class="lineno">   71</span>    <span class="comment">/* Find the minimum in our current top-k */</span></div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordtype">int</span> min_idx = 0;</div>
+<div class="line"><span class="lineno">   73</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">if</span> (local_values[i] &lt; local_values[min_idx]) {</div>
+<div class="line"><span class="lineno">   75</span>            min_idx = i;</div>
+<div class="line"><span class="lineno">   76</span>        }</div>
+<div class="line"><span class="lineno">   77</span>    }</div>
+<div class="line"><span class="lineno">   78</span> </div>
+<div class="line"><span class="lineno">   79</span>    <span class="comment">/* Scan remaining elements */</span></div>
+<div class="line"><span class="lineno">   80</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = k; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">   81</span>        <span class="keywordflow">if</span> (scores[i] &gt; local_values[min_idx]) {</div>
+<div class="line"><span class="lineno">   82</span>            <span class="comment">/* Replace the minimum */</span></div>
+<div class="line"><span class="lineno">   83</span>            indices[min_idx] = i;</div>
+<div class="line"><span class="lineno">   84</span>            local_values[min_idx] = scores[i];</div>
+<div class="line"><span class="lineno">   85</span> </div>
+<div class="line"><span class="lineno">   86</span>            <span class="comment">/* Find new minimum */</span></div>
+<div class="line"><span class="lineno">   87</span>            min_idx = 0;</div>
+<div class="line"><span class="lineno">   88</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; k; j++) {</div>
+<div class="line"><span class="lineno">   89</span>                <span class="keywordflow">if</span> (local_values[j] &lt; local_values[min_idx]) {</div>
+<div class="line"><span class="lineno">   90</span>                    min_idx = j;</div>
+<div class="line"><span class="lineno">   91</span>                }</div>
+<div class="line"><span class="lineno">   92</span>            }</div>
+<div class="line"><span class="lineno">   93</span>        }</div>
+<div class="line"><span class="lineno">   94</span>    }</div>
+<div class="line"><span class="lineno">   95</span> </div>
+<div class="line"><span class="lineno">   96</span>    <span class="comment">/* Sort results in descending order (simple insertion sort for small k) */</span></div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">   98</span>        <span class="keywordtype">float</span> val = local_values[i];</div>
+<div class="line"><span class="lineno">   99</span>        <span class="keywordtype">int</span> idx = indices[i];</div>
+<div class="line"><span class="lineno">  100</span>        <span class="keywordtype">int</span> j = i - 1;</div>
+<div class="line"><span class="lineno">  101</span>        <span class="keywordflow">while</span> (j &gt;= 0 &amp;&amp; local_values[j] &lt; val) {</div>
+<div class="line"><span class="lineno">  102</span>            local_values[j + 1] = local_values[j];</div>
+<div class="line"><span class="lineno">  103</span>            indices[j + 1] = indices[j];</div>
+<div class="line"><span class="lineno">  104</span>            j--;</div>
 <div class="line"><span class="lineno">  105</span>        }</div>
-<div class="line"><span class="lineno">  106</span>    }</div>
-<div class="line"><span class="lineno">  107</span>}</div>
+<div class="line"><span class="lineno">  106</span>        local_values[j + 1] = val;</div>
+<div class="line"><span class="lineno">  107</span>        indices[j + 1] = idx;</div>
+<div class="line"><span class="lineno">  108</span>    }</div>
+<div class="line"><span class="lineno">  109</span> </div>
+<div class="line"><span class="lineno">  110</span>    <span class="comment">/* Copy values if output requested */</span></div>
+<div class="line"><span class="lineno">  111</span>    <span class="keywordflow">if</span> (values) {</div>
+<div class="line"><span class="lineno">  112</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">  113</span>            values[i] = local_values[i];</div>
+<div class="line"><span class="lineno">  114</span>        }</div>
+<div class="line"><span class="lineno">  115</span>    }</div>
+<div class="line"><span class="lineno">  116</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00182">topk_batched_f32()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00125">topk_softmax_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00191">topk_batched_f32()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00134">topk_softmax_f32()</a>.</p>
 
 </div>
 </div>
@@ -539,46 +548,46 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00125">125</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  130</span>{</div>
-<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">if</span> (!scores || !indices || !weights || n &lt;= 0 || k &lt;= 0) {</div>
-<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  133</span>    }</div>
-<div class="line"><span class="lineno">  134</span> </div>
-<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">if</span> (k &gt; n) {</div>
-<div class="line"><span class="lineno">  136</span>        k = n;</div>
-<div class="line"><span class="lineno">  137</span>    }</div>
-<div class="line"><span class="lineno">  138</span> </div>
-<div class="line"><span class="lineno">  139</span>    <span class="comment">/* First get top-K indices and values */</span></div>
-<div class="line"><span class="lineno">  140</span>    <span class="keywordtype">float</span> values[k];</div>
-<div class="line"><span class="lineno">  141</span>    <a class="code hl_function" href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a>(scores, n, k, indices, values);</div>
-<div class="line"><span class="lineno">  142</span> </div>
-<div class="line"><span class="lineno">  143</span>    <span class="comment">/* Compute softmax over the selected values */</span></div>
-<div class="line"><span class="lineno">  144</span>    <span class="comment">/* Find max for numerical stability */</span></div>
-<div class="line"><span class="lineno">  145</span>    <span class="keywordtype">float</span> max_val = values[0];</div>
-<div class="line"><span class="lineno">  146</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">  147</span>        <span class="keywordflow">if</span> (values[i] &gt; max_val) {</div>
-<div class="line"><span class="lineno">  148</span>            max_val = values[i];</div>
-<div class="line"><span class="lineno">  149</span>        }</div>
-<div class="line"><span class="lineno">  150</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00134">134</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  139</span>{</div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordflow">if</span> (!scores || !indices || !weights || n &lt;= 0 || k &lt;= 0) {</div>
+<div class="line"><span class="lineno">  141</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  142</span>    }</div>
+<div class="line"><span class="lineno">  143</span> </div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">if</span> (k &gt; n) {</div>
+<div class="line"><span class="lineno">  145</span>        k = n;</div>
+<div class="line"><span class="lineno">  146</span>    }</div>
+<div class="line"><span class="lineno">  147</span> </div>
+<div class="line"><span class="lineno">  148</span>    <span class="comment">/* First get top-K indices and values */</span></div>
+<div class="line"><span class="lineno">  149</span>    <span class="keywordtype">float</span> values[k];</div>
+<div class="line"><span class="lineno">  150</span>    <a class="code hl_function" href="topk__kernels_8c.html#adcd797bc726d0f95fd659787fad1db52">topk_f32</a>(scores, n, k, indices, values);</div>
 <div class="line"><span class="lineno">  151</span> </div>
-<div class="line"><span class="lineno">  152</span>    <span class="comment">/* Compute exp and sum */</span></div>
-<div class="line"><span class="lineno">  153</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  154</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">  155</span>        weights[i] = expf(values[i] - max_val);</div>
-<div class="line"><span class="lineno">  156</span>        sum += weights[i];</div>
-<div class="line"><span class="lineno">  157</span>    }</div>
-<div class="line"><span class="lineno">  158</span> </div>
-<div class="line"><span class="lineno">  159</span>    <span class="comment">/* Normalize */</span></div>
-<div class="line"><span class="lineno">  160</span>    <span class="keywordtype">float</span> inv_sum = 1.0f / sum;</div>
-<div class="line"><span class="lineno">  161</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
-<div class="line"><span class="lineno">  162</span>        weights[i] *= inv_sum;</div>
-<div class="line"><span class="lineno">  163</span>    }</div>
-<div class="line"><span class="lineno">  164</span>}</div>
+<div class="line"><span class="lineno">  152</span>    <span class="comment">/* Compute softmax over the selected values */</span></div>
+<div class="line"><span class="lineno">  153</span>    <span class="comment">/* Find max for numerical stability */</span></div>
+<div class="line"><span class="lineno">  154</span>    <span class="keywordtype">float</span> max_val = values[0];</div>
+<div class="line"><span class="lineno">  155</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">  156</span>        <span class="keywordflow">if</span> (values[i] &gt; max_val) {</div>
+<div class="line"><span class="lineno">  157</span>            max_val = values[i];</div>
+<div class="line"><span class="lineno">  158</span>        }</div>
+<div class="line"><span class="lineno">  159</span>    }</div>
+<div class="line"><span class="lineno">  160</span> </div>
+<div class="line"><span class="lineno">  161</span>    <span class="comment">/* Compute exp and sum */</span></div>
+<div class="line"><span class="lineno">  162</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">  164</span>        weights[i] = expf(values[i] - max_val);</div>
+<div class="line"><span class="lineno">  165</span>        sum += weights[i];</div>
+<div class="line"><span class="lineno">  166</span>    }</div>
+<div class="line"><span class="lineno">  167</span> </div>
+<div class="line"><span class="lineno">  168</span>    <span class="comment">/* Normalize */</span></div>
+<div class="line"><span class="lineno">  169</span>    <span class="keywordtype">float</span> inv_sum = 1.0f / sum;</div>
+<div class="line"><span class="lineno">  170</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; i++) {</div>
+<div class="line"><span class="lineno">  171</span>        weights[i] *= inv_sum;</div>
+<div class="line"><span class="lineno">  172</span>    }</div>
+<div class="line"><span class="lineno">  173</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00040">topk_f32()</a>.</p>
+<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00049">topk_f32()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00182">topk_batched_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00191">topk_batched_f32()</a>.</p>
 
 </div>
 </div>

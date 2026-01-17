@@ -130,6 +130,9 @@ $(document).ready(function(){initNavTree('relu__kernels__bf16_8c.html',''); init
   <div class="headertitle"><div class="title">relu_kernels_bf16.c File Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>ReLU activation kernels for BF16 tensors.  
+<a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
@@ -146,7 +149,21 @@ Functions</h2></td></tr>
 <tr class="memitem:a55d24741c224580192c6104c2eb4525a" id="r_a55d24741c224580192c6104c2eb4525a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="relu__kernels__bf16_8c.html#a55d24741c224580192c6104c2eb4525a">relu_forward_inplace_bf16</a> (uint16_t *data, size_t n)</td></tr>
 <tr class="separator:a55d24741c224580192c6104c2eb4525a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Function Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>ReLU activation kernels for BF16 tensors. </p>
+<h1><a class="anchor" id="autotoc_md68"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
+<p>ReLU: y = max(0, x) </p>
+
+<p class="definition">Definition in file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
+</div><h2 class="groupheader">Function Documentation</h2>
 <a id="af64829ad63a9c81784d64d4f447ee39a" name="af64829ad63a9c81784d64d4f447ee39a"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af64829ad63a9c81784d64d4f447ee39a">&#9670;&#160;</a></span>relu_backward_bf16()</h2>
 
@@ -185,17 +202,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00029">29</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   33</span>{</div>
-<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">if</span> (!input || !d_output || !d_input) {</div>
-<div class="line"><span class="lineno">   35</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   36</span>    }</div>
-<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">   38</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]);</div>
-<div class="line"><span class="lineno">   39</span>        <span class="keywordtype">float</span> dy = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_output[i]);</div>
-<div class="line"><span class="lineno">   40</span>        d_input[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? dy : 0.0f);</div>
-<div class="line"><span class="lineno">   41</span>    }</div>
-<div class="line"><span class="lineno">   42</span>}</div>
+<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00045">45</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   49</span>{</div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">if</span> (!input || !d_output || !d_input) {</div>
+<div class="line"><span class="lineno">   51</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   52</span>    }</div>
+<div class="line"><span class="lineno">   53</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]);</div>
+<div class="line"><span class="lineno">   55</span>        <span class="keywordtype">float</span> dy = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_output[i]);</div>
+<div class="line"><span class="lineno">   56</span>        d_input[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? dy : 0.0f);</div>
+<div class="line"><span class="lineno">   57</span>    }</div>
+<div class="line"><span class="lineno">   58</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 </div><!-- fragment -->
@@ -235,16 +252,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00007">7</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    8</span>{</div>
-<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">if</span> (!input || !output) {</div>
-<div class="line"><span class="lineno">   10</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   11</span>    }</div>
-<div class="line"><span class="lineno">   12</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">   13</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]);</div>
-<div class="line"><span class="lineno">   14</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? x : 0.0f);</div>
-<div class="line"><span class="lineno">   15</span>    }</div>
-<div class="line"><span class="lineno">   16</span>}</div>
+<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00023">23</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   24</span>{</div>
+<div class="line"><span class="lineno">   25</span>    <span class="keywordflow">if</span> (!input || !output) {</div>
+<div class="line"><span class="lineno">   26</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   27</span>    }</div>
+<div class="line"><span class="lineno">   28</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">   29</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]);</div>
+<div class="line"><span class="lineno">   30</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? x : 0.0f);</div>
+<div class="line"><span class="lineno">   31</span>    }</div>
+<div class="line"><span class="lineno">   32</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
@@ -276,16 +293,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00018">18</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   19</span>{</div>
-<div class="line"><span class="lineno">   20</span>    <span class="keywordflow">if</span> (!data) {</div>
-<div class="line"><span class="lineno">   21</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   22</span>    }</div>
-<div class="line"><span class="lineno">   23</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">   24</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(data[i]);</div>
-<div class="line"><span class="lineno">   25</span>        data[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? x : 0.0f);</div>
-<div class="line"><span class="lineno">   26</span>    }</div>
-<div class="line"><span class="lineno">   27</span>}</div>
+<p class="definition">Definition at line <a class="el" href="relu__kernels__bf16_8c_source.html#l00034">34</a> of file <a class="el" href="relu__kernels__bf16_8c_source.html">relu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   35</span>{</div>
+<div class="line"><span class="lineno">   36</span>    <span class="keywordflow">if</span> (!data) {</div>
+<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   38</span>    }</div>
+<div class="line"><span class="lineno">   39</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">   40</span>        <span class="keywordtype">float</span> x = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(data[i]);</div>
+<div class="line"><span class="lineno">   41</span>        data[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x &gt; 0.0f ? x : 0.0f);</div>
+<div class="line"><span class="lineno">   42</span>    }</div>
+<div class="line"><span class="lineno">   43</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 

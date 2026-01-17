@@ -133,95 +133,109 @@ $(document).ready(function(){initNavTree('quantize__row__q8__k__sse_8c_source.ht
   <div class="headertitle"><div class="title">quantize_row_q8_k_sse.c</div></div>
 </div><!--header-->
 <div class="contents">
-<a href="quantize__row__q8__k__sse_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#include &lt;assert.h&gt;</span></div>
-<div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="preprocessor">#include &lt;math.h&gt;</span></div>
-<div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="preprocessor">#include &lt;string.h&gt;</span></div>
-<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
-<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span> </div>
-<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span> </div>
-<div class="foldopen" id="foldopen00008" data-start="{" data-end="}">
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno"><a class="line" href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">    8</a></span><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keywordtype">int</span> <a class="code hl_function" href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a>(<span class="keywordtype">float</span> fval) {</div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span>    <span class="keywordtype">float</span> val = fval + 12582912.f;</div>
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span>    <span class="keywordtype">int</span> i;</div>
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span>    memcpy(&amp;i, &amp;val, <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span>    <span class="keywordflow">return</span> (i &amp; 0x007fffff) - 0x00400000;</div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span>}</div>
-</div>
+<a href="quantize__row__q8__k__sse_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="comment">/**</span></div>
+<div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="comment"> * @file quantize_row_q8_k_sse.c</span></div>
+<div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="comment"> * @brief SSE-optimized Q8_K row quantization kernel</span></div>
+<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="comment"> * CK-ENGINE KERNEL RULES:</span></div>
+<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="comment"> * =======================</span></div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment"> * 1. NO malloc/free - memory via bump allocator, pointers passed in</span></div>
+<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment"> * 2. NO OpenMP - parallelization at orchestrator/codegen layer</span></div>
+<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="comment"> * 3. API must define: inputs, outputs, workspace, and memory layouts</span></div>
+<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="comment"> * 4. Pure computation - deterministic, no side effects</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="comment"> * After changes: make test &amp;&amp; make llamacpp-parity-full</span></div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="comment"> */</span></div>
 <div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span> </div>
-<div class="foldopen" id="foldopen00015" data-start="{" data-end="}">
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno"><a class="line" href="ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f">   15</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__sse_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k) {</div>
-<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span>    <span class="keywordflow">if</span> (!x || !vy || k &lt;= 0) {</div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span>    }</div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span>    assert(k % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> == 0);</div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>        <span class="keywordtype">float</span> max = 0.0f;</div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>        </div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>        <span class="comment">// SSE max absolute value</span></div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>        __m128 v_max = _mm_setzero_ps();</div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 4) {</div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>            __m128 v = _mm_loadu_ps(x + j);</div>
-<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>            __m128 v_abs = _mm_andnot_ps(_mm_set1_ps(-0.0f), v);</div>
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span>            v_max = _mm_max_ps(v_max, v_abs);</div>
-<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span>        }</div>
-<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span>        </div>
-<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>        <span class="comment">// Horizontal max</span></div>
-<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>        v_max = _mm_max_ps(v_max, _mm_shuffle_ps(v_max, v_max, _MM_SHUFFLE(1, 0, 3, 2)));</div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>        v_max = _mm_max_ps(v_max, _mm_shuffle_ps(v_max, v_max, _MM_SHUFFLE(0, 1, 0, 1)));</div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>        _mm_store_ss(&amp;max, v_max);</div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>        <span class="keywordflow">if</span> (max == 0.0f) {</div>
-<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 0.0f;</div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>            memset(y[i].qs, 0, <span class="keyword">sizeof</span>(y[i].qs));</div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>            memset(y[i].bsums, 0, <span class="keyword">sizeof</span>(y[i].bsums));</div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>            x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>            <span class="keywordflow">continue</span>;</div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>        }</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span> </div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>        __m128 v_iscale = _mm_set1_ps(iscale);</div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>        </div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>        <span class="comment">// Quantize and compute bsums in SSE</span></div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>            __m128 x0 = _mm_loadu_ps(x + j + 0);</div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>            __m128 x1 = _mm_loadu_ps(x + j + 4);</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>            __m128 x2 = _mm_loadu_ps(x + j + 8);</div>
-<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>            __m128 x3 = _mm_loadu_ps(x + j + 12);</div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span> </div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>            __m128i q0 = _mm_cvtps_epi32(_mm_mul_ps(x0, v_iscale));</div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>            __m128i q1 = _mm_cvtps_epi32(_mm_mul_ps(x1, v_iscale));</div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>            __m128i q2 = _mm_cvtps_epi32(_mm_mul_ps(x2, v_iscale));</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>            __m128i q3 = _mm_cvtps_epi32(_mm_mul_ps(x3, v_iscale));</div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span> </div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>            <span class="comment">// Pack i32 -&gt; i16 -&gt; i8</span></div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>            __m128i q01 = _mm_packs_epi32(q0, q1);</div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>            __m128i q23 = _mm_packs_epi32(q2, q3);</div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>            __m128i q0123 = _mm_packs_epi16(q01, q23);</div>
-<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span> </div>
-<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q0123);</div>
-<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span> </div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>            <span class="comment">// Compute bsum for these 16 elements</span></div>
-<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>            <span class="comment">// Each bsum[j/16] covers 16 elements</span></div>
-<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>            __m128i p01 = _mm_add_epi16(q01, q23);</div>
-<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>            p01 = _mm_add_epi16(p01, _mm_shuffle_epi32(p01, _MM_SHUFFLE(1, 0, 3, 2)));</div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>            p01 = _mm_add_epi16(p01, _mm_shufflelo_epi16(p01, _MM_SHUFFLE(1, 0, 3, 2)));</div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>            int16_t bsum = (int16_t)_mm_extract_epi16(p01, 0) + (int16_t)_mm_extract_epi16(p01, 1);</div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = bsum;</div>
-<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>        }</div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span> </div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
-<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>    }</div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>}</div>
+<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="preprocessor">#include &lt;assert.h&gt;</span></div>
+<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span><span class="preprocessor">#include &lt;math.h&gt;</span></div>
+<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="preprocessor">#include &lt;string.h&gt;</span></div>
+<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
+<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span> </div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span> </div>
+<div class="foldopen" id="foldopen00022" data-start="{" data-end="}">
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno"><a class="line" href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">   22</a></span><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keywordtype">int</span> <a class="code hl_function" href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a>(<span class="keywordtype">float</span> fval) {</div>
+<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span>    <span class="keywordtype">float</span> val = fval + 12582912.f;</div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>    <span class="keywordtype">int</span> i;</div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>    memcpy(&amp;i, &amp;val, <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>    <span class="keywordflow">return</span> (i &amp; 0x007fffff) - 0x00400000;</div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>}</div>
+</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span> </div>
+<div class="foldopen" id="foldopen00029" data-start="{" data-end="}">
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno"><a class="line" href="ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f">   29</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__sse_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k) {</div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>    <span class="keywordflow">if</span> (!x || !vy || k &lt;= 0) {</div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span>    }</div>
+<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span>    assert(k % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> == 0);</div>
+<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
+<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span> </div>
+<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
+<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>        <span class="keywordtype">float</span> max = 0.0f;</div>
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>        </div>
+<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>        <span class="comment">// SSE max absolute value</span></div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>        __m128 v_max = _mm_setzero_ps();</div>
+<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 4) {</div>
+<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>            __m128 v = _mm_loadu_ps(x + j);</div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>            __m128 v_abs = _mm_andnot_ps(_mm_set1_ps(-0.0f), v);</div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>            v_max = _mm_max_ps(v_max, v_abs);</div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>        }</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>        </div>
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>        <span class="comment">// Horizontal max</span></div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>        v_max = _mm_max_ps(v_max, _mm_shuffle_ps(v_max, v_max, _MM_SHUFFLE(1, 0, 3, 2)));</div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>        v_max = _mm_max_ps(v_max, _mm_shuffle_ps(v_max, v_max, _MM_SHUFFLE(0, 1, 0, 1)));</div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>        _mm_store_ss(&amp;max, v_max);</div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span> </div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>        <span class="keywordflow">if</span> (max == 0.0f) {</div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 0.0f;</div>
+<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>            memset(y[i].qs, 0, <span class="keyword">sizeof</span>(y[i].qs));</div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>            memset(y[i].bsums, 0, <span class="keyword">sizeof</span>(y[i].bsums));</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>            x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>            <span class="keywordflow">continue</span>;</div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>        }</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span> </div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>        __m128 v_iscale = _mm_set1_ps(iscale);</div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>        </div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>        <span class="comment">// Quantize and compute bsums in SSE</span></div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>            __m128 x0 = _mm_loadu_ps(x + j + 0);</div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>            __m128 x1 = _mm_loadu_ps(x + j + 4);</div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>            __m128 x2 = _mm_loadu_ps(x + j + 8);</div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>            __m128 x3 = _mm_loadu_ps(x + j + 12);</div>
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span> </div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>            __m128i q0 = _mm_cvtps_epi32(_mm_mul_ps(x0, v_iscale));</div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>            __m128i q1 = _mm_cvtps_epi32(_mm_mul_ps(x1, v_iscale));</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>            __m128i q2 = _mm_cvtps_epi32(_mm_mul_ps(x2, v_iscale));</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>            __m128i q3 = _mm_cvtps_epi32(_mm_mul_ps(x3, v_iscale));</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>            <span class="comment">// Pack i32 -&gt; i16 -&gt; i8</span></div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>            __m128i q01 = _mm_packs_epi32(q0, q1);</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>            __m128i q23 = _mm_packs_epi32(q2, q3);</div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>            __m128i q0123 = _mm_packs_epi16(q01, q23);</div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span> </div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q0123);</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span> </div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>            <span class="comment">// Compute bsum for these 16 elements</span></div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>            <span class="comment">// Each bsum[j/16] covers 16 elements</span></div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>            __m128i p01 = _mm_add_epi16(q01, q23);</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>            p01 = _mm_add_epi16(p01, _mm_shuffle_epi32(p01, _MM_SHUFFLE(1, 0, 3, 2)));</div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>            p01 = _mm_add_epi16(p01, _mm_shufflelo_epi16(p01, _MM_SHUFFLE(1, 0, 3, 2)));</div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>            int16_t bsum = (int16_t)_mm_extract_epi16(p01, 0) + (int16_t)_mm_extract_epi16(p01, 1);</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = bsum;</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>        }</div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span> </div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>    }</div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>}</div>
 </div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00120">ckernel_quant.h:120</a></div></div>
-<div class="ttc" id="aquantize__row__q8__k__sse_8c_html_ab5a6ee098afcfc17f8e2da12535945aa"><div class="ttname"><a href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a></div><div class="ttdeci">static int ck_nearest_int(float fval)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00008">quantize_row_q8_k_sse.c:8</a></div></div>
-<div class="ttc" id="aquantize__row__q8__k__sse_8c_html_ad7fa7d735b58b52c90cbd6160676e86f"><div class="ttname"><a href="quantize__row__q8__k__sse_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a></div><div class="ttdeci">void quantize_row_q8_k_sse(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00015">quantize_row_q8_k_sse.c:15</a></div></div>
+<div class="ttc" id="aquantize__row__q8__k__sse_8c_html_ab5a6ee098afcfc17f8e2da12535945aa"><div class="ttname"><a href="quantize__row__q8__k__sse_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a></div><div class="ttdeci">static int ck_nearest_int(float fval)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00022">quantize_row_q8_k_sse.c:22</a></div></div>
+<div class="ttc" id="aquantize__row__q8__k__sse_8c_html_ad7fa7d735b58b52c90cbd6160676e86f"><div class="ttname"><a href="quantize__row__q8__k__sse_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a></div><div class="ttdeci">void quantize_row_q8_k_sse(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00029">quantize_row_q8_k_sse.c:29</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00152">ckernel_quant.h:152</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html_abb47e300e16fb14224979b2538edb966"><div class="ttname"><a href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">block_q8_K::d</a></div><div class="ttdeci">float d</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00153">ckernel_quant.h:153</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html_ad3e3b87f42780053e576d03c01ac4176"><div class="ttname"><a href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">block_q8_K::bsums</a></div><div class="ttdeci">int16_t bsums[256/16]</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00155">ckernel_quant.h:155</a></div></div>

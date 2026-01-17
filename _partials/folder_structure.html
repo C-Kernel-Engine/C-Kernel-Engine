@@ -1,7 +1,7 @@
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-17 13:17</span>
+        <span class="folder-updated">Updated: 2026-01-17 23:44</span>
     </div>
     <pre class="tree-output">
 .
@@ -121,6 +121,7 @@
 |   |-- LAYERED_TEST_STRATEGY.md
 |   |-- MEGA_FUSED.md
 |   |-- MEGA_FUSION_CALCULATIONS.md
+|   |-- MEGA_FUSION_PREFILL_PLAN.md
 |   |-- PARITY_TESTING_PLAN.md
 |   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
 |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
@@ -335,6 +336,9 @@
 |   |   `-- verify_test_bug.py
 |   |-- add_parallel_decode.sh
 |   |-- analyze_parity.py
+|   |-- bench_mega_fused_attention_prefill.py
+|   |-- bench_prefill_fused_mlp.py
+|   |-- bench_prefill_fused_qkv.py
 |   |-- benchmark_avx512.sh
 |   |-- benchmark_vs_llamacpp.py
 |   |-- build_ir_v5.py
@@ -425,6 +429,7 @@
 |   |-- test_low_level_kernels.py
 |   |-- test_parity_direct.py
 |   |-- test_performance.sh
+|   |-- test_prefill_fusion.py
 |   |-- test_pytorch_parity.sh
 |   |-- test_q6k_kernels.py
 |   |-- test_q_kernel_direct.py
@@ -444,7 +449,9 @@
 |   |   `-- tries
 |   |-- kernels
 |   |   |-- fused
+|   |   |-- KERNEL_STATUS.md
 |   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
+|   |   |-- README.md
 |   |   |-- add_kernels_bf16.c
 |   |   |-- attention_decode_fused.c
 |   |   |-- attention_flash_true.c
@@ -453,11 +460,12 @@
 |   |   |-- dequant_kernels.c
 |   |   |-- embedding_kernels.c
 |   |   |-- embedding_kernels_bf16.c
-|   |   |-- fused_rmsnorm_linear.c
+|   |   |-- fp16_convert.c
 |   |   |-- gelu_kernels.c
 |   |   |-- gelu_kernels_bf16.c
 |   |   |-- gemm_batch_int8.c
 |   |   |-- gemm_fused_kernels.c
+|   |   |-- gemm_head_major_output.c
 |   |   |-- gemm_kernels.c
 |   |   |-- gemm_kernels_amx.c
 |   |   |-- gemm_kernels_bf16.c
@@ -484,7 +492,6 @@
 |   |   |-- layernorm_kernels_bf16.c
 |   |   |-- loss_kernels.c
 |   |   |-- loss_kernels_bf16.c
-|   |   |-- mega_fused_attention_avx.c
 |   |   |-- mlp_fused_decode.c
 |   |   |-- mlp_kernels.c
 |   |   |-- mlp_kernels_bf16.c
@@ -497,7 +504,6 @@
 |   |   |-- rmsnorm_kernels_bf16.c
 |   |   |-- rmsnorm_kernels_int4.c
 |   |   |-- rmsnorm_kernels_int8.c
-|   |   |-- rmsnorm_q8_k_fused.c
 |   |   |-- rope_kernels.c
 |   |   |-- rope_kernels_bf16.c
 |   |   |-- sigmoid_kernels.c
@@ -712,6 +718,7 @@
 |   |-- test_layernorm.py
 |   |-- test_lm_head_litmus.py
 |   |-- test_mega_fused_attention.py
+|   |-- test_mega_fused_attention_prefill.py
 |   |-- test_mlp.py
 |   |-- test_mlp_fusion_benchmark.py
 |   |-- test_multi_layer_parity.py
@@ -719,6 +726,8 @@
 |   |-- test_orchestration_layer.py
 |   |-- test_parallel_gemv.py
 |   |-- test_parity.py
+|   |-- test_prefill_fused_mlp_quant.py
+|   |-- test_prefill_fused_rmsnorm_qkv_quant.py
 |   |-- test_pytorch_parity.py
 |   |-- test_q4_k_dequant_match.py
 |   |-- test_q4_k_q8_k_matvec.py
@@ -766,7 +775,7 @@
 |-- tiny.config.json
 `-- valgrind.supp
 
-68 directories, 693 files
+68 directories, 702 files
 </pre>
 </div>
 

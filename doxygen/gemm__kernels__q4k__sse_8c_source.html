@@ -133,133 +133,148 @@ $(document).ready(function(){initNavTree('gemm__kernels__q4k__sse_8c_source.html
   <div class="headertitle"><div class="title">gemm_kernels_q4k_sse.c</div></div>
 </div><!--header-->
 <div class="contents">
-<a href="gemm__kernels__q4k__sse_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
-<div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
-<div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="preprocessor">#include &lt;string.h&gt;</span></div>
-<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span> </div>
-<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
-<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span> </div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment">// SSE4.1 implementation of Q4_K * Q8_K dot product</span></div>
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment">// Compatible with standard AVX (Sandy Bridge/Ivy Bridge)</span></div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span> </div>
-<div class="foldopen" id="foldopen00010" data-start="{" data-end="}">
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">   10</a></span><span class="keyword">static</span> <span class="keyword">inline</span> int32_t <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(__m128i v) {</div>
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span>    __m128i shuf = _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2));</div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span>    __m128i sums = _mm_add_epi32(v, shuf);</div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span>    shuf = _mm_shuffle_epi32(sums, _MM_SHUFFLE(2, 3, 0, 1));</div>
-<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span>    sums = _mm_add_epi32(sums, shuf);</div>
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span>    <span class="keywordflow">return</span> _mm_cvtsi128_si32(sums);</div>
-<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span>}</div>
+<a href="gemm__kernels__q4k__sse_8c.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="comment">/**</span></div>
+<div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="comment"> * @file gemm_kernels_q4k_sse.c</span></div>
+<div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="comment"> * @brief SSE4.1 Q4_K x Q8_K dot product kernels</span></div>
+<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="comment"> * CK-ENGINE KERNEL RULES:</span></div>
+<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="comment"> * =======================</span></div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment"> * 1. NO malloc/free - memory via bump allocator, pointers passed in</span></div>
+<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment"> * 2. NO OpenMP - parallelization at orchestrator/codegen layer</span></div>
+<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="comment"> * 3. API must define: inputs, outputs, workspace, and memory layouts</span></div>
+<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="comment"> * 4. Pure computation - deterministic, no side effects</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="comment"> * After changes: make test &amp;&amp; make llamacpp-parity-full</span></div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span><span class="comment"> * Compatible with Sandy Bridge/Ivy Bridge and later.</span></div>
+<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="comment"> */</span></div>
+<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span> </div>
+<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
+<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
+<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span><span class="preprocessor">#include &lt;string.h&gt;</span></div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span> </div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
+<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="comment">/* SSE4.1 implementation of Q4_K * Q8_K dot product */</span></div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span> </div>
+<div class="foldopen" id="foldopen00025" data-start="{" data-end="}">
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">   25</a></span><span class="keyword">static</span> <span class="keyword">inline</span> int32_t <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(__m128i v) {</div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>    __m128i shuf = _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2));</div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>    __m128i sums = _mm_add_epi32(v, shuf);</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>    shuf = _mm_shuffle_epi32(sums, _MM_SHUFFLE(2, 3, 0, 1));</div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>    sums = _mm_add_epi32(sums, shuf);</div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>    <span class="keywordflow">return</span> _mm_cvtsi128_si32(sums);</div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span>}</div>
 </div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span> </div>
-<div class="foldopen" id="foldopen00018" data-start="{" data-end="}">
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno"><a class="line" href="ckernel__quant_8h.html#afae7b0ff0904761e59897e996ddd862f">   18</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#afae7b0ff0904761e59897e996ddd862f">gemv_q4_k_q8_k_sse</a>(<span class="keywordtype">float</span> *y,</div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>                        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K)</div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span>{</div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span> </div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>    <span class="keyword">const</span> __m128i mask_low = _mm_set1_epi8(0x0F);</div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span> </div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
-<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>        <span class="keywordtype">float</span> sumf = 0.0f;</div>
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + row * blocks_per_row;</div>
 <div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span> </div>
-<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; blocks_per_row; ++i) {</div>
-<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *b4 = &amp;w_row[i];</div>
-<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *b8 = &amp;x[i];</div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span> </div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>            <span class="comment">// Unpack scales (same as ref)</span></div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>            uint8_t sc[8], m_val[8];</div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>            <a class="code hl_function" href="ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307">unpack_q4_k_scales</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a3a603ea5f9ee6a3732d96a244cb6a3b5">scales</a>, sc, m_val);</div>
-<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span> </div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>            <span class="keywordtype">float</span> d = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a37fe013be58ed82df03c3362450590d3">d</a>) * b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>            <span class="keywordtype">float</span> dmin = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a86e4a2173d9a1def4939ccb248a1bc49">dmin</a>) * b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
+<div class="foldopen" id="foldopen00033" data-start="{" data-end="}">
+<div class="line"><a id="l00033" name="l00033"></a><span class="lineno"><a class="line" href="ckernel__quant_8h.html#afae7b0ff0904761e59897e996ddd862f">   33</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#afae7b0ff0904761e59897e996ddd862f">gemv_q4_k_q8_k_sse</a>(<span class="keywordtype">float</span> *y,</div>
+<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
+<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
+<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>                        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>{</div>
+<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
+<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span> </div>
+<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>    <span class="keyword">const</span> __m128i mask_low = _mm_set1_epi8(0x0F);</div>
 <div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span> </div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>            <span class="keywordtype">int</span> is = 0;</div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>            <span class="keywordtype">int</span> q_offset = 0;</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span> </div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>            <span class="comment">// Process 4 chunks of 64 elements (256 total)</span></div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 64) {</div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>                <span class="comment">// We process 32 bytes of qs (covering 64 elements via low/high nibbles)</span></div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>                <span class="comment">// We access qs[0..31] relative to q_offset</span></div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>        <span class="keywordtype">float</span> sumf = 0.0f;</div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + row * blocks_per_row;</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span> </div>
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; blocks_per_row; ++i) {</div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *b4 = &amp;w_row[i];</div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *b8 = &amp;x[i];</div>
 <div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span> </div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>                <span class="comment">// Accumulators for this 64-element chunk</span></div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>                __m128i acc_lo = _mm_setzero_si128();</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>                __m128i acc_hi = _mm_setzero_si128();</div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>            <span class="comment">// Unpack scales (same as ref)</span></div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>            uint8_t sc[8], m_val[8];</div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>            <a class="code hl_function" href="ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307">unpack_q4_k_scales</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a3a603ea5f9ee6a3732d96a244cb6a3b5">scales</a>, sc, m_val);</div>
 <div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span> </div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>                <span class="comment">// Inner loop: 2 iters of 16 bytes (32 elements)</span></div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; 32; l += 16) {</div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>                    <span class="comment">// Load 16 bytes of Q4</span></div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>                    __m128i q4_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a74d5a6318849909fb1c19248961d7ac9">qs</a> + q_offset + l));</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span> </div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>                    <span class="comment">// Low nibbles -&gt; correspond to q8_lo (elements j+l .. j+l+15)</span></div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>                    __m128i q4_lo = _mm_and_si128(q4_vec, mask_low);</div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>                    </div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>                    <span class="comment">// High nibbles -&gt; correspond to q8_hi (elements j+32+l .. j+32+l+15)</span></div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>                    __m128i q4_hi = _mm_and_si128(_mm_srli_epi16(q4_vec, 4), mask_low);</div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>            <span class="keywordtype">float</span> d = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a37fe013be58ed82df03c3362450590d3">d</a>) * b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>            <span class="keywordtype">float</span> dmin = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a86e4a2173d9a1def4939ccb248a1bc49">dmin</a>) * b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span> </div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>            <span class="keywordtype">int</span> is = 0;</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>            <span class="keywordtype">int</span> q_offset = 0;</div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span> </div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>            <span class="comment">// Process 4 chunks of 64 elements (256 total)</span></div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 64) {</div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>                <span class="comment">// We process 32 bytes of qs (covering 64 elements via low/high nibbles)</span></div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>                <span class="comment">// We access qs[0..31] relative to q_offset</span></div>
 <div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span> </div>
-<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>                    <span class="comment">// Load Q8</span></div>
-<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>                    __m128i q8_lo_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a> + j + l));</div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>                    __m128i q8_hi_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a> + j + 32 + l));</div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>                <span class="comment">// Accumulators for this 64-element chunk</span></div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>                __m128i acc_lo = _mm_setzero_si128();</div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>                __m128i acc_hi = _mm_setzero_si128();</div>
 <div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span> </div>
-<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>                    <span class="comment">// Expand and Multiply-Add: Q4(u8) * Q8(s8) -&gt; i32</span></div>
-<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>                    <span class="comment">// Since Q4 is u8 and Q8 is s8, we use intermediate i16</span></div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>                    </div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>                    <span class="comment">// LO PART</span></div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>                    __m128i q4_lo_16_L = _mm_cvtepu8_epi16(q4_lo); <span class="comment">// lower 8 -&gt; 16</span></div>
-<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>                    __m128i q8_lo_16_L = _mm_cvtepi8_epi16(q8_lo_vec);</div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>                    __m128i prod_lo_L = _mm_madd_epi16(q4_lo_16_L, q8_lo_16_L); <span class="comment">// i32</span></div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>                    acc_lo = _mm_add_epi32(acc_lo, prod_lo_L);</div>
-<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span> </div>
-<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>                    __m128i q4_lo_16_H = _mm_cvtepu8_epi16(_mm_srli_si128(q4_lo, 8)); <span class="comment">// upper 8 -&gt; 16</span></div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>                    __m128i q8_lo_16_H = _mm_cvtepi8_epi16(_mm_srli_si128(q8_lo_vec, 8));</div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>                    __m128i prod_lo_H = _mm_madd_epi16(q4_lo_16_H, q8_lo_16_H); <span class="comment">// i32</span></div>
-<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>                    acc_lo = _mm_add_epi32(acc_lo, prod_lo_H);</div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span> </div>
-<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>                    <span class="comment">// HI PART</span></div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>                    __m128i q4_hi_16_L = _mm_cvtepu8_epi16(q4_hi);</div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>                    __m128i q8_hi_16_L = _mm_cvtepi8_epi16(q8_hi_vec);</div>
-<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>                    __m128i prod_hi_L = _mm_madd_epi16(q4_hi_16_L, q8_hi_16_L);</div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>                    acc_hi = _mm_add_epi32(acc_hi, prod_hi_L);</div>
-<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span> </div>
-<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                    __m128i q4_hi_16_H = _mm_cvtepu8_epi16(_mm_srli_si128(q4_hi, 8));</div>
-<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>                    __m128i q8_hi_16_H = _mm_cvtepi8_epi16(_mm_srli_si128(q8_hi_vec, 8));</div>
-<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>                    __m128i prod_hi_H = _mm_madd_epi16(q4_hi_16_H, q8_hi_16_H);</div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>                    acc_hi = _mm_add_epi32(acc_hi, prod_hi_H);</div>
-<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>                }</div>
-<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span> </div>
-<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>                int32_t sum_q4q8_lo = <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(acc_lo);</div>
-<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>                int32_t sum_q4q8_hi = <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(acc_hi);</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>                <span class="comment">// Inner loop: 2 iters of 16 bytes (32 elements)</span></div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; 32; l += 16) {</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>                    <span class="comment">// Load 16 bytes of Q4</span></div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>                    __m128i q4_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b4-&gt;<a class="code hl_variable" href="structblock__q4__K.html#a74d5a6318849909fb1c19248961d7ac9">qs</a> + q_offset + l));</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>                    <span class="comment">// Low nibbles -&gt; correspond to q8_lo (elements j+l .. j+l+15)</span></div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>                    __m128i q4_lo = _mm_and_si128(q4_vec, mask_low);</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>                    </div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>                    <span class="comment">// High nibbles -&gt; correspond to q8_hi (elements j+32+l .. j+32+l+15)</span></div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>                    __m128i q4_hi = _mm_and_si128(_mm_srli_epi16(q4_vec, 4), mask_low);</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span> </div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>                    <span class="comment">// Load Q8</span></div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>                    __m128i q8_lo_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a> + j + l));</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>                    __m128i q8_hi_vec = _mm_loadu_si128((<span class="keyword">const</span> __m128i *)(b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a> + j + 32 + l));</div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span> </div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>                    <span class="comment">// Expand and Multiply-Add: Q4(u8) * Q8(s8) -&gt; i32</span></div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>                    <span class="comment">// Since Q4 is u8 and Q8 is s8, we use intermediate i16</span></div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>                    </div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>                    <span class="comment">// LO PART</span></div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>                    __m128i q4_lo_16_L = _mm_cvtepu8_epi16(q4_lo); <span class="comment">// lower 8 -&gt; 16</span></div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                    __m128i q8_lo_16_L = _mm_cvtepi8_epi16(q8_lo_vec);</div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>                    __m128i prod_lo_L = _mm_madd_epi16(q4_lo_16_L, q8_lo_16_L); <span class="comment">// i32</span></div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>                    acc_lo = _mm_add_epi32(acc_lo, prod_lo_L);</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span> </div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>                    __m128i q4_lo_16_H = _mm_cvtepu8_epi16(_mm_srli_si128(q4_lo, 8)); <span class="comment">// upper 8 -&gt; 16</span></div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>                    __m128i q8_lo_16_H = _mm_cvtepi8_epi16(_mm_srli_si128(q8_lo_vec, 8));</div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>                    __m128i prod_lo_H = _mm_madd_epi16(q4_lo_16_H, q8_lo_16_H); <span class="comment">// i32</span></div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>                    acc_lo = _mm_add_epi32(acc_lo, prod_lo_H);</div>
 <div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span> </div>
-<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>                <span class="comment">/* bsums: each bsum is 16 elements */</span></div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>                int32_t bsum_lo = (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] +</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>                                  (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16 + 1];</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>                int32_t bsum_hi = (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[(j + 32) / 16] +</div>
-<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>                                  (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[(j + 32) / 16 + 1];</div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>                    <span class="comment">// HI PART</span></div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>                    __m128i q4_hi_16_L = _mm_cvtepu8_epi16(q4_hi);</div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>                    __m128i q8_hi_16_L = _mm_cvtepi8_epi16(q8_hi_vec);</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>                    __m128i prod_hi_L = _mm_madd_epi16(q4_hi_16_L, q8_hi_16_L);</div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>                    acc_hi = _mm_add_epi32(acc_hi, prod_hi_L);</div>
 <div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span> </div>
-<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>                sumf += d * (float)sc[is] * (<span class="keywordtype">float</span>)sum_q4q8_lo;</div>
-<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>                sumf -= dmin * (float)m_val[is] * (<span class="keywordtype">float</span>)bsum_lo;</div>
-<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>                sumf += d * (float)sc[is + 1] * (<span class="keywordtype">float</span>)sum_q4q8_hi;</div>
-<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>                sumf -= dmin * (float)m_val[is + 1] * (<span class="keywordtype">float</span>)bsum_hi;</div>
-<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span> </div>
-<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>                q_offset += 32;</div>
-<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>                is += 2;</div>
-<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>            }</div>
-<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>        }</div>
-<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>        y[row] = sumf;</div>
-<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>    }</div>
-<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>}</div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>                    __m128i q4_hi_16_H = _mm_cvtepu8_epi16(_mm_srli_si128(q4_hi, 8));</div>
+<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>                    __m128i q8_hi_16_H = _mm_cvtepi8_epi16(_mm_srli_si128(q8_hi_vec, 8));</div>
+<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>                    __m128i prod_hi_H = _mm_madd_epi16(q4_hi_16_H, q8_hi_16_H);</div>
+<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>                    acc_hi = _mm_add_epi32(acc_hi, prod_hi_H);</div>
+<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span>                }</div>
+<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span> </div>
+<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>                int32_t sum_q4q8_lo = <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(acc_lo);</div>
+<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>                int32_t sum_q4q8_hi = <a class="code hl_function" href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a>(acc_hi);</div>
+<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span> </div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>                <span class="comment">/* bsums: each bsum is 16 elements */</span></div>
+<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>                int32_t bsum_lo = (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] +</div>
+<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>                                  (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16 + 1];</div>
+<div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>                int32_t bsum_hi = (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[(j + 32) / 16] +</div>
+<div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span>                                  (int32_t)b8-&gt;<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[(j + 32) / 16 + 1];</div>
+<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span> </div>
+<div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span>                sumf += d * (float)sc[is] * (<span class="keywordtype">float</span>)sum_q4q8_lo;</div>
+<div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span>                sumf -= dmin * (float)m_val[is] * (<span class="keywordtype">float</span>)bsum_lo;</div>
+<div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span>                sumf += d * (float)sc[is + 1] * (<span class="keywordtype">float</span>)sum_q4q8_hi;</div>
+<div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>                sumf -= dmin * (float)m_val[is + 1] * (<span class="keywordtype">float</span>)bsum_hi;</div>
+<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span> </div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>                q_offset += 32;</div>
+<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span>                is += 2;</div>
+<div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span>            }</div>
+<div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span>        }</div>
+<div class="line"><a id="l00130" name="l00130"></a><span class="lineno">  130</span>        y[row] = sumf;</div>
+<div class="line"><a id="l00131" name="l00131"></a><span class="lineno">  131</span>    }</div>
+<div class="line"><a id="l00132" name="l00132"></a><span class="lineno">  132</span>}</div>
 </div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00325">ckernel_quant.h:325</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_adc037213865781c5c1ea63708ef94307"><div class="ttname"><a href="ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307">unpack_q4_k_scales</a></div><div class="ttdeci">static void unpack_q4_k_scales(const uint8_t *scales, uint8_t *sc, uint8_t *m)</div><div class="ttdoc">Unpack Q4_K sub-block scales and mins.</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00226">ckernel_quant.h:226</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00120">ckernel_quant.h:120</a></div></div>
-<div class="ttc" id="agemm__kernels__q4k__sse_8c_html_a1fd457548cf919a5f340dd1c8636eb01"><div class="ttname"><a href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a></div><div class="ttdeci">static int32_t hsum_epi32_sse(__m128i v)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__sse_8c_source.html#l00010">gemm_kernels_q4k_sse.c:10</a></div></div>
-<div class="ttc" id="agemm__kernels__q4k__sse_8c_html_afae7b0ff0904761e59897e996ddd862f"><div class="ttname"><a href="gemm__kernels__q4k__sse_8c.html#afae7b0ff0904761e59897e996ddd862f">gemv_q4_k_q8_k_sse</a></div><div class="ttdeci">void gemv_q4_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__sse_8c_source.html#l00018">gemm_kernels_q4k_sse.c:18</a></div></div>
+<div class="ttc" id="agemm__kernels__q4k__sse_8c_html_a1fd457548cf919a5f340dd1c8636eb01"><div class="ttname"><a href="gemm__kernels__q4k__sse_8c.html#a1fd457548cf919a5f340dd1c8636eb01">hsum_epi32_sse</a></div><div class="ttdeci">static int32_t hsum_epi32_sse(__m128i v)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__sse_8c_source.html#l00025">gemm_kernels_q4k_sse.c:25</a></div></div>
+<div class="ttc" id="agemm__kernels__q4k__sse_8c_html_afae7b0ff0904761e59897e996ddd862f"><div class="ttname"><a href="gemm__kernels__q4k__sse_8c.html#afae7b0ff0904761e59897e996ddd862f">gemv_q4_k_q8_k_sse</a></div><div class="ttdeci">void gemv_q4_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__sse_8c_source.html#l00033">gemm_kernels_q4k_sse.c:33</a></div></div>
 <div class="ttc" id="astructblock__q4__K_html"><div class="ttname"><a href="structblock__q4__K.html">block_q4_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00123">ckernel_quant.h:123</a></div></div>
 <div class="ttc" id="astructblock__q4__K_html_a37fe013be58ed82df03c3362450590d3"><div class="ttname"><a href="structblock__q4__K.html#a37fe013be58ed82df03c3362450590d3">block_q4_K::d</a></div><div class="ttdeci">ck_half d</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00124">ckernel_quant.h:124</a></div></div>
 <div class="ttc" id="astructblock__q4__K_html_a3a603ea5f9ee6a3732d96a244cb6a3b5"><div class="ttname"><a href="structblock__q4__K.html#a3a603ea5f9ee6a3732d96a244cb6a3b5">block_q4_K::scales</a></div><div class="ttdeci">uint8_t scales[12]</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00126">ckernel_quant.h:126</a></div></div>

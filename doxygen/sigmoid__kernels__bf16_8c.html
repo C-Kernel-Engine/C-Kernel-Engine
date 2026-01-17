@@ -130,6 +130,9 @@ $(document).ready(function(){initNavTree('sigmoid__kernels__bf16_8c.html',''); i
   <div class="headertitle"><div class="title">sigmoid_kernels_bf16.c File Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Sigmoid activation kernels for BF16 tensors.  
+<a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
@@ -144,7 +147,21 @@ Functions</h2></td></tr>
 <tr class="memitem:a8ff367a15f1448b30193ac1fe96446d8" id="r_a8ff367a15f1448b30193ac1fe96446d8"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="sigmoid__kernels__bf16_8c.html#a8ff367a15f1448b30193ac1fe96446d8">sigmoid_forward_bf16</a> (const uint16_t *input, uint16_t *output, size_t n, float *scratch_input, float *scratch_output)</td></tr>
 <tr class="separator:a8ff367a15f1448b30193ac1fe96446d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Function Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Sigmoid activation kernels for BF16 tensors. </p>
+<h1><a class="anchor" id="autotoc_md76"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
+<p>Sigmoid: y = 1 / (1 + exp(-x)) </p>
+
+<p class="definition">Definition in file <a class="el" href="sigmoid__kernels__bf16_8c_source.html">sigmoid_kernels_bf16.c</a>.</p>
+</div><h2 class="groupheader">Function Documentation</h2>
 <a id="a90690701828d7be0e2d375c4cbde511d" name="a90690701828d7be0e2d375c4cbde511d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a90690701828d7be0e2d375c4cbde511d">&#9670;&#160;</a></span>sigmoid_backward_bf16()</h2>
 
@@ -201,21 +218,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="sigmoid__kernels__bf16_8c_source.html#l00029">29</a> of file <a class="el" href="sigmoid__kernels__bf16_8c_source.html">sigmoid_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   36</span>{</div>
-<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">if</span> (!input || !d_output || !d_input || n == 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   39</span> </div>
-<div class="line"><span class="lineno">   40</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
-<div class="line"><span class="lineno">   41</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
-<div class="line"><span class="lineno">   42</span>    <a class="code hl_function" href="ckernel__engine_8h.html#aad3b3666d63fcbaa243ad4a988e187d8">sigmoid_backward</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
-<div class="line"><span class="lineno">   43</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
-<div class="line"><span class="lineno">   44</span>}</div>
+<p class="definition">Definition at line <a class="el" href="sigmoid__kernels__bf16_8c_source.html#l00045">45</a> of file <a class="el" href="sigmoid__kernels__bf16_8c_source.html">sigmoid_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   52</span>{</div>
+<div class="line"><span class="lineno">   53</span>    <span class="keywordflow">if</span> (!input || !d_output || !d_input || n == 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   55</span> </div>
+<div class="line"><span class="lineno">   56</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
+<div class="line"><span class="lineno">   57</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
+<div class="line"><span class="lineno">   58</span>    <a class="code hl_function" href="ckernel__engine_8h.html#aad3b3666d63fcbaa243ad4a988e187d8">sigmoid_backward</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
+<div class="line"><span class="lineno">   59</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
+<div class="line"><span class="lineno">   60</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_aad3b3666d63fcbaa243ad4a988e187d8"><div class="ttname"><a href="ckernel__engine_8h.html#aad3b3666d63fcbaa243ad4a988e187d8">sigmoid_backward</a></div><div class="ttdeci">void sigmoid_backward(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00123">sigmoid_kernels.c:123</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_aad3b3666d63fcbaa243ad4a988e187d8"><div class="ttname"><a href="ckernel__engine_8h.html#aad3b3666d63fcbaa243ad4a988e187d8">sigmoid_backward</a></div><div class="ttdeci">void sigmoid_backward(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00138">sigmoid_kernels.c:138</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00123">sigmoid_backward()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00138">sigmoid_backward()</a>.</p>
 
 </div>
 </div>
@@ -263,18 +280,18 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="sigmoid__kernels__bf16_8c_source.html#l00011">11</a> of file <a class="el" href="sigmoid__kernels__bf16_8c_source.html">sigmoid_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   16</span>{</div>
-<div class="line"><span class="lineno">   17</span>    <span class="keywordflow">if</span> (!input || !output || n == 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   18</span>    <span class="keywordflow">if</span> (!scratch_input || !scratch_output) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   19</span> </div>
-<div class="line"><span class="lineno">   20</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
-<div class="line"><span class="lineno">   21</span>    <a class="code hl_function" href="ckernel__engine_8h.html#af621782be75fb6a9acf541f7935b87d5">sigmoid_forward</a>(scratch_input, scratch_output, n);</div>
-<div class="line"><span class="lineno">   22</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_output, output, n);</div>
-<div class="line"><span class="lineno">   23</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_af621782be75fb6a9acf541f7935b87d5"><div class="ttname"><a href="ckernel__engine_8h.html#af621782be75fb6a9acf541f7935b87d5">sigmoid_forward</a></div><div class="ttdeci">void sigmoid_forward(const float *input, float *output, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00107">sigmoid_kernels.c:107</a></div></div>
+<p class="definition">Definition at line <a class="el" href="sigmoid__kernels__bf16_8c_source.html#l00027">27</a> of file <a class="el" href="sigmoid__kernels__bf16_8c_source.html">sigmoid_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   32</span>{</div>
+<div class="line"><span class="lineno">   33</span>    <span class="keywordflow">if</span> (!input || !output || n == 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">if</span> (!scratch_input || !scratch_output) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   35</span> </div>
+<div class="line"><span class="lineno">   36</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
+<div class="line"><span class="lineno">   37</span>    <a class="code hl_function" href="ckernel__engine_8h.html#af621782be75fb6a9acf541f7935b87d5">sigmoid_forward</a>(scratch_input, scratch_output, n);</div>
+<div class="line"><span class="lineno">   38</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_output, output, n);</div>
+<div class="line"><span class="lineno">   39</span>}</div>
+<div class="ttc" id="ackernel__engine_8h_html_af621782be75fb6a9acf541f7935b87d5"><div class="ttname"><a href="ckernel__engine_8h.html#af621782be75fb6a9acf541f7935b87d5">sigmoid_forward</a></div><div class="ttdeci">void sigmoid_forward(const float *input, float *output, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00122">sigmoid_kernels.c:122</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00107">sigmoid_forward()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="sigmoid__kernels_8c_source.html#l00122">sigmoid_forward()</a>.</p>
 
 </div>
 </div>

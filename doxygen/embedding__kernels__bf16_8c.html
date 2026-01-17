@@ -130,6 +130,9 @@ $(document).ready(function(){initNavTree('embedding__kernels__bf16_8c.html','');
   <div class="headertitle"><div class="title">embedding_kernels_bf16.c File Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Token/position embedding lookup kernels for BF16.  
+<a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &lt;string.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
@@ -144,7 +147,20 @@ Functions</h2></td></tr>
 <tr class="memitem:a6d58689c662e670a5423eedd0291d6b5" id="r_a6d58689c662e670a5423eedd0291d6b5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="embedding__kernels__bf16_8c.html#a6d58689c662e670a5423eedd0291d6b5">embedding_forward_bf16</a> (const int32_t *token_ids, int token_count, int <a class="el" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, const uint16_t *token_embeddings, const uint16_t *pos_embeddings, uint16_t *output, int embed_dim, int aligned_embed_dim, int context_window, int add_pos)</td></tr>
 <tr class="separator:a6d58689c662e670a5423eedd0291d6b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Function Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Token/position embedding lookup kernels for BF16. </p>
+<h1><a class="anchor" id="autotoc_md15"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full </p>
+
+<p class="definition">Definition in file <a class="el" href="embedding__kernels__bf16_8c_source.html">embedding_kernels_bf16.c</a>.</p>
+</div><h2 class="groupheader">Function Documentation</h2>
 <a id="a7c57b105fb88eb4165a0c649932be08d" name="a7c57b105fb88eb4165a0c649932be08d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a7c57b105fb88eb4165a0c649932be08d">&#9670;&#160;</a></span>embedding_backward_bf16()</h2>
 
@@ -219,39 +235,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="embedding__kernels__bf16_8c_source.html#l00058">58</a> of file <a class="el" href="embedding__kernels__bf16_8c_source.html">embedding_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   68</span>{</div>
-<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">if</span> (!token_ids || !d_output || !d_token_embeddings) {</div>
-<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   71</span>    }</div>
-<div class="line"><span class="lineno">   72</span> </div>
-<div class="line"><span class="lineno">   73</span>    <span class="keywordtype">int</span> tokens = token_count;</div>
-<div class="line"><span class="lineno">   74</span>    <span class="keywordflow">if</span> (tokens &lt; 0) tokens = 0;</div>
-<div class="line"><span class="lineno">   75</span>    <span class="keywordflow">if</span> (tokens &gt; context_window) tokens = context_window;</div>
-<div class="line"><span class="lineno">   76</span> </div>
-<div class="line"><span class="lineno">   77</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">   78</span>        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
-<div class="line"><span class="lineno">   79</span>        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
-<div class="line"><span class="lineno">   80</span>            <span class="keywordtype">id</span> = 0;</div>
-<div class="line"><span class="lineno">   81</span>        }</div>
-<div class="line"><span class="lineno">   82</span> </div>
-<div class="line"><span class="lineno">   83</span>        <span class="keyword">const</span> uint16_t *d_out = d_output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><span class="lineno">   84</span>        uint16_t *d_tok = d_token_embeddings + (size_t)<span class="keywordtype">id</span> * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><span class="lineno">   85</span>        uint16_t *d_pos = d_pos_embeddings ? (d_pos_embeddings + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim) : NULL;</div>
+<p class="definition">Definition at line <a class="el" href="embedding__kernels__bf16_8c_source.html#l00072">72</a> of file <a class="el" href="embedding__kernels__bf16_8c_source.html">embedding_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   82</span>{</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keywordflow">if</span> (!token_ids || !d_output || !d_token_embeddings) {</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   85</span>    }</div>
 <div class="line"><span class="lineno">   86</span> </div>
-<div class="line"><span class="lineno">   87</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">   88</span>            <span class="keywordtype">float</span> grad = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_out[d]);</div>
-<div class="line"><span class="lineno">   89</span> </div>
-<div class="line"><span class="lineno">   90</span>            <span class="keywordtype">float</span> cur_tok = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_tok[d]);</div>
-<div class="line"><span class="lineno">   91</span>            d_tok[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(cur_tok + grad);</div>
-<div class="line"><span class="lineno">   92</span> </div>
-<div class="line"><span class="lineno">   93</span>            <span class="keywordflow">if</span> (add_pos &amp;&amp; d_pos) {</div>
-<div class="line"><span class="lineno">   94</span>                <span class="keywordtype">float</span> cur_pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_pos[d]);</div>
-<div class="line"><span class="lineno">   95</span>                d_pos[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(cur_pos + grad);</div>
-<div class="line"><span class="lineno">   96</span>            }</div>
-<div class="line"><span class="lineno">   97</span>        }</div>
-<div class="line"><span class="lineno">   98</span>    }</div>
-<div class="line"><span class="lineno">   99</span>}</div>
+<div class="line"><span class="lineno">   87</span>    <span class="keywordtype">int</span> tokens = token_count;</div>
+<div class="line"><span class="lineno">   88</span>    <span class="keywordflow">if</span> (tokens &lt; 0) tokens = 0;</div>
+<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">if</span> (tokens &gt; context_window) tokens = context_window;</div>
+<div class="line"><span class="lineno">   90</span> </div>
+<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   92</span>        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
+<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
+<div class="line"><span class="lineno">   94</span>            <span class="keywordtype">id</span> = 0;</div>
+<div class="line"><span class="lineno">   95</span>        }</div>
+<div class="line"><span class="lineno">   96</span> </div>
+<div class="line"><span class="lineno">   97</span>        <span class="keyword">const</span> uint16_t *d_out = d_output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><span class="lineno">   98</span>        uint16_t *d_tok = d_token_embeddings + (size_t)<span class="keywordtype">id</span> * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><span class="lineno">   99</span>        uint16_t *d_pos = d_pos_embeddings ? (d_pos_embeddings + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim) : NULL;</div>
+<div class="line"><span class="lineno">  100</span> </div>
+<div class="line"><span class="lineno">  101</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  102</span>            <span class="keywordtype">float</span> grad = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_out[d]);</div>
+<div class="line"><span class="lineno">  103</span> </div>
+<div class="line"><span class="lineno">  104</span>            <span class="keywordtype">float</span> cur_tok = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_tok[d]);</div>
+<div class="line"><span class="lineno">  105</span>            d_tok[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(cur_tok + grad);</div>
+<div class="line"><span class="lineno">  106</span> </div>
+<div class="line"><span class="lineno">  107</span>            <span class="keywordflow">if</span> (add_pos &amp;&amp; d_pos) {</div>
+<div class="line"><span class="lineno">  108</span>                <span class="keywordtype">float</span> cur_pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_pos[d]);</div>
+<div class="line"><span class="lineno">  109</span>                d_pos[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(cur_pos + grad);</div>
+<div class="line"><span class="lineno">  110</span>            }</div>
+<div class="line"><span class="lineno">  111</span>        }</div>
+<div class="line"><span class="lineno">  112</span>    }</div>
+<div class="line"><span class="lineno">  113</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00169">true_bpe.h:169</a></div></div>
@@ -334,47 +350,47 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="embedding__kernels__bf16_8c_source.html#l00007">7</a> of file <a class="el" href="embedding__kernels__bf16_8c_source.html">embedding_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   17</span>{</div>
-<div class="line"><span class="lineno">   18</span>    <span class="keywordflow">if</span> (!token_ids || !token_embeddings || !output) {</div>
-<div class="line"><span class="lineno">   19</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   20</span>    }</div>
-<div class="line"><span class="lineno">   21</span> </div>
-<div class="line"><span class="lineno">   22</span>    <span class="keywordtype">int</span> tokens = token_count;</div>
-<div class="line"><span class="lineno">   23</span>    <span class="keywordflow">if</span> (tokens &lt; 0) tokens = 0;</div>
-<div class="line"><span class="lineno">   24</span>    <span class="keywordflow">if</span> (tokens &gt; context_window) tokens = context_window;</div>
-<div class="line"><span class="lineno">   25</span> </div>
-<div class="line"><span class="lineno">   26</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">   27</span>        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
-<div class="line"><span class="lineno">   28</span>        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
-<div class="line"><span class="lineno">   29</span>            <span class="keywordtype">id</span> = 0;</div>
-<div class="line"><span class="lineno">   30</span>        }</div>
-<div class="line"><span class="lineno">   31</span> </div>
-<div class="line"><span class="lineno">   32</span>        <span class="keyword">const</span> uint16_t *tok = token_embeddings + (size_t)<span class="keywordtype">id</span> * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><span class="lineno">   33</span>        <span class="keyword">const</span> uint16_t *pos = pos_embeddings ? (pos_embeddings + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim) : NULL;</div>
-<div class="line"><span class="lineno">   34</span>        uint16_t *out = output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<p class="definition">Definition at line <a class="el" href="embedding__kernels__bf16_8c_source.html#l00021">21</a> of file <a class="el" href="embedding__kernels__bf16_8c_source.html">embedding_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   31</span>{</div>
+<div class="line"><span class="lineno">   32</span>    <span class="keywordflow">if</span> (!token_ids || !token_embeddings || !output) {</div>
+<div class="line"><span class="lineno">   33</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   34</span>    }</div>
 <div class="line"><span class="lineno">   35</span> </div>
-<div class="line"><span class="lineno">   36</span>        <span class="keywordflow">if</span> (add_pos &amp;&amp; pos) {</div>
-<div class="line"><span class="lineno">   37</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">   38</span>                <span class="keywordtype">float</span> v = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(tok[d]) + <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(pos[d]);</div>
-<div class="line"><span class="lineno">   39</span>                out[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(v);</div>
-<div class="line"><span class="lineno">   40</span>            }</div>
-<div class="line"><span class="lineno">   41</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">   42</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">   43</span>                out[d] = tok[d];</div>
-<div class="line"><span class="lineno">   44</span>            }</div>
-<div class="line"><span class="lineno">   45</span>        }</div>
-<div class="line"><span class="lineno">   46</span> </div>
-<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = embed_dim; d &lt; aligned_embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">   48</span>            out[d] = 0;</div>
-<div class="line"><span class="lineno">   49</span>        }</div>
-<div class="line"><span class="lineno">   50</span>    }</div>
-<div class="line"><span class="lineno">   51</span> </div>
-<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = tokens; t &lt; context_window; ++t) {</div>
-<div class="line"><span class="lineno">   53</span>        uint16_t *out = output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
-<div class="line"><span class="lineno">   54</span>        memset(out, 0, (<span class="keywordtype">size_t</span>)aligned_embed_dim * <span class="keyword">sizeof</span>(uint16_t));</div>
-<div class="line"><span class="lineno">   55</span>    }</div>
-<div class="line"><span class="lineno">   56</span>}</div>
+<div class="line"><span class="lineno">   36</span>    <span class="keywordtype">int</span> tokens = token_count;</div>
+<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">if</span> (tokens &lt; 0) tokens = 0;</div>
+<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (tokens &gt; context_window) tokens = context_window;</div>
+<div class="line"><span class="lineno">   39</span> </div>
+<div class="line"><span class="lineno">   40</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   41</span>        <span class="keywordtype">int</span> <span class="keywordtype">id</span> = token_ids[t];</div>
+<div class="line"><span class="lineno">   42</span>        <span class="keywordflow">if</span> (id &lt; 0 || id &gt;= <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>) {</div>
+<div class="line"><span class="lineno">   43</span>            <span class="keywordtype">id</span> = 0;</div>
+<div class="line"><span class="lineno">   44</span>        }</div>
+<div class="line"><span class="lineno">   45</span> </div>
+<div class="line"><span class="lineno">   46</span>        <span class="keyword">const</span> uint16_t *tok = token_embeddings + (size_t)<span class="keywordtype">id</span> * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><span class="lineno">   47</span>        <span class="keyword">const</span> uint16_t *pos = pos_embeddings ? (pos_embeddings + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim) : NULL;</div>
+<div class="line"><span class="lineno">   48</span>        uint16_t *out = output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><span class="lineno">   49</span> </div>
+<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">if</span> (add_pos &amp;&amp; pos) {</div>
+<div class="line"><span class="lineno">   51</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">   52</span>                <span class="keywordtype">float</span> v = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(tok[d]) + <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(pos[d]);</div>
+<div class="line"><span class="lineno">   53</span>                out[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(v);</div>
+<div class="line"><span class="lineno">   54</span>            }</div>
+<div class="line"><span class="lineno">   55</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">   56</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">   57</span>                out[d] = tok[d];</div>
+<div class="line"><span class="lineno">   58</span>            }</div>
+<div class="line"><span class="lineno">   59</span>        }</div>
+<div class="line"><span class="lineno">   60</span> </div>
+<div class="line"><span class="lineno">   61</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = embed_dim; d &lt; aligned_embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">   62</span>            out[d] = 0;</div>
+<div class="line"><span class="lineno">   63</span>        }</div>
+<div class="line"><span class="lineno">   64</span>    }</div>
+<div class="line"><span class="lineno">   65</span> </div>
+<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = tokens; t &lt; context_window; ++t) {</div>
+<div class="line"><span class="lineno">   67</span>        uint16_t *out = output + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_embed_dim;</div>
+<div class="line"><span class="lineno">   68</span>        memset(out, 0, (<span class="keywordtype">size_t</span>)aligned_embed_dim * <span class="keyword">sizeof</span>(uint16_t));</div>
+<div class="line"><span class="lineno">   69</span>    }</div>
+<div class="line"><span class="lineno">   70</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="true__bpe_8h_source.html#l00169">vocab_size</a>.</p>
 
