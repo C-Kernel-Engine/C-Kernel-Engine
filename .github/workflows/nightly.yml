@@ -153,7 +153,7 @@ jobs:
             build/*.json
           retention-days: 7
 
-      - name: Commit nightly results to main (triggers docs deploy)
+      - name: Prepare nightly results for deployment
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           if [ -f docs/site/nightly-results/latest.json ]; then
@@ -169,14 +169,14 @@ jobs:
             echo ']}' >> docs/site/nightly-results/index.json
             sed -i 's/,\]/]/' docs/site/nightly-results/index.json
 
-            # Configure git
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-
-            # Commit and push changes (this triggers docs.yml to deploy)
-            git add docs/site/nightly-results/
-            PASSED=$(python3 -c "import json; print(json.load(open('docs/site/nightly-results/latest.json'))['summary']['passed'])")
-            FAILED=$(python3 -c "import json; print(json.load(open('docs/site/nightly-results/latest.json'))['summary']['failed'])")
-            git commit -m "Update nightly test results: ${PASSED} passed, ${FAILED} failed" || echo "No changes to commit"
-            git push origin main || echo "Push failed (may need permissions)"
+            echo "=== Nightly results prepared ==="
+            ls -la docs/site/nightly-results/
           fi
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/site
+          keep_files: true
