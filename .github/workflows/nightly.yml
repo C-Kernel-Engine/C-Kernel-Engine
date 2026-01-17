@@ -161,13 +161,45 @@ jobs:
             DATE=$(date +%Y-%m-%d)
             cp docs/site/nightly-results/latest.json "docs/site/nightly-results/report-${DATE}.json"
 
-            # Create/update index.json
-            echo '{"reports": [' > docs/site/nightly-results/index.json
-            ls -1 docs/site/nightly-results/report-*.json 2>/dev/null | sort -r | head -30 | while read f; do
-              echo "\"$(basename $f)\"," >> docs/site/nightly-results/index.json
-            done
-            echo ']}' >> docs/site/nightly-results/index.json
-            sed -i 's/,\]/]/' docs/site/nightly-results/index.json
+            # Create/update index.json with rich format (date + summary)
+            python3 << 'PYEOF'
+import json
+import os
+from datetime import datetime
+
+reports_dir = "docs/site/nightly-results"
+index_data = {
+    "updated": datetime.utcnow().isoformat() + "Z",
+    "reports": []
+}
+
+# Get all report files, sorted newest first
+report_files = sorted(
+    [f for f in os.listdir(reports_dir) if f.startswith("report-") and f.endswith(".json")],
+    reverse=True
+)[:30]
+
+for filename in report_files:
+    filepath = os.path.join(reports_dir, filename)
+    try:
+        with open(filepath) as f:
+            data = json.load(f)
+        # Extract date from filename: report-YYYY-MM-DD.json
+        date = filename.replace("report-", "").replace(".json", "")
+        index_data["reports"].append({
+            "date": date,
+            "file": filename,
+            "summary": data.get("summary", {}),
+            "duration_sec": data.get("duration_sec", 0)
+        })
+    except Exception as e:
+        print(f"Warning: Could not read {filename}: {e}")
+
+with open(os.path.join(reports_dir, "index.json"), "w") as f:
+    json.dump(index_data, f, indent=2)
+
+print(f"Created index.json with {len(index_data['reports'])} reports")
+PYEOF
 
             echo "=== Nightly results prepared ==="
             ls -la docs/site/nightly-results/
