@@ -2,6 +2,15 @@
  * @file topk_kernels.c
  * @brief Top-K selection kernels for MoE router dispatch
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Provides efficient top-K selection from a score vector.
  * Used in Mixture-of-Experts models to select which experts process each token.
  *

@@ -1,5 +1,15 @@
 /**
- * Optimized BF16 MLP Kernels
+ * @file mlp_kernels_bf16.c
+ * @brief Optimized BF16 MLP Kernels
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
  *
  * Uses direct BF16 GEMM instead of converting to FP32.
  * Layout: input[T,D] -> fc1[T,4D] -> GELU -> fc2[T,D]

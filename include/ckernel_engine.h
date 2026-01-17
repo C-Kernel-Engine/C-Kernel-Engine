@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "cpu_features.h"
 #include "ckernel_quant.h"  /* INT8 block types (block_q8_0, block_q8_K, etc.) */
+#include "mega_fused_attention.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -257,6 +258,26 @@ void gemm_nn_blocked(const float *A,
                      float *C,
                      int M, int N, int K);
 
+// Head-major output projection (reads attention output directly, no flatten)
+// Reads attn_out [num_heads, tokens, head_dim] with strided access
+void ck_gemm_nt_head_major_q5_0(const float *attn_out,
+                                  const void *wo,
+                                  const float *bias,
+                                  float *output,
+                                  int tokens,
+                                  int embed_dim,
+                                  int num_heads,
+                                  int head_dim);
+
+void ck_gemm_nt_head_major_q8_0(const float *attn_out,
+                                  const void *wo,
+                                  const float *bias,
+                                  float *output,
+                                  int tokens,
+                                  int embed_dim,
+                                  int num_heads,
+                                  int head_dim);
+
 // GEMM_TN: C[M,N] = A[K,M].T @ B[K,N] + bias[N]
 // A is stored row-major as [K,M], B is stored row-major as [K,N]
 // Used for backward d_W = d_output.T @ input
@@ -356,6 +377,179 @@ void fused_mlp_swiglu_decode_tiled(
     float *output,
     int D,
     int Hff);
+
+/* ============================================================================
+ * PREFILL FUSION KERNELS
+ * ============================================================================
+ * These kernels fuse operations for prefill (large batch/sequence) to avoid
+ * writing intermediate activations to DRAM. Fusion helps when activations
+ * exceed L3 cache size.
+ *
+ * For decode (single token), use the non-fused kernels as activations
+ * easily fit in L2 cache anyway.
+ */
+
+/**
+ * @brief Fused RMSNorm + QKV projection for prefill
+ *
+ * Tiles along token dimension to keep intermediate x_norm in L2 cache.
+ * Avoids ~7MB DRAM traffic per layer for seq_len=1024, hidden=896.
+ *
+ * @param scratch Temporary buffer from fused_rmsnorm_qkv_scratch_size()
+ */
+void fused_rmsnorm_qkv_prefill(
+    const float *x,        /* [seq_len × hidden] input */
+    const float *gamma,    /* [hidden] RMSNorm weights */
+    const float *Wq,       /* [q_dim × hidden] Q weights (transposed) */
+    const float *Wk,       /* [kv_dim × hidden] K weights (transposed) */
+    const float *Wv,       /* [kv_dim × hidden] V weights (transposed) */
+    float *Q,              /* [seq_len × q_dim] output */
+    float *K,              /* [seq_len × kv_dim] output */
+    float *V,              /* [seq_len × kv_dim] output */
+    int seq_len,
+    int hidden,
+    int q_dim,
+    int kv_dim,
+    float eps,
+    float *scratch);
+
+/**
+ * @brief Fused RMSNorm + QKV projection for prefill (head-major outputs)
+ *
+ * Writes Q as [num_heads, seq_len, aligned_head_dim] and K/V with stride
+ * kv_stride_tokens for KV-cache compatibility.
+ */
+void fused_rmsnorm_qkv_prefill_head_major(
+    const float *x,
+    const float *gamma,
+    const float *Wq, const float *Bq,
+    const float *Wk, const float *Bk,
+    const float *Wv, const float *Bv,
+    float *Q,
+    float *K,
+    float *V,
+    int seq_len,
+    int embed_dim,
+    int aligned_embed_dim,
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    float eps,
+    float *scratch);
+
+/**
+ * @brief Fused RMSNorm + QKV projection for prefill (head-major, Q8 activations)
+ *
+ * Supports Q5_0 or Q8_0 weights with Q8_0 activations.
+ */
+void fused_rmsnorm_qkv_prefill_head_major_quant(
+    const float *x,
+    const float *gamma,
+    const void *Wq, const float *Bq, CKDataType wq_dt,
+    const void *Wk, const float *Bk, CKDataType wk_dt,
+    const void *Wv, const float *Bv, CKDataType wv_dt,
+    float *Q,
+    float *K,
+    float *V,
+    int seq_len,
+    int embed_dim,
+    int aligned_embed_dim,
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    float eps,
+    void *scratch);
+
+/** @brief Unfused version for benchmarking comparison */
+void unfused_rmsnorm_qkv_prefill(
+    const float *x,
+    const float *gamma,
+    const float *Wq,
+    const float *Wk,
+    const float *Wv,
+    float *x_norm,         /* [seq_len × hidden] intermediate buffer */
+    float *Q,
+    float *K,
+    float *V,
+    int seq_len,
+    int hidden,
+    int q_dim,
+    int kv_dim,
+    float eps);
+
+/** @brief Get scratch buffer size for fused_rmsnorm_qkv_prefill */
+size_t fused_rmsnorm_qkv_scratch_size(int hidden);
+
+/** @brief Get scratch buffer size for fused_rmsnorm_qkv_prefill_head_major_quant */
+size_t fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size(int aligned_embed_dim);
+
+/**
+ * @brief Fused MLP (Gate + Up + SwiGLU + Down) for prefill
+ *
+ * Tiles along token dimension to keep gate/up/hidden in L3 cache.
+ *
+ * @param scratch Temporary buffer from fused_mlp_swiglu_scratch_size()
+ */
+void fused_mlp_swiglu_prefill(
+    const float *x,        /* [seq_len × hidden] input */
+    const float *W_gate,   /* [intermediate × hidden] (transposed) */
+    const float *W_up,     /* [intermediate × hidden] (transposed) */
+    const float *W_down,   /* [hidden × intermediate] (transposed) */
+    float *output,         /* [seq_len × hidden] output */
+    int seq_len,
+    int hidden,
+    int intermediate,
+    float *scratch);
+
+/**
+ * @brief Fused MLP (Gate + Up + SwiGLU + Down) for prefill with biases
+ */
+void fused_mlp_swiglu_prefill_bias(
+    const float *x,
+    const float *W_gate,
+    const float *W_up,
+    const float *W_down,
+    const float *B_gate,
+    const float *B_up,
+    const float *B_down,
+    float *output,
+    int seq_len,
+    int hidden,
+    int intermediate,
+    float *scratch);
+
+/** @brief Get scratch buffer size for fused_mlp_swiglu_prefill */
+size_t fused_mlp_swiglu_scratch_size(int intermediate);
+
+/**
+ * @brief Quantized fused MLP for prefill (W1=gate+up, W2=down)
+ *
+ * W1 uses Q8_0 activations (Q5_0/Q8_0 weights), W2 uses Q8_K activations
+ * (Q4_K/Q6_K weights).
+ */
+void fused_mlp_swiglu_prefill_w1w2_quant(
+    const float *x,
+    const void *W1,
+    const float *B1,
+    CKDataType w1_dt,
+    const void *W2,
+    const float *B2,
+    CKDataType w2_dt,
+    float *output,
+    int seq_len,
+    int embed_dim,
+    int aligned_embed_dim,
+    int intermediate_dim,
+    int aligned_intermediate_dim,
+    void *scratch);
+
+/** @brief Get scratch buffer size for fused_mlp_swiglu_prefill_w1w2_quant */
+size_t fused_mlp_swiglu_prefill_w1w2_quant_scratch_size(int aligned_embed_dim,
+                                                        int aligned_intermediate_dim);
 
 // High-performance GEMM microkernel with 8x8 register blocking
 // Inspired by oneDNN/BLIS - keeps all 64 accumulator values in registers

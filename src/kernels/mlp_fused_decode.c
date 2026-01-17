@@ -1,5 +1,17 @@
 /**
- * Fully Fused MLP Decode Kernel (T=1 token generation)
+ * @file mlp_fused_decode.c
+ * @brief Fully fused MLP decode kernel (T=1 token generation)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * LEGACY: This file is from v6/v6.5 and kept for backward compatibility.
  *
  * This kernel fuses the ENTIRE MLP block into a single pass:
  *   output = Down(SwiGLU(Gate(x), Up(x))) + residual

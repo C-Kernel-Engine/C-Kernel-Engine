@@ -1,3 +1,19 @@
+/**
+ * @file attention_decode_fused.c
+ * @brief Fused attention decode kernel (legacy v6/v6.5)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * LEGACY: This file is from v6/v6.5 and kept for backward compatibility.
+ */
+
 #include "ckernel_orchestration.h"
 
 #include "ckernel_engine.h"

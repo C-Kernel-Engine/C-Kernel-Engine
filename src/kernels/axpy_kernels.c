@@ -2,6 +2,15 @@
  * @file axpy_kernels.c
  * @brief AXPY kernels for FP32: y = y + alpha * x
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Classic BLAS Level-1 operation used in MoE expert output accumulation.
  * When gathering expert outputs: output += weight[i] * expert_output[i]
  *
@@ -34,11 +43,13 @@
 
 /**
  * @brief In-place AXPY: y += alpha * x
+ * @test test_axpy.py::TestAXPY::test_axpy_f32
+ * @test test_axpy.py::TestAXPY::test_axpy_vs_naive
  *
- * @param y Output/accumulator vector [n], modified in place
- * @param x Input vector [n]
- * @param alpha Scalar multiplier
- * @param n Vector length
+ * In-place scaled vector addition: y += alpha * x
+ * BLAS-like axpy operation.
+ *
+ * After changes: make test
  */
 void axpy_f32(float *y,
               const float *x,

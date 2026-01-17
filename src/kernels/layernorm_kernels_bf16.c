@@ -1,9 +1,25 @@
+/**
+ * @file layernorm_kernels_bf16.c
+ * @brief LayerNorm kernels for BF16 tensors
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * LayerNorm: y = gamma * (x - mean) / sqrt(var + eps) + beta
+ */
+
 #include <stdint.h>
 
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
 
-// Suppress false positive warnings about uninitialized variables
+/* Suppress false positive warnings about uninitialized variables */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 

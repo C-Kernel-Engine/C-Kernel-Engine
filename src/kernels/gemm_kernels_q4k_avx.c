@@ -2,6 +2,15 @@
  * @file gemm_kernels_q4k_avx.c
  * @brief AVX Q4_K x Q8_K matvec kernel for Sandy/Ivy Bridge
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Uses _mm_maddubs_epi16 (SSSE3) for efficient u8*s8 multiply-add while
  * maintaining our scale format from unpack_q4_k_scales.
  *

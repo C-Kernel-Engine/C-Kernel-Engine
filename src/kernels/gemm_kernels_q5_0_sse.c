@@ -1,11 +1,24 @@
+/**
+ * @file gemm_kernels_q5_0_sse.c
+ * @brief SSE4.1 GEMM for Q5_0 quantized weights
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Compatible with Sandy Bridge/Ivy Bridge and later.
+ */
+
 #include <immintrin.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "ckernel_quant.h"
-
-// SSE4.1 implementation of GEMM_NT Q5_0 (Weights Q5_0, Activations FP32)
-// Compatible with AVX/SSE4.1 CPUs
 
 void gemm_nt_q5_0_sse(const float *A,
                       const void *B,

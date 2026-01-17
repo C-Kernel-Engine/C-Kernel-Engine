@@ -1,3 +1,19 @@
+/**
+ * @file sigmoid_kernels.c
+ * @brief Sigmoid activation kernels with SIMD (AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Sigmoid: y = 1 / (1 + exp(-x))
+ */
+
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -6,8 +22,7 @@
 #include <immintrin.h>
 #endif
 
-
-// Core sigmoid scalar kernel.
+/* Core sigmoid scalar kernel */
 float sigmoid_scalar(float x)
 {
     return 1.0f / (1.0f + expf(-x));

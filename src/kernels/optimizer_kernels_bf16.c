@@ -2,6 +2,15 @@
  * @file optimizer_kernels_bf16.c
  * @brief BF16 optimizer kernels for training
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Note: Optimizer state (m, v) is always kept in fp32 for numerical stability.
  * Only weights and gradients are in bf16.
  */

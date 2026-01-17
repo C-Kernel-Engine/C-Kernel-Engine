@@ -1,3 +1,19 @@
+/**
+ * @file swiglu_kernels_bf16.c
+ * @brief SwiGLU activation kernels for BF16 tensors
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * SwiGLU: y = silu(gate) * up = (gate * sigmoid(gate)) * up
+ */
+
 #include <stdint.h>
 #include <math.h>
 
@@ -7,7 +23,7 @@
 #if defined(__AVX512F__)
 #include <immintrin.h>
 
-// Fast exp approximation for AVX-512
+/* Fast exp approximation for AVX-512 */
 static inline __m512 exp512_fast_bf16(__m512 x) {
     // Clamp to avoid overflow/underflow
     x = _mm512_max_ps(x, _mm512_set1_ps(-88.0f));

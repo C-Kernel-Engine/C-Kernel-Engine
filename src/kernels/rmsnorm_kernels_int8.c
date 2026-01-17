@@ -1,10 +1,24 @@
+/**
+ * @file rmsnorm_kernels_int8.c
+ * @brief RMSNorm kernels with INT8 output quantization
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
+
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "ckernel_engine.h"
 
-// Suppress false positive warnings about uninitialized variables
+/* Suppress false positive warnings about uninitialized variables */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 

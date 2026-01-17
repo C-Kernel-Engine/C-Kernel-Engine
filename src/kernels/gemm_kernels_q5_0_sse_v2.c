@@ -1,3 +1,17 @@
+/**
+ * @file gemm_kernels_q5_0_sse_v2.c
+ * @brief SSE-optimized GEMM kernels for Q5_0 x Q8_K quantization
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
+
 #include <immintrin.h>
 #include <stdint.h>
 #include <string.h>

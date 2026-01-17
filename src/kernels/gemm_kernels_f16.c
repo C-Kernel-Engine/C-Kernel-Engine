@@ -2,6 +2,15 @@
  * @file gemm_kernels_f16.c
  * @brief GEMM kernels with FP16 (half-precision) weights
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Implements matrix multiplication where:
  *   - Weights: FP16 (IEEE half-precision, used by vision encoders)
  *   - Activations: FP32

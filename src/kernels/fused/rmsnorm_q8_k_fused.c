@@ -1,3 +1,20 @@
+/**
+ * @file rmsnorm_q8_k_fused.c
+ * @brief Fused RMSNorm + Q8_K Quantization kernel
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * FUSION BENEFIT: Eliminates intermediate FP32 buffer between RMSNorm and
+ * quantization, keeping normalized values in registers/L1.
+ */
+
 #pragma GCC target("avx,sse4.1")
 #include <immintrin.h>
 #include <math.h>

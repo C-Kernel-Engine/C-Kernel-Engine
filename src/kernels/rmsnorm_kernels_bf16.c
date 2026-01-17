@@ -1,10 +1,26 @@
+/**
+ * @file rmsnorm_kernels_bf16.c
+ * @brief RMSNorm kernels for BF16 tensors
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * RMSNorm: y[i] = gamma[i] * x[i] / sqrt(mean(x^2) + eps)
+ */
+
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
 
 #include <math.h>
 #include <stdint.h>
 
-// RMSNorm forward for BF16 inputs/outputs; gamma stays in float for precision.
+/* RMSNorm forward for BF16 inputs/outputs; gamma stays in float for precision */
 void rmsnorm_forward_bf16(const uint16_t *input,
                           const float *gamma,
                           uint16_t *output,

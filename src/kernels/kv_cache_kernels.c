@@ -1,12 +1,24 @@
-// KV-cache helper kernels (head-major layout).
-//
-// These are small, explicit helpers used by the runtime/orchestrator to maintain
-// per-layer KV caches during autoregressive decoding.
-//
-// Layout:
-//   k_cache[ kv_head, token, aligned_head_dim ]
-//   v_cache[ kv_head, token, aligned_head_dim ]
-// with contiguous row-major storage and stride aligned_head_dim.
+/**
+ * @file kv_cache_kernels.c
+ * @brief KV-cache helper kernels (head-major layout)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Small, explicit helpers used by the runtime/orchestrator to maintain
+ * per-layer KV caches during autoregressive decoding.
+ *
+ * Layout:
+ *   k_cache[kv_head, token, aligned_head_dim]
+ *   v_cache[kv_head, token, aligned_head_dim]
+ * with contiguous row-major storage and stride aligned_head_dim.
+ */
 
 #include "ckernel_engine.h"
 

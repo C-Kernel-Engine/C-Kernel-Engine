@@ -1,10 +1,26 @@
+/**
+ * @file softmax_kernels.c
+ * @brief Softmax forward/backward kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Softmax: y[i] = exp(x[i] - max(x)) / sum(exp(x - max(x)))
+ */
+
 #include <math.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
 
-// Fast vectorized exp approximation (good for softmax, ~1e-4 relative error)
+/* Fast vectorized exp approximation (good for softmax, ~1e-4 relative error) */
 // Based on Schraudolph's algorithm with improved coefficients
 #if defined(__AVX512F__)
 static inline __m512 exp512_approx(__m512 x) {
@@ -114,6 +130,17 @@ static inline float hsum256_ps_softmax(__m256 v) {
 //   index = h * aligned_context_window * aligned_context_window
 //         + i * aligned_context_window
 //         + j
+/**
+ * Causal softmax (in-place, row-wise)
+ * @test test_softmax.py::TestSoftmaxForward::test_causal_softmax
+ * @test test_softmax.py::TestSoftmaxForward::test_causal_vs_softmax
+ * @test test_attention.py::TestAttentionForward::test_softmax_correctness
+ *
+ * Applies causal mask (j > i => 0) and softmax to scores matrix.
+ * In-place on [num_heads, T, T] scores matrix.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void causal_softmax_head_major(float *scores,
                                int num_heads,
                                int num_tokens,
@@ -300,6 +327,15 @@ void causal_softmax_head_major(float *scores,
 // Scalar-only exact causal softmax using standard library expf.
 // This is slower than causal_softmax_head_major but provides maximum accuracy.
 // Used by BF16 attention wrapper where approximation error accumulates.
+/**
+ * Causal softmax (exact version using stdlib expf)
+ * @test test_softmax.py::TestSoftmaxForward::test_causal_softmax_exact
+ * @test test_softmax.py::TestSoftmaxForward::test_exact_vs_fast
+ *
+ * Exact causal softmax using standard library expf for numerical accuracy reference.
+ *
+ * After changes: make test
+ */
 void causal_softmax_head_major_exact(float *scores,
                                       int num_heads,
                                       int num_tokens,

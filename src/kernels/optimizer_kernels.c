@@ -2,6 +2,15 @@
  * @file optimizer_kernels.c
  * @brief Optimizer kernels for training (AdamW, SGD)
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * AdamW Algorithm:
  *   m_t = beta1 * m_{t-1} + (1 - beta1) * g_t
  *   v_t = beta2 * v_{t-1} + (1 - beta2) * g_t^2

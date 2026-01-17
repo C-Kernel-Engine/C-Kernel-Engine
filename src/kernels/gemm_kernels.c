@@ -1,3 +1,22 @@
+/**
+ * @file gemm_kernels.c
+ * @brief General matrix multiply (GEMM) kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * LEGACY EXCEPTION: This file contains OpenMP for backward compatibility.
+ * New kernels should NOT use OpenMP internally.
+ *
+ * GEMM: C = alpha * A @ B + beta * C (with optional bias)
+ */
+
 #include "ckernel_engine.h"
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>

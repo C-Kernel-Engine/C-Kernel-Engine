@@ -1,3 +1,19 @@
+/**
+ * @file swiglu_kernels.c
+ * @brief SwiGLU activation kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * SwiGLU: y = silu(gate) * up = (gate * sigmoid(gate)) * up
+ */
+
 #include "ckernel_engine.h"
 #include <math.h>
 #include <stddef.h>
@@ -6,9 +22,9 @@
 #include <immintrin.h>
 #endif
 
-// ============================================================================
-// Fast exp approximation for SIMD
-// ============================================================================
+/* ========================================================================== */
+/* Fast exp approximation for SIMD                                            */
+/* ========================================================================== */
 
 #if defined(__AVX512F__)
 // AVX-512 fast exp approximation
@@ -100,14 +116,18 @@ static inline __m256 sigmoid256_fast(__m256 x) {
 }
 #endif
 
-// SwiGLU forward:
-// Input layout per token:
-//   gate:  input[t][0..D-1]
-//   value: input[t][D..2D-1]
-// Output:
-//   y[t][d] = silu(gate[t][d]) * value[t][d]
-//
-// where silu(x) = x * sigmoid(x).
+/**
+ * SwiGLU forward pass
+ * @test test_swiglu.py::TestSwiGLUForward::test_forward_tokens
+ * @test test_swiglu.py::TestSwiGLUForward::test_forward_single
+ * @test test_mlp.py::TestMLPForward::test_swiglu_mlp
+ * @test test_fused_swiglu_decode.py::TestFusedSwiGLUDecode::test_fused_swiglu_decode
+ * @test test_parity.py::test_swiglu_parity
+ *
+ * SwiGLU: y = silu(gate) * up where silu(x) = x * sigmoid(x)
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void swiglu_forward(const float *input,
                     float *output,
                     int tokens,
@@ -181,14 +201,17 @@ void swiglu_forward(const float *input,
     }
 }
 
-// SwiGLU backward:
-// Given dY, X (gate+value), compute dX in same layout [gate_grad, value_grad].
-//
-// y = b * silu(a), where silu(a) = a * s, s = sigmoid(a)
-// dy/da = b * silu'(a)
-// dy/db = silu(a)
-//
-// silu'(a) = s + a * s * (1 - s)
+/**
+ * SwiGLU backward pass
+ * @test test_swiglu.py::TestSwiGLUBackward::test_backward_tokens
+ * @test test_swiglu.py::TestSwiGLUBackward::test_backward_single
+ * @test test_parity.py::test_swiglu_backward_parity
+ *
+ * Computes dGate and dUp given dY.
+ * dGate = dy * b * silu'(a), dUp = dy * silu(a)
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void swiglu_backward(const float *input,
                      const float *d_output,
                      float *d_input,
@@ -304,7 +327,15 @@ void swiglu_backward(const float *input,
 // Exact versions using standard library expf (slower but accurate)
 // ============================================================================
 
-// SwiGLU forward (exact version using standard library sigmoid_scalar)
+/**
+ * SwiGLU forward pass (exact version using stdlib sigmoid)
+ * @test test_swiglu.py::TestSwiGLUForward::test_exact_vs_fast
+ * @test test_swiglu.py::TestSwiGLUForward::test_exact_single
+ *
+ * Uses standard library expf for numerical accuracy reference.
+ *
+ * After changes: make test
+ */
 void swiglu_forward_exact(const float *input,
                           float *output,
                           int tokens,
@@ -330,7 +361,15 @@ void swiglu_forward_exact(const float *input,
     }
 }
 
-// SwiGLU backward (exact version using standard library sigmoid_scalar)
+/**
+ * SwiGLU backward pass (exact version using stdlib sigmoid)
+ * @test test_swiglu.py::TestSwiGLUBackward::test_exact_vs_fast
+ * @test test_swiglu.py::TestSwiGLUBackward::test_exact_single
+ *
+ * Uses standard library expf for numerical accuracy reference.
+ *
+ * After changes: make test
+ */
 void swiglu_backward_exact(const float *input,
                            const float *d_output,
                            float *d_input,

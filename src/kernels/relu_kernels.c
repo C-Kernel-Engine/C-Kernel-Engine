@@ -1,3 +1,19 @@
+/**
+ * @file relu_kernels.c
+ * @brief ReLU activation kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * ReLU: y = max(0, x)
+ */
+
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -6,7 +22,7 @@
 #include <immintrin.h>
 #endif
 
-// ReLU forward: y = max(0, x)
+/* ReLU forward: y = max(0, x) */
 void relu_forward(const float *input, float *output, size_t n)
 {
     size_t i = 0;

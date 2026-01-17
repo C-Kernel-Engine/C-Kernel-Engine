@@ -2,6 +2,15 @@
  * @file gemm_kernels_q6k.c
  * @brief GEMM/GEMV kernels with Q6_K quantized weights
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Implements matrix multiplication where:
  *   - Activations (input): FP32
  *   - Weights: Q6_K (6-bit k-quant, int8 scales)

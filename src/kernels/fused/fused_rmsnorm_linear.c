@@ -2,6 +2,19 @@
  * @file fused_rmsnorm_linear.c
  * @brief Fused RMSNorm + Linear (GEMV) kernel
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. NO memcpy for layout - use strided access, not copies
+ * 4. API must define: inputs, outputs, workspace, and memory layouts
+ * 5. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * VIOLATION: Has free() calls and memcpy in test/benchmark code at end of file.
+ * TODO: Move test code to unittest/, remove free()/memcpy from kernel file.
+ *
  * FUSION BENEFIT:
  * ===============
  * Unfused:

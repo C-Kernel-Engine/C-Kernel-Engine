@@ -1,3 +1,19 @@
+/**
+ * @file rmsnorm_kernels.c
+ * @brief RMSNorm forward/backward kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * RMSNorm: y[i] = gamma[i] * x[i] / sqrt(mean(x^2) + eps)
+ */
+
 #include <math.h>
 #include <stddef.h>
 
@@ -5,7 +21,7 @@
 #include <immintrin.h>
 #endif
 
-// AVX1 horizontal sum helper (no _mm256_reduce_add_ps in AVX1)
+/* AVX1 horizontal sum helper (no _mm256_reduce_add_ps in AVX1) */
 #if defined(__AVX__) && !defined(__AVX512F__)
 static inline float hsum256_ps_rmsnorm(__m256 v) {
     // Sum upper and lower 128-bit lanes
@@ -19,14 +35,18 @@ static inline float hsum256_ps_rmsnorm(__m256 v) {
 }
 #endif
 
-// RMSNorm forward:
-// For each token t:
-//   r = sqrt( (1/D) * sum_i x_i^2 + eps )
-//   rstd = 1 / r
-//   x_hat_i = x_i * rstd
-//   y_i = gamma_i * x_hat_i
-//
-// We cache rstd per token for use in backward.
+/**
+ * RMSNorm forward pass
+ * @test test_rmsnorm.py::TestRMSNormForward::test_fp32_tokens
+ * @test test_rmsnorm.py::TestRMSNormForward::test_fp32_single
+ * @test test_rmsnorm.py::TestRMSNormForward::test_perf_rolled
+ * @test test_layernorm.py::TestLayerNormForward::test_rmsnorm_compat
+ * @test test_parity.py::test_rmsnorm_parity
+ *
+ * RMSNorm: y[i] = gamma[i] * x[i] / sqrt(mean(x^2) + eps)
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void rmsnorm_forward(const float *input,
                      const float *gamma,
                      float *output,
@@ -149,17 +169,18 @@ void rmsnorm_forward(const float *input,
     }
 }
 
-// RMSNorm backward:
-// Given dY, X, gamma, and cached rstd per token, compute:
-//   dX and dGamma.
-//
-// From derivation:
-//   x_hat_i = x_i * rstd_t
-//   m = (1/D) * sum_j (dY_j * gamma_j * x_hat_j)
-//   dX_i = rstd_t * (dY_i * gamma_i - x_hat_i * m)
-//   dGamma_i = sum_t (dY_i * x_hat_i)
-//
-// We do not include a beta parameter for RMSNorm here.
+/**
+ * RMSNorm backward pass
+ * @test test_rmsnorm.py::TestRMSNormBackward::test_backward_tokens
+ * @test test_rmsnorm.py::TestRMSNormBackward::test_backward_single
+ * @test test_parity.py::test_rmsnorm_backward_parity
+ *
+ * Computes dX and dGamma given dY, X, gamma, and cached rstd.
+ * dX_i = rstd * (dY_i * gamma_i - x_hat_i * m)
+ * dGamma_i = sum_t (dY_i * x_hat_i)
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void rmsnorm_backward(const float *d_output,
                       const float *input,
                       const float *gamma,

@@ -2,6 +2,15 @@
  * @file add_kernels_bf16.c
  * @brief Element-wise addition kernels for BF16 tensors
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Used for residual connections in transformer models:
  *   residual = x + sublayer_output
  *
@@ -248,6 +257,16 @@ void add_forward_2d_bf16(const uint16_t *a,
  * FP32 versions (for reference/testing)
  * ============================================================================= */
 
+/**
+ * Element-wise add: y = a + b
+ * @test test_add.py::TestAddForward::test_add_forward_f32
+ * @test test_add.py::TestAddForward::test_add_inplace_f32
+ * @test test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add
+ *
+ * Element-wise addition of two vectors.
+ *
+ * After changes: make test
+ */
 void add_forward_f32(const float *a,
                      const float *b,
                      float *y,

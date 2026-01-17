@@ -1,3 +1,20 @@
+/**
+ * @file attention_kernels.c
+ * @brief Attention score/softmax/output kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Attention: softmax(Q @ K^T / sqrt(d)) @ V
+ * Supports GQA (grouped-query attention) with head broadcasting.
+ */
+
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
 #include <math.h>
@@ -38,20 +55,18 @@ static inline size_t score_index(int h,
          + (size_t)j;
 }
 
-// Naive, reference-quality scaled dot-product attention with causal mask.
-//
-// Q, K, V are head-major:
-//   q[h, t, d] at q[h * T * aligned_head_dim + t * aligned_head_dim + d]
-//   same for k and v.
-//
-// scores buffer must be at least:
-//   num_heads * aligned_context_window * aligned_context_window floats.
-//
-// output has same layout as Q/V:
-//   out[h, t, d] at out[h * T * aligned_head_dim + t * aligned_head_dim + d]
-//
-// Only the first head_dim elements of each vector participate in the math;
-// aligned_head_dim allows callers to pad to cache-friendly widths.
+/**
+ * Causal attention forward (score-matrix version)
+ * @test test_attention.py::TestAttentionForward::test_causal_forward
+ * @test test_attention.py::TestAttentionForward::test_gqa_broadcast
+ * @test test_attention.py::TestAttentionForward::test_exact_vs_fast
+ * @test test_parity.py::test_attention_parity
+ *
+ * Computes softmax(Q @ K^T / sqrt(d)) @ V with causal masking.
+ * Uses O(N^2) memory for scores matrix.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_forward_causal_head_major(const float *q,
                                          const float *k,
                                          const float *v,
@@ -118,8 +133,16 @@ void attention_forward_causal_head_major(const float *q,
     }
 }
 
-// Exact version using standard library expf for softmax.
-// Slower but provides maximum accuracy - used for accuracy testing.
+/**
+ * Causal attention forward (exact version using stdlib expf)
+ * @test test_attention.py::TestAttentionForward::test_exact_single
+ * @test test_attention.py::TestAttentionForward::test_exact_vs_fast
+ *
+ * Uses standard library expf for numerical accuracy reference.
+ * Slower but provides maximum accuracy.
+ *
+ * After changes: make test
+ */
 void attention_forward_causal_head_major_exact(const float *q,
                                                 const float *k,
                                                 const float *v,
@@ -186,8 +209,18 @@ void attention_forward_causal_head_major_exact(const float *q,
     }
 }
 
-// GQA-aware scaled dot-product attention with causal mask.
-// Q has num_heads; K/V have num_kv_heads. Each query head maps to a KV head.
+/**
+ * GQA causal attention forward (score-matrix version)
+ * @test test_attention.py::TestAttentionForward::test_gqa_forward
+ * @test test_attention.py::TestAttentionForward::test_gqa_broadcast
+ * @test test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_backward
+ * @test test_parity.py::test_attention_gqa_parity
+ *
+ * Grouped-query attention: Q has num_heads, K/V have num_kv_heads.
+ * Each query head maps to a KV head via ratio.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_forward_causal_head_major_gqa(const float *q,
                                              const float *k,
                                              const float *v,
@@ -248,9 +281,16 @@ void attention_forward_causal_head_major_gqa(const float *q,
     }
 }
 
-// GQA attention forward using exact softmax (standard library expf).
-// Slower but provides maximum accuracy. Used by BF16 wrapper to avoid
-// approximation error accumulating with BF16 precision loss.
+/**
+ * GQA causal attention forward (exact version using stdlib expf)
+ * @test test_attention.py::TestAttentionForward::test_gqa_exact
+ * @test bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_gqa
+ *
+ * Uses standard library expf for numerical accuracy reference.
+ * Used by BF16 wrapper to avoid approximation error accumulation.
+ *
+ * After changes: make test
+ */
 void attention_forward_causal_head_major_gqa_exact(const float *q,
                                                     const float *k,
                                                     const float *v,
@@ -312,14 +352,16 @@ void attention_forward_causal_head_major_gqa_exact(const float *q,
     }
 }
 
-/*
- * BF16 attention forward with caller-provided scratch buffers.
+/**
+ * BF16 GQA causal attention forward
+ * @test bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_forward
+ * @test bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_gqa
+ * @test bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_flash
  *
- * scratch_q: [num_heads * num_tokens * aligned_head_dim] floats
- * scratch_k: [num_kv_heads * num_tokens * aligned_head_dim] floats
- * scratch_v: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ * Accepts BF16 inputs, converts to FP32, uses exact softmax.
+ * Caller provides scratch buffers (no per-call malloc).
  *
- * Caller allocates scratch once and reuses across calls (no per-call malloc).
+ * After changes: make test
  */
 void attention_forward_causal_head_major_gqa_bf16(const uint16_t *q,
                                                   const uint16_t *k,
@@ -743,6 +785,18 @@ static void attention_flash_query_causal(const float *q_vec,
     }
 }
 
+/**
+ * Flash attention forward for GQA (prefill, no score materialization)
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_forward
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_vs_score_matrix
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_gqa
+ * @test test_attention.py::TestAttentionForward::test_flash_forward
+ *
+ * Online softmax with streaming KV. O(N) memory instead of O(N^2).
+ * For prefill: all tokens attend to previous tokens.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_forward_causal_head_major_gqa_flash(const float *q,
                                                    const float *k,
                                                    const float *v,
@@ -792,6 +846,16 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
 #undef FLASH_QUERY_IMPL
 }
 
+/**
+ * Flash attention forward with custom KV stride (for KV cache)
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_strided
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention
+ *
+ * Variant with configurable kv_stride_tokens for KV cache layouts
+ * where K/V may not be contiguous in memory.
+ *
+ * After changes: make test
+ */
 void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
                                                            const float *k,
                                                            const float *v,
@@ -846,7 +910,18 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
 #undef FLASH_QUERY_IMPL
 }
 
-// Compatibility wrapper for legacy decode symbol; uses true flash decode.
+/**
+ * Flash attention decode (single token attends to KV cache)
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_decode
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_flash_decode
+ * @test test_fused_attention_decode.py::TestFusedAttentionDecode::test_flash_decode
+ * @test test_attention.py::TestAttentionForward::test_flash_decode
+ *
+ * Single query token attends to kv_tokens in KV cache.
+ * Uses true flash attention from attention_flash_true.c.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_forward_decode_head_major_gqa_flash(const float *q_token,
                                                    const float *k_cache,
                                                    const float *v_cache,
@@ -897,6 +972,12 @@ void attention_forward_decode_head_major_gqa_flash(const float *q_token,
  * It's kept for reference and as a fallback.
  *
  * TRUE flash attention is implemented in attention_flash_true.c
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_regular_decode
+ * @test test_attention.py::TestAttentionForward::test_regular_decode
+ *
+ * Regular attention decode (score-matrix version) for fallback.
+ *
+ * After changes: make test
  */
 void attention_forward_decode_head_major_gqa_regular(const float *q_token,
                                                    const float *k_cache,
@@ -984,13 +1065,14 @@ void attention_forward_decode_head_major_gqa_regular(const float *q_token,
 // For GQA: multiple query heads share the same KV head, so we accumulate
 // gradients from all query heads that map to each KV head.
 //
-/*
- * BF16 attention backward with caller-provided scratch buffers.
+/**
+ * BF16 attention backward with caller-provided scratch buffers
+ * @test bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_backward
  *
- * scratch_d_output: [num_heads * num_tokens * aligned_head_dim] floats
- * scratch_q: [num_heads * num_tokens * aligned_head_dim] floats
- * scratch_k: [num_kv_heads * num_tokens * aligned_head_dim] floats
- * scratch_v: [num_kv_heads * num_tokens * aligned_head_dim] floats
+ * Accepts BF16 inputs, converts to FP32, runs FP32 backward.
+ * Caller provides scratch buffers (no per-call malloc).
+ *
+ * After changes: make test
  */
 void attention_backward_causal_head_major_gqa_bf16(
     const uint16_t *d_output,      // [num_heads, T, aligned_head_dim]
@@ -1034,6 +1116,17 @@ void attention_backward_causal_head_major_gqa_bf16(
     /* No free - caller owns scratch buffers */
 }
 
+/**
+ * GQA causal attention backward (score-matrix version)
+ * @test test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_backward
+ * @test test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_vs_separate
+ * @test test_parity.py::test_attention_backward_parity
+ *
+ * Computes dQ, dK, dV given dOutput and attention weights.
+ * Supports grouped-query attention with head broadcasting.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_backward_causal_head_major_gqa(
     const float *d_output,      // [num_heads, T, aligned_head_dim]
     const float *q,             // [num_heads, T, aligned_head_dim]
@@ -1162,7 +1255,17 @@ void attention_backward_causal_head_major_gqa(
     }
 }
 
-// Non-GQA version (num_heads == num_kv_heads)
+/**
+ * Causal attention backward (non-GQA version)
+ * @test test_attention_backward.py::TestAttentionBackward::test_backward
+ * @test test_attention_backward.py::TestAttentionBackward::test_backward_vs_separate
+ * @test test_parity.py::test_attention_backward_parity
+ *
+ * Non-GQA version where num_heads == num_kv_heads.
+ * Simpler than GQA, no head broadcasting needed.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void attention_backward_causal_head_major(
     const float *d_output,
     const float *q,

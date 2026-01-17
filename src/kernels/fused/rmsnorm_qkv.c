@@ -1,5 +1,15 @@
-/*
- * rmsnorm_qkv.c - Fused RMSNorm + QKV Projection
+/**
+ * @file rmsnorm_qkv.c
+ * @brief Fused RMSNorm + QKV Projection
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
  *
  * Part of C-Kernel-Engine v6.6 Fusion Kernels
  *

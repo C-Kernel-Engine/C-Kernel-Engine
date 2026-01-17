@@ -1,5 +1,18 @@
-/*
- * attention_mlp_fused.c - Mega-Fused Attention + MLP Block
+/**
+ * @file attention_mlp_fused.c
+ * @brief Mega-Fused Attention + MLP Block
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. NO memcpy for layout - use strided access, not copies
+ * 4. API must define: inputs, outputs, workspace, and memory layouts
+ * 5. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * VIOLATION: Uses memcpy for layout conversion. TODO: Use strided access.
  *
  * Part of C-Kernel-Engine v6.6 Fusion Kernels
  *

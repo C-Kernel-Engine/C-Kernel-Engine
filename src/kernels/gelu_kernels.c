@@ -1,3 +1,20 @@
+/**
+ * @file gelu_kernels.c
+ * @brief GELU activation kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * GELU: y = x * 0.5 * (1 + erf(x / sqrt(2)))
+ * Fast approx: y = x * sigmoid(1.702 * x)
+ */
+
 #include <math.h>
 #include <stddef.h>
 
@@ -5,7 +22,7 @@
 #include <immintrin.h>
 #endif
 
-// Fast vectorized exp approximation (same as softmax_kernels.c)
+/* Fast vectorized exp approximation (same as softmax_kernels.c) */
 #if defined(__AVX512F__)
 static inline __m512 exp512_fast(__m512 x) {
     // Clamp to avoid overflow/underflow
@@ -97,9 +114,17 @@ static inline __m256 tanh256_fast(__m256 x) {
 }
 #endif
 
-// Fast GELU approximation, copied from C-Transformer's gelu_activation_token_parallel.
-// Applies in-place to a contiguous buffer of length n.
-// GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+/**
+ * GELU activation forward (fast approximation, in-place)
+ * @test test_gelu.py::TestGELUForward::test_gelu_fast_inplace
+ * @test test_gelu.py::TestGELUForward::test_gelu_vs_exact
+ * @test test_parity.py::test_gelu_parity
+ *
+ * Fast GELU approximation: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+ * In-place on contiguous buffer.
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void gelu_fast_inplace(float *data, size_t n)
 {
     const float sqrt_2_over_pi = 0.7978845608f;

@@ -1,5 +1,15 @@
 /**
- * RoPE (Rotary Position Embedding) Kernels
+ * @file rope_kernels.c
+ * @brief RoPE (Rotary Position Embedding) kernels with SIMD
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
  *
  * Applies rotary position embeddings to query and key vectors.
  * Used by Llama, SmolLM, and most modern transformer architectures.
@@ -8,10 +18,10 @@
  *   Split head_dim into two halves (0..half-1, half..head_dim-1).
  *   For each position m and index i in [0, half):
  *     x0 = x[i], x1 = x[i + half]
- *     x'[i]       = x0 * cos(m * θ_i) - x1 * sin(m * θ_i)
- *     x'[i+half]  = x0 * sin(m * θ_i) + x1 * cos(m * θ_i)
+ *     x'[i]       = x0 * cos(m * theta_i) - x1 * sin(m * theta_i)
+ *     x'[i+half]  = x0 * sin(m * theta_i) + x1 * cos(m * theta_i)
  *
- *   Where θ_i = 1 / (base^(2i/d)), typically base=10000.
+ *   Where theta_i = 1 / (base^(2i/d)), typically base=10000.
  *
  * Layout:
  *   x: [num_heads, num_tokens, head_dim] head-major
@@ -29,8 +39,16 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Precompute cos/sin cache for given sequence length and head dimension.
-// cos_cache, sin_cache: [max_seq_len, head_dim/2]
+/**
+ * Precompute RoPE cos/sin cache
+ * @test test_rope.py::TestRoPECache::test_cache_computation
+ * @test test_rope.py::TestRoPECache::test_cache_values
+ *
+ * Precomputes cos(m * theta_i) and sin(m * theta_i) for positions 0..max_seq_len-1.
+ * cos_cache, sin_cache: [max_seq_len, head_dim/2]
+ *
+ * After changes: make test
+ */
 void rope_precompute_cache(float *cos_cache,
                            float *sin_cache,
                            int max_seq_len,
@@ -148,10 +166,17 @@ static inline void rope_apply_head(float *x,
     }
 }
 
-// Apply RoPE forward to Q or K tensor (head-major layout).
-// x: [num_heads, num_tokens, head_dim]
-// cos_cache, sin_cache: [max_seq_len, head_dim/2]
-// Modifies x in-place.
+/**
+ * RoPE forward (head-major layout, in-place)
+ * @test test_rope.py::TestRoPEForward::test_rope_forward
+ * @test test_rope.py::TestRoPEForward::test_rope_vs_separate
+ * @test test_parity.py::test_rope_parity
+ *
+ * Applies rotary position embeddings in-place to Q or K tensor.
+ * x: [num_heads, num_tokens, head_dim] head-major
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void rope_forward(float *x,
                   const float *cos_cache,
                   const float *sin_cache,
@@ -170,6 +195,15 @@ void rope_forward(float *x,
     }
 }
 
+/**
+ * RoPE forward with custom head stride (for KV cache layouts)
+ * @test test_rope.py::TestRoPEForward::test_rope_strided
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_rope_decode
+ *
+ * Variant with configurable head_stride_tokens for non-contiguous head layouts.
+ *
+ * After changes: make test
+ */
 void rope_forward_strided(float *x,
                           const float *cos_cache,
                           const float *sin_cache,
@@ -189,14 +223,18 @@ void rope_forward_strided(float *x,
     }
 }
 
-// RoPE backward: inverse rotation (rotate by -θ).
-// Since cos(-θ) = cos(θ) and sin(-θ) = -sin(θ), the inverse is:
-//   d_x[2i]   =  d_x'[2i] * cos(θ) + d_x'[2i+1] * sin(θ)
-//   d_x[2i+1] = -d_x'[2i] * sin(θ) + d_x'[2i+1] * cos(θ)
-//
-// d_x: [num_heads, num_tokens, head_dim] - gradient w.r.t. input (output)
-// d_out: [num_heads, num_tokens, head_dim] - gradient from upstream (input)
-// cos_cache, sin_cache: [max_seq_len, head_dim/2]
+/**
+ * RoPE backward (inverse rotation)
+ * @test test_rope.py::TestRoPEBackward::test_rope_backward
+ * @test test_rope.py::TestRoPEBackward::test_rope_backward_vs_separate
+ *
+ * RoPE backward: inverse rotation (rotate by -θ).
+ * Since cos(-θ) = cos(θ) and sin(-θ) = -sin(θ):
+ *   d_x[2i] = d0 * c + d1 * s
+ *   d_x[2i+1] = -d0 * s + d1 * c
+ *
+ * After changes: make test
+ */
 void rope_backward(const float *d_out,
                    float *d_x,
                    const float *cos_cache,
@@ -295,8 +333,15 @@ void rope_backward(const float *d_out,
     }
 }
 
-// In-place backward: overwrite d_out with inverse-rotated gradients.
-// Useful when d_x == d_out is acceptable.
+/**
+ * RoPE backward in-place (overwrite with inverse rotation)
+ * @test test_rope.py::TestRoPEBackward::test_rope_backward_inplace
+ *
+ * In-place backward: overwrite d_out with inverse-rotated gradients.
+ * Useful when d_x == d_out is acceptable (saves memory).
+ *
+ * After changes: make test
+ */
 void rope_backward_inplace(float *d_x,
                            const float *cos_cache,
                            const float *sin_cache,
@@ -388,9 +433,18 @@ void rope_backward_inplace(float *d_x,
     }
 }
 
-// Combined RoPE forward for both Q and K (common pattern in inference).
-// q: [num_heads, num_tokens, head_dim]
-// k: [num_kv_heads, num_tokens, head_dim]
+/**
+ * RoPE forward for both Q and K (common inference pattern)
+ * @test test_rope.py::TestRoPEForward::test_rope_forward_qk
+ * @test test_fused_attention_decode.py::TestFusedAttentionDecode::test_qk_rope
+ * @test test_parity.py::test_rope_qk_parity
+ *
+ * Combined RoPE forward for both Q and K in one call.
+ * q: [num_heads, num_tokens, head_dim]
+ * k: [num_kv_heads, num_tokens, head_dim]
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
 void rope_forward_qk(float *q,
                      float *k,
                      const float *cos_cache,
@@ -406,6 +460,15 @@ void rope_forward_qk(float *q,
     rope_forward(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
 }
 
+/**
+ * RoPE forward for both Q and K with custom strides (KV cache layouts)
+ * @test test_rope.py::TestRoPEForward::test_rope_forward_qk_strided
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_qk_rope_strided
+ *
+ * Combined QK RoPE with configurable strides for KV cache layouts.
+ *
+ * After changes: make test
+ */
 void rope_forward_qk_strided(float *q,
                              float *k,
                              const float *cos_cache,
@@ -423,7 +486,14 @@ void rope_forward_qk_strided(float *q,
     rope_forward_strided(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, k_stride_tokens);
 }
 
-// Combined RoPE backward for both d_q and d_k.
+/**
+ * RoPE backward for both dQ and dK
+ * @test test_rope.py::TestRoPEBackward::test_rope_backward_qk
+ *
+ * Combined RoPE backward for both dQ and dK gradients.
+ *
+ * After changes: make test
+ */
 void rope_backward_qk(const float *d_q_out,
                       const float *d_k_out,
                       float *d_q,

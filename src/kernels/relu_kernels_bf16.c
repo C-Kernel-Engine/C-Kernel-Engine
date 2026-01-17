@@ -1,3 +1,19 @@
+/**
+ * @file relu_kernels_bf16.c
+ * @brief ReLU activation kernels for BF16 tensors
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * ReLU: y = max(0, x)
+ */
+
 #include <stddef.h>
 #include <stdint.h>
 

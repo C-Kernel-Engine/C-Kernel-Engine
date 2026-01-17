@@ -2,6 +2,15 @@
  * @file gemm_kernels_amx.c
  * @brief AMX (Advanced Matrix Extensions) GEMM kernels
  *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
  * Intel AMX provides dedicated matrix multiply hardware:
  *   - 8 tile registers (TMM0-TMM7), each up to 1KB
  *   - TDPBSSD: INT8 signed dot product (A signed, B signed)

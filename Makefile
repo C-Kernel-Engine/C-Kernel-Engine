@@ -212,8 +212,11 @@ SRCS    := src/backend_native.c \
            src/ck_tokenizer.c \
            src/cpu_features.c \
             src/kernels/gemm_kernels.c \
-            src/kernels/gemm_fused_kernels.c \
-            src/kernels/mlp_fused_decode.c \
+           src/kernels/gemm_fused_kernels.c \
+           src/kernels/mlp_fused_decode.c \
+            src/kernels/fused/prefill_fused_gemm.c \
+            src/kernels/fused/mega_fused_attention_avx.c \
+            src/kernels/fused/mega_fused_attention_prefill.c \
             src/kernels/gemm_microkernel.c \
 	           src/kernels/layernorm_kernels.c \
 	           src/kernels/layernorm_kernels_bf16.c \
@@ -263,10 +266,10 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_amx.c \
 	           src/kernels/gemm_kernels_q6k_q8k.c \
 	           src/kernels/gemm_batch_int8.c \
-	           src/kernels/fused_rmsnorm_linear.c \
+	           src/kernels/fused/fused_rmsnorm_linear.c \
 	           src/kernels/gemm_kernels_q8_0.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
-	           src/kernels/rmsnorm_q8_k_fused.c \
+	           src/kernels/fused/rmsnorm_q8_k_fused.c \
 	           src/kernels/gemm_kernels_f16.c \
 	           src/kernels/optimizer_kernels.c \
 	           src/kernels/optimizer_kernels_bf16.c \
@@ -405,6 +408,9 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_optimizer.py \
             unittest/test_gemv_kernels_comprehensive.py \
             unittest/test_fused_rmsnorm_qkv.py \
+            unittest/test_prefill_fused_rmsnorm_qkv_quant.py \
+            unittest/test_prefill_fused_mlp_quant.py \
+            unittest/test_mega_fused_attention_prefill.py \
             unittest/test_fused_attention_mlp.py
 
 PY_TESTS_BF16 := unittest/bf16/test_sigmoid_bf16.py \
@@ -2057,6 +2063,9 @@ TEST_HARNESS_SRCS := src/backend_native.c \
 	src/kernels/gemm_kernels.c \
 	src/kernels/gemm_fused_kernels.c \
 	src/kernels/mlp_fused_decode.c \
+	src/kernels/fused/prefill_fused_gemm.c \
+	src/kernels/fused/mega_fused_attention_avx.c \
+	src/kernels/fused/mega_fused_attention_prefill.c \
 	src/kernels/gemm_microkernel.c \
 	src/kernels/layernorm_kernels.c \
 	src/kernels/mlp_kernels.c \

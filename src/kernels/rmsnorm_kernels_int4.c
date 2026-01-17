@@ -1,3 +1,17 @@
+/**
+ * @file rmsnorm_kernels_int4.c
+ * @brief RMSNorm kernels with INT4 output quantization
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ */
+
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>

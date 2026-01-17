@@ -1,3 +1,22 @@
+/**
+ * @file mlp_kernels.c
+ * @brief MLP (feed-forward) kernels with SIMD (SSE/AVX/AVX512)
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * LEGACY EXCEPTION: This file contains OpenMP for backward compatibility.
+ * New kernels should NOT use OpenMP internally.
+ *
+ * MLP: out = FC2(GELU(FC1(x)))
+ */
+
 #include "ckernel_engine.h"
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
 #include <immintrin.h>
@@ -5,7 +24,7 @@
 #include <omp.h>
 #include <stdlib.h>
 
-// Forward MLP kernel (FC1 -> GELU -> FC2) adapted from C-Transformer's
+/* Forward MLP kernel (FC1 -> GELU -> FC2) adapted from C-Transformer's */
 // mlp_token_parallel but expressed in a model-agnostic form. We keep the
 // familiar name `mlp_token_parallel` for reuse during decode/inference.
 //

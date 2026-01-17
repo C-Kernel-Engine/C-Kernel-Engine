@@ -1,11 +1,26 @@
+/**
+ * @file gemm_kernels_q4k_sse.c
+ * @brief SSE4.1 Q4_K x Q8_K dot product kernels
+ *
+ * CK-ENGINE KERNEL RULES:
+ * =======================
+ * 1. NO malloc/free - memory via bump allocator, pointers passed in
+ * 2. NO OpenMP - parallelization at orchestrator/codegen layer
+ * 3. API must define: inputs, outputs, workspace, and memory layouts
+ * 4. Pure computation - deterministic, no side effects
+ *
+ * After changes: make test && make llamacpp-parity-full
+ *
+ * Compatible with Sandy Bridge/Ivy Bridge and later.
+ */
+
 #include <immintrin.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "ckernel_quant.h"
 
-// SSE4.1 implementation of Q4_K * Q8_K dot product
-// Compatible with standard AVX (Sandy Bridge/Ivy Bridge)
+/* SSE4.1 implementation of Q4_K * Q8_K dot product */
 
 static inline int32_t hsum_epi32_sse(__m128i v) {
     __m128i shuf = _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2));
