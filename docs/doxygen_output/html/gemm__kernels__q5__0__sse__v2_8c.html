@@ -323,44 +323,44 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00613">613</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00618"></a><span class="lineno">  618</span>&#160;{</div>
-<div class="line"><a name="l00619"></a><span class="lineno">  619</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *blocks = (<span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *)B;</div>
-<div class="line"><a name="l00620"></a><span class="lineno">  620</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
-<div class="line"><a name="l00621"></a><span class="lineno">  621</span>&#160; </div>
-<div class="line"><a name="l00622"></a><span class="lineno">  622</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><a name="l00623"></a><span class="lineno">  623</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
-<div class="line"><a name="l00624"></a><span class="lineno">  624</span>&#160; </div>
-<div class="line"><a name="l00625"></a><span class="lineno">  625</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a name="l00626"></a><span class="lineno">  626</span>&#160;            <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><a name="l00627"></a><span class="lineno">  627</span>&#160; </div>
-<div class="line"><a name="l00628"></a><span class="lineno">  628</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; b++) {</div>
-<div class="line"><a name="l00629"></a><span class="lineno">  629</span>&#160;                <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *block = &amp;blocks[n * blocks_per_row + b];</div>
-<div class="line"><a name="l00630"></a><span class="lineno">  630</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(block-&gt;<a class="code" href="structblock__q5__0.html#a4c5238d5b9b5e8406ca30b40302a15ce">d</a>);</div>
-<div class="line"><a name="l00631"></a><span class="lineno">  631</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> *ap = &amp;a_row[b * <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>];</div>
-<div class="line"><a name="l00632"></a><span class="lineno">  632</span>&#160; </div>
-<div class="line"><a name="l00633"></a><span class="lineno">  633</span>&#160;                uint32_t qh;</div>
-<div class="line"><a name="l00634"></a><span class="lineno">  634</span>&#160;                memcpy(&amp;qh, block-&gt;<a class="code" href="structblock__q5__0.html#a823c98aafc2ecd999f30689d289fb963">qh</a>, <span class="keyword">sizeof</span>(qh));</div>
-<div class="line"><a name="l00635"></a><span class="lineno">  635</span>&#160; </div>
-<div class="line"><a name="l00636"></a><span class="lineno">  636</span>&#160;                <span class="comment">/* llama.cpp Q5_0 layout - note j+12 for second weight high bit */</span></div>
-<div class="line"><a name="l00637"></a><span class="lineno">  637</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a> / 2; j++) {</div>
-<div class="line"><a name="l00638"></a><span class="lineno">  638</span>&#160;                    <span class="keyword">const</span> uint8_t packed = block-&gt;<a class="code" href="structblock__q5__0.html#aeb5285bb56ae2ed55bfb99a2bcb53282">qs</a>[j];</div>
-<div class="line"><a name="l00639"></a><span class="lineno">  639</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> lo = (packed &amp; 0x0F);</div>
-<div class="line"><a name="l00640"></a><span class="lineno">  640</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> hi = (packed &gt;&gt; 4);</div>
-<div class="line"><a name="l00641"></a><span class="lineno">  641</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> xh_0 = ((qh &gt;&gt; (j + 0)) &lt;&lt; 4) &amp; 0x10;</div>
-<div class="line"><a name="l00642"></a><span class="lineno">  642</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> xh_1 = ((qh &gt;&gt; (j + 12))) &amp; 0x10;</div>
-<div class="line"><a name="l00643"></a><span class="lineno">  643</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> q0 = (lo | xh_0) - 16;</div>
-<div class="line"><a name="l00644"></a><span class="lineno">  644</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> q1 = (hi | xh_1) - 16;</div>
-<div class="line"><a name="l00645"></a><span class="lineno">  645</span>&#160; </div>
-<div class="line"><a name="l00646"></a><span class="lineno">  646</span>&#160;                    sum += d * (float)q0 * ap[j];</div>
-<div class="line"><a name="l00647"></a><span class="lineno">  647</span>&#160;                    sum += d * (float)q1 * ap[j + 16];</div>
-<div class="line"><a name="l00648"></a><span class="lineno">  648</span>&#160;                }</div>
-<div class="line"><a name="l00649"></a><span class="lineno">  649</span>&#160;            }</div>
-<div class="line"><a name="l00650"></a><span class="lineno">  650</span>&#160; </div>
-<div class="line"><a name="l00651"></a><span class="lineno">  651</span>&#160;            <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] = sum + (bias ? bias[n] : 0.0f);</div>
-<div class="line"><a name="l00652"></a><span class="lineno">  652</span>&#160;        }</div>
-<div class="line"><a name="l00653"></a><span class="lineno">  653</span>&#160;    }</div>
-<div class="line"><a name="l00654"></a><span class="lineno">  654</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00779">779</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00784"></a><span class="lineno">  784</span>&#160;{</div>
+<div class="line"><a name="l00785"></a><span class="lineno">  785</span>&#160;    <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *blocks = (<span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *)B;</div>
+<div class="line"><a name="l00786"></a><span class="lineno">  786</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
+<div class="line"><a name="l00787"></a><span class="lineno">  787</span>&#160; </div>
+<div class="line"><a name="l00788"></a><span class="lineno">  788</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><a name="l00789"></a><span class="lineno">  789</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
+<div class="line"><a name="l00790"></a><span class="lineno">  790</span>&#160; </div>
+<div class="line"><a name="l00791"></a><span class="lineno">  791</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a name="l00792"></a><span class="lineno">  792</span>&#160;            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><a name="l00793"></a><span class="lineno">  793</span>&#160; </div>
+<div class="line"><a name="l00794"></a><span class="lineno">  794</span>&#160;            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; b++) {</div>
+<div class="line"><a name="l00795"></a><span class="lineno">  795</span>&#160;                <span class="keyword">const</span> <a class="code" href="structblock__q5__0.html">block_q5_0</a> *block = &amp;blocks[n * blocks_per_row + b];</div>
+<div class="line"><a name="l00796"></a><span class="lineno">  796</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(block-&gt;<a class="code" href="structblock__q5__0.html#a4c5238d5b9b5e8406ca30b40302a15ce">d</a>);</div>
+<div class="line"><a name="l00797"></a><span class="lineno">  797</span>&#160;                <span class="keyword">const</span> <span class="keywordtype">float</span> *ap = &amp;a_row[b * <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>];</div>
+<div class="line"><a name="l00798"></a><span class="lineno">  798</span>&#160; </div>
+<div class="line"><a name="l00799"></a><span class="lineno">  799</span>&#160;                uint32_t qh;</div>
+<div class="line"><a name="l00800"></a><span class="lineno">  800</span>&#160;                memcpy(&amp;qh, block-&gt;<a class="code" href="structblock__q5__0.html#a823c98aafc2ecd999f30689d289fb963">qh</a>, <span class="keyword">sizeof</span>(qh));</div>
+<div class="line"><a name="l00801"></a><span class="lineno">  801</span>&#160; </div>
+<div class="line"><a name="l00802"></a><span class="lineno">  802</span>&#160;                <span class="comment">/* llama.cpp Q5_0 layout - note j+12 for second weight high bit */</span></div>
+<div class="line"><a name="l00803"></a><span class="lineno">  803</span>&#160;                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a> / 2; j++) {</div>
+<div class="line"><a name="l00804"></a><span class="lineno">  804</span>&#160;                    <span class="keyword">const</span> uint8_t packed = block-&gt;<a class="code" href="structblock__q5__0.html#aeb5285bb56ae2ed55bfb99a2bcb53282">qs</a>[j];</div>
+<div class="line"><a name="l00805"></a><span class="lineno">  805</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> lo = (packed &amp; 0x0F);</div>
+<div class="line"><a name="l00806"></a><span class="lineno">  806</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> hi = (packed &gt;&gt; 4);</div>
+<div class="line"><a name="l00807"></a><span class="lineno">  807</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> xh_0 = ((qh &gt;&gt; (j + 0)) &lt;&lt; 4) &amp; 0x10;</div>
+<div class="line"><a name="l00808"></a><span class="lineno">  808</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> xh_1 = ((qh &gt;&gt; (j + 12))) &amp; 0x10;</div>
+<div class="line"><a name="l00809"></a><span class="lineno">  809</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> q0 = (lo | xh_0) - 16;</div>
+<div class="line"><a name="l00810"></a><span class="lineno">  810</span>&#160;                    <span class="keyword">const</span> <span class="keywordtype">int</span> q1 = (hi | xh_1) - 16;</div>
+<div class="line"><a name="l00811"></a><span class="lineno">  811</span>&#160; </div>
+<div class="line"><a name="l00812"></a><span class="lineno">  812</span>&#160;                    sum += d * (float)q0 * ap[j];</div>
+<div class="line"><a name="l00813"></a><span class="lineno">  813</span>&#160;                    sum += d * (float)q1 * ap[j + 16];</div>
+<div class="line"><a name="l00814"></a><span class="lineno">  814</span>&#160;                }</div>
+<div class="line"><a name="l00815"></a><span class="lineno">  815</span>&#160;            }</div>
+<div class="line"><a name="l00816"></a><span class="lineno">  816</span>&#160; </div>
+<div class="line"><a name="l00817"></a><span class="lineno">  817</span>&#160;            <a class="code" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] = sum + (bias ? bias[n] : 0.0f);</div>
+<div class="line"><a name="l00818"></a><span class="lineno">  818</span>&#160;        }</div>
+<div class="line"><a name="l00819"></a><span class="lineno">  819</span>&#160;    }</div>
+<div class="line"><a name="l00820"></a><span class="lineno">  820</span>&#160;}</div>
 <div class="ttc" id="ackernel__quant_8h_html_a01fd96c19126075d365d10748fb254ac"><div class="ttname"><a href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a></div><div class="ttdeci">#define QK5_0</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00067">ckernel_quant.h:67</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition:</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 <div class="ttc" id="astructblock__q5__0_html"><div class="ttname"><a href="structblock__q5__0.html">block_q5_0</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00069">ckernel_quant.h:69</a></div></div>
@@ -459,11 +459,11 @@ Functions</h2></td></tr>
 <div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;}</div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00120">ckernel_quant.h:120</a></div></div>
 <div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_a64b28ca8a25883986a0d22e39a574a32"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a></div><div class="ttdeci">void quantize_row_q8_k(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00098">gemm_kernels_q4k_q8k.c:98</a></div></div>
-<div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_aa25694bd7b677f5b945be6f5dbdaa9c9"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9">gemm_nt_q5_0_ref</a></div><div class="ttdeci">void gemm_nt_q5_0_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">GEMM with transposed Q5_0 weights: C = A @ B^T.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00613">gemm_kernels_q5_0.c:613</a></div></div>
+<div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_aa25694bd7b677f5b945be6f5dbdaa9c9"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9">gemm_nt_q5_0_ref</a></div><div class="ttdeci">void gemm_nt_q5_0_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">GEMM with transposed Q5_0 weights: C = A @ B^T.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0_8c_source.html#l00779">gemm_kernels_q5_0.c:779</a></div></div>
 <div class="ttc" id="agemm__kernels__q5__0__sse__v2_8c_html_afb621aff9a12017b33347eb42473baf7"><div class="ttname"><a href="gemm__kernels__q5__0__sse__v2_8c.html#afb621aff9a12017b33347eb42473baf7">dot_q5_0_q8_k_32_sse</a></div><div class="ttdeci">static float dot_q5_0_q8_k_32_sse(const block_q5_0 *bw, const block_q8_K *ba, int q8_offset)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00011">gemm_kernels_q5_0_sse_v2.c:11</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00152">ckernel_quant.h:152</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00011">dot_q5_0_q8_k_32_sse()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00613">gemm_nt_q5_0_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00098">quantize_row_q8_k()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__0__sse__v2_8c_source.html#l00011">dot_q5_0_q8_k_32_sse()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00779">gemm_nt_q5_0_ref()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00098">quantize_row_q8_k()</a>.</p>
 
 </div>
 </div>
