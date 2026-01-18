@@ -37,5 +37,6 @@ var ckernel__quant_8h =
     [ "quantize_row_q8_k_sse", "ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f", null ],
     [ "rmsnorm_q8_k_fused", "ckernel__quant_8h.html#a92b59a0fe356901c8aaabfe548a4add6", null ],
     [ "unpack_q4_k_scales", "ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307", null ],
-    [ "vec_dot_q5_0_q8_0", "ckernel__quant_8h.html#a8744a3b1e4d1dc928fce050f111414a6", null ]
+    [ "vec_dot_q5_0_q8_0", "ckernel__quant_8h.html#a8744a3b1e4d1dc928fce050f111414a6", null ],
+    [ "vec_dot_q8_0_q8_0", "ckernel__quant_8h.html#aea5f7a52ed3f21e0c6795766cfb28751", null ]
 ];

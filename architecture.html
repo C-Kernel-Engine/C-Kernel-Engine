@@ -1131,20 +1131,14 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-17 23:44</span>
+        <span class="folder-updated">Updated: 2026-01-18 16:12</span>
     </div>
     <pre class="tree-output">
 .
 |-- assets
 |   `-- cover_image.png
 |-- benchmarks
-|   |-- bench_gemm_vs_onednn.c
-|   |-- bench_gemm_vs_pytorch.py
-|   |-- compare_gemm.py
-|   |-- perf_flash_attn_micro.c
-|   |-- perf_gemm_micro.c
-|   |-- perf_q4k
-|   `-- perf_q4k.c
+|   `-- perf_flash_attn_micro.c
 |-- docs
 |   |-- adr
 |   |   |-- 0001-ir-v4-pipeline.md
@@ -1467,6 +1461,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- add_parallel_decode.sh
 |   |-- analyze_parity.py
 |   |-- bench_mega_fused_attention_prefill.py
+|   |-- bench_mega_fused_outproj_mlp_prefill.py
 |   |-- bench_prefill_fused_mlp.py
 |   |-- bench_prefill_fused_qkv.py
 |   |-- benchmark_avx512.sh
@@ -1533,6 +1528,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- run_all_tests.sh
 |   |-- run_full_validation.sh
 |   |-- run_litmus_demo.sh
+|   |-- run_mega_fusion_test.sh
 |   |-- run_parity_smoketest.sh
 |   |-- run_perf.sh
 |   |-- simple_perf.sh
@@ -1794,6 +1790,14 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |   `-- test_swiglu_bf16.py
 |   |-- fixtures
 |   |   `-- mini_v4.config.json
+|   |-- fusion
+|   |   |-- test_gemm_vs_gemv.c
+|   |   |-- test_mega_fused_attention.py
+|   |   |-- test_mega_fused_attention_prefill.py
+|   |   |-- test_mega_fused_attention_prefill_q8_0.py
+|   |   |-- test_mega_fused_outproj_mlp_prefill.py
+|   |   |-- test_mega_fusion_outproj_mlp_parity.py
+|   |   `-- test_mega_fusion_parity.py
 |   |-- validation
 |   |   |-- __init__.py
 |   |   |-- auto_validate.py
@@ -1847,8 +1851,6 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |   |-- test_layer_weights_parity.py
 |   |-- test_layernorm.py
 |   |-- test_lm_head_litmus.py
-|   |-- test_mega_fused_attention.py
-|   |-- test_mega_fused_attention_prefill.py
 |   |-- test_mlp.py
 |   |-- test_mlp_fusion_benchmark.py
 |   |-- test_multi_layer_parity.py
@@ -1905,7 +1907,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
 |-- tiny.config.json
 `-- valgrind.supp
 
-68 directories, 702 files
+69 directories, 703 files
 </pre>
 </div>
 
@@ -2157,7 +2159,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-17</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-18</p>
             </div>
         </div>
     </footer>

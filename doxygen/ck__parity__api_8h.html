@@ -170,6 +170,9 @@ Functions</h2></td></tr>
 <tr class="memitem:a95cddf8f78737e393631663f79da52c1" id="r_a95cddf8f78737e393631663f79da52c1"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#a95cddf8f78737e393631663f79da52c1">ck_get_qk_k</a> (void)</td></tr>
 <tr class="memdesc:a95cddf8f78737e393631663f79da52c1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get QK_K (elements per super-block)  <br /></td></tr>
 <tr class="separator:a95cddf8f78737e393631663f79da52c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c4d08fced7821fcb646b347b72b865b" id="r_a5c4d08fced7821fcb646b347b72b865b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#a5c4d08fced7821fcb646b347b72b865b">ck_test_attention_causal</a> (const float *q, const float *k, const float *v, float *out, int num_heads, int num_kv_heads, int tokens, int seq_len, int head_dim)</td></tr>
+<tr class="memdesc:a5c4d08fced7821fcb646b347b72b865b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Multi-head causal attention for prefill (head-major layout)  <br /></td></tr>
+<tr class="separator:a5c4d08fced7821fcb646b347b72b865b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a437f320412acb3a395d3d4388a65df8c" id="r_a437f320412acb3a395d3d4388a65df8c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#a437f320412acb3a395d3d4388a65df8c">ck_test_dequant_q4_0</a> (const void *src, float *dst, int n)</td></tr>
 <tr class="memdesc:a437f320412acb3a395d3d4388a65df8c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dequantize Q4_0 data to FP32.  <br /></td></tr>
 <tr class="separator:a437f320412acb3a395d3d4388a65df8c"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -209,6 +212,9 @@ Functions</h2></td></tr>
 <tr class="memitem:a6c5534c711d8306cf8973670bc9d3cfc" id="r_a6c5534c711d8306cf8973670bc9d3cfc"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#a6c5534c711d8306cf8973670bc9d3cfc">ck_test_gemv_q8_0_q8_0</a> (const void *weight_q8_0, const float *input_f32, float *output, int rows, int cols)</td></tr>
 <tr class="memdesc:a6c5534c711d8306cf8973670bc9d3cfc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Q8_0 x Q8_0 quantized GEMV - matches llama.cpp's approach.  <br /></td></tr>
 <tr class="separator:a6c5534c711d8306cf8973670bc9d3cfc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afb09a29d3caada83d9e84efed6209fec" id="r_afb09a29d3caada83d9e84efed6209fec"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#afb09a29d3caada83d9e84efed6209fec">ck_test_outproj_mlp_fused_q5_0</a> (const float *attn_out, const float *residual, const float *ln2_gamma, const void *wo, const void *w1, const void *w2, float *output, int tokens, int num_heads, int head_dim, int embed_dim, int intermediate, float eps, int w2_is_q6k)</td></tr>
+<tr class="memdesc:afb09a29d3caada83d9e84efed6209fec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Test mega-fused OutProj + MLP kernel (Q5_0 weights)  <br /></td></tr>
+<tr class="separator:afb09a29d3caada83d9e84efed6209fec"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0294dd45ee3d2fd2f25f2e586b1b9311" id="r_a0294dd45ee3d2fd2f25f2e586b1b9311"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8h.html#a0294dd45ee3d2fd2f25f2e586b1b9311">ck_test_quantize_q8_k</a> (const float *src, void *dst, int n)</td></tr>
 <tr class="memdesc:a0294dd45ee3d2fd2f25f2e586b1b9311"><td class="mdescLeft">&#160;</td><td class="mdescRight">Quantize FP32 to Q8_K (for activations)  <br /></td></tr>
 <tr class="separator:a0294dd45ee3d2fd2f25f2e586b1b9311"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -376,10 +382,10 @@ Functions</h2></td></tr>
 
 <p>Get Q4_K block size in bytes. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00613">613</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  614</span>{</div>
-<div class="line"><span class="lineno">  615</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a>);</div>
-<div class="line"><span class="lineno">  616</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00761">761</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  762</span>{</div>
+<div class="line"><span class="lineno">  763</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a>);</div>
+<div class="line"><span class="lineno">  764</span>}</div>
 <div class="ttc" id="astructblock__q4__K_html"><div class="ttname"><a href="structblock__q4__K.html">block_q4_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00123">ckernel_quant.h:123</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -402,10 +408,10 @@ Functions</h2></td></tr>
 
 <p>Get Q6_K block size in bytes. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00618">618</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  619</span>{</div>
-<div class="line"><span class="lineno">  620</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a>);</div>
-<div class="line"><span class="lineno">  621</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00766">766</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  767</span>{</div>
+<div class="line"><span class="lineno">  768</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a>);</div>
+<div class="line"><span class="lineno">  769</span>}</div>
 <div class="ttc" id="astructblock__q6__K_html"><div class="ttname"><a href="structblock__q6__K.html">block_q6_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00138">ckernel_quant.h:138</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -428,10 +434,10 @@ Functions</h2></td></tr>
 
 <p>Get Q8_K block size in bytes. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00623">623</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  624</span>{</div>
-<div class="line"><span class="lineno">  625</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>);</div>
-<div class="line"><span class="lineno">  626</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00771">771</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  772</span>{</div>
+<div class="line"><span class="lineno">  773</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>);</div>
+<div class="line"><span class="lineno">  774</span>}</div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00152">ckernel_quant.h:152</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -454,13 +460,118 @@ Functions</h2></td></tr>
 
 <p>Get QK_K (elements per super-block) </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00628">628</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  629</span>{</div>
-<div class="line"><span class="lineno">  630</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">  631</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00776">776</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  777</span>{</div>
+<div class="line"><span class="lineno">  778</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">  779</span>}</div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00120">ckernel_quant.h:120</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00120">QK_K</a>.</p>
+
+</div>
+</div>
+<a id="a5c4d08fced7821fcb646b347b72b865b" name="a5c4d08fced7821fcb646b347b72b865b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c4d08fced7821fcb646b347b72b865b">&#9670;&#160;</a></span>ck_test_attention_causal()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_test_attention_causal </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>seq_len</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Multi-head causal attention for prefill (head-major layout) </p>
+<p>Layout (head-major, matches llama.cpp test): Q: [num_heads, tokens, head_dim] K: [num_kv_heads, seq_len, head_dim] V: [num_kv_heads, seq_len, head_dim] out: [num_heads, tokens, head_dim]</p>
+<p>Supports GQA (grouped-query attention) where num_heads &gt; num_kv_heads. Causal masking: token t can only attend to positions 0..t (inclusive).</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">q</td><td>Query [num_heads, tokens, head_dim] </td></tr>
+    <tr><td class="paramname">k</td><td>Key [num_kv_heads, seq_len, head_dim] </td></tr>
+    <tr><td class="paramname">v</td><td>Value [num_kv_heads, seq_len, head_dim] </td></tr>
+    <tr><td class="paramname">out</td><td>Output [num_heads, tokens, head_dim] </td></tr>
+    <tr><td class="paramname">num_heads</td><td>Number of query heads </td></tr>
+    <tr><td class="paramname">num_kv_heads</td><td>Number of key/value heads (for GQA) </td></tr>
+    <tr><td class="paramname">tokens</td><td>Number of query tokens </td></tr>
+    <tr><td class="paramname">seq_len</td><td>Key/value sequence length (for prefill: seq_len == tokens) </td></tr>
+    <tr><td class="paramname">head_dim</td><td>Dimension per head </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00619">619</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  628</span>{</div>
+<div class="line"><span class="lineno">  629</span>    <span class="comment">/* For prefill, seq_len == tokens, and kv_stride == tokens.</span></div>
+<div class="line"><span class="lineno">  630</span><span class="comment">     * The CK kernel expects strided KV layout with kv_stride_tokens parameter.</span></div>
+<div class="line"><span class="lineno">  631</span><span class="comment">     * For parity testing with contiguous tensors, kv_stride = seq_len.</span></div>
+<div class="line"><span class="lineno">  632</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  633</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a>(</div>
+<div class="line"><span class="lineno">  634</span>        q, k, v, out,</div>
+<div class="line"><span class="lineno">  635</span>        num_heads, num_kv_heads, tokens,</div>
+<div class="line"><span class="lineno">  636</span>        head_dim, head_dim,  <span class="comment">/* aligned_head_dim = head_dim for testing */</span></div>
+<div class="line"><span class="lineno">  637</span>        seq_len              <span class="comment">/* kv_stride_tokens = seq_len for contiguous KV */</span></div>
+<div class="line"><span class="lineno">  638</span>    );</div>
+<div class="line"><span class="lineno">  639</span>}</div>
+<div class="ttc" id="ack__parity__api_8c_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l00859">attention_kernels.c:859</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l00859">attention_forward_causal_head_major_gqa_flash_strided()</a>.</p>
 
 </div>
 </div>
@@ -498,10 +609,10 @@ Functions</h2></td></tr>
 
 <p>Dequantize Q4_0 data to FP32. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00087">87</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   88</span>{</div>
-<div class="line"><span class="lineno">   89</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a03dfd2a1c4ee71909e61cd5fd22ed259">dequant_q4_0_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
-<div class="line"><span class="lineno">   90</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00093">93</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   94</span>{</div>
+<div class="line"><span class="lineno">   95</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a03dfd2a1c4ee71909e61cd5fd22ed259">dequant_q4_0_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
+<div class="line"><span class="lineno">   96</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a03dfd2a1c4ee71909e61cd5fd22ed259"><div class="ttname"><a href="ck__parity__api_8c.html#a03dfd2a1c4ee71909e61cd5fd22ed259">dequant_q4_0_row</a></div><div class="ttdeci">void dequant_q4_0_row(const void *src, float *dst, size_t n_elements)</div><div class="ttdoc">Dequantize Q4_0 row (multiple blocks)</div><div class="ttdef"><b>Definition</b> <a href="dequant__kernels_8c_source.html#l00061">dequant_kernels.c:61</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="dequant__kernels_8c_source.html#l00061">dequant_q4_0_row()</a>.</p>
@@ -550,10 +661,10 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00077">77</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   78</span>{</div>
-<div class="line"><span class="lineno">   79</span>    <a class="code hl_function" href="ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030">dequant_q4_k_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
-<div class="line"><span class="lineno">   80</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00083">83</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   84</span>{</div>
+<div class="line"><span class="lineno">   85</span>    <a class="code hl_function" href="ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030">dequant_q4_k_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
+<div class="line"><span class="lineno">   86</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_af2d02981687e405f123c38e442a53030"><div class="ttname"><a href="ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030">dequant_q4_k_row</a></div><div class="ttdeci">void dequant_q4_k_row(const void *src, float *dst, size_t n_elements)</div><div class="ttdoc">Dequantize Q4_K row (multiple blocks)</div><div class="ttdef"><b>Definition</b> <a href="dequant__kernels_8c_source.html#l00370">dequant_kernels.c:370</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="dequant__kernels_8c_source.html#l00370">dequant_q4_k_row()</a>.</p>
@@ -594,10 +705,10 @@ Functions</h2></td></tr>
 
 <p>Dequantize Q6_K data to FP32. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00082">82</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   83</span>{</div>
-<div class="line"><span class="lineno">   84</span>    <a class="code hl_function" href="ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6">dequant_q6_k_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
-<div class="line"><span class="lineno">   85</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00088">88</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   89</span>{</div>
+<div class="line"><span class="lineno">   90</span>    <a class="code hl_function" href="ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6">dequant_q6_k_row</a>(src, dst, (<span class="keywordtype">size_t</span>)n);</div>
+<div class="line"><span class="lineno">   91</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_addb481c891fc0db58976bf3d363235a6"><div class="ttname"><a href="ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6">dequant_q6_k_row</a></div><div class="ttdeci">void dequant_q6_k_row(const void *src, float *dst, size_t n_elements)</div><div class="ttdoc">Dequantize Q6_K row (multiple blocks)</div><div class="ttdef"><b>Definition</b> <a href="dequant__kernels_8c_source.html#l00420">dequant_kernels.c:420</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="dequant__kernels_8c_source.html#l00420">dequant_q6_k_row()</a>.</p>
@@ -668,30 +779,30 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00303">303</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  307</span>{</div>
-<div class="line"><span class="lineno">  308</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
-<div class="line"><span class="lineno">  309</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
-<div class="line"><span class="lineno">  310</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
-<div class="line"><span class="lineno">  311</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  312</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  313</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  314</span>    }</div>
-<div class="line"><span class="lineno">  315</span> </div>
-<div class="line"><span class="lineno">  316</span>    <span class="comment">/* Quantize all input tokens */</span></div>
-<div class="line"><span class="lineno">  317</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  318</span>        <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32 + t * cols,</div>
-<div class="line"><span class="lineno">  319</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00309">309</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  313</span>{</div>
+<div class="line"><span class="lineno">  314</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
+<div class="line"><span class="lineno">  315</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
+<div class="line"><span class="lineno">  316</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
+<div class="line"><span class="lineno">  317</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  318</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  319</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  320</span>    }</div>
 <div class="line"><span class="lineno">  321</span> </div>
-<div class="line"><span class="lineno">  322</span>    <span class="comment">/* Use gemm_nt_q4_k_q8_k: C[M,N] = A[M,K] * B[N,K]^T</span></div>
-<div class="line"><span class="lineno">  323</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
-<div class="line"><span class="lineno">  324</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
-<div class="line"><span class="lineno">  325</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  326</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64fc7f7c8582355c66edf044b9858964">gemm_nt_q4_k_q8_k</a>(q8_data, weight_q4k, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  322</span>    <span class="comment">/* Quantize all input tokens */</span></div>
+<div class="line"><span class="lineno">  323</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  324</span>        <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32 + t * cols,</div>
+<div class="line"><span class="lineno">  325</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<div class="line"><span class="lineno">  326</span>    }</div>
 <div class="line"><span class="lineno">  327</span> </div>
-<div class="line"><span class="lineno">  328</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  329</span>}</div>
+<div class="line"><span class="lineno">  328</span>    <span class="comment">/* Use gemm_nt_q4_k_q8_k: C[M,N] = A[M,K] * B[N,K]^T</span></div>
+<div class="line"><span class="lineno">  329</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
+<div class="line"><span class="lineno">  330</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
+<div class="line"><span class="lineno">  331</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  332</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64fc7f7c8582355c66edf044b9858964">gemm_nt_q4_k_q8_k</a>(q8_data, weight_q4k, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  333</span> </div>
+<div class="line"><span class="lineno">  334</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  335</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a64b28ca8a25883986a0d22e39a574a32"><div class="ttname"><a href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a></div><div class="ttdeci">void quantize_row_q8_k(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00107">gemm_kernels_q4k_q8k.c:107</a></div></div>
 <div class="ttc" id="ack__parity__api_8c_html_a64fc7f7c8582355c66edf044b9858964"><div class="ttname"><a href="ck__parity__api_8c.html#a64fc7f7c8582355c66edf044b9858964">gemm_nt_q4_k_q8_k</a></div><div class="ttdeci">void gemm_nt_q4_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00295">gemm_kernels_q4k_q8k.c:295</a></div></div>
 <div class="ttc" id="ack__parity__api_8h_html_a426464dcb991e33454a0a082cb52d079"><div class="ttname"><a href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a></div><div class="ttdeci">#define CK_QK_K</div><div class="ttdef"><b>Definition</b> <a href="ck__parity__api_8h_source.html#l00028">ck_parity_api.h:28</a></div></div>
@@ -766,36 +877,36 @@ Functions</h2></td></tr>
 <p>Q5_0 GEMM - batched matrix multiply with Q5_0 weights (32-element blocks)</p>
 <p>Used for MLP W1 (gate/up projection) and attention Q/K with Q5_0 weights. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00402">402</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  406</span>{</div>
-<div class="line"><span class="lineno">  407</span>    <span class="comment">/* Allocate Q8_0 buffer for quantized activations */</span></div>
-<div class="line"><span class="lineno">  408</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  409</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  410</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  411</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  412</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  413</span>    }</div>
-<div class="line"><span class="lineno">  414</span> </div>
-<div class="line"><span class="lineno">  415</span>    <span class="comment">/* Quantize all input tokens */</span></div>
-<div class="line"><span class="lineno">  416</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  417</span>        <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32 + t * cols,</div>
-<div class="line"><span class="lineno">  418</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00408">408</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  412</span>{</div>
+<div class="line"><span class="lineno">  413</span>    <span class="comment">/* Allocate Q8_0 buffer for quantized activations */</span></div>
+<div class="line"><span class="lineno">  414</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  415</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  416</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  417</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  418</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  419</span>    }</div>
 <div class="line"><span class="lineno">  420</span> </div>
-<div class="line"><span class="lineno">  421</span>    <span class="comment">/* Use gemm_nt_q5_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T</span></div>
-<div class="line"><span class="lineno">  422</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
-<div class="line"><span class="lineno">  423</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
-<div class="line"><span class="lineno">  424</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  425</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a>(q8_data, weight_q5_0, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  421</span>    <span class="comment">/* Quantize all input tokens */</span></div>
+<div class="line"><span class="lineno">  422</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  423</span>        <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32 + t * cols,</div>
+<div class="line"><span class="lineno">  424</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<div class="line"><span class="lineno">  425</span>    }</div>
 <div class="line"><span class="lineno">  426</span> </div>
-<div class="line"><span class="lineno">  427</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  428</span>}</div>
+<div class="line"><span class="lineno">  427</span>    <span class="comment">/* Use gemm_nt_q5_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T</span></div>
+<div class="line"><span class="lineno">  428</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
+<div class="line"><span class="lineno">  429</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
+<div class="line"><span class="lineno">  430</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  431</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a>(q8_data, weight_q5_0, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  432</span> </div>
+<div class="line"><span class="lineno">  433</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  434</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_ab58c945a0911101ac318f093dfce1770"><div class="ttname"><a href="ck__parity__api_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01416">gemm_kernels_q5_0.c:1416</a></div></div>
-<div class="ttc" id="ack__parity__api_8c_html_adf8ea140a408f51698d95718f1d8db49"><div class="ttname"><a href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a></div><div class="ttdeci">void quantize_row_q8_0(const float *x, void *vy, int k)</div><div class="ttdoc">Quantize FP32 to Q8_0 format (scalar reference)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00054">gemm_kernels_q8_0.c:54</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_adf8ea140a408f51698d95718f1d8db49"><div class="ttname"><a href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a></div><div class="ttdeci">void quantize_row_q8_0(const float *x, void *vy, int k)</div><div class="ttdoc">Quantize FP32 to Q8_0 format (scalar reference)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00059">gemm_kernels_q8_0.c:59</a></div></div>
 <div class="ttc" id="ack__parity__api_8h_html_ac42bce785e077edbe8459e3b2f157d70"><div class="ttname"><a href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a></div><div class="ttdeci">#define CK_QK8_0</div><div class="ttdef"><b>Definition</b> <a href="ck__parity__api_8h_source.html#l00030">ck_parity_api.h:30</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html"><div class="ttname"><a href="structblock__q8__0.html">block_q8_0</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00103">ckernel_quant.h:103</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01416">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01416">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -865,30 +976,30 @@ Functions</h2></td></tr>
 <p>Q6_K GEMM - batched matrix multiply with Q6_K weights.</p>
 <p>Used for MLP W2 (down projection) with Q6_K weights. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00336">336</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  340</span>{</div>
-<div class="line"><span class="lineno">  341</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
-<div class="line"><span class="lineno">  342</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
-<div class="line"><span class="lineno">  343</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
-<div class="line"><span class="lineno">  344</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  345</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  346</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  347</span>    }</div>
-<div class="line"><span class="lineno">  348</span> </div>
-<div class="line"><span class="lineno">  349</span>    <span class="comment">/* Quantize all input tokens */</span></div>
-<div class="line"><span class="lineno">  350</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  351</span>        <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32 + t * cols,</div>
-<div class="line"><span class="lineno">  352</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00342">342</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  346</span>{</div>
+<div class="line"><span class="lineno">  347</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
+<div class="line"><span class="lineno">  348</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
+<div class="line"><span class="lineno">  349</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
+<div class="line"><span class="lineno">  350</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  351</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  352</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  353</span>    }</div>
 <div class="line"><span class="lineno">  354</span> </div>
-<div class="line"><span class="lineno">  355</span>    <span class="comment">/* Use gemm_nt_q6_k_q8_k: C[M,N] = A[M,K] * B[N,K]^T</span></div>
-<div class="line"><span class="lineno">  356</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
-<div class="line"><span class="lineno">  357</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
-<div class="line"><span class="lineno">  358</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  359</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a>(q8_data, weight_q6k, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  355</span>    <span class="comment">/* Quantize all input tokens */</span></div>
+<div class="line"><span class="lineno">  356</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  357</span>        <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32 + t * cols,</div>
+<div class="line"><span class="lineno">  358</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<div class="line"><span class="lineno">  359</span>    }</div>
 <div class="line"><span class="lineno">  360</span> </div>
-<div class="line"><span class="lineno">  361</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  362</span>}</div>
+<div class="line"><span class="lineno">  361</span>    <span class="comment">/* Use gemm_nt_q6_k_q8_k: C[M,N] = A[M,K] * B[N,K]^T</span></div>
+<div class="line"><span class="lineno">  362</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
+<div class="line"><span class="lineno">  363</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
+<div class="line"><span class="lineno">  364</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  365</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a>(q8_data, weight_q6k, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  366</span> </div>
+<div class="line"><span class="lineno">  367</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  368</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_ac912d4edc9cd1c7de9f1697ae510fbff"><div class="ttname"><a href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01144">gemm_kernels_q6k_q8k.c:1144</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00028">CK_QK_K</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01144">gemm_nt_q6_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00107">quantize_row_q8_k()</a>.</p>
@@ -961,33 +1072,33 @@ Functions</h2></td></tr>
 <p>Q8_0 GEMM - batched matrix multiply with Q8_0 weights (32-element blocks)</p>
 <p>Used for attention V projection with Q8_0 weights. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00369">369</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  373</span>{</div>
-<div class="line"><span class="lineno">  374</span>    <span class="comment">/* Allocate Q8_0 buffer for quantized activations */</span></div>
-<div class="line"><span class="lineno">  375</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  376</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  377</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  378</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  379</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  380</span>    }</div>
-<div class="line"><span class="lineno">  381</span> </div>
-<div class="line"><span class="lineno">  382</span>    <span class="comment">/* Quantize all input tokens */</span></div>
-<div class="line"><span class="lineno">  383</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  384</span>        <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32 + t * cols,</div>
-<div class="line"><span class="lineno">  385</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00375">375</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  379</span>{</div>
+<div class="line"><span class="lineno">  380</span>    <span class="comment">/* Allocate Q8_0 buffer for quantized activations */</span></div>
+<div class="line"><span class="lineno">  381</span>    <span class="keywordtype">int</span> n_blocks_per_row = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  382</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_tokens * n_blocks_per_row * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  383</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  384</span>        memset(output, 0, n_tokens * rows * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  385</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  386</span>    }</div>
 <div class="line"><span class="lineno">  387</span> </div>
-<div class="line"><span class="lineno">  388</span>    <span class="comment">/* Use gemm_nt_q8_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T</span></div>
-<div class="line"><span class="lineno">  389</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
-<div class="line"><span class="lineno">  390</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
-<div class="line"><span class="lineno">  391</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  392</span>    <a class="code hl_function" href="ck__parity__api_8c.html#aa90624e7e78519324b65d6a45b346bfe">gemm_nt_q8_0_q8_0</a>(q8_data, weight_q8_0, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  388</span>    <span class="comment">/* Quantize all input tokens */</span></div>
+<div class="line"><span class="lineno">  389</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  390</span>        <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32 + t * cols,</div>
+<div class="line"><span class="lineno">  391</span>                          q8_data + t * n_blocks_per_row, cols);</div>
+<div class="line"><span class="lineno">  392</span>    }</div>
 <div class="line"><span class="lineno">  393</span> </div>
-<div class="line"><span class="lineno">  394</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  395</span>}</div>
+<div class="line"><span class="lineno">  394</span>    <span class="comment">/* Use gemm_nt_q8_0_q8_0: C[M,N] = A[M,K] * B[N,K]^T</span></div>
+<div class="line"><span class="lineno">  395</span><span class="comment">     * Our layout: output[n_tokens, rows] = input[n_tokens, cols] * weight[rows, cols]^T</span></div>
+<div class="line"><span class="lineno">  396</span><span class="comment">     * So: M = n_tokens, N = rows, K = cols</span></div>
+<div class="line"><span class="lineno">  397</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  398</span>    <a class="code hl_function" href="ck__parity__api_8c.html#aa90624e7e78519324b65d6a45b346bfe">gemm_nt_q8_0_q8_0</a>(q8_data, weight_q8_0, NULL, output, n_tokens, rows, cols);</div>
+<div class="line"><span class="lineno">  399</span> </div>
+<div class="line"><span class="lineno">  400</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  401</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_aa90624e7e78519324b65d6a45b346bfe"><div class="ttname"><a href="ck__parity__api_8c.html#aa90624e7e78519324b65d6a45b346bfe">gemm_nt_q8_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0(const void *A_q8, const void *B_q8, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">gemm_nt_q8_0_q8_0 with optional bias (matches header signature)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00525">gemm_batch_int8.c:525</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__batch__int8_8c_source.html#l00525">gemm_nt_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__batch__int8_8c_source.html#l00525">gemm_nt_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -1041,24 +1152,24 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00105">105</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  109</span>{</div>
-<div class="line"><span class="lineno">  110</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
-<div class="line"><span class="lineno">  111</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
-<div class="line"><span class="lineno">  112</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
-<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  114</span>        *output = 0.0f;</div>
-<div class="line"><span class="lineno">  115</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  116</span>    }</div>
-<div class="line"><span class="lineno">  117</span> </div>
-<div class="line"><span class="lineno">  118</span>    <span class="comment">/* Quantize input to Q8_K */</span></div>
-<div class="line"><span class="lineno">  119</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32, q8_data, cols);</div>
-<div class="line"><span class="lineno">  120</span> </div>
-<div class="line"><span class="lineno">  121</span>    <span class="comment">/* Compute dot product using GEMV with M=1 */</span></div>
-<div class="line"><span class="lineno">  122</span>    <a class="code hl_function" href="ck__parity__api_8c.html#abd2ce09c06d448b502b30fac01bc1d30">gemv_q4_k_q8_k</a>(output, weight_q4k, q8_data, 1, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00111">111</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  115</span>{</div>
+<div class="line"><span class="lineno">  116</span>    <span class="comment">/* Allocate Q8_K buffer for quantized activations */</span></div>
+<div class="line"><span class="lineno">  117</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079">CK_QK_K</a>;</div>
+<div class="line"><span class="lineno">  118</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a>));</div>
+<div class="line"><span class="lineno">  119</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  120</span>        *output = 0.0f;</div>
+<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  122</span>    }</div>
 <div class="line"><span class="lineno">  123</span> </div>
-<div class="line"><span class="lineno">  124</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  125</span>}</div>
+<div class="line"><span class="lineno">  124</span>    <span class="comment">/* Quantize input to Q8_K */</span></div>
+<div class="line"><span class="lineno">  125</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(input_f32, q8_data, cols);</div>
+<div class="line"><span class="lineno">  126</span> </div>
+<div class="line"><span class="lineno">  127</span>    <span class="comment">/* Compute dot product using GEMV with M=1 */</span></div>
+<div class="line"><span class="lineno">  128</span>    <a class="code hl_function" href="ck__parity__api_8c.html#abd2ce09c06d448b502b30fac01bc1d30">gemv_q4_k_q8_k</a>(output, weight_q4k, q8_data, 1, cols);</div>
+<div class="line"><span class="lineno">  129</span> </div>
+<div class="line"><span class="lineno">  130</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  131</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_abd2ce09c06d448b502b30fac01bc1d30"><div class="ttname"><a href="ck__parity__api_8c.html#abd2ce09c06d448b502b30fac01bc1d30">gemv_q4_k_q8_k</a></div><div class="ttdeci">void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00239">gemm_kernels_q4k_q8k.c:239</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00028">CK_QK_K</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00239">gemv_q4_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00107">quantize_row_q8_k()</a>.</p>
@@ -1121,33 +1232,33 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00152">152</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  156</span>{</div>
-<div class="line"><span class="lineno">  157</span>    <span class="comment">/* Match llama.cpp&#39;s test_gemv_q5_0:</span></div>
-<div class="line"><span class="lineno">  158</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
-<div class="line"><span class="lineno">  159</span><span class="comment">     * 2. Use quantized dot product (vec_dot_q5_0_q8_0)</span></div>
-<div class="line"><span class="lineno">  160</span><span class="comment">     *</span></div>
-<div class="line"><span class="lineno">  161</span><span class="comment">     * This ensures parity with llama.cpp which always uses the</span></div>
-<div class="line"><span class="lineno">  162</span><span class="comment">     * quantized path, NOT the FP32 dequantization path.</span></div>
-<div class="line"><span class="lineno">  163</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  164</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  165</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  166</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  167</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
-<div class="line"><span class="lineno">  168</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  169</span>    }</div>
-<div class="line"><span class="lineno">  170</span> </div>
-<div class="line"><span class="lineno">  171</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
-<div class="line"><span class="lineno">  172</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
-<div class="line"><span class="lineno">  173</span> </div>
-<div class="line"><span class="lineno">  174</span>    <span class="comment">/* Call the quantized GEMV kernel (same as ck_test_gemv_q5_0_q8_0) */</span></div>
-<div class="line"><span class="lineno">  175</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3">gemv_q5_0_q8_0</a>(output, weight_q5_0, q8_data, rows, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00158">158</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  162</span>{</div>
+<div class="line"><span class="lineno">  163</span>    <span class="comment">/* Match llama.cpp&#39;s test_gemv_q5_0:</span></div>
+<div class="line"><span class="lineno">  164</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
+<div class="line"><span class="lineno">  165</span><span class="comment">     * 2. Use quantized dot product (vec_dot_q5_0_q8_0)</span></div>
+<div class="line"><span class="lineno">  166</span><span class="comment">     *</span></div>
+<div class="line"><span class="lineno">  167</span><span class="comment">     * This ensures parity with llama.cpp which always uses the</span></div>
+<div class="line"><span class="lineno">  168</span><span class="comment">     * quantized path, NOT the FP32 dequantization path.</span></div>
+<div class="line"><span class="lineno">  169</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  170</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  171</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  172</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  173</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
+<div class="line"><span class="lineno">  174</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  175</span>    }</div>
 <div class="line"><span class="lineno">  176</span> </div>
-<div class="line"><span class="lineno">  177</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  178</span>}</div>
+<div class="line"><span class="lineno">  177</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
+<div class="line"><span class="lineno">  178</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
+<div class="line"><span class="lineno">  179</span> </div>
+<div class="line"><span class="lineno">  180</span>    <span class="comment">/* Call the quantized GEMV kernel (same as ck_test_gemv_q5_0_q8_0) */</span></div>
+<div class="line"><span class="lineno">  181</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3">gemv_q5_0_q8_0</a>(output, weight_q5_0, q8_data, rows, cols);</div>
+<div class="line"><span class="lineno">  182</span> </div>
+<div class="line"><span class="lineno">  183</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  184</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a4fb9cf343ac07a0868c55f25bd201ca3"><div class="ttname"><a href="ck__parity__api_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3">gemv_q5_0_q8_0</a></div><div class="ttdeci">void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">Matrix-vector multiply with Q5_0 weights and Q8_0 input.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01381">gemm_kernels_q5_0.c:1381</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01381">gemv_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01381">gemv_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -1208,30 +1319,30 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00208">208</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  212</span>{</div>
-<div class="line"><span class="lineno">  213</span>    <span class="comment">/* This matches llama.cpp&#39;s approach:</span></div>
-<div class="line"><span class="lineno">  214</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
-<div class="line"><span class="lineno">  215</span><span class="comment">     * 2. Use quantized dot product (integer math)</span></div>
-<div class="line"><span class="lineno">  216</span><span class="comment">     * 3. Scale at the end</span></div>
-<div class="line"><span class="lineno">  217</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  218</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  219</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  220</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  221</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
-<div class="line"><span class="lineno">  222</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  223</span>    }</div>
-<div class="line"><span class="lineno">  224</span> </div>
-<div class="line"><span class="lineno">  225</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
-<div class="line"><span class="lineno">  226</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
-<div class="line"><span class="lineno">  227</span> </div>
-<div class="line"><span class="lineno">  228</span>    <span class="comment">/* Call the quantized GEMV kernel */</span></div>
-<div class="line"><span class="lineno">  229</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3">gemv_q5_0_q8_0</a>(output, weight_q5_0, q8_data, rows, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00214">214</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  218</span>{</div>
+<div class="line"><span class="lineno">  219</span>    <span class="comment">/* This matches llama.cpp&#39;s approach:</span></div>
+<div class="line"><span class="lineno">  220</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
+<div class="line"><span class="lineno">  221</span><span class="comment">     * 2. Use quantized dot product (integer math)</span></div>
+<div class="line"><span class="lineno">  222</span><span class="comment">     * 3. Scale at the end</span></div>
+<div class="line"><span class="lineno">  223</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  224</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  225</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  226</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  227</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
+<div class="line"><span class="lineno">  228</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  229</span>    }</div>
 <div class="line"><span class="lineno">  230</span> </div>
-<div class="line"><span class="lineno">  231</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  232</span>}</div>
+<div class="line"><span class="lineno">  231</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
+<div class="line"><span class="lineno">  232</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
+<div class="line"><span class="lineno">  233</span> </div>
+<div class="line"><span class="lineno">  234</span>    <span class="comment">/* Call the quantized GEMV kernel */</span></div>
+<div class="line"><span class="lineno">  235</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3">gemv_q5_0_q8_0</a>(output, weight_q5_0, q8_data, rows, cols);</div>
+<div class="line"><span class="lineno">  236</span> </div>
+<div class="line"><span class="lineno">  237</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  238</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01381">gemv_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01381">gemv_q5_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -1275,27 +1386,27 @@ Functions</h2></td></tr>
 
 <p>Q6_K GEMV. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00127">127</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  131</span>{</div>
-<div class="line"><span class="lineno">  132</span>    <span class="comment">/* Q6_K GEMV is not yet implemented in CK - provide reference impl */</span></div>
-<div class="line"><span class="lineno">  133</span>    <span class="comment">/* For now, dequantize and compute in FP32 */</span></div>
-<div class="line"><span class="lineno">  134</span>    <span class="keywordtype">float</span> *weight_f32 = (<span class="keywordtype">float</span> *)malloc(cols * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">if</span> (!weight_f32) {</div>
-<div class="line"><span class="lineno">  136</span>        *output = 0.0f;</div>
-<div class="line"><span class="lineno">  137</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  138</span>    }</div>
-<div class="line"><span class="lineno">  139</span> </div>
-<div class="line"><span class="lineno">  140</span>    <a class="code hl_function" href="ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6">dequant_q6_k_row</a>(weight_q6k, weight_f32, cols);</div>
-<div class="line"><span class="lineno">  141</span> </div>
-<div class="line"><span class="lineno">  142</span>    <span class="comment">/* Dot product in FP32 */</span></div>
-<div class="line"><span class="lineno">  143</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; cols; i++) {</div>
-<div class="line"><span class="lineno">  145</span>        sum += (double)weight_f32[i] * (<span class="keywordtype">double</span>)input_f32[i];</div>
-<div class="line"><span class="lineno">  146</span>    }</div>
-<div class="line"><span class="lineno">  147</span>    *output = (float)sum;</div>
-<div class="line"><span class="lineno">  148</span> </div>
-<div class="line"><span class="lineno">  149</span>    free(weight_f32);</div>
-<div class="line"><span class="lineno">  150</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00133">133</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  137</span>{</div>
+<div class="line"><span class="lineno">  138</span>    <span class="comment">/* Q6_K GEMV is not yet implemented in CK - provide reference impl */</span></div>
+<div class="line"><span class="lineno">  139</span>    <span class="comment">/* For now, dequantize and compute in FP32 */</span></div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordtype">float</span> *weight_f32 = (<span class="keywordtype">float</span> *)malloc(cols * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordflow">if</span> (!weight_f32) {</div>
+<div class="line"><span class="lineno">  142</span>        *output = 0.0f;</div>
+<div class="line"><span class="lineno">  143</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  144</span>    }</div>
+<div class="line"><span class="lineno">  145</span> </div>
+<div class="line"><span class="lineno">  146</span>    <a class="code hl_function" href="ck__parity__api_8c.html#addb481c891fc0db58976bf3d363235a6">dequant_q6_k_row</a>(weight_q6k, weight_f32, cols);</div>
+<div class="line"><span class="lineno">  147</span> </div>
+<div class="line"><span class="lineno">  148</span>    <span class="comment">/* Dot product in FP32 */</span></div>
+<div class="line"><span class="lineno">  149</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">  150</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; cols; i++) {</div>
+<div class="line"><span class="lineno">  151</span>        sum += (double)weight_f32[i] * (<span class="keywordtype">double</span>)input_f32[i];</div>
+<div class="line"><span class="lineno">  152</span>    }</div>
+<div class="line"><span class="lineno">  153</span>    *output = (float)sum;</div>
+<div class="line"><span class="lineno">  154</span> </div>
+<div class="line"><span class="lineno">  155</span>    free(weight_f32);</div>
+<div class="line"><span class="lineno">  156</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="dequant__kernels_8c_source.html#l00420">dequant_q6_k_row()</a>.</p>
 
@@ -1357,33 +1468,33 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00180">180</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  184</span>{</div>
-<div class="line"><span class="lineno">  185</span>    <span class="comment">/* Match llama.cpp&#39;s test_gemv_q8_0:</span></div>
-<div class="line"><span class="lineno">  186</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
-<div class="line"><span class="lineno">  187</span><span class="comment">     * 2. Use quantized dot product (vec_dot_q8_0_q8_0)</span></div>
-<div class="line"><span class="lineno">  188</span><span class="comment">     *</span></div>
-<div class="line"><span class="lineno">  189</span><span class="comment">     * This ensures parity with llama.cpp which always uses the</span></div>
-<div class="line"><span class="lineno">  190</span><span class="comment">     * quantized path, NOT the FP32 dequantization path.</span></div>
-<div class="line"><span class="lineno">  191</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  192</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  193</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  194</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
-<div class="line"><span class="lineno">  196</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  197</span>    }</div>
-<div class="line"><span class="lineno">  198</span> </div>
-<div class="line"><span class="lineno">  199</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
-<div class="line"><span class="lineno">  200</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
-<div class="line"><span class="lineno">  201</span> </div>
-<div class="line"><span class="lineno">  202</span>    <span class="comment">/* Call the quantized GEMV kernel (same as ck_test_gemv_q8_0_q8_0) */</span></div>
-<div class="line"><span class="lineno">  203</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a>(output, weight_q8_0, q8_data, rows, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00186">186</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  190</span>{</div>
+<div class="line"><span class="lineno">  191</span>    <span class="comment">/* Match llama.cpp&#39;s test_gemv_q8_0:</span></div>
+<div class="line"><span class="lineno">  192</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
+<div class="line"><span class="lineno">  193</span><span class="comment">     * 2. Use quantized dot product (vec_dot_q8_0_q8_0)</span></div>
+<div class="line"><span class="lineno">  194</span><span class="comment">     *</span></div>
+<div class="line"><span class="lineno">  195</span><span class="comment">     * This ensures parity with llama.cpp which always uses the</span></div>
+<div class="line"><span class="lineno">  196</span><span class="comment">     * quantized path, NOT the FP32 dequantization path.</span></div>
+<div class="line"><span class="lineno">  197</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  198</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  199</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  200</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
+<div class="line"><span class="lineno">  202</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  203</span>    }</div>
 <div class="line"><span class="lineno">  204</span> </div>
-<div class="line"><span class="lineno">  205</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  206</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_ab56038b4e1cf73692b6be9c28ada9023"><div class="ttname"><a href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a></div><div class="ttdeci">void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">Matrix-vector multiply with Q8_0 weights and Q8_0 input.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00896">gemm_kernels_q8_0.c:896</a></div></div>
+<div class="line"><span class="lineno">  205</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
+<div class="line"><span class="lineno">  206</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
+<div class="line"><span class="lineno">  207</span> </div>
+<div class="line"><span class="lineno">  208</span>    <span class="comment">/* Call the quantized GEMV kernel (same as ck_test_gemv_q8_0_q8_0) */</span></div>
+<div class="line"><span class="lineno">  209</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a>(output, weight_q8_0, q8_data, rows, cols);</div>
+<div class="line"><span class="lineno">  210</span> </div>
+<div class="line"><span class="lineno">  211</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  212</span>}</div>
+<div class="ttc" id="ack__parity__api_8c_html_ab56038b4e1cf73692b6be9c28ada9023"><div class="ttname"><a href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a></div><div class="ttdeci">void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">Matrix-vector multiply with Q8_0 weights and Q8_0 input.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00978">gemm_kernels_q8_0.c:978</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00896">gemv_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00978">gemv_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -1444,30 +1555,236 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00234">234</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  238</span>{</div>
-<div class="line"><span class="lineno">  239</span>    <span class="comment">/* This matches llama.cpp&#39;s approach:</span></div>
-<div class="line"><span class="lineno">  240</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
-<div class="line"><span class="lineno">  241</span><span class="comment">     * 2. Use quantized dot product (integer math)</span></div>
-<div class="line"><span class="lineno">  242</span><span class="comment">     * 3. Scale at the end</span></div>
-<div class="line"><span class="lineno">  243</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  244</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
-<div class="line"><span class="lineno">  245</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
-<div class="line"><span class="lineno">  246</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
-<div class="line"><span class="lineno">  247</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
-<div class="line"><span class="lineno">  248</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  249</span>    }</div>
-<div class="line"><span class="lineno">  250</span> </div>
-<div class="line"><span class="lineno">  251</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
-<div class="line"><span class="lineno">  252</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
-<div class="line"><span class="lineno">  253</span> </div>
-<div class="line"><span class="lineno">  254</span>    <span class="comment">/* Call the quantized GEMV kernel */</span></div>
-<div class="line"><span class="lineno">  255</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a>(output, weight_q8_0, q8_data, rows, cols);</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00240">240</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  244</span>{</div>
+<div class="line"><span class="lineno">  245</span>    <span class="comment">/* This matches llama.cpp&#39;s approach:</span></div>
+<div class="line"><span class="lineno">  246</span><span class="comment">     * 1. Quantize input to Q8_0 format</span></div>
+<div class="line"><span class="lineno">  247</span><span class="comment">     * 2. Use quantized dot product (integer math)</span></div>
+<div class="line"><span class="lineno">  248</span><span class="comment">     * 3. Scale at the end</span></div>
+<div class="line"><span class="lineno">  249</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  250</span>    <span class="keywordtype">int</span> n_blocks = cols / <a class="code hl_define" href="ck__parity__api_8h.html#ac42bce785e077edbe8459e3b2f157d70">CK_QK8_0</a>;</div>
+<div class="line"><span class="lineno">  251</span>    <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *q8_data = (<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)malloc(n_blocks * <span class="keyword">sizeof</span>(<a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a>));</div>
+<div class="line"><span class="lineno">  252</span>    <span class="keywordflow">if</span> (!q8_data) {</div>
+<div class="line"><span class="lineno">  253</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r++) output[r] = 0.0f;</div>
+<div class="line"><span class="lineno">  254</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  255</span>    }</div>
 <div class="line"><span class="lineno">  256</span> </div>
-<div class="line"><span class="lineno">  257</span>    free(q8_data);</div>
-<div class="line"><span class="lineno">  258</span>}</div>
+<div class="line"><span class="lineno">  257</span>    <span class="comment">/* Quantize input to Q8_0 */</span></div>
+<div class="line"><span class="lineno">  258</span>    <a class="code hl_function" href="ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49">quantize_row_q8_0</a>(input_f32, q8_data, cols);</div>
+<div class="line"><span class="lineno">  259</span> </div>
+<div class="line"><span class="lineno">  260</span>    <span class="comment">/* Call the quantized GEMV kernel */</span></div>
+<div class="line"><span class="lineno">  261</span>    <a class="code hl_function" href="ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023">gemv_q8_0_q8_0</a>(output, weight_q8_0, q8_data, rows, cols);</div>
+<div class="line"><span class="lineno">  262</span> </div>
+<div class="line"><span class="lineno">  263</span>    free(q8_data);</div>
+<div class="line"><span class="lineno">  264</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00896">gemv_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00054">quantize_row_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00030">CK_QK8_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00978">gemv_q8_0_q8_0()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00059">quantize_row_q8_0()</a>.</p>
+
+</div>
+</div>
+<a id="afb09a29d3caada83d9e84efed6209fec" name="afb09a29d3caada83d9e84efed6209fec"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afb09a29d3caada83d9e84efed6209fec">&#9670;&#160;</a></span>ck_test_outproj_mlp_fused_q5_0()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_test_outproj_mlp_fused_q5_0 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>attn_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>residual</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln2_gamma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>wo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>w1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>w2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>intermediate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>w2_is_q6k</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Test mega-fused OutProj + MLP kernel (Q5_0 weights) </p>
+<p>This tests the mega_fused_outproj_mlp_prefill kernel which fuses:</p><ol type="1">
+<li>Quantize attention output (head-major) to Q8_0</li>
+<li>OutProj: attn_out @ W_o (Q5_0) → h1</li>
+<li>Residual: h1 += residual</li>
+<li>RMSNorm: h1 → ln2_out</li>
+<li>MLP: silu(ln2_out @ W_gate) * (ln2_out @ W_up) @ W2</li>
+<li>Residual: output += h1</li>
+</ol>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">attn_out</td><td>Attention output [num_heads, tokens, head_dim] (FP32, head-major) </td></tr>
+    <tr><td class="paramname">residual</td><td>Residual input [tokens, embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">ln2_gamma</td><td>RMSNorm gamma [embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">wo</td><td>OutProj weights [embed_dim, embed_dim] (Q5_0) </td></tr>
+    <tr><td class="paramname">w1</td><td>MLP W1 weights [2*intermediate, embed_dim] (Q5_0) </td></tr>
+    <tr><td class="paramname">w2</td><td>MLP W2 weights [embed_dim, intermediate] (Q4_K or Q6_K) </td></tr>
+    <tr><td class="paramname">output</td><td>Output [tokens, embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">tokens</td><td>Number of tokens </td></tr>
+    <tr><td class="paramname">num_heads</td><td>Number of attention heads </td></tr>
+    <tr><td class="paramname">head_dim</td><td>Dimension per head </td></tr>
+    <tr><td class="paramname">embed_dim</td><td>Embedding dimension (= num_heads * head_dim) </td></tr>
+    <tr><td class="paramname">intermediate</td><td>MLP intermediate dimension </td></tr>
+    <tr><td class="paramname">eps</td><td>RMSNorm epsilon </td></tr>
+    <tr><td class="paramname">w2_is_q6k</td><td>If true, W2 is Q6_K; if false, W2 is Q4_K</td></tr>
+  </table>
+  </dd>
+</dl>
+<p>This is a simplified wrapper for parity testing that:</p><ul>
+<li>Uses Q5_0 for W_o and W1 weights</li>
+<li>Uses Q4_K for W2 weights</li>
+<li>Allocates scratch internally</li>
+</ul>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">attn_out</td><td>Attention output [num_heads, tokens, head_dim] (FP32, head-major) </td></tr>
+    <tr><td class="paramname">residual</td><td>Residual input [tokens, embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">ln2_gamma</td><td>RMSNorm gamma [embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">wo</td><td>OutProj weights [embed_dim, embed_dim] (Q5_0) </td></tr>
+    <tr><td class="paramname">w1</td><td>MLP W1 weights [2*intermediate, embed_dim] (Q5_0) </td></tr>
+    <tr><td class="paramname">w2</td><td>MLP W2 weights [embed_dim, intermediate] (Q4_K or Q6_K) </td></tr>
+    <tr><td class="paramname">output</td><td>Output [tokens, embed_dim] (FP32) </td></tr>
+    <tr><td class="paramname">tokens</td><td>Number of tokens </td></tr>
+    <tr><td class="paramname">num_heads</td><td>Number of attention heads </td></tr>
+    <tr><td class="paramname">head_dim</td><td>Dimension per head </td></tr>
+    <tr><td class="paramname">embed_dim</td><td>Embedding dimension (= num_heads * head_dim) </td></tr>
+    <tr><td class="paramname">intermediate</td><td>MLP intermediate dimension </td></tr>
+    <tr><td class="paramname">eps</td><td>RMSNorm epsilon </td></tr>
+    <tr><td class="paramname">w2_is_q6k</td><td>If true, W2 is Q6_K; if false, W2 is Q4_K </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00694">694</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  709</span>{</div>
+<div class="line"><span class="lineno">  710</span>    <span class="comment">/* CK uses dtype enum: CK_DT_Q5_0 = 11, CK_DT_Q4_K = 7, CK_DT_Q6_K = 8 */</span></div>
+<div class="line"><span class="lineno">  711</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> CK_DT_Q5_0_VAL = 11;</div>
+<div class="line"><span class="lineno">  712</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> CK_DT_Q4_K_VAL = 7;</div>
+<div class="line"><span class="lineno">  713</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> CK_DT_Q6_K_VAL = 8;</div>
+<div class="line"><span class="lineno">  714</span> </div>
+<div class="line"><span class="lineno">  715</span>    <span class="comment">/* For parity testing, aligned = actual (no padding) */</span></div>
+<div class="line"><span class="lineno">  716</span>    <span class="keywordtype">int</span> aligned_embed_dim = embed_dim;</div>
+<div class="line"><span class="lineno">  717</span>    <span class="keywordtype">int</span> aligned_head_dim = head_dim;</div>
+<div class="line"><span class="lineno">  718</span>    <span class="keywordtype">int</span> aligned_intermediate = intermediate;</div>
+<div class="line"><span class="lineno">  719</span> </div>
+<div class="line"><span class="lineno">  720</span>    <span class="comment">/* Ensure intermediate is multiple of 256 (QK_K) for K-quants */</span></div>
+<div class="line"><span class="lineno">  721</span>    <span class="keywordflow">if</span> ((intermediate % 256) != 0) {</div>
+<div class="line"><span class="lineno">  722</span>        aligned_intermediate = ((intermediate + 255) / 256) * 256;</div>
+<div class="line"><span class="lineno">  723</span>    }</div>
+<div class="line"><span class="lineno">  724</span> </div>
+<div class="line"><span class="lineno">  725</span>    <span class="comment">/* Allocate scratch */</span></div>
+<div class="line"><span class="lineno">  726</span>    <span class="keywordtype">size_t</span> scratch_size = <a class="code hl_function" href="ck__parity__api_8c.html#aca1476c2ed7a5ed20fd199f597a67149">mega_fused_outproj_mlp_prefill_scratch_size</a>(</div>
+<div class="line"><span class="lineno">  727</span>        tokens, aligned_embed_dim, num_heads, aligned_head_dim, aligned_intermediate);</div>
+<div class="line"><span class="lineno">  728</span> </div>
+<div class="line"><span class="lineno">  729</span>    <span class="keywordtype">void</span> *scratch = malloc(scratch_size);</div>
+<div class="line"><span class="lineno">  730</span>    <span class="keywordflow">if</span> (!scratch) {</div>
+<div class="line"><span class="lineno">  731</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  732</span>    }</div>
+<div class="line"><span class="lineno">  733</span> </div>
+<div class="line"><span class="lineno">  734</span>    <span class="comment">/* Call the mega-fused kernel */</span></div>
+<div class="line"><span class="lineno">  735</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a5d7c4d5f6bccab4053d2b263ef156c68">mega_fused_outproj_mlp_prefill</a>(</div>
+<div class="line"><span class="lineno">  736</span>        output,</div>
+<div class="line"><span class="lineno">  737</span>        attn_out,</div>
+<div class="line"><span class="lineno">  738</span>        residual,</div>
+<div class="line"><span class="lineno">  739</span>        ln2_gamma,</div>
+<div class="line"><span class="lineno">  740</span>        wo, NULL, CK_DT_Q5_0_VAL,          <span class="comment">/* W_o with Q5_0 */</span></div>
+<div class="line"><span class="lineno">  741</span>        w1, NULL, CK_DT_Q5_0_VAL,          <span class="comment">/* W1 with Q5_0 */</span></div>
+<div class="line"><span class="lineno">  742</span>        w2, NULL, w2_is_q6k ? CK_DT_Q6_K_VAL : CK_DT_Q4_K_VAL,  <span class="comment">/* W2 with Q4_K or Q6_K */</span></div>
+<div class="line"><span class="lineno">  743</span>        tokens,</div>
+<div class="line"><span class="lineno">  744</span>        embed_dim,</div>
+<div class="line"><span class="lineno">  745</span>        aligned_embed_dim,</div>
+<div class="line"><span class="lineno">  746</span>        num_heads,</div>
+<div class="line"><span class="lineno">  747</span>        aligned_head_dim,</div>
+<div class="line"><span class="lineno">  748</span>        intermediate,</div>
+<div class="line"><span class="lineno">  749</span>        aligned_intermediate,</div>
+<div class="line"><span class="lineno">  750</span>        eps,</div>
+<div class="line"><span class="lineno">  751</span>        scratch</div>
+<div class="line"><span class="lineno">  752</span>    );</div>
+<div class="line"><span class="lineno">  753</span> </div>
+<div class="line"><span class="lineno">  754</span>    free(scratch);</div>
+<div class="line"><span class="lineno">  755</span>}</div>
+<div class="ttc" id="ack__parity__api_8c_html_a5d7c4d5f6bccab4053d2b263ef156c68"><div class="ttname"><a href="ck__parity__api_8c.html#a5d7c4d5f6bccab4053d2b263ef156c68">mega_fused_outproj_mlp_prefill</a></div><div class="ttdeci">void mega_fused_outproj_mlp_prefill(float *output, const float *attn_out, const float *residual, const float *ln2_gamma, const void *wo, const float *bo, int wo_dt, const void *w1, const float *b1, int w1_dt, const void *w2, const float *b2, int w2_dt, int tokens, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim, int intermediate_dim, int aligned_intermediate_dim, float eps, void *scratch)</div></div>
+<div class="ttc" id="ack__parity__api_8c_html_aca1476c2ed7a5ed20fd199f597a67149"><div class="ttname"><a href="ck__parity__api_8c.html#aca1476c2ed7a5ed20fd199f597a67149">mega_fused_outproj_mlp_prefill_scratch_size</a></div><div class="ttdeci">size_t mega_fused_outproj_mlp_prefill_scratch_size(int tokens, int aligned_embed_dim, int num_heads, int aligned_head_dim, int aligned_intermediate_dim)</div><div class="ttdoc">Get scratch buffer size for mega_fused_outproj_mlp_prefill.</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__outproj__mlp__prefill_8c_source.html#l00159">mega_fused_outproj_mlp_prefill.c:159</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="ck__parity__api_8c.html#a5d7c4d5f6bccab4053d2b263ef156c68">mega_fused_outproj_mlp_prefill()</a>, and <a class="el" href="mega__fused__outproj__mlp__prefill_8c_source.html#l00159">mega_fused_outproj_mlp_prefill_scratch_size()</a>.</p>
 
 </div>
 </div>
@@ -1513,10 +1830,10 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00096">96</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   97</span>{</div>
-<div class="line"><span class="lineno">   98</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(src, dst, n);</div>
-<div class="line"><span class="lineno">   99</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00102">102</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  103</span>{</div>
+<div class="line"><span class="lineno">  104</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(src, dst, n);</div>
+<div class="line"><span class="lineno">  105</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00107">quantize_row_q8_k()</a>.</p>
 
@@ -1586,12 +1903,12 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00434">434</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  438</span>{</div>
-<div class="line"><span class="lineno">  439</span>    <span class="comment">/* CK rmsnorm_forward has aligned_embed_dim parameter</span></div>
-<div class="line"><span class="lineno">  440</span><span class="comment">     * For testing, use dim as aligned_embed_dim (no padding) */</span></div>
-<div class="line"><span class="lineno">  441</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(input, weight, output, NULL, n_tokens, dim, dim, eps);</div>
-<div class="line"><span class="lineno">  442</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00440">440</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  444</span>{</div>
+<div class="line"><span class="lineno">  445</span>    <span class="comment">/* CK rmsnorm_forward has aligned_embed_dim parameter</span></div>
+<div class="line"><span class="lineno">  446</span><span class="comment">     * For testing, use dim as aligned_embed_dim (no padding) */</span></div>
+<div class="line"><span class="lineno">  447</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(input, weight, output, NULL, n_tokens, dim, dim, eps);</div>
+<div class="line"><span class="lineno">  448</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a9a068ed02d809a81a23f09e61b820baf"><div class="ttname"><a href="ck__parity__api_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a></div><div class="ttdeci">void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00050">rmsnorm_kernels.c:50</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00050">rmsnorm_forward()</a>.</p>
@@ -1677,80 +1994,80 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00444">444</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  447</span>{</div>
-<div class="line"><span class="lineno">  448</span>    <span class="comment">/* Precompute cos/sin cache */</span></div>
-<div class="line"><span class="lineno">  449</span>    <span class="keywordtype">int</span> half_dim = head_dim / 2;</div>
-<div class="line"><span class="lineno">  450</span>    <span class="keywordtype">int</span> max_seq = pos_offset + n_tokens;</div>
-<div class="line"><span class="lineno">  451</span> </div>
-<div class="line"><span class="lineno">  452</span>    <span class="keywordtype">float</span> *cos_cache = (<span class="keywordtype">float</span> *)malloc(max_seq * half_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  453</span>    <span class="keywordtype">float</span> *sin_cache = (<span class="keywordtype">float</span> *)malloc(max_seq * half_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  454</span>    <span class="keywordflow">if</span> (!cos_cache || !sin_cache) {</div>
-<div class="line"><span class="lineno">  455</span>        free(cos_cache);</div>
-<div class="line"><span class="lineno">  456</span>        free(sin_cache);</div>
-<div class="line"><span class="lineno">  457</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  458</span>    }</div>
-<div class="line"><span class="lineno">  459</span> </div>
-<div class="line"><span class="lineno">  460</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a3c55e1a13ca92346f9cf41bc4453f3df">rope_precompute_cache</a>(cos_cache, sin_cache, max_seq, head_dim, theta);</div>
-<div class="line"><span class="lineno">  461</span> </div>
-<div class="line"><span class="lineno">  462</span>    <span class="comment">/* CK RoPE expects layout [num_heads, num_tokens, head_dim]</span></div>
-<div class="line"><span class="lineno">  463</span><span class="comment">     * Reshape from [n_tokens, n_heads * head_dim] to [n_heads, n_tokens, head_dim]</span></div>
-<div class="line"><span class="lineno">  464</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  465</span>    <span class="keywordtype">float</span> *q_reorder = (<span class="keywordtype">float</span> *)malloc(n_heads * n_tokens * head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  466</span>    <span class="keywordtype">float</span> *k_reorder = (<span class="keywordtype">float</span> *)malloc(n_heads_kv * n_tokens * head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00450">450</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  453</span>{</div>
+<div class="line"><span class="lineno">  454</span>    <span class="comment">/* Precompute cos/sin cache */</span></div>
+<div class="line"><span class="lineno">  455</span>    <span class="keywordtype">int</span> half_dim = head_dim / 2;</div>
+<div class="line"><span class="lineno">  456</span>    <span class="keywordtype">int</span> max_seq = pos_offset + n_tokens;</div>
+<div class="line"><span class="lineno">  457</span> </div>
+<div class="line"><span class="lineno">  458</span>    <span class="keywordtype">float</span> *cos_cache = (<span class="keywordtype">float</span> *)malloc(max_seq * half_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  459</span>    <span class="keywordtype">float</span> *sin_cache = (<span class="keywordtype">float</span> *)malloc(max_seq * half_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  460</span>    <span class="keywordflow">if</span> (!cos_cache || !sin_cache) {</div>
+<div class="line"><span class="lineno">  461</span>        free(cos_cache);</div>
+<div class="line"><span class="lineno">  462</span>        free(sin_cache);</div>
+<div class="line"><span class="lineno">  463</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  464</span>    }</div>
+<div class="line"><span class="lineno">  465</span> </div>
+<div class="line"><span class="lineno">  466</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a3c55e1a13ca92346f9cf41bc4453f3df">rope_precompute_cache</a>(cos_cache, sin_cache, max_seq, head_dim, theta);</div>
 <div class="line"><span class="lineno">  467</span> </div>
-<div class="line"><span class="lineno">  468</span>    <span class="keywordflow">if</span> (q_reorder &amp;&amp; k_reorder) {</div>
-<div class="line"><span class="lineno">  469</span>        <span class="comment">/* Reorder Q: [T, H*D] -&gt; [H, T, D] */</span></div>
-<div class="line"><span class="lineno">  470</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  471</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
-<div class="line"><span class="lineno">  472</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
-<div class="line"><span class="lineno">  473</span>                    q_reorder[h * n_tokens * head_dim + t * head_dim + d] =</div>
-<div class="line"><span class="lineno">  474</span>                        q[t * n_heads * head_dim + h * head_dim + d];</div>
-<div class="line"><span class="lineno">  475</span>                }</div>
-<div class="line"><span class="lineno">  476</span>            }</div>
-<div class="line"><span class="lineno">  477</span>        }</div>
-<div class="line"><span class="lineno">  478</span> </div>
-<div class="line"><span class="lineno">  479</span>        <span class="comment">/* Reorder K: [T, H_kv*D] -&gt; [H_kv, T, D] */</span></div>
-<div class="line"><span class="lineno">  480</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  481</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
-<div class="line"><span class="lineno">  482</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
-<div class="line"><span class="lineno">  483</span>                    k_reorder[h * n_tokens * head_dim + t * head_dim + d] =</div>
-<div class="line"><span class="lineno">  484</span>                        k[t * n_heads_kv * head_dim + h * head_dim + d];</div>
-<div class="line"><span class="lineno">  485</span>                }</div>
-<div class="line"><span class="lineno">  486</span>            }</div>
-<div class="line"><span class="lineno">  487</span>        }</div>
-<div class="line"><span class="lineno">  488</span> </div>
-<div class="line"><span class="lineno">  489</span>        <span class="comment">/* Apply RoPE */</span></div>
-<div class="line"><span class="lineno">  490</span>        <a class="code hl_function" href="ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a>(q_reorder, k_reorder,</div>
-<div class="line"><span class="lineno">  491</span>                        cos_cache, sin_cache,</div>
-<div class="line"><span class="lineno">  492</span>                        n_heads, n_heads_kv, n_tokens,</div>
-<div class="line"><span class="lineno">  493</span>                        head_dim, head_dim, pos_offset);</div>
+<div class="line"><span class="lineno">  468</span>    <span class="comment">/* CK RoPE expects layout [num_heads, num_tokens, head_dim]</span></div>
+<div class="line"><span class="lineno">  469</span><span class="comment">     * Reshape from [n_tokens, n_heads * head_dim] to [n_heads, n_tokens, head_dim]</span></div>
+<div class="line"><span class="lineno">  470</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  471</span>    <span class="keywordtype">float</span> *q_reorder = (<span class="keywordtype">float</span> *)malloc(n_heads * n_tokens * head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  472</span>    <span class="keywordtype">float</span> *k_reorder = (<span class="keywordtype">float</span> *)malloc(n_heads_kv * n_tokens * head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  473</span> </div>
+<div class="line"><span class="lineno">  474</span>    <span class="keywordflow">if</span> (q_reorder &amp;&amp; k_reorder) {</div>
+<div class="line"><span class="lineno">  475</span>        <span class="comment">/* Reorder Q: [T, H*D] -&gt; [H, T, D] */</span></div>
+<div class="line"><span class="lineno">  476</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  477</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
+<div class="line"><span class="lineno">  478</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
+<div class="line"><span class="lineno">  479</span>                    q_reorder[h * n_tokens * head_dim + t * head_dim + d] =</div>
+<div class="line"><span class="lineno">  480</span>                        q[t * n_heads * head_dim + h * head_dim + d];</div>
+<div class="line"><span class="lineno">  481</span>                }</div>
+<div class="line"><span class="lineno">  482</span>            }</div>
+<div class="line"><span class="lineno">  483</span>        }</div>
+<div class="line"><span class="lineno">  484</span> </div>
+<div class="line"><span class="lineno">  485</span>        <span class="comment">/* Reorder K: [T, H_kv*D] -&gt; [H_kv, T, D] */</span></div>
+<div class="line"><span class="lineno">  486</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  487</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
+<div class="line"><span class="lineno">  488</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
+<div class="line"><span class="lineno">  489</span>                    k_reorder[h * n_tokens * head_dim + t * head_dim + d] =</div>
+<div class="line"><span class="lineno">  490</span>                        k[t * n_heads_kv * head_dim + h * head_dim + d];</div>
+<div class="line"><span class="lineno">  491</span>                }</div>
+<div class="line"><span class="lineno">  492</span>            }</div>
+<div class="line"><span class="lineno">  493</span>        }</div>
 <div class="line"><span class="lineno">  494</span> </div>
-<div class="line"><span class="lineno">  495</span>        <span class="comment">/* Reorder back: [H, T, D] -&gt; [T, H*D] */</span></div>
-<div class="line"><span class="lineno">  496</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  497</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
-<div class="line"><span class="lineno">  498</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
-<div class="line"><span class="lineno">  499</span>                    q[t * n_heads * head_dim + h * head_dim + d] =</div>
-<div class="line"><span class="lineno">  500</span>                        q_reorder[h * n_tokens * head_dim + t * head_dim + d];</div>
-<div class="line"><span class="lineno">  501</span>                }</div>
-<div class="line"><span class="lineno">  502</span>            }</div>
-<div class="line"><span class="lineno">  503</span>        }</div>
-<div class="line"><span class="lineno">  504</span> </div>
-<div class="line"><span class="lineno">  505</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  506</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
-<div class="line"><span class="lineno">  507</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
-<div class="line"><span class="lineno">  508</span>                    k[t * n_heads_kv * head_dim + h * head_dim + d] =</div>
-<div class="line"><span class="lineno">  509</span>                        k_reorder[h * n_tokens * head_dim + t * head_dim + d];</div>
-<div class="line"><span class="lineno">  510</span>                }</div>
-<div class="line"><span class="lineno">  511</span>            }</div>
-<div class="line"><span class="lineno">  512</span>        }</div>
-<div class="line"><span class="lineno">  513</span>    }</div>
-<div class="line"><span class="lineno">  514</span> </div>
-<div class="line"><span class="lineno">  515</span>    free(q_reorder);</div>
-<div class="line"><span class="lineno">  516</span>    free(k_reorder);</div>
-<div class="line"><span class="lineno">  517</span>    free(cos_cache);</div>
-<div class="line"><span class="lineno">  518</span>    free(sin_cache);</div>
-<div class="line"><span class="lineno">  519</span>}</div>
+<div class="line"><span class="lineno">  495</span>        <span class="comment">/* Apply RoPE */</span></div>
+<div class="line"><span class="lineno">  496</span>        <a class="code hl_function" href="ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a>(q_reorder, k_reorder,</div>
+<div class="line"><span class="lineno">  497</span>                        cos_cache, sin_cache,</div>
+<div class="line"><span class="lineno">  498</span>                        n_heads, n_heads_kv, n_tokens,</div>
+<div class="line"><span class="lineno">  499</span>                        head_dim, head_dim, pos_offset);</div>
+<div class="line"><span class="lineno">  500</span> </div>
+<div class="line"><span class="lineno">  501</span>        <span class="comment">/* Reorder back: [H, T, D] -&gt; [T, H*D] */</span></div>
+<div class="line"><span class="lineno">  502</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  503</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
+<div class="line"><span class="lineno">  504</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
+<div class="line"><span class="lineno">  505</span>                    q[t * n_heads * head_dim + h * head_dim + d] =</div>
+<div class="line"><span class="lineno">  506</span>                        q_reorder[h * n_tokens * head_dim + t * head_dim + d];</div>
+<div class="line"><span class="lineno">  507</span>                }</div>
+<div class="line"><span class="lineno">  508</span>            }</div>
+<div class="line"><span class="lineno">  509</span>        }</div>
+<div class="line"><span class="lineno">  510</span> </div>
+<div class="line"><span class="lineno">  511</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  512</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
+<div class="line"><span class="lineno">  513</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; d++) {</div>
+<div class="line"><span class="lineno">  514</span>                    k[t * n_heads_kv * head_dim + h * head_dim + d] =</div>
+<div class="line"><span class="lineno">  515</span>                        k_reorder[h * n_tokens * head_dim + t * head_dim + d];</div>
+<div class="line"><span class="lineno">  516</span>                }</div>
+<div class="line"><span class="lineno">  517</span>            }</div>
+<div class="line"><span class="lineno">  518</span>        }</div>
+<div class="line"><span class="lineno">  519</span>    }</div>
+<div class="line"><span class="lineno">  520</span> </div>
+<div class="line"><span class="lineno">  521</span>    free(q_reorder);</div>
+<div class="line"><span class="lineno">  522</span>    free(k_reorder);</div>
+<div class="line"><span class="lineno">  523</span>    free(cos_cache);</div>
+<div class="line"><span class="lineno">  524</span>    free(sin_cache);</div>
+<div class="line"><span class="lineno">  525</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a3c55e1a13ca92346f9cf41bc4453f3df"><div class="ttname"><a href="ck__parity__api_8c.html#a3c55e1a13ca92346f9cf41bc4453f3df">rope_precompute_cache</a></div><div class="ttdeci">void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00052">rope_kernels.c:52</a></div></div>
 <div class="ttc" id="ack__parity__api_8c_html_ab18869516e9a6ab5998038716ac8a179"><div class="ttname"><a href="ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a></div><div class="ttdeci">void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00448">rope_kernels.c:448</a></div></div>
 </div><!-- fragment -->
@@ -1823,62 +2140,62 @@ Functions</h2></td></tr>
 <p>RoPE with interleaved format (for llama.cpp compatibility) </p>
 <p>Uses interleaved format: (x0, x1) -&gt; (x0*cos - x1*sin, x0*sin + x1*cos) </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00521">521</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  524</span>{</div>
-<div class="line"><span class="lineno">  525</span>    <span class="comment">/* Interleaved RoPE format (matches llama.cpp):</span></div>
-<div class="line"><span class="lineno">  526</span><span class="comment">     * (x0, x1) -&gt; (x0*cos - x1*sin, x0*sin + x1*cos)</span></div>
-<div class="line"><span class="lineno">  527</span><span class="comment">     * Applied to consecutive pairs of elements</span></div>
-<div class="line"><span class="lineno">  528</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  529</span> </div>
-<div class="line"><span class="lineno">  530</span>    <span class="comment">/* Precompute inverse frequencies */</span></div>
-<div class="line"><span class="lineno">  531</span>    <span class="keywordtype">float</span> *inv_freq = (<span class="keywordtype">float</span> *)malloc((head_dim / 2) * <span class="keyword">sizeof</span>(float));</div>
-<div class="line"><span class="lineno">  532</span>    <span class="keywordflow">if</span> (!inv_freq) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  533</span> </div>
-<div class="line"><span class="lineno">  534</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
-<div class="line"><span class="lineno">  535</span>        inv_freq[i] = 1.0f / powf(theta, (<span class="keywordtype">float</span>)(2 * i) / head_dim);</div>
-<div class="line"><span class="lineno">  536</span>    }</div>
-<div class="line"><span class="lineno">  537</span> </div>
-<div class="line"><span class="lineno">  538</span>    <span class="comment">/* Apply RoPE to Q */</span></div>
-<div class="line"><span class="lineno">  539</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  540</span>        <span class="keywordtype">int</span> pos = pos_offset + t;</div>
-<div class="line"><span class="lineno">  541</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
-<div class="line"><span class="lineno">  542</span>            <span class="keywordtype">float</span> *qh = q + t * n_heads * head_dim + h * head_dim;</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00527">527</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  530</span>{</div>
+<div class="line"><span class="lineno">  531</span>    <span class="comment">/* Interleaved RoPE format (matches llama.cpp):</span></div>
+<div class="line"><span class="lineno">  532</span><span class="comment">     * (x0, x1) -&gt; (x0*cos - x1*sin, x0*sin + x1*cos)</span></div>
+<div class="line"><span class="lineno">  533</span><span class="comment">     * Applied to consecutive pairs of elements</span></div>
+<div class="line"><span class="lineno">  534</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  535</span> </div>
+<div class="line"><span class="lineno">  536</span>    <span class="comment">/* Precompute inverse frequencies */</span></div>
+<div class="line"><span class="lineno">  537</span>    <span class="keywordtype">float</span> *inv_freq = (<span class="keywordtype">float</span> *)malloc((head_dim / 2) * <span class="keyword">sizeof</span>(float));</div>
+<div class="line"><span class="lineno">  538</span>    <span class="keywordflow">if</span> (!inv_freq) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  539</span> </div>
+<div class="line"><span class="lineno">  540</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
+<div class="line"><span class="lineno">  541</span>        inv_freq[i] = 1.0f / powf(theta, (<span class="keywordtype">float</span>)(2 * i) / head_dim);</div>
+<div class="line"><span class="lineno">  542</span>    }</div>
 <div class="line"><span class="lineno">  543</span> </div>
-<div class="line"><span class="lineno">  544</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
-<div class="line"><span class="lineno">  545</span>                <span class="keywordtype">float</span> freq = pos * inv_freq[i];</div>
-<div class="line"><span class="lineno">  546</span>                <span class="keywordtype">float</span> cos_val = cosf(freq);</div>
-<div class="line"><span class="lineno">  547</span>                <span class="keywordtype">float</span> sin_val = sinf(freq);</div>
-<div class="line"><span class="lineno">  548</span> </div>
-<div class="line"><span class="lineno">  549</span>                <span class="comment">/* Interleaved format */</span></div>
-<div class="line"><span class="lineno">  550</span>                <span class="keywordtype">float</span> x0 = qh[i * 2];</div>
-<div class="line"><span class="lineno">  551</span>                <span class="keywordtype">float</span> x1 = qh[i * 2 + 1];</div>
-<div class="line"><span class="lineno">  552</span>                qh[i * 2]     = x0 * cos_val - x1 * sin_val;</div>
-<div class="line"><span class="lineno">  553</span>                qh[i * 2 + 1] = x0 * sin_val + x1 * cos_val;</div>
-<div class="line"><span class="lineno">  554</span>            }</div>
-<div class="line"><span class="lineno">  555</span>        }</div>
-<div class="line"><span class="lineno">  556</span>    }</div>
-<div class="line"><span class="lineno">  557</span> </div>
-<div class="line"><span class="lineno">  558</span>    <span class="comment">/* Apply RoPE to K */</span></div>
-<div class="line"><span class="lineno">  559</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
-<div class="line"><span class="lineno">  560</span>        <span class="keywordtype">int</span> pos = pos_offset + t;</div>
-<div class="line"><span class="lineno">  561</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
-<div class="line"><span class="lineno">  562</span>            <span class="keywordtype">float</span> *kh = k + t * n_heads_kv * head_dim + h * head_dim;</div>
+<div class="line"><span class="lineno">  544</span>    <span class="comment">/* Apply RoPE to Q */</span></div>
+<div class="line"><span class="lineno">  545</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  546</span>        <span class="keywordtype">int</span> pos = pos_offset + t;</div>
+<div class="line"><span class="lineno">  547</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads; h++) {</div>
+<div class="line"><span class="lineno">  548</span>            <span class="keywordtype">float</span> *qh = q + t * n_heads * head_dim + h * head_dim;</div>
+<div class="line"><span class="lineno">  549</span> </div>
+<div class="line"><span class="lineno">  550</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
+<div class="line"><span class="lineno">  551</span>                <span class="keywordtype">float</span> freq = pos * inv_freq[i];</div>
+<div class="line"><span class="lineno">  552</span>                <span class="keywordtype">float</span> cos_val = cosf(freq);</div>
+<div class="line"><span class="lineno">  553</span>                <span class="keywordtype">float</span> sin_val = sinf(freq);</div>
+<div class="line"><span class="lineno">  554</span> </div>
+<div class="line"><span class="lineno">  555</span>                <span class="comment">/* Interleaved format */</span></div>
+<div class="line"><span class="lineno">  556</span>                <span class="keywordtype">float</span> x0 = qh[i * 2];</div>
+<div class="line"><span class="lineno">  557</span>                <span class="keywordtype">float</span> x1 = qh[i * 2 + 1];</div>
+<div class="line"><span class="lineno">  558</span>                qh[i * 2]     = x0 * cos_val - x1 * sin_val;</div>
+<div class="line"><span class="lineno">  559</span>                qh[i * 2 + 1] = x0 * sin_val + x1 * cos_val;</div>
+<div class="line"><span class="lineno">  560</span>            }</div>
+<div class="line"><span class="lineno">  561</span>        }</div>
+<div class="line"><span class="lineno">  562</span>    }</div>
 <div class="line"><span class="lineno">  563</span> </div>
-<div class="line"><span class="lineno">  564</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
-<div class="line"><span class="lineno">  565</span>                <span class="keywordtype">float</span> freq = pos * inv_freq[i];</div>
-<div class="line"><span class="lineno">  566</span>                <span class="keywordtype">float</span> cos_val = cosf(freq);</div>
-<div class="line"><span class="lineno">  567</span>                <span class="keywordtype">float</span> sin_val = sinf(freq);</div>
-<div class="line"><span class="lineno">  568</span> </div>
-<div class="line"><span class="lineno">  569</span>                <span class="keywordtype">float</span> x0 = kh[i * 2];</div>
-<div class="line"><span class="lineno">  570</span>                <span class="keywordtype">float</span> x1 = kh[i * 2 + 1];</div>
-<div class="line"><span class="lineno">  571</span>                kh[i * 2]     = x0 * cos_val - x1 * sin_val;</div>
-<div class="line"><span class="lineno">  572</span>                kh[i * 2 + 1] = x0 * sin_val + x1 * cos_val;</div>
-<div class="line"><span class="lineno">  573</span>            }</div>
-<div class="line"><span class="lineno">  574</span>        }</div>
-<div class="line"><span class="lineno">  575</span>    }</div>
-<div class="line"><span class="lineno">  576</span> </div>
-<div class="line"><span class="lineno">  577</span>    free(inv_freq);</div>
-<div class="line"><span class="lineno">  578</span>}</div>
+<div class="line"><span class="lineno">  564</span>    <span class="comment">/* Apply RoPE to K */</span></div>
+<div class="line"><span class="lineno">  565</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; n_tokens; t++) {</div>
+<div class="line"><span class="lineno">  566</span>        <span class="keywordtype">int</span> pos = pos_offset + t;</div>
+<div class="line"><span class="lineno">  567</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; n_heads_kv; h++) {</div>
+<div class="line"><span class="lineno">  568</span>            <span class="keywordtype">float</span> *kh = k + t * n_heads_kv * head_dim + h * head_dim;</div>
+<div class="line"><span class="lineno">  569</span> </div>
+<div class="line"><span class="lineno">  570</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim / 2; i++) {</div>
+<div class="line"><span class="lineno">  571</span>                <span class="keywordtype">float</span> freq = pos * inv_freq[i];</div>
+<div class="line"><span class="lineno">  572</span>                <span class="keywordtype">float</span> cos_val = cosf(freq);</div>
+<div class="line"><span class="lineno">  573</span>                <span class="keywordtype">float</span> sin_val = sinf(freq);</div>
+<div class="line"><span class="lineno">  574</span> </div>
+<div class="line"><span class="lineno">  575</span>                <span class="keywordtype">float</span> x0 = kh[i * 2];</div>
+<div class="line"><span class="lineno">  576</span>                <span class="keywordtype">float</span> x1 = kh[i * 2 + 1];</div>
+<div class="line"><span class="lineno">  577</span>                kh[i * 2]     = x0 * cos_val - x1 * sin_val;</div>
+<div class="line"><span class="lineno">  578</span>                kh[i * 2 + 1] = x0 * sin_val + x1 * cos_val;</div>
+<div class="line"><span class="lineno">  579</span>            }</div>
+<div class="line"><span class="lineno">  580</span>        }</div>
+<div class="line"><span class="lineno">  581</span>    }</div>
+<div class="line"><span class="lineno">  582</span> </div>
+<div class="line"><span class="lineno">  583</span>    free(inv_freq);</div>
+<div class="line"><span class="lineno">  584</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1925,27 +2242,27 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00587">587</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  588</span>{</div>
-<div class="line"><span class="lineno">  589</span>    <span class="comment">/* Find max for numerical stability */</span></div>
-<div class="line"><span class="lineno">  590</span>    <span class="keywordtype">float</span> max_val = input[0];</div>
-<div class="line"><span class="lineno">  591</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">  592</span>        <span class="keywordflow">if</span> (input[i] &gt; max_val) max_val = input[i];</div>
-<div class="line"><span class="lineno">  593</span>    }</div>
-<div class="line"><span class="lineno">  594</span> </div>
-<div class="line"><span class="lineno">  595</span>    <span class="comment">/* Compute exp and sum */</span></div>
-<div class="line"><span class="lineno">  596</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  597</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">  598</span>        output[i] = expf(input[i] - max_val);</div>
-<div class="line"><span class="lineno">  599</span>        sum += output[i];</div>
-<div class="line"><span class="lineno">  600</span>    }</div>
-<div class="line"><span class="lineno">  601</span> </div>
-<div class="line"><span class="lineno">  602</span>    <span class="comment">/* Normalize */</span></div>
-<div class="line"><span class="lineno">  603</span>    <span class="keywordtype">float</span> inv_sum = 1.0f / sum;</div>
-<div class="line"><span class="lineno">  604</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; i++) {</div>
-<div class="line"><span class="lineno">  605</span>        output[i] *= inv_sum;</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00593">593</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  594</span>{</div>
+<div class="line"><span class="lineno">  595</span>    <span class="comment">/* Find max for numerical stability */</span></div>
+<div class="line"><span class="lineno">  596</span>    <span class="keywordtype">float</span> max_val = input[0];</div>
+<div class="line"><span class="lineno">  597</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">  598</span>        <span class="keywordflow">if</span> (input[i] &gt; max_val) max_val = input[i];</div>
+<div class="line"><span class="lineno">  599</span>    }</div>
+<div class="line"><span class="lineno">  600</span> </div>
+<div class="line"><span class="lineno">  601</span>    <span class="comment">/* Compute exp and sum */</span></div>
+<div class="line"><span class="lineno">  602</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  603</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">  604</span>        output[i] = expf(input[i] - max_val);</div>
+<div class="line"><span class="lineno">  605</span>        sum += output[i];</div>
 <div class="line"><span class="lineno">  606</span>    }</div>
-<div class="line"><span class="lineno">  607</span>}</div>
+<div class="line"><span class="lineno">  607</span> </div>
+<div class="line"><span class="lineno">  608</span>    <span class="comment">/* Normalize */</span></div>
+<div class="line"><span class="lineno">  609</span>    <span class="keywordtype">float</span> inv_sum = 1.0f / sum;</div>
+<div class="line"><span class="lineno">  610</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; i++) {</div>
+<div class="line"><span class="lineno">  611</span>        output[i] *= inv_sum;</div>
+<div class="line"><span class="lineno">  612</span>    }</div>
+<div class="line"><span class="lineno">  613</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1999,10 +2316,10 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00580">580</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  583</span>{</div>
-<div class="line"><span class="lineno">  584</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a>(gate_up, output, n_tokens, intermediate_dim);</div>
-<div class="line"><span class="lineno">  585</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00586">586</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  589</span>{</div>
+<div class="line"><span class="lineno">  590</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a>(gate_up, output, n_tokens, intermediate_dim);</div>
+<div class="line"><span class="lineno">  591</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a26369aa07808fb6aae4502d54a1ba650"><div class="ttname"><a href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a></div><div class="ttdeci">void swiglu_forward(const float *input, float *output, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00131">swiglu_kernels.c:131</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="swiglu__kernels_8c_source.html#l00131">swiglu_forward()</a>.</p>
@@ -2070,10 +2387,10 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00275">275</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  279</span>{</div>
-<div class="line"><span class="lineno">  280</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(cols, output, weight_q5_0, input_q8_0);</div>
-<div class="line"><span class="lineno">  281</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00281">281</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  285</span>{</div>
+<div class="line"><span class="lineno">  286</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(cols, output, weight_q5_0, input_q8_0);</div>
+<div class="line"><span class="lineno">  287</span>}</div>
 <div class="ttc" id="ack__parity__api_8c_html_a8744a3b1e4d1dc928fce050f111414a6"><div class="ttname"><a href="ck__parity__api_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a></div><div class="ttdeci">void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Auto-dispatch quantized dot product Q5_0 x Q8_0.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01350">gemm_kernels_q5_0.c:1350</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01350">vec_dot_q5_0_q8_0()</a>.</p>
@@ -2139,13 +2456,13 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00291">291</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  295</span>{</div>
-<div class="line"><span class="lineno">  296</span>    <a class="code hl_function" href="ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a>(cols, output, weight_q8_0, input_q8_0);</div>
-<div class="line"><span class="lineno">  297</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_aea5f7a52ed3f21e0c6795766cfb28751"><div class="ttname"><a href="ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a></div><div class="ttdeci">void vec_dot_q8_0_q8_0(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Auto-dispatch quantized dot product Q8_0 x Q8_0.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00867">gemm_kernels_q8_0.c:867</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__parity__api_8c_source.html#l00297">297</a> of file <a class="el" href="ck__parity__api_8c_source.html">ck_parity_api.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  301</span>{</div>
+<div class="line"><span class="lineno">  302</span>    <a class="code hl_function" href="ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a>(cols, output, weight_q8_0, input_q8_0);</div>
+<div class="line"><span class="lineno">  303</span>}</div>
+<div class="ttc" id="ack__parity__api_8c_html_aea5f7a52ed3f21e0c6795766cfb28751"><div class="ttname"><a href="ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a></div><div class="ttdeci">void vec_dot_q8_0_q8_0(int n, float *s, const void *vx, const void *vy)</div><div class="ttdoc">Auto-dispatch quantized dot product Q8_0 x Q8_0.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00949">gemm_kernels_q8_0.c:949</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00867">vec_dot_q8_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00949">vec_dot_q8_0_q8_0()</a>.</p>
 
 </div>
 </div>

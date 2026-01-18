@@ -14,7 +14,7 @@ var searchData=
   ['initialized_11',['initialized',['../structCKMetricsContext.html#ad73dc6efeb6c25c0bf023f8eadd1a5b2',1,'CKMetricsContext']]],
   ['input_12',['input',['../structCKLayerOffsets.html#a207b51ce0a5d8afb92fbb3f810ca4574',1,'CKLayerOffsets::input'],['../structCKLayerForwardParams.html#ad678ed659e2a04e07062a4aff3fe50a7',1,'CKLayerForwardParams::input'],['../structCKLayerBackwardParams.html#ac93a8ba8f46764f67690abf1991f1bf8',1,'CKLayerBackwardParams::input'],['../structCKLayerForwardParamsQ4K.html#ad73e1dbeb642314392d9bd140dd0aff8',1,'CKLayerForwardParamsQ4K::input']]],
   ['inputs_13',['inputs',['../structCKIRNode.html#a595fda2c0bbc4073e1f28af4495ec8ac',1,'CKIRNode::inputs'],['../structCKIRV2Node.html#a4d8d72b29b1770b0b87624ac821fcf68',1,'CKIRV2Node::inputs']]],
-  ['insight_3a_14',['KEY INSIGHT:',['../prefill__fused__gemm_8c.html#autotoc_md25',1,'']]],
+  ['insight_3a_14',['KEY INSIGHT:',['../prefill__fused__gemm_8c.html#autotoc_md27',1,'']]],
   ['interfaces_15',['interfaces',['../structNetworkTopology.html#a31ec354a019961b6c7619bd2f71696ca',1,'NetworkTopology']]],
   ['intermediate_5fdim_16',['intermediate_dim',['../structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e',1,'CKLayerForwardParamsQ4K::intermediate_dim'],['../structCKLayerBackwardParams.html#a5b49b24d78c69f0ffbac75cea89bf697',1,'CKLayerBackwardParams::intermediate_dim'],['../structCKLayerForwardParams.html#ac1ce35724d91ff94c95707a6d879d0a9',1,'CKLayerForwardParams::intermediate_dim'],['../structCKSectionConfig.html#a754d226bbafb22421965678394c0920c',1,'CKSectionConfig::intermediate_dim']]],
   ['intermediate_5fsize_17',['intermediate_size',['../structCKModelConfig.html#a2da9b0b988ccf3b7117a611da5984d34',1,'CKModelConfig']]],

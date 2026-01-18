@@ -57,7 +57,7 @@ var searchData=
   ['print_5fversion_54',['print_version',['../v6__cli_8c.html#a2e0d36c06cdd7fbacb264c67367d3b01',1,'print_version(void):&#160;v6_cli.c'],['../v6_86__cli_8c.html#a2e0d36c06cdd7fbacb264c67367d3b01',1,'print_version(void):&#160;v6.6_cli.c'],['../v6_85__cli_8c.html#a2e0d36c06cdd7fbacb264c67367d3b01',1,'print_version(void):&#160;v6.5_cli.c']]],
   ['print_5fwarning_55',['print_warning',['../show__config_8c.html#aa89d156e8491ad3112f448c5918b21e2',1,'show_config.c']]],
   ['priority_56',['priority',['../true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04',1,'priority:&#160;true_bpe.h'],['../structRecommendation.html#a2dea715a398d739605559094647c11eb',1,'Recommendation::priority'],['../structCKTrieNode.html#aace4764a43a80b9f2039dd91fb50c649',1,'CKTrieNode::priority'],['../structCKMergeRule.html#af89e288682de3079e22683c57b629d4c',1,'CKMergeRule::priority']]],
-  ['problem_20this_20solves_3a_57',['PROBLEM THIS SOLVES:',['../gemm__head__major__output_8c.html#autotoc_md34',1,'']]],
+  ['problem_20this_20solves_3a_57',['PROBLEM THIS SOLVES:',['../gemm__head__major__output_8c.html#autotoc_md36',1,'']]],
   ['process_5frepl_5fcommand_58',['process_repl_command',['../ck__cli__v6_85_8c.html#a747330398e5c4f4d90c999b2519de1d3',1,'process_repl_command(const char *line, CLIOptions *opt, ModelAPI *api):&#160;ck_cli_v6.5.c'],['../ck__cli__v6_86_8c.html#a747330398e5c4f4d90c999b2519de1d3',1,'process_repl_command(const char *line, CLIOptions *opt, ModelAPI *api):&#160;ck_cli_v6.6.c']]],
   ['producer_59',['producer',['../structCKInputRef.html#a952a97cab88682ffb36027b353492e6f',1,'CKInputRef']]],
   ['proj_5fout_60',['proj_out',['../structCKLayerOffsets.html#ad4bc2b7cea35add011aa22e48f10f99c',1,'CKLayerOffsets']]],
