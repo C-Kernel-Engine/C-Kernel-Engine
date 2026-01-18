@@ -130,7 +130,8 @@ class BenchResult:
 
 
 class AttnBench:
-    def __init__(self):
+    def __init__(self, kernel: str):
+        self.kernel = kernel
         self.lib = load_lib("libckernel_engine.so")
         self._bind()
 
@@ -228,6 +229,41 @@ class AttnBench:
         ]
         lib.mega_fused_attention_prefill.restype = None
 
+        lib.mega_fused_attention_prefill_q8_0.argtypes = [
+            ctypes.POINTER(ctypes.c_float),  # output
+            ctypes.POINTER(ctypes.c_float),  # input
+            ctypes.POINTER(ctypes.c_float),  # residual
+            ctypes.POINTER(ctypes.c_float),  # ln1_gamma
+            ctypes.c_void_p,                 # wq
+            ctypes.POINTER(ctypes.c_float),  # bq
+            ctypes.c_int,                    # wq_dt
+            ctypes.c_void_p,                 # wk
+            ctypes.POINTER(ctypes.c_float),  # bk
+            ctypes.c_int,                    # wk_dt
+            ctypes.c_void_p,                 # wv
+            ctypes.POINTER(ctypes.c_float),  # bv
+            ctypes.c_int,                    # wv_dt
+            ctypes.c_void_p,                 # wo
+            ctypes.POINTER(ctypes.c_float),  # bo
+            ctypes.c_int,                    # wo_dt
+            ctypes.POINTER(ctypes.c_float),  # kv_cache_k
+            ctypes.POINTER(ctypes.c_float),  # kv_cache_v
+            ctypes.c_void_p,                 # rope_cos
+            ctypes.c_void_p,                 # rope_sin
+            ctypes.c_int,                    # start_pos
+            ctypes.c_int,                    # tokens
+            ctypes.c_int,                    # cache_capacity
+            ctypes.c_int,                    # embed_dim
+            ctypes.c_int,                    # aligned_embed_dim
+            ctypes.c_int,                    # num_heads
+            ctypes.c_int,                    # num_kv_heads
+            ctypes.c_int,                    # head_dim
+            ctypes.c_int,                    # aligned_head_dim
+            ctypes.c_float,                  # eps
+            ctypes.c_void_p,                 # scratch
+        ]
+        lib.mega_fused_attention_prefill_q8_0.restype = None
+
         lib.mega_fused_attention_prefill_scratch_size.argtypes = [
             ctypes.c_int,
             ctypes.c_int,
@@ -235,6 +271,14 @@ class AttnBench:
             ctypes.c_int,
         ]
         lib.mega_fused_attention_prefill_scratch_size.restype = ctypes.c_size_t
+
+        lib.mega_fused_attention_prefill_q8_0_scratch_size.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        lib.mega_fused_attention_prefill_q8_0_scratch_size.restype = ctypes.c_size_t
 
     def run_baseline(self, dims: AttnDims, weights: AttnWeights, buf: AttnBuffers):
         lib = self.lib
@@ -283,7 +327,11 @@ class AttnBench:
 
     def run_fused(self, dims: AttnDims, weights: AttnWeights, buf: AttnBuffers):
         rope_null = ctypes.c_void_p(0)
-        self.lib.mega_fused_attention_prefill(
+        if self.kernel == "q8q8":
+            fused = self.lib.mega_fused_attention_prefill_q8_0
+        else:
+            fused = self.lib.mega_fused_attention_prefill
+        fused(
             ptr_f32(buf.out_fused),
             ptr_f32(buf.x),
             None,
@@ -340,16 +388,30 @@ def make_buffers(dims: AttnDims, qkv_scratch_bytes: int, scratch_bytes: int) -> 
     )
 
 
-def make_synthetic_weights(dims: AttnDims, wv_dt: int) -> AttnWeights:
-    wq = make_q5_0_weights(dims.num_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
-    wk = make_q5_0_weights(dims.num_kv_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
+def make_synthetic_weights(dims: AttnDims,
+                           wv_dt: int,
+                           wq_dt: int = CK_DT_Q5_0,
+                           wk_dt: int = CK_DT_Q5_0,
+                           wo_dt: int = CK_DT_Q5_0) -> AttnWeights:
+    if wq_dt == CK_DT_Q8_0:
+        wq = make_q8_0_weights(dims.num_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
+    else:
+        wq = make_q5_0_weights(dims.num_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
+
+    if wk_dt == CK_DT_Q8_0:
+        wk = make_q8_0_weights(dims.num_kv_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
+    else:
+        wk = make_q5_0_weights(dims.num_kv_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
 
     if wv_dt == CK_DT_Q8_0:
         wv = make_q8_0_weights(dims.num_kv_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
     else:
         wv = make_q5_0_weights(dims.num_kv_heads * dims.aligned_head_dim, dims.aligned_embed_dim)
 
-    wo = make_q5_0_weights(dims.aligned_embed_dim, dims.aligned_embed_dim)
+    if wo_dt == CK_DT_Q8_0:
+        wo = make_q8_0_weights(dims.aligned_embed_dim, dims.aligned_embed_dim)
+    else:
+        wo = make_q5_0_weights(dims.aligned_embed_dim, dims.aligned_embed_dim)
 
     bq = np.random.randn(dims.num_heads * dims.aligned_head_dim).astype(np.float32)
     bk = np.random.randn(dims.num_kv_heads * dims.aligned_head_dim).astype(np.float32)
@@ -358,7 +420,7 @@ def make_synthetic_weights(dims: AttnDims, wv_dt: int) -> AttnWeights:
     return AttnWeights(
         wq=wq, wk=wk, wv=wv, wo=wo,
         bq=bq, bk=bk, bv=bv,
-        wq_dt=CK_DT_Q5_0, wk_dt=CK_DT_Q5_0, wv_dt=wv_dt, wo_dt=CK_DT_Q5_0
+        wq_dt=wq_dt, wk_dt=wk_dt, wv_dt=wv_dt, wo_dt=wo_dt
     )
 
 
@@ -404,10 +466,16 @@ def run_bench_for_dims(bench: AttnBench, dims: AttnDims, weights: AttnWeights,
     qkv_scratch_bytes = bench.lib.fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size(
         ctypes.c_int(dims.aligned_embed_dim)
     )
-    scratch_bytes = bench.lib.mega_fused_attention_prefill_scratch_size(
-        ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
-        ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
-    )
+    if bench.kernel == "q8q8":
+        scratch_bytes = bench.lib.mega_fused_attention_prefill_q8_0_scratch_size(
+            ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
+            ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
+        )
+    else:
+        scratch_bytes = bench.lib.mega_fused_attention_prefill_scratch_size(
+            ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
+            ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
+        )
     buf = make_buffers(dims, qkv_scratch_bytes, scratch_bytes)
 
     baseline_fn = lambda: bench.run_baseline(dims, weights, buf)
@@ -433,6 +501,8 @@ def main() -> int:
     ap.add_argument("--seq-lens", default="32,64,128,256")
     ap.add_argument("--warmup", type=int, default=3)
     ap.add_argument("--iters", type=int, default=10)
+    ap.add_argument("--kernel", default="q5q8", choices=["q5q8", "q8q8"],
+                    help="Select fused kernel variant for out-proj.")
     ap.add_argument("--q8-outproj", action="store_true",
                     help="Enable head-major Q8_0 out-proj fast path (sets CK_Q8_0_OUTPROJ=1).")
     args = ap.parse_args()
@@ -442,7 +512,7 @@ def main() -> int:
 
     seq_lens = [int(x) for x in args.seq_lens.split(",") if x]
 
-    bench = AttnBench()
+    bench = AttnBench(args.kernel)
 
     cfg = load_config(args.model_dir)
     embed_dim = int(cfg["hidden_size"])
@@ -460,21 +530,28 @@ def main() -> int:
         "head_dim": head_dim,
     })
 
-    print("\n[SYNTHETIC] wq/wk/wo=q5_0, wv=q5_0")
-    for tokens in seq_lens:
-        dims = AttnDims(tokens, embed_dim, aligned_embed_dim, num_heads, num_kv_heads,
-                        head_dim, aligned_head_dim, tokens, eps)
-        weights = make_synthetic_weights(dims, wv_dt=CK_DT_Q5_0)
-        res = run_bench_for_dims(bench, dims, weights, args.warmup, args.iters)
-        print_result("synthetic-q5wv", dims, res)
+    if args.kernel == "q8q8":
+        wq_dt = wk_dt = wo_dt = CK_DT_Q8_0
+        wv_dts = [CK_DT_Q8_0]
+        label_suffix = "q8_0"
+    else:
+        wq_dt = wk_dt = wo_dt = CK_DT_Q5_0
+        wv_dts = [CK_DT_Q5_0, CK_DT_Q8_0]
+        label_suffix = "q5_0"
 
-    print("\n[SYNTHETIC] wq/wk/wo=q5_0, wv=q8_0")
-    for tokens in seq_lens:
-        dims = AttnDims(tokens, embed_dim, aligned_embed_dim, num_heads, num_kv_heads,
-                        head_dim, aligned_head_dim, tokens, eps)
-        weights = make_synthetic_weights(dims, wv_dt=CK_DT_Q8_0)
-        res = run_bench_for_dims(bench, dims, weights, args.warmup, args.iters)
-        print_result("synthetic-q8wv", dims, res)
+    for wv_dt in wv_dts:
+        wv_label = "q8_0" if wv_dt == CK_DT_Q8_0 else "q5_0"
+        print(f"\n[SYNTHETIC] wq/wk/wo={label_suffix}, wv={wv_label}")
+        for tokens in seq_lens:
+            dims = AttnDims(tokens, embed_dim, aligned_embed_dim, num_heads, num_kv_heads,
+                            head_dim, aligned_head_dim, tokens, eps)
+            weights = make_synthetic_weights(dims,
+                                             wv_dt=wv_dt,
+                                             wq_dt=wq_dt,
+                                             wk_dt=wk_dt,
+                                             wo_dt=wo_dt)
+            res = run_bench_for_dims(bench, dims, weights, args.warmup, args.iters)
+            print_result(f"synthetic-{wv_label}", dims, res)
 
     entries = load_manifest(args.model_dir)
     layers = find_layers_by_wv_dtype(entries)
@@ -518,16 +595,25 @@ def main() -> int:
         )
 
         dtype_str = wv_e["dtype"]
+        if args.kernel == "q8q8" and DTYPE_STR_TO_CK[wo_e["dtype"]] != CK_DT_Q8_0:
+            print(f"real-L{layer}-{dtype_str:<5} tokens=----  SKIP (wo not q8_0)")
+            continue
         for tokens in seq_lens:
             dims = AttnDims(tokens, embed_dim, aligned_embed_dim, num_heads, num_kv_heads,
                             head_dim, aligned_head_dim, tokens, eps)
             qkv_scratch_bytes = bench.lib.fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size(
                 ctypes.c_int(dims.aligned_embed_dim)
             )
-            scratch_bytes = bench.lib.mega_fused_attention_prefill_scratch_size(
-                ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
-                ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
-            )
+            if bench.kernel == "q8q8":
+                scratch_bytes = bench.lib.mega_fused_attention_prefill_q8_0_scratch_size(
+                    ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
+                    ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
+                )
+            else:
+                scratch_bytes = bench.lib.mega_fused_attention_prefill_scratch_size(
+                    ctypes.c_int(dims.tokens), ctypes.c_int(dims.aligned_embed_dim),
+                    ctypes.c_int(dims.num_heads), ctypes.c_int(dims.aligned_head_dim)
+                )
             buf = make_buffers(dims, qkv_scratch_bytes, scratch_bytes)
             buf.gamma[:] = gamma
 

@@ -641,6 +641,125 @@ void test_softmax(const float * input, float * output, int n) {
 }
 
 // ============================================================================
+// Attention Test (for comparing CK-Engine vs llama.cpp)
+// ============================================================================
+
+/**
+ * @brief Multi-head causal attention for prefill (matches CK-Engine interface)
+ *
+ * Layout (head-major, matching CK-Engine):
+ *   Q: [num_heads, tokens, head_dim]
+ *   K: [num_kv_heads, seq_len, head_dim]
+ *   V: [num_kv_heads, seq_len, head_dim]
+ *   out: [num_heads, tokens, head_dim]
+ *
+ * Supports GQA (grouped-query attention) where num_heads > num_kv_heads.
+ * Causal masking: token t can only attend to positions 0..t (inclusive).
+ *
+ * @param q           Query [num_heads, tokens, head_dim]
+ * @param k           Key [num_kv_heads, seq_len, head_dim]
+ * @param v           Value [num_kv_heads, seq_len, head_dim]
+ * @param out         Output [num_heads, tokens, head_dim]
+ * @param num_heads   Number of query heads
+ * @param num_kv_heads Number of key/value heads (for GQA)
+ * @param tokens      Number of query tokens
+ * @param seq_len     Key/value sequence length (for prefill: seq_len == tokens)
+ * @param head_dim    Dimension per head
+ */
+void test_attention_causal_multihead(const float * q,
+                                     const float * k,
+                                     const float * v,
+                                     float * out,
+                                     int num_heads,
+                                     int num_kv_heads,
+                                     int tokens,
+                                     int seq_len,
+                                     int head_dim) {
+    const float scale = 1.0f / sqrtf((float)head_dim);
+
+    // Allocate temporary buffers (avoid stack overflow for large seq_len)
+    float * scores = new float[seq_len];
+    float * exp_scores = new float[seq_len];
+
+    // Head strides
+    const size_t q_head_stride = (size_t)tokens * (size_t)head_dim;
+    const size_t kv_head_stride = (size_t)seq_len * (size_t)head_dim;
+
+    // Process each query head
+    for (int h = 0; h < num_heads; h++) {
+        // GQA: map query head to KV head
+        int kv_h = (num_kv_heads == num_heads) ? h :
+                   (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+
+        const float * q_head = q + h * q_head_stride;
+        const float * k_head = k + kv_h * kv_head_stride;
+        const float * v_head = v + kv_h * kv_head_stride;
+        float * out_head = out + h * q_head_stride;
+
+        // Process each query token
+        for (int t = 0; t < tokens; t++) {
+            const float * q_vec = q_head + t * head_dim;
+            float * out_vec = out_head + t * head_dim;
+
+            // Causal attention: only attend to positions 0..t (inclusive)
+            // For prefill with seq_len == tokens, causal_len = t + 1
+            int causal_len = (seq_len == tokens) ? (t + 1) : seq_len;
+
+            // Compute attention scores: q[t] @ k[0:causal_len]^T
+            float max_score = -INFINITY;
+            for (int s = 0; s < causal_len; s++) {
+                const float * k_vec = k_head + s * head_dim;
+                float score = 0.0f;
+                for (int d = 0; d < head_dim; d++) {
+                    score += q_vec[d] * k_vec[d];
+                }
+                scores[s] = score * scale;
+                if (scores[s] > max_score) max_score = scores[s];
+            }
+
+            // Softmax: exp and sum
+            float sum = 0.0f;
+            for (int s = 0; s < causal_len; s++) {
+                exp_scores[s] = expf(scores[s] - max_score);
+                sum += exp_scores[s];
+            }
+
+            // Normalize
+            float inv_sum = 1.0f / sum;
+            for (int s = 0; s < causal_len; s++) {
+                exp_scores[s] *= inv_sum;
+            }
+
+            // Weighted sum of values: out = sum(attn_weights * V)
+            for (int d = 0; d < head_dim; d++) {
+                float result = 0.0f;
+                for (int s = 0; s < causal_len; s++) {
+                    result += exp_scores[s] * v_head[s * head_dim + d];
+                }
+                out_vec[d] = result;
+            }
+        }
+    }
+
+    delete[] scores;
+    delete[] exp_scores;
+}
+
+/**
+ * @brief Simple single-head attention (legacy, kept for compatibility)
+ */
+void test_attention_flash(const float * q,
+                         const float * k,
+                         const float * v,
+                         float * out,
+                         int tokens,
+                         int head_dim,
+                         int seq_len) {
+    // Delegate to multi-head version with num_heads=1
+    test_attention_causal_multihead(q, k, v, out, 1, 1, tokens, seq_len, head_dim);
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -707,6 +826,148 @@ int get_qk5_0(void) {
  */
 int get_qk8_0(void) {
     return QK8_0;
+}
+
+// ============================================================================
+// Fused OutProj + MLP Reference (for parity testing mega_fused_outproj_mlp)
+// ============================================================================
+
+/**
+ * @brief Reference implementation of fused OutProj + MLP
+ *
+ * Steps (matches mega_fused_outproj_mlp_prefill):
+ * 1. Flatten head-major attn_out to token-major
+ * 2. OutProj: attn_flat @ W_o (Q5_0 x Q8_0) → h1
+ * 3. Residual: h1 += residual
+ * 4. RMSNorm: h1 → ln2_out
+ * 5. MLP:
+ *    - gate = ln2_out @ W_gate (Q5_0 x Q8_0)
+ *    - up = ln2_out @ W_up (Q5_0 x Q8_0)
+ *    - hidden = SiLU(gate) * up
+ *    - output = hidden @ W2 (Q4_K/Q6_K x Q8_K)
+ * 6. Residual: output += h1
+ *
+ * @param attn_out     Attention output [num_heads, tokens, head_dim] (FP32, head-major)
+ * @param residual     Residual input [tokens, embed_dim] (FP32)
+ * @param ln2_gamma    RMSNorm gamma [embed_dim] (FP32)
+ * @param wo           OutProj weights [embed_dim, embed_dim] (Q5_0)
+ * @param w1           MLP W1 weights [2*intermediate, embed_dim] (Q5_0) - gate+up concatenated
+ * @param w2           MLP W2 weights [embed_dim, intermediate] (Q4_K or Q6_K)
+ * @param output       Output [tokens, embed_dim] (FP32)
+ * @param tokens       Number of tokens
+ * @param num_heads    Number of attention heads
+ * @param head_dim     Dimension per head
+ * @param embed_dim    Embedding dimension (= num_heads * head_dim)
+ * @param intermediate MLP intermediate dimension
+ * @param eps          RMSNorm epsilon
+ * @param w2_is_q6k    If true, W2 is Q6_K; if false, W2 is Q4_K
+ */
+void test_outproj_mlp_fused_q5_0(
+    const float * attn_out,
+    const float * residual,
+    const float * ln2_gamma,
+    const void * wo,
+    const void * w1,
+    const void * w2,
+    float * output,
+    int tokens,
+    int num_heads,
+    int head_dim,
+    int embed_dim,
+    int intermediate,
+    float eps,
+    int w2_is_q6k)
+{
+    // Allocate intermediate buffers
+    float * attn_flat = new float[tokens * embed_dim];
+    float * h1 = new float[tokens * embed_dim];
+    float * ln2_out = new float[tokens * embed_dim];
+    float * gate = new float[tokens * intermediate];
+    float * up = new float[tokens * intermediate];
+
+    // Step 1: Flatten head-major [num_heads, tokens, head_dim] to token-major [tokens, embed_dim]
+    // CK layout: attn_out[h, t, d] → attn_flat[t, h * head_dim + d]
+    for (int h = 0; h < num_heads; h++) {
+        for (int t = 0; t < tokens; t++) {
+            for (int d = 0; d < head_dim; d++) {
+                int src_idx = h * tokens * head_dim + t * head_dim + d;
+                int dst_idx = t * embed_dim + h * head_dim + d;
+                attn_flat[dst_idx] = attn_out[src_idx];
+            }
+        }
+    }
+
+    // Step 2: OutProj - attn_flat @ W_o
+    // W_o is [embed_dim rows, embed_dim cols] in Q5_0
+    test_gemm_q5_0(wo, attn_flat, h1, embed_dim, embed_dim, tokens);
+
+    // Step 3: Residual add - h1 += residual
+    for (int i = 0; i < tokens * embed_dim; i++) {
+        h1[i] += residual[i];
+    }
+
+    // Step 4: RMSNorm - h1 → ln2_out
+    test_rmsnorm(h1, ln2_gamma, ln2_out, tokens, embed_dim, eps);
+
+    // Step 5: MLP
+    // W1 is [2*intermediate rows, embed_dim cols] - gate and up weights concatenated
+    // Gate weights: rows 0 to intermediate-1
+    // Up weights: rows intermediate to 2*intermediate-1
+    int w1_row_bytes = ((embed_dim + 31) / 32) * sizeof(block_q5_0);
+    const void * w_gate = w1;
+    const void * w_up = (const char *)w1 + (size_t)intermediate * w1_row_bytes;
+
+    // gate = ln2_out @ W_gate
+    test_gemm_q5_0(w_gate, ln2_out, gate, intermediate, embed_dim, tokens);
+
+    // up = ln2_out @ W_up
+    test_gemm_q5_0(w_up, ln2_out, up, intermediate, embed_dim, tokens);
+
+    // hidden = SiLU(gate) * up (reuse gate buffer)
+    for (int i = 0; i < tokens * intermediate; i++) {
+        float g = gate[i];
+        float silu = g / (1.0f + expf(-g));
+        gate[i] = silu * up[i];
+    }
+
+    // output = hidden @ W2 (Q4_K or Q6_K)
+    if (w2_is_q6k) {
+        test_gemm_q6_k(w2, gate, output, embed_dim, intermediate, tokens);
+    } else {
+        test_gemm_q4_k(w2, gate, output, embed_dim, intermediate, tokens);
+    }
+
+    // Step 6: Residual add - output += h1
+    for (int i = 0; i < tokens * embed_dim; i++) {
+        output[i] += h1[i];
+    }
+
+    delete[] attn_flat;
+    delete[] h1;
+    delete[] ln2_out;
+    delete[] gate;
+    delete[] up;
+}
+
+/**
+ * @brief Get Q5_0 block size for row calculation
+ */
+int get_q5_0_row_bytes(int cols) {
+    return ((cols + 31) / 32) * sizeof(block_q5_0);
+}
+
+/**
+ * @brief Get Q4_K block size for row calculation
+ */
+int get_q4_k_row_bytes(int cols) {
+    return ((cols + 255) / 256) * sizeof(block_q4_K);
+}
+
+/**
+ * @brief Get Q6_K block size for row calculation
+ */
+int get_q6_k_row_bytes(int cols) {
+    return ((cols + 255) / 256) * sizeof(block_q6_K);
 }
 
 } // extern "C"

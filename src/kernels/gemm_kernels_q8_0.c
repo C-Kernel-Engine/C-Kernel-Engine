@@ -31,6 +31,11 @@
 #include "ckernel_quant.h"
 #include "ck_features.h"
 
+/* Include SIMD headers based on available extensions */
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
+#include <immintrin.h>
+#endif
+
 void quantize_row_q8_k(const float *x, void *vy, int k);
 
 /* ============================================================================
@@ -56,6 +61,87 @@ void quantize_row_q8_0(const float *x, void *vy, int k)
     block_q8_0 *y = (block_q8_0 *)vy;
     const int nb = k / QK8_0;  /* QK8_0 = 32 */
 
+#if defined(__AVX__)
+    const __m256 sign_bit = _mm256_set1_ps(-0.0f);
+    const __m256 v_half = _mm256_set1_ps(0.5f);
+    const __m256 v_min = _mm256_set1_ps(-127.0f);
+    const __m256 v_max = _mm256_set1_ps(127.0f);
+
+    for (int i = 0; i < nb; i++) {
+        __m256 v0 = _mm256_loadu_ps(x + 0);
+        __m256 v1 = _mm256_loadu_ps(x + 8);
+        __m256 v2 = _mm256_loadu_ps(x + 16);
+        __m256 v3 = _mm256_loadu_ps(x + 24);
+        x += QK8_0;
+
+        __m256 max_abs = _mm256_andnot_ps(sign_bit, v0);
+        max_abs = _mm256_max_ps(max_abs, _mm256_andnot_ps(sign_bit, v1));
+        max_abs = _mm256_max_ps(max_abs, _mm256_andnot_ps(sign_bit, v2));
+        max_abs = _mm256_max_ps(max_abs, _mm256_andnot_ps(sign_bit, v3));
+
+        __m128 max4 = _mm_max_ps(_mm256_extractf128_ps(max_abs, 1),
+                                 _mm256_castps256_ps128(max_abs));
+        max4 = _mm_max_ps(max4, _mm_movehl_ps(max4, max4));
+        max4 = _mm_max_ss(max4, _mm_movehdup_ps(max4));
+        const float max_scalar = _mm_cvtss_f32(max4);
+
+        const float d = max_scalar / 127.0f;
+        const float id = max_scalar != 0.0f ? 127.0f / max_scalar : 0.0f;
+        y[i].d = CK_FP32_TO_FP16(d);
+
+        const __m256 mul = _mm256_set1_ps(id);
+        v0 = _mm256_mul_ps(v0, mul);
+        v1 = _mm256_mul_ps(v1, mul);
+        v2 = _mm256_mul_ps(v2, mul);
+        v3 = _mm256_mul_ps(v3, mul);
+
+        v0 = _mm256_min_ps(_mm256_max_ps(v0, v_min), v_max);
+        v1 = _mm256_min_ps(_mm256_max_ps(v1, v_min), v_max);
+        v2 = _mm256_min_ps(_mm256_max_ps(v2, v_min), v_max);
+        v3 = _mm256_min_ps(_mm256_max_ps(v3, v_min), v_max);
+
+        /* Round half away from zero to match the scalar path */
+        v0 = _mm256_add_ps(v0, _mm256_or_ps(_mm256_and_ps(v0, sign_bit), v_half));
+        v1 = _mm256_add_ps(v1, _mm256_or_ps(_mm256_and_ps(v1, sign_bit), v_half));
+        v2 = _mm256_add_ps(v2, _mm256_or_ps(_mm256_and_ps(v2, sign_bit), v_half));
+        v3 = _mm256_add_ps(v3, _mm256_or_ps(_mm256_and_ps(v3, sign_bit), v_half));
+
+        __m256i i0 = _mm256_cvttps_epi32(v0);
+        __m256i i1 = _mm256_cvttps_epi32(v1);
+        __m256i i2 = _mm256_cvttps_epi32(v2);
+        __m256i i3 = _mm256_cvttps_epi32(v3);
+
+#if defined(__AVX2__)
+        i0 = _mm256_packs_epi32(i0, i1);
+        i2 = _mm256_packs_epi32(i2, i3);
+        i0 = _mm256_packs_epi16(i0, i2);
+
+        const __m256i perm = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+        i0 = _mm256_permutevar8x32_epi32(i0, perm);
+        _mm256_storeu_si256((__m256i *)y[i].qs, i0);
+#else
+        __m128i ni0 = _mm256_castsi256_si128(i0);
+        __m128i ni1 = _mm256_extractf128_si256(i0, 1);
+        __m128i ni2 = _mm256_castsi256_si128(i1);
+        __m128i ni3 = _mm256_extractf128_si256(i1, 1);
+        __m128i ni4 = _mm256_castsi256_si128(i2);
+        __m128i ni5 = _mm256_extractf128_si256(i2, 1);
+        __m128i ni6 = _mm256_castsi256_si128(i3);
+        __m128i ni7 = _mm256_extractf128_si256(i3, 1);
+
+        ni0 = _mm_packs_epi32(ni0, ni1);
+        ni2 = _mm_packs_epi32(ni2, ni3);
+        ni4 = _mm_packs_epi32(ni4, ni5);
+        ni6 = _mm_packs_epi32(ni6, ni7);
+
+        ni0 = _mm_packs_epi16(ni0, ni2);
+        ni4 = _mm_packs_epi16(ni4, ni6);
+
+        _mm_storeu_si128((__m128i *)(y[i].qs + 0), ni0);
+        _mm_storeu_si128((__m128i *)(y[i].qs + 16), ni4);
+#endif
+    }
+#else
     for (int i = 0; i < nb; i++) {
         const float *xb = x + i * QK8_0;
 
@@ -83,12 +169,8 @@ void quantize_row_q8_0(const float *x, void *vy, int k)
             y[i].qs[j] = (int8_t)q;
         }
     }
-}
-
-/* Include SIMD headers based on available extensions */
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
-#include <immintrin.h>
 #endif
+}
 
 /* ============================================================================
  * Forward Pass: GEMV y = W @ x

@@ -1,6 +1,6 @@
 /**
- * @file mega_fused_attention_prefill.c
- * @brief Mega-fused prefill attention kernel
+ * @file mega_fused_attention_prefill_q8_0.c
+ * @brief Mega-fused prefill attention kernel with Q8_0 out-proj
  *
  * CK-ENGINE KERNEL RULES:
  * =======================
@@ -10,21 +10,8 @@
  * 4. API must define: inputs, outputs, workspace, and memory layouts
  * 5. Pure computation - deterministic, no side effects
  *
- * After changes: make test && make llamacpp-parity-full
- *
- * RMSNorm → QKV → RoPE → Flash Attention → OutProj + Residual
+ * RMSNorm → QKV → RoPE → Flash Attention → Q8_0 OutProj + Residual
  * Writes K/V directly into the KV cache layout (stride = cache_capacity).
- *
- * PERFORMANCE OPTIMIZATION:
- * =========================
- * Uses ck_gemm_nt_head_major_*() to read head-major attention output
- * directly with strided access, eliminating the flatten_head_major()
- * memcpy bottleneck (448 memcpy calls for 32 tokens × 14 heads)
- *
-.* TESTING 
- * =======
- *  python3 scripts/bench_mega_fused_attention_prefill.py --q8-outproj --seq-lens 32,64 --iters 3 --warmup 1   
- *
  */
 
 #include "ckernel_engine.h"
@@ -32,52 +19,11 @@
 #include "ckernel_quant.h"
 
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
 
-static size_t align_up_size(size_t value, size_t align) {
+static size_t align_up_size(size_t value, size_t align)
+{
     return (value + align - 1) & ~(align - 1);
-}
-
-static void flatten_head_major(const float *attn_out,
-                               float *dst,
-                               int tokens,
-                               int aligned_embed_dim,
-                               int num_heads,
-                               int aligned_head_dim)
-{
-    const size_t head_in_stride = (size_t)tokens * (size_t)aligned_head_dim;
-    for (int t = 0; t < tokens; ++t) {
-        float *out_row = dst + (size_t)t * (size_t)aligned_embed_dim;
-        for (int h = 0; h < num_heads; ++h) {
-            const float *src = attn_out + (size_t)h * head_in_stride +
-                               (size_t)t * (size_t)aligned_head_dim;
-            memcpy(out_row + (size_t)h * (size_t)aligned_head_dim,
-                   src,
-                   (size_t)aligned_head_dim * sizeof(float));
-        }
-    }
-}
-
-static int ck_q8_0_outproj_enabled(void)
-{
-    static int cached = -2;
-    if (cached != -2) {
-        return cached;
-    }
-
-    const char *env = getenv("CK_Q8_0_OUTPROJ");
-    if (!env || !env[0]) {
-        cached = 0;
-        return cached;
-    }
-    if (env[0] == '0' || env[0] == 'n' || env[0] == 'N' ||
-        env[0] == 'f' || env[0] == 'F') {
-        cached = 0;
-    } else {
-        cached = 1;
-    }
-    return cached;
 }
 
 static void quantize_attn_out_head_major_q8_0(const float *attn_out,
@@ -100,7 +46,7 @@ static void quantize_attn_out_head_major_q8_0(const float *attn_out,
     }
 }
 
-static void out_proj_head_major_q5_0_q8_0(const uint8_t *attn_q8,
+static void out_proj_head_major_q8_0_q8_0(const uint8_t *attn_q8,
                                           const void *wo,
                                           const float *bias,
                                           float *output,
@@ -111,23 +57,23 @@ static void out_proj_head_major_q5_0_q8_0(const uint8_t *attn_q8,
 {
     const size_t q8_row_bytes = ck_dtype_row_bytes(CK_DT_Q8_0,
                                                    (size_t)aligned_head_dim);
-    const int blocks_per_head = aligned_head_dim / QK5_0;
-    const int blocks_per_row = aligned_embed_dim / QK5_0;
-    const block_q5_0 *weights = (const block_q5_0 *)wo;
+    const int blocks_per_head = aligned_head_dim / QK8_0;
+    const int blocks_per_row = aligned_embed_dim / QK8_0;
+    const block_q8_0 *weights = (const block_q8_0 *)wo;
 
     for (int t = 0; t < tokens; ++t) {
         float *out_row = output + (size_t)t * (size_t)aligned_embed_dim;
         for (int n = 0; n < aligned_embed_dim; ++n) {
             float sum = bias ? bias[n] : 0.0f;
-            const block_q5_0 *w_row = weights + (size_t)n * (size_t)blocks_per_row;
+            const block_q8_0 *w_row = weights + (size_t)n * (size_t)blocks_per_row;
 
             for (int h = 0; h < num_heads; ++h) {
                 const uint8_t *a_row = attn_q8 +
                                        ((size_t)h * (size_t)tokens + (size_t)t) *
                                        q8_row_bytes;
-                const block_q5_0 *w_head = w_row + (size_t)h * (size_t)blocks_per_head;
+                const block_q8_0 *w_head = w_row + (size_t)h * (size_t)blocks_per_head;
                 float partial = 0.0f;
-                vec_dot_q5_0_q8_0(aligned_head_dim, &partial, w_head, a_row);
+                vec_dot_q8_0_q8_0(aligned_head_dim, &partial, w_head, a_row);
                 sum += partial;
             }
             out_row[n] = sum;
@@ -135,10 +81,10 @@ static void out_proj_head_major_q5_0_q8_0(const uint8_t *attn_q8,
     }
 }
 
-size_t mega_fused_attention_prefill_scratch_size(int tokens,
-                                                 int aligned_embed_dim,
-                                                 int num_heads,
-                                                 int aligned_head_dim)
+size_t mega_fused_attention_prefill_q8_0_scratch_size(int tokens,
+                                                      int aligned_embed_dim,
+                                                      int num_heads,
+                                                      int aligned_head_dim)
 {
     if (tokens <= 0 || aligned_embed_dim <= 0 || num_heads <= 0 || aligned_head_dim <= 0) {
         return 0;
@@ -156,7 +102,7 @@ size_t mega_fused_attention_prefill_scratch_size(int tokens,
            align_up_size(qkv_scratch, 64);
 }
 
-void mega_fused_attention_prefill(
+void mega_fused_attention_prefill_q8_0(
     float *output,
     const float *input,
     const float *residual,
@@ -195,6 +141,12 @@ void mega_fused_attention_prefill(
     if (start_pos < 0 || start_pos + tokens > cache_capacity) {
         return;
     }
+    if (wo_dt != CK_DT_Q8_0) {
+        return;
+    }
+    if ((aligned_head_dim % QK8_0) != 0 || (aligned_embed_dim % QK8_0) != 0) {
+        return;
+    }
 
     const size_t q_bytes = (size_t)num_heads * (size_t)tokens *
                            (size_t)aligned_head_dim * sizeof(float);
@@ -211,6 +163,7 @@ void mega_fused_attention_prefill(
     scratch_bytes += align_up_size(proj_bytes, 64);
     void *qkv_scratch = (void *)scratch_bytes;
     (void)qkv_scratch_bytes;
+    (void)proj_scratch;
 
     float *k_ptr = kv_cache_k + (size_t)start_pos * (size_t)aligned_head_dim;
     float *v_ptr = kv_cache_v + (size_t)start_pos * (size_t)aligned_head_dim;
@@ -311,18 +264,15 @@ void mega_fused_attention_prefill(
         return;
     }
 
-    if (wo_dt == CK_DT_Q5_0 &&
-        ck_q8_0_outproj_enabled() &&
-        (aligned_head_dim % QK5_0) == 0 &&
-        (aligned_embed_dim % QK5_0) == 0) {
-        /* Quantized activations path: Q8_0 attn_out + Q5_0 weights. */
+    /* Quantized activations path: Q8_0 attn_out + Q8_0 weights. */
+    {
         uint8_t *attn_q8 = (uint8_t *)q;
         quantize_attn_out_head_major_q8_0(attn_out,
                                           attn_q8,
                                           tokens,
                                           num_heads,
                                           aligned_head_dim);
-        out_proj_head_major_q5_0_q8_0(attn_q8,
+        out_proj_head_major_q8_0_q8_0(attn_q8,
                                       wo,
                                       bo,
                                       output,
@@ -330,47 +280,6 @@ void mega_fused_attention_prefill(
                                       aligned_embed_dim,
                                       num_heads,
                                       aligned_head_dim);
-    } else if (wo_dt == CK_DT_Q5_0 &&
-               (aligned_head_dim % QK5_0) == 0 &&
-               (aligned_embed_dim % QK5_0) == 0) {
-        /* Head-major output projection with Q5_0 weights - no flatten needed */
-        ck_gemm_nt_head_major_q5_0(attn_out,
-                                    wo,
-                                    bo,
-                                    output,
-                                    tokens,
-                                    aligned_embed_dim,
-                                    num_heads,
-                                    aligned_head_dim);
-    } else if (wo_dt == CK_DT_Q8_0 &&
-               (aligned_head_dim % QK8_0) == 0 &&
-               (aligned_embed_dim % QK8_0) == 0) {
-        /* Head-major output projection with Q8_0 weights - no flatten needed */
-        ck_gemm_nt_head_major_q8_0(attn_out,
-                                    wo,
-                                    bo,
-                                    output,
-                                    tokens,
-                                    aligned_embed_dim,
-                                    num_heads,
-                                    aligned_head_dim);
-    } else {
-        /* Fallback: flatten then GEMM (slow path) */
-        flatten_head_major(attn_out,
-                           proj_scratch,
-                           tokens,
-                           aligned_embed_dim,
-                           num_heads,
-                           aligned_head_dim);
-
-        ck_gemm_nt_quant(proj_scratch,
-                         wo,
-                         bo,
-                         output,
-                         tokens,
-                         aligned_embed_dim,
-                         aligned_embed_dim,
-                         wo_dt);
     }
 
     if (residual) {
@@ -380,5 +289,4 @@ void mega_fused_attention_prefill(
                                     tokens,
                                     aligned_embed_dim);
     }
-
 }

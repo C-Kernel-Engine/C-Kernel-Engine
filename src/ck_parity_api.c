@@ -70,6 +70,12 @@ extern void rope_precompute_cache(float *cos_cache, float *sin_cache,
 /* SwiGLU kernel (from swiglu_kernels.c) */
 extern void swiglu_forward(const float *input, float *output, int tokens, int dim);
 
+/* Attention kernels (from attention_kernels.c / attention_flash_true.c) */
+extern void attention_forward_causal_head_major_gqa_flash_strided(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens,
+    int head_dim, int aligned_head_dim, int kv_stride_tokens);
+
 /* ============================================================================
  * Dequantization Tests
  * ============================================================================ */
@@ -604,6 +610,148 @@ void ck_test_softmax(const float *input, float *output, int n)
     for (int i = 0; i < n; i++) {
         output[i] *= inv_sum;
     }
+}
+
+/* ============================================================================
+ * Attention Kernels
+ * ============================================================================ */
+
+void ck_test_attention_causal(const float *q,
+                               const float *k,
+                               const float *v,
+                               float *out,
+                               int num_heads,
+                               int num_kv_heads,
+                               int tokens,
+                               int seq_len,
+                               int head_dim)
+{
+    /* For prefill, seq_len == tokens, and kv_stride == tokens.
+     * The CK kernel expects strided KV layout with kv_stride_tokens parameter.
+     * For parity testing with contiguous tensors, kv_stride = seq_len.
+     */
+    attention_forward_causal_head_major_gqa_flash_strided(
+        q, k, v, out,
+        num_heads, num_kv_heads, tokens,
+        head_dim, head_dim,  /* aligned_head_dim = head_dim for testing */
+        seq_len              /* kv_stride_tokens = seq_len for contiguous KV */
+    );
+}
+
+/* ============================================================================
+ * Mega-Fused OutProj + MLP Kernels
+ * ============================================================================ */
+
+/* External declaration for mega_fused_outproj_mlp_prefill */
+extern void mega_fused_outproj_mlp_prefill(
+    float *output,
+    const float *attn_out,
+    const float *residual,
+    const float *ln2_gamma,
+    const void *wo, const float *bo, int wo_dt,
+    const void *w1, const float *b1, int w1_dt,
+    const void *w2, const float *b2, int w2_dt,
+    int tokens,
+    int embed_dim,
+    int aligned_embed_dim,
+    int num_heads,
+    int aligned_head_dim,
+    int intermediate_dim,
+    int aligned_intermediate_dim,
+    float eps,
+    void *scratch);
+
+extern size_t mega_fused_outproj_mlp_prefill_scratch_size(
+    int tokens,
+    int aligned_embed_dim,
+    int num_heads,
+    int aligned_head_dim,
+    int aligned_intermediate_dim);
+
+/**
+ * @brief Test mega-fused OutProj + MLP kernel (Q5_0 weights)
+ *
+ * This is a simplified wrapper for parity testing that:
+ * - Uses Q5_0 for W_o and W1 weights
+ * - Uses Q4_K for W2 weights
+ * - Allocates scratch internally
+ *
+ * @param attn_out     Attention output [num_heads, tokens, head_dim] (FP32, head-major)
+ * @param residual     Residual input [tokens, embed_dim] (FP32)
+ * @param ln2_gamma    RMSNorm gamma [embed_dim] (FP32)
+ * @param wo           OutProj weights [embed_dim, embed_dim] (Q5_0)
+ * @param w1           MLP W1 weights [2*intermediate, embed_dim] (Q5_0)
+ * @param w2           MLP W2 weights [embed_dim, intermediate] (Q4_K or Q6_K)
+ * @param output       Output [tokens, embed_dim] (FP32)
+ * @param tokens       Number of tokens
+ * @param num_heads    Number of attention heads
+ * @param head_dim     Dimension per head
+ * @param embed_dim    Embedding dimension (= num_heads * head_dim)
+ * @param intermediate MLP intermediate dimension
+ * @param eps          RMSNorm epsilon
+ * @param w2_is_q6k    If true, W2 is Q6_K; if false, W2 is Q4_K
+ */
+void ck_test_outproj_mlp_fused_q5_0(
+    const float *attn_out,
+    const float *residual,
+    const float *ln2_gamma,
+    const void *wo,
+    const void *w1,
+    const void *w2,
+    float *output,
+    int tokens,
+    int num_heads,
+    int head_dim,
+    int embed_dim,
+    int intermediate,
+    float eps,
+    int w2_is_q6k)
+{
+    /* CK uses dtype enum: CK_DT_Q5_0 = 11, CK_DT_Q4_K = 7, CK_DT_Q6_K = 8 */
+    const int CK_DT_Q5_0_VAL = 11;
+    const int CK_DT_Q4_K_VAL = 7;
+    const int CK_DT_Q6_K_VAL = 8;
+
+    /* For parity testing, aligned = actual (no padding) */
+    int aligned_embed_dim = embed_dim;
+    int aligned_head_dim = head_dim;
+    int aligned_intermediate = intermediate;
+
+    /* Ensure intermediate is multiple of 256 (QK_K) for K-quants */
+    if ((intermediate % 256) != 0) {
+        aligned_intermediate = ((intermediate + 255) / 256) * 256;
+    }
+
+    /* Allocate scratch */
+    size_t scratch_size = mega_fused_outproj_mlp_prefill_scratch_size(
+        tokens, aligned_embed_dim, num_heads, aligned_head_dim, aligned_intermediate);
+
+    void *scratch = malloc(scratch_size);
+    if (!scratch) {
+        return;
+    }
+
+    /* Call the mega-fused kernel */
+    mega_fused_outproj_mlp_prefill(
+        output,
+        attn_out,
+        residual,
+        ln2_gamma,
+        wo, NULL, CK_DT_Q5_0_VAL,          /* W_o with Q5_0 */
+        w1, NULL, CK_DT_Q5_0_VAL,          /* W1 with Q5_0 */
+        w2, NULL, w2_is_q6k ? CK_DT_Q6_K_VAL : CK_DT_Q4_K_VAL,  /* W2 with Q4_K or Q6_K */
+        tokens,
+        embed_dim,
+        aligned_embed_dim,
+        num_heads,
+        aligned_head_dim,
+        intermediate,
+        aligned_intermediate,
+        eps,
+        scratch
+    );
+
+    free(scratch);
 }
 
 /* ============================================================================

@@ -1,9 +1,28 @@
 #!/usr/bin/env python3
 """
-Unit test for mega_fused_attention_prefill (quantized weights).
+Unit test for mega_fused_attention_prefill (Q5_0 weights)
+=========================================================
 
-Baseline: fused_rmsnorm_qkv_prefill_head_major_quant + flash attention +
-quantized out-proj + residual add.
+WHAT IT DOES:
+    - Tests mega_fused_attention_prefill with Q5_0 quantized weights
+    - Compares against baseline: fused_rmsnorm_qkv_prefill_head_major_quant
+      + flash attention + quantized out-proj + residual add
+    - Verifies numerical correctness of the fused kernel
+
+WHEN TO RUN:
+    - After modifying mega_fused_attention_prefill.c
+    - When changing Q5_0 weight handling in prefill path
+    - As unit test for prefill attention fusion
+
+TRIGGERED BY:
+    - Makefile PY_TESTS list (make test-full)
+    - Direct execution for development testing
+
+DEPENDENCIES:
+    - build/libckernel_engine.so
+    - unittest/lib_loader.py, unittest/test_utils.py
+
+STATUS: ACTIVE - Unit test for Q5_0 prefill attention
 """
 import ctypes
 import os
@@ -12,7 +31,8 @@ import sys
 import numpy as np
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add unittest/ to path (parent of fusion/)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lib_loader import load_lib
 from test_utils import TestReport, TestResult, max_diff

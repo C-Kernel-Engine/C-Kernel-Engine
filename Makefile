@@ -217,6 +217,9 @@ SRCS    := src/backend_native.c \
             src/kernels/fused/prefill_fused_gemm.c \
             src/kernels/fused/mega_fused_attention_avx.c \
             src/kernels/fused/mega_fused_attention_prefill.c \
+            src/kernels/fused/mega_fused_attention_prefill_q8_0.c \
+            src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+            src/kernels/gemm_head_major_output.c \
             src/kernels/gemm_microkernel.c \
 	           src/kernels/layernorm_kernels.c \
 	           src/kernels/layernorm_kernels_bf16.c \
@@ -393,7 +396,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_swiglu.py \
             unittest/test_fused_swiglu_decode.py \
             unittest/test_fused_attention_decode.py \
-            unittest/test_mega_fused_attention.py \
+            unittest/fusion/test_mega_fused_attention.py \
             unittest/test_sigmoid.py \
             unittest/test_relu.py \
             unittest/test_attention.py \
@@ -410,7 +413,9 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_fused_rmsnorm_qkv.py \
             unittest/test_prefill_fused_rmsnorm_qkv_quant.py \
             unittest/test_prefill_fused_mlp_quant.py \
-            unittest/test_mega_fused_attention_prefill.py \
+            unittest/fusion/test_mega_fused_attention_prefill.py \
+            unittest/fusion/test_mega_fused_attention_prefill_q8_0.py \
+            unittest/fusion/test_mega_fused_outproj_mlp_prefill.py \
             unittest/test_fused_attention_mlp.py
 
 PY_TESTS_BF16 := unittest/bf16/test_sigmoid_bf16.py \
@@ -547,7 +552,7 @@ test-mega-fused-correctness: $(CK_CLI_V6_5)
 	@echo "  STEP 1: NUMERICAL CORRECTNESS"
 	@echo "  (Must pass before performance tests!)"
 	@echo "========================================"
-	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --correctness
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_mega_fused_attention.py --correctness
 
 test-mega-fused-perf: test-mega-fused-correctness $(CK_CLI_V6_5)
 	@echo ""
@@ -556,7 +561,7 @@ test-mega-fused-perf: test-mega-fused-correctness $(CK_CLI_V6_5)
 	@echo "  (THE CRITICAL TEST - fusion's whole point!)"
 	@echo "========================================"
 	@mkdir -p test_results
-	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --perf --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_mega_fused_attention.py --perf --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
 
 test-mega-fused-flamegraph: test-mega-fused-correctness $(CK_CLI_V6_5)
 	@echo ""
@@ -565,7 +570,7 @@ test-mega-fused-flamegraph: test-mega-fused-correctness $(CK_CLI_V6_5)
 	@echo "  (Visual confirmation of reduced memory)"
 	@echo "========================================"
 	@mkdir -p test_results
-	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --flamegraph --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_mega_fused_attention.py --flamegraph --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
 
 test-mega-fused: $(CK_CLI_V6_5)
 	@echo ""
@@ -574,7 +579,7 @@ test-mega-fused: $(CK_CLI_V6_5)
 	@echo "  (Correctness → Performance → Flamegraph)"
 	@echo "========================================"
 	@mkdir -p test_results
-	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_mega_fused_attention.py --all --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_mega_fused_attention.py --all --model $(TEST_MODEL) --tokens $(TEST_TOKENS)
 
 # Direct perf measurement (without Python)
 test-perf-baseline:
@@ -1179,6 +1184,10 @@ showtests:
 	@echo "  make test-full        Full tests (5-10 min)"
 	@echo "  make test-stress      Stress tests (10+ min)"
 	@echo ""
+	@echo "Mega-Fusion Attention Tests:"
+	@echo "  make llamacpp-fusion-test-full     Full mega-fusion test vs llama.cpp"
+	@echo "  make llamacpp-fusion-test-quick    Quick mega-fusion test"
+	@echo ""
 	@echo "Nightly / CI:"
 	@echo "  make nightly          Run all tests with summary"
 	@echo "  make nightly-quick    Quick subset (~5 min)"
@@ -1579,6 +1588,21 @@ llamacpp-parity-avx512:
 	else \
 		echo "SKIP: AVX-512 not available on this machine"; \
 	fi
+
+# =============================================================================
+# Mega-Fusion Attention Tests
+# =============================================================================
+# Test CK-Engine's mega-fused attention against llama.cpp implementation
+
+# Mega-Fusion Attention Test (CK-Engine vs llama.cpp)
+llamacpp-fusion-test-full:
+	@echo "Running mega-fusion attention test with llama.cpp comparison..."
+	@./scripts/run_mega_fusion_test.sh --skip-build
+
+# Quick mega-fusion test
+llamacpp-fusion-test-quick:
+	@echo "Running quick mega-fusion attention test..."
+	@./scripts/run_mega_fusion_test.sh --quick --skip-build
 
 # =============================================================================
 # Profiling: Flamegraph and Performance Analysis
@@ -1991,12 +2015,17 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/swiglu_kernels.c \
                src/kernels/softmax_kernels.c \
                src/kernels/sigmoid_kernels.c \
+               src/kernels/attention_kernels.c \
+               src/kernels/attention_flash_true.c \
+               src/kernels/fused/prefill_fused_gemm.c \
+               src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+               src/kernels/add_kernels_bf16.c
 
 LIB_PARITY := $(BUILD_DIR)/libck_parity.so
 
 # Build CK parity testing library
 $(LIB_PARITY): $(BUILD_DIR) $(PARITY_SRCS)
-	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) -lm
+	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) $(LDFLAGS) -lm
 
 libck_parity.so: $(LIB_PARITY)
 	@echo "Built CK parity library: $(LIB_PARITY)"
@@ -2066,6 +2095,9 @@ TEST_HARNESS_SRCS := src/backend_native.c \
 	src/kernels/fused/prefill_fused_gemm.c \
 	src/kernels/fused/mega_fused_attention_avx.c \
 	src/kernels/fused/mega_fused_attention_prefill.c \
+	src/kernels/fused/mega_fused_attention_prefill_q8_0.c \
+	src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+	src/kernels/gemm_head_major_output.c \
 	src/kernels/gemm_microkernel.c \
 	src/kernels/layernorm_kernels.c \
 	src/kernels/mlp_kernels.c \

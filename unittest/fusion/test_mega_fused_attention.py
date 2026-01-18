@@ -1,12 +1,37 @@
 #!/usr/bin/env python3
 """
 Mega-Fused Attention Kernel Tests
+=================================
 
 Comprehensive test suite for mega_fused_attention_avx.c kernel:
 1. Numerical correctness vs PyTorch reference
 2. Numerical correctness vs separate kernel calls
 3. Performance tests with perf (DRAM pressure)
 4. Flamegraph generation
+
+WHAT IT DOES:
+    - Tests mega_fused_attention_decode_avx correctness against PyTorch
+    - Measures DRAM pressure reduction from fusion
+    - Generates flamegraphs for memory access patterns
+
+WHEN TO RUN:
+    - After modifying mega_fused_attention_*.c kernels
+    - When debugging numerical issues in attention
+    - For performance profiling and optimization
+
+TRIGGERED BY:
+    - make test-mega-fused-correctness  (correctness only)
+    - make test-mega-fused-perf         (DRAM pressure)
+    - make test-mega-fused-flamegraph   (visualization)
+    - make test-mega-fused              (all tests)
+
+DEPENDENCIES:
+    - build/libckernel_engine.so
+    - PyTorch (for reference implementation)
+    - perf (for performance tests)
+    - FlameGraph tools (for flamegraph)
+
+STATUS: ACTIVE - Core correctness + performance test suite
 
 Run with:
     python3 test_mega_fused_attention.py --all          # All tests
@@ -29,8 +54,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-# Add unittest to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add unittest to path (parent of fusion/)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from test_utils import TestReport, TestResult, get_cpu_info, max_diff, print_system_info
 

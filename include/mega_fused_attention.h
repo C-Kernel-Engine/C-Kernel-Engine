@@ -156,11 +156,79 @@ void mega_fused_attention_prefill(
     void *scratch
 );
 
+/**
+ * @brief Mega-fused prefill attention kernel (Q8_0 out-proj)
+ *
+ * Same layout and scratch requirements as mega_fused_attention_prefill.
+ */
+void mega_fused_attention_prefill_q8_0(
+    float *output,
+    const float *input,
+    const float *residual,
+    const float *ln1_gamma,
+    const void *wq, const float *bq, CKDataType wq_dt,
+    const void *wk, const float *bk, CKDataType wk_dt,
+    const void *wv, const float *bv, CKDataType wv_dt,
+    const void *wo, const float *bo, CKDataType wo_dt,
+    float *kv_cache_k,
+    float *kv_cache_v,
+    const float *rope_cos,
+    const float *rope_sin,
+    int start_pos,
+    int tokens,
+    int cache_capacity,
+    int embed_dim,
+    int aligned_embed_dim,
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int aligned_head_dim,
+    float eps,
+    void *scratch
+);
+
 /** @brief Get scratch buffer size for mega_fused_attention_prefill */
 size_t mega_fused_attention_prefill_scratch_size(int tokens,
                                                  int aligned_embed_dim,
                                                  int num_heads,
                                                  int aligned_head_dim);
+
+/** @brief Get scratch buffer size for mega_fused_attention_prefill_q8_0 */
+size_t mega_fused_attention_prefill_q8_0_scratch_size(int tokens,
+                                                      int aligned_embed_dim,
+                                                      int num_heads,
+                                                      int aligned_head_dim);
+
+/**
+ * @brief Mega-fused post-attention block (out-proj + RMSNorm2 + MLP) for prefill
+ *
+ * Uses head-major attention output and quantized out-proj (Q5_0/Q8_0 weights).
+ */
+void mega_fused_outproj_mlp_prefill(
+    float *output,
+    const float *attn_out,
+    const float *residual,
+    const float *ln2_gamma,
+    const void *wo, const float *bo, CKDataType wo_dt,
+    const void *w1, const float *b1, CKDataType w1_dt,
+    const void *w2, const float *b2, CKDataType w2_dt,
+    int tokens,
+    int embed_dim,
+    int aligned_embed_dim,
+    int num_heads,
+    int aligned_head_dim,
+    int intermediate_dim,
+    int aligned_intermediate_dim,
+    float eps,
+    void *scratch
+);
+
+/** @brief Get scratch buffer size for mega_fused_outproj_mlp_prefill */
+size_t mega_fused_outproj_mlp_prefill_scratch_size(int tokens,
+                                                   int aligned_embed_dim,
+                                                   int num_heads,
+                                                   int aligned_head_dim,
+                                                   int aligned_intermediate_dim);
 
 /**
  * @brief Phase 1: Fused RMSNorm + QKV (intermediates in registers)

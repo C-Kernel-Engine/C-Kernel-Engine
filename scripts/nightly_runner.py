@@ -645,6 +645,44 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
     print(f"\nJSON report saved to: {filepath}")
 
 
+def update_nightly_index():
+    """Update the nightly results index.json file."""
+    reports_dir = ROOT / "docs" / "site" / "nightly-results"
+    index_file = reports_dir / "index.json"
+
+    index_data = {
+        "updated": datetime.utcnow().isoformat() + "Z",
+        "reports": []
+    }
+
+    # Get all report files, sorted newest first
+    report_files = sorted(
+        [f for f in os.listdir(reports_dir) if f.startswith("report-") and f.endswith(".json")],
+        reverse=True
+    )[:30]
+
+    for filename in report_files:
+        filepath = os.path.join(reports_dir, filename)
+        try:
+            with open(filepath) as f:
+                data = json.load(f)
+            # Extract date from filename: report-YYYY-MM-DD.json
+            date = filename.replace("report-", "").replace(".json", "")
+            index_data["reports"].append({
+                "date": date,
+                "file": filename,
+                "summary": data.get("summary", {}),
+                "duration_sec": data.get("duration_sec", 0)
+            })
+        except Exception as e:
+            print(f"Warning: Could not read {filename}: {e}")
+
+    with open(index_file, "w") as f:
+        json.dump(index_data, f, indent=2)
+
+    print(f"Created index.json with {len(index_data['reports'])} reports")
+
+
 def main():
     parser = argparse.ArgumentParser(description="C-Kernel-Engine Nightly Test Runner")
     parser.add_argument("--quick", action="store_true", help="Run quick subset only")
@@ -655,7 +693,13 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--list", action="store_true", help="List all tests")
     parser.add_argument("--no-fail", action="store_true", help="Always return exit code 0 (for CI warning mode)")
+    parser.add_argument("--update-index", action="store_true", help="Update nightly results index (for CI)")
     args = parser.parse_args()
+
+    # Handle --update-index (must be done before normal flow)
+    if args.update_index:
+        update_nightly_index()
+        return 0
 
     if args.list:
         print("\nAvailable tests:")
