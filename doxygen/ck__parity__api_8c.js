@@ -1,11 +1,9 @@
 var ck__parity__api_8c =
 [
-    [ "attention_forward_causal_head_major_gqa_flash_strided", "ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e", null ],
     [ "ck_get_block_q4_k_size", "ck__parity__api_8c.html#ae3f2ecb6eac88dd8df6785319196b3ae", null ],
     [ "ck_get_block_q6_k_size", "ck__parity__api_8c.html#ae5f78ab1af3e1f44d57f284cfe068ed3", null ],
     [ "ck_get_block_q8_k_size", "ck__parity__api_8c.html#a12d459a543e9e2753fe5f6d0f70f1c7b", null ],
     [ "ck_get_qk_k", "ck__parity__api_8c.html#a95cddf8f78737e393631663f79da52c1", null ],
-    [ "ck_test_attention_causal", "ck__parity__api_8c.html#a5c4d08fced7821fcb646b347b72b865b", null ],
     [ "ck_test_dequant_q4_0", "ck__parity__api_8c.html#a437f320412acb3a395d3d4388a65df8c", null ],
     [ "ck_test_dequant_q4_k", "ck__parity__api_8c.html#a57f071bb10b877ef28d5803dc97111aa", null ],
     [ "ck_test_dequant_q6_k", "ck__parity__api_8c.html#a1376a32f86dfadb9480147809ea95f29", null ],
@@ -19,7 +17,6 @@ var ck__parity__api_8c =
     [ "ck_test_gemv_q6_k", "ck__parity__api_8c.html#afa96b526d228d061c98b81d813c9093a", null ],
     [ "ck_test_gemv_q8_0", "ck__parity__api_8c.html#ae6b6e7d7848157d54ba75f661fe9ca39", null ],
     [ "ck_test_gemv_q8_0_q8_0", "ck__parity__api_8c.html#a6c5534c711d8306cf8973670bc9d3cfc", null ],
-    [ "ck_test_outproj_mlp_fused_q5_0", "ck__parity__api_8c.html#afb09a29d3caada83d9e84efed6209fec", null ],
     [ "ck_test_quantize_q8_k", "ck__parity__api_8c.html#a0294dd45ee3d2fd2f25f2e586b1b9311", null ],
     [ "ck_test_rmsnorm", "ck__parity__api_8c.html#a4cdbef772ebe98f21f9e3a026300982a", null ],
     [ "ck_test_rope", "ck__parity__api_8c.html#a15e78c3b254565f6061c47cc878b9209", null ],
@@ -41,8 +38,6 @@ var ck__parity__api_8c =
     [ "gemv_q6_k_q8_k", "ck__parity__api_8c.html#a7b78875a957c11b30c9f7170b6c87c45", null ],
     [ "gemv_q8_0", "ck__parity__api_8c.html#a3e0166eab910ca7f003602c29f428cb1", null ],
     [ "gemv_q8_0_q8_0", "ck__parity__api_8c.html#ab56038b4e1cf73692b6be9c28ada9023", null ],
-    [ "mega_fused_outproj_mlp_prefill", "ck__parity__api_8c.html#a5d7c4d5f6bccab4053d2b263ef156c68", null ],
-    [ "mega_fused_outproj_mlp_prefill_scratch_size", "ck__parity__api_8c.html#aca1476c2ed7a5ed20fd199f597a67149", null ],
     [ "quantize_row_q8_0", "ck__parity__api_8c.html#adf8ea140a408f51698d95718f1d8db49", null ],
     [ "quantize_row_q8_k", "ck__parity__api_8c.html#a64b28ca8a25883986a0d22e39a574a32", null ],
     [ "rmsnorm_forward", "ck__parity__api_8c.html#a9a068ed02d809a81a23f09e61b820baf", null ],
