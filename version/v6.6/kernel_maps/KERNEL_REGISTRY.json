@@ -1,0 +1,2681 @@
+{
+  "_meta": {
+    "description": "Kernel registry generated from v6.6 kernel maps",
+    "version": "v6.6",
+    "generated_by": "gen_kernel_registry_from_maps.py",
+    "source_dir": "version/v6.6/kernel_maps",
+    "counts": {
+      "total": 17,
+      "by_op": {
+        "attention": 1,
+        "embedding": 1,
+        "fused_attention_block": 1,
+        "fused_mlp_block": 1,
+        "fused_qkv_block": 1,
+        "gemm": 5,
+        "gemv": 2,
+        "quantize": 2,
+        "rmsnorm": 1,
+        "rope": 1,
+        "swiglu": 1
+      }
+    }
+  },
+  "kernels": [
+    {
+      "id": "attention_forward_causal_head_major_gqa_flash_strided",
+      "op": "attention",
+      "variant": "causal_flash_fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim]"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Attention output [heads, tokens, head_dim]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "qkv_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * D * 4",
+          "desc": "QKV tiles for flash attention"
+        },
+        {
+          "name": "attn_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * T * 4",
+          "desc": "Attention scores [heads, T, T]"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "Stride in tokens for KV cache layout"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32",
+          "desc": "Head dimension (unpadded)"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "Flash attention uses SIMD paths when available. T should be multiple of 32 for optimal tile sizes."
+      },
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_flash_strided",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention.py"
+        ],
+        "bench": [
+          "scripts/bench_attention.py"
+        ],
+        "parity": [
+          {
+            "kind": "llamacpp",
+            "command": "python test_mega_fusion_parity.py",
+            "tolerance": "1e-4",
+            "notes": "Compare against llama.cpp ggml_flash_attn_ext"
+          }
+        ]
+      },
+      "notes": "Causal multi-head attention with GQA support. Uses flash attention algorithm with strided KV cache layout for efficient KV cache updates. Supports grouped-query attention where H >= KV.",
+      "name": "attention_forward_causal_head_major_gqa_flash_strided",
+      "_source_file": "attention_forward_causal_head_major_gqa_flash_strided.json"
+    },
+    {
+      "id": "embedding_forward_q8_0",
+      "op": "embedding",
+      "variant": "q8_0",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "tokens",
+          "dtype": "int32",
+          "shape": [
+            "T"
+          ],
+          "desc": "Input token IDs [tokens]"
+        },
+        {
+          "name": "weight",
+          "dtype": "q8_0",
+          "shape": [
+            "V",
+            "E"
+          ],
+          "desc": "Embedding weights [vocab_size, embed_dim] (Q8_0 quantized)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Embeddings [tokens, embed_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "E",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "token"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "E": 64
+        },
+        "notes": "Simple table lookup; E should be multiple of 64 for SIMD"
+      },
+      "impl": {
+        "function": "embedding_forward_q8_0",
+        "sources": [
+          "src/kernels/embedding_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_embedding.py"
+        ],
+        "bench": [
+          "scripts/bench_embedding.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_embedding.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Compare against numpy reference"
+          }
+        ]
+      },
+      "notes": "Token embedding lookup with Q8_0 quantized weights. Simple table lookup operation.",
+      "name": "embedding_forward_q8_0",
+      "_source_file": "embedding_forward_q8_0.json"
+    },
+    {
+      "id": "fused_rmsnorm_qkv_prefill_head_major_quant",
+      "op": "fused_qkv_block",
+      "variant": "q5_0_w_fp32_a",
+      "quant": {
+        "weight": "q5_0|q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Input activations [tokens, aligned_embed_dim]"
+        },
+        {
+          "name": "ln_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm gamma weight [embed_dim]"
+        },
+        {
+          "name": "wq",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AD",
+            "AE"
+          ],
+          "desc": "Q projection weights [heads, aligned_head_dim, aligned_embed_dim] (Q5_0)"
+        },
+        {
+          "name": "bq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "Q bias [heads, aligned_head_dim] (or NULL)"
+        },
+        {
+          "name": "wk",
+          "dtype": "q5_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "K projection weights [kv_heads, aligned_head_dim, aligned_embed_dim] (Q5_0)"
+        },
+        {
+          "name": "bk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "K bias [kv_heads, aligned_head_dim] (or NULL)"
+        },
+        {
+          "name": "wv",
+          "dtype": "q8_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "V projection weights [kv_heads, aligned_head_dim, aligned_embed_dim] (Q8_0)"
+        },
+        {
+          "name": "bv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "V bias [kv_heads, aligned_head_dim] (or NULL)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "AD"
+          ],
+          "desc": "Query output [heads, tokens, aligned_head_dim] (head-major)"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "AD"
+          ],
+          "desc": "Key output [kv_heads, tokens, aligned_head_dim] (head-major)"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "AD"
+          ],
+          "desc": "Value output [kv_heads, tokens, aligned_head_dim] (head-major)"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "temp",
+          "dtype": "fp32",
+          "size_bytes": "T * AE * 4",
+          "desc": "Temporary buffer for RMSNorm output"
+        }
+      ],
+      "dims": [
+        "T",
+        "E",
+        "AE",
+        "H",
+        "KV",
+        "D",
+        "AD"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "Stride in tokens for KV cache layout"
+        },
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "RMSNorm epsilon (typically 1e-5)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "notes": "Q5_0 requires K dimension multiple of 256 for dequantization. Produces head-major output for efficient attention."
+      },
+      "fuses": [
+        "rmsnorm_forward",
+        "gemv_q5_0_q8_0",
+        "gemv_q5_0_q8_0",
+        "gemv_q8_0_q8_0"
+      ],
+      "impl": {
+        "function": "fused_rmsnorm_qkv_prefill_head_major_quant",
+        "sources": [
+          "src/kernels/fused/rmsnorm_qkv.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_fused_rmsnorm_qkv.py"
+        ],
+        "bench": [
+          "scripts/bench_fused_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_fused_rmsnorm_qkv.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against unfused reference implementation"
+          }
+        ]
+      },
+      "notes": "Fused RMSNorm + QKV projection producing head-major output. Fuses 4 operations into 1, reducing memory traffic.",
+      "name": "fused_rmsnorm_qkv_prefill_head_major_quant",
+      "_source_file": "fused_rmsnorm_qkv_prefill_head_major_quant.json"
+    },
+    {
+      "id": "gemm_blocked_serial",
+      "op": "gemm",
+      "variant": "fp32_nt",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Input matrix [M, K] (row-major)"
+        },
+        {
+          "name": "B",
+          "dtype": "fp32",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [N, K] (row-major, stored transposed)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias vector [N] (or NULL for no bias)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Output matrix [M, N] = A @ B + bias"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Split by output rows; each thread computes subset of C."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "ith_nth",
+            "notes": "Split by output features; each thread computes subset of output columns."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 64,
+          "N": 64
+        },
+        "notes": "GEMM nt: C = A @ B^T. B is stored as [N, K] row-major. K and N should be multiples of 64."
+      },
+      "impl": {
+        "function": "gemm_blocked_serial",
+        "sources": [
+          "src/kernels/gemm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Verify GEMM matches numpy matmul"
+          }
+        ]
+      },
+      "notes": "General matrix multiplication: C = A @ B^T + bias. This is the 'nt' variant; weights are stored as [N, K]. Used for projection layers in transformer blocks.",
+      "name": "gemm_blocked_serial",
+      "_source_file": "gemm_blocked_serial.json"
+    },
+    {
+      "id": "gemm_nt_q4_k_q8_k",
+      "op": "gemm",
+      "variant": "q4_k_w_q8_k_a",
+      "quant": {
+        "weight": "q4_k",
+        "activation": "q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "q8_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (Q8_K quantized)"
+        },
+        {
+          "name": "B",
+          "dtype": "q4_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q4_K quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "temp",
+          "dtype": "fp32",
+          "size_bytes": "M * N * 4",
+          "desc": "Temporary accumulation buffer"
+        }
+      ],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by rows (tokens); good for prefill with many tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 16,
+              "align_bytes": 64,
+              "allow_tail": true
+            },
+            "notes": "Split by output features; good for decode."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization for W2 (down) projection."
+      },
+      "impl": {
+        "function": "gemm_nt_q4_k_q8_k",
+        "sources": [
+          "src/kernels/gemm_kernels_q4k.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm_q4_k.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm_q4_k.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm_q4_k.py --compare-numpy",
+            "tolerance": "1e-3",
+            "notes": "Compare against numpy matmul (higher tolerance due to quantization)"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "make llamacpp-parity-gemm-q4k",
+            "tolerance": "1e-3",
+            "notes": "Compare against llama.cpp ggml_gemm_q4k"
+          }
+        ]
+      },
+      "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. Used for W2 (down) projection in MLP. High compression ratio.",
+      "name": "gemm_nt_q4_k_q8_k",
+      "_source_file": "gemm_nt_q4_k_q8_k.json"
+    },
+    {
+      "id": "gemm_nt_q5_0_q8_0",
+      "op": "gemm",
+      "variant": "q5_0_w_q8_0_a",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (Q8_0 quantized)"
+        },
+        {
+          "name": "B",
+          "dtype": "q5_0",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q5_0 quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "temp",
+          "dtype": "fp32",
+          "size_bytes": "M * N * 4",
+          "desc": "Temporary accumulation buffer"
+        }
+      ],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by rows (tokens); good for prefill with many tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 16,
+              "align_bytes": 64,
+              "allow_tail": true
+            },
+            "notes": "Split by output features; good for decode."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q5_0 requires K dimension multiple of 256 for dequantization. B is transposed (nt = A * B^T)."
+      },
+      "impl": {
+        "function": "gemm_nt_q5_0_q8_0",
+        "sources": [
+          "src/kernels/gemm_kernels_q5_0.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against numpy matmul"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "make llamacpp-parity-gemm",
+            "tolerance": "1e-4",
+            "notes": "Compare against llama.cpp ggml_gemm"
+          }
+        ]
+      },
+      "notes": "General matrix multiplication with Q5_0 weights and Q8_0 activations. Used for QKV projection and output projection in prefill.",
+      "name": "gemm_nt_q5_0_q8_0",
+      "_source_file": "gemm_nt_q5_0_q8_0.json"
+    },
+    {
+      "id": "gemm_nt_q6_k_q8_k",
+      "op": "gemm",
+      "variant": "q6_k_w_q8_k_a",
+      "quant": {
+        "weight": "q6_k",
+        "activation": "q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "q8_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (Q8_K quantized)"
+        },
+        {
+          "name": "B",
+          "dtype": "q6_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q6_K quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "temp",
+          "dtype": "fp32",
+          "size_bytes": "M * N * 4",
+          "desc": "Temporary accumulation buffer"
+        }
+      ],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by rows (tokens); good for prefill with many tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 16,
+              "align_bytes": 64,
+              "allow_tail": true
+            },
+            "notes": "Split by output features; good for decode."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q6_K requires K dimension multiple of 256 for dequantization. Alternative to Q4_K for W2 (down) projection with better accuracy."
+      },
+      "impl": {
+        "function": "gemm_nt_q6_k_q8_k",
+        "sources": [
+          "src/kernels/gemm_kernels_q6k.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm_q6_k.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm_q6_k.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm_q6_k.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against numpy matmul (moderate tolerance)"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "make llamacpp-parity-gemm-q6k",
+            "tolerance": "1e-4",
+            "notes": "Compare against llama.cpp ggml_gemm_q6k"
+          }
+        ]
+      },
+      "notes": "General matrix multiplication with Q6_K weights and Q8_K activations. Used for W2 (down) projection in MLP when Q4_K accuracy is insufficient.",
+      "name": "gemm_nt_q6_k_q8_k",
+      "_source_file": "gemm_nt_q6_k_q8_k.json"
+    },
+    {
+      "id": "gemm_nt_q8_0_q8_0",
+      "op": "gemm",
+      "variant": "q8_0_w_q8_0_a",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (Q8_0 quantized)"
+        },
+        {
+          "name": "B",
+          "dtype": "q8_0",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "temp",
+          "dtype": "fp32",
+          "size_bytes": "M * N * 4",
+          "desc": "Temporary accumulation buffer"
+        }
+      ],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by rows (tokens); good for prefill with many tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 16,
+              "align_bytes": 64,
+              "allow_tail": true
+            },
+            "notes": "Split by output features; good for decode."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q8_0 requires K dimension multiple of 32 for dequantization. B is transposed (nt = A * B^T)."
+      },
+      "impl": {
+        "function": "gemm_nt_q8_0_q8_0",
+        "sources": [
+          "src/kernels/gemm_kernels_q8_0.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against numpy matmul"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "make llamacpp-parity-gemm",
+            "tolerance": "1e-4",
+            "notes": "Compare against llama.cpp ggml_gemm"
+          }
+        ]
+      },
+      "notes": "General matrix multiplication with Q8_0 weights and Q8_0 activations. Used for Wv projection in prefill.",
+      "name": "gemm_nt_q8_0_q8_0",
+      "_source_file": "gemm_nt_q8_0_q8_0.json"
+    },
+    {
+      "id": "gemv_q5_0_q8_0",
+      "op": "gemv",
+      "variant": "q5_0_w_q8_0_a_fp32_out",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        },
+        {
+          "name": "x",
+          "dtype": "q8_0",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_0)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "output"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across output rows; each thread computes subset of y."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q5_0 uses 32-value blocks; K should be a multiple of 32 for correct layout."
+      },
+      "impl": {
+        "function": "gemv_q5_0_q8_0",
+        "sources": [
+          "src/kernels/gemm_kernels_q5_0.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "sse4_1",
+            "requires": [
+              "sse4_1"
+            ],
+            "compile_flags": [
+              "-msse4.1"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm_q5_0_q8_0.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm_q5_0_q8_0.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm_q5_0_q8_0.py --compare-numpy",
+            "tolerance": "1e-3",
+            "notes": "Compare dequantized output against numpy fp32 matmul"
+          }
+        ]
+      },
+      "notes": "Generalized matrix-vector multiplication for Q5_0 weights with Q8_0 activation input. Computes y = W @ x where W is stored transposed (each row is one output feature).",
+      "name": "gemv_q5_0_q8_0",
+      "_source_file": "gemv_q5_0_q8_0.json"
+    },
+    {
+      "id": "gemv_q8_0_q8_0",
+      "op": "gemv",
+      "variant": "q8_0_w_q8_0_a_fp32_out",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "W",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        },
+        {
+          "name": "x",
+          "dtype": "q8_0",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_0)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "output"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across output rows; each thread computes subset of y."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q8_0 requires K multiple of 32 for SIMD alignment. More relaxed than Q4_K/Q5_0."
+      },
+      "impl": {
+        "function": "gemv_q8_0_q8_0",
+        "sources": [
+          "src/kernels/gemm_kernels_q8_0.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "sse4_1",
+            "requires": [
+              "sse4_1"
+            ],
+            "compile_flags": [
+              "-msse4.1"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemm_q8_0_q8_0.py"
+        ],
+        "bench": [
+          "scripts/bench_gemm_q8_0_q8_0.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemm_q8_0_q8_0.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare dequantized output against numpy fp32 matmul"
+          }
+        ]
+      },
+      "notes": "Generalized matrix-vector multiplication for Q8_0 weights with Q8_0 activation input. Q8_0 has looser alignment requirements (32) than Q4_K/Q5_0 (256).",
+      "name": "gemv_q8_0_q8_0",
+      "_source_file": "gemv_q8_0_q8_0.json"
+    },
+    {
+      "id": "mega_fused_attention_prefill",
+      "op": "fused_attention_block",
+      "variant": "q5_0_w_q8_0_v_fp32_out",
+      "quant": {
+        "weight": "q5_0|q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Input activations"
+        },
+        {
+          "name": "residual",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Residual input (or NULL)"
+        },
+        {
+          "name": "ln_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm gamma weight"
+        },
+        {
+          "name": "wq",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AD",
+            "AE"
+          ],
+          "desc": "Q projection weights"
+        },
+        {
+          "name": "bq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "Q bias (or NULL)"
+        },
+        {
+          "name": "wk",
+          "dtype": "q5_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "K projection weights"
+        },
+        {
+          "name": "bk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "K bias (or NULL)"
+        },
+        {
+          "name": "wv",
+          "dtype": "q8_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "V projection weights"
+        },
+        {
+          "name": "bv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "V bias (or NULL)"
+        },
+        {
+          "name": "wo",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AE",
+            "AD"
+          ],
+          "desc": "Output projection weights"
+        },
+        {
+          "name": "bo",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Output bias (or NULL)"
+        },
+        {
+          "name": "kv_cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "K cache [written starting at start_pos]"
+        },
+        {
+          "name": "kv_cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "V cache [written starting at start_pos]"
+        },
+        {
+          "name": "rope_cos",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE cos [pos, :D/2]"
+        },
+        {
+          "name": "rope_sin",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE sin [pos, :D/2]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Output [includes residual add]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "size_bytes": "mega_fused_attention_prefill_scratch_size()",
+          "desc": "Scratch buffer for attention computation"
+        }
+      ],
+      "dims": [
+        "T",
+        "E",
+        "AE",
+        "H",
+        "KV",
+        "D",
+        "AD",
+        "max_T"
+      ],
+      "params": [
+        {
+          "name": "start_pos",
+          "dtype": "int32",
+          "desc": "Starting position in KV cache"
+        },
+        {
+          "name": "tokens",
+          "dtype": "int32",
+          "desc": "Number of tokens to process"
+        },
+        {
+          "name": "cache_capacity",
+          "dtype": "int32",
+          "desc": "KV cache capacity (stride)"
+        },
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "RMSNorm epsilon (typically 1e-5)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "none"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "notes": "Q5_0 uses 32-value blocks; AE should be multiple of 32 for correct layout."
+      },
+      "fuses": [
+        "rmsnorm_forward",
+        "gemv_q5_0_q8_0",
+        "gemv_q5_0_q8_0",
+        "gemv_q8_0_q8_0",
+        "rope_forward_qk",
+        "attention_forward_causal_head_major_gqa_flash_strided",
+        "gemv_q5_0_q8_0",
+        "ck_residual_add_token_major"
+      ],
+      "impl": {
+        "function": "mega_fused_attention_prefill",
+        "sources": [
+          "src/kernels/fused/mega_fused_attention_prefill.c",
+          "src/kernels/fused/prefill_fused_gemm.c",
+          "src/kernels/fused/attention_fused_gqa.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_mega_fused_attention_prefill.py"
+        ],
+        "bench": [
+          "scripts/bench_mega_fused_attention_prefill.py"
+        ],
+        "parity": [
+          {
+            "kind": "llamacpp",
+            "command": "make fusion-test-full-with-lamacpp",
+            "tolerance": "1e-4",
+            "notes": "Parity check for fused attention vs llama.cpp ggml_flash_attn_ext"
+          }
+        ]
+      },
+      "notes": "This is the 'holy grail' fusion - RMSNorm+QKV+RoPE+Attention+OutProj+Residual in single DRAM round-trip",
+      "name": "mega_fused_attention_prefill",
+      "_source_file": "mega_fused_attention_prefill.json"
+    },
+    {
+      "id": "mega_fused_outproj_mlp_prefill",
+      "op": "fused_mlp_block",
+      "variant": "q5_0_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q5_0|q4_k|q6_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "attn_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Attention output [heads, tokens, head_dim] (head-major)"
+        },
+        {
+          "name": "residual",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Residual input [tokens, aligned_embed_dim]"
+        },
+        {
+          "name": "ln2_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm gamma [embed_dim]"
+        },
+        {
+          "name": "wo",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AE",
+            "D"
+          ],
+          "desc": "Output projection weights [heads, aligned_embed, head_dim]"
+        },
+        {
+          "name": "bo",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Output bias [aligned_embed] (or NULL)"
+        },
+        {
+          "name": "w1",
+          "dtype": "q5_0",
+          "shape": [
+            "AI",
+            2,
+            "AE"
+          ],
+          "desc": "MLP gate weights [2*intermediate, aligned_embed] (concatenated w1+w3)"
+        },
+        {
+          "name": "b1",
+          "dtype": "fp32",
+          "shape": [
+            "AI",
+            2
+          ],
+          "optional": true,
+          "desc": "MLP gate biases [2*intermediate] (or NULL)"
+        },
+        {
+          "name": "w2",
+          "dtype": "q4_k|q6_k",
+          "shape": [
+            "AE",
+            "AI"
+          ],
+          "desc": "MLP down weights [aligned_embed, intermediate]"
+        },
+        {
+          "name": "b2",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "MLP down bias [aligned_embed] (or NULL)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Final output [tokens, aligned_embed_dim] (includes residual add)"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "size_bytes": "mega_fused_outproj_mlp_prefill_scratch_size()",
+          "desc": "Scratch buffer for fused computation"
+        }
+      ],
+      "dims": [
+        "T",
+        "E",
+        "AE",
+        "H",
+        "D",
+        "AD",
+        "I",
+        "AI"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "RMSNorm epsilon (typically 1e-5)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "none"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64,
+          "AI": 64
+        },
+        "notes": "Q5_0 uses 32-value blocks; AE should be multiple of 32 for correct layout."
+      },
+      "fuses": [
+        "ck_attention_project_head_major",
+        "ck_residual_add_token_major",
+        "rmsnorm_forward",
+        "gemm_blocked_serial",
+        "gemm_blocked_serial",
+        "swiglu_forward",
+        "gemm_blocked_serial"
+      ],
+      "impl": {
+        "function": "mega_fused_outproj_mlp_prefill",
+        "sources": [
+          "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
+          "src/kernels/fused/prefill_fused_gemm.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_mega_fused_outproj_mlp.py"
+        ],
+        "bench": [
+          "scripts/bench_mega_fused_outproj_mlp.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_mega_fused_outproj_mlp.py --compare-numpy",
+            "tolerance": "1e-3",
+            "notes": "Compare fused MLP output against unfused reference"
+          }
+        ]
+      },
+      "notes": "Mega-fused OutProj + MLP: Quantize attn_out \u2192 OutProj \u2192 Residual \u2192 RMSNorm \u2192 MLP (w1*w3\u2192SwiGLU\u2192w2) \u2192 Residual. Fuses 8 operations into 1.",
+      "name": "mega_fused_outproj_mlp_prefill",
+      "_source_file": "mega_fused_outproj_mlp_prefill.json"
+    },
+    {
+      "id": "quantize_row_q8_0",
+      "op": "quantize",
+      "variant": "fp32_to_q8_0",
+      "quant": {
+        "weight": "fp32",
+        "activation": "q8_0",
+        "output": "q8_0"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Input vector [N] (FP32)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "q8_0",
+          "shape": [
+            "N"
+          ],
+          "desc": "Quantized output [N] (Q8_0)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "feature",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Process elements in parallel; each thread handles a slice of the vector."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "N": 32
+        },
+        "notes": "N should be multiple of 32 for Q8_0 block quantization."
+      },
+      "impl": {
+        "function": "quantize_row_q8_0",
+        "sources": [
+          "src/kernels/quantize_row_q8_k_sse.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_quantize.py"
+        ],
+        "bench": [
+          "scripts/bench_quantize.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_quantize.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Compare quantized output against reference"
+          }
+        ]
+      },
+      "notes": "Quantize FP32 vector to Q8_0 format. Used in fused kernels to prepare activations for quantized GEMM.",
+      "name": "quantize_row_q8_0",
+      "_source_file": "quantize_row_q8_0.json"
+    },
+    {
+      "id": "quantize_row_q8_k",
+      "op": "quantize",
+      "variant": "fp32_to_q8_k",
+      "quant": {
+        "weight": "fp32",
+        "activation": "q8_k",
+        "output": "q8_k"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Input vector [N] (FP32)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "q8_k",
+          "shape": [
+            "N"
+          ],
+          "desc": "Quantized output [N] (Q8_K)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "feature",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "feature",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Process elements in parallel; each thread handles a slice of the vector."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "N": 256
+        },
+        "notes": "N should be multiple of 256 for Q8_K block quantization."
+      },
+      "impl": {
+        "function": "quantize_row_q8_k",
+        "sources": [
+          "src/kernels/quantize_row_q8_k_sse.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_quantize.py"
+        ],
+        "bench": [
+          "scripts/bench_quantize.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_quantize.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Compare quantized output against reference"
+          }
+        ]
+      },
+      "notes": "Quantize FP32 vector to Q8_K format. Used in fused kernels for MLP activations.",
+      "name": "quantize_row_q8_k",
+      "_source_file": "quantize_row_q8_k.json"
+    },
+    {
+      "id": "rmsnorm_forward",
+      "op": "rmsnorm",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Input activations [tokens, embed_dim]"
+        },
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm scale weight"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Normalized output"
+        },
+        {
+          "name": "rstd",
+          "dtype": "fp32",
+          "shape": [
+            "T"
+          ],
+          "desc": "Running stddev (can be used for backward pass)"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "mean",
+          "dtype": "fp32",
+          "size_bytes": "T * 4",
+          "desc": "Mean per row (reuse for variance)"
+        },
+        {
+          "name": "variance",
+          "dtype": "fp32",
+          "size_bytes": "T * 4",
+          "desc": "Variance per row"
+        }
+      ],
+      "dims": [
+        "T",
+        "E"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "Epsilon for numerical stability (typically 1e-5)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "feature",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Process tokens in parallel; each thread normalizes one or more tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "E",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 64,
+              "align_bytes": 32,
+              "allow_tail": true
+            },
+            "notes": "Parallelize across embed dimension; reduction needed for mean/variance."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "E": 64
+        },
+        "notes": "For optimal performance, E should be multiple of 64 for SIMD vectorization"
+      },
+      "impl": {
+        "function": "rmsnorm_forward",
+        "sources": [
+          "src/kernels/rmsnorm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rmsnorm.py"
+        ],
+        "bench": [
+          "scripts/bench_rmsnorm.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_rmsnorm.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against numpy reference implementation"
+          }
+        ]
+      },
+      "notes": "Root Mean Square Layer Normalization. Computes: output = input / sqrt(mean(x^2) + eps) * gamma",
+      "name": "rmsnorm_forward",
+      "_source_file": "rmsnorm_forward.json"
+    },
+    {
+      "id": "rope_forward_qk",
+      "op": "rope",
+      "variant": "fp32_head_major",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
+        },
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE cos cache [max_seq, head_dim/2]"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE sin cache [max_seq, head_dim/2]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor after RoPE application (in-place)"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor after RoPE application (in-place)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Position offset for cos/sin cache lookup"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head",
+          "token"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          },
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across tokens; each thread handles one or more tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "D should be multiple of 64 for optimal SIMD. D is the unpadded dimension; AD is used for alignment."
+      },
+      "impl": {
+        "function": "rope_forward_qk",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rope.py"
+        ],
+        "bench": [
+          "scripts/bench_rope.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_rope.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Verify RoPE rotation matches numpy reference"
+          }
+        ]
+      },
+      "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta)",
+      "name": "rope_forward_qk",
+      "_source_file": "rope_forward_qk.json"
+    },
+    {
+      "id": "swiglu_forward",
+      "op": "swiglu",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Gate tensor [tokens, intermediate_dim] (first half of MLP intermediate)"
+        },
+        {
+          "name": "up",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "SwiGLU output: silu(gate) * up"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "gate_activated",
+          "dtype": "fp32",
+          "size_bytes": "T * I * 4",
+          "desc": "SiLU(gate) activation (can reuse output if careful)"
+        }
+      ],
+      "dims": [
+        "T",
+        "I"
+      ],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "feature",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Each thread processes one or more complete tokens."
+          },
+          {
+            "name": "feature",
+            "partition_dim": "I",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across intermediate dimension; requires sigmoid and multiplication."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "I": 64
+        },
+        "notes": "SiLU(x) = x * sigmoid(x). I should be multiple of 64 for optimal SIMD."
+      },
+      "impl": {
+        "function": "swiglu_forward",
+        "sources": [
+          "src/kernels/swiglu_kernels.c",
+          "src/kernels/sigmoid_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_swiglu.py"
+        ],
+        "bench": [
+          "scripts/bench_swiglu.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_swiglu.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Verify SiLU(x) * up matches numpy reference"
+          }
+        ]
+      },
+      "notes": "SwiGLU activation: SiLU(gate) * up = gate * sigmoid(gate) * up. Used in LLaMA-style MLP blocks.",
+      "name": "swiglu_forward",
+      "_source_file": "swiglu_forward.json"
+    }
+  ]
+}

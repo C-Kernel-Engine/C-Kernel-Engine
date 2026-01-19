@@ -1,0 +1,57 @@
+{
+  "id": "embedding_forward_q8_0",
+  "op": "embedding",
+  "variant": "q8_0",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "tokens", "dtype": "int32", "shape": ["T"], "desc": "Input token IDs [tokens]"},
+    {"name": "weight", "dtype": "q8_0", "shape": ["V", "E"], "desc": "Embedding weights [vocab_size, embed_dim] (Q8_0 quantized)"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["T", "E"], "desc": "Embeddings [tokens, embed_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["T", "E", "V"],
+  "params": [],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "token"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"E": 64},
+    "notes": "Simple table lookup; E should be multiple of 64 for SIMD"
+  },
+  "impl": {
+    "function": "embedding_forward_q8_0",
+    "sources": ["src/kernels/embedding_kernels.c"],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_embedding.py"],
+    "bench": ["scripts/bench_embedding.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_embedding.py --compare-numpy",
+        "tolerance": "1e-5",
+        "notes": "Compare against numpy reference"
+      }
+    ]
+  },
+  "notes": "Token embedding lookup with Q8_0 quantized weights. Simple table lookup operation."
+}

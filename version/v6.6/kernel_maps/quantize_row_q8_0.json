@@ -1,0 +1,56 @@
+{
+  "id": "quantize_row_q8_0",
+  "op": "quantize",
+  "variant": "fp32_to_q8_0",
+  "quant": {
+    "weight": "fp32",
+    "activation": "q8_0",
+    "output": "q8_0"
+  },
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["N"], "desc": "Input vector [N] (FP32)"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "q8_0", "shape": ["N"], "desc": "Quantized output [N] (Q8_0)"}
+  ],
+  "scratch": [],
+  "dims": ["N"],
+  "params": [],
+  "parallelization": {
+    "supported": ["feature"],
+    "preferred": {"prefill": "feature", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Process elements in parallel; each thread handles a slice of the vector."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"N": 32},
+    "notes": "N should be multiple of 32 for Q8_0 block quantization."
+  },
+  "impl": {
+    "function": "quantize_row_q8_0",
+    "sources": ["src/kernels/quantize_row_q8_k_sse.c"],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_quantize.py"],
+    "bench": ["scripts/bench_quantize.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_quantize.py --compare-numpy",
+        "tolerance": "1e-5",
+        "notes": "Compare quantized output against reference"
+      }
+    ]
+  },
+  "notes": "Quantize FP32 vector to Q8_0 format. Used in fused kernels to prepare activations for quantized GEMM."
+}

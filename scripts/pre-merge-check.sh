@@ -33,9 +33,27 @@ echo ""
 FAILED=0
 
 # -----------------------------------------------------------------------------
+# Check 0: Kernel Map Validation (NEW - no build required)
+# -----------------------------------------------------------------------------
+echo -e "${CYAN}[0/5] Kernel Map Validation${NC}"
+KERNEL_MAPS_DIR="$ROOT_DIR/version/v6.6/kernel_maps"
+if [ -f "$KERNEL_MAPS_DIR/validate_kernel_maps.py" ]; then
+    if python "$KERNEL_MAPS_DIR/validate_kernel_maps.py" > /dev/null 2>&1; then
+        echo -e "${GREEN}[PASS]${NC} Kernel maps are valid"
+    else
+        echo -e "${RED}[FAIL]${NC} Kernel map validation failed"
+        python "$KERNEL_MAPS_DIR/validate_kernel_maps.py"
+        FAILED=1
+    fi
+else
+    echo -e "${YELLOW}[SKIP]${NC} No kernel maps found"
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
 # Check 1: Build succeeds
 # -----------------------------------------------------------------------------
-echo -e "${CYAN}[1/4] Build Check${NC}"
+echo -e "${CYAN}[1/5] Build Check${NC}"
 cd "$ROOT_DIR"
 if make clean && make -j$(nproc) 2>&1 | tail -5; then
     echo -e "${GREEN}[PASS]${NC} Build succeeded"
@@ -48,7 +66,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # Check 2: No compiler errors (warnings OK)
 # -----------------------------------------------------------------------------
-echo -e "${CYAN}[2/4] Compiler Error Check${NC}"
+echo -e "${CYAN}[2/5] Compiler Error Check${NC}"
 if make 2>&1 | grep -q "error:"; then
     echo -e "${RED}[FAIL]${NC} Compiler errors found"
     FAILED=1
@@ -60,7 +78,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # Check 3: E2E Inference works
 # -----------------------------------------------------------------------------
-echo -e "${CYAN}[3/4] E2E Inference Check${NC}"
+echo -e "${CYAN}[3/5] E2E Inference Check${NC}"
 if $QUICK_MODE; then
     echo -e "${YELLOW}[SKIP]${NC} Skipped (quick mode)"
 else
@@ -81,7 +99,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # Check 4: Critical kernel tests
 # -----------------------------------------------------------------------------
-echo -e "${CYAN}[4/4] Kernel Parity Check${NC}"
+echo -e "${CYAN}[4/5] Kernel Parity Check${NC}"
 if $QUICK_MODE; then
     echo -e "${YELLOW}[SKIP]${NC} Skipped (quick mode)"
 else

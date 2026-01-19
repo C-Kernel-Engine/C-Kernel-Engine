@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "name": "qwen2",
+  "family": "llama",
+  "flags": {
+    "use_qkv_bias": "from_weights",
+    "activation": "swiglu",
+    "rope": "rope"
+  },
+  "block_types": {
+    "dense": {
+      "ops": [
+        "rmsnorm",
+        "qkv_proj",
+        "rope_qk",
+        "attn",
+        "out_proj",
+        "residual_add",
+        "rmsnorm",
+        "mlp_gate_up",
+        "silu_mul",
+        "mlp_down",
+        "residual_add"
+      ]
+    }
+  },
+  "layer_map": {
+    "default": "dense",
+    "overrides": {}
+  }
+}

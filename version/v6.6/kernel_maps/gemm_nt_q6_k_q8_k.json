@@ -1,0 +1,73 @@
+{
+  "id": "gemm_nt_q6_k_q8_k",
+  "op": "gemm",
+  "variant": "q6_k_w_q8_k_a",
+  "quant": {
+    "weight": "q6_k",
+    "activation": "q8_k",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "q8_k", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (Q8_K quantized)"},
+    {"name": "B", "dtype": "q6_k", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q6_K quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [
+    {"name": "temp", "dtype": "fp32", "size_bytes": "M * N * 4", "desc": "Temporary accumulation buffer"}
+  ],
+  "dims": ["M", "N", "K"],
+  "params": [],
+  "parallelization": {
+    "supported": ["token", "feature"],
+    "preferred": {"prefill": "token", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "M",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Split by rows (tokens); good for prefill with many tokens."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "range": {"min_chunk": 16, "align_bytes": 64, "allow_tail": true},
+        "notes": "Split by output features; good for decode."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q6_K requires K dimension multiple of 256 for dequantization. Alternative to Q4_K for W2 (down) projection with better accuracy."
+  },
+  "impl": {
+    "function": "gemm_nt_q6_k_q8_k",
+    "sources": ["src/kernels/gemm_kernels_q6k.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm_q6_k.py"],
+    "bench": ["scripts/bench_gemm_q6_k.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemm_q6_k.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against numpy matmul (moderate tolerance)"
+      },
+      {
+        "kind": "llamacpp",
+        "command": "make llamacpp-parity-gemm-q6k",
+        "tolerance": "1e-4",
+        "notes": "Compare against llama.cpp ggml_gemm_q6k"
+      }
+    ]
+  },
+  "notes": "General matrix multiplication with Q6_K weights and Q8_K activations. Used for W2 (down) projection in MLP when Q4_K accuracy is insufficient."
+}

@@ -1,0 +1,64 @@
+{
+  "id": "gemm_blocked_serial",
+  "op": "gemm",
+  "variant": "fp32_nt",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "desc": "Input matrix [M, K] (row-major)"},
+    {"name": "B", "dtype": "fp32", "shape": ["N", "K"], "desc": "Weight matrix [N, K] (row-major, stored transposed)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias vector [N] (or NULL for no bias)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Output matrix [M, N] = A @ B + bias"}
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "parallelization": {
+    "supported": ["output", "feature"],
+    "preferred": {"prefill": "output", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "output",
+        "partition_dim": "M",
+        "param_style": "ith_nth",
+        "notes": "Split by output rows; each thread computes subset of C."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "ith_nth",
+        "notes": "Split by output features; each thread computes subset of output columns."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 64, "N": 64},
+    "notes": "GEMM nt: C = A @ B^T. B is stored as [N, K] row-major. K and N should be multiples of 64."
+  },
+  "impl": {
+    "function": "gemm_blocked_serial",
+    "sources": ["src/kernels/gemm_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm.py"],
+    "bench": ["scripts/bench_gemm.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemm.py --compare-numpy",
+        "tolerance": "1e-5",
+        "notes": "Verify GEMM matches numpy matmul"
+      }
+    ]
+  },
+  "notes": "General matrix multiplication: C = A @ B^T + bias. This is the 'nt' variant; weights are stored as [N, K]. Used for projection layers in transformer blocks."
+}

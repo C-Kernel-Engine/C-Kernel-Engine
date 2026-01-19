@@ -1,0 +1,114 @@
+• Here’s a detailed, stage‑by‑stage plan comparing v6.5 vs v6.6, with what we can reuse vs change. I’ll use “IR1” = graph IR (ops + dtype + dims), “IR2” = lowered IR (explicit buffers + kernel IDs + schedule).
+
+  v6.5 baseline (what already works)
+
+  - GGUF → bump: scripts/v6.5/convert_gguf_to_bump_v6_5.py
+    Outputs weights.bump + weights_manifest.json (per‑tensor dtype, alignment). This is solid and stable.
+  - IR1 (graph): scripts/v6.5/build_ir_v6_5.py
+    Builds per‑layer ops from config + manifest, selects quant kernels from scripts/v6.5/quant_types.py.
+  - Fusion/optimization: scripts/v6.5/fusion_patterns.py
+    Manual pattern lists, mostly decode‑side.
+  - IR2 + memory layout: scripts/v6.5/v6_5_ir_lowering.py
+    Training‑first layout (per‑layer activations, huge scratch).
+  - Codegen: scripts/v6.5/codegen_v6_5.py
+    Explicit unrolled C with per‑layer dtypes; includes quant activation paths.
+
+  v6.6 current state
+
+  - GGUF → bump: scripts/v6.6/convert_gguf_to_bump_v6_6.py
+    Almost identical to v6.5 — good to reuse directly.
+  - IR1/IR2: scripts/v6.6/build_ir_v6_6.py + scripts/v6.6/v6_6_ir_lowering.py
+    Cloned from v6.5; still hardcoded, not registry‑driven.
+  - Fusion: scripts/v6.6/fusion_patterns.py
+    Still manual patterns.
+  - Codegen: scripts/v6.6/codegen_v6_6.py
+    Similar to v6.5, but not yet driven by kernel maps.
+
+  ———
+
+  ## What we should reuse vs adjust vs build from scratch
+
+  1) convert_gguf_to_bump
+
+  - Reuse as‑is: scripts/v6.6/convert_gguf_to_bump_v6_6.py
+    It already emits the per‑tensor dtype table and manifest (needed for kernel selection).
+  - Optional small adjustment: add a manifest “summary” (quant mix per layer) to help IR selection. Not required.
+
+  2) IR1 (graph)
+
+  - Reuse: the structure of scripts/v6.6/build_ir_v6_6.py (op generation, dims, config parsing).
+  - Adjust: kernel selection should come from map‑generated registry, not hardcoded quant_types.py.
+  - Build new layer: registry lookup by op + dtype + mode + kernel_maps signatures.
+
+  3) Fusion/optimization
+
+  - Reuse: the idea of a pattern pass (scripts/v6.6/fusion_patterns.py).
+  - Adjust: patterns should come from kernel maps fuses lists (not hardcoded).
+  - New output: write a fusion_log.json for debug (which ops replaced).
+
+  4) IR2 + memory planner
+
+  - Reuse: scripts/v6.6/v6_6_ir_lowering.py structure (buffer + layout classes).
+  - Adjust: instead of training‑first, add an inference mode that:
+      - Allocates only buffers required by the fused schedule.
+      - Treats scratch as reusable.
+      - Honors condition / save_for_backward from kernel maps.
+  - Build new: “schedule‑driven” memory plan (needs registry inputs/outputs/scratch).
+
+  5) Codegen
+
+  - Reuse: scripts/v6.6/codegen_v6_6.py templating and explicit unrolled style.
+  - Adjust: emit kernel calls from lowered schedule, not from hardcoded flow.
+  - New: emit argument ordering based on kernel map impl.function + params.
+  Step A: convert_gguf_to_bump (keep)
+
+  - Keep scripts/v6.6/convert_gguf_to_bump_v6_6.py.
+  - Ensure manifest contains per‑tensor dtype (already does).
+  - Optional: add a quant summary block for quick model validation.
+
+  Step B: IR1 generation (graph)
+
+  - Update scripts/v6.6/build_ir_v6_6.py to load version/v6.6/kernel_maps/KERNEL_REGISTRY.json.
+  - Select kernels by: op + mode (prefill/decode) + weight_dtype + activation_dtype.
+  - Store kernel ID on each op (IR1 output).
+
+  Step C: Fusion + optimization
+
+  - Replace hardcoded patterns in scripts/v6.6/fusion_patterns.py with map‑driven fuses.
+  - Add a fusion log output (what was replaced, by which fused kernel).
+
+  Step D: IR2 lowering + memory plan
+
+  - Update scripts/v6.6/v6_6_ir_lowering.py to read fused schedule and allocate:
+      - Inputs/outputs/scratch per kernel map
+      - Minimal inference buffers (skip training‑only)
+  - Use kernel map dimensions for buffer size calculation.
+
+  Step E: Codegen
+
+  - Update scripts/v6.6/codegen_v6_6.py to:
+      - Walk the lowered schedule
+      - Emit calls with kernel map argument ordering
+      - Generate memory layout + prefill/decode entrypoints
+
+  ———
+
+  ## Minimum kernel maps needed for Qwen (q4_k_m)
+
+  You’ll need these mapped before IR/codegen can be registry‑driven:
+
+  - Embedding: embedding_forward_q8_0
+  - RMSNorm: rmsnorm_forward
+  - QKV projection: gemv_q5_0_q8_0, gemv_q8_0_q8_0, gemm_nt_q5_0_q8_0, gemm_nt_q8_0_q8_0
+  - RoPE: rope_forward_qk
+  - Flash attention: attention_forward_causal_head_major_gqa_flash_strided
+  - Out‑proj: gemv_q5_0_q8_0 / gemm_nt_q5_0_q8_0
+  - MLP: gemm_nt_q5_0_q8_0 + gemm_nt_q4_k_q8_k / gemm_nt_q6_k_q8_k + swiglu_forward
+  - Residual add: ck_residual_add_token_major
+  - Quantize: quantize_row_q8_0, quantize_row_q8_k
+
+  ———
+
+  If you want, I can start with Step B (IR1 selection from map registry) or Step D (inference‑mode memory planner).
+
+

@@ -1,0 +1,79 @@
+{
+  "id": "mega_fused_outproj_mlp_prefill",
+  "op": "fused_mlp_block",
+  "variant": "q5_0_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q5_0|q4_k|q6_k",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "attn_out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Attention output [heads, tokens, head_dim] (head-major)"},
+    {"name": "residual", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input [tokens, aligned_embed_dim]"},
+    {"name": "ln2_gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm gamma [embed_dim]"},
+    {"name": "wo", "dtype": "q5_0", "shape": ["H", "AE", "D"], "desc": "Output projection weights [heads, aligned_embed, head_dim]"},
+    {"name": "bo", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "Output bias [aligned_embed] (or NULL)"},
+    {"name": "w1", "dtype": "q5_0", "shape": ["AI", 2, "AE"], "desc": "MLP gate weights [2*intermediate, aligned_embed] (concatenated w1+w3)"},
+    {"name": "b1", "dtype": "fp32", "shape": ["AI", 2], "optional": true, "desc": "MLP gate biases [2*intermediate] (or NULL)"},
+    {"name": "w2", "dtype": "q4_k|q6_k", "shape": ["AE", "AI"], "desc": "MLP down weights [aligned_embed, intermediate]"},
+    {"name": "b2", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "MLP down bias [aligned_embed] (or NULL)"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Final output [tokens, aligned_embed_dim] (includes residual add)"}
+  ],
+  "scratch": [
+    {"name": "scratch", "dtype": "fp32", "size_bytes": "mega_fused_outproj_mlp_prefill_scratch_size()", "desc": "Scratch buffer for fused computation"}
+  ],
+  "dims": ["T", "E", "AE", "H", "D", "AD", "I", "AI"],
+  "params": [
+    {"name": "eps", "dtype": "float32", "desc": "RMSNorm epsilon (typically 1e-5)"}
+  ],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "none"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "ith_nth",
+        "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64, "AI": 64},
+    "notes": "Q5_0 uses 32-value blocks; AE should be multiple of 32 for correct layout."
+  },
+  "fuses": [
+    "ck_attention_project_head_major",
+    "ck_residual_add_token_major",
+    "rmsnorm_forward",
+    "gemm_blocked_serial",
+    "gemm_blocked_serial",
+    "swiglu_forward",
+    "gemm_blocked_serial"
+  ],
+  "impl": {
+    "function": "mega_fused_outproj_mlp_prefill",
+    "sources": [
+      "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
+      "src/kernels/fused/prefill_fused_gemm.c"
+    ],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_mega_fused_outproj_mlp.py"],
+    "bench": ["scripts/bench_mega_fused_outproj_mlp.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_mega_fused_outproj_mlp.py --compare-numpy",
+        "tolerance": "1e-3",
+        "notes": "Compare fused MLP output against unfused reference"
+      }
+    ]
+  },
+  "notes": "Mega-fused OutProj + MLP: Quantize attn_out → OutProj → Residual → RMSNorm → MLP (w1*w3→SwiGLU→w2) → Residual. Fuses 8 operations into 1."
+}

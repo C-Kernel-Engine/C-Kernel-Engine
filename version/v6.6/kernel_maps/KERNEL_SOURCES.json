@@ -1,0 +1,2931 @@
+{
+  "_meta": {
+    "description": "Auto-generated kernel source scan",
+    "version": "v6.6",
+    "generated_by": "gen_kernel_registry.py",
+    "counts": {
+      "inference": 172,
+      "training": 44,
+      "optimizer": 12,
+      "fusion": 68,
+      "quantization": 37,
+      "utility": 19,
+      "total": 352
+    }
+  },
+  "inference": {
+    "activation": [
+      {
+        "name": "sigmoid_forward",
+        "source": "sigmoid_kernels.c",
+        "path": "src/kernels/sigmoid_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "swiglu_forward",
+        "source": "swiglu_kernels.c",
+        "path": "src/kernels/swiglu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "swiglu_forward_exact",
+        "source": "swiglu_kernels.c",
+        "path": "src/kernels/swiglu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gelu_fast_inplace",
+        "source": "gelu_kernels.c",
+        "path": "src/kernels/gelu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gelu_exact_inplace",
+        "source": "gelu_kernels.c",
+        "path": "src/kernels/gelu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "swiglu_forward_bf16",
+        "source": "swiglu_kernels_bf16.c",
+        "path": "src/kernels/swiglu_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "gelu_fast_inplace_bf16",
+        "source": "gelu_kernels_bf16.c",
+        "path": "src/kernels/gelu_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "relu_forward_bf16",
+        "source": "relu_kernels_bf16.c",
+        "path": "src/kernels/relu_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "relu_forward_inplace_bf16",
+        "source": "relu_kernels_bf16.c",
+        "path": "src/kernels/relu_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "sigmoid_forward_bf16",
+        "source": "sigmoid_kernels_bf16.c",
+        "path": "src/kernels/sigmoid_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "relu_forward",
+        "source": "relu_kernels.c",
+        "path": "src/kernels/relu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "relu_forward_inplace",
+        "source": "relu_kernels.c",
+        "path": "src/kernels/relu_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ],
+    "positional": [
+      {
+        "name": "rope_forward_bf16",
+        "source": "rope_kernels_bf16.c",
+        "path": "src/kernels/rope_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "rope_forward_qk_bf16",
+        "source": "rope_kernels_bf16.c",
+        "path": "src/kernels/rope_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "rope_precompute_cache",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rope_apply_head",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rope_forward",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rope_forward_strided",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rope_forward_qk",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rope_forward_qk_strided",
+        "source": "rope_kernels.c",
+        "path": "src/kernels/rope_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ],
+    "gemm": [
+      {
+        "name": "gemv_q6_k_q8_k_avx512_vbmi",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q6_k_q8_k",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q6_k_q8_k_parallel",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q6_k_q8_k_parallel_simd",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemm_q6_k_q8_k",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemm_nt_q6_k_q8_k",
+        "source": "gemm_kernels_q6k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+        "dtypes": [
+          "q6_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q8_0",
+        "source": "gemm_kernels_q8_0.c",
+        "path": "src/kernels/gemm_kernels_q8_0.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemm_q8_0",
+        "source": "gemm_kernels_q8_0.c",
+        "path": "src/kernels/gemm_kernels_q8_0.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemm_nt_q8_0",
+        "source": "gemm_kernels_q8_0.c",
+        "path": "src/kernels/gemm_kernels_q8_0.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemv_q8_0_q8_0",
+        "source": "gemm_kernels_q8_0.c",
+        "path": "src/kernels/gemm_kernels_q8_0.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemv_q4_k",
+        "source": "gemm_kernels_q4k.c",
+        "path": "src/kernels/gemm_kernels_q4k.c",
+        "dtypes": [
+          "q4_k"
+        ]
+      },
+      {
+        "name": "gemm_q4_k",
+        "source": "gemm_kernels_q4k.c",
+        "path": "src/kernels/gemm_kernels_q4k.c",
+        "dtypes": [
+          "q4_k"
+        ]
+      },
+      {
+        "name": "gemm_nt_q4_k",
+        "source": "gemm_kernels_q4k.c",
+        "path": "src/kernels/gemm_kernels_q4k.c",
+        "dtypes": [
+          "q4_k"
+        ]
+      },
+      {
+        "name": "gemv_q4_k_q8_k_parallel_simd",
+        "source": "gemm_kernels_q4k_avx.c",
+        "path": "src/kernels/gemm_kernels_q4k_avx.c",
+        "dtypes": [
+          "q4_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q4_k_q8_k_parallel",
+        "source": "gemm_kernels_q4k_avx.c",
+        "path": "src/kernels/gemm_kernels_q4k_avx.c",
+        "dtypes": [
+          "q4_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q4_0",
+        "source": "gemm_kernels_q4_0.c",
+        "path": "src/kernels/gemm_kernels_q4_0.c",
+        "dtypes": [
+          "q4_0"
+        ]
+      },
+      {
+        "name": "gemm_q4_0",
+        "source": "gemm_kernels_q4_0.c",
+        "path": "src/kernels/gemm_kernels_q4_0.c",
+        "dtypes": [
+          "q4_0"
+        ]
+      },
+      {
+        "name": "gemm_nt_q4_0",
+        "source": "gemm_kernels_q4_0.c",
+        "path": "src/kernels/gemm_kernels_q4_0.c",
+        "dtypes": [
+          "q4_0"
+        ]
+      },
+      {
+        "name": "ck_gemm_add_bias",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_nt_matvec_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_naive_serial_double",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_naive_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_avx512_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_fine_grained_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_nn_serial_double",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_nn_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_nn_blocked",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_tn_serial_double",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_tn_parallel",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_tn_blocked",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_blocked_serial",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemv_q4_1",
+        "source": "gemm_kernels_q4_1.c",
+        "path": "src/kernels/gemm_kernels_q4_1.c",
+        "dtypes": [
+          "q4_1"
+        ]
+      },
+      {
+        "name": "gemm_q4_1",
+        "source": "gemm_kernels_q4_1.c",
+        "path": "src/kernels/gemm_kernels_q4_1.c",
+        "dtypes": [
+          "q4_1"
+        ]
+      },
+      {
+        "name": "gemm_nt_q4_1",
+        "source": "gemm_kernels_q4_1.c",
+        "path": "src/kernels/gemm_kernels_q4_1.c",
+        "dtypes": [
+          "q4_1"
+        ]
+      },
+      {
+        "name": "gemm_nt_q5_0_sse_v2",
+        "source": "gemm_kernels_q5_0_sse_v2.c",
+        "path": "src/kernels/gemm_kernels_q5_0_sse_v2.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemv_q6_k",
+        "source": "gemm_kernels_q6k.c",
+        "path": "src/kernels/gemm_kernels_q6k.c",
+        "dtypes": [
+          "q6_k"
+        ]
+      },
+      {
+        "name": "gemm_q6_k",
+        "source": "gemm_kernels_q6k.c",
+        "path": "src/kernels/gemm_kernels_q6k.c",
+        "dtypes": [
+          "q6_k"
+        ]
+      },
+      {
+        "name": "gemm_nt_q6_k",
+        "source": "gemm_kernels_q6k.c",
+        "path": "src/kernels/gemm_kernels_q6k.c",
+        "dtypes": [
+          "q6_k"
+        ]
+      },
+      {
+        "name": "gemv_q5_1",
+        "source": "gemm_kernels_q5_1.c",
+        "path": "src/kernels/gemm_kernels_q5_1.c",
+        "dtypes": [
+          "q5_1"
+        ]
+      },
+      {
+        "name": "gemm_q5_1",
+        "source": "gemm_kernels_q5_1.c",
+        "path": "src/kernels/gemm_kernels_q5_1.c",
+        "dtypes": [
+          "q5_1"
+        ]
+      },
+      {
+        "name": "gemm_nt_q5_1",
+        "source": "gemm_kernels_q5_1.c",
+        "path": "src/kernels/gemm_kernels_q5_1.c",
+        "dtypes": [
+          "q5_1"
+        ]
+      },
+      {
+        "name": "gemv_nt_q5_0_head_major_output",
+        "source": "gemm_head_major_output.c",
+        "path": "src/kernels/gemm_head_major_output.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "ck_gemm_nt_head_major_q5_0",
+        "source": "gemm_head_major_output.c",
+        "path": "src/kernels/gemm_head_major_output.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "ck_gemm_nt_head_major_q8_0",
+        "source": "gemm_head_major_output.c",
+        "path": "src/kernels/gemm_head_major_output.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemm_amx_int8_core",
+        "source": "gemm_kernels_amx.c",
+        "path": "src/kernels/gemm_kernels_amx.c",
+        "dtypes": [
+          "int8"
+        ]
+      },
+      {
+        "name": "gemv_q4_k_q8_k",
+        "source": "gemm_kernels_q4k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k.c",
+        "dtypes": [
+          "q4_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemm_q4_k_q8_k",
+        "source": "gemm_kernels_q4k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k.c",
+        "dtypes": [
+          "q4_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemm_nt_q4_k_q8_k",
+        "source": "gemm_kernels_q4k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k.c",
+        "dtypes": [
+          "q4_k",
+          "q8_k"
+        ]
+      },
+      {
+        "name": "gemv_q5_0",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemv_q5_0_parallel",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemv_q5_0_parallel_simd",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemm_q5_0",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemm_nt_q5_0",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0"
+        ]
+      },
+      {
+        "name": "gemv_q5_0_q8_0",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0",
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemm_nt_q5_0_q8_0",
+        "source": "gemm_kernels_q5_0.c",
+        "path": "src/kernels/gemm_kernels_q5_0.c",
+        "dtypes": [
+          "q5_0",
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemv_f16",
+        "source": "gemm_kernels_f16.c",
+        "path": "src/kernels/gemm_kernels_f16.c",
+        "dtypes": [
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_f16",
+        "source": "gemm_kernels_f16.c",
+        "path": "src/kernels/gemm_kernels_f16.c",
+        "dtypes": [
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_nt_q8_0_q8_0",
+        "source": "gemm_batch_int8.c",
+        "path": "src/kernels/gemm_batch_int8.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "gemm_microkernel",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_microkernel_blocked",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_microkernel_packed",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_microkernel_blocked_bt",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_microkernel_edge",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_microkernel_sequential",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_init_threads",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "gemm_bf16_native",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_blocked_serial_bf16",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_bf16_fp32out",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_nn_bf16",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "gemm_tn_bf16",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      }
+    ],
+    "other": [
+      {
+        "name": "convert_int4_to_float",
+        "source": "rmsnorm_kernels_int4.c",
+        "path": "src/kernels/rmsnorm_kernels_int4.c",
+        "dtypes": [
+          "int4"
+        ]
+      },
+      {
+        "name": "hsum256_epi32",
+        "source": "gemm_kernels_q4k_q8k_vnni.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "load_q8_even_odd_16",
+        "source": "gemm_kernels_q4k_q8k_vnni.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "hsum256_ps_rmsnorm",
+        "source": "rmsnorm_kernels.c",
+        "path": "src/kernels/rmsnorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_min",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "hsum256_ps",
+        "source": "gemm_kernels.c",
+        "path": "src/kernels/gemm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_fast_expf",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_expf",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_flash_attn_tile_k",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_flash_attn_choose_tile_k",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_flash_attn_fast_exp_kind",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "max_k_for_query",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_hsum256_ps",
+        "source": "attention_decode_fused.c",
+        "path": "src/kernels/attention_decode_fused.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_dot_f32",
+        "source": "attention_decode_fused.c",
+        "path": "src/kernels/attention_decode_fused.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_qkv_project_head_major_token",
+        "source": "attention_decode_fused.c",
+        "path": "src/kernels/attention_decode_fused.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "convert_bf16_tensor_to_buf",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "qkv_index",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "score_index",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "hsum256_ps_flash",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "configure_tiles_gemm",
+        "source": "gemm_kernels_amx.c",
+        "path": "src/kernels/gemm_kernels_amx.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "release_tiles",
+        "source": "gemm_kernels_amx.c",
+        "path": "src/kernels/gemm_kernels_amx.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_nearest_int",
+        "source": "gemm_kernels_q4k_q8k.c",
+        "path": "src/kernels/gemm_kernels_q4k_q8k.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "convert_int8_to_float",
+        "source": "rmsnorm_kernels_int8.c",
+        "path": "src/kernels/rmsnorm_kernels_int8.c",
+        "dtypes": [
+          "int8"
+        ]
+      },
+      {
+        "name": "hsum512_ps",
+        "source": "mlp_fused_decode.c",
+        "path": "src/kernels/mlp_fused_decode.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "dot_f16",
+        "source": "gemm_kernels_f16.c",
+        "path": "src/kernels/gemm_kernels_f16.c",
+        "dtypes": [
+          "f16"
+        ]
+      },
+      {
+        "name": "pack_a_panel",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "pack_b_panel",
+        "source": "gemm_microkernel.c",
+        "path": "src/kernels/gemm_microkernel.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_fma_f32_to_f16",
+        "source": "fp16_convert.c",
+        "path": "src/kernels/fp16_convert.c",
+        "dtypes": [
+          "f16"
+        ]
+      },
+      {
+        "name": "ck_scale_f32_to_f16",
+        "source": "fp16_convert.c",
+        "path": "src/kernels/fp16_convert.c",
+        "dtypes": [
+          "f16"
+        ]
+      },
+      {
+        "name": "hmax256_ps",
+        "source": "softmax_kernels.c",
+        "path": "src/kernels/softmax_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "hsum256_ps_softmax",
+        "source": "softmax_kernels.c",
+        "path": "src/kernels/softmax_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_min_i",
+        "source": "gemm_kernels_bf16.c",
+        "path": "src/kernels/gemm_kernels_bf16.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ],
+    "normalization": [
+      {
+        "name": "rmsnorm_forward_int4",
+        "source": "rmsnorm_kernels_int4.c",
+        "path": "src/kernels/rmsnorm_kernels_int4.c",
+        "dtypes": [
+          "int4"
+        ]
+      },
+      {
+        "name": "rmsnorm_forward",
+        "source": "rmsnorm_kernels.c",
+        "path": "src/kernels/rmsnorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "layernorm_forward_rolled_slice_bf16",
+        "source": "layernorm_kernels_bf16.c",
+        "path": "src/kernels/layernorm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "layernorm_forward_unrolled_slice_bf16",
+        "source": "layernorm_kernels_bf16.c",
+        "path": "src/kernels/layernorm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "rmsnorm_forward_bf16",
+        "source": "rmsnorm_kernels_bf16.c",
+        "path": "src/kernels/rmsnorm_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "zero_layernorm_padding",
+        "source": "layernorm_kernels.c",
+        "path": "src/kernels/layernorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "layernorm_naive_serial_matched_precision",
+        "source": "layernorm_kernels.c",
+        "path": "src/kernels/layernorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "layernorm_naive_serial",
+        "source": "layernorm_kernels.c",
+        "path": "src/kernels/layernorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "layernorm_forward_rolled_slice",
+        "source": "layernorm_kernels.c",
+        "path": "src/kernels/layernorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "layernorm_forward_unrolled_slice",
+        "source": "layernorm_kernels.c",
+        "path": "src/kernels/layernorm_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "rmsnorm_forward_int8",
+        "source": "rmsnorm_kernels_int8.c",
+        "path": "src/kernels/rmsnorm_kernels_int8.c",
+        "dtypes": [
+          "int8"
+        ]
+      }
+    ],
+    "embedding": [
+      {
+        "name": "embedding_forward",
+        "source": "embedding_kernels.c",
+        "path": "src/kernels/embedding_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "embedding_forward_q4_k",
+        "source": "embedding_kernels.c",
+        "path": "src/kernels/embedding_kernels.c",
+        "dtypes": [
+          "q4_k"
+        ]
+      },
+      {
+        "name": "embedding_forward_q8_0",
+        "source": "embedding_kernels.c",
+        "path": "src/kernels/embedding_kernels.c",
+        "dtypes": [
+          "q8_0"
+        ]
+      },
+      {
+        "name": "embedding_forward_q6_k",
+        "source": "embedding_kernels.c",
+        "path": "src/kernels/embedding_kernels.c",
+        "dtypes": [
+          "q6_k"
+        ]
+      },
+      {
+        "name": "embedding_forward_bf16",
+        "source": "embedding_kernels_bf16.c",
+        "path": "src/kernels/embedding_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      }
+    ],
+    "vision": [
+      {
+        "name": "im2patch",
+        "source": "vision_kernels.c",
+        "path": "src/kernels/vision_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "patch2im",
+        "source": "vision_kernels.c",
+        "path": "src/kernels/vision_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "im2patch_bf16",
+        "source": "vision_kernels_bf16.c",
+        "path": "src/kernels/vision_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "patch2im_bf16",
+        "source": "vision_kernels_bf16.c",
+        "path": "src/kernels/vision_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      }
+    ],
+    "attention": [
+      {
+        "name": "causal_softmax_head_major_bf16",
+        "source": "softmax_kernels_bf16.c",
+        "path": "src/kernels/softmax_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "backward_causal_softmax_head_major_bf16",
+        "source": "softmax_kernels_bf16.c",
+        "path": "src/kernels/softmax_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "topk_softmax_f32",
+        "source": "topk_kernels.c",
+        "path": "src/kernels/topk_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_flash_decode",
+        "source": "attention_flash_true.c",
+        "path": "src/kernels/attention_flash_true.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "softmax_cross_entropy_loss_bf16",
+        "source": "loss_kernels_bf16.c",
+        "path": "src/kernels/loss_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "ck_attention_project_head_major_decode_token",
+        "source": "attention_decode_fused.c",
+        "path": "src/kernels/attention_decode_fused.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "ck_attention_project_head_major_decode_token_residual",
+        "source": "attention_decode_fused.c",
+        "path": "src/kernels/attention_decode_fused.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_exact",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_gqa",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_gqa_exact",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_gqa_bf16",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "attention_flash_query_causal",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_gqa_flash",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_causal_head_major_gqa_flash_strided",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_decode_head_major_gqa_flash",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "attention_forward_decode_head_major_gqa_regular",
+        "source": "attention_kernels.c",
+        "path": "src/kernels/attention_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "softmax_cross_entropy_loss",
+        "source": "loss_kernels.c",
+        "path": "src/kernels/loss_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "causal_softmax_head_major",
+        "source": "softmax_kernels.c",
+        "path": "src/kernels/softmax_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "causal_softmax_head_major_exact",
+        "source": "softmax_kernels.c",
+        "path": "src/kernels/softmax_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "backward_causal_softmax_head_major",
+        "source": "softmax_kernels.c",
+        "path": "src/kernels/softmax_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ],
+    "sampling": [
+      {
+        "name": "topk_f32",
+        "source": "topk_kernels.c",
+        "path": "src/kernels/topk_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "topk_batched_f32",
+        "source": "topk_kernels.c",
+        "path": "src/kernels/topk_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "argmax_f32",
+        "source": "topk_kernels.c",
+        "path": "src/kernels/topk_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ],
+    "mlp": [
+      {
+        "name": "mlp_token_parallel",
+        "source": "mlp_kernels.c",
+        "path": "src/kernels/mlp_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "mlp_token_parallel_exact",
+        "source": "mlp_kernels.c",
+        "path": "src/kernels/mlp_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "mlp_token_parallel_bf16",
+        "source": "mlp_kernels_bf16.c",
+        "path": "src/kernels/mlp_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      },
+      {
+        "name": "mlp_token_parallel_bf16_fp32act",
+        "source": "mlp_kernels_bf16.c",
+        "path": "src/kernels/mlp_kernels_bf16.c",
+        "dtypes": [
+          "bf16",
+          "f16"
+        ]
+      }
+    ],
+    "kv_cache": [
+      {
+        "name": "kv_cache_repack_head_major_inplace",
+        "source": "kv_cache_kernels.c",
+        "path": "src/kernels/kv_cache_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      },
+      {
+        "name": "kv_cache_write_head_major",
+        "source": "kv_cache_kernels.c",
+        "path": "src/kernels/kv_cache_kernels.c",
+        "dtypes": [
+          "fp32"
+        ]
+      }
+    ]
+  },
+  "training": [
+    {
+      "name": "sigmoid_backward",
+      "source": "sigmoid_kernels.c",
+      "path": "src/kernels/sigmoid_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rope_backward_bf16",
+      "source": "rope_kernels_bf16.c",
+      "path": "src/kernels/rope_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "rope_backward_qk_bf16",
+      "source": "rope_kernels_bf16.c",
+      "path": "src/kernels/rope_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "swiglu_backward",
+      "source": "swiglu_kernels.c",
+      "path": "src/kernels/swiglu_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "swiglu_backward_exact",
+      "source": "swiglu_kernels.c",
+      "path": "src/kernels/swiglu_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_backward_int4",
+      "source": "rmsnorm_kernels_int4.c",
+      "path": "src/kernels/rmsnorm_kernels_int4.c",
+      "dtypes": [
+        "int4"
+      ]
+    },
+    {
+      "name": "add_backward_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gelu_backward_exact",
+      "source": "gelu_kernels.c",
+      "path": "src/kernels/gelu_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gelu_backward_fast",
+      "source": "gelu_kernels.c",
+      "path": "src/kernels/gelu_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemv_q8_0_backward",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "gemm_q8_0_backward",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "gemv_q4_k_backward",
+      "source": "gemm_kernels_q4k.c",
+      "path": "src/kernels/gemm_kernels_q4k.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "gemm_q4_k_backward",
+      "source": "gemm_kernels_q4k.c",
+      "path": "src/kernels/gemm_kernels_q4k.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "embedding_backward",
+      "source": "embedding_kernels.c",
+      "path": "src/kernels/embedding_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_backward",
+      "source": "rmsnorm_kernels.c",
+      "path": "src/kernels/rmsnorm_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemv_q4_0_backward",
+      "source": "gemm_kernels_q4_0.c",
+      "path": "src/kernels/gemm_kernels_q4_0.c",
+      "dtypes": [
+        "q4_0"
+      ]
+    },
+    {
+      "name": "gemm_q4_0_backward",
+      "source": "gemm_kernels_q4_0.c",
+      "path": "src/kernels/gemm_kernels_q4_0.c",
+      "dtypes": [
+        "q4_0"
+      ]
+    },
+    {
+      "name": "layernorm_backward_kernel_bf16",
+      "source": "layernorm_kernels_bf16.c",
+      "path": "src/kernels/layernorm_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gemv_q4_1_backward",
+      "source": "gemm_kernels_q4_1.c",
+      "path": "src/kernels/gemm_kernels_q4_1.c",
+      "dtypes": [
+        "q4_1"
+      ]
+    },
+    {
+      "name": "gemm_q4_1_backward",
+      "source": "gemm_kernels_q4_1.c",
+      "path": "src/kernels/gemm_kernels_q4_1.c",
+      "dtypes": [
+        "q4_1"
+      ]
+    },
+    {
+      "name": "rmsnorm_backward_bf16",
+      "source": "rmsnorm_kernels_bf16.c",
+      "path": "src/kernels/rmsnorm_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gemv_q5_1_backward",
+      "source": "gemm_kernels_q5_1.c",
+      "path": "src/kernels/gemm_kernels_q5_1.c",
+      "dtypes": [
+        "q5_1"
+      ]
+    },
+    {
+      "name": "gemm_q5_1_backward",
+      "source": "gemm_kernels_q5_1.c",
+      "path": "src/kernels/gemm_kernels_q5_1.c",
+      "dtypes": [
+        "q5_1"
+      ]
+    },
+    {
+      "name": "fc2_backward_kernel",
+      "source": "mlp_kernels.c",
+      "path": "src/kernels/mlp_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fc1_backward_kernel",
+      "source": "mlp_kernels.c",
+      "path": "src/kernels/mlp_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rope_backward",
+      "source": "rope_kernels.c",
+      "path": "src/kernels/rope_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rope_backward_inplace",
+      "source": "rope_kernels.c",
+      "path": "src/kernels/rope_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rope_backward_qk",
+      "source": "rope_kernels.c",
+      "path": "src/kernels/rope_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "swiglu_backward_bf16",
+      "source": "swiglu_kernels_bf16.c",
+      "path": "src/kernels/swiglu_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gelu_backward_exact_bf16",
+      "source": "gelu_kernels_bf16.c",
+      "path": "src/kernels/gelu_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gelu_backward_fast_bf16",
+      "source": "gelu_kernels_bf16.c",
+      "path": "src/kernels/gelu_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "relu_backward_bf16",
+      "source": "relu_kernels_bf16.c",
+      "path": "src/kernels/relu_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "attention_backward_causal_head_major_gqa_bf16",
+      "source": "attention_kernels.c",
+      "path": "src/kernels/attention_kernels.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "attention_backward_causal_head_major_gqa",
+      "source": "attention_kernels.c",
+      "path": "src/kernels/attention_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "attention_backward_causal_head_major",
+      "source": "attention_kernels.c",
+      "path": "src/kernels/attention_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "layernorm_backward_kernel",
+      "source": "layernorm_kernels.c",
+      "path": "src/kernels/layernorm_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "sigmoid_backward_bf16",
+      "source": "sigmoid_kernels_bf16.c",
+      "path": "src/kernels/sigmoid_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "rmsnorm_backward_int8",
+      "source": "rmsnorm_kernels_int8.c",
+      "path": "src/kernels/rmsnorm_kernels_int8.c",
+      "dtypes": [
+        "int8"
+      ]
+    },
+    {
+      "name": "gemv_q5_0_backward",
+      "source": "gemm_kernels_q5_0.c",
+      "path": "src/kernels/gemm_kernels_q5_0.c",
+      "dtypes": [
+        "q5_0"
+      ]
+    },
+    {
+      "name": "gemm_q5_0_backward",
+      "source": "gemm_kernels_q5_0.c",
+      "path": "src/kernels/gemm_kernels_q5_0.c",
+      "dtypes": [
+        "q5_0"
+      ]
+    },
+    {
+      "name": "embedding_backward_bf16",
+      "source": "embedding_kernels_bf16.c",
+      "path": "src/kernels/embedding_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gemv_f16_backward",
+      "source": "gemm_kernels_f16.c",
+      "path": "src/kernels/gemm_kernels_f16.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "gemm_f16_backward",
+      "source": "gemm_kernels_f16.c",
+      "path": "src/kernels/gemm_kernels_f16.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "relu_backward",
+      "source": "relu_kernels.c",
+      "path": "src/kernels/relu_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    }
+  ],
+  "optimizer": [
+    {
+      "name": "adamw_update_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "sgd_momentum_update_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "zero_gradients_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gradient_accumulate_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gradient_scale_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "gradient_clip_norm_bf16",
+      "source": "optimizer_kernels_bf16.c",
+      "path": "src/kernels/optimizer_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "adamw_update_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "sgd_momentum_update_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "zero_gradients_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gradient_accumulate_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gradient_scale_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gradient_clip_norm_f32",
+      "source": "optimizer_kernels.c",
+      "path": "src/kernels/optimizer_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    }
+  ],
+  "fusion": [
+    {
+      "name": "hsum256_ps_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "hsum512_ps_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemm_bias_relu_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemm_bias_gelu_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemm_bias_silu_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "gemm_swiglu_fused",
+      "source": "gemm_fused_kernels.c",
+      "path": "src/kernels/gemm_fused_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl",
+      "source": "attention_decode_fused.c",
+      "path": "src/kernels/attention_decode_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "ck_layer_forward_rmsnorm_swiglu_decode_fused_attn",
+      "source": "attention_decode_fused.c",
+      "path": "src/kernels/attention_decode_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_mlp",
+      "source": "attention_decode_fused.c",
+      "path": "src/kernels/attention_decode_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_decode",
+      "source": "mlp_fused_decode.c",
+      "path": "src/kernels/mlp_fused_decode.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_decode_tiled",
+      "source": "mlp_fused_decode.c",
+      "path": "src/kernels/mlp_fused_decode.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_decode_v2",
+      "source": "mlp_fused_decode.c",
+      "path": "src/kernels/mlp_fused_decode.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "hmax256_ps_fused",
+      "source": "rmsnorm_q8_k_fused.c",
+      "path": "src/kernels/fused/rmsnorm_q8_k_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_q8_k_fused",
+      "source": "rmsnorm_q8_k_fused.c",
+      "path": "src/kernels/fused/rmsnorm_q8_k_fused.c",
+      "dtypes": [
+        "q8_k"
+      ]
+    },
+    {
+      "name": "mega_fuse_output_proj_residual",
+      "source": "mega_fused_attention_avx.c",
+      "path": "src/kernels/fused/mega_fused_attention_avx.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mega_fused_attention_decode",
+      "source": "mega_fused_attention_avx.c",
+      "path": "src/kernels/fused/mega_fused_attention_avx.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "align_up_size",
+      "source": "mega_fused_attention_prefill_q8_0.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill_q8_0.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "quantize_attn_out_head_major_q8_0",
+      "source": "mega_fused_attention_prefill_q8_0.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "out_proj_head_major_q8_0_q8_0",
+      "source": "mega_fused_attention_prefill_q8_0.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "mega_fused_attention_prefill_q8_0_scratch_size",
+      "source": "mega_fused_attention_prefill_q8_0.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "mega_fused_attention_prefill_q8_0",
+      "source": "mega_fused_attention_prefill_q8_0.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "flatten_head_major",
+      "source": "mega_fused_attention_prefill.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "ck_q8_0_outproj_enabled",
+      "source": "mega_fused_attention_prefill.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "out_proj_head_major_q5_0_q8_0",
+      "source": "mega_fused_attention_prefill.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill.c",
+      "dtypes": [
+        "q5_0",
+        "q8_0"
+      ]
+    },
+    {
+      "name": "mega_fused_attention_prefill_scratch_size",
+      "source": "mega_fused_attention_prefill.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mega_fused_attention_prefill",
+      "source": "mega_fused_attention_prefill.c",
+      "path": "src/kernels/fused/mega_fused_attention_prefill.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "ck_nearest_int_fused",
+      "source": "fused_rmsnorm_linear.c",
+      "path": "src/kernels/fused/fused_rmsnorm_linear.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_linear_q4k",
+      "source": "fused_rmsnorm_linear.c",
+      "path": "src/kernels/fused/fused_rmsnorm_linear.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "compute_rms_scale_internal",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "softmax_inplace",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "attention_mlp_fused_fp32",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mlp_fused_fp32_v2",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mlp_fused_fp32_v3",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mlp_separate_fp32",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "attention_mlp_fused_q4k",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "layer_fused_attn_mlp_qkv_q4k",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "attention_mlp_separate_fp32",
+      "source": "attention_mlp_fused.c",
+      "path": "src/kernels/fused/attention_mlp_fused.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "compute_rms_scale",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_qkv_fp32_fused",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_qkv_q4k_fused",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "rmsnorm_qkv_fp32_fused_v2",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_qkv_fp32_fused_v3",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_qkv_separate_fp32",
+      "source": "rmsnorm_qkv.c",
+      "path": "src/kernels/fused/rmsnorm_qkv.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mega_fused_outproj_mlp_prefill_scratch_size",
+      "source": "mega_fused_outproj_mlp_prefill.c",
+      "path": "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mega_fused_outproj_mlp_prefill",
+      "source": "mega_fused_outproj_mlp_prefill.c",
+      "path": "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "hsum256_prefill",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "rmsnorm_tile",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "qkv_q8_0_dtype_supported",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "gemm_nt_q8_0_dispatch",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "gemm_tile_nt_strided",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "add_bias_tile",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_gemm_2d_tiled",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_qkv_prefill",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_qkv_prefill_head_major",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_qkv_prefill_head_major_quant",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "unfused_rmsnorm_qkv_prefill",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_rmsnorm_qkv_scratch_size",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_prefill_bias",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_prefill",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_scratch_size",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "silu_prefill",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "mlp_q8_0_dtype_supported",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "mlp_q8_k_dtype_supported",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_k"
+      ]
+    },
+    {
+      "name": "gemm_nt_q8_0_mlp_dispatch",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "gemm_nt_q8_k_mlp_dispatch",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "q8_k"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_prefill_w1w2_quant",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fused_mlp_swiglu_prefill_w1w2_quant_scratch_size",
+      "source": "prefill_fused_gemm.c",
+      "path": "src/kernels/fused/prefill_fused_gemm.c",
+      "dtypes": [
+        "fp32"
+      ]
+    }
+  ],
+  "quantization": [
+    {
+      "name": "dot_q6_k_q8_k_avx512_vbmi",
+      "source": "gemm_kernels_q6k_q8k.c",
+      "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+      "dtypes": [
+        "q6_k",
+        "q8_k"
+      ]
+    },
+    {
+      "name": "vec_dot_q6_k_q8_k",
+      "source": "gemm_kernels_q6k_q8k.c",
+      "path": "src/kernels/gemm_kernels_q6k_q8k.c",
+      "dtypes": [
+        "q6_k",
+        "q8_k"
+      ]
+    },
+    {
+      "name": "convert_float_to_int4",
+      "source": "rmsnorm_kernels_int4.c",
+      "path": "src/kernels/rmsnorm_kernels_int4.c",
+      "dtypes": [
+        "int4"
+      ]
+    },
+    {
+      "name": "quantize_row_q8_k",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_k"
+      ]
+    },
+    {
+      "name": "quantize_row_q8_0",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "dot_q8_0",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "vec_dot_q8_0_q8_0",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "dot_q4_k",
+      "source": "gemm_kernels_q4k.c",
+      "path": "src/kernels/gemm_kernels_q4k.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "dot_q4_0",
+      "source": "gemm_kernels_q4_0.c",
+      "path": "src/kernels/gemm_kernels_q4_0.c",
+      "dtypes": [
+        "q4_0"
+      ]
+    },
+    {
+      "name": "dot_q4_1",
+      "source": "gemm_kernels_q4_1.c",
+      "path": "src/kernels/gemm_kernels_q4_1.c",
+      "dtypes": [
+        "q4_1"
+      ]
+    },
+    {
+      "name": "dot_q5_1",
+      "source": "gemm_kernels_q5_1.c",
+      "path": "src/kernels/gemm_kernels_q5_1.c",
+      "dtypes": [
+        "q5_1"
+      ]
+    },
+    {
+      "name": "dequant_q5_0_row",
+      "source": "gemm_head_major_output.c",
+      "path": "src/kernels/gemm_head_major_output.c",
+      "dtypes": [
+        "q5_0"
+      ]
+    },
+    {
+      "name": "convert_float_to_int8",
+      "source": "rmsnorm_kernels_int8.c",
+      "path": "src/kernels/rmsnorm_kernels_int8.c",
+      "dtypes": [
+        "int8"
+      ]
+    },
+    {
+      "name": "dequant_q5_0_block",
+      "source": "gemm_kernels_q5_0.c",
+      "path": "src/kernels/gemm_kernels_q5_0.c",
+      "dtypes": [
+        "q5_0"
+      ]
+    },
+    {
+      "name": "dot_q5_0",
+      "source": "gemm_kernels_q5_0.c",
+      "path": "src/kernels/gemm_kernels_q5_0.c",
+      "dtypes": [
+        "q5_0"
+      ]
+    },
+    {
+      "name": "vec_dot_q5_0_q8_0",
+      "source": "gemm_kernels_q5_0.c",
+      "path": "src/kernels/gemm_kernels_q5_0.c",
+      "dtypes": [
+        "q5_0",
+        "q8_0"
+      ]
+    },
+    {
+      "name": "dequant_q4_0_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_0"
+      ]
+    },
+    {
+      "name": "dequant_q4_0_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_0"
+      ]
+    },
+    {
+      "name": "dequant_q4_1_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_1"
+      ]
+    },
+    {
+      "name": "dequant_q4_1_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_1"
+      ]
+    },
+    {
+      "name": "dequant_q5_1_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q5_1"
+      ]
+    },
+    {
+      "name": "dequant_q5_1_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q5_1"
+      ]
+    },
+    {
+      "name": "dequant_q8_0_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "dequant_q8_0_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q8_0"
+      ]
+    },
+    {
+      "name": "dequant_q4_k_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "dequant_q4_k_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q4_k"
+      ]
+    },
+    {
+      "name": "dequant_q6_k_block",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q6_k"
+      ]
+    },
+    {
+      "name": "dequant_q6_k_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "q6_k"
+      ]
+    },
+    {
+      "name": "dequant_row",
+      "source": "dequant_kernels.c",
+      "path": "src/kernels/dequant_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "fp16_to_fp32",
+      "source": "gemm_kernels_f16.c",
+      "path": "src/kernels/gemm_kernels_f16.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "convert_f16_to_f32",
+      "source": "gemm_kernels_f16.c",
+      "path": "src/kernels/gemm_kernels_f16.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "convert_f32_to_f16",
+      "source": "gemm_kernels_f16.c",
+      "path": "src/kernels/gemm_kernels_f16.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "ck_fp32_to_fp16_row",
+      "source": "fp16_convert.c",
+      "path": "src/kernels/fp16_convert.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "ck_fp16_to_fp32_row",
+      "source": "fp16_convert.c",
+      "path": "src/kernels/fp16_convert.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "ck_fp32_to_fp16_2d",
+      "source": "fp16_convert.c",
+      "path": "src/kernels/fp16_convert.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "ck_fp16_to_fp32_2d",
+      "source": "fp16_convert.c",
+      "path": "src/kernels/fp16_convert.c",
+      "dtypes": [
+        "f16"
+      ]
+    },
+    {
+      "name": "ck_fp32_to_fp16_inplace",
+      "source": "fp16_convert.c",
+      "path": "src/kernels/fp16_convert.c",
+      "dtypes": [
+        "f16"
+      ]
+    }
+  ],
+  "utility": [
+    {
+      "name": "add_forward_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "add_scaled_forward_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "add_inplace_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "add_scaled_inplace_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "add_forward_2d_bf16",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "bf16",
+        "f16"
+      ]
+    },
+    {
+      "name": "add_forward_f32",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "add_inplace_f32",
+      "source": "add_kernels_bf16.c",
+      "path": "src/kernels/add_kernels_bf16.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "hsum_avx2_q8",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "hsum_sse_q8",
+      "source": "gemm_kernels_q8_0.c",
+      "path": "src/kernels/gemm_kernels_q8_0.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "attention_flash_init",
+      "source": "attention_flash_true.c",
+      "path": "src/kernels/attention_flash_true.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "attention_flash_cleanup",
+      "source": "attention_flash_true.c",
+      "path": "src/kernels/attention_flash_true.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "axpy_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "scal_copy_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "weighted_sum_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "axpy_zero_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "axpy_2d_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "moe_accumulate_expert_f32",
+      "source": "axpy_kernels.c",
+      "path": "src/kernels/axpy_kernels.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "amx_tile_config_init",
+      "source": "gemm_batch_int8.c",
+      "path": "src/kernels/gemm_batch_int8.c",
+      "dtypes": [
+        "fp32"
+      ]
+    },
+    {
+      "name": "onednn_init",
+      "source": "gemm_microkernel.c",
+      "path": "src/kernels/gemm_microkernel.c",
+      "dtypes": [
+        "fp32"
+      ]
+    }
+  ]
+}

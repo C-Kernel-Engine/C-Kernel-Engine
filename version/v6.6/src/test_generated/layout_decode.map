@@ -1,0 +1,130 @@
+================================================================================
+MEMORY MAP: qwen2_0.5b_decode
+================================================================================
+Generated:    2026-01-12T04:06:36.622390 UTC
+IR Version:   3
+================================================================================
+
+CONFIGURATION
+--------------------------------------------------------------------------------
+  model_type               qwen2
+  embed_dim                896
+  num_heads                14
+  num_kv_heads             2
+  head_dim                 64
+  intermediate_dim         4864
+  num_layers               24
+  vocab_size               151936
+  max_seq_len              131072
+  rope_theta               1000000.0
+  rms_norm_eps             1e-06
+  tie_word_embeddings      True
+  dtype                    fp32
+  aligned_embed            1024
+  aligned_head             64
+  aligned_intermediate     4864
+  weight_dtype             q4_k
+  aligned_context          131072
+
+MEMORY SUMMARY
+--------------------------------------------------------------------------------
+  Total:           3,573,889,600 bytes  (3.57 GB)
+  Weights:           317,683,328 bytes  (317.7 MB)
+  Activations:     3,256,169,984 bytes  (3.26 GB)
+  Canaries:               36,224 bytes  (566 × 64 bytes)
+
+================================================================================
+SECTION 0: text_decoder
+================================================================================
+
+HEADER
+--------------------------------------------------------------------------------
+Offset         End                    Size  Buffer                           Shape                Type      
+--------------------------------------------------------------------------------
+0x00000080   0x05376080     87,515,136  token_emb                        [151936, 1024]       weight
+0x053760C0   0x0538AF00         85,568  vocab_offsets                    [151936]             weight
+0x0538AF40   0x0538AF40              0  vocab_strings                    [0]                  weight
+0x0538AF80   0x0538AF80              0  vocab_merges                     [0, 3]               weight
+0x0538AFC0   0x0538BFC0          4,096  embedded_input                   [1, 1024]            activation
+
+LAYER 0
+--------------------------------------------------------------------------------
+Offset         End                    Size  Buffer                           Shape                Type      
+--------------------------------------------------------------------------------
+0x0538C080   0x0538C2C0            576  layer.0.ln1_gamma                [1024]               weight
+0x0538C300   0x0538D300          4,096  layer.0.ln1_out                  [1, 1024]            activation
+0x0538D340   0x0540B340        516,096  layer.0.wq                       [14, 64, 1024]       weight
+0x0540B380   0x0540B5C0            576  layer.0.bq                       [14, 64]             weight
+0x0540B600   0x0541D600         73,728  layer.0.wk                       [2, 64, 1024]        weight
+0x0541D640   0x0541D700            192  layer.0.bk                       [2, 64]              weight
+0x0541D740   0x0542F740         73,728  layer.0.wv                       [2, 64, 1024]        weight
+0x0542F780   0x0542F840            192  layer.0.bv                       [2, 64]              weight
+0x0542F880   0x05430680          3,584  layer.0.q                        [14, 1, 64]          activation
+0x054306C0   0x094306C0     67,108,864  layer.0.k                        [2, 131072, 64]      activation
+0x09430700   0x0D430700     67,108,864  layer.0.v                        [2, 131072, 64]      activation
+0x0D430740   0x0D4AE740        516,096  layer.0.wo                       [14, 1024, 64]       weight
+0x0D4AE780   0x0D4AF780          4,096  layer.0.proj_tmp                 [1, 1024]            activation
+0x0D4AF7C0   0x0D4B07C0          4,096  layer.0.proj_scratch             [1, 1024]            scratch
+0x0D4B0800   0x0D4B1800          4,096  layer.0.residual1                [1, 1024]            activation
+0x0D4B1840   0x0D4B1A80            576  layer.0.ln2_gamma                [1024]               weight
+0x0D4B1AC0   0x0D4B2AC0          4,096  layer.0.ln2_out                  [1, 1024]            activation
+0x0D4B2B00   0x0DA0AB00      5,603,328  layer.0.w1                       [9728, 1024]         weight
+0x0DA0AB40   0x0DCB6B40      2,801,664  layer.0.w2                       [1024, 4864]         weight
+0x0DCB6B80   0x0DCB7B80          4,096  layer.0.mlp_out                  [1, 1024]            activation
+0x0DCB7BC0   0x0DCB8BC0          4,096  layer.0.output                   [1, 1024]            activation
+
+... LAYERS 1-22 follow same pattern ...
+    Layer stride: 143,838,208 bytes
+
+LAYER 23
+--------------------------------------------------------------------------------
+Offset         End                    Size  Buffer                           Shape                Type      
+--------------------------------------------------------------------------------
+0xCA691480   0xCA6916C0            576  layer.23.ln1_gamma               [1024]               weight
+0xCA691700   0xCA692700          4,096  layer.23.ln1_out                 [1, 1024]            activation
+0xCA692740   0xCA710740        516,096  layer.23.wq                      [14, 64, 1024]       weight
+0xCA710780   0xCA7109C0            576  layer.23.bq                      [14, 64]             weight
+0xCA710A00   0xCA722A00         73,728  layer.23.wk                      [2, 64, 1024]        weight
+0xCA722A40   0xCA722B00            192  layer.23.bk                      [2, 64]              weight
+0xCA722B40   0xCA734B40         73,728  layer.23.wv                      [2, 64, 1024]        weight
+0xCA734B80   0xCA734C40            192  layer.23.bv                      [2, 64]              weight
+0xCA734C80   0xCA735A80          3,584  layer.23.q                       [14, 1, 64]          activation
+0xCA735AC0   0xCE735AC0     67,108,864  layer.23.k                       [2, 131072, 64]      activation
+0xCE735B00   0xD2735B00     67,108,864  layer.23.v                       [2, 131072, 64]      activation
+0xD2735B40   0xD27B3B40        516,096  layer.23.wo                      [14, 1024, 64]       weight
+0xD27B3B80   0xD27B4B80          4,096  layer.23.proj_tmp                [1, 1024]            activation
+0xD27B4BC0   0xD27B5BC0          4,096  layer.23.proj_scratch            [1, 1024]            scratch
+0xD27B5C00   0xD27B6C00          4,096  layer.23.residual1               [1, 1024]            activation
+0xD27B6C40   0xD27B6E80            576  layer.23.ln2_gamma               [1024]               weight
+0xD27B6EC0   0xD27B7EC0          4,096  layer.23.ln2_out                 [1, 1024]            activation
+0xD27B7F00   0xD2D0FF00      5,603,328  layer.23.w1                      [9728, 1024]         weight
+0xD2D0FF40   0xD2FBBF40      2,801,664  layer.23.w2                      [1024, 4864]         weight
+0xD2FBBF80   0xD2FBCF80          4,096  layer.23.mlp_out                 [1, 1024]            activation
+0xD2FBCFC0   0xD2FBDFC0          4,096  layer.23.output                  [1, 1024]            activation
+
+FOOTER
+--------------------------------------------------------------------------------
+Offset         End                    Size  Buffer                           Shape                Type      
+--------------------------------------------------------------------------------
+0xD2FBE080   0xD2FBE2C0            576  final_ln_weight                  [1024]               weight
+0xD2FBE300   0xD2FBF300          4,096  final_output                     [1, 1024]            activation
+0x00000080   0x00000080              0  lm_head_weight                   [151936, 1024]       weight (TIED)
+0xD2FBF340   0xD3053940        607,744  logits                           [1, 151936]          activation
+
+GLOBALS
+--------------------------------------------------------------------------------
+Offset         End                    Size  Buffer                           Shape                Type      
+--------------------------------------------------------------------------------
+0xD30539C0   0xD40539C0     16,777,216  rope_cos_cache                   [131072, 32]         precomputed
+0xD4053A00   0xD5053A00     16,777,216  rope_sin_cache                   [131072, 32]         precomputed
+
+================================================================================
+VERIFICATION
+================================================================================
+[✓] All offsets 64-byte aligned
+[✓] No overlapping buffers
+[✓] Canary count: 566
+
+================================================================================
+END OF MEMORY MAP
+================================================================================

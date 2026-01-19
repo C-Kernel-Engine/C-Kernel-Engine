@@ -1,0 +1,59 @@
+{
+  "id": "gemv_q8_0_q8_0",
+  "op": "gemv",
+  "variant": "q8_0_w_q8_0_a_fp32_out",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "q8_0",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"},
+    {"name": "x", "dtype": "q8_0", "shape": ["K"], "desc": "Input vector [K] (quantized q8_0)"}
+  ],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "parallelization": {
+    "supported": ["output"],
+    "preferred": {"prefill": "output", "decode": "output"},
+    "strategies": [
+      {
+        "name": "output",
+        "partition_dim": "M",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across output rows; each thread computes subset of y."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q8_0 requires K multiple of 32 for SIMD alignment. More relaxed than Q4_K/Q5_0."
+  },
+  "impl": {
+    "function": "gemv_q8_0_q8_0",
+    "sources": ["src/kernels/gemm_kernels_q8_0.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "sse4_1", "requires": ["sse4_1"], "compile_flags": ["-msse4.1"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm_q8_0_q8_0.py"],
+    "bench": ["scripts/bench_gemm_q8_0_q8_0.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemm_q8_0_q8_0.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare dequantized output against numpy fp32 matmul"
+      }
+    ]
+  },
+  "notes": "Generalized matrix-vector multiplication for Q8_0 weights with Q8_0 activation input. Q8_0 has looser alignment requirements (32) than Q4_K/Q5_0 (256)."
+}
