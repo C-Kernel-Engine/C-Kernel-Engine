@@ -6,11 +6,6 @@ var mega__fused__attention_8h =
     [ "mega_fuse_report_stats", "mega__fused__attention_8h.html#a37f0664c9146b0e5a80624fdaffbb1f5", null ],
     [ "mega_fuse_rmsnorm_qkv", "mega__fused__attention_8h.html#aeeb0cc88f51b1af24d80deeea9bae2b4", null ],
     [ "mega_fuse_rmsnorm_qkv_rope", "mega__fused__attention_8h.html#a45deca0f8d6b12dd912c6b76dd49d80c", null ],
-    [ "mega_fused_attention_decode", "mega__fused__attention_8h.html#a7b2cd3664e2858631e67aebb6576b1e2", null ],
-    [ "mega_fused_attention_prefill", "mega__fused__attention_8h.html#a27249851108497d6b5fb85c55450dcc1", null ],
-    [ "mega_fused_attention_prefill_q8_0", "mega__fused__attention_8h.html#acdd13869b94d435a14a0ada232c66e71", null ],
-    [ "mega_fused_attention_prefill_q8_0_scratch_size", "mega__fused__attention_8h.html#a00f6e544eff204d7567bfe46076d3533", null ],
-    [ "mega_fused_attention_prefill_scratch_size", "mega__fused__attention_8h.html#a1bcc7ea2d222390ac04fd37f3d8081df", null ],
-    [ "mega_fused_outproj_mlp_prefill", "mega__fused__attention_8h.html#a88f688b6b8916971950e975f3f6ee650", null ],
-    [ "mega_fused_outproj_mlp_prefill_scratch_size", "mega__fused__attention_8h.html#aca1476c2ed7a5ed20fd199f597a67149", null ]
+    [ "mega_fused_attention_decode", "mega__fused__attention_8h.html#a626ea4f03fa804f5db76618f0bcfb9a1", null ],
+    [ "mega_fused_attention_prefill", "mega__fused__attention_8h.html#ab29476f695d711722430d9a03ad2072e", null ]
 ];
