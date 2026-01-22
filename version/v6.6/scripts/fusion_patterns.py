@@ -333,6 +333,141 @@ class FusionStats:
 
 
 # ---------------------------------------------------------------------------
+# Registry-Driven Fusion (Phase 3)
+# ---------------------------------------------------------------------------
+# Auto-generate fusion patterns from kernel registry entries with "fuses" field.
+# Registry patterns use kernel IDs for matching (from lowered IR).
+# Manual patterns use op names (from graph IR).
+
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+
+def load_kernel_registry(registry_path: Optional[Path] = None) -> Dict:
+    """Load kernel registry from JSON file."""
+    if registry_path is None:
+        registry_path = Path(__file__).parent.parent / "kernel_maps" / "KERNEL_REGISTRY.json"
+
+    if not registry_path.exists():
+        raise FileNotFoundError(f"Kernel registry not found: {registry_path}")
+
+    import json
+    with open(registry_path) as f:
+        return json.load(f)
+
+
+def build_fusion_patterns_from_registry(registry: Dict) -> List[Dict]:
+    """
+    Auto-generate fusion patterns from registry entries with "fuses" field.
+
+    Registry entries with "fuses" define what ops they replace.
+    Pattern sequence matches by kernel IDs from lowered IR.
+    """
+    patterns = []
+
+    for kernel_entry in registry.get("kernels", []):
+        if "fuses" not in kernel_entry:
+            continue
+
+        kernel_id = kernel_entry.get("id")
+        op_type = kernel_entry.get("op", "")
+        fuses = kernel_entry.get("fuses", [])
+
+        if not fuses:
+            continue
+
+        # Determine mode from kernel name
+        mode = ["prefill", "decode"]
+        if "prefill" in kernel_id.lower():
+            mode = ["prefill"]
+        elif "decode" in kernel_id.lower():
+            mode = ["decode"]
+
+        # Build pattern
+        pattern = {
+            "name": kernel_id,
+            "priority": 100,  # Highest priority for fused kernels
+            "mode": mode,
+            "sequence": fuses,  # Kernel IDs to match
+            "fused_op": op_type,
+            "fused_kernel": kernel_id,
+            "remove_buffers": [],
+            "description": f"Auto-generated from registry: {kernel_id}",
+        }
+
+        patterns.append(pattern)
+
+    return patterns
+
+
+def get_registry_driven_patterns(
+    mode: str,
+    registry_path: Optional[Path] = None
+) -> List[Dict]:
+    """
+    Get fusion patterns for a mode, merged from registry and manual patterns.
+
+    Registry patterns (fused kernels) have highest priority.
+    Manual patterns cover ops without registry fusion.
+    """
+    # Load registry
+    registry = load_kernel_registry(registry_path)
+
+    # Build registry patterns
+    registry_patterns = build_fusion_patterns_from_registry(registry)
+
+    # Get manual patterns for this mode
+    manual_patterns = get_patterns_for_mode(mode)
+
+    # Merge: registry patterns (exact kernel matches) + manual patterns
+    combined = list(registry_patterns)
+    registry_kernel_ids = {p["fused_kernel"] for p in registry_patterns}
+
+    for pattern in manual_patterns:
+        if pattern.get("fused_kernel") not in registry_kernel_ids:
+            combined.append(pattern)
+
+    # Sort by priority (highest first)
+    return sorted(combined, key=lambda x: -x.get("priority", 0))
+
+
+def match_pattern_by_kernel_ids(
+    lowered_ops: List[Dict[str, Any]],
+    pattern: Dict[str, Any]
+) -> Optional[int]:
+    """
+    Match fusion pattern against lowered IR ops by kernel IDs.
+
+    Args:
+        lowered_ops: Ops from lowered IR with "kernel" field
+        pattern: Fusion pattern with "sequence" (list of kernel IDs)
+
+    Returns:
+        Start index of matching sequence, or None
+    """
+    sequence = pattern.get("sequence", [])
+    if not sequence:
+        return None
+
+    for start_idx in range(len(lowered_ops) - len(sequence) + 1):
+        match = True
+        for seq_idx, kernel_id in enumerate(sequence):
+            op_idx = start_idx + seq_idx
+            if op_idx >= len(lowered_ops):
+                match = False
+                break
+            op_kernel = lowered_ops[op_idx].get("kernel")
+            if op_kernel != kernel_id:
+                match = False
+                break
+
+        if match:
+            return start_idx
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Main exports
 # ---------------------------------------------------------------------------
 
@@ -345,4 +480,8 @@ __all__ = [
     "validate_data_flow",
     "merge_op_ios",
     "FusionStats",
+    "load_kernel_registry",
+    "build_fusion_patterns_from_registry",
+    "get_registry_driven_patterns",
+    "match_pattern_by_kernel_ids",
 ]

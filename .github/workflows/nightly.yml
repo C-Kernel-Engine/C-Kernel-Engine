@@ -107,20 +107,20 @@ jobs:
           echo "=== Running Full Nightly Test Suite ==="
           echo "Includes: 30+ kernel tests, BF16, quantization, training tests"
 
-          # Create output directory
-          mkdir -p docs/site/nightly-results
+          # Create output directory (site/site/ because docs/site/ deploys to root)
+          mkdir -p docs/site/site/nightly-results
 
-          # Run tests and write directly to the location test-report.html reads from
-          python scripts/nightly_runner.py --no-fail --json docs/site/nightly-results/latest.json 2>&1 | tee build/nightly_test.log
+          # Run tests and write to site/nightly-results/ path on gh-pages
+          python scripts/nightly_runner.py --no-fail --json docs/site/site/nightly-results/latest.json 2>&1 | tee build/nightly_test.log
 
           # Also save to build for artifact upload
-          cp docs/site/nightly-results/latest.json build/nightly_report.json 2>/dev/null || true
+          cp docs/site/site/nightly-results/latest.json build/nightly_report.json 2>/dev/null || true
 
           # Show summary
-          if [ -f docs/site/nightly-results/latest.json ]; then
+          if [ -f docs/site/site/nightly-results/latest.json ]; then
             echo ""
             echo "=== Nightly Test Summary ==="
-            python3 -c "import json; d=json.load(open('docs/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
+            python3 -c "import json; d=json.load(open('docs/site/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
           fi
 
       - name: Upload test results
@@ -136,16 +136,16 @@ jobs:
       - name: Prepare nightly results for deployment
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          if [ -f docs/site/nightly-results/latest.json ]; then
+          if [ -f docs/site/site/nightly-results/latest.json ]; then
             # Create dated report
             DATE=$(date +%Y-%m-%d)
-            cp docs/site/nightly-results/latest.json "docs/site/nightly-results/report-${DATE}.json"
+            cp docs/site/site/nightly-results/latest.json "docs/site/site/nightly-results/report-${DATE}.json"
 
             # Update index.json with all report summaries
-            python3 scripts/nightly_runner.py --update-index
+            python3 scripts/nightly_runner.py --update-index --results-dir docs/site/site/nightly-results
 
             echo "=== Nightly results prepared ==="
-            ls -la docs/site/nightly-results/
+            ls -la docs/site/site/nightly-results/
           fi
 
       - name: Deploy to GitHub Pages

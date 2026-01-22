@@ -546,6 +546,9 @@ def main():
                     "format": "ck-bumpwgt5-manifest-v1",
                     "version": args.bump_version,
                     "weights_path": args.output,
+                    "config": config,
+                    "template": template_data,
+                    "quant_summary": quant_summary,
                     "num_merges": num_merges,
                     "total_vocab_bytes": total_vocab_bytes,
                     "entries": manifest_entries,
@@ -640,10 +643,16 @@ def main():
             "format": "ck-bumpwgt5-manifest-v1" if args.bump_version == BUMP_VERSION_V5 else "ck-bumpwgt4-manifest-v1",
             "version": args.bump_version,
             "weights_path": args.output,
+            "config": config if args.bump_version == BUMP_VERSION_V5 else None,
+            "template": template_data if args.bump_version == BUMP_VERSION_V5 else None,
+            "quant_summary": quant_summary if args.bump_version == BUMP_VERSION_V5 else None,
             "num_merges": num_merges,
             "total_vocab_bytes": total_vocab_bytes,
             "entries": manifest_entries,
         }
+        if args.bump_version != BUMP_VERSION_V5:
+            for key in ("config", "template", "quant_summary"):
+                manifest.pop(key, None)
         with open(args.manifest_out, "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, indent=2)
 

@@ -5,16 +5,19 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "version/v6.6/kernel_maps",
     "counts": {
-      "total": 17,
+      "total": 20,
       "by_op": {
         "attention": 1,
+        "attention_projection": 1,
         "embedding": 1,
         "fused_attention_block": 1,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
         "gemm": 5,
         "gemv": 2,
+        "qkv_projection": 1,
         "quantize": 2,
+        "residual_add": 1,
         "rmsnorm": 1,
         "rope": 1,
         "swiglu": 1
@@ -201,6 +204,467 @@
       "notes": "Causal multi-head attention with GQA support. Uses flash attention algorithm with strided KV cache layout for efficient KV cache updates. Supports grouped-query attention where H >= KV.",
       "name": "attention_forward_causal_head_major_gqa_flash_strided",
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided.json"
+    },
+    {
+      "id": "ck_attention_project_head_major_quant",
+      "op": "attention_projection",
+      "variant": "mixed_w_fp32_a",
+      "quant": {
+        "weight": "q5_0|q8_0|q4_k|q6_k|fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "attn_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "AD"
+          ],
+          "desc": "Attention output [heads, tokens, aligned_head_dim]"
+        },
+        {
+          "name": "wo",
+          "dtype": "mixed",
+          "shape": [
+            "H",
+            "AE",
+            "AD"
+          ],
+          "desc": "Output projection weights [heads, aligned_embed_dim, aligned_head_dim]"
+        },
+        {
+          "name": "bo",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Output bias [aligned_embed_dim] (or NULL)"
+        },
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Scratch buffer for head flattening"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Projected output [tokens, aligned_embed_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "E",
+        "AE",
+        "H",
+        "D",
+        "AD"
+      ],
+      "params": [
+        {
+          "name": "wo_dtype",
+          "dtype": "int32",
+          "desc": "CKDataType for Wo"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "token"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by tokens; each thread handles a range of rows."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "notes": "Supports mixed quant Wo via ck_attention_project_head_major_quant."
+      },
+      "impl": {
+        "function": "ck_attention_project_head_major_quant",
+        "sources": [
+          "src/ckernel_orchestration.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_project.py"
+        ],
+        "bench": [
+          "scripts/bench_attention_project.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_attention_project.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against reference projection"
+          }
+        ]
+      },
+      "notes": "Head-major attention output projection with mixed quant weights.",
+      "name": "ck_attention_project_head_major_quant",
+      "_source_file": "ck_attention_project_head_major_quant.json"
+    },
+    {
+      "id": "ck_qkv_project_head_major_quant",
+      "op": "qkv_projection",
+      "variant": "mixed_w_fp32_a",
+      "quant": {
+        "weight": "mixed",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Input activations [tokens, aligned_embed_dim]"
+        },
+        {
+          "name": "wq",
+          "dtype": "mixed",
+          "shape": [
+            "H",
+            "AD",
+            "AE"
+          ],
+          "desc": "Q weights [heads, aligned_head_dim, aligned_embed_dim]"
+        },
+        {
+          "name": "bq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "Q bias [heads, aligned_head_dim] (or NULL)"
+        },
+        {
+          "name": "wk",
+          "dtype": "mixed",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "K weights [kv_heads, aligned_head_dim, aligned_embed_dim]"
+        },
+        {
+          "name": "bk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "K bias [kv_heads, aligned_head_dim] (or NULL)"
+        },
+        {
+          "name": "wv",
+          "dtype": "mixed",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "V weights [kv_heads, aligned_head_dim, aligned_embed_dim]"
+        },
+        {
+          "name": "bv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "V bias [kv_heads, aligned_head_dim] (or NULL)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "AD"
+          ],
+          "desc": "Query output [heads, tokens, aligned_head_dim]"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "AD"
+          ],
+          "desc": "Key output [kv_heads, tokens, aligned_head_dim]"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "AD"
+          ],
+          "desc": "Value output [kv_heads, tokens, aligned_head_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "E",
+        "AE",
+        "H",
+        "KV",
+        "D",
+        "AD"
+      ],
+      "params": [
+        {
+          "name": "wq_dtype",
+          "dtype": "int32",
+          "desc": "CKDataType for Wq"
+        },
+        {
+          "name": "wk_dtype",
+          "dtype": "int32",
+          "desc": "CKDataType for Wk"
+        },
+        {
+          "name": "wv_dtype",
+          "dtype": "int32",
+          "desc": "CKDataType for Wv"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "Stride in tokens for KV cache layout"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "notes": "Supports mixed quant weights; input/output are fp32. Weights are head-major."
+      },
+      "impl": {
+        "function": "ck_qkv_project_head_major_quant",
+        "sources": [
+          "src/ckernel_orchestration.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_fused_rmsnorm_qkv.py"
+        ],
+        "bench": [
+          "scripts/bench_fused_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_fused_rmsnorm_qkv.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare against unfused reference implementation"
+          }
+        ]
+      },
+      "notes": "Head-major QKV projection with mixed quantized weights. Uses ck_qkv_project_head_major_quant with per-weight dtypes.",
+      "name": "ck_qkv_project_head_major_quant",
+      "_source_file": "ck_qkv_project_head_major_quant.json"
+    },
+    {
+      "id": "ck_residual_add_token_major",
+      "op": "residual_add",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "a",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Residual input A [tokens, aligned_embed_dim]"
+        },
+        {
+          "name": "b",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Residual input B [tokens, aligned_embed_dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "AE"
+          ],
+          "desc": "Output [tokens, aligned_embed_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "E",
+        "AE"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "token"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Split by tokens; each thread handles a range of rows."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64
+        },
+        "notes": "Token-major residual add."
+      },
+      "impl": {
+        "function": "ck_residual_add_token_major",
+        "sources": [
+          "src/ckernel_orchestration.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_residual_add.py"
+        ],
+        "bench": [
+          "scripts/bench_residual_add.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_residual_add.py --compare-numpy",
+            "tolerance": "1e-6",
+            "notes": "Compare against numpy add"
+          }
+        ]
+      },
+      "notes": "Simple fp32 residual add for token-major activations.",
+      "name": "ck_residual_add_token_major",
+      "_source_file": "ck_residual_add_token_major.json"
     },
     {
       "id": "embedding_forward_q8_0",

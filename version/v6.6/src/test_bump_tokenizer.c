@@ -11,7 +11,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-/* BUMP file header structure (must match convert_gguf_to_bump_v6_5.py) */
+/* BUMP file header structure (must match convert_gguf_to_bump_v6_6.py) */
 #pragma pack(push, 1)
 typedef struct {
     char magic[8];        /* "BUMPWGT4" */
@@ -37,6 +37,17 @@ typedef struct {
 #pragma pack(pop)
 
 #define BUMP_HEADER_SIZE 128
+#define BUMP_MAGIC_V4 "BUMPWGT4"
+#define BUMP_MAGIC_V5 "BUMPWGT5"
+#define BUMP_META_MAGIC "BUMPV5MD"
+
+#pragma pack(push, 1)
+typedef struct {
+    char magic[8];        /* "BUMPV5MD" */
+    uint64_t meta_size;
+    uint8_t meta_sha256[32];
+} BumpMetaFooter;
+#pragma pack(pop)
 
 /* Read manifest from JSON file to get tokenizer offsets */
 typedef struct {
@@ -115,7 +126,8 @@ int main(int argc, char **argv) {
     }
 
     /* Verify magic */
-    if (memcmp(header.magic, "BUMPWGT4", 8) != 0) {
+    if (memcmp(header.magic, BUMP_MAGIC_V4, 8) != 0 &&
+        memcmp(header.magic, BUMP_MAGIC_V5, 8) != 0) {
         fprintf(stderr, "Error: Invalid magic: %.8s\n", header.magic);
         fclose(f);
         return 1;
@@ -133,6 +145,31 @@ int main(int argc, char **argv) {
     printf("  Num merges: %u\n", header.num_merges);
     printf("  Vocab bytes: %u\n", header.total_vocab_bytes);
     printf("\n");
+
+    if (memcmp(header.magic, BUMP_MAGIC_V5, 8) == 0) {
+        BumpMetaFooter footer;
+        if (fseek(f, 0, SEEK_END) == 0) {
+            long file_size = ftell(f);
+            if (file_size >= (long)sizeof(footer)) {
+                if (fseek(f, file_size - (long)sizeof(footer), SEEK_SET) == 0 &&
+                    fread(&footer, sizeof(footer), 1, f) == 1 &&
+                    memcmp(footer.magic, BUMP_META_MAGIC, 8) == 0) {
+                    long meta_offset = file_size - (long)sizeof(footer) - (long)footer.meta_size;
+                    printf("BUMPWGT5 metadata footer:\n");
+                    printf("  meta_size: %llu bytes\n",
+                           (unsigned long long)footer.meta_size);
+                    printf("  meta_offset: %ld\n", meta_offset);
+                    printf("  meta_sha256: ");
+                    for (size_t i = 0; i < sizeof(footer.meta_sha256); ++i) {
+                        printf("%02x", footer.meta_sha256[i]);
+                    }
+                    printf("\n\n");
+                } else {
+                    printf("Warning: missing or invalid BUMPWGT5 metadata footer\n\n");
+                }
+            }
+        }
+    }
 
     /* If we have a manifest, use it to find tokenizer entries */
     if (manifest_path) {

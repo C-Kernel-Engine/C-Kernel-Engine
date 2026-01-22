@@ -88,3 +88,20 @@ python3 version/v6.6/scripts/build_ir_v6_6.py \
 - Templates live in `version/v6.6/templates/`.
 - Kernel maps live in `version/v6.6/kernel_maps/`.
 - BUMPWGT5 spec: `version/v6.6/docs/BUMPWGT5_SPEC.md`.
+
+## How the pieces fit
+
+1) Converter (GGUF/HF → BUMP)
+   - Produces `weights.bump` + `weights_manifest.json`.
+   - `weights_manifest.json` contains file offsets/sizes/dtypes plus template + config (v5).
+   - BUMPWGT5 appends metadata (template/config/quant summary) at EOF.
+
+2) IR / layout (build_ir_v6_6.py)
+   - Consumes template + config + kernel registry (prefers manifest when present).
+   - Uses `weights_manifest.json` for per-layer dtypes and validation.
+   - Outputs `weights_manifest.map` (adds *runtime offsets*).
+
+3) Loader (runtime)
+   - Reads `weights.bump` and `weights_manifest.map`.
+   - Copies each tensor from file offset → runtime offset.
+   - Does not use BUMPWGT5 metadata (that’s build-time).

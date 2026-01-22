@@ -32,13 +32,405 @@ for path in (_V4_DIR, _ROOT_DIR, _V3_DIR):
         if path_str not in sys.path:
             sys.path.insert(0, path_str)
 
-import build_ir_v3 as v3
-import codegen_v4
+import json
+import struct
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+
+# Import from ir_types_v6_6 for v6 types
+# Use absolute import to avoid relative import issues
+_ir_types_path = Path(__file__).parent / "ir_types_v6_6.py"
+if _ir_types_path.exists():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ir_types_v6_6", _ir_types_path)
+    ir_v6 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ir_v6)
+    # Re-export types for code that uses v3.XXX
+    DTYPE_BYTES = ir_v6.DTYPE_BYTES
+    QUANT_BLOCK = ir_v6.QUANT_BLOCK
+    Buffer = ir_v6.Buffer
+    Weight = ir_v6.Weight
+    Op = ir_v6.Op
+    LayerIR = ir_v6.LayerIR
+    GraphIR = ir_v6.GraphIR
+    LoweredIR = ir_v6.LoweredIR
+    Layout = ir_v6.Layout
+    ModelLayout = ir_v6.ModelLayout  # Alias
+    Schedule = ir_v6.Schedule
+    OpType = ir_v6.OpType
+    DType = ir_v6.DType
+    Mode = ir_v6.Mode
+    # Re-export helper functions
+    make_buffer_name = ir_v6.make_buffer_name
+    compute_buffer_size = ir_v6.compute_buffer_size
+    load_registry_ops = ir_v6.load_registry_ops
+    build_op_type_enum = ir_v6.build_op_type_enum
+    normalize_kernel_registry = ir_v6.normalize_kernel_registry
+    resolve_kernel_template = ir_v6.resolve_kernel_template
+    parse_config = ir_v6.parse_config
+    model_id_to_name = ir_v6.model_id_to_name
+    # Re-export constants
+    DEFAULT_KERNEL_REGISTRY_PATH = ir_v6.DEFAULT_KERNEL_REGISTRY_PATH
+else:
+    # Fallback if ir_types_v6_6 not available yet
+    DTYPE_BYTES = {
+        "fp32": 4, "fp16": 2, "bf16": 2, "i8": 1, "int32": 4,
+        "q8_0": 1, "q5_0": 0.6875, "q4_k": 0.5625, "q6_k": 0.8203125
+    }
+    QUANT_BLOCK = {"q8_0": 32, "q5_0": 32, "q4_k": 256, "q6_k": 256}
+    Buffer = None
+    Weight = None
+    Op = None
+    LayerIR = None
+    GraphIR = None
+    LoweredIR = None
+    Layout = None
+    ModelLayout = None
+    Schedule = None
+    OpType = None
+    DType = None
+    Mode = None
+    make_buffer_name = None
+    compute_buffer_size = None
+    load_registry_ops = None
+    build_op_type_enum = None
+    normalize_kernel_registry = None
+    resolve_kernel_template = None
+    parse_config = None
+    model_id_to_name = None
+    DEFAULT_KERNEL_REGISTRY_PATH = None
+
+# Aliases for v3 compatibility (these come from ir_types_v6_6)
+CACHE_LINE = 64
+
+# v3-style classes (for code that expects v3)
+@dataclass
+class Canary:
+    """Buffer canary for debugging."""
+    name: str
+    offset: int
+    size: int
+    value: int = 0xDEADBEEF
+
+
+@dataclass
+class BumpAllocator:
+    """Simple bump allocator for layout planning."""
+    start_offset: int = 64
+    current: int = 64
+    allocations: List[Dict] = field(default_factory=list)
+
+    @property
+    def offset(self) -> int:
+        """Current offset (alias for current for compatibility)."""
+        return self.current
+
+    def alloc(self, size: int, align: int = 64) -> int:
+        aligned = (self.current + align - 1) // align * align
+        self.current = aligned + size
+        self.allocations.append({"offset": aligned, "size": size})
+        return aligned
+
+    def alloc_canary(self, name: str, size: int = 16, align: int = 64) -> Canary:
+        """Allocate a canary for debugging/guards."""
+        offset = self.alloc(size, align)
+        return Canary(name=name, offset=offset, size=size)
+
+
+@dataclass
+class LayerLayout:
+    """Per-layer layout information."""
+    layer_id: int
+    buffers: Dict[str, Buffer] = field(default_factory=dict)
+    canary_start: Optional[Canary] = None
+    canary_end: Optional[Canary] = None
+    total_bytes: int = 0
+
+
+@dataclass
+class SectionLayout:
+    """Section layout for organizing buffers."""
+    name: str = ""
+    section_id: int = 0
+    config: Optional[Dict] = None
+    header_canary_start: Optional[Canary] = None
+    header_buffers: List[Buffer] = field(default_factory=list)
+    header_canary_end: Optional[Canary] = None
+    layers: List[LayerLayout] = field(default_factory=list)
+    footer_canary_start: Optional[Canary] = None
+    footer_buffers: List[Buffer] = field(default_factory=list)
+    footer_canary_end: Optional[Canary] = None
+    globals: List[Buffer] = field(default_factory=list)
+    total_bytes: int = 0
+
+
+def resolve_shape_expr(expr, sym_values: Dict[str, int]) -> int:
+    """Resolve a shape expression to an integer.
+
+    Args:
+        expr: Can be a string like 'T*E' or a list like ['V', 'AE']
+        sym_values: Dict mapping symbol names to values
+
+    Returns:
+        Total number of elements as integer
+    """
+    if not expr:
+        return 0
+    result = 1
+    # Handle list format ['V', 'AE'] or string format 'T*E'
+    parts = expr if isinstance(expr, list) else expr.split("*")
+    for part in parts:
+        part = str(part).strip()
+        if part.isdigit():
+            result *= int(part)
+        elif part in sym_values:
+            result *= sym_values[part]
+        else:
+            # Try to parse as simple number
+            try:
+                result *= int(part)
+            except ValueError:
+                pass
+    return result
+
+
+def aligned_size(shape, dtype: str, align: int = 64) -> int:
+    """Calculate aligned buffer size."""
+    # Handle different shape formats
+    if isinstance(shape, int):
+        # Already a resolved integer
+        elements = shape
+    elif isinstance(shape, str):
+        sym_values = {"T": 512, "E": 2048}
+        elements = resolve_shape_expr(shape, sym_values)
+    elif isinstance(shape, list):
+        sym_values = {"T": 512, "E": 2048, "H": 32, "AD": 128}
+        elements = 1
+        for s in shape:
+            if isinstance(s, int):
+                elements *= s
+            elif isinstance(s, str) and s in sym_values:
+                elements *= sym_values[s]
+            else:
+                elements *= 64  # Fallback for unknown symbols
+    else:
+        elements = 64
+
+    bytes_per_elem = DTYPE_BYTES.get(dtype, 4)
+    size = elements * bytes_per_elem
+    return ((size) + align - 1) // align * align
+
+
+def align_up_bytes(size: int, align: int = 64) -> int:
+    """Round up to aligned size."""
+    return ((size + align - 1) // align) * align
+
+
 import codegen_v6_6 as codegen_v6  # Alias for backward compatibility
 import fusion_patterns as fp
 import parallel_planner as pp
 import quant_types as qt
 import training_config as tc
+
+# ---------------------------------------------------------------------------
+# v3 Utility functions (moved from v3 to avoid dependency)
+# ---------------------------------------------------------------------------
+
+def download_hf_config(model_id: str, cache_dir: str = None) -> Tuple[Dict, str]:
+    """Download config.json from HuggingFace Hub."""
+    import urllib.request
+    import urllib.error
+
+    if cache_dir is None:
+        cache_dir = os.path.expanduser("~/.cache/ckernel/configs")
+
+    os.makedirs(cache_dir, exist_ok=True)
+
+    # Sanitize model_id for filename
+    safe_name = model_id.replace("/", "_")
+    local_path = os.path.join(cache_dir, f"{safe_name}_config.json")
+
+    # URL to fetch
+    url = f"https://huggingface.co/{model_id}/resolve/main/config.json"
+
+    print(f"[HF] Fetching config from: {model_id}")
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'CKernel-Engine/1.0'})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = response.read().decode('utf-8')
+            config = json.loads(data)
+            with open(local_path, 'w') as f:
+                f.write(data)
+            return config, local_path
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP error fetching config: {e}")
+
+
+def parse_hf_model_id(model_input: str) -> str:
+    """Parse model ID from various input formats."""
+    model_input = model_input.strip()
+
+    # Handle hf:// prefix
+    if model_input.startswith('hf://'):
+        model_input = model_input[5:]
+        if model_input.endswith('.gguf'):
+            parts = model_input.split('/')
+            if len(parts) >= 2:
+                return parts[0] + "/" + parts[1]
+
+    # Handle full URLs
+    patterns = [
+        r'https?://huggingface\.co/([^/]+/[^/]+)/?.*',
+        r'https?://hf\.co/([^/]+/[^/]+)/?.*',
+    ]
+
+    for pattern in patterns:
+        match = re.match(pattern, model_input)
+        if match:
+            return match.group(1)
+
+    # Already in org/model format
+    if '/' in model_input and not model_input.startswith('http'):
+        return model_input
+
+    raise ValueError(f"Invalid model ID: {model_input}")
+
+
+def parse_config(config_path: str) -> Dict:
+    """Load and parse config.json."""
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+
+def model_id_to_name(model_id: str) -> str:
+    """Convert model ID to safe name."""
+    return model_id.replace("/", "--").replace("_", "-").lower()
+
+
+# ---------------------------------------------------------------------------
+# Emit functions (from codegen_v3)
+# ---------------------------------------------------------------------------
+
+def emit_layout_json(layout: ModelLayout, path: str) -> None:
+    """Emit layout as JSON."""
+    data = {
+        "model": getattr(layout, 'name', ''),
+        "config": getattr(layout, 'config', {}),
+        "buffers": layout.buffers if hasattr(layout, 'buffers') else {},
+        "total_bytes": layout.total_bytes,
+    }
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def emit_layout_map(layout: ModelLayout, path: str) -> None:
+    """Emit layout as human-readable map."""
+    lines = [
+        "=" * 60,
+        "LAYOUT MAP",
+        "=" * 60,
+        f"Total: {layout.total_bytes} bytes",
+        "",
+    ]
+    if hasattr(layout, 'buffers'):
+        for name, info in sorted(layout.buffers.items()):
+            lines.append(f"  {name}: offset={info.get('offset', 0)}, size={info.get('size', 0)}")
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def emit_c_header(layout: ModelLayout, path: str, extra_api: str = "") -> None:
+    """Emit C header with layout constants."""
+    lines = [
+        "#ifndef GENERATED_LAYOUT_H",
+        "#define GENERATED_LAYOUT_H",
+        "",
+        "#include <stdint.h>",
+        "",
+        f"// Total arena size: {layout.total_bytes} bytes",
+        f"#define ARENA_SIZE {layout.total_bytes}",
+        "",
+    ]
+    if hasattr(layout, 'buffers'):
+        for name, info in sorted(layout.buffers.items()):
+            safe_name = name.replace(".", "_").replace("-", "_")
+            lines.append(f"#define {safe_name.upper()}_OFFSET {info.get('offset', 0)}")
+            lines.append(f"#define {safe_name.upper()}_SIZE {info.get('size', 0)}")
+    lines.append("")
+    # Handle extra_api as string or list
+    if extra_api:
+        if isinstance(extra_api, list):
+            lines.extend(extra_api)
+        else:
+            lines.append(extra_api)
+    lines.append("")
+    lines.append("#endif")
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def emit_c_source(layout: ModelLayout, path: str, header_name: str = "generated_layout.h") -> None:
+    """Emit C source with layout arrays."""
+    lines = [
+        f'#include "{header_name}"',
+        "",
+        "// Layout buffer table",
+        f"const uint8_t* BUFFER_TABLE[] = {{",
+    ]
+    if hasattr(layout, 'buffers'):
+        for name in sorted(layout.buffers.keys()):
+            safe_name = name.replace(".", "_").replace("-", "_")
+            lines.append(f"    // {name}")
+            lines.append(f"    (uint8_t*)({safe_name.upper()}_OFFSET),")
+    lines.append("};")
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+# ---------------------------------------------------------------------------
+# v3 Compatibility Alias
+# ---------------------------------------------------------------------------
+# Make 'v3' point to this module for code that uses v3.XXX
+import sys
+v3 = sys.modules[__name__]
+
+
+# ---------------------------------------------------------------------------
+# Safetensors utilities (moved from v3 to avoid dependency)
+# ---------------------------------------------------------------------------
+
+def read_weights_index(path: str) -> Dict[str, Any]:
+    """Read safetensors index.json file."""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def read_safetensors_header(path: str) -> Dict[str, Any]:
+    """Read the header from a safetensors file.
+
+    Safetensors format:
+    - 8 bytes: header size (little-endian uint64)
+    - N bytes: header JSON (utf-8)
+    - Rest: tensor data
+    """
+    with open(path, "rb") as f:
+        # Read header size (8 bytes, little-endian)
+        header_size_bytes = f.read(8)
+        if len(header_size_bytes) < 8:
+            raise ValueError(f"Invalid safetensors file: {path}")
+
+        header_size = struct.unpack("<Q", header_size_bytes)[0]
+
+        # Read header JSON
+        header_bytes = f.read(header_size)
+        if len(header_bytes) < header_size:
+            raise ValueError(f"Truncated safetensors header in: {path}")
+
+        header_json = header_bytes.decode("utf-8")
+        return json.loads(header_json)
 
 # ---------------------------------------------------------------------------
 # Presets (local configs for quick tests)

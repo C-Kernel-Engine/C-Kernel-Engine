@@ -561,7 +561,21 @@ def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Pa
     kernel_header = kernel_header_path.name
     kernel_source = kernel_source_path.name
 
-    wrapper = f"""\ 
+    # Extract config values for wrapper
+    config = layout_json.get("config", {})
+    max_seq_len = config.get("max_seq_len", 32768)
+    vocab_size = config.get("vocab_size", 151936)
+    num_layers = config.get("num_layers", 24)
+    num_merges = config.get("num_merges", 151387)
+    total_vocab_bytes = config.get("total_vocab_bytes", 1527572)
+    embed_dim = config.get("embed_dim", 896)
+    num_heads = config.get("num_heads", 14)
+    head_dim = config.get("head_dim", 64)
+    intermediate_dim = config.get("intermediate_dim", 4864)
+    total_bytes = layout_json.get("total_bytes", 0)
+    footer_offset = total_bytes - 4096 if total_bytes > 4096 else 0
+
+    wrapper = f"""\
 // AUTO-GENERATED v6 wrapper: {model_name}
 #include <stdint.h>
 #include <stdlib.h>
@@ -569,10 +583,69 @@ def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Pa
 #include <stdio.h>
 
 #include "{kernel_header}"
-#include "ckernel_model_load_v4.h"
+#include "ckernel_model_load_v6.6.h"
 
-#include "{kernel_source}"
+/* Model constants from layout */
+#define {safe_name}_MAX_SEQ_LEN {max_seq_len}
+#define {safe_name}_VOCAB_SIZE {vocab_size}
+#define {safe_name}_NUM_LAYERS {num_layers}
+#define {safe_name}_NUM_MERGES {num_merges}
+#define {safe_name}_TOTAL_VOCAB_BYTES {total_vocab_bytes}
+#define {safe_name}_EMBED_DIM {embed_dim}
+#define {safe_name}_NUM_HEADS {num_heads}
+#define {safe_name}_HEAD_DIM {head_dim}
+#define {safe_name}_INTERMEDIATE_DIM {intermediate_dim}
 
+/* Magic header/footer offsets */
+#define {safe_name}_HEADER_OFFSET 0
+#define {safe_name}_FOOTER_OFFSET {footer_offset}
+
+/* HEADER struct for accessing header fields */
+typedef struct {{
+    uint64_t vocab_offsets;
+    uint64_t vocab_strings;
+    uint64_t vocab_merges;
+}} {safe_name}_HEADER_T;
+
+/* FOOTER struct for accessing footer fields */
+typedef struct {{
+    uint64_t logits;
+}} {safe_name}_FOOTER_T;
+
+/* Pointer macro for accessing model data - handles HEADER.field pattern */
+/* The field parameter should be an offset value, not a struct member access */
+/* For QWEN2_DECODE_HEADER.vocab_offsets, we use the model's vocab_offsets field */
+#define {safe_name}_DECODE_PTR(model, field) \\
+    ((void*)((uint8_t*)(model)->weights_base + (field)))
+
+/* Direct field access - just use the field value as offset */
+#define {safe_name}_PTR(model, offset) \\
+    ((void*)((uint8_t*)(model)->weights_base + (offset)))
+
+/* Model struct for {model_name} */
+typedef struct {{
+    void *weights_base;
+    size_t weights_size;
+    /* Direct offsets for header/footer fields */
+    uint64_t vocab_offsets;
+    uint64_t vocab_strings;
+    uint64_t vocab_merges;
+    uint64_t logits;
+}} {safe_name}Model;
+
+/* Shorthand macros for generated code compatibility */
+/* For QWEN2_DECODE_HEADER.vocab_offsets pattern, we use model's direct field value */
+#define {safe_name}_HEADER_FIELD(field) ((model)->field)
+
+/* Global model instance */
+static {safe_name}Model g_model;
+static int g_initialized = 0;
+static int g_active_tokens = 0;
+static int g_kv_cache_enabled = 0;
+static int g_kv_cache_capacity = {safe_name}_MAX_SEQ_LEN;
+static int g_kv_cache_tokens = 0;
+
+/* Global model instance */
 static {safe_name}Model g_model;
 static int g_initialized = 0;
 static int g_active_tokens = 0;
@@ -802,21 +875,12 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         kernel_sources = kernel_list_path.read_text().strip().split('\n')
 
     # Default kernel sources if not specified
+    # For v6.6, we only need the generated kernel and minimal runtime
     if not kernel_sources:
-        src_dir = PROJECT_ROOT / "src" / "kernels"
-        kernel_sources = [str(f) for f in src_dir.glob("*.c")]
-    extra_sources = [
-        PROJECT_ROOT / "src" / "v4_legacy" / "ckernel_model_load_v4.c",
-        PROJECT_ROOT / "src" / "ckernel_orchestration.c",
-        PROJECT_ROOT / "src" / "ckernel_strict.c",
-        PROJECT_ROOT / "src" / "cpu_features.c",
-    ]
-    existing = set(kernel_sources)
-    for src in extra_sources:
-        src_str = str(src)
-        if src_str not in existing:
-            kernel_sources.append(src_str)
-            existing.add(src_str)
+        # Only include minimal v6.6 runtime, not all infrastructure
+        kernel_sources = [
+            "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/src/ckernel_model_load_v6_6.c",
+        ]
 
     # Build command
     cflags = ["-O3", "-march=native", "-mtune=native", "-DNDEBUG"]
@@ -828,7 +892,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
 
     cmd = [
         "gcc", *cflags, "-fPIC", "-fopenmp", "-shared",
-        f"-I{PROJECT_ROOT / 'include'}",
+        "-I/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/src",
         "-o", str(lib_path),
         str(model_c_path),
     ] + kernel_sources + ["-lm"]

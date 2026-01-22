@@ -645,9 +645,12 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
     print(f"\nJSON report saved to: {filepath}")
 
 
-def update_nightly_index():
+def update_nightly_index(results_dir=None):
     """Update the nightly results index.json file."""
-    reports_dir = ROOT / "docs" / "site" / "nightly-results"
+    if results_dir:
+        reports_dir = Path(results_dir)
+    else:
+        reports_dir = ROOT / "docs" / "site" / "nightly-results"
     index_file = reports_dir / "index.json"
 
     index_data = {
@@ -694,11 +697,12 @@ def main():
     parser.add_argument("--list", action="store_true", help="List all tests")
     parser.add_argument("--no-fail", action="store_true", help="Always return exit code 0 (for CI warning mode)")
     parser.add_argument("--update-index", action="store_true", help="Update nightly results index (for CI)")
+    parser.add_argument("--results-dir", type=str, help="Directory for nightly results (used with --update-index)")
     args = parser.parse_args()
 
     # Handle --update-index (must be done before normal flow)
     if args.update_index:
-        update_nightly_index()
+        update_nightly_index(args.results_dir)
         return 0
 
     if args.list:

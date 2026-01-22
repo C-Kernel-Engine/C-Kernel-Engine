@@ -1803,6 +1803,8 @@ def main() -> None:
                 "down_dt": down_dt,
             })
 
+        layers_with_bias = sum(1 for info in layer_infos if info["bq"] is not None)
+
         dtype_table.extend([CK_DT_FP32, CK_DT_FP32])
         dtype_table_bytes = bytes(dtype_table)
 
@@ -2027,6 +2029,9 @@ def main() -> None:
                     manifest_dict = {
                         "version": 5,
                         "model": arch,
+                        "config": config,
+                        "template": template_data,
+                        "quant_summary": quant_summary,
                         "num_layers": num_layers,
                         "embed_dim": embed_dim,
                         "num_heads": num_heads,
@@ -2131,8 +2136,6 @@ def main() -> None:
             json.dump(cfg, cf, indent=2)
             cf.write("\n")
 
-    # Count how many layers have biases
-    layers_with_bias = sum(1 for info in layer_infos if info["bq"] is not None)
     bias_status = f"biases={layers_with_bias}/{num_layers} layers" if layers_with_bias > 0 else "no biases"
 
     print(
@@ -2163,6 +2166,9 @@ def main() -> None:
         manifest = manifest_dict or {
             "version": 5,
             "model": arch,
+            "config": config if args.bump_version == BUMP_VERSION_V5 else None,
+            "template": template_data if args.bump_version == BUMP_VERSION_V5 else None,
+            "quant_summary": quant_summary if args.bump_version == BUMP_VERSION_V5 else None,
             "num_layers": num_layers,
             "embed_dim": embed_dim,
             "num_heads": num_heads,
@@ -2176,6 +2182,9 @@ def main() -> None:
             "total_vocab_bytes": total_vocab_bytes,
             "entries": manifest_entries,
         }
+        if args.bump_version != BUMP_VERSION_V5:
+            for key in ("config", "template", "quant_summary"):
+                manifest.pop(key, None)
         with open(args.manifest_out, "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, indent=2)
             mf.write("\n")

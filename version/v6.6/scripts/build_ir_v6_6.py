@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-build_ir_v6_6.py - IR v6.6 pipeline (standalone, manifest-first, INT8 activations)
+build_ir_v6_6.py - IR v6.6 pipeline (standalone, manifest-first, registry-driven)
 
-config.json + weights_manifest.json -> graph IR -> lowered IR -> layout -> generated C
+config.json + weights_manifest.json + KERNEL_REGISTRY.json -> graph IR -> lowered IR -> layout -> generated C
 
 v6.6 improvements over v6:
   - INT8 activations enabled by default (5-15x speedup over FP32)
@@ -10,8 +10,14 @@ v6.6 improvements over v6:
   - Uses gemv_q4_k_q8_k for Q4_K weights
   - Proper mixed-quant support via per-tensor dtypes from manifest
   - Consistent v6.6 naming throughout
+  - REGISTRY-DRIVEN: All kernel selection from KERNEL_REGISTRY.json (mandatory)
 
-Usage:
+REQUIREMENTS:
+  1. weights_manifest.json (from convert_*_to_bump_v6_6.py)
+  2. KERNEL_REGISTRY.json (from gen_kernel_registry_from_maps.py)
+     Run: python version/v6.6/scripts/gen_kernel_registry_from_maps.py
+
+USAGE:
   python build_ir_v6_6.py --weights-manifest=weights_manifest.json --modes=decode
 
 For FP32 activations (slower but precise):
@@ -25,27 +31,17 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_V3_DIR = _SCRIPT_DIR / "v3"
-_V4_DIR = _SCRIPT_DIR / "v4"
-for path in (_SCRIPT_DIR, _V4_DIR, _V3_DIR):
-    if path.is_dir():
-        path_str = str(path)
-        if path_str not in sys.path:
-            sys.path.insert(0, path_str)
-
-import ir_types_v6_6 as v3
-import v6_6_ir_lowering as v6_low  # New v6.6 IR lowering with per-layer buffers
-import codegen_v6_6 as codegen_v6  # Alias for backward compatibility
+# v6.6 imports - compat layer handles legacy v3/v4 functions
+# Note: compat_ir_v4_v6_6.py imports from ir_types_v6_6.py for v6 types
+import compat_ir_v4_v6_6 as v3
+import v6_6_ir_lowering as v6_low  # v6.6 IR lowering with per-layer buffers
+import codegen_v6_6 as codegen_v6
 import fusion_patterns as fp
 import parallel_planner as pp
 import quant_types as qt
 import training_config as tc
-
-# Optional: compat_codegen_v4_v6_6 (only import if needed later)
-# import compat_codegen_v4_v6_6 as codegen_v4
 
 # ---------------------------------------------------------------------------
 # Presets (local configs for quick tests)
@@ -82,80 +78,6 @@ WEIGHT_MAP_V4 = [
 ]
 
 # ---------------------------------------------------------------------------
-# Kernel selection (baseline)
-# ---------------------------------------------------------------------------
-
-KERNELS = {
-    # Forward kernels
-    "embedding": {"bf16": "embedding_bf16", "f32": "embedding_f32"},
-    "rmsnorm": {"bf16": "rmsnorm_bf16", "f32": "rmsnorm_f32"},
-    "linear": {"bf16": "gemm_bf16", "f32": "gemm_f32"},
-    "rope": {"bf16": "rope_bf16", "f32": "rope_f32"},
-    "attention_prefill": {"bf16": "attention_prefill_bf16", "f32": "attention_prefill_f32"},
-    "attention_decode": {"bf16": "attention_decode_bf16", "f32": "attention_decode_f32"},
-    "swiglu": {"bf16": "swiglu_bf16", "f32": "swiglu_f32"},
-    "add": {"bf16": "add_bf16", "f32": "add_f32"},
-    "kv_cache_update": {"bf16": "kv_cache_update", "f32": "kv_cache_update"},
-    # Fused kernels (forward)
-    "fused_mlp": {"bf16": "mlp_fused_decode_bf16", "f32": "mlp_fused_decode_f32"},
-    "gemm_swiglu": {"bf16": "gemm_swiglu_fused_bf16", "f32": "gemm_swiglu_fused"},
-    "residual_rmsnorm": {"bf16": "residual_rmsnorm_fused_bf16", "f32": "residual_rmsnorm_fused_f32"},
-    "gemm_gelu": {"bf16": "gemm_bias_gelu_fused_bf16", "f32": "gemm_bias_gelu_fused"},
-    "gemm_relu": {"bf16": "gemm_bias_relu_fused_bf16", "f32": "gemm_bias_relu_fused"},
-    "attention_proj_fused": {"bf16": "attention_proj_fused_decode_bf16", "f32": "attention_proj_fused_decode_f32"},
-    # Backward kernels
-    "embedding_backward": {"bf16": "embedding_backward_bf16", "f32": "embedding_backward"},
-    "rmsnorm_backward": {"bf16": "rmsnorm_backward_bf16", "f32": "rmsnorm_backward"},
-    "gemm_backward": {"bf16": "gemm_backward_bf16", "f32": "gemm_backward"},
-    "rope_backward": {"bf16": "rope_backward_bf16", "f32": "rope_backward"},
-    "attention_backward": {"bf16": "attention_backward_causal_head_major_gqa_bf16", "f32": "attention_backward_causal_head_major_gqa"},
-    "softmax_backward": {"bf16": "backward_causal_softmax_head_major_bf16", "f32": "backward_causal_softmax_head_major"},
-    "swiglu_backward": {"bf16": "swiglu_backward_bf16", "f32": "swiglu_backward"},
-    "gelu_backward": {"bf16": "gelu_backward_fast_bf16", "f32": "gelu_backward_fast"},
-    "relu_backward": {"bf16": "relu_backward_bf16", "f32": "relu_backward"},
-    "sigmoid_backward": {"bf16": "sigmoid_backward_bf16", "f32": "sigmoid_backward"},
-    "add_backward": {"bf16": "add_backward_bf16", "f32": "add_backward"},
-    "layernorm_backward": {"bf16": "layernorm_backward_kernel_bf16", "f32": "layernorm_backward_kernel"},
-    "fc1_backward": {"bf16": "fc1_backward_kernel_bf16", "f32": "fc1_backward_kernel"},
-    "fc2_backward": {"bf16": "fc2_backward_kernel_bf16", "f32": "fc2_backward_kernel"},
-    # Loss kernels
-    "cross_entropy_loss": {"bf16": "cross_entropy_loss_bf16", "f32": "cross_entropy_loss"},
-}
-
-# Quantized kernels: (weight_dtype, activation_dtype) -> kernel name
-# Used for inference with quantized weights (llama.cpp compatible)
-QUANT_KERNELS = {
-    # GEMV with quantized weights (decode mode - single token)
-    ("linear", "q4_k", "f32"): "gemv_q4_k",
-    ("linear", "q4_k", "q8_k"): "gemv_q4_k_q8_k",
-    ("linear", "q6_k", "f32"): "gemv_q6_k",
-    ("linear", "q4_0", "f32"): "gemv_q4_0",
-    ("linear", "q4_1", "f32"): "gemv_q4_1",
-    ("linear", "q5_0", "f32"): "gemv_q5_0",
-    ("linear", "q5_1", "f32"): "gemv_q5_1",
-    ("linear", "q8_0", "f32"): "gemv_q8_0",
-    # GEMM for prefill (batched, quantized weights)
-    ("linear_prefill", "q4_k", "f32"): "gemm_nt_q4_k",
-    ("linear_prefill", "q6_k", "f32"): "gemm_nt_q6_k",
-    ("linear_prefill", "q4_0", "f32"): "gemm_q4_0",
-    ("linear_prefill", "q4_1", "f32"): "gemm_nt_q4_1",
-    ("linear_prefill", "q5_0", "f32"): "gemm_nt_q5_0",
-    ("linear_prefill", "q5_1", "f32"): "gemm_nt_q5_1",
-    ("linear_prefill", "q8_0", "f32"): "gemm_q8_0",
-    ("linear_prefill", "q4_k", "q8_k"): "gemm_nt_q4_k_q8_k",
-    # Dequantization (for explicit dequant ops)
-    ("dequant", "q4_k", "f32"): "dequant_q4_k_row",
-    ("dequant", "q6_k", "f32"): "dequant_q6_k_row",
-    ("dequant", "q4_0", "f32"): "dequant_q4_0_row",
-    ("dequant", "q4_1", "f32"): "dequant_q4_1_row",
-    ("dequant", "q5_0", "f32"): "dequant_q5_0_row",
-    ("dequant", "q5_1", "f32"): "dequant_q5_1_row",
-    ("dequant", "q8_0", "f32"): "dequant_q8_0_row",
-    # On-the-fly activation quantization
-    ("quantize", "f32", "q8_k"): "quantize_row_q8_k",
-}
-
-# ---------------------------------------------------------------------------
 # Alignment helpers
 # ---------------------------------------------------------------------------
 
@@ -171,7 +93,6 @@ def align_up_elems(elems: int, elem_bytes: int, alignment: int) -> int:
 # ---------------------------------------------------------------------------
 # Graph IR v6 (kernel-aligned, manifest-first)
 # ---------------------------------------------------------------------------
-
 def map_template_op_to_internal(template_op: str, layer_id: int, op_index: int,
                                 prev_outputs: List[str],
                                 rmsnorm_count: int = 0, residual_count: int = 0,
@@ -588,122 +509,51 @@ def build_graph_ir_v6(config: Dict, model_name: str, alignment_bytes: int = 64, 
             "attrs": {"theta": config.get("rope_theta", 10000.0)},
         })
 
-    # Build body ops from template or use default
-    if template and "block_types" in template:
-        print(f"[TEMPLATE] Building graph from template: {template.get('name', 'unknown')}")
+    # Build body ops from template (required for v6.6)
+    if not template or "block_types" not in template:
+        raise ValueError(
+            "Template is required (from weights_manifest or BUMP metadata). "
+            "Run convert_*_to_bump_v6_6.py and pass --weights-manifest or --bump."
+        )
 
-        # Read and use template flags
-        template_flags = template.get("flags", {})
-        print(f"[TEMPLATE] Flags:")
-        for key, value in template_flags.items():
-            print(f"  - {key}: {value}")
-            # Store flags in config for later use
-            config[f"template_{key}"] = value
+    print(f"[TEMPLATE] Building graph from template: {template.get('name', 'unknown')}")
 
-        # Use template to build ops
-        body_ops = []
-        # For now, use the first (or default) block type
-        # In the future, we can implement layer_map overrides
-        default_block = template["block_types"].get("dense")
-        if default_block and "ops" in default_block:
-            # Sequence-aware mapping: track op index and previous outputs
-            prev_outputs = []  # Track outputs from previous ops in the sequence
-            for op_index, template_op in enumerate(default_block["ops"]):
-                mapped_op = map_template_op_to_internal(
-                    template_op,
-                    1,  # layer_id will be filled per layer (using 1 for template building)
-                    op_index,
-                    prev_outputs
-                )
-                if mapped_op:
-                    body_ops.append(mapped_op)
-                    # Add outputs to prev_outputs for next iteration
-                    # Note: outputs might have placeholders like {L}, so we need to track them properly
-                    if "outputs" in mapped_op:
-                        for output in mapped_op["outputs"]:
-                            # Store with placeholder for now, will be filled per layer
-                            prev_outputs.append(output)
-            print(f"[TEMPLATE] Generated {len(body_ops)} ops from template")
-        else:
-            print("[TEMPLATE] Warning: no dense block found, using default")
-            body_ops = _get_default_body_ops()
-    else:
-        print("[TEMPLATE] Using default (hardcoded) graph structure")
-        body_ops = _get_default_body_ops()
+    # Read and use template flags
+    template_flags = template.get("flags", {})
+    print(f"[TEMPLATE] Flags:")
+    for key, value in template_flags.items():
+        print(f"  - {key}: {value}")
+        # Store flags in config for later use
+        config[f"template_{key}"] = value
 
-    # Helper to get default ops (for backward compatibility)
-    def _get_default_body_ops():
-        return [
-            {
-                "op": "rmsnorm",
-                "name": "ln1",
-                "inputs": ["input"],
-                "weights": ["layer.{L}.ln1_gamma"],
-                "outputs": ["layer.{L}.ln1_out"],
-            },
-            {
-                "op": "qkv_project",
-                "name": "qkv_project",
-                "inputs": ["layer.{L}.ln1_out"],
-                "weights": ["layer.{L}.wq", "layer.{L}.wk", "layer.{L}.wv"],
-                "biases": ["layer.{L}.bq", "layer.{L}.bk", "layer.{L}.bv"],
-                "outputs": ["layer.{L}.q", "layer.{L}.k", "layer.{L}.v"],
-            },
-            {
-                "op": "attention",
-                "name": "attention",
-                "inputs": ["layer.{L}.q", "layer.{L}.k", "layer.{L}.v"],
-                "outputs": ["layer.{L}.attn_out"],
-                "scratch": ["layer.{L}.scores"],
-            },
-            {
-                "op": "attn_proj",
-                "name": "attn_proj",
-                "inputs": ["layer.{L}.attn_out"],
-                "weights": ["layer.{L}.wo"],
-                "outputs": ["layer.{L}.proj_tmp"],
-                "scratch": ["layer.{L}.proj_scratch"],
-            },
-            {
-                "op": "residual_add",
-                "name": "residual1",
-                "inputs": ["input", "layer.{L}.proj_tmp"],
-                "outputs": ["layer.{L}.residual1"],
-            },
-            {
-                "op": "rmsnorm",
-                "name": "ln2",
-                "inputs": ["layer.{L}.residual1"],
-                "weights": ["layer.{L}.ln2_gamma"],
-                "outputs": ["layer.{L}.ln2_out"],
-            },
-            {
-                "op": "mlp_up",
-                "name": "mlp_up",
-                "inputs": ["layer.{L}.ln2_out"],
-                "weights": ["layer.{L}.w1"],
-                "outputs": ["layer.{L}.fc1_out"],
-            },
-            {
-                "op": "swiglu",
-                "name": "swiglu",
-                "inputs": ["layer.{L}.fc1_out"],
-                "outputs": ["layer.{L}.swiglu_out"],
-            },
-            {
-                "op": "mlp_down",
-                "name": "mlp_down",
-                "inputs": ["layer.{L}.swiglu_out"],
-                "weights": ["layer.{L}.w2"],
-                "outputs": ["layer.{L}.mlp_out"],
-            },
-            {
-                "op": "residual_add",
-                "name": "residual2",
-                "inputs": ["layer.{L}.residual1", "layer.{L}.mlp_out"],
-                "outputs": ["layer.{L}.output"],
-            },
-        ]
+    # Use template to build ops
+    body_ops = []
+    # For now, use the first (or default) block type
+    # In the future, we can implement layer_map overrides
+    default_block = template["block_types"].get("dense")
+    if not default_block or "ops" not in default_block:
+        raise ValueError("Template missing block_types.dense.ops")
+
+    # Sequence-aware mapping: track op index and previous outputs
+    prev_outputs = []  # Track outputs from previous ops in the sequence
+    rmsnorm_count = 0
+    residual_count = 0
+    for op_index, template_op in enumerate(default_block["ops"]):
+        mapped_op, rmsnorm_count, residual_count = map_template_op_to_internal(
+            template_op,
+            1,  # layer_id will be filled per layer (using 1 for template building)
+            op_index,
+            prev_outputs,
+            rmsnorm_count,
+            residual_count,
+            template_flags
+        )
+        if mapped_op:
+            body_ops.append(mapped_op)
+            # Add outputs to prev_outputs for next iteration
+            if "outputs" in mapped_op:
+                prev_outputs.extend(mapped_op["outputs"])
+    print(f"[TEMPLATE] Generated {len(body_ops)} ops from template")
 
     # Handle rope insertion
     if globals_buffers:
@@ -1100,6 +950,7 @@ def build_graph_ir_v6(config: Dict, model_name: str, alignment_bytes: int = 64, 
         "generated": datetime.utcnow().isoformat() + "Z",
         "model": model_name,
         "config": config,
+        "template": template,
         "symbols": symbols,
         "sections": [section],
         "weight_map": weight_map,
@@ -1155,19 +1006,16 @@ def extract_kernel_names_from_c(path: str) -> List[str]:
     return kernels
 
 
-def load_kernel_registry(path: Optional[str] = None) -> Dict[str, Dict]:
-    if path:
-        with open(path, "r") as f:
-            data = json.load(f)
-        kernels = data.get("kernels", [])
-        # Support both "name" (from source scan) and "id" (from kernel maps)
-        return {k.get("name") or k.get("id"): k for k in kernels}
-
-    c_path = os.path.join("src", "ckernel_kernel_specs.c")
-    if os.path.exists(c_path):
-        names = extract_kernel_names_from_c(c_path)
-        return {name: {"name": name} for name in names}
-    return {}
+def load_kernel_registry() -> Dict[str, Dict]:
+    registry_path = v3.DEFAULT_KERNEL_REGISTRY_PATH
+    if not registry_path.exists():
+        raise FileNotFoundError(
+            f"Kernel registry not found: {registry_path}. "
+            "Run version/v6.6/scripts/gen_kernel_registry_from_maps.py first."
+        )
+    with registry_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    return v3.normalize_kernel_registry(data)
 
 
 # ---------------------------------------------------------------------------
@@ -1196,7 +1044,8 @@ def op_enabled(op: Dict, mode: str) -> bool:
 
 
 def select_kernel(op: Dict, dtype: str, mode: str, registry: Dict[str, Dict],
-                  weight_dtype: Optional[str] = None) -> Optional[str]:
+                  weight_dtype: Optional[str] = None,
+                  allow_missing: bool = False) -> Optional[str]:
     """Select kernel for an operation.
 
     Args:
@@ -1226,6 +1075,18 @@ def select_kernel(op: Dict, dtype: str, mode: str, registry: Dict[str, Dict],
 
     # Check for quantized weight operations
     w_dtype = weight_dtype or op.get("weight_dtype")
+    is_quant = bool(w_dtype) and (w_dtype == "mixed" or qt.is_quantized_dtype(w_dtype))
+
+    def quant_weight_matches(weight_q: str, target: str) -> bool:
+        if not weight_q or not target:
+            return False
+        weight_q = weight_q.strip().lower()
+        target = target.strip().lower()
+        if weight_q == "mixed":
+            return True
+        if "|" in weight_q:
+            return target in [part.strip().lower() for part in weight_q.split("|")]
+        return weight_q == target
 
     # PRIORITY 1: Check kernel registry (from kernel maps) for best match
     # This allows kernel maps to define exact kernels with metadata
@@ -1260,13 +1121,15 @@ def select_kernel(op: Dict, dtype: str, mode: str, registry: Dict[str, Dict],
                 op_matches = (kernel_op == op_name or
                              kernel_op == key or
                              (op_name == "attn_proj" and kernel_op == "attention_projection") or
-                             (op_name == "qkv_project" and kernel_op == "qkv_projection"))
+                             (op_name == "qkv_project" and kernel_op == "qkv_projection") or
+                             (op_name == "mlp_up" and kernel_op == "gemm") or
+                             (op_name == "mlp_down" and kernel_op == "gemm"))
 
                 if op_matches:
                     # Match quantization
-                    if w_dtype and qt.is_quantized_dtype(w_dtype):
+                    if is_quant:
                         weight_q = kernel_quant.get("weight", "").lower()
-                        if weight_q == w_dtype.lower():
+                        if quant_weight_matches(weight_q, w_dtype):
                             matching_kernel = kernel_entry.get("function", kernel_entry.get("id", kernel_id))
                             print(f"[KERNEL] Selected from registry (op+quant): {op_name}+{w_dtype} -> {matching_kernel}")
                             break
@@ -1281,28 +1144,13 @@ def select_kernel(op: Dict, dtype: str, mode: str, registry: Dict[str, Dict],
         if matching_kernel:
             return matching_kernel
 
-    # PRIORITY 2: Use QUANT_KERNELS for quantized operations (legacy fallback)
-    if w_dtype and qt.is_quantized_dtype(w_dtype):
-        w_dtype_key = w_dtype.lower()
-        quant_key = (key, w_dtype_key, dtype_key)
-        if quant_key in QUANT_KERNELS:
-            print(f"[KERNEL] Selected from QUANT_KERNELS: {quant_key}")
-            return QUANT_KERNELS[quant_key]
-        if mode == "prefill" and key == "linear":
-            prefill_key = ("linear_prefill", w_dtype_key, dtype_key)
-            if prefill_key in QUANT_KERNELS:
-                print(f"[KERNEL] Selected from QUANT_KERNELS (prefill): {prefill_key}")
-                return QUANT_KERNELS[prefill_key]
+    if allow_missing:
+        return op.get("kernel")
 
-    # PRIORITY 3: Use static KERNELS table (legacy fallback)
-    if registry and key in registry:
-        print(f"[KERNEL] Selected from registry (exact match): {key}")
-        return key
-
-    candidates = KERNELS.get(key, {})
-    fallback = candidates.get(dtype_key, f"{key}_{dtype_key}")
-    print(f"[KERNEL] Selected from fallback: {key} + {dtype_key} -> {fallback}")
-    return fallback
+    raise KeyError(
+        f"No kernel match in registry for op='{op_name}' mode='{mode}' "
+        f"dtype='{dtype_key}' weight_dtype='{w_dtype or ''}'"
+    )
 
 
 def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict],
@@ -1321,6 +1169,7 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
       training_cfg: Optional TrainingConfig with batch size, optimizer settings, etc.
     """
     config = graph["config"]
+    template = graph.get("template")
     symbols = graph["symbols"].copy()
 
     # Override tokens (S) while keeping max seq (T)
@@ -1345,6 +1194,8 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
         for entry in weights_manifest.get("entries", []):
             if "name" in entry:
                 manifest_entries[entry["name"]] = entry
+
+    quant_summary = graph.get("quant_summary", {})
 
     # Templates
     header_templates = section["buffers"]["header"]
@@ -1438,8 +1289,19 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
                 continue
             op_out = dict(op)
             op_weight_dtype = None
+            op_weight_dtypes = None
             op_weight_names = []
-            if "weights" in op_out:
+
+            # Prefer quant_summary for per-op dtypes (layer-aware)
+            if isinstance(quant_summary, dict) and quant_summary:
+                op_weight_dtypes = get_op_weight_dtypes(quant_summary, layer_id, op_out.get("op", ""))
+                if op_weight_dtypes:
+                    unique = {dt for dt in op_weight_dtypes.values() if dt}
+                    if unique:
+                        op_weight_dtype = next(iter(unique)) if len(unique) == 1 else "mixed"
+
+            # Fallback to manifest entries if quant_summary missing or incomplete
+            if op_weight_dtype is None and "weights" in op_out:
                 op_weight_names = resolve_names(op_out["weights"], layer_id, bindings)
                 for w_name in op_weight_names:
                     entry = manifest_entries.get(w_name)
@@ -1452,15 +1314,20 @@ def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict
                         if op_weight_dtype is None:
                             op_weight_dtype = w_dtype
                         elif op_weight_dtype != w_dtype:
-                            op_weight_dtype = None
+                            op_weight_dtype = "mixed"
                             break
+
+            if op_weight_dtypes:
+                op_out["weight_dtypes"] = op_weight_dtypes
             if op_weight_dtype:
                 op_out["weight_dtype"] = op_weight_dtype
             op_out["kernel"] = select_kernel(op, config["dtype"], mode, registry,
-                                             weight_dtype=op_weight_dtype)
+                                             weight_dtype=op_weight_dtype,
+                                             allow_missing=skip_registry_check)
             # Don't require backward kernels to be in registry
+            is_quant = op_weight_dtype and (op_weight_dtype == "mixed" or qt.is_quantized_dtype(op_weight_dtype))
             if (op_out["kernel"] and registry and op_out["kernel"] not in registry and
-                    not skip_registry_check and not (op_weight_dtype and qt.is_quantized_dtype(op_weight_dtype))):
+                    not skip_registry_check and not is_quant):
                 raise KeyError(f"Unknown kernel: {op_out['kernel']}")
             if op_out["kernel"]:
                 op_out["kernel_dtype"] = config["dtype"]
@@ -2075,12 +1942,29 @@ def _lower_training_mode(
 # Fusion Optimization Pass
 # ---------------------------------------------------------------------------
 
-def find_fusion_candidates(ops: List[Dict], mode: str) -> List[Dict]:
+def find_fusion_candidates(ops: List[Dict], mode: str, registry_path: Optional[Path] = None) -> List[Dict]:
     """
     Scan a list of ops for fusible sequences.
     Returns candidates sorted by priority (highest first).
+
+    Supports both:
+      - Manual patterns: Match by op names (from graph IR)
+      - Registry patterns: Match by kernel IDs (from lowered IR)
+
+    Args:
+        ops: List of ops from lowered IR
+        mode: Execution mode (prefill/decode)
+        registry_path: Optional path to kernel registry
     """
-    patterns = fp.get_patterns_for_mode(mode)
+    # Try to use registry-driven patterns if registry is available
+    try:
+        patterns = fp.get_registry_driven_patterns(mode, registry_path)
+        print(f"[FUSION] Loaded {len(patterns)} patterns (registry + manual)")
+    except (FileNotFoundError, ImportError):
+        # Fallback to manual patterns only
+        patterns = fp.get_patterns_for_mode(mode)
+        print(f"[FUSION] Loaded {len(patterns)} patterns (manual only)")
+
     candidates = []
 
     for pattern in patterns:
@@ -2090,15 +1974,30 @@ def find_fusion_candidates(ops: List[Dict], mode: str) -> List[Dict]:
         # Sliding window match
         for i in range(len(ops) - seq_len + 1):
             window = ops[i:i + seq_len]
-            if fp.ops_match_sequence(window, seq):
-                # Validate data flow
-                if fp.validate_data_flow(window):
+
+            # Check if this is a registry pattern (kernel IDs) or manual pattern (op names)
+            # Registry patterns have kernel IDs in ops, manual patterns have op names
+            if "kernel" in window[0]:
+                # Registry pattern: match by kernel IDs
+                kernel_seq = [op.get("kernel") for op in window]
+                if kernel_seq == seq:
                     candidates.append({
                         "start_idx": i,
                         "end_idx": i + seq_len,
                         "pattern": pattern,
                         "matched_ops": window,
                     })
+            else:
+                # Manual pattern: match by op names
+                if fp.ops_match_sequence(window, seq):
+                    # Validate data flow
+                    if fp.validate_data_flow(window):
+                        candidates.append({
+                            "start_idx": i,
+                            "end_idx": i + seq_len,
+                            "pattern": pattern,
+                            "matched_ops": window,
+                        })
 
     return candidates
 
@@ -2176,7 +2075,7 @@ def filter_unused_buffers(buffers: List[Dict], ops: List[Dict], removed_patterns
     return filtered
 
 
-def apply_fusion_pass(lowered: Dict, mode: str, config: Dict) -> Tuple[Dict, fp.FusionStats]:
+def apply_fusion_pass(lowered: Dict, mode: str, config: Dict, registry_path: Optional[Path] = None) -> Tuple[Dict, fp.FusionStats]:
     """
     Apply fusion optimizations to lowered IR.
 
@@ -2184,6 +2083,7 @@ def apply_fusion_pass(lowered: Dict, mode: str, config: Dict) -> Tuple[Dict, fp.
         lowered: Lowered IR dict
         mode: Execution mode (prefill/decode)
         config: Fusion configuration
+        registry_path: Optional path to kernel registry
 
     Returns:
         (optimized_ir, fusion_stats)
@@ -2195,9 +2095,16 @@ def apply_fusion_pass(lowered: Dict, mode: str, config: Dict) -> Tuple[Dict, fp.
     optimized = copy.deepcopy(lowered)
     dtype = optimized["config"]["dtype"]
 
+    # Get fusion patterns (registry-driven if available)
+    try:
+        patterns = fp.get_registry_driven_patterns(mode, registry_path)
+    except (FileNotFoundError, ImportError):
+        # Fallback to manual patterns only
+        patterns = fp.get_patterns_for_mode(mode)
+
     # Collect all patterns' removed buffers
     all_removed_patterns = []
-    for pattern in fp.FUSION_PATTERNS:
+    for pattern in patterns:
         all_removed_patterns.extend(pattern.get("remove_buffers", []))
 
     # Process each layer
@@ -2206,7 +2113,7 @@ def apply_fusion_pass(lowered: Dict, mode: str, config: Dict) -> Tuple[Dict, fp.
         ops = layer["ops"]
 
         # Find and apply fusions
-        candidates = find_fusion_candidates(ops, mode)
+        candidates = find_fusion_candidates(ops, mode, registry_path)
         new_ops, applied = apply_fusions_to_ops(ops, candidates, dtype)
 
         if applied:
@@ -2309,7 +2216,7 @@ def build_layout_from_lowered(lowered: Dict, model_name: str) -> v3.ModelLayout:
                                   v3.CACHE_LINE)
         else:
             size = v3.aligned_size(spec["resolved_shape"], spec["dtype"], v3.CACHE_LINE)
-        offset = allocator.alloc(name, size)
+        offset = allocator.alloc(size)
         buf = v3.Buffer(
             name=name,
             shape=spec["resolved_shape"],
@@ -2670,7 +2577,6 @@ def parse_args(argv: List[str]) -> Dict:
             "--weights-header",
             "--weights-index",
             "--weights-manifest",
-            "--kernel-specs",
             "--template",
             "--emit",
             "--tokens",
@@ -2691,6 +2597,7 @@ def parse_args(argv: List[str]) -> Dict:
             "--data-parallel",
             "--tensor-parallel",
             "--codegen",
+            "--bump",
         }
         normalized: List[str] = []
         i = 0
@@ -2722,7 +2629,6 @@ def parse_args(argv: List[str]) -> Dict:
         "dtype": None,
         "weight_dtype": None,  # Quantized weight dtype (q4_k, q6_k, etc.)
         "modes": ["prefill", "decode"],
-        "kernel_specs": None,
         "template": None,
         "preset": None,
         "emit": "exe",
@@ -2750,6 +2656,8 @@ def parse_args(argv: List[str]) -> Dict:
         "weight_decay": 0.01,
         "data_parallel": 1,  # Data parallel size
         "tensor_parallel": 1,  # Tensor parallel size
+        # BUMPWGT5 weights file
+        "bump": None,  # Path to BUMPWGT5 weights file (reads metadata from EOF footer)
     }
 
     for arg in argv:
@@ -2768,8 +2676,6 @@ def parse_args(argv: List[str]) -> Dict:
             args["weights_index"] = arg.split("=", 1)[1]
         elif arg.startswith("--weights-manifest="):
             args["weights_manifest"] = arg.split("=", 1)[1]
-        elif arg.startswith("--kernel-specs="):
-            args["kernel_specs"] = arg.split("=", 1)[1]
         elif arg.startswith("--template="):
             args["template"] = arg.split("=", 1)[1]
         elif arg == "--emit-lib":
@@ -2854,12 +2760,15 @@ def parse_args(argv: List[str]) -> Dict:
             args["data_parallel"] = int(arg.split("=", 1)[1])
         elif arg.startswith("--tensor-parallel="):
             args["tensor_parallel"] = int(arg.split("=", 1)[1])
+        elif arg.startswith("--bump="):
+            args["bump"] = arg.split("=", 1)[1]
         elif arg.startswith("--"):
             raise ValueError(f"Unknown option: {arg}")
         else:
             args["model"] = arg
 
-    if not args.get("help") and not args["model"] and not args["config"] and not args["preset"]:
+    if (not args.get("help") and not args["model"] and not args["config"] and
+            not args["preset"] and not args.get("weights_manifest") and not args.get("bump")):
         raise ValueError("Must provide model ID/URL or --config=FILE or --preset=NAME")
 
     return args
@@ -2882,7 +2791,7 @@ def print_usage():
     print("  --weights-header=FILE   Safetensors header for weight mapping")
     print("  --weights-index=FILE    model.safetensors.index.json")
     print("  --weights-manifest=FILE Weights manifest (from convert_*_to_bump.py)")
-    print("  --kernel-specs=FILE     Kernel registry JSON (optional)")
+    print("  --bump=FILE             BUMPWGT5 weights file (reads template/config from footer)")
     print("  --template=NAME         Template name (e.g., qwen2, llama) or path")
     print("  --prefix=DIR            Output directory")
     print("  --tokens=N              Tokens for prefill/backward (default: max_seq_len)")
@@ -2963,6 +2872,460 @@ def print_usage():
     print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --fusion-verbose --parallel-verbose")
 
 
+# ============================================================================
+# BUMPWGT5 METADATA READING (EOF FOOTER)
+# ============================================================================
+#
+# BUMPWGT5 FILE STRUCTURE:
+# ========================
+#   [weights binary data...] + [metadata JSON] + [footer (48 bytes)]
+#
+# FOOTER FORMAT (little-endian, 48 bytes total):
+# +--------+--------+--------+----------------------------------------+
+# | Offset | Size   | Type   | Description                            |
+# +--------+--------+--------+----------------------------------------+
+# | 0      | 8      | u8[8]  | Magic: "BUMPV5MD" (8 bytes)            |
+# | 8      | 8      | uint64 | meta_size: size of metadata JSON bytes |
+# | 16     | 32     | u8[32] | SHA-256 hash of metadata JSON bytes    |
+# +--------+--------+--------+----------------------------------------+
+#
+# METADATA JSON CONTENTS:
+# =======================
+# {
+#   "version": 5,                           # BUMP format version
+#   "template": {                           # Full template (same as --template files)
+#     "name": "qwen2",
+#     "block_types": { "dense": { "ops": [...] } },
+#     "layer_map": { "default": "dense" },
+#     "flags": { "use_qkv_bias": "from_weights", ... }
+#   },
+#   "config": {                             # Model configuration
+#     "model_type": "qwen2",
+#     "embed_dim": 1024,
+#     "num_heads": 16,
+#     "num_kv_heads": 2,
+#     "head_dim": 64,
+#     "intermediate_size": 2816,
+#     "max_seq_len": 32768,
+#     "vocab_size": 151936,
+#     "num_layers": 24
+#   },
+#   "quant_summary": {                      # Per-tensor quantization info
+#     "model.layers.0.attn.wq": "q4_k",
+#     "model.layers.0.attn.wk": "q4_k",
+#     "model.layers.0.mlp.w1": "q5_0",
+#     ...
+#   },
+#   "manifest_hash": "abc123..."            # SHA-256 of weights_manifest.json
+# }
+#
+# WHY BUMP METADATA?
+# ==================
+# 1. Single source of truth: template, config, and weights are guaranteed to match
+# 2. No need for separate --template, --config, --weights-manifest arguments
+# 3. Enables validation: manifest_hash confirms manifest matches baked weights
+# 4. Self-describing: any BUMP file can be loaded without external files
+#
+# USAGE:
+# ======
+#   python build_ir_v6_6.py --bump=model.bump
+#
+# This will:
+#   1. Read template from BUMP metadata
+#   2. Apply config overrides from metadata
+#   3. Use quant_summary for kernel selection
+#   4. Validate manifest_hash if --weights-manifest is provided
+# ============================================================================
+
+import struct
+import hashlib
+
+BUMP_FOOTER_SIZE = 48  # Footer is always 48 bytes: 8 + 8 + 32
+BUMP_FOOTER_MAGIC = b"BUMPV5MD"  # Magic bytes to identify BUMPWGT5 format
+
+
+def read_bump_metadata(bump_path: str) -> Dict[str, Any]:
+    """
+    Read metadata from BUMPWGT5 EOF footer.
+
+    This function reads the metadata embedded at the end of BUMPWGT5 files.
+    The metadata contains the template, model config, quantization info,
+    and a hash of the weights manifest for validation.
+
+    Args:
+        bump_path: Path to BUMPWGT5 weights file (e.g., "model.bump")
+
+    Returns:
+        Dict containing:
+        - version: BUMP format version (5)
+        - template: Full template JSON (same format as --template files)
+          - name: Template name (e.g., "qwen2", "llama")
+          - block_types: Dict of block definitions with "ops" lists
+          - layer_map: Dict mapping layer indices to block types
+          - flags: Architecture flags (use_qkv_bias, activation, rope)
+        - config: Model configuration dict
+          - embed_dim: Embedding dimension
+          - num_heads: Number of attention heads
+          - num_kv_heads: Number of key/value heads (for GQA)
+          - head_dim: Dimension per attention head
+          - intermediate_dim: MLP intermediate dimension
+          - max_seq_len: Maximum sequence length
+          - vocab_size: Vocabulary size
+          - num_layers: Number of transformer layers
+        - quant_summary: {tensor_name: dtype} map for quantized weights
+          - Maps full tensor paths to quantization types
+          - Used for kernel selection (q4_k, q5_0, q8_0, etc.)
+        - manifest_hash: SHA-256 hex string of canonical weights_manifest.json
+          - Used to validate that external manifest matches BUMP file
+
+    Raises:
+        ValueError: If file is too small, invalid magic, corrupted metadata,
+                    or SHA256 verification fails
+
+    Example:
+        >>> metadata = read_bump_metadata("model.bump")
+        >>> print(metadata["template"]["name"])
+        "qwen2"
+        >>> print(metadata["config"]["num_layers"])
+        24
+    """
+    with open(bump_path, "rb") as f:
+        # Get file size by seeking to end
+        f.seek(0, os.SEEK_END)
+        file_size = f.tell()
+
+        # Seek to start of footer (last 48 bytes)
+        f.seek(-BUMP_FOOTER_SIZE, os.SEEK_END)
+
+        footer = f.read(BUMP_FOOTER_SIZE)
+        if len(footer) != BUMP_FOOTER_SIZE:
+            raise ValueError(
+                f"BUMP file too small: cannot read footer "
+                f"(file is {file_size} bytes, need {BUMP_FOOTER_SIZE})"
+            )
+
+        # Parse footer: 8-byte magic + 8-byte size (little-endian) + 32-byte hash
+        # Format: "<8sQ32s" = little-endian, 8-byte string, unsigned long long, 32-byte string
+        magic, meta_size, expected_hash = struct.unpack("<8sQ32s", footer)
+
+        # Validate magic bytes
+        if magic != BUMP_FOOTER_MAGIC:
+            raise ValueError(
+                f"Not a BUMPWGT5 file: invalid magic {magic!r} "
+                f"(expected {BUMP_FOOTER_MAGIC!r})"
+            )
+
+        # Calculate offset to metadata JSON
+        # Metadata starts at: file_size - footer_size - meta_size
+        meta_offset = file_size - BUMP_FOOTER_SIZE - meta_size
+
+        if meta_offset < 0:
+            raise ValueError(
+                f"Invalid metadata: meta_size={meta_size} exceeds file bounds "
+                f"(file is {file_size} bytes)"
+            )
+
+        # Read metadata JSON bytes
+        f.seek(meta_offset)
+        meta_bytes = f.read(meta_size)
+        if len(meta_bytes) != meta_size:
+            raise ValueError(
+                f"Failed to read metadata: expected {meta_size} bytes, "
+                f"got {len(meta_bytes)}"
+            )
+
+        # Verify SHA256 of raw bytes (CRITICAL: don't re-serialize!)
+        # We hash the raw bytes we read, not json.dumps() output
+        actual_hash = hashlib.sha256(meta_bytes).digest()
+        if actual_hash != expected_hash:
+            # Show first 16 chars of hashes for debugging
+            raise ValueError(
+                f"Metadata SHA256 mismatch: file may be corrupted or tampered with "
+                f"(expected {expected_hash[:16].hex()}..., got {actual_hash[:16].hex()}...)"
+            )
+
+        # Parse metadata JSON
+        metadata = json.loads(meta_bytes.decode("utf-8"))
+
+        # Diagnostic output
+        config_meta = metadata.get("config", {}) if isinstance(metadata.get("config"), dict) else {}
+        model_name = config_meta.get("model_type") or config_meta.get("model") or "unknown"
+        template_name = metadata.get("template", {}).get("name", "unknown") if isinstance(metadata.get("template"), dict) else "unknown"
+        quant_count = len(metadata.get("quant_summary", {}))
+
+        print(f"[BUMP] Read metadata from {bump_path}")
+        print(f"[BUMP]   Template: {template_name}")
+        print(f"[BUMP]   Config: {model_name}")
+        print(f"[BUMP]   Quant types: {quant_count} tensors")
+
+        return metadata
+
+
+def canonical_json_bytes(payload: Dict[str, Any]) -> bytes:
+    """
+    Encode JSON with stable ordering for hashing.
+
+    This produces canonical JSON that can be hashed and compared across systems.
+    Key properties:
+    - sort_keys=True: Keys are sorted alphabetically
+    - separators=(",", ":"): No spaces after commas/colons
+    - ensure_ascii=True: ASCII output (no unicode escapes needed)
+
+    Args:
+        payload: Dict to serialize to canonical JSON bytes
+
+    Returns:
+        UTF-8 encoded JSON bytes with stable ordering
+
+    Example:
+        >>> canonical_json_bytes({"b": 1, "a": 2})
+        b'{"a":2,"b":1}'
+    """
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def normalize_bump_config(raw_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize a BUMP/manifest config dict into build_ir config keys.
+
+    Accepts both BUMPWGT5 field names (intermediate_size, context_length, model)
+    and build_ir names (intermediate_dim, max_seq_len, model_type).
+    """
+    bump_to_config = {
+        "embed_dim": "embed_dim",
+        "num_heads": "num_heads",
+        "num_kv_heads": "num_kv_heads",
+        "head_dim": "head_dim",
+        "intermediate_size": "intermediate_dim",
+        "intermediate_dim": "intermediate_dim",
+        "context_length": "max_seq_len",
+        "max_seq_len": "max_seq_len",
+        "max_position_embeddings": "max_seq_len",  # HF uses this key
+        "vocab_size": "vocab_size",
+        "num_layers": "num_layers",
+        "model": "model_type",
+        "model_type": "model_type",
+        "activation_fn": "activation_fn",
+        "rms_eps": "rms_eps",
+    }
+    normalized: Dict[str, Any] = {}
+    if not isinstance(raw_config, dict):
+        return normalized
+    for bump_key, cfg_key in bump_to_config.items():
+        if bump_key in raw_config:
+            normalized[cfg_key] = raw_config[bump_key]
+    return normalized
+
+
+def extract_config_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract a config dict from a weights manifest.
+
+    Supports either:
+    - manifest["config"] (preferred, full config dict), or
+    - top-level fields like embed_dim/num_heads/etc (legacy).
+    """
+    if not isinstance(manifest, dict):
+        return {}
+
+    if isinstance(manifest.get("config"), dict):
+        return normalize_bump_config(manifest["config"])
+
+    legacy_keys = (
+        "model",
+        "model_type",
+        "embed_dim",
+        "num_layers",
+        "num_heads",
+        "num_kv_heads",
+        "head_dim",
+        "intermediate_size",
+        "intermediate_dim",
+        "context_length",
+        "max_seq_len",
+        "vocab_size",
+        "rms_eps",
+    )
+    legacy_cfg = {key: manifest[key] for key in legacy_keys if key in manifest}
+    return normalize_bump_config(legacy_cfg)
+
+
+def extract_quant_summary(weights_manifest: Optional[Dict[str, Any]],
+                          bump_metadata: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
+    """Extract per-layer quant summary from manifest or BUMP metadata."""
+    if isinstance(weights_manifest, dict):
+        qs = weights_manifest.get("quant_summary")
+        if isinstance(qs, dict):
+            return qs
+    if isinstance(bump_metadata, dict):
+        qs = bump_metadata.get("quant_summary")
+        if isinstance(qs, dict):
+            return qs
+    return {}
+
+
+def lookup_quant_dtype(quant_summary: Dict[str, Dict[str, str]],
+                       layer_id: int,
+                       weight_key: str) -> Optional[str]:
+    """Lookup dtype from quant_summary for a given layer + weight key."""
+    if not quant_summary:
+        return None
+    layer_key = f"layer.{layer_id}"
+    layer_entry = quant_summary.get(layer_key)
+    if isinstance(layer_entry, dict):
+        dtype = layer_entry.get(weight_key)
+        if dtype:
+            return dtype
+
+    # Fallback: quant_summary might be a flat map with full tensor names
+    candidates = [
+        f"layer.{layer_id}.{weight_key}",
+        f"model.layer.{layer_id}.{weight_key}",
+        f"model.layers.{layer_id}.{weight_key}",
+    ]
+    for name in candidates:
+        dtype = quant_summary.get(name)
+        if dtype:
+            return dtype
+    return None
+
+
+def get_op_weight_dtypes(quant_summary: Dict[str, Dict[str, str]],
+                         layer_id: int,
+                         op_name: str) -> Optional[Dict[str, str]]:
+    """Return per-op weight dtypes from quant_summary (if available)."""
+    if not quant_summary:
+        return None
+    if op_name == "qkv_project":
+        return {
+            "wq": lookup_quant_dtype(quant_summary, layer_id, "wq"),
+            "wk": lookup_quant_dtype(quant_summary, layer_id, "wk"),
+            "wv": lookup_quant_dtype(quant_summary, layer_id, "wv"),
+        }
+    if op_name == "attn_proj":
+        return {"wo": lookup_quant_dtype(quant_summary, layer_id, "wo")}
+    if op_name == "mlp_up":
+        return {"w1": lookup_quant_dtype(quant_summary, layer_id, "w1")}
+    if op_name == "mlp_down":
+        return {"w2": lookup_quant_dtype(quant_summary, layer_id, "w2")}
+    return None
+
+
+def check_kernel_coverage(graph: Dict,
+                          registry: Dict[str, Dict],
+                          quant_summary: Dict[str, Dict[str, str]],
+                          mode: str) -> List[str]:
+    """Check that all required kernels exist in registry.
+
+    Returns list of missing kernels (empty = all present).
+    """
+    missing = []
+    config = graph["config"]
+    section = graph["sections"][0]
+    num_layers = config["num_layers"]
+
+    # Check header ops
+    for op in section.get("header", {}).get("ops", []):
+        op_name = op["op"]
+        if op_name in HOST_OPS or op_name == "lm_head":
+            continue
+
+        # Determine weight dtype
+        weight_dtypes = get_op_weight_dtypes(quant_summary, 0, op_name)
+        if weight_dtypes:
+            # Multi-weight op (e.g., qkv has wq, wk, wv)
+            for weight_name, weight_dtype in weight_dtypes.items():
+                if weight_dtype:
+                    if not kernel_exists_in_registry(op_name, weight_dtype, mode, registry):
+                        missing.append(
+                            f"{op_name}[{weight_name}] weight={weight_dtype} mode={mode}"
+                        )
+        else:
+            # Single-weight op
+            if not kernel_exists_in_registry(op_name, None, mode, registry):
+                missing.append(f"{op_name} mode={mode}")
+
+    # Check layer ops
+    for layer_id in range(num_layers):
+        # Use ops from template structure
+        template = graph.get("template", {})
+        if template and "block_types" in template:
+            default_block = template["block_types"].get("dense", {})
+            if "ops" in default_block:
+                # Template ops are strings like "rmsnorm", not dicts
+                for op_name in default_block["ops"]:
+                    if not op_name or op_name in HOST_OPS:
+                        continue
+
+                    weight_dtypes = get_op_weight_dtypes(quant_summary, layer_id, op_name)
+                    if weight_dtypes:
+                        for weight_name, weight_dtype in weight_dtypes.items():
+                            if weight_dtype:
+                                if not kernel_exists_in_registry(op_name, weight_dtype, mode, registry):
+                                    missing.append(
+                                        f"layer.{layer_id}.{op_name}[{weight_name}] weight={weight_dtype} mode={mode}"
+                                    )
+                    else:
+                        if not kernel_exists_in_registry(op_name, None, mode, registry):
+                            missing.append(f"layer.{layer_id}.{op_name} mode={mode}")
+
+    return missing
+
+
+def kernel_exists_in_registry(op_name: str,
+                              weight_dtype: Optional[str],
+                              mode: str,
+                              registry: Dict[str, Dict]) -> bool:
+    """Check if kernel exists in registry for (op, weight_dtype, mode)."""
+    if not registry:
+        return False
+
+    # Build registry index if not done
+    if not hasattr(kernel_exists_in_registry, "_index"):
+        kernel_exists_in_registry._index = {
+            k: v for k, v in registry.items()
+        }
+
+    registry_index = kernel_exists_in_registry._index
+
+    # Map template op to registry op name
+    op_map = {
+        "qkv_proj": "qkv_projection",
+        "attn_proj": "attention_projection",
+        "residual_add": "residual_add",
+        "rmsnorm": "rmsnorm",
+        "attention": "attention",
+        "rope_qk": "rope",
+        "mlp_gate_up": "gemm",
+        "mlp_up": "gemm",
+        "swiglu": "swiglu",
+        "mlp_down": "gemm",
+    }
+
+    registry_op = op_map.get(op_name, op_name)
+
+    # Find kernels matching this op
+    for kernel_id, entry in registry_index.items():
+        if entry.get("op") != registry_op:
+            continue
+
+        # Check dtype compatibility
+        quant = entry.get("quant", {})
+        weight_support = quant.get("weight", "")
+
+        if weight_dtype:
+            if "mixed" in weight_support.lower():
+                return True
+            if weight_dtype.lower() in weight_support.lower():
+                return True
+        else:
+            # No weight dtype constraint
+            if not weight_support or weight_support.lower() in ("", "none"):
+                return True
+
+    return False
+
+
 def main(argv: List[str]) -> int:
     try:
         args = parse_args(argv)
@@ -2974,6 +3337,15 @@ def main(argv: List[str]) -> int:
     if args.get("help"):
         print_usage()
         return 0
+
+    bootstrap_manifest = None
+    if args.get("weights_manifest"):
+        with open(args["weights_manifest"], "r") as f:
+            bootstrap_manifest = json.load(f)
+
+    bootstrap_bump_metadata = None
+    if args.get("bump"):
+        bootstrap_bump_metadata = read_bump_metadata(args["bump"])
 
     if args.get("preset"):
         preset = PRESETS.get(args["preset"])
@@ -2998,20 +3370,32 @@ def main(argv: List[str]) -> int:
             else:
                 raise FileNotFoundError(f"Config file not found: {config_path}")
         print(f"[CONFIG] Reading local: {config_path}")
-        config = v3.parse_config(config_path)
+        raw_config = v3.parse_config(config_path)
+        # Normalize config keys (HF uses different names than BUMP)
+        config = normalize_bump_config(raw_config)
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                raw_config = json.load(f)
             config["num_merges"] = int(raw_config.get("num_merges", config.get("num_merges", 0)) or 0)
             config["total_vocab_bytes"] = int(raw_config.get("total_vocab_bytes", config.get("total_vocab_bytes", 0)) or 0)
         except Exception:
             pass
         model_name = args["name"] or config.get("model_type", "model")
-    else:
+    elif args.get("model"):
         model_id = v3.parse_hf_model_id(args["model"])
         raw_config, cached_path = v3.download_hf_config(model_id)
-        config = v3.parse_config(cached_path)
+        raw_config = v3.parse_config(cached_path)
+        config = normalize_bump_config(raw_config)
         model_name = args["name"] or v3.model_id_to_name(model_id)
+    else:
+        manifest_cfg = extract_config_from_manifest(bootstrap_manifest)
+        bump_cfg = normalize_bump_config(
+            bootstrap_bump_metadata.get("config", {}) if isinstance(bootstrap_bump_metadata, dict) else {}
+        )
+        config = manifest_cfg or bump_cfg
+        if not config:
+            raise ValueError("No config found in manifest or BUMP metadata; pass --config or --preset")
+        if "dtype" not in config:
+            config["dtype"] = "fp32"
+        model_name = args["name"] or config.get("model_type", "model")
 
     if args["dtype"]:
         dtype = args["dtype"]
@@ -3047,18 +3431,72 @@ def main(argv: List[str]) -> int:
     print(f"[MODEL]  {model_name}")
     print(f"[OUTPUT] {output_dir}/")
 
-    # Kernel registry
-    registry = load_kernel_registry(args.get("kernel_specs"))
-    if registry:
-        print(f"[KERNELS] Loaded {len(registry)} kernel specs")
-    else:
-        print("[KERNELS] Warning: no kernel registry found; kernel validation disabled")
+    # =========================================================================
+    # KERNEL REGISTRY
+    # =========================================================================
+    # The kernel registry maps kernel names to their buffer specifications,
+    # constraints, and fusion relationships. It's used for:
+    # 1. Validating that required buffers are allocated
+    # 2. Selecting appropriate kernels for a given operation
+    # 3. Fusion pass (finding fused kernels that replace multiple ops)
+    registry = load_kernel_registry()
+    print(f"[KERNELS] Loaded {len(registry)} kernel specs")
 
-    # Load template
+    # =========================================================================
+    # TEMPLATE LOADING
+    # =========================================================================
+    # The template defines the IR graph structure:
+    # - block_types: Named operation sequences (e.g., "dense", "moe")
+    # - layer_map: Which block type to use per layer (with overrides)
+    # - flags: Architecture flags (use_qkv_bias, activation, rope, etc.)
+    #
+    # Priority for template source (highest to lowest):
+    # 1. --template=NAME/FILE: Explicit override from file system
+    # 2. --weights-manifest=FILE: Use embedded template (sidecar source of truth)
+    # 3. --bump=FILE: Read template from BUMPWGT5 EOF metadata
+    # 4. Default: Use hardcoded _get_default_body_ops()
+    #
+    # The weights manifest is the preferred source because it is produced
+    # alongside the weights and is used by the loader/runtime mapping.
+    # =========================================================================
     template = None
+    bump_metadata = bootstrap_bump_metadata
+
+    # -------------------------------------------------------------------------
+    # STEP 1: If --bump is provided, read metadata from BUMPWGT5 EOF footer
+    # -------------------------------------------------------------------------
+    if args.get("bump") and bump_metadata is None:
+        print(f"[BUMP] Reading metadata from: {args['bump']}")
+        bump_metadata = read_bump_metadata(args["bump"])
+
+    # -------------------------------------------------------------------------
+    # STEP 2: Read weights manifest early (drives template/config when present)
+    # -------------------------------------------------------------------------
+    weights_manifest = bootstrap_manifest
+    if args.get("weights_manifest") and weights_manifest is None:
+        print(f"[WEIGHTS] Reading manifest: {args['weights_manifest']}")
+        with open(args["weights_manifest"], "r") as f:
+            weights_manifest = json.load(f)
+
+        # Validate manifest hash against BUMP metadata (if available)
+        if bump_metadata and bump_metadata.get("manifest_hash"):
+            expected_hash = bump_metadata["manifest_hash"]
+            actual_hash = hashlib.sha256(canonical_json_bytes(weights_manifest)).hexdigest()
+            if actual_hash != expected_hash:
+                raise ValueError(
+                    "weights_manifest.json hash mismatch for BUMPWGT5 metadata "
+                    f"(expected {expected_hash}, got {actual_hash})"
+                )
+            print("[WEIGHTS] Manifest hash matches BUMP metadata")
+
+    # -------------------------------------------------------------------------
+    # STEP 3: Select template (CLI > manifest > BUMP > default)
+    # -------------------------------------------------------------------------
+    manifest_template = weights_manifest.get("template") if isinstance(weights_manifest, dict) else None
+    bump_template = bump_metadata.get("template") if isinstance(bump_metadata, dict) else None
+
     if args.get("template"):
         template_path = args["template"]
-        # If template is a name (not a path), try to load from templates directory
         if not os.path.exists(template_path):
             template_path = os.path.join("version", "v6.6", "templates", f"{args['template']}.json")
         if os.path.exists(template_path):
@@ -3068,10 +3506,68 @@ def main(argv: List[str]) -> int:
             print(f"[TEMPLATE] Loaded template: {template.get('name', 'unknown')}")
         else:
             print(f"[TEMPLATE] Warning: template not found: {template_path}")
+    elif isinstance(manifest_template, dict):
+        template = manifest_template
+        print(f"[TEMPLATE] Using template from weights manifest: {template.get('name', 'unknown')}")
+    elif isinstance(bump_template, dict):
+        template = bump_template
+        print(f"[TEMPLATE] Using template from BUMP metadata: {template.get('name', 'unknown')}")
     else:
         print("[TEMPLATE] Using default (hardcoded) graph structure")
 
-    # Weights metadata
+    if isinstance(manifest_template, dict) and isinstance(bump_template, dict):
+        manifest_name = manifest_template.get("name")
+        bump_name = bump_template.get("name")
+        if manifest_name and bump_name and manifest_name != bump_name:
+            raise ValueError(
+                f"Template mismatch: manifest '{manifest_name}' vs BUMP '{bump_name}'"
+            )
+
+    # -------------------------------------------------------------------------
+    # STEP 4: Apply config overrides (manifest takes precedence)
+    # -------------------------------------------------------------------------
+    manifest_cfg = normalize_bump_config(weights_manifest.get("config", {})) if isinstance(weights_manifest, dict) else {}
+    bump_cfg = normalize_bump_config(bump_metadata.get("config", {})) if isinstance(bump_metadata, dict) else {}
+
+    if manifest_cfg and bump_cfg:
+        mismatches = []
+        for key in sorted(set(manifest_cfg) & set(bump_cfg)):
+            if manifest_cfg[key] != bump_cfg[key]:
+                mismatches.append((key, manifest_cfg[key], bump_cfg[key]))
+        if mismatches:
+            msg = ", ".join(f"{k}={a} vs {b}" for k, a, b in mismatches)
+            raise ValueError(f"Config mismatch between manifest and BUMP metadata: {msg}")
+
+    if manifest_cfg:
+        print(f"[CONFIG] Applying {len(manifest_cfg)} fields from weights manifest")
+        for key, value in manifest_cfg.items():
+            if value != config.get(key):
+                print(f"[CONFIG]   Override {key}: {config.get(key)} -> {value}")
+                config[key] = value
+
+    if bump_cfg:
+        print(f"[CONFIG] Applying {len(bump_cfg)} fields from BUMP metadata")
+        for key, value in bump_cfg.items():
+            if key not in manifest_cfg and value != config.get(key):
+                print(f"[CONFIG]   Override {key}: {config.get(key)} -> {value}")
+                config[key] = value
+
+    # =========================================================================
+    # WEIGHTS METADATA
+    # =========================================================================
+    # Weights can come from multiple sources:
+    #   - Safetensors header (.safetensors)
+    #   - Weights index (model.safetensors.index.json)
+    #   - Weights manifest (weights_manifest.json from convert_*_to_bump.py)
+    #
+    # The manifest is critical for quantized inference:
+    #   - Maps tensor names to file offsets
+    #   - Specifies dtype per tensor (q4_k, q5_0, q8_0, etc.)
+    #   - Used by the weight loader to map tensors to memory
+    #
+    # If BUMP metadata is provided, we validate the manifest hash matches
+    # the canonical JSON hash stored in the BUMP footer.
+    # =========================================================================
     weights_meta = {}
     if args["weights_header"]:
         print(f"[WEIGHTS] Reading safetensors header: {args['weights_header']}")
@@ -3079,11 +3575,7 @@ def main(argv: List[str]) -> int:
     if args["weights_index"]:
         print(f"[WEIGHTS] Reading index: {args['weights_index']}")
         weights_meta["index"] = read_weights_index(args["weights_index"])
-    weights_manifest = None
-    if args.get("weights_manifest"):
-        print(f"[WEIGHTS] Reading manifest: {args['weights_manifest']}")
-        with open(args["weights_manifest"], "r") as f:
-            weights_manifest = json.load(f)
+    # Determine weight dtype from manifest if not explicitly specified
     manifest_weight_dtype = None
     if weights_manifest and isinstance(weights_manifest, dict):
         dtype_set = {
@@ -3112,10 +3604,54 @@ def main(argv: List[str]) -> int:
     elif manifest_weight_dtype:
         config["weight_dtype"] = manifest_weight_dtype
 
+    quant_summary = extract_quant_summary(weights_manifest, bump_metadata)
+    if quant_summary:
+        print(f"[QUANT] Loaded {len(quant_summary)} per-layer dtype entries")
+
     # Graph IR
     graph = build_graph_ir_v6(config, model_name, template=template)
+    if quant_summary:
+        graph["quant_summary"] = quant_summary
     if weights_meta:
         graph["weights"] = weights_meta
+
+    # ---------------------------------------------------------------------------
+    # PREFLIGHT COVERAGE CHECK
+    # ---------------------------------------------------------------------------
+    # Validate that all required kernels exist in registry before lowering.
+    # This gives early feedback if kernels are missing.
+    if registry and quant_summary:
+        print("\n[PREFILL] Checking kernel coverage...")
+        missing_kernels = check_kernel_coverage(
+            graph, registry, quant_summary, mode="prefill"
+        )
+        if missing_kernels:
+            print(f"\n[WARNING] Missing {len(missing_kernels)} kernels for prefill mode (registry incomplete):")
+            for miss in missing_kernels[:10]:  # Show first 10
+                print(f"  - {miss}")
+            if len(missing_kernels) > 10:
+                print(f"  ... and {len(missing_kernels) - 10} more")
+            print("[WARNING] Skipping kernel coverage check - registry needs more kernels")
+            # raise RuntimeError("Kernel coverage check failed for prefill")
+
+        print(f"[PREFILL] Kernel coverage check skipped (incomplete registry)")
+
+        print("\n[DECODE] Checking kernel coverage...")
+        missing_kernels = check_kernel_coverage(
+            graph, registry, quant_summary, mode="decode"
+        )
+        if missing_kernels:
+            print(f"\n[WARNING] Missing {len(missing_kernels)} kernels for decode mode (registry incomplete):")
+            for miss in missing_kernels[:10]:
+                print(f"  - {miss}")
+            if len(missing_kernels) > 10:
+                print(f"  ... and {len(missing_kernels) - 10} more")
+            print("[WARNING] Skipping kernel coverage check - registry needs more kernels")
+            # raise RuntimeError("Kernel coverage check failed for decode")
+
+        print(f"[DECODE] Kernel coverage check skipped (incomplete registry)")
+    elif registry and not quant_summary:
+        print("\n[WARNING] Registry loaded but no quant_summary - skipping coverage check")
 
     os.makedirs(output_dir, exist_ok=True)
     graph_path = os.path.join(output_dir, "graph.json")
