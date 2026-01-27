@@ -1281,8 +1281,8 @@
 </div>
 
 <script>
-const RESULTS_URL = './site/nightly-results/latest.json';
-const INDEX_URL = './site/nightly-results/index.json';
+const RESULTS_URL = './nightly-results/latest.json';
+const INDEX_URL = './nightly-results/index.json';
 
 function loadResults() {
   document.getElementById('loading-state').classList.add('active');
@@ -1442,13 +1442,25 @@ function renderHistory(reports) {
   bar.innerHTML = '';
   labelsContainer.innerHTML = '';
 
+  // Normalize reports array - handle both formats:
+  // Old format: ["report-2026-01-16.json", ...]
+  // New format: [{date: "2026-01-16", summary: {...}}, ...]
+  const normalizedReports = reports.map(r => {
+    if (typeof r === 'string') {
+      // Extract date from filename: report-YYYY-MM-DD.json
+      const match = r.match(/report-(\d{4}-\d{2}-\d{2})\.json/);
+      return match ? { date: match[1], file: r, summary: null } : null;
+    }
+    return r;
+  }).filter(r => r !== null);
+
   // Create 30 days of data
   const days = [];
   for (let i = 29; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
-    const report = reports.find(r => r.date === dateStr);
+    const report = normalizedReports.find(r => r.date === dateStr);
     days.push({
       date: date,
       dateStr: dateStr,
@@ -1464,19 +1476,28 @@ function renderHistory(reports) {
     div.className = 'history-day';
 
     if (day.report) {
-      const summary = day.report.summary || {};
-      const passed = summary.passed || 0;
-      const failed = summary.failed || 0;
-      const total = summary.total || 1;
+      const summary = day.report.summary;
+      // Check if we have actual summary data
+      if (summary && typeof summary.total === 'number' && summary.total > 0) {
+        const passed = summary.passed || 0;
+        const failed = summary.failed || 0;
+        const total = summary.total;
 
-      div.style.height = Math.max(10, (passed / total) * 100) + '%';
+        div.style.height = Math.max(10, (passed / total) * 100) + '%';
 
-      if (failed > 0) {
-        div.classList.add('has-fail');
-        div.title = `${day.dateStr}: ${failed} failed / ${total} total`;
+        if (failed > 0) {
+          div.classList.add('has-fail');
+          div.title = `${day.dateStr}: ${failed} failed / ${total} total`;
+        } else {
+          div.classList.add('all-pass');
+          div.title = `${day.dateStr}: ${passed} passed`;
+        }
       } else {
+        // Report exists but no embedded summary (old index format)
         div.classList.add('all-pass');
-        div.title = `${day.dateStr}: ${passed} passed`;
+        div.style.height = '50%';
+        div.style.opacity = '0.5';
+        div.title = `${day.dateStr}: Data available (click to view)`;
       }
     } else {
       div.classList.add('no-data');
@@ -1716,7 +1737,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-27</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-17</p>
             </div>
         </div>
     </footer>

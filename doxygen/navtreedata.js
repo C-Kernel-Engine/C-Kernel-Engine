@@ -25,7 +25,6 @@
 var NAVTREE =
 [
   [ "C-Kernel-Engine", "index.html", [
-    [ "Test List", "test.html", null ],
     [ "Data Structures", "annotated.html", [
       [ "Data Structures", "annotated.html", "annotated_dup" ],
       [ "Data Structure Index", "classes.html", null ],
@@ -52,23 +51,23 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ck__metrics_8h.html#a13bda17865c16027ce312cdbdf01c67f",
-"ckernel__codegen_8c.html#a019c1eb00e7aaa6c7c261029b383384c",
-"ckernel__engine_8h.html#a3ffa58aab7da5c6e77096ad19385329a",
-"ckernel__ir__v2_8h.html#ad34447264bfb018e6d5f856c5fcff1f3",
-"ckernel__orchestration_8c.html#a266b9c19eafb8e11f3e51253c8dd0b45",
-"functions_vars_d.html",
-"gemm__kernels__q6k__q8k_8c.html#add6d884387d931ac5e750a43eff7b5f8",
-"mega__fused__outproj__mlp__prefill_8c.html#a957557433ef72c3e677bd6b34be2d662",
-"src_2data__structures_2tries_2trie_8h.html#ab8035bc5fe0a2b35f00ee8acbba4cba3",
-"structCKLayerForwardParams.html#acc91fa02742733363b55e38ff2305e7f",
-"structCKMetricsContext.html#ac8c5ff0262220f241dfe28523e72cd42",
-"structMemoryInfo.html#af134427563f2d7794d5cb40fe77aac7f",
-"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b",
-"v6_85_2test__generated_2ck-kernel-inference_8c.html#a168af438bba2c00fa0050a11e2356b07",
-"v6_85_2test__generated_2qwen2__int8_8c.html#a49f4d83446c58f6b567e6667ee468f06",
-"v6_86_2test__generated_2ck-kernel-inference_8c.html#aa166790009f89187756bfa0110467dd3",
-"v6_86_2test__generated_2qwen2__int8_8c.html#ab898071398b359603a35c202e9c65f3b"
+"ck__features_8h.html#a17c9d197aff83b06de55a7c5ba3371ad",
+"ckernel__codegen_8c.html#a19907ff45ce4075112ea38814eacf709",
+"ckernel__engine_8h.html#a4f024774420774821f805d0742694d02",
+"ckernel__ir__v2__demo_8c.html",
+"ckernel__orchestration_8c.html#a45ad329928b675ddc00ad3d5059335b3",
+"fused__kernels_8h_source.html",
+"gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74",
+"parallel__orchestration_8c.html#a16e02661985307528fd35a40fa83135f",
+"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d",
+"structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e",
+"structCKTokenizer.html#af683cca99ab7ca70c6b680c4a276277b",
+"structTransformerModel.html#a955d1efe9f4e9e8bedca00a5a85a5d18",
+"true__bpe_8c.html#a782d1c06da75ca70c98690a59eeede43",
+"v6_85_2test__generated_2generic__api__test_8c.html#a9c9c6cab7aae0613e1e4936d730e69da",
+"v6_86_2generated_2ck-kernel-inference_8c.html#a103089856415dfa7dcf06968b94a55ee",
+"v6_86_2test__generated_2generic__api__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062",
+"v6__inference_8c.html#aa426a8be646bd381a914fef6ca0c9c4b"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
