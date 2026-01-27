@@ -25,6 +25,7 @@
 var NAVTREE =
 [
   [ "C-Kernel-Engine", "index.html", [
+    [ "Test List", "test.html", null ],
     [ "Data Structures", "annotated.html", [
       [ "Data Structures", "annotated.html", "annotated_dup" ],
       [ "Data Structure Index", "classes.html", null ],
@@ -51,23 +52,23 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ck__features_8h.html#a17c9d197aff83b06de55a7c5ba3371ad",
-"ckernel__codegen_8c.html#a19907ff45ce4075112ea38814eacf709",
-"ckernel__engine_8h.html#a4f024774420774821f805d0742694d02",
-"ckernel__ir__v2__demo_8c.html",
-"ckernel__orchestration_8c.html#a45ad329928b675ddc00ad3d5059335b3",
-"fused__kernels_8h_source.html",
-"gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74",
-"parallel__orchestration_8c.html#a16e02661985307528fd35a40fa83135f",
-"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d",
-"structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e",
-"structCKTokenizer.html#af683cca99ab7ca70c6b680c4a276277b",
-"structTransformerModel.html#a955d1efe9f4e9e8bedca00a5a85a5d18",
-"true__bpe_8c.html#a782d1c06da75ca70c98690a59eeede43",
-"v6_85_2test__generated_2generic__api__test_8c.html#a9c9c6cab7aae0613e1e4936d730e69da",
-"v6_86_2generated_2ck-kernel-inference_8c.html#a103089856415dfa7dcf06968b94a55ee",
-"v6_86_2test__generated_2generic__api__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062",
-"v6__inference_8c.html#aa426a8be646bd381a914fef6ca0c9c4b"
+"ck__metrics_8h.html#a13bda17865c16027ce312cdbdf01c67f",
+"ckernel__codegen_8c.html#a019c1eb00e7aaa6c7c261029b383384c",
+"ckernel__engine_8h.html#a3ffa58aab7da5c6e77096ad19385329a",
+"ckernel__ir__v2_8h.html#ac6a19aa94348b33702ba27f461574cb5ae176b4a1e2034abbe0a9d96a548a7cb2",
+"ckernel__orchestration_8c.html#a107109f43bf909569b9ab2dd75bffb18",
+"functions_vars_b.html",
+"gemm__kernels__q6k__q8k_8c.html#aa7f87aba64d19dce415df9230e8eb0b8",
+"mega__fused__outproj__mlp__prefill_8c.html#a6a5da63aac6821fd65ed403bb1546577",
+"src_2data__structures_2tries_2trie_8h.html#a77957858c36d4cf9efea8049948f7df3",
+"structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6",
+"structCKMetricsContext.html#a8bfcc20a51c505a5c520dc804a689977",
+"structMemoryInfo.html#ac20112f20e405d5fafdd560b3535f000",
+"system__topology_8h.html#ab03a6d20880e7f93998b361c0036ea44",
+"v6_85_2test__generated_2ck-kernel-inference_8c.html#a04b2f4fbbf4b58951807d9abc141ffd8",
+"v6_85_2test__generated_2qwen2__int8_8c.html#a40fd2085b4a6972bdd956e1080459611",
+"v6_86_2test__generated_2ck-kernel-inference_8c.html#a965f26b121416e026a65907dfaa31890",
+"v6_86_2test__generated_2qwen2__int8_8c.html#aacde96713e00bce85ab0bde7d42de330"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
