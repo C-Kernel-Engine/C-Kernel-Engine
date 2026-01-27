@@ -1,0 +1,38 @@
+{
+  "id": "memcpy",
+  "op": "residual_save",
+  "variant": "fp32_copy",
+  "quant": {
+    "weight": null,
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "src", "dtype": "fp32", "shape": ["N"], "desc": "Source buffer [N] (FP32)"}
+  ],
+  "outputs": [
+    {"name": "dst", "dtype": "fp32", "shape": ["N"], "desc": "Destination buffer [N] (FP32)"}
+  ],
+  "scratch": [],
+  "dims": ["N"],
+  "params": [
+    {"name": "_memcpy_bytes", "type": "size_t", "desc": "Number of bytes to copy"}
+  ],
+  "parallelization": {
+    "supported": [],
+    "preferred": {"prefill": null, "decode": null},
+    "strategies": []
+  },
+  "constraints": {
+    "notes": "Simple memory copy for residual saving."
+  },
+  "impl": {
+    "function": "memcpy",
+    "sources": [],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {},
+  "notes": "Memory copy for saving residual before RMSNorm for skip connections."
+}

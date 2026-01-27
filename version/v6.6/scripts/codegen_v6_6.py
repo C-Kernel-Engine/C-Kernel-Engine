@@ -262,11 +262,13 @@ def _guard_bump_offsets(layout: Dict, ir_list: List[Dict]) -> None:
     if unknown:
         print(f"Warning: Unresolved bump macros in IR: {sorted(unknown)[:5]}")
 
-def emit_op(op: Dict, seq_idx: int | None = None) -> str:
+def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False) -> str:
     """Emit a single function call from an IR operation.
 
     Just read the op and emit the call. No special cases.
     IR Lower 3 provides call-ready args with exact expressions.
+
+    If debug=True, emit printf statements to dump output buffer values.
     """
     function = op.get("function", op.get("kernel", "unknown"))
     idx = op.get("idx", 0)
@@ -291,10 +293,33 @@ def emit_op(op: Dict, seq_idx: int | None = None) -> str:
     if seq_idx is not None:
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
 
+    # Add debug output if enabled
+    if debug:
+        # Find output buffer (usually the arg with "output" or "C" in name, or casted to non-const float*)
+        output_expr = None
+        for arg in args:
+            name = arg.get("name", "").lower()
+            source = arg.get("source", "").lower()
+            expr = arg.get("expr", "")
+            # Output args are typically non-const float pointers
+            if "(float*)" in expr and "const" not in expr:
+                output_expr = expr
+                break
+            if "output" in name or "output" in source or name == "c":
+                output_expr = expr
+                break
+
+        if output_expr:
+            # Remove cast to get raw pointer
+            raw_expr = output_expr.replace("(float*)", "").replace("(void*)", "").strip()
+            lines.append(f'    {{ float *_dbg = (float*){raw_expr}; '
+                        f'printf("[Op {idx} {op_name} L{layer}] out[0..4]: %f %f %f %f %f\\n", '
+                        f'_dbg[0], _dbg[1], _dbg[2], _dbg[3], _dbg[4]); }}')
+
     return "\n".join(lines)
 
 
-def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str) -> str:
+def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False) -> str:
     """Emit the decode function with all ops unrolled."""
     lines = []
     lines.append("""
@@ -313,7 +338,7 @@ static void ck_decode(CKModel *model, int32_t token) {
     lines.append("")
 
     for seq_idx, op in enumerate(ops):
-        lines.append(emit_op(op, seq_idx))
+        lines.append(emit_op(op, seq_idx, debug=debug))
         lines.append("")
 
     lines.append("    model->pos++;")
@@ -555,8 +580,11 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) { return (uintptr_t)(g_model ? g
 # MAIN
 # =============================================================================
 
-def generate(ir_path: Path, layout_path: Path) -> str:
-    """Generate complete C code."""
+def generate(ir_path: Path, layout_path: Path, debug: bool = False) -> str:
+    """Generate complete C code.
+
+    If debug=True, emit printf statements to dump tensor values after each op.
+    """
     with open(ir_path) as f:
         ir = json.load(f)
     with open(layout_path) as f:
@@ -619,7 +647,7 @@ def generate(ir_path: Path, layout_path: Path) -> str:
 
     parts.append(emit_memory_layout(layout, config))
     parts.append(emit_model_and_api())  # Defines CKModel and forward declares ck_decode
-    parts.append(emit_decode_function(ops, token_offset, token_base))
+    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug))
 
     return "\n".join(parts)
 
@@ -634,6 +662,8 @@ def main():
     parser.add_argument("--prefill", help="Lowered prefill IR JSON (optional)")
     # Output
     parser.add_argument("-o", "--output", required=True, help="Output C file")
+    # Debug
+    parser.add_argument("--debug", action="store_true", help="Emit debug printf for tensor values")
     args = parser.parse_args()
 
     # Handle legacy API (--decode/--prefill)
@@ -660,7 +690,7 @@ def main():
         _guard_bump_offsets(layout_obj, ir_list)
 
         # Generate decode code
-        code = generate(decode_ir, layout_decode)
+        code = generate(decode_ir, layout_decode, debug=args.debug)
 
         # Generate prefill code if provided
         prefill_code = ""
@@ -701,7 +731,7 @@ def main():
         with open(args.layout) as f:
             layout_obj = json.load(f)
         _guard_bump_offsets(layout_obj, [ir_obj])
-        code = generate(Path(args.ir), Path(args.layout))
+        code = generate(Path(args.ir), Path(args.layout), debug=args.debug)
         with open(args.output, 'w') as f:
             f.write(code)
         print(f"Generated: {args.output}")

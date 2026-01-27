@@ -551,6 +551,107 @@
         .badge-orange { background: var(--orange); color: var(--dark); }
         .badge-green { background: var(--green); color: white; }
         .badge-red { background: #e74c3c; color: white; }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: var(--dark-card);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+        .legend-color { width: 14px; height: 14px; border-radius: 50%; }
+        .legend-line { width: 24px; height: 2px; }
+
+        /* Node details panel */
+        .node-details {
+            position: fixed;
+            right: 20px;
+            top: 120px;
+            width: 320px;
+            background: var(--dark-card);
+            border: 1px solid var(--orange);
+            border-radius: 8px;
+            padding: 1rem;
+            z-index: 100;
+            display: none;
+            box-shadow: var(--shadow-lg);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .node-details.visible { display: block; }
+        .node-details h4 { color: var(--orange); margin-bottom: 0.75rem; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; }
+        .node-details .detail-row { display: flex; justify-content: space-between; margin: 0.4rem 0; font-size: 0.85rem; }
+        .node-details .detail-label { color: var(--text-muted); }
+        .node-details .detail-value { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+        .node-details-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+        .node-details-close:hover { color: var(--orange); }
+
+        /* Performance panel */
+        .perf-panel {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--dark-card);
+            border-radius: 8px;
+            border: 1px solid var(--grey);
+        }
+        .perf-bar {
+            height: 24px;
+            background: var(--dark);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        .perf-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        /* Dataflow specific styles */
+        #dataflowTable tbody tr:hover {
+            background: var(--grey) !important;
+        }
+
+        #dataflowTable .flow-item {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        #dataflowTable .flow-item strong {
+            color: var(--white);
+        }
+
+        #residualTable tr:hover {
+            background: var(--grey);
+        }
+
+        .slot-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .slot-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -565,6 +666,7 @@
     </header>
 
     <div class="controls">
+        <label><input type="file" id="ir1File" accept=".json" onchange="loadIR1(event)">Load IR1 (Dataflow)</label>
         <label><input type="file" id="layoutFile" accept=".json" onchange="loadLayout(event)">Load Layout JSON</label>
         <label><input type="file" id="loweredFile" accept=".json" onchange="loadLowered(event)">Load Lowered IR</label>
         <label><input type="file" id="callFile" accept=".json" onchange="loadCallIR(event)">Load Call IR</label>
@@ -581,6 +683,7 @@
         <div class="tab" onclick="showTab('kernels')">Kernel Flow</div>
         <div class="tab" onclick="showTab('quantization')">Quantization Audit</div>
         <div class="tab" onclick="showTab('parity')">Parity Debug</div>
+        <div class="tab" onclick="showTab('dataflow')">Dataflow Graph</div>
         <div class="tab" onclick="showTab('stats')">Statistics</div>
     </div>
 
@@ -613,12 +716,26 @@
         </div>
 
         <div id="kernels" class="panel">
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+            <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
                 <button onclick="renderGraphView()" class="btn-primary" style="padding: 0.5rem 1rem; background: var(--orange); color: var(--dark); border: none; border-radius: 4px; cursor: pointer;">Force Directed Graph</button>
                 <button onclick="renderLinearView()" style="padding: 0.5rem 1rem; background: var(--grey); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">Linear View</button>
+                <button onclick="toggleZoom()" style="padding: 0.5rem 1rem; background: var(--grey); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">Zoom Fit</button>
+                <button onclick="exportGraph()" style="padding: 0.5rem 1rem; background: var(--grey); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">Export PNG</button>
                 <input type="text" class="search-box" placeholder="Filter nodes..." oninput="filterGraph(this.value)" id="graphSearch">
                 <span style="color: var(--text-muted); font-size: 0.8rem;" id="graphNodeCount"></span>
             </div>
+
+            <!-- Legend -->
+            <div class="legend" id="graphLegend" style="display: none;">
+                <div class="legend-item"><div class="legend-color" style="background: #e74c3c;"></div>Quantize</div>
+                <div class="legend-item"><div class="legend-color" style="background: #47b475;"></div>GEMV</div>
+                <div class="legend-item"><div class="legend-color" style="background: #f39c12;"></div>Attention</div>
+                <div class="legend-item"><div class="legend-color" style="background: #9b59b6;"></div>Norm</div>
+                <div class="legend-item"><div class="legend-color" style="background: #3498db;"></div>Embedding</div>
+                <div class="legend-item"><div class="legend-line" style="background: #666;"></div>Sequential</div>
+                <div class="legend-item"><div class="legend-line" style="background: var(--orange);"></div>Data Flow</div>
+            </div>
+
             <div id="graphContainer" style="width: 100%; height: 600px; border: 1px solid var(--grey); border-radius: 8px; background: var(--dark); overflow: hidden;"></div>
             <div id="kernelFlow"></div>
         </div>
@@ -694,6 +811,84 @@
             </div>
         </div>
 
+        <div id="dataflow" class="panel">
+            <h2 style="margin-bottom: 1rem;">IR1 Dataflow Graph</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Visualize the logical dataflow between operations. Each op shows its inputs (where data comes from)
+                and outputs (where data goes). Slots represent logical buffers (main_stream, residual, etc.).
+            </p>
+
+            <div class="stats-grid" id="dataflowStats">
+                <div class="stat-card"><div class="stat-value" id="dfTotalOps">-</div><div class="stat-label">Total Ops</div></div>
+                <div class="stat-card"><div class="stat-value" id="dfActiveSlots">-</div><div class="stat-label">Active Slots</div></div>
+                <div class="stat-card"><div class="stat-value" id="dfFormat">-</div><div class="stat-label">IR Format</div></div>
+                <div class="stat-card"><div class="stat-value" id="dfVersion">-</div><div class="stat-label">Version</div></div>
+            </div>
+
+            <!-- Slot Status -->
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">Slots</span> Logical Buffer State</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Track which op last wrote to each logical slot. Memory planner uses this to assign physical buffers.
+                </p>
+                <div id="slotStatus" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+            </div>
+
+            <!-- Layer Selector -->
+            <div style="margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <label style="color: var(--text-secondary);">Show Layer:</label>
+                <select id="dfLayerSelect" onchange="renderDataflowLayer(this.value)" style="padding: 0.5rem; background: var(--dark-card); color: var(--text-primary); border: 1px solid var(--grey); border-radius: 4px;">
+                    <option value="-1">Header</option>
+                </select>
+                <button onclick="renderDataflowGraph()" style="padding: 0.5rem 1rem; background: var(--orange); color: var(--dark); border: none; border-radius: 4px; cursor: pointer;">Show Graph View</button>
+                <input type="text" class="search-box" placeholder="Filter ops..." oninput="filterDataflow(this.value)" id="dfSearch">
+            </div>
+
+            <!-- Dataflow Table -->
+            <div class="parity-section">
+                <h3><span class="badge badge-green">Ops</span> Operation Dataflow</h3>
+                <div style="overflow-x: auto;">
+                    <table id="dataflowTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">ID</th>
+                                <th style="width: 150px;">Operation</th>
+                                <th style="width: 200px;">Kernel</th>
+                                <th>Inputs (from)</th>
+                                <th>Outputs (to)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Dataflow Graph Container -->
+            <div class="parity-section" id="dfGraphSection" style="display: none;">
+                <h3><span class="badge badge-orange">Graph</span> Visual Dataflow</h3>
+                <div id="dataflowGraphContainer" style="width: 100%; height: 500px; border: 1px solid var(--grey); border-radius: 8px; background: var(--dark); overflow: hidden;"></div>
+            </div>
+
+            <!-- Residual Tracking -->
+            <div class="parity-section">
+                <h3><span class="badge badge-red">Residual</span> Skip Connection Tracking</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Track where residuals are saved and used. This is critical for correct buffer assignment.
+                </p>
+                <table id="residualTable">
+                    <thead>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Instance</th>
+                            <th>Residual Source (Op)</th>
+                            <th>Used By (residual_add)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         <div id="stats" class="panel">
             <h2>IR Statistics</h2>
             <div class="stats-grid" id="statsGrid"></div>
@@ -706,6 +901,30 @@
     </main>
 
     <div class="tooltip" id="tooltip"></div>
+
+    <!-- Node Details Panel -->
+    <div class="node-details" id="nodeDetails">
+        <span class="node-details-close" onclick="closeNodeDetails()">×</span>
+        <h4>Operation Details</h4>
+        <div id="nodeDetailsContent"></div>
+    </div>
+
+    <!-- Performance Metrics Panel -->
+    <div id="perfPanel" class="perf-panel" style="display: none;">
+        <h4 style="color: var(--orange); margin-bottom: 0.75rem;">Performance Estimate</h4>
+        <div class="detail-row"><span class="detail-label">Total FLOPs:</span><span class="detail-value" id="perfFlops">-</span></div>
+        <div class="detail-row"><span class="detail-label">Memory Read:</span><span class="detail-value" id="perfMemRead">-</span></div>
+        <div class="detail-row"><span class="detail-label">Memory Write:</span><span class="detail-value" id="perfMemWrite">-</span></div>
+        <div class="perf-bar">
+            <div class="perf-fill" id="perfAttention" style="width: 0%; background: var(--orange);">Attention</div>
+        </div>
+        <div class="perf-bar">
+            <div class="perf-fill" id="perfMLP" style="width: 0%; background: var(--blue);">MLP</div>
+        </div>
+        <div class="perf-bar">
+            <div class="perf-fill" id="perfOther" style="width: 0%; background: var(--green);">Other</div>
+        </div>
+    </div>
 
     <script>
         let layoutData = null;
@@ -722,12 +941,16 @@
         function showTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.querySelector(`.tab:nth-child(${['memory','kernels','quantization','parity','stats'].indexOf(tabId)+1})`).classList.add('active');
+            const tabOrder = ['memory','kernels','quantization','parity','dataflow','stats'];
+            document.querySelector(`.tab:nth-child(${tabOrder.indexOf(tabId)+1})`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
 
-            // Render quantization when tab is shown
+            // Render specific tabs when shown
             if (tabId === 'quantization') {
                 renderQuantizationAudit();
+            }
+            if (tabId === 'dataflow') {
+                renderDataflow();
             }
         }
 
@@ -788,6 +1011,7 @@
             renderKernelFlow();
             renderStats();
             renderQuantizationAudit();
+            renderDataflow();
         }
 
         function renderQuantizationAudit() {
@@ -1194,8 +1418,10 @@
         // D3.js Graph Visualization
         let graphSvg = null;
         let graphSimulation = null;
+        let graphZoom = null;
         let graphData = { nodes: [], links: [] };
         let currentGraphMode = 'linear';
+        let graphG = null;  // Main group for zoom
 
         function getKernelColor(kernelType) {
             const colors = {
@@ -1217,6 +1443,8 @@
             container.innerHTML = '';
             renderKernelFlow();
             document.getElementById('kernelFlow').style.display = 'block';
+            document.getElementById('graphLegend').style.display = 'none';
+            document.getElementById('perfPanel').style.display = 'none';
         }
 
         function renderGraphView() {
@@ -1228,9 +1456,10 @@
             }
 
             const ops = data.operations || data.ops || [];
+            const config = data.config || {};
             document.getElementById('kernelFlow').style.display = 'none';
 
-            // Build graph data
+            // Build graph data with enhanced info
             const nodes = [];
             const links = [];
             const nodeMap = new Map();
@@ -1243,28 +1472,55 @@
                     function: op.function || op.kernel_id || '',
                     kernelType: kernelType,
                     layer: op.layer !== undefined ? op.layer : -1,
+                    section: op.section || 'body',
                     color: getKernelColor(kernelType),
-                    visible: true
+                    visible: true,
+                    // Store full op data for details panel
+                    fullOp: op,
+                    params: op.params || {},
+                    args: op.args || [],
+                    outputs: op.outputs || []
                 };
                 nodes.push(node);
                 nodeMap.set(idx, node);
             });
 
-            // Create links based on sequential flow and data dependencies
+            // Create links - both sequential and data flow
             for (let i = 0; i < ops.length - 1; i++) {
-                // Sequential link
+                // Sequential link (always present)
                 links.push({
                     source: i,
                     target: i + 1,
                     type: 'sequential'
                 });
+
+                // Check for data flow links based on op types
+                const srcOp = ops[i];
+                const tgtOp = ops[i + 1];
+
+                // Detect attention data flow
+                if ((srcOp.op || '').includes('q_proj') && (tgtOp.op || '').includes('attention')) {
+                    links.push({ source: i, target: i + 1, type: 'data' });
+                }
+                if ((srcOp.op || '').includes('attention') && (tgtOp.op || '').includes('out_proj')) {
+                    links.push({ source: i, target: i + 1, type: 'data' });
+                }
+                // MLP data flow
+                if ((srcOp.op || '').includes('gate_up') && (tgtOp.op || '').includes('down')) {
+                    links.push({ source: i, target: i + 1, type: 'data' });
+                }
+                // Norm to proj
+                if ((srcOp.op || '').includes('norm') && (tgtOp.op || '').includes('proj')) {
+                    links.push({ source: i, target: i + 1, type: 'data' });
+                }
             }
 
             graphData = { nodes, links };
-            drawForceDirectedGraph(nodes, links);
+            drawForceDirectedGraph(nodes, links, config);
+            showPerformanceMetrics(nodes, config);
         }
 
-        function drawForceDirectedGraph(nodes, links) {
+        function drawForceDirectedGraph(nodes, links, config) {
             const container = document.getElementById('graphContainer');
             container.innerHTML = '';
 
@@ -1290,7 +1546,7 @@
                 layers[layerKey].nodes.push(d);
             });
 
-            // Create SVG with proper viewBox
+            // Create SVG with zoom support
             const svg = d3.select(container)
                 .append('svg')
                 .attr('width', '100%')
@@ -1299,67 +1555,77 @@
                 .attr('preserveAspectRatio', 'xMidYMid meet')
                 .style('background', 'var(--dark)');
 
-            const g = svg.append('g')
-                .attr('transform', `translate(${padding}, ${padding})`);
+            // Add zoom behavior
+            graphZoom = d3.zoom()
+                .scaleExtent([0.1, 4])
+                .on('zoom', (event) => {
+                    if (graphG) {
+                        graphG.attr('transform', event.transform);
+                    }
+                });
 
-            // Define arrow marker
-            svg.select('defs').remove();
+            svg.call(graphZoom);
+
             const defs = svg.append('defs');
-            defs.append('marker')
-                .attr('id', 'arrowhead')
-                .attr('viewBox', '-0 -5 10 10')
-                .attr('refX', 15)
-                .attr('refY', 0)
-                .attr('orient', 'auto')
-                .attr('markerWidth', 5)
-                .attr('markerHeight', 5)
-                .append('path')
-                .attr('d', 'M 0,-5 L 10,0 L 0,5')
-                .attr('fill', '#666');
+
+            // Arrow markers for different link types
+            ['sequential', 'data'].forEach(type => {
+                defs.append('marker')
+                    .attr('id', `arrowhead-${type}`)
+                    .attr('viewBox', '-0 -5 10 10')
+                    .attr('refX', 18)
+                    .attr('refY', 0)
+                    .attr('orient', 'auto')
+                    .attr('markerWidth', 6)
+                    .attr('markerHeight', 6)
+                    .append('path')
+                    .attr('d', 'M 0,-5 L 10,0 L 0,5')
+                    .attr('fill', type === 'data' ? 'var(--orange)' : '#666');
+            });
+
+            graphG = svg.append('g')
+                .attr('transform', `translate(${padding}, ${padding})`);
 
             const graphWidth = width - padding * 2;
             const graphHeight = height - padding * 2;
 
-            // Calculate positions: layers arranged horizontally, nodes within layers stacked vertically
-            const layerWidth = graphWidth / layerOrder.length;
+            // Calculate positions: layers arranged horizontally, nodes stacked vertically
+            const layerWidth = Math.max(graphWidth / layerOrder.length, 80);
 
             layerOrder.forEach((layer, layerIdx) => {
                 const nodeHeight = graphHeight / (layer.nodes.length + 1);
                 layer.nodes.forEach((node, nodeIdx) => {
-                    // Position: layer determines X, index within layer determines Y
                     node.x = padding + layerIdx * layerWidth + layerWidth / 2;
                     node.y = padding + (nodeIdx + 1) * nodeHeight;
-                    // Store layer for link styling
                     node.layerIdx = layerIdx;
                 });
             });
 
-            // Draw layer labels on top
-            const layerLabels = svg.append('g').selectAll('text')
+            // Draw layer labels
+            const layerLabels = graphG.append('g').selectAll('text')
                 .data(layerOrder)
                 .enter().append('text')
                 .text(d => d.id === 'special' ? 'Special' : `Layer ${d.id.split('_')[1]}`)
                 .attr('x', (d, i) => padding + i * layerWidth + layerWidth / 2)
-                .attr('y', padding - 10)
+                .attr('y', padding - 15)
                 .attr('text-anchor', 'middle')
                 .attr('fill', 'var(--orange)')
-                .attr('font-size', '12px')
-                .attr('font-weight', 'bold');
+                .attr('font-size', '11px')
+                .attr('font-weight', 'bold')
+                .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)');
 
-            // Draw links (only show nearest neighbor links to reduce visual clutter)
-            const visibleLinks = links.filter((l, i) => i % 5 === 0 || Math.abs((l.source.id || l.source) - (l.target.id || l.target)) === 1);
-
-            const link = g.append('g')
+            // Draw links
+            const link = graphG.append('g')
                 .selectAll('line')
-                .data(visibleLinks)
+                .data(links)
                 .enter().append('line')
-                .attr('stroke', '#444')
-                .attr('stroke-width', 1)
-                .attr('opacity', 0.6)
-                .attr('marker-end', 'url(#arrowhead)');
+                .attr('stroke', d => d.type === 'data' ? 'var(--orange)' : '#444')
+                .attr('stroke-width', d => d.type === 'data' ? 2 : 1)
+                .attr('stroke-opacity', d => d.type === 'data' ? 0.9 : 0.5)
+                .attr('marker-end', d => `url(#arrowhead-${d.type})`);
 
             // Draw nodes
-            const node = g.append('g')
+            const node = graphG.append('g')
                 .selectAll('g')
                 .data(nodes)
                 .enter().append('g')
@@ -1368,49 +1634,69 @@
                 .call(d3.drag()
                     .on('start', dragstarted)
                     .on('drag', dragged)
-                    .on('end', dragended));
+                    .on('end', dragended))
+                .on('click', nodeClicked);
 
             // Node circles
             node.append('circle')
-                .attr('r', d => d.kernelType === 'attention' ? 14 : 10)
+                .attr('r', d => {
+                    const baseSize = d.kernelType === 'attention' ? 16 : 12;
+                    return d.layer === -1 ? baseSize * 1.3 : baseSize;
+                })
                 .attr('fill', d => d.color)
                 .attr('stroke', '#fff')
                 .attr('stroke-width', 2)
-                .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))')
+                .style('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))')
                 .on('mouseover', showNodeTooltip)
                 .on('mouseout', hideNodeTooltip);
 
-            // Node labels - show on hover instead
+            // Node labels (always visible)
             node.append('text')
-                .text(d => (d.op || '').substring(0, 10))
+                .text(d => {
+                    const name = d.op || '';
+                    // Abbreviate common names
+                    return name.replace('ckernel_', '')
+                               .replace('layer_', 'L')
+                               .substring(0, 12);
+                })
                 .attr('x', 0)
-                .attr('y', -18)
+                .attr('y', -22)
                 .attr('text-anchor', 'middle')
                 .attr('fill', '#fff')
-                .attr('font-size', '9px')
+                .attr('font-size', '10px')
                 .attr('font-family', "'JetBrains Mono', monospace")
                 .style('pointer-events', 'none')
-                .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)')
-                .style('opacity', 0.7);
+                .style('text-shadow', '0 1px 4px rgba(0,0,0,0.9)');
+
+            // Layer background bands
+            layerOrder.forEach((layer, i) => {
+                const band = graphG.insert('rect', ':first-child')
+                    .attr('class', 'layer-band')
+                    .attr('x', padding + i * layerWidth)
+                    .attr('y', padding - 30)
+                    .attr('width', layerWidth)
+                    .attr('height', graphHeight + 40)
+                    .attr('fill', i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)')
+                    .attr('rx', 4);
+            });
 
             // Initial positions
             node.attr('transform', d => `translate(${d.x},${d.y})`);
 
-            // Update link positions immediately
+            // Update link positions
             link
                 .attr('x1', d => d.source.x)
                 .attr('y1', d => d.source.y)
                 .attr('x2', d => d.target.x)
                 .attr('y2', d => d.target.y);
 
-            // Add gentle force simulation for interactivity (not layout)
+            // Force simulation for subtle adjustments
             graphSimulation = d3.forceSimulation(nodes)
-                .force('charge', d3.forceManyBody().strength(-50))
-                .force('collision', d3.forceCollide().radius(20))
-                .alphaDecay(0.1)
-                .velocityDecay(0.8)
+                .force('charge', d3.forceManyBody().strength(-30))
+                .force('collision', d3.forceCollide().radius(25))
+                .alphaDecay(0.05)
+                .velocityDecay(0.6)
                 .on('tick', () => {
-                    // Constrain to bounds
                     nodes.forEach(d => {
                         d.x = Math.max(padding + 10, Math.min(width - padding - 10, d.x));
                         d.y = Math.max(padding + 20, Math.min(height - padding - 20, d.y));
@@ -1425,8 +1711,12 @@
                     node.attr('transform', d => `translate(${d.x},${d.y})`);
                 });
 
+            // Show legend
+            document.getElementById('graphLegend').style.display = 'flex';
+
             // Update node count
-            document.getElementById('graphNodeCount').textContent = `${nodes.length} nodes, ${links.length} edges | ${layerOrder.length} layers`;
+            document.getElementById('graphNodeCount').textContent =
+                `${nodes.length} nodes, ${links.length} edges | ${layerOrder.length} layers`;
 
             graphSvg = svg;
 
@@ -1448,6 +1738,233 @@
             }
         }
 
+        // Toggle zoom to fit
+        function toggleZoom() {
+            if (graphSvg && graphZoom) {
+                graphSvg.transition().duration(500)
+                    .call(graphZoom.transform, d3.zoomIdentity);
+            }
+        }
+
+        // Export graph as PNG
+        function exportGraph() {
+            if (!graphSvg) {
+                alert('No graph to export. Render a graph first.');
+                return;
+            }
+
+            const container = document.getElementById('graphContainer');
+            const width = container.clientWidth || 1200;
+            const height = container.clientHeight || 600;
+
+            // Clone SVG for export
+            const svgClone = graphSvg.node().cloneNode(true);
+
+            // Add white background
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('width', '100%');
+            bg.setAttribute('height', '100%');
+            bg.setAttribute('fill', '#232323');
+            svgClone.insertBefore(bg, svgClone.firstChild);
+
+            const svgData = new XMLSerializer().serializeToString(svgClone);
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width * 2;  // 2x for retina
+            canvas.height = height * 2;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(2, 2);
+
+            const img = new Image();
+            img.onload = () => {
+                ctx.fillStyle = '#232323';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0);
+
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = `ck-graph-${Date.now()}.png`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            };
+            img.src = URL.createObjectURL(svgBlob);
+        }
+
+        // Node click handler - show details
+        function nodeClicked(event, d) {
+            const panel = document.getElementById('nodeDetails');
+            const content = document.getElementById('nodeDetailsContent');
+
+            // Highlight selected node
+            graphSvg.selectAll('circle')
+                .attr('stroke', node => node.id === d.id ? 'var(--orange)' : '#fff')
+                .attr('stroke-width', node => node.id === d.id ? 4 : 2);
+
+            // Build details content
+            let detailsHtml = `
+                <div class="detail-row">
+                    <span class="detail-label">Operation:</span>
+                    <span class="detail-value">${d.op}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Function:</span>
+                    <span class="detail-value">${d.function}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Layer:</span>
+                    <span class="detail-value">${d.layer >= 0 ? d.layer : 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value">${d.kernelType}</span>
+                </div>
+            `;
+
+            // Add dimensions if available
+            if (d.params) {
+                if (d.params._input_dim) {
+                    detailsHtml += `<div class="detail-row">
+                        <span class="detail-label">Input Dim:</span>
+                        <span class="detail-value">${d.params._input_dim}</span>
+                    </div>`;
+                }
+                if (d.params._output_dim) {
+                    detailsHtml += `<div class="detail-row">
+                        <span class="detail-label">Output Dim:</span>
+                        <span class="detail-value">${d.params._output_dim}</span>
+                    </div>`;
+                }
+                if (d.params.embed_dim) {
+                    detailsHtml += `<div class="detail-row">
+                        <span class="detail-label">Embed Dim:</span>
+                        <span class="detail-value">${d.params.embed_dim}</span>
+                    </div>`;
+                }
+            }
+
+            // Add input/output info
+            if (d.args && d.args.length > 0) {
+                detailsHtml += `<div style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">Inputs:</div>`;
+                d.args.forEach(arg => {
+                    detailsHtml += `<div class="detail-row" style="margin-left: 0.5rem;">
+                        <span class="detail-label">${arg.name}:</span>
+                        <span class="detail-value" style="font-size: 0.75rem;">${arg.source || ''}</span>
+                    </div>`;
+                });
+            }
+
+            if (d.outputs && d.outputs.length > 0) {
+                detailsHtml += `<div style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Outputs:</div>`;
+                d.outputs.forEach(out => {
+                    detailsHtml += `<div class="detail-row" style="margin-left: 0.5rem;">
+                        <span class="detail-label">${out.name}:</span>
+                        <span class="detail-value" style="font-size: 0.75rem;">${out.dtype || ''}</span>
+                    </div>`;
+                });
+            }
+
+            // Add performance estimate
+            const flops = estimateFlops(d);
+            if (flops > 0) {
+                detailsHtml += `
+                    <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--grey);">
+                        <div class="detail-row">
+                            <span class="detail-label">Est. FLOPs:</span>
+                            <span class="detail-value">${formatNumber(flops)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = detailsHtml;
+            panel.classList.add('visible');
+        }
+
+        function closeNodeDetails() {
+            document.getElementById('nodeDetails').classList.remove('visible');
+            // Reset node highlights
+            if (graphSvg) {
+                graphSvg.selectAll('circle')
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 2);
+            }
+        }
+
+        function estimateFlops(node) {
+            // Rough FLOP estimation based on op type and dimensions
+            const params = node.params || {};
+            const embedDim = params.embed_dim || 896;
+            const inputDim = params._input_dim || embedDim;
+            const outputDim = params._output_dim || embedDim;
+
+            switch (node.kernelType) {
+                case 'attention':
+                    // Q @ K^T + S @ V: ~4 * n^2 * d
+                    return 4 * inputDim * inputDim * 64;
+                case 'gemv':
+                case 'gemm':
+                    return 2 * inputDim * outputDim;
+                case 'rmsnorm':
+                    return 2 * inputDim;
+                case 'quantize':
+                    return inputDim;
+                default:
+                    return inputDim * outputDim;
+            }
+        }
+
+        function formatNumber(n) {
+            if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+            return n.toString();
+        }
+
+        function showPerformanceMetrics(nodes, config) {
+            const panel = document.getElementById('perfPanel');
+            panel.style.display = 'block';
+
+            const numLayers = config.num_layers || 24;
+            const embedDim = config.embed_dim || 896;
+            const headDim = config.head_dim || 64;
+
+            // Calculate total FLOPs
+            let totalFlops = 0;
+            let attentionFlops = 0;
+            let mlpFlops = 0;
+            let otherFlops = 0;
+
+            nodes.forEach(node => {
+                const flops = estimateFlops(node) * numLayers;
+                totalFlops += flops;
+
+                if (node.kernelType === 'attention') attentionFlops += flops;
+                else if (node.kernelType === 'gemv') mlpFlops += flops;
+                else otherFlops += flops;
+            });
+
+            document.getElementById('perfFlops').textContent = formatNumber(totalFlops);
+
+            // Memory estimates (rough)
+            const weightsMem = numLayers * 6 * embedDim * embedDim * 4;  // 6 weight matrices
+            const activationsMem = numLayers * embedDim * 4;
+            document.getElementById('perfMemRead').textContent = formatNumber(weightsMem + activationsMem) + 'B';
+            document.getElementById('perfMemWrite').textContent = formatNumber(activationsMem) + 'B';
+
+            // Update bars
+            const updateBar = (id, value) => {
+                const pct = Math.min(100, (value / totalFlops) * 100);
+                document.getElementById(id).style.width = pct + '%';
+            };
+
+            updateBar('perfAttention', attentionFlops);
+            updateBar('perfMLP', mlpFlops);
+            updateBar('perfOther', otherFlops);
+        }
+
         function showNodeTooltip(event, d) {
             const tooltip = document.getElementById('tooltip');
             tooltip.innerHTML = `
@@ -1459,6 +1976,10 @@
             tooltip.style.left = event.pageX + 15 + 'px';
             tooltip.style.top = event.pageY + 15 + 'px';
             tooltip.style.display = 'block';
+        }
+
+        function hideNodeTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
         }
 
         function filterGraph(query) {
@@ -1480,11 +2001,503 @@
                     .attr('stroke', d => d.visible ? '#fff' : '#555');
                 graphSvg.selectAll('g text')
                     .attr('opacity', d => d.visible ? 1 : 0.1);
+                graphSvg.selectAll('line')
+                    .attr('opacity', d => (d.source.visible && d.target.visible) ? 1 : 0.1);
             }
 
             // Update count
             const visibleCount = graphData.nodes.filter(n => n.visible).length;
             document.getElementById('graphNodeCount').textContent = `${visibleCount}/${graphData.nodes.length} nodes`;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // IR1 DATAFLOW VISUALIZATION
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        let ir1Data = null;
+        let currentDfLayer = -1;
+
+        function loadIR1(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                ir1Data = JSON.parse(e.target.result);
+                renderDataflow();
+                showTab('dataflow');
+            };
+            reader.readAsText(file);
+        }
+
+        function renderDataflow() {
+            if (!ir1Data) return;
+
+            const ops = ir1Data.ops || [];
+            const format = ir1Data.format || 'unknown';
+            const version = ir1Data.version || '-';
+
+            // Update stats
+            document.getElementById('dfTotalOps').textContent = ops.length;
+            document.getElementById('dfFormat').textContent = format.replace('ir1-', '');
+            document.getElementById('dfVersion').textContent = 'v' + version;
+
+            // Find all active slots
+            const slots = new Set();
+            ops.forEach(op => {
+                if (op.dataflow) {
+                    Object.values(op.dataflow.inputs || {}).forEach(input => {
+                        if (input.from_op !== undefined) {
+                            // Find what slot it came from
+                        }
+                    });
+                    Object.keys(op.dataflow.outputs || {}).forEach(out => {
+                        slots.add(out);
+                    });
+                }
+            });
+            document.getElementById('dfActiveSlots').textContent = slots.size || '-';
+
+            // Populate layer selector
+            const layerSelect = document.getElementById('dfLayerSelect');
+            const layers = new Set(ops.map(op => op.layer).filter(l => l >= 0));
+            layerSelect.innerHTML = '<option value="-1">Header</option>';
+            [...layers].sort((a, b) => a - b).forEach(layer => {
+                layerSelect.innerHTML += `<option value="${layer}">Layer ${layer}</option>`;
+            });
+            layerSelect.innerHTML += '<option value="footer">Footer</option>';
+
+            // Render slot status
+            renderSlotStatus(ops);
+
+            // Render dataflow table for header
+            renderDataflowLayer(-1);
+
+            // Render residual tracking
+            renderResidualTracking(ops);
+        }
+
+        function renderSlotStatus(ops) {
+            const slotDiv = document.getElementById('slotStatus');
+            slotDiv.innerHTML = '';
+
+            // Track last writer for each slot
+            const slotWriters = {};
+            ops.forEach(op => {
+                if (op.dataflow && op.dataflow.outputs) {
+                    Object.entries(op.dataflow.outputs).forEach(([outName, outInfo]) => {
+                        // Infer slot from output name or dtype
+                        const slot = outName;
+                        slotWriters[slot] = {
+                            op_id: op.op_id,
+                            op_name: op.op,
+                            dtype: outInfo.dtype || 'fp32'
+                        };
+                    });
+                }
+            });
+
+            // Slot colors
+            const slotColors = {
+                'out': '#47b475',
+                'output': '#47b475',
+                'y': '#47b475',
+                'x': '#3498db',
+                'q': '#e74c3c',
+                'k': '#9b59b6',
+                'dst': '#f39c12'
+            };
+
+            Object.entries(slotWriters).forEach(([slot, info]) => {
+                const color = slotColors[slot] || '#666';
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    padding: 0.5rem 1rem;
+                    background: ${color}22;
+                    border: 1px solid ${color};
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                `;
+                card.innerHTML = `
+                    <div style="color: ${color}; font-weight: 600;">${slot}</div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem;">
+                        ← Op ${info.op_id} (${info.op_name})
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.7rem;">
+                        dtype: ${info.dtype}
+                    </div>
+                `;
+                slotDiv.appendChild(card);
+            });
+        }
+
+        function renderDataflowLayer(layer) {
+            if (!ir1Data) return;
+
+            currentDfLayer = layer;
+            const ops = ir1Data.ops || [];
+
+            // Filter ops by layer
+            let filteredOps;
+            if (layer === 'footer') {
+                filteredOps = ops.filter(op => op.section === 'footer');
+            } else {
+                const layerNum = parseInt(layer);
+                filteredOps = ops.filter(op => {
+                    if (layerNum === -1) return op.section === 'header' || (op.layer === -1 && op.section !== 'footer');
+                    return op.layer === layerNum;
+                });
+            }
+
+            const tbody = document.querySelector('#dataflowTable tbody');
+            tbody.innerHTML = '';
+
+            filteredOps.forEach(op => {
+                const row = document.createElement('tr');
+                row.style.cursor = 'pointer';
+                row.onclick = () => highlightDataflowOp(op.op_id);
+
+                // Build inputs display
+                let inputsHtml = '';
+                if (op.dataflow && op.dataflow.inputs) {
+                    Object.entries(op.dataflow.inputs).forEach(([name, info]) => {
+                        if (info.from_op !== undefined) {
+                            inputsHtml += `
+                                <div class="flow-item flow-input" style="margin: 2px 0; cursor: pointer;"
+                                     onclick="event.stopPropagation(); scrollToOp(${info.from_op})">
+                                    <strong>${name}</strong>: Op ${info.from_op}.${info.from_output || '?'}
+                                    <span class="dtype dtype-${info.dtype || 'unknown'}">${info.dtype || '?'}</span>
+                                </div>
+                            `;
+                        } else if (info.from) {
+                            inputsHtml += `
+                                <div class="flow-item" style="margin: 2px 0; background: rgba(100,100,100,0.3);">
+                                    <strong>${name}</strong>: ${info.from}
+                                </div>
+                            `;
+                        }
+                    });
+                }
+                if (!inputsHtml) inputsHtml = '<span style="color: var(--text-muted);">-</span>';
+
+                // Build outputs display
+                let outputsHtml = '';
+                if (op.dataflow && op.dataflow.outputs) {
+                    Object.entries(op.dataflow.outputs).forEach(([name, info]) => {
+                        outputsHtml += `
+                            <div class="flow-item flow-output" style="margin: 2px 0;">
+                                <strong>${name}</strong>
+                                <span class="dtype dtype-${info.dtype || 'unknown'}">${info.dtype || '?'}</span>
+                            </div>
+                        `;
+                    });
+                }
+                if (!outputsHtml) outputsHtml = '<span style="color: var(--text-muted);">-</span>';
+
+                // Get kernel type for border color
+                const kernelType = getKernelType(op.kernel || '');
+                const borderColor = getKernelColor(kernelType);
+
+                row.innerHTML = `
+                    <td style="font-family: monospace; color: var(--blue);">${op.op_id}</td>
+                    <td style="border-left: 3px solid ${borderColor}; padding-left: 0.75rem;">
+                        <div style="font-weight: 600; color: var(--white);">${op.op || '-'}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">L${op.layer} inst:${op.instance || 0}</div>
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--blue);">${op.kernel || '-'}</td>
+                    <td>${inputsHtml}</td>
+                    <td>${outputsHtml}</td>
+                `;
+                row.id = `df-op-${op.op_id}`;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function scrollToOp(opId) {
+            const row = document.getElementById(`df-op-${opId}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.background = 'var(--orange)';
+                row.style.color = 'var(--dark)';
+                setTimeout(() => {
+                    row.style.background = '';
+                    row.style.color = '';
+                }, 2000);
+            } else {
+                // Op is in a different layer, find it
+                if (!ir1Data) return;
+                const op = ir1Data.ops.find(o => o.op_id === opId);
+                if (op) {
+                    const layerSelect = document.getElementById('dfLayerSelect');
+                    layerSelect.value = op.layer;
+                    renderDataflowLayer(op.layer);
+                    setTimeout(() => scrollToOp(opId), 100);
+                }
+            }
+        }
+
+        function highlightDataflowOp(opId) {
+            // Remove previous highlights
+            document.querySelectorAll('#dataflowTable tbody tr').forEach(row => {
+                row.style.background = '';
+            });
+
+            // Highlight current
+            const row = document.getElementById(`df-op-${opId}`);
+            if (row) {
+                row.style.background = 'var(--grey)';
+            }
+        }
+
+        function filterDataflow(query) {
+            const rows = document.querySelectorAll('#dataflowTable tbody tr');
+            const lowerQuery = query.toLowerCase();
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(lowerQuery) ? '' : 'none';
+            });
+        }
+
+        function renderResidualTracking(ops) {
+            const tbody = document.querySelector('#residualTable tbody');
+            tbody.innerHTML = '';
+
+            // Find all residual_add ops and their sources
+            const residualAdds = ops.filter(op => op.op === 'residual_add');
+            const rmsnorms = ops.filter(op => op.op === 'rmsnorm');
+
+            residualAdds.forEach(add => {
+                const row = document.createElement('tr');
+
+                // Find the residual source (input 'b')
+                let residualSource = '-';
+                let residualFromOp = null;
+                if (add.dataflow && add.dataflow.inputs && add.dataflow.inputs.b) {
+                    const bInput = add.dataflow.inputs.b;
+                    if (bInput.from_op !== undefined) {
+                        residualFromOp = bInput.from_op;
+                        const sourceOp = ops.find(o => o.op_id === bInput.from_op);
+                        residualSource = sourceOp ? `Op ${bInput.from_op} (${sourceOp.op})` : `Op ${bInput.from_op}`;
+                    } else if (bInput.from) {
+                        residualSource = bInput.from;
+                    }
+                }
+
+                // Find the current stream source (input 'a')
+                let currentSource = '-';
+                if (add.dataflow && add.dataflow.inputs && add.dataflow.inputs.a) {
+                    const aInput = add.dataflow.inputs.a;
+                    if (aInput.from_op !== undefined) {
+                        const sourceOp = ops.find(o => o.op_id === aInput.from_op);
+                        currentSource = sourceOp ? `Op ${aInput.from_op} (${sourceOp.op})` : `Op ${aInput.from_op}`;
+                    }
+                }
+
+                const isCorrect = residualFromOp !== null;
+
+                row.innerHTML = `
+                    <td style="font-weight: bold;">Layer ${add.layer}</td>
+                    <td>${add.instance || 0}</td>
+                    <td style="cursor: pointer; color: var(--blue);" onclick="scrollToOp(${residualFromOp || -1})">
+                        ${residualSource}
+                        ${!isCorrect ? '<span style="color: #e74c3c;"> (uninitialized!)</span>' : ''}
+                    </td>
+                    <td>
+                        <strong>Op ${add.op_id}</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            a=${currentSource}
+                        </div>
+                    </td>
+                `;
+
+                if (!isCorrect) {
+                    row.style.background = 'rgba(231, 76, 60, 0.2)';
+                }
+
+                tbody.appendChild(row);
+            });
+
+            if (residualAdds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted); text-align: center;">No residual_add ops found</td></tr>';
+            }
+        }
+
+        function renderDataflowGraph() {
+            if (!ir1Data) {
+                alert('Load an IR1 file first.');
+                return;
+            }
+
+            document.getElementById('dfGraphSection').style.display = 'block';
+            const container = document.getElementById('dataflowGraphContainer');
+            container.innerHTML = '';
+
+            const ops = ir1Data.ops || [];
+            const width = container.clientWidth || 1000;
+            const height = 500;
+
+            // Filter to current layer or all
+            let filteredOps = ops;
+            if (currentDfLayer !== -1 && currentDfLayer !== 'footer') {
+                const layerNum = parseInt(currentDfLayer);
+                filteredOps = ops.filter(op => op.layer === layerNum);
+            }
+
+            // Build nodes and links
+            const nodes = [];
+            const links = [];
+            const nodeMap = new Map();
+
+            filteredOps.forEach((op, idx) => {
+                const kernelType = getKernelType(op.kernel || '');
+                const node = {
+                    id: op.op_id,
+                    op: op.op,
+                    kernel: op.kernel,
+                    layer: op.layer,
+                    color: getKernelColor(kernelType),
+                    dataflow: op.dataflow
+                };
+                nodes.push(node);
+                nodeMap.set(op.op_id, node);
+            });
+
+            // Create dataflow links based on from_op
+            filteredOps.forEach(op => {
+                if (op.dataflow && op.dataflow.inputs) {
+                    Object.entries(op.dataflow.inputs).forEach(([inputName, input]) => {
+                        if (input.from_op !== undefined && nodeMap.has(input.from_op)) {
+                            links.push({
+                                source: input.from_op,
+                                target: op.op_id,
+                                inputName: inputName,
+                                dtype: input.dtype || 'fp32'
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Create SVG
+            const svg = d3.select(container)
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .style('background', 'var(--dark)');
+
+            // Zoom
+            const zoom = d3.zoom()
+                .scaleExtent([0.2, 3])
+                .on('zoom', (event) => g.attr('transform', event.transform));
+            svg.call(zoom);
+
+            const g = svg.append('g').attr('transform', 'translate(50, 30)');
+
+            // Arrow marker
+            svg.append('defs').append('marker')
+                .attr('id', 'df-arrow')
+                .attr('viewBox', '-0 -5 10 10')
+                .attr('refX', 20)
+                .attr('refY', 0)
+                .attr('orient', 'auto')
+                .attr('markerWidth', 8)
+                .attr('markerHeight', 8)
+                .append('path')
+                .attr('d', 'M 0,-5 L 10,0 L 0,5')
+                .attr('fill', 'var(--orange)');
+
+            // Layout nodes in a grid based on order
+            const nodeWidth = 120;
+            const nodeHeight = 60;
+            const cols = Math.ceil(Math.sqrt(nodes.length * 2));
+
+            nodes.forEach((node, i) => {
+                node.x = (i % cols) * (nodeWidth + 40) + 60;
+                node.y = Math.floor(i / cols) * (nodeHeight + 50) + 40;
+            });
+
+            // Draw links
+            const link = g.append('g')
+                .selectAll('path')
+                .data(links)
+                .enter().append('path')
+                .attr('d', d => {
+                    const source = nodes.find(n => n.id === d.source);
+                    const target = nodes.find(n => n.id === d.target);
+                    if (!source || !target) return '';
+                    return `M${source.x},${source.y} Q${(source.x + target.x) / 2},${Math.min(source.y, target.y) - 30} ${target.x},${target.y}`;
+                })
+                .attr('stroke', 'var(--orange)')
+                .attr('stroke-width', 2)
+                .attr('fill', 'none')
+                .attr('marker-end', 'url(#df-arrow)')
+                .attr('opacity', 0.7);
+
+            // Link labels
+            g.append('g')
+                .selectAll('text')
+                .data(links)
+                .enter().append('text')
+                .text(d => d.inputName)
+                .attr('x', d => {
+                    const source = nodes.find(n => n.id === d.source);
+                    const target = nodes.find(n => n.id === d.target);
+                    return source && target ? (source.x + target.x) / 2 : 0;
+                })
+                .attr('y', d => {
+                    const source = nodes.find(n => n.id === d.source);
+                    const target = nodes.find(n => n.id === d.target);
+                    return source && target ? Math.min(source.y, target.y) - 35 : 0;
+                })
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'var(--orange)')
+                .attr('font-size', '10px');
+
+            // Draw nodes
+            const node = g.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .enter().append('g')
+                .attr('transform', d => `translate(${d.x - nodeWidth/2},${d.y - nodeHeight/2})`)
+                .style('cursor', 'pointer')
+                .on('click', (event, d) => scrollToOp(d.id));
+
+            // Node rectangles
+            node.append('rect')
+                .attr('width', nodeWidth)
+                .attr('height', nodeHeight)
+                .attr('rx', 6)
+                .attr('fill', d => d.color + '33')
+                .attr('stroke', d => d.color)
+                .attr('stroke-width', 2);
+
+            // Node labels
+            node.append('text')
+                .text(d => `#${d.id}`)
+                .attr('x', 8)
+                .attr('y', 18)
+                .attr('fill', 'var(--text-muted)')
+                .attr('font-size', '10px')
+                .attr('font-family', "'JetBrains Mono', monospace");
+
+            node.append('text')
+                .text(d => d.op.substring(0, 15))
+                .attr('x', nodeWidth / 2)
+                .attr('y', 35)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#fff')
+                .attr('font-size', '11px')
+                .attr('font-weight', 'bold');
+
+            node.append('text')
+                .text(d => (d.kernel || '').substring(0, 18))
+                .attr('x', nodeWidth / 2)
+                .attr('y', 50)
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'var(--text-muted)')
+                .attr('font-size', '9px')
+                .attr('font-family', "'JetBrains Mono', monospace");
         }
     </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>

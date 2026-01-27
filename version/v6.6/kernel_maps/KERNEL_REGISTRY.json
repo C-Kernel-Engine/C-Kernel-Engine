@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 38,
+      "total": 39,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
@@ -21,6 +21,7 @@
         "quantize": 2,
         "quantize_batch": 2,
         "residual_add": 1,
+        "residual_save": 1,
         "rmsnorm": 1,
         "rope": 1,
         "swiglu": 1,
@@ -3941,6 +3942,73 @@
       "notes": "Mega-fused OutProj + MLP: Quantize attn_out \u2192 OutProj \u2192 Residual \u2192 RMSNorm \u2192 MLP (w1*w3\u2192SwiGLU\u2192w2) \u2192 Residual. Fuses 8 operations into 1.",
       "name": "mega_fused_outproj_mlp_prefill",
       "_source_file": "mega_fused_outproj_mlp_prefill.json"
+    },
+    {
+      "id": "memcpy",
+      "op": "residual_save",
+      "variant": "fp32_copy",
+      "quant": {
+        "weight": null,
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "src",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Source buffer [N] (FP32)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dst",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Destination buffer [N] (FP32)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "params": [
+        {
+          "name": "_memcpy_bytes",
+          "type": "size_t",
+          "desc": "Number of bytes to copy"
+        }
+      ],
+      "parallelization": {
+        "supported": [],
+        "preferred": {
+          "prefill": null,
+          "decode": null
+        },
+        "strategies": []
+      },
+      "constraints": {
+        "notes": "Simple memory copy for residual saving."
+      },
+      "impl": {
+        "function": "memcpy",
+        "sources": [],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {},
+      "notes": "Memory copy for saving residual before RMSNorm for skip connections.",
+      "name": "memcpy",
+      "_source_file": "memcpy.json"
     },
     {
       "id": "quantize_batch_q8_0",

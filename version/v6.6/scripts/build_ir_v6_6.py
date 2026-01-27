@@ -52,6 +52,248 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
+# Import memory planner
+from memory_planner_v6_6 import plan_memory, MemoryPlanner
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DATAFLOW DEFINITIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Each op type defines:
+#   - inputs: {input_name: slot_name} - which logical slot this input reads from
+#   - outputs: {output_name: slot_name} - which logical slot this output writes to
+#   - dtype: output dtype (fp32, q8_0, q8_k, etc.)
+#
+# Slot names are logical (not physical buffers):
+#   - "main_stream"     : Primary activation stream (fp32)
+#   - "main_stream_q8"  : Quantized activation stream (q8_0 or q8_k)
+#   - "residual"        : Saved residual for skip connection
+#   - "q_scratch"       : Q projection output
+#   - "k_scratch"       : K projection output
+#   - "v_scratch"       : V projection output
+#   - "attn_scratch"    : Attention output
+#   - "mlp_scratch"     : MLP gate_up output
+#   - "kv_cache"        : KV cache (persistent across tokens)
+#   - "external:X"      : External input (token_ids, etc.)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+OP_DATAFLOW = {
+    # Header ops
+    "dense_embedding_lookup": {
+        "inputs": {"token_ids": "external:token_ids"},
+        "outputs": {"out": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+
+    # Attention block
+    "rmsnorm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "quantize_input_0": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
+    },
+    "quantize_input_1": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
+    },
+    "residual_save": {
+        "inputs": {"src": "main_stream"},
+        "outputs": {"dst": {"slot": "residual", "dtype": "fp32"}},
+    },
+    "q_proj": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "q_scratch", "dtype": "fp32"}},
+    },
+    "k_proj": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "k_scratch", "dtype": "fp32"}},
+    },
+    "v_proj": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "v_scratch", "dtype": "fp32"}},
+    },
+    "bias_add_q": {
+        "inputs": {"x": "q_scratch"},
+        "outputs": {"x": {"slot": "q_scratch", "dtype": "fp32"}},
+    },
+    "bias_add_k": {
+        "inputs": {"x": "k_scratch"},
+        "outputs": {"x": {"slot": "k_scratch", "dtype": "fp32"}},
+    },
+    "bias_add_v": {
+        "inputs": {"x": "v_scratch"},
+        "outputs": {"x": {"slot": "v_scratch", "dtype": "fp32"}},
+    },
+    "rope_qk": {
+        "inputs": {"q": "q_scratch", "k": "k_scratch"},
+        "outputs": {
+            "q": {"slot": "q_scratch", "dtype": "fp32"},
+            "k": {"slot": "k_scratch", "dtype": "fp32"},
+        },
+    },
+    "kv_cache_store": {
+        "inputs": {"k": "k_scratch", "v": "v_scratch"},
+        "outputs": {
+            "k_cache": {"slot": "kv_cache", "dtype": "fp32"},
+            "v_cache": {"slot": "kv_cache", "dtype": "fp32"},
+        },
+    },
+    "attn": {
+        "inputs": {"q": "q_scratch", "k": "kv_cache", "v": "kv_cache"},
+        "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
+    },
+    "quantize_out_proj_input": {
+        "inputs": {"input": "attn_scratch"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
+    },
+    "out_proj": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "bias_add": {
+        "inputs": {"x": "main_stream"},
+        "outputs": {"x": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "residual_add": {
+        "inputs": {
+            "a": "main_stream",   # Current stream (from out_proj/bias_add)
+            "b": "residual",      # Saved residual
+        },
+        "outputs": {"out": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+
+    # MLP block
+    "mlp_gate_up": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "bias_add_mlp": {
+        "inputs": {"x": "mlp_scratch"},
+        "outputs": {"x": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "silu_mul": {
+        "inputs": {"x": "mlp_scratch"},
+        "outputs": {"x": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
+    },
+    "quantize_mlp_down_input": {
+        "inputs": {"input": "mlp_scratch"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_k"}},
+    },
+    "mlp_down": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+
+    # Footer ops
+    "quantize_final_output": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
+    },
+    "logits": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "logits", "dtype": "fp32"}},
+    },
+}
+
+
+class DataflowTracker:
+    """
+    Tracks dataflow during IR1 generation.
+
+    Maintains a mapping of slot_name -> (op_id, output_name, dtype) for each logical slot.
+    When an op is added, records its inputs (from current slot state) and outputs (updates slot state).
+    """
+
+    def __init__(self):
+        # Map slot name -> {op_id, output_name, dtype}
+        self.slots: Dict[str, Dict[str, Any]] = {}
+        # For residual_save tracking within a layer
+        self.layer_residual_sources: Dict[int, Dict[str, Any]] = {}  # layer -> slot info
+
+    def reset_for_layer(self, layer: int):
+        """Reset per-layer state (but keep residual from previous residual_save)."""
+        # Clear main stream slots but keep residual
+        pass  # Slots persist, residual_save will update the residual slot
+
+    def record_op(self, op_id: int, op_type: str, layer: int, instance: int) -> Dict[str, Any]:
+        """
+        Record an op's dataflow and return the dataflow info to embed in IR1.
+
+        Returns:
+            {
+                "inputs": {input_name: {"from_op": X, "from_output": "Y", "dtype": "Z"}},
+                "outputs": {output_name: {"dtype": "Z"}}
+            }
+        """
+        dataflow_def = OP_DATAFLOW.get(op_type, {})
+
+        # ═══════════════════════════════════════════════════════════
+        # NOTE: Residual saving is now handled by explicit residual_save ops
+        # inserted before rmsnorm in IR1 generation. The residual_save op
+        # updates the "residual" slot, and residual_add reads from it.
+        # ═══════════════════════════════════════════════════════════
+
+        # Build inputs from current slot state
+        inputs = {}
+        for input_name, slot_name in dataflow_def.get("inputs", {}).items():
+            if slot_name.startswith("external:"):
+                # External input (token_ids, etc.)
+                inputs[input_name] = {
+                    "from": slot_name,
+                    "dtype": "i32" if "token" in slot_name else "fp32"
+                }
+            elif slot_name in self.slots:
+                # Get from slot
+                slot_info = self.slots[slot_name]
+                inputs[input_name] = {
+                    "from_op": slot_info["op_id"],
+                    "from_output": slot_info["output_name"],
+                    "dtype": slot_info["dtype"],
+                }
+            else:
+                # Slot not yet written - this is a bug or first use
+                inputs[input_name] = {
+                    "from": f"uninitialized:{slot_name}",
+                    "dtype": "unknown"
+                }
+
+        # Build outputs and update slot state
+        outputs = {}
+        for output_name, output_info in dataflow_def.get("outputs", {}).items():
+            if isinstance(output_info, dict):
+                slot_name = output_info["slot"]
+                dtype = output_info["dtype"]
+            else:
+                # Legacy format - just slot name
+                slot_name = output_info
+                dtype = "fp32"
+
+            outputs[output_name] = {"dtype": dtype}
+
+            # Update slot state
+            self.slots[slot_name] = {
+                "op_id": op_id,
+                "output_name": output_name,
+                "dtype": dtype,
+            }
+
+            # Special handling for residual_save - track per layer
+            if op_type == "residual_save":
+                self.layer_residual_sources[layer] = self.slots[slot_name].copy()
+
+        return {
+            "inputs": inputs,
+            "outputs": outputs,
+        }
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return statistics about tracked dataflow."""
+        return {
+            "slots_active": list(self.slots.keys()),
+            "layers_with_residual": list(self.layer_residual_sources.keys()),
+        }
+
 
 def _sanitize_macro(name: str) -> str:
     """Return an ASCII-safe macro suffix for a name."""
@@ -236,7 +478,8 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
     # quantize_input_0/1: quantize embed_dim (rmsnorm output before projections)
     # quantize_out_proj_input: quantize embed_dim (attention output)
     # quantize_mlp_down_input: quantize intermediate_size (swiglu output)
-    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input"):
+    # quantize_final_output: quantize embed_dim (footer rmsnorm output before logits)
+    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input", "quantize_final_output"):
         return embed, embed  # output_dim not used, but _input_dim = embed
     if op_name in ("quantize_mlp_down_input",):
         return inter, inter  # _input_dim = intermediate_size
@@ -574,14 +817,18 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
     print(f"  Mode: {mode}")
     print(f"  Layers: {num_layers}")
 
-    arranged_kernels = []  # Pass 1: list of {kernel, op, section, layer, op_id, instance}
+    arranged_kernels = []  # Pass 1: list of {kernel, op, section, layer, op_id, instance, dataflow}
     global_op_id = 0  # Global operation ID counter
 
     # ═══════════════════════════════════════════════════════════
-    # IR1 is simple: just op_id, kernel, op, section, layer, instance
-    # Data flow (buffer connections) is handled in IR Lower (IR3)
-    # IR Lower uses op sequence + op types to determine buffer routing
+    # IR1 now includes DATAFLOW information:
+    #   - Each op has "dataflow" with "inputs" and "outputs"
+    #   - Inputs reference the op_id that produced them
+    #   - This enables the memory planner to assign physical buffers
     # ═══════════════════════════════════════════════════════════
+
+    # Initialize dataflow tracker
+    dataflow_tracker = DataflowTracker()
 
     # Weight entries from manifest (for Pass 2 binding)
     entries = manifest.get("entries", [])
@@ -786,6 +1033,21 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
                                             print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED]")
                                         break
 
+                        # Insert residual_save BEFORE rmsnorm to save input for skip connection
+                        if op == "rmsnorm":
+                            residual_save_op_name = f"residual_save"
+                            residual_save_info = get_op_info(residual_save_op_name, "body", layer_idx)
+                            arranged_kernels.append({
+                                "op_id": residual_save_info["op_id"],
+                                "kernel": "memcpy",
+                                "op": residual_save_op_name,
+                                "section": "body",
+                                "layer": layer_idx,
+                                "instance": rmsnorm_instance,  # Same instance as rmsnorm
+                                "_auto_inserted": True,
+                            })
+                            print(f"      [{residual_save_info['op_id']:3d}] {residual_save_op_name:20s} → memcpy  (inst: {rmsnorm_instance}) [AUTO-INSERTED before rmsnorm]")
+
                         for k in kernels:
                             # Handle both plain kernel ID and (kernel_id, split_op) tuples
                             if isinstance(k, tuple):
@@ -841,8 +1103,37 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
             # Header/Footer: run once (no layer quant)
             else:
                 print(f"\n    {section_name.capitalize()}:")
+                footer_quantize_inserted = False  # Track if we've inserted quantize for footer
                 for op_idx, op in enumerate(ops):
                     kernels = map_op_to_kernel(op, {}, mode)
+
+                    # Footer: Insert quantize op BEFORE any op that needs Q8 activation
+                    # (after rmsnorm outputs FP32, before logits needs Q8_0)
+                    if section_name == "footer" and not footer_quantize_inserted:
+                        for k in kernels:
+                            k_id = k[0] if isinstance(k, tuple) else k
+                            if kernel_needs_q8_activation(registry, k_id):
+                                # Get activation dtype from kernel
+                                for kreg in registry.get("kernels", []):
+                                    if kreg.get("id") == k_id:
+                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
+                                        quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
+                                        if quantize_kernel:
+                                            quant_op_name = "quantize_final_output"
+                                            quant_op_info = get_op_info(quant_op_name, section_name, -1)
+                                            arranged_kernels.append({
+                                                "op_id": quant_op_info["op_id"],
+                                                "kernel": quantize_kernel,
+                                                "op": quant_op_name,
+                                                "section": section_name,
+                                                "layer": -1,
+                                                "instance": 0,
+                                            })
+                                            print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED before {op}]")
+                                            footer_quantize_inserted = True
+                                        break
+                                break
+
                     for k in kernels:
                         # Handle both plain kernel ID and (kernel_id, split_op) tuples
                         if isinstance(k, tuple):
@@ -863,34 +1154,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
                         })
                         print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
 
-                    # Footer: Insert quantize op after rmsnorm if next op needs Q8 activation
-                    if section_name == "footer" and op == "rmsnorm" and op_idx + 1 < len(ops):
-                        next_op = ops[op_idx + 1]
-                        next_kernels = map_op_to_kernel(next_op, {}, mode)
-
-                        for nk in next_kernels:
-                            nk_id = nk[0] if isinstance(nk, tuple) else nk
-                            if kernel_needs_q8_activation(registry, nk_id):
-                                # Get activation dtype from kernel
-                                for kreg in registry.get("kernels", []):
-                                    if kreg.get("id") == nk_id:
-                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
-                                        quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
-                                        if quantize_kernel:
-                                            quant_op_name = "quantize_final_output"
-                                            quant_op_info = get_op_info(quant_op_name, section_name, -1)
-                                            arranged_kernels.append({
-                                                "op_id": quant_op_info["op_id"],
-                                                "kernel": quantize_kernel,
-                                                "op": quant_op_name,
-                                                "section": section_name,
-                                                "layer": -1,
-                                                "instance": 0,
-                                            })
-                                            print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED for footer]")
-                                        break
-                                break
-
                     if not kernels:
                         if OP_TO_WEIGHT_KEYS.get(op) == "metadata":
                             print(f"            {op:20s} → (metadata)")
@@ -898,6 +1161,34 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
                             print(f"            {op:20s} → (no kernel)")
 
     print(f"\n✓ Pass 1: Generated {len(arranged_kernels)} kernel calls")
+
+    # ═══════════════════════════════════════════════════════════
+    # PASS 1.5: Add dataflow information
+    # For each op, record what it reads from and writes to
+    # This enables the memory planner to assign physical buffers
+    # ═══════════════════════════════════════════════════════════
+    print(f"\n  Pass 1.5: Computing dataflow graph...")
+
+    current_layer = -1
+    for ir_op in arranged_kernels:
+        op_id = ir_op["op_id"]
+        op_type = ir_op["op"]
+        layer = ir_op["layer"]
+        instance = ir_op.get("instance", 0)
+
+        # Reset tracker for new layer
+        if layer != current_layer and layer >= 0:
+            dataflow_tracker.reset_for_layer(layer)
+            current_layer = layer
+
+        # Record dataflow for this op
+        dataflow_info = dataflow_tracker.record_op(op_id, op_type, layer, instance)
+        ir_op["dataflow"] = dataflow_info
+
+    # Print dataflow stats
+    stats = dataflow_tracker.get_stats()
+    print(f"  ✓ Pass 1.5: Added dataflow to {len(arranged_kernels)} ops")
+    print(f"    Active slots: {', '.join(stats['slots_active'])}")
 
     # ═══════════════════════════════════════════════════════════
     # PASS 2: Bind weights from sidecar entries
@@ -1276,8 +1567,10 @@ def generate_ir_lower_1(
             continue
 
         # Build lowered op - preserve ALL weights from IR1
+        # Also preserve op_id and dataflow for memory planner
         lowered_op = {
             "idx": idx,
+            "op_id": ir_op.get("op_id", idx),  # Preserve original op_id for memory planner
             "kernel": kernel_id,
             "op": op_name,
             "layer": layer,
@@ -1289,9 +1582,16 @@ def generate_ir_lower_1(
             "scratch": [],
             "params": ir_op.get("params", {}),
             "bias_for": ir_op.get("bias_for"),
+            "dataflow": ir_op.get("dataflow", {}),  # Preserve dataflow for memory planner
         }
         if ir_op.get("_auto_inserted"):
             lowered_op["_auto_inserted"] = True
+
+        # Special handling for residual_save/memcpy: compute _memcpy_bytes
+        if op_name == "residual_save":
+            embed_dim = manifest.get("config", {}).get("embed_dim", 896)
+            seq_len = 1 if mode == "decode" else manifest.get("config", {}).get("context_length", 2048)
+            lowered_op["params"]["_memcpy_bytes"] = embed_dim * seq_len * 4  # FP32 = 4 bytes
 
         # Map kernel input activations from kernel map
         # New format has 4 sections:
@@ -1408,6 +1708,136 @@ def generate_ir_lower_1(
                 # Remove scratch K/V references if present
                 op["inputs"].pop("k", None)
                 op["inputs"].pop("v", None)
+
+        elif mode == "prefill":
+            # For prefill: after q_proj/k_proj/v_proj, insert transpose from [T, H*D] to [H, T, D]
+            # GEMM outputs token-major but attention expects head-major
+            if op["op"] == "q_proj":
+                layer = op["layer"]
+                transpose_q_op = {
+                    "idx": len(final_ops),
+                    "kernel": "transpose_qkv_to_head_major",
+                    "op": "transpose_qkv_to_head_major",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "transpose_inplace",
+                    "weights": {},
+                    "inputs": {"buf": {"type": "scratch", "source": "q_scratch"}},
+                    "outputs": {"buf": {"type": "scratch", "buffer": "q_scratch"}},
+                    "scratch": [],
+                    "_auto_inserted": True,
+                    "_qkv_type": "q",
+                }
+                final_ops.append(transpose_q_op)
+
+            if op["op"] == "k_proj":
+                layer = op["layer"]
+                transpose_k_op = {
+                    "idx": len(final_ops),
+                    "kernel": "transpose_kv_to_head_major",
+                    "op": "transpose_kv_to_head_major",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "transpose_inplace",
+                    "weights": {},
+                    "inputs": {"buf": {"type": "scratch", "source": "k_scratch"}},
+                    "outputs": {"buf": {"type": "scratch", "buffer": "k_scratch"}},
+                    "scratch": [],
+                    "_auto_inserted": True,
+                    "_is_k": True,
+                }
+                final_ops.append(transpose_k_op)
+
+            if op["op"] == "v_proj":
+                layer = op["layer"]
+                transpose_v_op = {
+                    "idx": len(final_ops),
+                    "kernel": "transpose_kv_to_head_major",
+                    "op": "transpose_kv_to_head_major",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "transpose_inplace",
+                    "weights": {},
+                    "inputs": {"buf": {"type": "scratch", "source": "v_scratch"}},
+                    "outputs": {"buf": {"type": "scratch", "buffer": "v_scratch"}},
+                    "scratch": [],
+                    "_auto_inserted": True,
+                    "_is_k": False,
+                }
+                final_ops.append(transpose_v_op)
+
+            # For prefill: after attention, transpose output from head-major [H, T, D] to token-major [T, H*D]
+            # Then insert kv_cache_batch_copy to copy K/V from scratch to cache
+            if op["op"] == "attn":
+                layer = op["layer"]
+                # First: transpose attention output from head-major to token-major
+                transpose_attn_out_op = {
+                    "idx": len(final_ops),
+                    "kernel": "transpose_attn_out_to_token_major",
+                    "op": "transpose_attn_out_to_token_major",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "transpose_inplace",
+                    "weights": {},
+                    "inputs": {"buf": {"type": "scratch", "source": "attn_scratch"}},
+                    "outputs": {"buf": {"type": "scratch", "buffer": "attn_scratch"}},
+                    "scratch": [],
+                    "_auto_inserted": True,
+                }
+                final_ops.append(transpose_attn_out_op)
+                # Second: kv_cache_batch_copy
+                kv_batch_copy_op = {
+                    "idx": len(final_ops),
+                    "kernel": "kv_cache_batch_copy",
+                    "op": "kv_cache_batch_copy",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "memcpy",  # Will emit memcpy calls for K and V
+                    "weights": {},
+                    "inputs": {
+                        "k_src": {"type": "scratch", "source": "k_scratch"},
+                        "v_src": {"type": "scratch", "source": "v_scratch"},
+                    },
+                    "outputs": {
+                        "k_dst": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
+                        "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
+                    },
+                    "scratch": [],
+                    "_auto_inserted": True,
+                }
+                final_ops.append(kv_batch_copy_op)
+                kv_store_count += 1
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AUTOMATIC LOGITS COPY FOR PREFILL
+    # ═══════════════════════════════════════════════════════════════════════════
+    # In prefill mode, logits are computed for ALL tokens as [num_tokens, vocab_size].
+    # But ck_model_forward() expects logits at position 0 (for the LAST token).
+    # Insert a copy_last_logits op to copy logits[(n-1)*V : n*V] to logits[0:V].
+    copy_last_logits_inserted = False
+    if mode == "prefill":
+        # Insert copy_last_logits at the very end
+        copy_last_logits_op = {
+            "idx": len(final_ops),
+            "kernel": "copy_last_logits",
+            "op": "copy_last_logits",
+            "layer": -1,
+            "section": "footer",
+            "function": "memmove",  # Use memmove for safety (overlapping memory)
+            "weights": {},
+            "inputs": {
+                "src": {"type": "activation", "source": "logits", "offset": "(num_tokens - 1) * vocab_size"},
+            },
+            "outputs": {
+                "dst": {"type": "activation", "buffer": "logits"},
+            },
+            "scratch": [],
+            "_auto_inserted": True,
+            "_copy_size": "vocab_size * sizeof(float)",
+        }
+        final_ops.append(copy_last_logits_op)
+        copy_last_logits_inserted = True
+        print(f"  Inserted copy_last_logits op for prefill mode")
 
     # Renumber ops
     for i, op in enumerate(final_ops):
@@ -1837,8 +2267,13 @@ def generate_memory_layout(
     embedded_size = seq_len * embed_dim * 4
     add_buffer("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
 
-    # Layer input buffer (for ping-pong, same size as embedded)
-    add_buffer("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+    # Layer input buffer (for ping-pong)
+    # Must be large enough for Q8_K quantization of MLP intermediate (n_ff elements)
+    # Q8_K uses 272 bytes per 256 elements: ceil(n_ff/256) * 272 * seq_len
+    q8k_blocks = (intermediate_size + 255) // 256
+    q8k_size = q8k_blocks * 272 * seq_len
+    layer_input_size = max(embedded_size, q8k_size)
+    add_buffer("layer_input", layer_input_size, f"[{seq_len}, max({embed_dim}, Q8_K({intermediate_size}))]")
 
     # Residual buffer (for residual connections - stores input before layer processing)
     add_buffer("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
@@ -2316,11 +2751,48 @@ def generate_ir_lower_2(
 
     lowered_ops = []
 
-    # Track activation buffer usage for ping-pong
-    # IMPORTANT: For decode mode, start with token_ids as input for embedding
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # MEMORY PLANNER: Pre-compute buffer assignments based on dataflow
+    # This replaces the old ping-pong logic with explicit dataflow-based assignment
+    # ═══════════════════════════════════════════════════════════════════════════════
+    print("  Running memory planner...")
+    buffer_assignments = plan_memory(ir_lower_1_ops)
+    print(f"  ✓ Memory planner assigned buffers for {len(buffer_assignments)} ops")
+
+    # Helper to get buffer info from memory planner
+    def get_planned_buffer(op_id: int, io_type: str, name: str) -> Optional[Dict]:
+        """Get buffer assignment from memory planner.
+
+        Args:
+            op_id: Operation ID
+            io_type: 'inputs' or 'outputs'
+            name: Input/output name (e.g., 'x', 'y', 'input', 'output')
+
+        Returns:
+            Buffer info dict with 'buffer' and 'dtype' keys, or None
+        """
+        assignment = buffer_assignments.get(op_id, {})
+        io_assignments = assignment.get(io_type, {})
+        return io_assignments.get(name)
+
+    # Map buffer names to activation buffer names
+    # Memory planner uses A_EMBEDDED_INPUT, A_LAYER_INPUT, etc.
+    # Layout uses embedded_input, layer_input, etc.
+    buffer_name_map = {
+        "A_EMBEDDED_INPUT": "embedded_input",
+        "A_LAYER_INPUT": "layer_input",
+        "A_RESIDUAL": "residual",
+        "A_ATTN_SCRATCH": "attn_scratch",
+        "A_MLP_SCRATCH": "mlp_scratch",
+        "A_LAYER_OUTPUT": "layer_output",
+        "A_LOGITS": "logits",
+        "kv_cache": "kv_cache",
+    }
+
+    # Legacy ping-pong tracking (kept for fallback, but should not be needed)
     current_input_buffer = "token_ids"
-    current_output_buffer = "embedded_input"  # Embedding outputs here (offset 20)
-    qkv_input_buffer = "token_ids"  # Track input buffer for Q/K/V projections
+    current_output_buffer = "embedded_input"
+    qkv_input_buffer = "token_ids"
     last_output_buffer: Optional[str] = None
 
     for ir_op in ir_lower_1_ops:
@@ -2451,18 +2923,34 @@ def generate_ir_lower_2(
                         }
                         last_output_buffer = "v_scratch"
         elif op_type in ("q_proj", "k_proj", "v_proj"):
-            # Track the RMSNorm output buffer (used by all Q/K/V ops)
-            if op_type == "q_proj":
-                # Q starts reading from current_input_buffer (RMSNorm output)
-                qkv_input_buffer = current_input_buffer
-            # All Q/K/V read from the same input (RMSNorm output)
-            buf = activation_buffers.get(qkv_input_buffer)
-            if buf:
-                for input_name, input_info in ir_op.get("inputs", {}).items():
+            # ═══════════════════════════════════════════════════════════════
+            # USE MEMORY PLANNER for QKV input buffer assignment
+            # The memory planner knows the correct buffer (main_stream_q8)
+            # ═══════════════════════════════════════════════════════════════
+            op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+
+            for input_name, input_info in ir_op.get("inputs", {}).items():
+                # Skip weight inputs
+                if input_name in ir_op.get("weights", {}):
+                    continue
+
+                # Use memory planner for input buffer
+                planned = get_planned_buffer(op_id, "inputs", input_name)
+
+                if planned:
+                    planner_buf = planned.get("buffer", "layer_input")
+                    buf_name = buffer_name_map.get(planner_buf, planner_buf)
+                    buf = activation_buffers.get(buf_name)
+                else:
+                    # Fallback to layer_input (Q8 buffer) - this is where quantize_input writes
+                    buf_name = "layer_input"
+                    buf = activation_buffers.get("layer_input")
+
+                if buf:
                     lowered_op["activations"][input_name] = {
-                        "buffer": qkv_input_buffer,
+                        "buffer": buf_name,
                         "activation_offset": buf["offset"],
-                        "dtype": input_info.get("dtype", "fp32"),
+                        "dtype": input_info.get("dtype", "q8_0"),
                         "ptr_expr": f"activations + {buf['offset']}",
                     }
             # Q writes to q_scratch
@@ -2528,34 +3016,46 @@ def generate_ir_lower_2(
                 if is_weight_input:
                     continue  # Weight is handled via weights dict
 
-                # All other inputs use current ping-pong buffer
-                # Special case: attention projection reads from head-major attention output
-                if input_name == "attn_out":
-                    buf = activation_buffers.get("attn_scratch")
-                    buf_name = "attn_scratch"
-                elif input_name == "scratch":
-                    buf = activation_buffers.get("mlp_scratch")
-                    buf_name = "mlp_scratch"
-                # Special case: residual_add needs different buffers for 'a' and 'b'
-                elif ir_op.get("op", "") == "residual_add":
-                    if input_name == "a":
-                        # 'a' is the current stream output (previous op)
-                        buf = activation_buffers.get(current_input_buffer)
-                        buf_name = current_input_buffer
-                    elif input_name == "b":
-                        # 'b' is the saved residual (from before attention)
-                        buf = activation_buffers.get("residual")
-                        buf_name = "residual"
+                # ═══════════════════════════════════════════════════════════════
+                # USE MEMORY PLANNER for buffer assignment
+                # ═══════════════════════════════════════════════════════════════
+                op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+
+                # Map from kernel input names to dataflow names
+                # Kernel maps use: A (input), B (weight), C (output)
+                # Dataflow uses: x (input), y (output)
+                kernel_to_dataflow_input = {
+                    "A": "x",      # Matrix input for gemm/gemv
+                    "x": "x",      # Direct match
+                    "input": "x",  # Alternative name
+                    "a": "a",      # residual_add input a
+                    "b": "b",      # residual_add input b
+                    "src": "src",  # memcpy source
+                    "gate": "x",   # swiglu gate input -> reads from mlp_scratch
+                    "up": "x",     # swiglu up input -> reads from mlp_scratch
+                }
+                dataflow_name = kernel_to_dataflow_input.get(input_name, input_name)
+                planned = get_planned_buffer(op_id, "inputs", dataflow_name)
+                # Also try the original name if mapping didn't find it
+                if not planned:
+                    planned = get_planned_buffer(op_id, "inputs", input_name)
+
+                if planned:
+                    # Use memory planner's assignment
+                    planner_buf = planned.get("buffer", "embedded_input")
+                    buf_name = buffer_name_map.get(planner_buf, planner_buf)
+                    buf = activation_buffers.get(buf_name)
+                else:
+                    # Fallback to legacy logic for unplanned ops
+                    if input_name == "attn_out":
+                        buf = activation_buffers.get("attn_scratch")
+                        buf_name = "attn_scratch"
+                    elif input_name == "scratch":
+                        buf = activation_buffers.get("mlp_scratch")
+                        buf_name = "mlp_scratch"
                     else:
                         buf = activation_buffers.get(current_input_buffer)
                         buf_name = current_input_buffer
-                elif ir_op.get("op", "") in ("silu_mul", "mlp_down"):
-                    # MLP path: swiglu + mlp_down consume mlp_scratch
-                    buf = activation_buffers.get("mlp_scratch")
-                    buf_name = "mlp_scratch"
-                else:
-                    buf = activation_buffers.get(current_input_buffer)
-                    buf_name = current_input_buffer
 
                 if buf:
                     lowered_op["activations"][input_name] = {
@@ -2567,20 +3067,40 @@ def generate_ir_lower_2(
 
             # Process outputs - add concrete offsets (for non-QKV ops)
             for output_name, output_info in ir_op.get("outputs", {}).items():
-                # Special case: embedding outputs to embedded_input, not layer_output
-                if "embedding" in ir_op.get("kernel", "").lower():
-                    output_buf_name = "embedded_input"
-                # Special case: prefill attention outputs head-major to attn_scratch
-                elif ir_op.get("op") == "attn" and mode == "prefill":
-                    output_buf_name = "attn_scratch"
-                # Special case: logits outputs to logits buffer, not ping-pong buffer
-                elif ir_op.get("op") == "logits":
-                    output_buf_name = "logits"
-                # MLP gate/up + swiglu outputs go to mlp_scratch (intermediate size)
-                elif ir_op.get("op") in ("mlp_gate_up", "silu_mul"):
-                    output_buf_name = "mlp_scratch"
+                # ═══════════════════════════════════════════════════════════════
+                # USE MEMORY PLANNER for output buffer assignment
+                # ═══════════════════════════════════════════════════════════════
+                op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+
+                # Map from kernel output names to dataflow names
+                kernel_to_dataflow_output = {
+                    "C": "y",       # Matrix output for gemm/gemv
+                    "y": "y",       # Direct match
+                    "output": "output",  # Quantize output
+                    "dst": "dst",   # memcpy destination
+                }
+                dataflow_name = kernel_to_dataflow_output.get(output_name, output_name)
+                planned = get_planned_buffer(op_id, "outputs", dataflow_name)
+                # Also try the original name if mapping didn't find it
+                if not planned:
+                    planned = get_planned_buffer(op_id, "outputs", output_name)
+
+                if planned:
+                    # Use memory planner's assignment
+                    planner_buf = planned.get("buffer", "embedded_input")
+                    output_buf_name = buffer_name_map.get(planner_buf, planner_buf)
                 else:
-                    output_buf_name = current_output_buffer
+                    # Fallback to legacy logic for unplanned ops
+                    if "embedding" in ir_op.get("kernel", "").lower():
+                        output_buf_name = "embedded_input"
+                    elif ir_op.get("op") == "attn" and mode == "prefill":
+                        output_buf_name = "attn_scratch"
+                    elif ir_op.get("op") == "logits":
+                        output_buf_name = "logits"
+                    elif ir_op.get("op") in ("mlp_gate_up", "silu_mul"):
+                        output_buf_name = "mlp_scratch"
+                    else:
+                        output_buf_name = current_output_buffer
 
                 buf = activation_buffers.get(output_buf_name)
                 if buf:
@@ -2611,6 +3131,8 @@ def generate_ir_lower_2(
                 })
 
         # Special handling for RoPE: add q_scratch and k_scratch buffers
+        # RoPE always uses the scratch buffers (where k_proj/v_proj just wrote)
+        # in both decode and prefill modes
         if ir_op.get("op", "") == "rope_qk":
             q_buf = activation_buffers.get("q_scratch")
             if q_buf:
@@ -2622,29 +3144,15 @@ def generate_ir_lower_2(
                     "ptr_expr": f"activations + {q_buf['offset']}",
                 })
 
-            if mode == "prefill":
-                layer_idx = int(ir_op.get("layer", 0))
-                kv_offs = kv_layer_offsets(layer_idx)
-                if kv_offs:
-                    k_off = kv_offs[0]
-                    lowered_op["scratch"].append({
-                        "name": "k_scratch",
-                        "scratch_offset": k_off,
-                        "size": activation_buffers.get("k_scratch", {}).get("size", 0),
-                        "dtype": "fp32",
-                        "ptr_expr": f"activations + {k_off}",
-                        "force_offset": True,
-                    })
-            else:
-                k_buf = activation_buffers.get("k_scratch")
-                if k_buf:
-                    lowered_op["scratch"].append({
-                        "name": "k_scratch",
-                        "scratch_offset": k_buf["offset"],
-                        "size": k_buf["size"],
-                        "dtype": "fp32",
-                        "ptr_expr": f"activations + {k_buf['offset']}",
-                    })
+            k_buf = activation_buffers.get("k_scratch")
+            if k_buf:
+                lowered_op["scratch"].append({
+                    "name": "k_scratch",
+                    "scratch_offset": k_buf["offset"],
+                    "size": k_buf["size"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {k_buf['offset']}",
+                })
 
         # Special handling for kv_cache_store: add k_scratch and v_scratch buffers
         if ir_op.get("op", "") == "kv_cache_store":
@@ -2663,7 +3171,9 @@ def generate_ir_lower_2(
         # Note: op type is "attn" but kernel contains "attention"
         if ir_op.get("op", "") == "attn" or "attention" in ir_op.get("kernel", ""):
             for scratch_name in ["q_scratch", "k_scratch", "v_scratch"]:
-                if mode == "prefill" and scratch_name in ("k_scratch", "v_scratch"):
+                # For DECODE mode, use KV cache offsets for K and V (they're read from cache)
+                # For PREFILL mode, use scratch buffers (K/V are computed fresh each time)
+                if mode == "decode" and scratch_name in ("k_scratch", "v_scratch"):
                     layer_idx = int(ir_op.get("layer", 0))
                     kv_offs = kv_layer_offsets(layer_idx)
                     if kv_offs:
@@ -2734,44 +3244,8 @@ def generate_ir_lower_2(
 
         lowered_ops.append(lowered_op)
 
-        # AUTO-INSERT: Save residual buffer after RMSNorm in body sections
-        # This saves the layer_input (RMSNorm output) before attention overwrites it
-        if ir_op.get("section") == "body" and ir_op.get("op") == "rmsnorm":
-            # Insert a residual save operation
-            residual_buf = activation_buffers.get("residual")
-            layer_input_buf = activation_buffers.get("layer_input")
-            if residual_buf and layer_input_buf:
-                residual_save_op = {
-                    "idx": len(lowered_ops),
-                    "kernel": "memcpy",
-                    "op": "residual_save",
-                    "layer": ir_op.get("layer", -1),
-                    "section": "body",
-                    "function": "memcpy",
-                    "weights": {},
-                    "activations": {
-                        "src": {
-                            "buffer": "layer_input",
-                            "activation_offset": layer_input_buf["offset"],
-                            "dtype": "fp32",
-                            "ptr_expr": f"activations + {layer_input_buf['offset']}",
-                        }
-                    },
-                    "outputs": {
-                        "dst": {
-                            "buffer": "residual",
-                            "activation_offset": residual_buf["offset"],
-                            "dtype": "fp32",
-                            "ptr_expr": f"activations + {residual_buf['offset']}",
-                        }
-                    },
-                    "scratch": [],
-                    "params": {
-                        "_memcpy_bytes": config.get("embed_dim", 896) * (1 if mode == "decode" else config.get("max_seq_len", config.get("context_length", 2048))) * 4
-                    },
-                    "_auto_inserted": True,
-                }
-                lowered_ops.append(residual_save_op)
+        # NOTE: residual_save ops are now explicitly in IR1 (inserted before rmsnorm)
+        # The memory planner assigns buffers based on dataflow. No need to auto-insert here.
 
         # Ping-pong buffers for next op, UNLESS this is a Q/K/V projection
         # Q/K/V all read from the same input (RMSNorm output), so skip ping-pong for K/V
@@ -3319,10 +3793,10 @@ def main(args: List[str]) -> int:
     # Output
     if parsed_args.output:
         output_data = {
-            "format": "ir1-structured",
-            "version": 2,
+            "format": "ir1-dataflow",
+            "version": 3,
             "mode": parsed_args.mode,
-            "ops": ir1  # Now a list of {kernel, op, section, layer, weights}
+            "ops": ir1  # Now a list of {kernel, op, section, layer, weights, dataflow}
         }
         with open(parsed_args.output, 'w') as f:
             json.dump(output_data, f, indent=2)
