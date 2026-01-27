@@ -555,8 +555,20 @@ CK_EXPORT int ck_model_forward(float *output) {
 /* Decode single token */
 CK_EXPORT int ck_model_decode(int32_t token, float *output) {
     if (!g_model) return -1;
+    /* Capture position before decode (ck_decode increments pos at end) */
+    int token_pos = g_model->pos;
     ck_decode(g_model, token);
-    if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));
+    /* Copy logits from position 0 to position token_pos in the logits buffer.
+     * This makes the logits buffer match what ck_chat.py expects:
+     * logits[token_pos * VOCAB_SIZE .. (token_pos+1) * VOCAB_SIZE] */
+    if (token_pos > 0) {
+        memmove(
+            g_model->logits + (size_t)token_pos * VOCAB_SIZE,
+            g_model->logits,
+            VOCAB_SIZE * sizeof(float)
+        );
+    }
+    if (output) memcpy(output, g_model->logits + (size_t)token_pos * VOCAB_SIZE, VOCAB_SIZE * sizeof(float));
     return 0;
 }
 
