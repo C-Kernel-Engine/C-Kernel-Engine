@@ -27,7 +27,7 @@ for path in (_SCRIPT_DIR, _V4_DIR):
         if path_str not in sys.path:
             sys.path.insert(0, path_str)
 
-import compat_ir_v4_v6_6 as v4
+import ir_core_v6_6 as v4
 import convert_gguf_to_bump_v6_6 as gguf
 
 

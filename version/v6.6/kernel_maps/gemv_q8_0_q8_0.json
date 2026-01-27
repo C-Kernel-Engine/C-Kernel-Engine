@@ -8,9 +8,12 @@
     "output": "fp32"
   },
   "inputs": [
-    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"},
     {"name": "x", "dtype": "q8_0", "shape": ["K"], "desc": "Input vector [K] (quantized q8_0)"}
   ],
+  "weights": [
+    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"}
+  ],
+  "activations": [],
   "outputs": [
     {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
   ],
@@ -34,6 +37,7 @@
   },
   "impl": {
     "function": "gemv_q8_0_q8_0",
+    "c_declaration": "void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);",
     "sources": ["src/kernels/gemm_kernels_q8_0.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},

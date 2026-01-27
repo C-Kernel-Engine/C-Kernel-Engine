@@ -8,9 +8,12 @@
     "output": "fp32"
   },
   "inputs": [
-    {"name": "tokens", "dtype": "int32", "shape": ["T"], "desc": "Input token IDs [tokens]"},
+    {"name": "tokens", "dtype": "int32", "shape": ["T"], "desc": "Input token IDs [tokens]"}
+  ],
+  "weights": [
     {"name": "weight", "dtype": "q8_0", "shape": ["V", "E"], "desc": "Embedding weights [vocab_size, embed_dim] (Q8_0 quantized)"}
   ],
+  "activations": [],
   "outputs": [
     {"name": "output", "dtype": "fp32", "shape": ["T", "E"], "desc": "Embeddings [tokens, embed_dim]"}
   ],
@@ -36,6 +39,7 @@
   },
   "impl": {
     "function": "embedding_forward_q8_0",
+    "c_declaration": "void embedding_forward_q8_0(const int32_t *token_ids, int token_count, int vocab_size, const void *token_embeddings, const float *pos_embeddings, float *output, int embed_dim, int aligned_embed_dim, int context_window, int add_pos);",
     "sources": ["src/kernels/embedding_kernels.c"],
     "variants": [
       {"name": "default", "requires": [], "compile_flags": []}

@@ -1,3965 +1,3345 @@
 #!/usr/bin/env python3
 """
-build_ir_v6_6.py - IR v6.6 pipeline (standalone, manifest-first, registry-driven)
+build_ir_v6_6.py - Complete IR Pipeline: Template + Quant → IR1 → Fusion → Layout
 
-config.json + weights_manifest.json + KERNEL_REGISTRY.json -> graph IR -> lowered IR -> layout -> generated C
+PIPELINE (4 stages):
+    1. IR1 Generation: Template + Quant Summary → Kernel IDs
+    2. Fusion Pass: Combine consecutive kernels using registry-driven patterns
+    3. Memory Layout: Plan activation buffers and weight offsets
+    4. Output: IR1 JSON + Memory Layout JSON
 
-v6.6 improvements over v6:
-  - INT8 activations enabled by default (5-15x speedup over FP32)
-  - Uses gemv_q5_0_q8_0, gemv_q8_0_q8_0 for Q5_0/Q8_0 weights
-  - Uses gemv_q4_k_q8_k for Q4_K weights
-  - Proper mixed-quant support via per-tensor dtypes from manifest
-  - Consistent v6.6 naming throughout
-  - REGISTRY-DRIVEN: All kernel selection from KERNEL_REGISTRY.json (mandatory)
+Stage 1 - IR1 Generation (Direct mapping, no intermediate abstractions):
+    1. Parse template sequence (what ops to run)
+    2. Read quant summary from manifest (what dtypes for weights)
+    3. Map template ops → kernel ops → concrete kernel IDs
+    4. Return: List of kernel function names
+
+Stage 2 - Fusion Pass:
+    1. Scan kernel registry for kernels with "fuses" field
+    2. Match consecutive kernel sequences in IR1
+    3. Replace matching sequences with fused kernels
+    4. Return: Optimized kernel list + fusion statistics
+
+Stage 3 - Memory Layout:
+    1. Calculate activation buffer sizes (based on mode: decode vs prefill)
+    2. Plan weight memory layout with explicit offsets
+    3. Generate buffer allocation map
+    4. Return: Complete memory layout with offsets
 
 REQUIREMENTS:
-  1. weights_manifest.json (from convert_*_to_bump_v6_6.py)
-  2. KERNEL_REGISTRY.json (from gen_kernel_registry_from_maps.py)
-     Run: python version/v6.6/scripts/gen_kernel_registry_from_maps.py
+    1. weights_manifest.json with template and quant_summary
+    2. KERNEL_REGISTRY.json
 
 USAGE:
-  python build_ir_v6_6.py --weights-manifest=weights_manifest.json --modes=decode
+    # Generate IR1 only
+    python build_ir_v6_6.py --manifest=/path/to/weights_manifest.json \\
+        --mode=decode --output=ir1_decode.json
 
-For FP32 activations (slower but precise):
-  python codegen_v6_6.py --activations=fp32 ...
+    # Generate full pipeline (IR1 + Fusion + Layout)
+    python build_ir_v6_6.py --manifest=/path/to/weights_manifest.json \\
+        --mode=decode --output=ir1_decode.json --layout-output=layout_decode.json
+
+OUTPUTS:
+    - IR1 JSON: Simple kernel sequence (before fusion)
+    - Layout JSON: Fused kernels + memory layout with explicit offsets
 """
 
-import copy
+import argparse
 import json
 import os
-import re
+import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 
-# v6.6 imports - compat layer handles legacy v3/v4 functions
-# Note: compat_ir_v4_v6_6.py imports from ir_types_v6_6.py for v6 types
-import compat_ir_v4_v6_6 as v3
-import v6_6_ir_lowering as v6_low  # v6.6 IR lowering with per-layer buffers
-import codegen_v6_6 as codegen_v6
-import fusion_patterns as fp
-import parallel_planner as pp
-import quant_types as qt
-import training_config as tc
 
-# ---------------------------------------------------------------------------
-# Presets (local configs for quick tests)
-# ---------------------------------------------------------------------------
+def _sanitize_macro(name: str) -> str:
+    """Return an ASCII-safe macro suffix for a name."""
+    out = []
+    prev_us = False
+    for ch in name:
+        if ch.isalnum():
+            out.append(ch.upper())
+            prev_us = False
+        else:
+            if not prev_us:
+                out.append("_")
+                prev_us = True
+    s = "".join(out).strip("_")
+    if not s:
+        s = "UNNAMED"
+    if s[0].isdigit():
+        s = f"N_{s}"
+    return s
 
-PRESETS = {
-    "qwen2-0.5b": {
-        "config": "qwen2_0.5.json",
-        "name": "qwen2_0.5b",
-        "hf": "Qwen/Qwen2-0.5B",
-    },
-    "smollm-135": {
-        "config": "smolLM-135.json",
-        "name": "smollm_135",
-        "hf": "HuggingFaceTB/SmolLM-135M",
-    },
+
+def _align_up(value: int, align: int) -> int:
+    return (value + align - 1) // align * align
+
+
+def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, num_layers_override: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
+    """Return activation buffer specs keyed by name."""
+    embed_dim = int(config.get("embed_dim", 896))
+    num_heads = int(config.get("num_heads", 14))
+    num_kv_heads = int(config.get("num_kv_heads", 2))
+    head_dim = int(config.get("head_dim", 64))
+    intermediate_size = int(config.get("intermediate_size", config.get("intermediate_dim", 4864)))
+    vocab_size = int(config.get("vocab_size", 151936))
+    num_layers = int(num_layers_override or config.get("num_layers", 24))
+
+    max_context = int(config.get("context_length", 32768))
+    if context_len is None:
+        context_len = max_context
+    else:
+        context_len = min(context_len, max_context)
+
+    seq_len = 1 if mode == "decode" else context_len
+
+    specs = {}
+
+    def add(name: str, size: int, shape: str, dtype: str = "fp32") -> None:
+        specs[name] = {
+            "name": name,
+            "size": int(size),
+            "shape": shape,
+            "dtype": dtype,
+        }
+
+    # Text input (optional)
+    max_input_bytes = seq_len * 16
+    add("text_input", max_input_bytes, f"[{max_input_bytes}]", "u8")
+
+    # Token IDs
+    token_ids_size = seq_len * 4
+    add("token_ids", token_ids_size, f"[{seq_len}]", "i32")
+
+    # Embedding + layer buffers
+    embedded_size = seq_len * embed_dim * 4
+    add("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+    add("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+    add("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
+
+    # KV cache + RoPE
+    kv_per_layer = num_kv_heads * context_len * head_dim * 4
+    total_kv_size = num_layers * 2 * kv_per_layer
+    add("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
+
+    rope_size = context_len * (head_dim // 2) * 4 * 2
+    add("rope_cache", rope_size, f"[2, {context_len}, {head_dim // 2}]")
+
+    # Scratch buffers
+    q_size = num_heads * seq_len * head_dim * 4
+    k_size = num_kv_heads * seq_len * head_dim * 4
+    v_size = num_kv_heads * seq_len * head_dim * 4
+    attn_out_size = num_heads * seq_len * head_dim * 4
+    add("q_scratch", q_size, f"[{num_heads}, {seq_len}, {head_dim}]")
+    add("k_scratch", k_size, f"[{num_kv_heads}, {seq_len}, {head_dim}]")
+    add("v_scratch", v_size, f"[{num_kv_heads}, {seq_len}, {head_dim}]")
+    add("attn_scratch", attn_out_size, f"[{num_heads}, {seq_len}, {head_dim}]")
+
+    mlp_size = seq_len * intermediate_size * 2 * 4
+    fused_attn_scratch = max(350 * 1024, 3 * num_heads * seq_len * head_dim * 4 + embed_dim * 4 * seq_len * 4)
+    scratch_size = max(mlp_size, fused_attn_scratch)
+    add("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn)]")
+
+    # Layer output
+    layer_out_size = seq_len * embed_dim * 4
+    add("layer_output", layer_out_size, f"[{seq_len}, {embed_dim}]")
+
+    # Logits
+    logits_seq = 1 if mode == "decode" else seq_len
+    logits_size = logits_seq * vocab_size * 4
+    add("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
+
+    return specs
+
+# Script directory
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+# Template Op → Kernel Op Mapping
+# This is the single source of truth for how template ops map to kernel registry ops
+# Note: "matmul" is a logical op that maps to gemv (decode) or gemm (prefill) based on mode
+TEMPLATE_TO_KERNEL_OP = {
+    # Header ops
+    "tokenizer": None,  # Metadata op - no kernel
+    "dense_embedding_lookup": "embedding",  # Token embedding lookup
+    "embedding": "embedding",
+
+    # Attention block
+    "rmsnorm": "rmsnorm",
+    "qkv_proj": "qkv_projection",  # Or fallback to 3x matmul
+    "rope_qk": "rope",
+    "kv_cache_store": "kv_cache_store",  # Store K,V to KV cache at pos
+    "attn": "attention",
+    "out_proj": "matmul",  # gemv (decode) or gemm (prefill)
+
+    # Residual
+    "residual_add": "residual_add",
+
+    # MLP block
+    # NOTE: mega_fused_outproj_mlp_prefill expects head-major attention output,
+    # which conflicts with the current pipeline where attention is followed by OutProj.
+    # Use simple matmul for mlp_gate_up to avoid the mismatch.
+    "mlp_gate_up": "matmul",  # gemv (decode) or gemm (prefill) - use unfused MLP
+    "silu_mul": "swiglu",
+    "mlp_down": "matmul",  # gemv (decode) or gemm (prefill)
+
+    # Footer ops
+    "final_rmsnorm": "rmsnorm",
+    "weight_tying": None,  # Metadata op - no kernel
+    "logits": "matmul",  # gemv (decode) or gemm (prefill)
 }
 
-HOST_OPS = {"embedding", "rope_precompute"}
+# Map IR1 weight keys to kernel input names
+# IR1 uses: wq, wk, wv, wo, w1, w2, ln1_gamma, token_emb, etc.
+# Kernel maps use: W, x, gamma, weight, etc.
+WEIGHT_TO_KERNEL_INPUT = {
+    # Matrix weights → W
+    "wq": "W", "wk": "W", "wv": "W", "wo": "W",
+    "w1": "W", "w2": "W", "w3": "W",
+    # Biases → bias (if kernel has it)
+    "bq": "bias", "bk": "bias", "bv": "bias", "bo": "bias",
+    "b1": "bias", "b2": "bias",
+    # Layer norms → gamma
+    "ln1_gamma": "gamma", "ln2_gamma": "gamma",
+    # Embeddings
+    "token_emb": "weight",
+    # Footer
+    "final_ln_weight": "gamma", "final_ln_bias": "bias",
+}
 
-WEIGHT_MAP_V4 = [
-    {"hf": "model.embed_tokens.weight", "ck": "token_emb"},
-    {"hf": "model.layers.{layer}.input_layernorm.weight", "ck": "layer.{L}.ln1_gamma"},
-    {"hf": "model.layers.{layer}.self_attn.q_proj.weight", "ck": "layer.{L}.wq"},
-    {"hf": "model.layers.{layer}.self_attn.k_proj.weight", "ck": "layer.{L}.wk"},
-    {"hf": "model.layers.{layer}.self_attn.v_proj.weight", "ck": "layer.{L}.wv"},
-    {"hf": "model.layers.{layer}.self_attn.o_proj.weight", "ck": "layer.{L}.wo"},
-    {"hf": "model.layers.{layer}.post_attention_layernorm.weight", "ck": "layer.{L}.ln2_gamma"},
-    {"hf": "model.layers.{layer}.mlp.gate_proj.weight", "ck": "layer.{L}.w1", "pack": "concat", "axis": 0, "part": "gate"},
-    {"hf": "model.layers.{layer}.mlp.up_proj.weight", "ck": "layer.{L}.w1", "pack": "concat", "axis": 0, "part": "up"},
-    {"hf": "model.layers.{layer}.mlp.down_proj.weight", "ck": "layer.{L}.w2"},
-    {"hf": "model.norm.weight", "ck": "final_ln_weight"},
-    {"hf": "lm_head.weight", "ck": "lm_head_weight", "optional": True},
-]
+def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Optional[int]]:
+    """Compute output/input dims for matmul-like ops (gemv/gemm) and quantize ops."""
+    embed = config.get("embed_dim", 896)
+    heads = config.get("num_heads", 14)
+    kv_heads = config.get("num_kv_heads", 2)
+    head_dim = config.get("head_dim", 64)
+    inter = config.get("intermediate_size", config.get("intermediate_dim", 4864))
+    vocab = config.get("vocab_size", 0)
 
-# ---------------------------------------------------------------------------
-# Alignment helpers
-# ---------------------------------------------------------------------------
-
-QK_K = 256
-
-def align_up_bytes(n: int, alignment: int) -> int:
-    return (n + alignment - 1) & ~(alignment - 1)
-
-def align_up_elems(elems: int, elem_bytes: int, alignment: int) -> int:
-    return align_up_bytes(elems * elem_bytes, alignment) // elem_bytes
-
-
-# ---------------------------------------------------------------------------
-# Graph IR v6 (kernel-aligned, manifest-first)
-# ---------------------------------------------------------------------------
-def map_template_op_to_internal(template_op: str, layer_id: int, op_index: int,
-                                prev_outputs: List[str],
-                                rmsnorm_count: int = 0, residual_count: int = 0,
-                                template_flags: Optional[Dict] = None) -> Tuple[Optional[Dict], int, int]:
-    """
-    Map a template op to internal IR op format.
-
-    Args:
-        template_op: The template op name (e.g., "rmsnorm", "qkv_proj")
-        layer_id: The layer index
-        op_index: Position of this op in the sequence (0-based)
-        prev_outputs: List of output tensor names from previous ops in the sequence
-        rmsnorm_count: Number of rmsnorm ops already seen in this layer
-        residual_count: Number of residual_add ops already seen in this layer
-        template_flags: Template flags (use_qkv_bias, etc.)
-
-    Returns:
-        Tuple of (mapped_op_dict, updated_rmsnorm_count, updated_residual_count)
-        Returns (None, rmsnorm_count, residual_count) if op should be skipped
-    """
-    template_flags = template_flags or {}
-    has_bias = template_flags.get("use_qkv_bias") == True
-
-    # Mapping from template ops to internal ops
-    # Base mappings don't include layer-specific details
-    op_mappings = {
-        "rmsnorm": {
-            "op": "rmsnorm",
-            "name": "ln{ln_num}",
-            "inputs": ["input"],
-            "weights": ["layer.{L}.ln{ln_num}_gamma"],
-            "outputs": ["layer.{L}.ln{ln_num}_out"],
-        },
-        "qkv_proj": {
-            "op": "qkv_project",
-            "name": "qkv_project",
-            "inputs": ["layer.{L}.ln{ln_num}_out"],
-            "weights": ["layer.{L}.wq", "layer.{L}.wk", "layer.{L}.wv"],
-            "outputs": ["layer.{L}.q", "layer.{L}.k", "layer.{L}.v"],
-        },
-        "rope_qk": {
-            "op": "rope",
-            "name": "rope",
-            "inputs": ["layer.{L}.q", "layer.{L}.k", "rope_cos_cache", "rope_sin_cache"],
-            "outputs": ["layer.{L}.q", "layer.{L}.k"],
-        },
-        "attn": {
-            "op": "attention",
-            "name": "attention",
-            "inputs": ["layer.{L}.q", "layer.{L}.k", "layer.{L}.v"],
-            "outputs": ["layer.{L}.attn_out"],
-            "scratch": ["layer.{L}.scores"],
-        },
-        "out_proj": {
-            "op": "attn_proj",
-            "name": "attn_proj",
-            "inputs": ["layer.{L}.attn_out"],
-            "weights": ["layer.{L}.wo"],
-            "outputs": ["layer.{L}.proj_tmp"],
-            "scratch": ["layer.{L}.proj_scratch"],
-        },
-        "residual_add": {
-            "op": "residual_add",
-            "name": "residual{residual_num}",
-            "inputs": [],
-            "outputs": ["layer.{L}.residual{residual_num}_out"],
-        },
-        "mlp_gate_up": {
-            "op": "mlp_up",
-            "name": "mlp_up",
-            "inputs": ["layer.{L}.ln{ln_num}_out"],
-            "weights": ["layer.{L}.w1"],
-            "outputs": ["layer.{L}.fc1_out"],
-        },
-        "silu_mul": {
-            "op": "swiglu",
-            "name": "swiglu",
-            "inputs": ["layer.{L}.fc1_out"],
-            "outputs": ["layer.{L}.swiglu_out"],
-        },
-        "mlp_down": {
-            "op": "mlp_down",
-            "name": "mlp_down",
-            "inputs": ["layer.{L}.swiglu_out"],
-            "weights": ["layer.{L}.w2"],
-            "outputs": ["layer.{L}.mlp_out"],
-        },
-    }
-
-    if template_op not in op_mappings:
-        print(f"[TEMPLATE] Warning: unknown op '{template_op}', skipping")
-        return None, rmsnorm_count, residual_count
-
-    # Get the base mapping
-    mapped = copy.deepcopy(op_mappings[template_op])
-
-    # Replace layer placeholder
-    def replace_layer_placeholder(obj):
-        if isinstance(obj, str):
-            return obj.replace("{L}", str(layer_id))
-        elif isinstance(obj, list):
-            return [replace_layer_placeholder(item) for item in obj]
-        return obj
-
-    # Handle bias based on template flags
-    if template_op == "qkv_proj" and has_bias:
-        mapped["biases"] = ["layer.{L}.bq", "layer.{L}.bk", "layer.{L}.bv"]
-
-    # Sequence-aware determination based on counts (passed in, not function attrs)
-    if template_op == "rmsnorm":
-        # First rmsnorm is ln1 (index 0), second is ln2 (index 1)
-        ln_num = 1 if rmsnorm_count == 0 else 2
-        rmsnorm_count += 1
-        mapped["name"] = mapped["name"].replace("{ln_num}", str(ln_num))
-        mapped["weights"] = [w.replace("{ln_num}", str(ln_num)) for w in mapped["weights"]]
-        mapped["outputs"] = [o.replace("{ln_num}", str(ln_num)) for o in mapped["outputs"]]
-        # Input for ln1 is "input" (from previous layer or residual)
-        # Input for ln2 is residual1 (from first residual_add)
-        if ln_num == 2:
-            # Find residual1 output from previous ops
-            residual1_found = False
-            for prev_out in prev_outputs:
-                if f"layer.{layer_id}.residual1_out" in prev_out:
-                    mapped["inputs"] = [prev_out]
-                    residual1_found = True
-                    break
-            if not residual1_found:
-                # Fallback - use the first output that looks like a residual
-                for prev_out in prev_outputs:
-                    if "residual" in prev_out and "out" in prev_out:
-                        mapped["inputs"] = [prev_out]
-                        residual1_found = True
-                        break
-                if not residual1_found:
-                    mapped["inputs"] = [f"layer.{layer_id}.residual1_out"]
-    elif template_op == "residual_add":
-        # First residual_add → residual1 (adds: input + proj_tmp)
-        # Second residual_add → residual2 (adds: residual1_out + mlp_out)
-        residual_num = 1 if residual_count == 0 else 2
-        residual_count += 1
-
-        # Determine inputs based on which residual_add this is
-        if residual_num == 1:
-            # First residual: add layer input to attention output
-            # Find proj_tmp from previous ops
-            proj_tmp = None
-            for prev_out in prev_outputs:
-                if f"layer.{layer_id}.proj_tmp" in prev_out:
-                    proj_tmp = prev_out
-                    break
-            if proj_tmp:
-                mapped["inputs"] = ["input", proj_tmp]
-            else:
-                mapped["inputs"] = ["input", f"layer.{layer_id}.proj_tmp"]
-            mapped["outputs"] = [f"layer.{layer_id}.residual1_out"]
-        else:
-            # Second residual: add residual1 to mlp output
-            # Find residual1 output and mlp_out from previous ops
-            residual1_out = None
-            mlp_out = None
-            for prev_out in prev_outputs:
-                if f"layer.{layer_id}.residual1_out" in prev_out:
-                    residual1_out = prev_out
-                elif f"layer.{layer_id}.mlp_out" in prev_out:
-                    mlp_out = prev_out
-
-            if residual1_out and mlp_out:
-                mapped["inputs"] = [residual1_out, mlp_out]
-            else:
-                # Fallback
-                mapped["inputs"] = [f"layer.{layer_id}.residual1_out", f"layer.{layer_id}.mlp_out"]
-            mapped["outputs"] = [f"layer.{layer_id}.output"]
-
-        mapped["name"] = mapped["name"].replace("{residual_num}", str(residual_num))
-        mapped["outputs"] = [o.replace("{residual_num}", str(residual_num)) for o in mapped["outputs"]]
-    elif template_op == "mlp_gate_up":
-        # MLP gate_up should take input from ln2 output (residual1_out after residual1)
-        # Find ln2 output from previous ops
-        ln2_out = None
-        for prev_out in prev_outputs:
-            if f"layer.{layer_id}.ln2_out" in prev_out:
-                ln2_out = prev_out
-                break
-
-        if ln2_out:
-            mapped["inputs"] = [ln2_out]
-        else:
-            # Fallback to residual1
-            mapped["inputs"] = [f"layer.{layer_id}.residual1_out"]
-
-        # Update outputs to use ln_num for consistency
-        mapped["outputs"] = [o.replace("{ln_num}", "2") for o in mapped["outputs"]]
-        mapped["weights"] = [w.replace("{ln_num}", "2") for w in mapped["weights"]]
-    else:
-        # For other ops, just replace {ln_num} if present
-        # Most ops after attention use ln2
-        if "{ln_num}" in mapped["name"]:
-            mapped["name"] = mapped["name"].replace("{ln_num}", "2")
-        if "{ln_num}" in str(mapped.get("weights", [])):
-            mapped["weights"] = [w.replace("{ln_num}", "2") for w in mapped["weights"]]
-        if "{ln_num}" in str(mapped.get("outputs", [])):
-            mapped["outputs"] = [o.replace("{ln_num}", "2") for o in mapped["outputs"]]
-
-    return replace_layer_placeholder(mapped), rmsnorm_count, residual_count
+    if op_name in ("q_proj",):
+        return heads * head_dim, embed
+    if op_name in ("k_proj", "v_proj"):
+        return kv_heads * head_dim, embed
+    if op_name in ("out_proj", "attn_proj"):
+        return embed, embed
+    if op_name in ("mlp_gate_up", "mlp_up"):
+        return inter * 2, embed
+    if op_name in ("mlp_gate",):
+        return inter, embed
+    if op_name in ("mlp_down",):
+        return embed, inter
+    if op_name in ("logits",):
+        return vocab, embed
+    # Quantize ops: _input_dim is the size to quantize
+    # quantize_input_0/1: quantize embed_dim (rmsnorm output before projections)
+    # quantize_out_proj_input: quantize embed_dim (attention output)
+    # quantize_mlp_down_input: quantize intermediate_size (swiglu output)
+    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input"):
+        return embed, embed  # output_dim not used, but _input_dim = embed
+    if op_name in ("quantize_mlp_down_input",):
+        return inter, inter  # _input_dim = intermediate_size
+    return None, None
 
 
-def build_graph_ir_v6(config: Dict, model_name: str, alignment_bytes: int = 64, template: Optional[Dict] = None) -> Dict:
-    dtype = config["dtype"]
-    elem_bytes = v3.DTYPE_BYTES.get(dtype, 4)
-    weight_dtype = str(config.get("weight_dtype", "")).lower()
-    use_k_align = weight_dtype in ("q4_k", "q6_k", "q8_k")
-    qk_align_bytes = QK_K * elem_bytes
-
-    E = config["embed_dim"]
-    H = config["num_heads"]
-    KV = config["num_kv_heads"]
-    D = config["head_dim"]
-    I = config["intermediate_dim"]
-    T = config["max_seq_len"]
-    V = config["vocab_size"]
-
-    AE = align_up_elems(E, elem_bytes, qk_align_bytes if use_k_align else alignment_bytes)
-    AD = align_up_elems(D, elem_bytes, alignment_bytes)
-    AI = align_up_elems(I, elem_bytes, qk_align_bytes if use_k_align else alignment_bytes)
-    AC = align_up_elems(T, elem_bytes, alignment_bytes)
-    config["aligned_embed"] = AE
-    config["aligned_head"] = AD
-    config["aligned_intermediate"] = AI
-    config["aligned_context"] = AC
-
-    symbols = {
-        "E": {"name": "embed_dim", "value": E},
-        "AE": {"name": "aligned_embed", "value": AE},
-        "H": {"name": "num_heads", "value": H},
-        "KV": {"name": "num_kv_heads", "value": KV},
-        "D": {"name": "head_dim", "value": D},
-        "AD": {"name": "aligned_head", "value": AD},
-        "I": {"name": "intermediate_dim", "value": I},
-        "AI": {"name": "aligned_intermediate", "value": AI},
-        "T": {"name": "max_seq_len", "value": T},
-        "AC": {"name": "aligned_context", "value": AC},
-        "S": {"name": "tokens", "value": T},
-        "V": {"name": "vocab_size", "value": V},
-        "NUM_MERGES": {"name": "num_merges", "value": config.get("num_merges", 0)},
-        "VOCAB_BYTES": {"name": "total_vocab_bytes", "value": config.get("total_vocab_bytes", 0)},
-        # Training-specific symbols (set during lowering)
-        "B": {"name": "batch_size", "value": 1},
-        "MB": {"name": "micro_batch_size", "value": 1},
-        "ACCUM": {"name": "accumulation_steps", "value": 1},
-    }
-    sym_values = {k: v["value"] for k, v in symbols.items()}
-
-    def buf(name: str,
-            role: str,
-            shape_expr: List[str],
-            when: Optional[List[str]] = None,
-            tied_to: Optional[str] = None,
-            buf_dtype: Optional[str] = None) -> Dict:
-        resolved = v3.resolve_shape_expr(shape_expr, sym_values)
-        out = {
-            "name": name,
-            "role": role,
-            "dtype": buf_dtype or dtype,
-            "shape": shape_expr,
-            "resolved_shape": resolved,
-        }
-        if tied_to:
-            out["tied_to"] = tied_to
-        if when:
-            out["when"] = when
-        return out
-
-    globals_buffers = []
-    if config.get("rope_theta", 0) > 0:
-        globals_buffers.append(buf("rope_cos_cache", "precomputed", ["T", "D/2"]))
-        globals_buffers.append(buf("rope_sin_cache", "precomputed", ["T", "D/2"]))
-
-    header_buffers = [
-        buf("token_emb", "weight", ["V", "AE"]),
-        # Vocabulary binary data (part of model weights)
-        buf("vocab_offsets", "weight", ["V"], buf_dtype="i32"),
-        buf("vocab_strings", "weight", ["VOCAB_BYTES"], buf_dtype="u8"),
-        buf("vocab_merges", "weight", ["NUM_MERGES", "3"], buf_dtype="i32"),
-        buf("embedded_input", "activation", ["S", "AE"]),
-        # Backward gradients
-        buf("d_embedded_input", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("d_token_emb", "weight_grad", ["V", "AE"], when=["backward", "training"]),
-        # Adam optimizer state for token_emb (fp32 for numerical stability)
-        buf("m_token_emb", "optimizer_state", ["V", "AE"], when=["training"], buf_dtype="f32"),
-        buf("v_token_emb", "optimizer_state", ["V", "AE"], when=["training"], buf_dtype="f32"),
-    ]
-
-    layer_buffers = [
-        # Forward activations
-        buf("layer.{L}.input", "activation", ["S", "AE"]),
-        buf("layer.{L}.ln1_gamma", "weight", ["AE"]),
-        buf("layer.{L}.ln1_out", "activation", ["S", "AE"]),
-        buf("layer.{L}.ln1_rstd", "activation", ["S"], when=["backward", "training"]),
-        buf("layer.{L}.wq", "weight", ["H", "AD", "AE"]),
-        buf("layer.{L}.bq", "weight", ["H", "AD"]),  # Attention Q bias (Qwen2-style)
-        buf("layer.{L}.wk", "weight", ["KV", "AD", "AE"]),
-        buf("layer.{L}.bk", "weight", ["KV", "AD"]),  # Attention K bias (Qwen2-style)
-        buf("layer.{L}.wv", "weight", ["KV", "AD", "AE"]),
-        buf("layer.{L}.bv", "weight", ["KV", "AD"]),  # Attention V bias (Qwen2-style)
-        buf("layer.{L}.q", "activation", ["H", "S", "AD"]),
-        buf("layer.{L}.k", "activation", ["KV", "AC", "AD"]),
-        buf("layer.{L}.v", "activation", ["KV", "AC", "AD"]),
-        buf("layer.{L}.scores", "activation", ["H", "AC", "AC"], when=["prefill", "backward"]),
-        buf("layer.{L}.attn_out", "activation", ["H", "S", "AD"]),
-        buf("layer.{L}.wo", "weight", ["H", "AE", "AD"]),
-        buf("layer.{L}.bo", "weight", ["AE"]),  # Attention output bias (zeros placeholder)
-        buf("layer.{L}.proj_tmp", "activation", ["S", "AE"]),
-        buf("layer.{L}.proj_scratch", "scratch", ["S", "AE"]),
-        buf("layer.{L}.residual1", "activation", ["S", "AE"]),
-        buf("layer.{L}.ln2_gamma", "weight", ["AE"]),
-        buf("layer.{L}.ln2_out", "activation", ["S", "AE"]),
-        buf("layer.{L}.ln2_rstd", "activation", ["S"], when=["backward", "training"]),
-        buf("layer.{L}.w1", "weight", ["2*AI", "AE"]),
-        buf("layer.{L}.b1", "weight", ["2*AI"]),  # FFN bias (zeros placeholder)
-        buf("layer.{L}.fc1_out", "activation", ["S", "2*AI"]),
-        buf("layer.{L}.swiglu_out", "activation", ["S", "AI"]),
-        buf("layer.{L}.w2", "weight", ["AE", "AI"]),
-        buf("layer.{L}.b2", "weight", ["AE"]),  # FFN output bias (zeros placeholder)
-        buf("layer.{L}.mlp_out", "activation", ["S", "AE"]),
-        buf("layer.{L}.output", "activation", ["S", "AE"]),
-        # Backward gradients (d_x = gradient w.r.t. x)
-        buf("layer.{L}.d_output", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_mlp_out", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_swiglu_out", "gradient", ["S", "AI"], when=["backward", "training"]),
-        buf("layer.{L}.d_fc1_out", "gradient", ["S", "2*AI"], when=["backward", "training"]),
-        buf("layer.{L}.d_ln2_out", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_residual1", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_proj_tmp", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_attn_out", "gradient", ["H", "S", "AD"], when=["backward", "training"]),
-        buf("layer.{L}.d_q", "gradient", ["H", "S", "AD"], when=["backward", "training"]),
-        buf("layer.{L}.d_k", "gradient", ["KV", "S", "AD"], when=["backward", "training"]),
-        buf("layer.{L}.d_v", "gradient", ["KV", "S", "AD"], when=["backward", "training"]),
-        buf("layer.{L}.d_ln1_out", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_input", "gradient", ["S", "AE"], when=["backward", "training"]),
-        # Weight gradients
-        buf("layer.{L}.d_ln1_gamma", "weight_grad", ["AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_wq", "weight_grad", ["H", "AD", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_wk", "weight_grad", ["KV", "AD", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_wv", "weight_grad", ["KV", "AD", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_wo", "weight_grad", ["H", "AE", "AD"], when=["backward", "training"]),
-        buf("layer.{L}.d_ln2_gamma", "weight_grad", ["AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_w1", "weight_grad", ["2*AI", "AE"], when=["backward", "training"]),
-        buf("layer.{L}.d_w2", "weight_grad", ["AE", "AI"], when=["backward", "training"]),
-        # Adam optimizer state: m (momentum), v (variance) - stored in fp32
-        buf("layer.{L}.m_ln1_gamma", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_ln1_gamma", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_wq", "optimizer_state", ["H", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_wq", "optimizer_state", ["H", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_wk", "optimizer_state", ["KV", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_wk", "optimizer_state", ["KV", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_wv", "optimizer_state", ["KV", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_wv", "optimizer_state", ["KV", "AD", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_wo", "optimizer_state", ["H", "AE", "AD"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_wo", "optimizer_state", ["H", "AE", "AD"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_ln2_gamma", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_ln2_gamma", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_w1", "optimizer_state", ["2*AI", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_w1", "optimizer_state", ["2*AI", "AE"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.m_w2", "optimizer_state", ["AE", "AI"], when=["training"], buf_dtype="f32"),
-        buf("layer.{L}.v_w2", "optimizer_state", ["AE", "AI"], when=["training"], buf_dtype="f32"),
-    ]
-
-    tie_embeddings = bool(config.get("tie_word_embeddings", True))
-
-    footer_buffers = [
-        buf("final_ln_weight", "weight", ["AE"]),
-        buf("final_output", "activation", ["S", "AE"]),
-        buf("final_ln_rstd", "activation", ["S"], when=["backward", "training"]),
-        buf("lm_head_weight", "weight", ["V", "AE"], tied_to="token_emb" if tie_embeddings else None),
-        buf("logits", "activation", ["S", "V"]),
-        # Training: labels input and loss output
-        buf("labels", "input", ["S"], when=["training"], buf_dtype="i32"),
-        buf("loss", "output", [1], when=["training"], buf_dtype="f32"),
-        # Backward gradients (loss gradient from cross-entropy)
-        buf("d_logits", "gradient", ["S", "V"], when=["backward", "training"]),
-        buf("d_final_output", "gradient", ["S", "AE"], when=["backward", "training"]),
-        buf("d_final_ln_weight", "weight_grad", ["AE"], when=["backward", "training"]),
-        buf("d_lm_head_weight", "weight_grad", ["V", "AE"], when=["backward", "training"]),
-        # Adam optimizer state for final_ln_weight
-        buf("m_final_ln_weight", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        buf("v_final_ln_weight", "optimizer_state", ["AE"], when=["training"], buf_dtype="f32"),
-        # lm_head optimizer state (tied to token_emb if tie_embeddings)
-        buf("m_lm_head_weight", "optimizer_state", ["V", "AE"], when=["training"], buf_dtype="f32"),
-        buf("v_lm_head_weight", "optimizer_state", ["V", "AE"], when=["training"], buf_dtype="f32"),
-        # Training hyperparameters (scalars)
-        buf("learning_rate", "hyperparameter", [1], when=["training"], buf_dtype="f32"),
-        buf("beta1", "hyperparameter", [1], when=["training"], buf_dtype="f32"),
-        buf("beta2", "hyperparameter", [1], when=["training"], buf_dtype="f32"),
-        buf("epsilon", "hyperparameter", [1], when=["training"], buf_dtype="f32"),
-        buf("weight_decay", "hyperparameter", [1], when=["training"], buf_dtype="f32"),
-        buf("step_count", "state", [1], when=["training"], buf_dtype="i32"),
-    ]
-
-    header_ops = [
-        {
-            "op": "embedding",
-            "name": "token_embed",
-            "inputs": ["tokens"],
-            "weights": ["token_emb"],
-            "outputs": ["embedded_input"],
-        },
-    ]
-    if globals_buffers:
-        header_ops.append({
-            "op": "rope_precompute",
-            "name": "rope_precompute",
-            "inputs": [],
-            "outputs": ["rope_cos_cache", "rope_sin_cache"],
-            "attrs": {"theta": config.get("rope_theta", 10000.0)},
-        })
-
-    # Build body ops from template (required for v6.6)
-    if not template or "block_types" not in template:
-        raise ValueError(
-            "Template is required (from weights_manifest or BUMP metadata). "
-            "Run convert_*_to_bump_v6_6.py and pass --weights-manifest or --bump."
-        )
-
-    print(f"[TEMPLATE] Building graph from template: {template.get('name', 'unknown')}")
-
-    # Read and use template flags
-    template_flags = template.get("flags", {})
-    print(f"[TEMPLATE] Flags:")
-    for key, value in template_flags.items():
-        print(f"  - {key}: {value}")
-        # Store flags in config for later use
-        config[f"template_{key}"] = value
-
-    # Use template to build ops
-    body_ops = []
-    # For now, use the first (or default) block type
-    # In the future, we can implement layer_map overrides
-    default_block = template["block_types"].get("dense")
-    if not default_block or "ops" not in default_block:
-        raise ValueError("Template missing block_types.dense.ops")
-
-    # Sequence-aware mapping: track op index and previous outputs
-    prev_outputs = []  # Track outputs from previous ops in the sequence
-    rmsnorm_count = 0
-    residual_count = 0
-    for op_index, template_op in enumerate(default_block["ops"]):
-        mapped_op, rmsnorm_count, residual_count = map_template_op_to_internal(
-            template_op,
-            1,  # layer_id will be filled per layer (using 1 for template building)
-            op_index,
-            prev_outputs,
-            rmsnorm_count,
-            residual_count,
-            template_flags
-        )
-        if mapped_op:
-            body_ops.append(mapped_op)
-            # Add outputs to prev_outputs for next iteration
-            if "outputs" in mapped_op:
-                prev_outputs.extend(mapped_op["outputs"])
-    print(f"[TEMPLATE] Generated {len(body_ops)} ops from template")
-
-    # Handle rope insertion
-    if globals_buffers:
-        # Check if template already includes rope_qk
-        template_has_rope = False
-        if template and "block_types" in template:
-            default_block = template["block_types"].get("dense")
-            if default_block and "ops" in default_block:
-                template_has_rope = "rope_qk" in default_block["ops"]
-
-        if not template_has_rope:
-            # Insert rope op after qkv_project (at index 2)
-            body_ops.insert(2, {
-                "op": "rope",
-                "name": "rope",
-                "inputs": ["layer.{L}.q", "layer.{L}.k", "rope_cos_cache", "rope_sin_cache"],
-                "outputs": ["layer.{L}.q", "layer.{L}.k"],
-            })
-            print("[TEMPLATE] Inserted rope op (template didn't include rope_qk)")
-
-    # Backward ops (reverse order of forward)
-    # Used by both 'backward' mode (gradient-only) and 'training' mode (forward+backward)
-    backward_body_ops = [
-        # residual2 backward: d_output splits to d_residual1 and d_mlp_out
-        {
-            "op": "add_backward",
-            "name": "residual2_backward",
-            "inputs": ["d_output"],
-            "outputs": ["layer.{L}.d_residual1", "layer.{L}.d_mlp_out"],
-            "when": ["backward", "training"],
-        },
-        # mlp_down backward: d_mlp_out -> d_swiglu_out, d_w2
-        {
-            "op": "gemm_backward",
-            "name": "mlp_down_backward",
-            "inputs": ["layer.{L}.d_mlp_out", "layer.{L}.swiglu_out", "layer.{L}.w2"],
-            "outputs": ["layer.{L}.d_swiglu_out"],
-            "weight_grads": ["layer.{L}.d_w2"],
-            "when": ["backward", "training"],
-        },
-        # swiglu backward: d_swiglu_out -> d_fc1_out
-        {
-            "op": "swiglu_backward",
-            "name": "swiglu_backward",
-            "inputs": ["layer.{L}.d_swiglu_out", "layer.{L}.fc1_out"],
-            "outputs": ["layer.{L}.d_fc1_out"],
-            "when": ["backward", "training"],
-        },
-        # mlp_up backward: d_fc1_out -> d_ln2_out, d_w1
-        {
-            "op": "gemm_backward",
-            "name": "mlp_up_backward",
-            "inputs": ["layer.{L}.d_fc1_out", "layer.{L}.ln2_out", "layer.{L}.w1"],
-            "outputs": ["layer.{L}.d_ln2_out"],
-            "weight_grads": ["layer.{L}.d_w1"],
-            "when": ["backward", "training"],
-        },
-        # ln2 backward: d_ln2_out -> d_residual1_ln2, d_ln2_gamma
-        {
-            "op": "rmsnorm_backward",
-            "name": "ln2_backward",
-            "inputs": ["layer.{L}.d_ln2_out", "layer.{L}.residual1", "layer.{L}.ln2_gamma", "layer.{L}.ln2_rstd"],
-            "outputs": ["layer.{L}.d_residual1"],  # Accumulates with residual path
-            "weight_grads": ["layer.{L}.d_ln2_gamma"],
-            "when": ["backward", "training"],
-        },
-        # residual1 backward: d_residual1 splits to d_input and d_proj_tmp
-        {
-            "op": "add_backward",
-            "name": "residual1_backward",
-            "inputs": ["layer.{L}.d_residual1"],
-            "outputs": ["layer.{L}.d_input", "layer.{L}.d_proj_tmp"],
-            "when": ["backward", "training"],
-        },
-        # attn_proj backward: d_proj_tmp -> d_attn_out, d_wo
-        {
-            "op": "gemm_backward",
-            "name": "attn_proj_backward",
-            "inputs": ["layer.{L}.d_proj_tmp", "layer.{L}.attn_out", "layer.{L}.wo"],
-            "outputs": ["layer.{L}.d_attn_out"],
-            "weight_grads": ["layer.{L}.d_wo"],
-            "when": ["backward", "training"],
-        },
-        # attention backward: d_attn_out -> d_q, d_k, d_v
-        {
-            "op": "attention_backward",
-            "name": "attention_backward",
-            "inputs": ["layer.{L}.d_attn_out", "layer.{L}.q", "layer.{L}.k", "layer.{L}.v", "layer.{L}.scores"],
-            "outputs": ["layer.{L}.d_q", "layer.{L}.d_k", "layer.{L}.d_v"],
-            "when": ["backward", "training"],
-        },
-        # qkv_project backward: d_q,d_k,d_v -> d_ln1_out, d_wq,d_wk,d_wv
-        {
-            "op": "qkv_backward",
-            "name": "qkv_backward",
-            "inputs": ["layer.{L}.d_q", "layer.{L}.d_k", "layer.{L}.d_v", "layer.{L}.ln1_out"],
-            "weights": ["layer.{L}.wq", "layer.{L}.wk", "layer.{L}.wv"],
-            "outputs": ["layer.{L}.d_ln1_out"],
-            "weight_grads": ["layer.{L}.d_wq", "layer.{L}.d_wk", "layer.{L}.d_wv"],
-            "when": ["backward", "training"],
-        },
-        # ln1 backward: d_ln1_out -> d_input, d_ln1_gamma
-        {
-            "op": "rmsnorm_backward",
-            "name": "ln1_backward",
-            "inputs": ["layer.{L}.d_ln1_out", "input", "layer.{L}.ln1_gamma", "layer.{L}.ln1_rstd"],
-            "outputs": ["layer.{L}.d_input"],  # Accumulates with residual path
-            "weight_grads": ["layer.{L}.d_ln1_gamma"],
-            "when": ["backward", "training"],
-        },
-    ]
-
-    # Insert rope backward if rope is used
-    if globals_buffers:
-        # Find attention_backward index and insert rope_backward before it
-        for i, op in enumerate(backward_body_ops):
-            if op["name"] == "attention_backward":
-                backward_body_ops.insert(i + 1, {
-                    "op": "rope_backward",
-                    "name": "rope_backward",
-                    "inputs": ["layer.{L}.d_q", "layer.{L}.d_k", "rope_cos_cache", "rope_sin_cache"],
-                    "outputs": ["layer.{L}.d_q", "layer.{L}.d_k"],
-                    "when": ["backward", "training"],
-                })
-                break
-
-    footer_ops = [
-        {
-            "op": "rmsnorm",
-            "name": "final_ln",
-            "inputs": ["last_layer_output"],
-            "weights": ["final_ln_weight"],
-            "outputs": ["final_output"],
-            "cache": ["final_ln_rstd"],  # Cache rstd for backward
-        },
-        {
-            "op": "lm_head",
-            "name": "lm_head",
-            "inputs": ["final_output"],
-            "weights": ["lm_head_weight"],
-            "outputs": ["logits"],
-        },
-        # Training: cross-entropy loss (logits, labels) -> loss, d_logits
-        {
-            "op": "cross_entropy_loss",
-            "name": "cross_entropy",
-            "inputs": ["logits", "labels"],
-            "outputs": ["loss", "d_logits"],
-            "when": ["training"],
-            "description": "Cross-entropy loss with fused softmax and gradient computation",
-        },
-    ]
-
-    # Footer backward ops (start from d_logits)
-    # For 'backward' mode: d_logits is assumed to be provided externally
-    # For 'training' mode: d_logits comes from cross_entropy_loss above
-    footer_backward_ops = [
-        # lm_head backward: d_logits -> d_final_output, d_lm_head_weight
-        {
-            "op": "gemm_backward",
-            "name": "lm_head_backward",
-            "inputs": ["d_logits", "final_output", "lm_head_weight"],
-            "outputs": ["d_final_output"],
-            "weight_grads": ["d_lm_head_weight"],
-            "when": ["backward", "training"],
-        },
-        # final_ln backward: d_final_output -> d_last_layer_output, d_final_ln_weight
-        {
-            "op": "rmsnorm_backward",
-            "name": "final_ln_backward",
-            "inputs": ["d_final_output", "last_layer_output", "final_ln_weight", "final_ln_rstd"],
-            "outputs": ["d_last_layer_output"],
-            "weight_grads": ["d_final_ln_weight"],
-            "when": ["backward", "training"],
-        },
-    ]
-
-    # Header backward ops
-    header_backward_ops = [
-        # embedding backward: d_embedded_input -> d_token_emb (scatter add)
-        {
-            "op": "embedding_backward",
-            "name": "embedding_backward",
-            "inputs": ["d_embedded_input", "tokens"],
-            "outputs": ["d_token_emb"],
-            "when": ["backward", "training"],
-        },
-    ]
-
-    # Optimizer step ops (AdamW update for each weight)
-    # These run after backward pass, updating weights using gradients
-    optimizer_layer_ops = [
-        # ln1_gamma
-        {
-            "op": "adamw_update",
-            "name": "adamw_ln1_gamma",
-            "inputs": ["layer.{L}.d_ln1_gamma", "layer.{L}.ln1_gamma",
-                       "layer.{L}.m_ln1_gamma", "layer.{L}.v_ln1_gamma",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.ln1_gamma", "layer.{L}.m_ln1_gamma", "layer.{L}.v_ln1_gamma"],
-            "when": ["training"],
-        },
-        # wq
-        {
-            "op": "adamw_update",
-            "name": "adamw_wq",
-            "inputs": ["layer.{L}.d_wq", "layer.{L}.wq",
-                       "layer.{L}.m_wq", "layer.{L}.v_wq",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.wq", "layer.{L}.m_wq", "layer.{L}.v_wq"],
-            "when": ["training"],
-        },
-        # wk
-        {
-            "op": "adamw_update",
-            "name": "adamw_wk",
-            "inputs": ["layer.{L}.d_wk", "layer.{L}.wk",
-                       "layer.{L}.m_wk", "layer.{L}.v_wk",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.wk", "layer.{L}.m_wk", "layer.{L}.v_wk"],
-            "when": ["training"],
-        },
-        # wv
-        {
-            "op": "adamw_update",
-            "name": "adamw_wv",
-            "inputs": ["layer.{L}.d_wv", "layer.{L}.wv",
-                       "layer.{L}.m_wv", "layer.{L}.v_wv",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.wv", "layer.{L}.m_wv", "layer.{L}.v_wv"],
-            "when": ["training"],
-        },
-        # wo
-        {
-            "op": "adamw_update",
-            "name": "adamw_wo",
-            "inputs": ["layer.{L}.d_wo", "layer.{L}.wo",
-                       "layer.{L}.m_wo", "layer.{L}.v_wo",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.wo", "layer.{L}.m_wo", "layer.{L}.v_wo"],
-            "when": ["training"],
-        },
-        # ln2_gamma
-        {
-            "op": "adamw_update",
-            "name": "adamw_ln2_gamma",
-            "inputs": ["layer.{L}.d_ln2_gamma", "layer.{L}.ln2_gamma",
-                       "layer.{L}.m_ln2_gamma", "layer.{L}.v_ln2_gamma",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.ln2_gamma", "layer.{L}.m_ln2_gamma", "layer.{L}.v_ln2_gamma"],
-            "when": ["training"],
-        },
-        # w1 (gate + up)
-        {
-            "op": "adamw_update",
-            "name": "adamw_w1",
-            "inputs": ["layer.{L}.d_w1", "layer.{L}.w1",
-                       "layer.{L}.m_w1", "layer.{L}.v_w1",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.w1", "layer.{L}.m_w1", "layer.{L}.v_w1"],
-            "when": ["training"],
-        },
-        # w2 (down)
-        {
-            "op": "adamw_update",
-            "name": "adamw_w2",
-            "inputs": ["layer.{L}.d_w2", "layer.{L}.w2",
-                       "layer.{L}.m_w2", "layer.{L}.v_w2",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["layer.{L}.w2", "layer.{L}.m_w2", "layer.{L}.v_w2"],
-            "when": ["training"],
-        },
-    ]
-
-    # Header optimizer ops (token_emb)
-    optimizer_header_ops = [
-        {
-            "op": "adamw_update",
-            "name": "adamw_token_emb",
-            "inputs": ["d_token_emb", "token_emb",
-                       "m_token_emb", "v_token_emb",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["token_emb", "m_token_emb", "v_token_emb"],
-            "when": ["training"],
-        },
-    ]
-
-    # Footer optimizer ops (final_ln_weight, lm_head_weight)
-    optimizer_footer_ops = [
-        {
-            "op": "adamw_update",
-            "name": "adamw_final_ln_weight",
-            "inputs": ["d_final_ln_weight", "final_ln_weight",
-                       "m_final_ln_weight", "v_final_ln_weight",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["final_ln_weight", "m_final_ln_weight", "v_final_ln_weight"],
-            "when": ["training"],
-        },
-        # lm_head update (skipped if tied to token_emb)
-        {
-            "op": "adamw_update",
-            "name": "adamw_lm_head_weight",
-            "inputs": ["d_lm_head_weight", "lm_head_weight",
-                       "m_lm_head_weight", "v_lm_head_weight",
-                       "learning_rate", "beta1", "beta2", "epsilon", "weight_decay", "step_count"],
-            "outputs": ["lm_head_weight", "m_lm_head_weight", "v_lm_head_weight"],
-            "when": ["training"],
-            "skip_if_tied": True,  # Skip if lm_head tied to token_emb
-        },
-        # Increment step count
-        {
-            "op": "increment",
-            "name": "increment_step",
-            "inputs": ["step_count"],
-            "outputs": ["step_count"],
-            "when": ["training"],
-        },
-    ]
-
-    # Gradient reduction ops (for data parallel training)
-    gradient_reduction_ops = [
-        # AllReduce all weight gradients (sum across workers, then average)
-        {
-            "op": "allreduce",
-            "name": "allreduce_gradients",
-            "inputs": ["all_weight_gradients"],
-            "outputs": ["all_weight_gradients"],
-            "attrs": {
-                "reduce_op": "sum",
-                "scale": "1/data_parallel_size",
-            },
-            "when": ["training"],
-            "condition": "data_parallel_size > 1",
-        },
-    ]
-
-    section = {
-        "id": 0,
-        "name": "text_decoder",
-        "inputs": [
-            {"name": "tokens", "dtype": "i32", "shape": ["S"]},
-        ],
-        "globals": globals_buffers,
-        "buffers": {
-            "header": header_buffers,
-            "layer": layer_buffers,
-            "footer": footer_buffers,
-        },
-        "header": {
-            "ops": header_ops,
-            "backward_ops": header_backward_ops,
-            "optimizer_ops": optimizer_header_ops,
-            "outputs": ["embedded_input"],
-        },
-        "body": {
-            "repeat": "num_layers",
-            "layer_var": "L",
-            "bindings": {
-                "input": {
-                    "first_layer": "embedded_input",
-                    "next_layer": "layer.{L-1}.output",
-                },
-                # Backward bindings (gradient flows from output to input)
-                "d_output": {
-                    "last_layer": "d_last_layer_output",  # From footer backward
-                    "prev_layer": "layer.{L+1}.d_input",  # From next layer's backward
-                },
-            },
-            "ops": body_ops,
-            "backward_ops": backward_body_ops,
-            "optimizer_ops": optimizer_layer_ops,
-            "outputs": ["layer.{L}.output"],
-        },
-        "footer": {
-            "bindings": {
-                "last_layer_output": "layer.{L-1}.output",
-            },
-            "ops": footer_ops,
-            "backward_ops": footer_backward_ops,
-            "optimizer_ops": optimizer_footer_ops,
-            "outputs": ["logits"],
-        },
-        "gradient_reduction": gradient_reduction_ops,
-    }
-
-    if config.get("model_type") in {"llama", "qwen2", "mistral"}:
-        weight_map = WEIGHT_MAP_V4
-    else:
-        weight_map = []
-
-    return {
-        "version": 4,
-        "kind": "graph",
-        "generated": datetime.utcnow().isoformat() + "Z",
-        "model": model_name,
-        "config": config,
-        "template": template,
-        "symbols": symbols,
-        "sections": [section],
-        "weight_map": weight_map,
-    }
+def _align_up(value: int, alignment: int) -> int:
+    if alignment <= 1:
+        return value
+    return (value + alignment - 1) // alignment * alignment
 
 
-# ---------------------------------------------------------------------------
-# Weights metadata (safetensors header / index)
-# ---------------------------------------------------------------------------
-
-def read_safetensors_header(path: str) -> Dict:
-    """Read safetensors header without loading weights."""
-    with open(path, "rb") as f:
-        header_len = int.from_bytes(f.read(8), "little")
-        header_json = f.read(header_len).decode("utf-8")
-    return json.loads(header_json)
-
-
-def read_weights_index(path: str) -> Dict:
-    """Read model.safetensors.index.json (names only)."""
-    with open(path, "r") as f:
+def load_kernel_registry() -> Dict:
+    """Load kernel registry."""
+    registry_path = PROJECT_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
+    with open(registry_path, 'r') as f:
         return json.load(f)
 
 
-def extract_weight_names(weights_meta: Dict) -> List[str]:
-    names = set()
-    header = weights_meta.get("header", {})
-    for key in header.keys():
-        if key != "__metadata__":
-            names.add(key)
-    index = weights_meta.get("index", {})
-    weight_map = index.get("weight_map", {})
-    names.update(weight_map.keys())
-    return sorted(names)
+def load_manifest(manifest_path: Path) -> Dict:
+    """Load weights manifest with template and quant summary."""
+    with open(manifest_path, 'r') as f:
+        return json.load(f)
 
 
-def extract_kernel_names_from_c(path: str) -> List[str]:
-    """Extract kernel spec names from src/ckernel_kernel_specs.c."""
-    kernels = []
-    in_table = False
-    with open(path, "r") as f:
-        for line in f:
-            if "const CKKernelSpec ck_kernel_specs[]" in line:
-                in_table = True
-                continue
-            if in_table and line.strip().startswith("};"):
-                break
-            if not in_table:
-                continue
-            m = re.search(r'\{\s*"([^"]+)"\s*,', line)
-            if m:
-                kernels.append(m.group(1))
-    return kernels
-
-
-def load_kernel_registry() -> Dict[str, Dict]:
-    registry_path = v3.DEFAULT_KERNEL_REGISTRY_PATH
-    if not registry_path.exists():
-        raise FileNotFoundError(
-            f"Kernel registry not found: {registry_path}. "
-            "Run version/v6.6/scripts/gen_kernel_registry_from_maps.py first."
-        )
-    with registry_path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-    return v3.normalize_kernel_registry(data)
-
-
-# ---------------------------------------------------------------------------
-# Lowering helpers
-# ---------------------------------------------------------------------------
-
-def expand_layer_name(name: str, layer_id: int) -> str:
-    """Expand layer placeholders in a buffer/op name."""
-    if "{L-1}" in name:
-        name = name.replace("{L-1}", str(layer_id - 1))
-    if "{L}" in name:
-        name = name.replace("{L}", str(layer_id))
-    return name
-
-
-def normalize_layer_template(name: str) -> str:
-    """Normalize layer.N.* into layer.{L}.*"""
-    return re.sub(r"layer\.[0-9]+\.", "layer.{L}.", name)
-
-
-def op_enabled(op: Dict, mode: str) -> bool:
-    when = op.get("when")
-    if not when:
-        return True
-    return mode in when
-
-
-def select_kernel(op: Dict, dtype: str, mode: str, registry: Dict[str, Dict],
-                  weight_dtype: Optional[str] = None,
-                  allow_missing: bool = False) -> Optional[str]:
-    """Select kernel for an operation.
-
-    Args:
-        op: Operation dict with at least "op" key
-        dtype: Default/activation dtype ("f32", "bf16", etc.)
-        mode: Execution mode ("prefill", "decode", "training")
-        registry: Optional kernel registry for custom kernels
-        weight_dtype: Optional weight dtype for quantized inference ("q4_k", "q6_k", etc.)
-
-    Returns:
-        Kernel function name, or None for host-side ops
+def validate_template_ops(template_ops: List[str]) -> List[str]:
     """
-    op_name = op["op"]
-    if op_name in HOST_OPS or op_name == "lm_head":
-        return None
-    if op_name == "attention":
-        key = "attention" if mode in {"prefill", "decode"} else op_name
-    else:
-        key = op_name
-
-    # Normalize dtype
-    dtype_key = dtype
-    if dtype_key == "fp32":
-        dtype_key = "f32"
-    elif dtype_key == "fp16":
-        dtype_key = "f16"
-
-    # Check for quantized weight operations
-    w_dtype = weight_dtype or op.get("weight_dtype")
-    is_quant = bool(w_dtype) and (w_dtype == "mixed" or qt.is_quantized_dtype(w_dtype))
-
-    def quant_weight_matches(weight_q: str, target: str) -> bool:
-        if not weight_q or not target:
-            return False
-        weight_q = weight_q.strip().lower()
-        target = target.strip().lower()
-        if weight_q == "mixed":
-            return True
-        if "|" in weight_q:
-            return target in [part.strip().lower() for part in weight_q.split("|")]
-        return weight_q == target
-
-    # PRIORITY 1: Check kernel registry (from kernel maps) for best match
-    # This allows kernel maps to define exact kernels with metadata
-    if registry:
-        matching_kernel = None
-
-        # Build potential kernel IDs to search for
-        search_keys = [key]
-
-        if w_dtype and qt.is_quantized_dtype(w_dtype):
-            w_dtype_key = w_dtype.lower()
-            search_keys.extend([
-                f"{key}_{w_dtype_key}",
-                f"{key}_{w_dtype_key}_{dtype_key}",
-            ])
-
-        # Search registry for exact match first
-        for search_key in search_keys:
-            if search_key in registry:
-                kernel_entry = registry[search_key]
-                matching_kernel = kernel_entry.get("function", kernel_entry.get("id", search_key))
-                print(f"[KERNEL] Selected from registry: {search_key} -> {matching_kernel}")
-                break
-
-        # If no exact match, search by op type and quant in kernel map entries
-        if not matching_kernel:
-            for kernel_id, kernel_entry in registry.items():
-                kernel_op = kernel_entry.get("op", "")
-                kernel_quant = kernel_entry.get("quant", {})
-
-                # Match by op type
-                op_matches = (kernel_op == op_name or
-                             kernel_op == key or
-                             (op_name == "attn_proj" and kernel_op == "attention_projection") or
-                             (op_name == "qkv_project" and kernel_op == "qkv_projection") or
-                             (op_name == "mlp_up" and kernel_op == "gemm") or
-                             (op_name == "mlp_down" and kernel_op == "gemm"))
-
-                if op_matches:
-                    # Match quantization
-                    if is_quant:
-                        weight_q = kernel_quant.get("weight", "").lower()
-                        if quant_weight_matches(weight_q, w_dtype):
-                            matching_kernel = kernel_entry.get("function", kernel_entry.get("id", kernel_id))
-                            print(f"[KERNEL] Selected from registry (op+quant): {op_name}+{w_dtype} -> {matching_kernel}")
-                            break
-                    else:
-                        # Non-quantized - match activation dtype
-                        act_q = kernel_quant.get("activation", "").lower()
-                        if act_q == dtype_key or act_q == dtype:
-                            matching_kernel = kernel_entry.get("function", kernel_entry.get("id", kernel_id))
-                            print(f"[KERNEL] Selected from registry (op): {op_name} -> {matching_kernel}")
-                            break
-
-        if matching_kernel:
-            return matching_kernel
-
-    if allow_missing:
-        return op.get("kernel")
-
-    raise KeyError(
-        f"No kernel match in registry for op='{op_name}' mode='{mode}' "
-        f"dtype='{dtype_key}' weight_dtype='{w_dtype or ''}'"
-    )
-
-
-def lower_graph_ir(graph: Dict, mode: str, tokens: int, registry: Dict[str, Dict],
-                   training_cfg: Optional["tc.TrainingConfig"] = None,
-                   weights_manifest: Optional[Dict] = None,
-                   weight_dtype: Optional[str] = None) -> Dict:
-    """Lower graph IR into a per-mode expanded program.
-
-    Modes:
-      - prefill: Forward pass only (parallel attention)
-      - decode: Forward pass only (single-token attention)
-      - backward: Backward pass only (assumes activations cached)
-      - training: Forward + loss + backward (complete training step)
-
-    Args:
-      training_cfg: Optional TrainingConfig with batch size, optimizer settings, etc.
+    Validate that all template ops have kernel mappings.
+    Returns list of unmapped ops (empty if all valid).
     """
-    config = graph["config"]
-    template = graph.get("template")
-    symbols = graph["symbols"].copy()
-
-    # Override tokens (S) while keeping max seq (T)
-    symbols["S"] = {"name": "tokens", "value": tokens}
-
-    # For training mode, set batch and accumulation parameters
-    if mode == "training" and training_cfg:
-        symbols["B"] = {"name": "batch_size", "value": training_cfg.batch_size}
-        symbols["MB"] = {"name": "micro_batch_size", "value": training_cfg.micro_batch_size}
-        symbols["ACCUM"] = {"name": "accumulation_steps", "value": training_cfg.accumulation_steps}
-    else:
-        symbols["B"] = {"name": "batch_size", "value": 1}
-        symbols["MB"] = {"name": "micro_batch_size", "value": 1}
-        symbols["ACCUM"] = {"name": "accumulation_steps", "value": 1}
-
-    sym_values = {k: v["value"] for k, v in symbols.items()}
-
-    section = graph["sections"][0]
-    num_layers = config["num_layers"]
-    manifest_entries = {}
-    if weights_manifest and isinstance(weights_manifest, dict):
-        for entry in weights_manifest.get("entries", []):
-            if "name" in entry:
-                manifest_entries[entry["name"]] = entry
-
-    quant_summary = graph.get("quant_summary", {})
-
-    # Templates
-    header_templates = section["buffers"]["header"]
-    layer_templates = section["buffers"]["layer"]
-    footer_templates = section["buffers"]["footer"]
-    globals_templates = section.get("globals", [])
-
-    header_template_map = {b["name"]: b for b in header_templates}
-    footer_template_map = {b["name"]: b for b in footer_templates}
-    globals_template_map = {b["name"]: b for b in globals_templates}
-    layer_template_map = {b["name"]: b for b in layer_templates}
-
-    inputs = []
-    for buf in section.get("inputs", []):
-        resolved = v3.resolve_shape_expr(buf["shape"], sym_values)
-        inputs.append({**buf, "resolved_shape": resolved})
-    input_names = {b["name"] for b in inputs}
-
-    def buffer_spec(name: str, mode_override: Optional[str] = None) -> Optional[Dict]:
-        check_mode = mode_override or mode
-        if name in header_template_map:
-            tmpl = header_template_map[name]
-        elif name in footer_template_map:
-            tmpl = footer_template_map[name]
-        elif name in globals_template_map:
-            tmpl = globals_template_map[name]
-        elif name.startswith("layer."):
-            tmpl_name = normalize_layer_template(name)
-            tmpl = layer_template_map.get(tmpl_name)
-            if tmpl is None:
-                raise KeyError(f"Missing layer template for: {name}")
-        else:
-            raise KeyError(f"Missing template for: {name}")
-
-        # Check when clause - for training mode, accept both forward and backward buffers
-        when = tmpl.get("when")
-        if when:
-            if check_mode == "training":
-                # Training mode needs all buffers (forward + backward)
-                pass  # Accept all
-            elif check_mode not in when:
-                return None
-
-        # Get buffer role and shape
-        role = tmpl.get("role", "activation")
-        shape = list(tmpl["shape"])  # Copy to avoid modifying template
-
-        # For CPU training: buffers stay 2D (no batch dimension)
-        # Batch is simulated via sequential accumulation loop, not 3D tensor ops
-        # AMX only supports 2D tile operations
-
-        resolved = v3.resolve_shape_expr(shape, sym_values)
-        dtype = tmpl.get("dtype", config["dtype"])
-        if role == "weight":
-            manifest = manifest_entries.get(name)
-            if manifest and "dtype" in manifest:
-                dtype = manifest["dtype"]
-            elif weight_dtype:
-                dtype = weight_dtype
-
-        out = {
-            "name": name,
-            "role": role,
-            "dtype": dtype,
-            "shape": shape,
-            "resolved_shape": resolved,
-        }
-        if tmpl.get("tied_to"):
-            out["tied_to"] = tmpl["tied_to"]
-        if role == "weight":
-            manifest = manifest_entries.get(name)
-            if manifest and "size" in manifest:
-                out["file_size"] = int(manifest["size"])
-        return out
-
-    def resolve_names(names: List[str], layer_id: int, bindings: Dict[str, str]) -> List[str]:
-        out = []
-        for n in names:
-            if n in bindings:
-                n = bindings[n]
-            n = expand_layer_name(n, layer_id)
-            out.append(n)
-        return out
-
-    def process_ops(ops_source: List[Dict], layer_id: int, bindings: Dict[str, str],
-                    used_bufs: Dict[str, set], skip_registry_check: bool = False) -> List[Dict]:
-        """Process a list of ops, expanding names and selecting kernels."""
-        result = []
-        for op in ops_source:
-            if not op_enabled(op, mode):
-                continue
-            op_out = dict(op)
-            op_weight_dtype = None
-            op_weight_dtypes = None
-            op_weight_names = []
-
-            # Prefer quant_summary for per-op dtypes (layer-aware)
-            if isinstance(quant_summary, dict) and quant_summary:
-                op_weight_dtypes = get_op_weight_dtypes(quant_summary, layer_id, op_out.get("op", ""))
-                if op_weight_dtypes:
-                    unique = {dt for dt in op_weight_dtypes.values() if dt}
-                    if unique:
-                        op_weight_dtype = next(iter(unique)) if len(unique) == 1 else "mixed"
-
-            # Fallback to manifest entries if quant_summary missing or incomplete
-            if op_weight_dtype is None and "weights" in op_out:
-                op_weight_names = resolve_names(op_out["weights"], layer_id, bindings)
-                for w_name in op_weight_names:
-                    entry = manifest_entries.get(w_name)
-                    w_dtype = None
-                    if entry and "dtype" in entry:
-                        w_dtype = entry["dtype"]
-                    elif weight_dtype:
-                        w_dtype = weight_dtype
-                    if w_dtype:
-                        if op_weight_dtype is None:
-                            op_weight_dtype = w_dtype
-                        elif op_weight_dtype != w_dtype:
-                            op_weight_dtype = "mixed"
-                            break
-
-            if op_weight_dtypes:
-                op_out["weight_dtypes"] = op_weight_dtypes
-            if op_weight_dtype:
-                op_out["weight_dtype"] = op_weight_dtype
-            op_out["kernel"] = select_kernel(op, config["dtype"], mode, registry,
-                                             weight_dtype=op_weight_dtype,
-                                             allow_missing=skip_registry_check)
-            # Don't require backward kernels to be in registry
-            is_quant = op_weight_dtype and (op_weight_dtype == "mixed" or qt.is_quantized_dtype(op_weight_dtype))
-            if (op_out["kernel"] and registry and op_out["kernel"] not in registry and
-                    not skip_registry_check and not is_quant):
-                raise KeyError(f"Unknown kernel: {op_out['kernel']}")
-            if op_out["kernel"]:
-                op_out["kernel_dtype"] = config["dtype"]
-
-            for key in ("inputs", "outputs", "weights", "biases", "scratch", "weight_grads", "cache"):
-                if key in op_out:
-                    names = resolve_names(op_out[key], layer_id, bindings)
-                    op_out[key] = names
-                    for name in names:
-                        if name in input_names:
-                            continue
-                        if name.startswith("layer."):
-                            used_bufs["layer"].add(name)
-                        elif name in globals_template_map:
-                            used_bufs["globals"].add(name)
-                        elif name in header_template_map:
-                            used_bufs["header"].add(name)
-                        elif name in footer_template_map:
-                            used_bufs["footer"].add(name)
-
-            # Special case: attention in decode mode doesn't need scratch
-            if "scratch" in op_out and op_out["op"] == "attention" and mode == "decode":
-                op_out["scratch"] = []
-
-            result.append(op_out)
-        return result
-
-    # Determine which ops to process based on mode
-    is_backward = mode == "backward"
-    is_training = mode == "training"
-    skip_registry = is_backward or is_training  # Backward kernels may not be registered
-
-    # For training mode, we produce a two-phase schedule: forward + backward
-    if is_training:
-        return _lower_training_mode(
-            graph, section, config, symbols, sym_values, num_layers,
-            header_templates, layer_templates, footer_templates, globals_templates,
-            header_template_map, footer_template_map, globals_template_map, layer_template_map,
-            inputs, input_names, buffer_spec, resolve_names, process_ops, registry
-        )
-
-    # For backward mode, we process backward_ops; for forward modes, we process ops
-    if is_backward:
-        header_ops_source = section["header"].get("backward_ops", [])
-        body_ops_source = section["body"].get("backward_ops", [])
-        footer_ops_source = section["footer"].get("backward_ops", [])
-    else:
-        # Forward ops (for prefill, decode)
-        header_ops_source = section["header"]["ops"]
-        body_ops_source = section["body"]["ops"]
-        footer_ops_source = section["footer"]["ops"]
-
-    # Track used buffers
-    used_bufs = {"header": {"vocab_offsets", "vocab_strings", "vocab_merges"}, "footer": set(), "globals": set(), "layer": set()}
-
-    # Header ops (no layer expansion)
-    header_ops = process_ops(header_ops_source, 0, {}, used_bufs, skip_registry)
-
-    # Body ops (expanded per layer)
-    # For backward mode, process layers in reverse order
-    layers_out = []
-    layer_order = range(num_layers - 1, -1, -1) if is_backward else range(num_layers)
-
-    # Check if template has layer_map
-    template_has_layer_map = template and "layer_map" in template
-    layer_map = template.get("layer_map", {}) if template_has_layer_map else {}
-
-    for layer_id in layer_order:
-        used_bufs["layer"] = set()  # Reset per layer
-
-        # Determine which block type to use for this layer
-        # Check overrides first, then use default
-        block_type = layer_map.get("default", "dense")
-        if "overrides" in layer_map and str(layer_id) in layer_map["overrides"]:
-            block_type = layer_map["overrides"][str(layer_id)]
-            if layer_id < 10:  # Only print for first few layers to avoid spam
-                print(f"[TEMPLATE] Layer {layer_id}: using block '{block_type}' (override)")
-
-        # Get the appropriate ops for this block type
-        layer_ops_source = body_ops_source  # Default
-        if template_has_layer_map and block_type in template["block_types"]:
-            # Build ops for this specific block type
-            block_def = template["block_types"][block_type]
-            if "ops" in block_def:
-                # Build ops using template mapping
-                block_ops = []
-                prev_outputs = []
-                # Initialize sequence counters for this layer
-                rmsnorm_count = 0
-                residual_count = 0
-                # Get template flags
-                template_flags = template.get("flags", {})
-                for op_index, template_op in enumerate(block_def["ops"]):
-                    mapped_op, rmsnorm_count, residual_count = map_template_op_to_internal(
-                        template_op,
-                        layer_id,
-                        op_index,
-                        prev_outputs,
-                        rmsnorm_count,
-                        residual_count,
-                        template_flags
-                    )
-                    if mapped_op:
-                        block_ops.append(mapped_op)
-                        if "outputs" in mapped_op:
-                            prev_outputs.extend(mapped_op["outputs"])
-                layer_ops_source = block_ops
-                if layer_id < 10:  # Only print for first few layers
-                    print(f"[TEMPLATE] Layer {layer_id}: built {len(block_ops)} ops from block '{block_type}'")
-
-        bindings = {}
-        for key, spec in section["body"].get("bindings", {}).items():
-            if isinstance(spec, dict):
-                # Forward bindings
-                if "first_layer" in spec and "next_layer" in spec:
-                    if layer_id == 0:
-                        bindings[key] = spec["first_layer"]
-                    else:
-                        bindings[key] = expand_layer_name(spec["next_layer"], layer_id)
-                # Backward bindings
-                elif "last_layer" in spec and "prev_layer" in spec:
-                    if layer_id == num_layers - 1:
-                        bindings[key] = spec["last_layer"]
-                    else:
-                        bindings[key] = expand_layer_name(spec["prev_layer"], layer_id)
-            else:
-                bindings[key] = spec
-
-        layer_ops = process_ops(layer_ops_source, layer_id, bindings, used_bufs, skip_registry)
-
-        # Build layer buffers in template order
-        layer_buffers = []
-        for tmpl in layer_templates:
-            name = expand_layer_name(tmpl["name"], layer_id)
-            if name in used_bufs["layer"]:
-                spec = buffer_spec(name)
-                if spec:
-                    layer_buffers.append(spec)
-
-        layers_out.append({
-            "id": layer_id,
-            "ops": layer_ops,
-            "buffers": layer_buffers,
-        })
-
-    # Footer ops
-    footer_bindings = {}
-    for key, spec in section["footer"].get("bindings", {}).items():
-        if isinstance(spec, dict) and "first_layer" in spec and "next_layer" in spec:
-            if num_layers == 0:
-                footer_bindings[key] = spec.get("first_layer", spec.get("next_layer", ""))
-            else:
-                footer_bindings[key] = expand_layer_name(spec.get("next_layer", ""), num_layers)
-        else:
-            footer_bindings[key] = expand_layer_name(spec, num_layers)
-
-    footer_ops = process_ops(footer_ops_source, num_layers, footer_bindings, used_bufs, skip_registry)
-
-    # Build header/footer/global buffers in template order
-    header_buffers = []
-    for tmpl in header_templates:
-        name = tmpl["name"]
-        if name in used_bufs["header"]:
-            spec = buffer_spec(name)
-            if spec:
-                header_buffers.append(spec)
-
-    footer_buffers = []
-    for tmpl in footer_templates:
-        name = tmpl["name"]
-        if name in used_bufs["footer"]:
-            spec = buffer_spec(name)
-            if spec:
-                footer_buffers.append(spec)
-
-    # Resolve tied_to references: if a buffer references another, add the target
-    header_names = {b["name"] for b in header_buffers}
-    for buf in footer_buffers:
-        tied_to = buf.get("tied_to")
-        if tied_to and tied_to not in header_names:
-            spec = buffer_spec(tied_to)
-            if spec:
-                header_buffers.insert(0, spec)
-                header_names.add(tied_to)
-
-    globals_buffers = []
-    for tmpl in globals_templates:
-        name = tmpl["name"]
-        if name in used_bufs["globals"]:
-            spec = buffer_spec(name)
-            if spec:
-                globals_buffers.append(spec)
-
-    return {
-        "version": 4,
-        "kind": "lowered",
-        "mode": mode,
-        "generated": datetime.utcnow().isoformat() + "Z",
-        "model": graph["model"],
-        "config": config,
-        "symbols": symbols,
-        "sections": [
-            {
-                "id": section["id"],
-                "name": section["name"],
-                "inputs": inputs,
-                "globals": globals_buffers,
-                "header": {"ops": header_ops, "buffers": header_buffers},
-                "layers": layers_out,
-                "footer": {"ops": footer_ops, "buffers": footer_buffers},
-            }
-        ],
-    }
-
-
-def _lower_training_mode(
-    graph: Dict, section: Dict, config: Dict, symbols: Dict, sym_values: Dict,
-    num_layers: int, header_templates: List, layer_templates: List,
-    footer_templates: List, globals_templates: List,
-    header_template_map: Dict, footer_template_map: Dict,
-    globals_template_map: Dict, layer_template_map: Dict,
-    inputs: List, input_names: set,
-    buffer_spec, resolve_names, process_ops, registry: Dict
-) -> Dict:
-    """
-    Lower graph IR for training mode: forward pass + loss + backward pass.
-
-    Produces a structure with explicit forward and backward phases:
-    {
-        "forward_pass": { header, layers[0..N], footer (with loss) },
-        "backward_pass": { footer, layers[N..0], header }
-    }
-    """
-    mode = "training"
-
-    # Track all used buffers
-    all_used = {"header": set(), "footer": set(), "globals": set()}
-
-    # =========================================================================
-    # FORWARD PASS
-    # =========================================================================
-
-    # Forward header ops
-    fwd_header_ops = process_ops(
-        section["header"]["ops"], 0, {},
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # Forward body ops (layers 0 → N-1)
-    fwd_layers = []
-    for layer_id in range(num_layers):
-        layer_used = set()
-        used_bufs = {"header": all_used["header"], "footer": all_used["footer"],
-                     "globals": all_used["globals"], "layer": layer_used}
-
-        # Build forward bindings
-        bindings = {}
-        for key, spec in section["body"].get("bindings", {}).items():
-            if isinstance(spec, dict):
-                if "first_layer" in spec and "next_layer" in spec:
-                    if layer_id == 0:
-                        bindings[key] = spec["first_layer"]
-                    else:
-                        bindings[key] = expand_layer_name(spec["next_layer"], layer_id)
-            elif not isinstance(spec, dict):
-                bindings[key] = spec
-
-        layer_ops = process_ops(
-            section["body"]["ops"], layer_id, bindings, used_bufs,
-            skip_registry_check=True
-        )
-
-        # Collect all layer buffer names used in forward
-        fwd_layers.append({
-            "id": layer_id,
-            "ops": layer_ops,
-            "_used": layer_used,
-        })
-
-    # Forward footer ops (includes lm_head and cross_entropy_loss)
-    footer_bindings = {}
-    for key, spec in section["footer"].get("bindings", {}).items():
-        if isinstance(spec, dict):
-            continue
-        footer_bindings[key] = expand_layer_name(spec, num_layers)
-
-    fwd_footer_ops = process_ops(
-        section["footer"]["ops"], num_layers, footer_bindings,
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # =========================================================================
-    # BACKWARD PASS
-    # =========================================================================
-
-    # Backward footer ops (lm_head_backward, final_ln_backward)
-    bwd_footer_ops = process_ops(
-        section["footer"].get("backward_ops", []), num_layers, footer_bindings,
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # Backward body ops (layers N-1 → 0, reverse order)
-    bwd_layers = []
-    for layer_id in range(num_layers - 1, -1, -1):
-        layer_used = set()
-        used_bufs = {"header": all_used["header"], "footer": all_used["footer"],
-                     "globals": all_used["globals"], "layer": layer_used}
-
-        # Build backward bindings
-        bindings = {}
-        for key, spec in section["body"].get("bindings", {}).items():
-            if isinstance(spec, dict):
-                # Backward bindings (d_output comes from next layer or footer)
-                if "last_layer" in spec and "prev_layer" in spec:
-                    if layer_id == num_layers - 1:
-                        bindings[key] = spec["last_layer"]
-                    else:
-                        bindings[key] = expand_layer_name(spec["prev_layer"], layer_id)
-                # Forward bindings (for accessing cached activations)
-                elif "first_layer" in spec and "next_layer" in spec:
-                    if layer_id == 0:
-                        bindings[key] = spec["first_layer"]
-                    else:
-                        bindings[key] = expand_layer_name(spec["next_layer"], layer_id)
-            elif not isinstance(spec, dict):
-                bindings[key] = spec
-
-        layer_ops = process_ops(
-            section["body"].get("backward_ops", []), layer_id, bindings, used_bufs,
-            skip_registry_check=True
-        )
-
-        # Merge used buffers with forward pass for this layer
-        fwd_layer = fwd_layers[layer_id]
-        combined_used = fwd_layer["_used"] | layer_used
-
-        bwd_layers.append({
-            "id": layer_id,
-            "ops": layer_ops,
-            "_used": combined_used,
-        })
-
-    # Backward header ops (embedding_backward)
-    bwd_header_ops = process_ops(
-        section["header"].get("backward_ops", []), 0, {},
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # =========================================================================
-    # GRADIENT REDUCTION (for data parallel training)
-    # =========================================================================
-
-    gradient_reduction = section.get("gradient_reduction", [])
-    reduction_ops = process_ops(
-        gradient_reduction, 0, {},
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # =========================================================================
-    # OPTIMIZER PASS
-    # =========================================================================
-
-    # Optimizer header ops (token_emb update)
-    opt_header_ops = process_ops(
-        section["header"].get("optimizer_ops", []), 0, {},
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # Optimizer layer ops (per-layer weight updates)
-    opt_layers = []
-    for layer_id in range(num_layers):
-        layer_used = set()
-        used_bufs = {"header": all_used["header"], "footer": all_used["footer"],
-                     "globals": all_used["globals"], "layer": layer_used}
-
-        # No special bindings needed for optimizer
-        bindings = {}
-
-        layer_ops = process_ops(
-            section["body"].get("optimizer_ops", []), layer_id, bindings, used_bufs,
-            skip_registry_check=True
-        )
-
-        # Add optimizer buffer usage to layer
-        fwd_layers[layer_id]["_used"] |= layer_used
-
-        opt_layers.append({
-            "id": layer_id,
-            "ops": layer_ops,
-        })
-
-    # Optimizer footer ops (final_ln_weight, lm_head_weight updates)
-    opt_footer_ops = process_ops(
-        section["footer"].get("optimizer_ops", []), num_layers, footer_bindings,
-        {"header": all_used["header"], "footer": all_used["footer"],
-         "globals": all_used["globals"], "layer": set()},
-        skip_registry_check=True
-    )
-
-    # =========================================================================
-    # BUILD BUFFERS
-    # =========================================================================
-
-    # Build layer buffers (need both forward and backward buffers)
-    final_layers = []
-    for layer_id in range(num_layers):
-        fwd_layer = fwd_layers[layer_id]
-        bwd_layer = bwd_layers[num_layers - 1 - layer_id]  # Backward is reversed
-        combined_used = fwd_layer["_used"] | bwd_layer["_used"]
-
-        layer_buffers = []
-        for tmpl in layer_templates:
-            name = expand_layer_name(tmpl["name"], layer_id)
-            if name in combined_used:
-                spec = buffer_spec(name, mode_override="training")
-                if spec:
-                    layer_buffers.append(spec)
-
-        final_layers.append({
-            "id": layer_id,
-            "forward_ops": fwd_layer["ops"],
-            "backward_ops": bwd_layer["ops"],
-            "buffers": layer_buffers,
-        })
-
-    # Header buffers
-    header_buffers = []
-    for tmpl in header_templates:
-        name = tmpl["name"]
-        if name in all_used["header"]:
-            spec = buffer_spec(name, mode_override="training")
-            if spec:
-                header_buffers.append(spec)
-
-    # Footer buffers
-    footer_buffers = []
-    for tmpl in footer_templates:
-        name = tmpl["name"]
-        if name in all_used["footer"]:
-            spec = buffer_spec(name, mode_override="training")
-            if spec:
-                footer_buffers.append(spec)
-
-    # Resolve tied_to references
-    header_names = {b["name"] for b in header_buffers}
-    for buf in footer_buffers:
-        tied_to = buf.get("tied_to")
-        if tied_to and tied_to not in header_names:
-            spec = buffer_spec(tied_to, mode_override="training")
-            if spec:
-                header_buffers.insert(0, spec)
-                header_names.add(tied_to)
-
-    # Globals buffers
-    globals_buffers = []
-    for tmpl in globals_templates:
-        name = tmpl["name"]
-        if name in all_used["globals"]:
-            spec = buffer_spec(name, mode_override="training")
-            if spec:
-                globals_buffers.append(spec)
-
-    # Add training-specific inputs (labels - same shape as tokens, no batch dim)
-    # Batch is simulated via accumulation loop, not tensor dimension
-    training_inputs = list(inputs)
-    labels_spec = buffer_spec("labels", mode_override="training")
-    if labels_spec:
-        training_inputs.append({
-            "name": "labels",
-            "dtype": "i32",
-            "shape": ["S"],
-            "resolved_shape": [sym_values["S"]],
-        })
-
-    # Compute batch simulation parameters
-    effective_batch = sym_values.get("B", 1)
-    context_length = sym_values.get("S", 128)
-    tokens_per_batch = effective_batch * context_length
-
-    return {
-        "version": 4,
-        "kind": "lowered",
-        "mode": "training",
-        "generated": datetime.utcnow().isoformat() + "Z",
-        "model": graph["model"],
-        "config": config,
-        "symbols": symbols,
-        # CPU batch simulation: no 3D tensor ops, use sequential accumulation
-        "batch_simulation": {
-            "strategy": "sequential_accumulate",
-            "effective_batch_size": effective_batch,
-            "accumulation_steps": effective_batch,
-            "samples_per_step": 1,
-            "context_length": context_length,
-            "tokens_per_batch": tokens_per_batch,
-            "description": (
-                f"Simulate batch={effective_batch} by processing {effective_batch} samples "
-                f"sequentially with same weights, accumulating gradients, then updating once. "
-                f"Each sample has {context_length} tokens. "
-                f"Mathematically equivalent to GPU parallel batch."
-            ),
-        },
-        # Execution order shows the accumulation loop explicitly
-        "execution_order": {
-            "description": "Training step structure for CPU batch simulation",
-            "phases": [
-                {
-                    "name": "zero_gradients",
-                    "description": "Initialize all weight gradients to zero",
-                },
-                {
-                    "name": "accumulation_loop",
-                    "loop_var": "sample_idx",
-                    "loop_count": effective_batch,
-                    "description": f"Process {effective_batch} samples with frozen weights",
-                    "body": [
-                        "load_sample[sample_idx]",
-                        "forward_pass.header",
-                        "forward_pass.layers[0..N]",
-                        "forward_pass.footer",
-                        "backward_pass.footer",
-                        "backward_pass.layers[N..0]",
-                        "backward_pass.header",
-                        "gradient_accumulate",  # d_weight += d_weight_sample
-                    ],
-                },
-                {
-                    "name": "gradient_average",
-                    "description": f"Average gradients: d_weight /= {effective_batch}",
-                },
-                {
-                    "name": "gradient_reduction",
-                    "condition": "data_parallel_size > 1",
-                    "description": "AllReduce gradients across data parallel workers",
-                },
-                {
-                    "name": "optimizer_step",
-                    "description": "Update weights once using averaged gradients",
-                    "body": [
-                        "optimizer_pass.header",
-                        "optimizer_pass.layers[0..N]",
-                        "optimizer_pass.footer",
-                    ],
-                },
-            ],
-        },
-        "sections": [
-            {
-                "id": section["id"],
-                "name": section["name"],
-                "inputs": training_inputs,
-                "globals": globals_buffers,
-                "forward_pass": {
-                    "header": {"ops": fwd_header_ops, "buffers": header_buffers},
-                    "layers": [{"id": l["id"], "ops": l["forward_ops"]} for l in final_layers],
-                    "footer": {"ops": fwd_footer_ops, "buffers": footer_buffers},
-                },
-                "backward_pass": {
-                    "footer": {"ops": bwd_footer_ops},
-                    "layers": [{"id": l["id"], "ops": l["backward_ops"]} for l in reversed(final_layers)],
-                    "header": {"ops": bwd_header_ops},
-                },
-                "gradient_ops": {
-                    "zero": {
-                        "op": "zero_gradients",
-                        "description": "Set all d_weight buffers to zero",
-                        "targets": "all weight_grad buffers",
-                    },
-                    "accumulate": {
-                        "op": "gradient_accumulate",
-                        "description": "d_weight += d_weight_sample (after each backward)",
-                    },
-                    "average": {
-                        "op": "gradient_average",
-                        "description": f"d_weight /= {effective_batch} (before optimizer)",
-                        "divisor": effective_batch,
-                    },
-                },
-                "gradient_reduction": {
-                    "ops": reduction_ops,
-                    "condition": "data_parallel_size > 1",
-                    "description": "AllReduce gradients across data parallel workers",
-                },
-                "optimizer_pass": {
-                    "header": {"ops": opt_header_ops},
-                    "layers": [{"id": l["id"], "ops": l["ops"]} for l in opt_layers],
-                    "footer": {"ops": opt_footer_ops},
-                },
-                "buffers": {
-                    "header": header_buffers,
-                    "layers": [{"id": l["id"], "buffers": l["buffers"]} for l in final_layers],
-                    "footer": footer_buffers,
-                },
-            }
-        ],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Fusion Optimization Pass
-# ---------------------------------------------------------------------------
-
-def find_fusion_candidates(ops: List[Dict], mode: str, registry_path: Optional[Path] = None) -> List[Dict]:
-    """
-    Scan a list of ops for fusible sequences.
-    Returns candidates sorted by priority (highest first).
-
-    Supports both:
-      - Manual patterns: Match by op names (from graph IR)
-      - Registry patterns: Match by kernel IDs (from lowered IR)
-
-    Args:
-        ops: List of ops from lowered IR
-        mode: Execution mode (prefill/decode)
-        registry_path: Optional path to kernel registry
-    """
-    # Try to use registry-driven patterns if registry is available
-    try:
-        patterns = fp.get_registry_driven_patterns(mode, registry_path)
-        print(f"[FUSION] Loaded {len(patterns)} patterns (registry + manual)")
-    except (FileNotFoundError, ImportError):
-        # Fallback to manual patterns only
-        patterns = fp.get_patterns_for_mode(mode)
-        print(f"[FUSION] Loaded {len(patterns)} patterns (manual only)")
-
-    candidates = []
-
-    for pattern in patterns:
-        seq = pattern["sequence"]
-        seq_len = len(seq)
-
-        # Sliding window match
-        for i in range(len(ops) - seq_len + 1):
-            window = ops[i:i + seq_len]
-
-            # Check if this is a registry pattern (kernel IDs) or manual pattern (op names)
-            # Registry patterns have kernel IDs in ops, manual patterns have op names
-            if "kernel" in window[0]:
-                # Registry pattern: match by kernel IDs
-                kernel_seq = [op.get("kernel") for op in window]
-                if kernel_seq == seq:
-                    candidates.append({
-                        "start_idx": i,
-                        "end_idx": i + seq_len,
-                        "pattern": pattern,
-                        "matched_ops": window,
-                    })
-            else:
-                # Manual pattern: match by op names
-                if fp.ops_match_sequence(window, seq):
-                    # Validate data flow
-                    if fp.validate_data_flow(window):
-                        candidates.append({
-                            "start_idx": i,
-                            "end_idx": i + seq_len,
-                            "pattern": pattern,
-                            "matched_ops": window,
-                        })
-
-    return candidates
-
-
-def apply_fusions_to_ops(ops: List[Dict], candidates: List[Dict], dtype: str) -> Tuple[List[Dict], List[Dict]]:
-    """
-    Apply non-overlapping fusions to ops list.
-    Returns (new_ops, applied_fusions).
-    """
-    if not candidates:
-        return ops, []
-
-    # Sort by priority (already sorted) then by start index
-    # Take highest priority non-overlapping fusions
-    applied = []
-    used_indices = set()
-
-    for cand in candidates:
-        start, end = cand["start_idx"], cand["end_idx"]
-        # Check for overlap with already applied fusions
-        if any(i in used_indices for i in range(start, end)):
-            continue
-
-        # Mark indices as used
-        for i in range(start, end):
-            used_indices.add(i)
-        applied.append(cand)
-
-    if not applied:
-        return ops, []
-
-    # Build new ops list
-    new_ops = []
-    i = 0
-    while i < len(ops):
-        # Check if this index starts a fusion
-        fusion = next((f for f in applied if f["start_idx"] == i), None)
-        if fusion:
-            # Create fused op
-            fused_op = fp.merge_op_ios(
-                fusion["matched_ops"],
-                fusion["pattern"],
-                dtype
-            )
-            new_ops.append(fused_op)
-            i = fusion["end_idx"]
-        else:
-            new_ops.append(ops[i])
-            i += 1
-
-    return new_ops, applied
-
-
-def filter_unused_buffers(buffers: List[Dict], ops: List[Dict], removed_patterns: List[str]) -> List[Dict]:
-    """
-    Remove buffers that are no longer used after fusion.
-    """
-    # Collect all buffer names still referenced by ops
-    used_names = set()
-    for op in ops:
-        for key in ("inputs", "outputs", "weights", "scratch"):
-            for name in op.get(key, []):
-                used_names.add(name)
-
-    # Keep buffers that are either:
-    # 1. Still used by some op
-    # 2. Not in the removed patterns list
-    filtered = []
-    for buf in buffers:
-        name = buf["name"]
-        is_removed = any(name.endswith(p) for p in removed_patterns)
-        if name in used_names or not is_removed:
-            filtered.append(buf)
-
-    return filtered
-
-
-def apply_fusion_pass(lowered: Dict, mode: str, config: Dict, registry_path: Optional[Path] = None) -> Tuple[Dict, fp.FusionStats]:
-    """
-    Apply fusion optimizations to lowered IR.
-
-    Args:
-        lowered: Lowered IR dict
-        mode: Execution mode (prefill/decode)
-        config: Fusion configuration
-        registry_path: Optional path to kernel registry
-
-    Returns:
-        (optimized_ir, fusion_stats)
-    """
-    if not config.get("enable_fusion", True):
-        return lowered, fp.FusionStats()
-
-    stats = fp.FusionStats()
-    optimized = copy.deepcopy(lowered)
-    dtype = optimized["config"]["dtype"]
-
-    # Get fusion patterns (registry-driven if available)
-    try:
-        patterns = fp.get_registry_driven_patterns(mode, registry_path)
-    except (FileNotFoundError, ImportError):
-        # Fallback to manual patterns only
-        patterns = fp.get_patterns_for_mode(mode)
-
-    # Collect all patterns' removed buffers
-    all_removed_patterns = []
-    for pattern in patterns:
-        all_removed_patterns.extend(pattern.get("remove_buffers", []))
-
-    # Process each layer
-    for layer in optimized["sections"][0]["layers"]:
-        layer_id = layer["id"]
-        ops = layer["ops"]
-
-        # Find and apply fusions
-        candidates = find_fusion_candidates(ops, mode, registry_path)
-        new_ops, applied = apply_fusions_to_ops(ops, candidates, dtype)
-
-        if applied:
-            layer["ops"] = new_ops
-
-            # Track removed buffers for this layer
-            removed_buffers = []
-            for fusion in applied:
-                pattern = fusion["pattern"]
-                for suffix in pattern.get("remove_buffers", []):
-                    # Find matching buffer names
-                    for buf in layer["buffers"]:
-                        if buf["name"].endswith(suffix):
-                            removed_buffers.append(buf["name"])
-
-            # Filter unused buffers
-            layer["buffers"] = filter_unused_buffers(
-                layer["buffers"],
-                new_ops,
-                all_removed_patterns
-            )
-
-            # Record stats
-            for fusion in applied:
-                pattern = fusion["pattern"]
-                ops_count = len(fusion["matched_ops"])
-                stats.record_fusion(layer_id, pattern, ops_count, removed_buffers)
-
-    # Also check header/footer ops (less common but possible)
-    section = optimized["sections"][0]
-    for part in ["header", "footer"]:
-        if part in section and "ops" in section[part]:
-            ops = section[part]["ops"]
-            candidates = find_fusion_candidates(ops, mode)
-            new_ops, applied = apply_fusions_to_ops(ops, candidates, dtype)
-            if applied:
-                section[part]["ops"] = new_ops
-
-    return optimized, stats
-
-
-def emit_fusion_report(stats: fp.FusionStats, mode: str, path: str) -> None:
-    """Emit fusion report JSON."""
-    report = {
-        "mode": mode,
-        "generated": datetime.utcnow().isoformat() + "Z",
-        **stats.to_dict(),
-    }
-    with open(path, "w") as f:
-        json.dump(report, f, indent=2)
-    print(f"[FUSION] Written: {path}")
-
-
-# ---------------------------------------------------------------------------
-# Layout from lowered IR
-# ---------------------------------------------------------------------------
-
-def build_layout_from_lowered(lowered: Dict, model_name: str) -> v3.ModelLayout:
-    """Compute deterministic layout from lowered IR."""
-    allocator = v3.BumpAllocator(start_offset=64)
-
-    section = lowered["sections"][0]
-    mode = lowered.get("mode", "prefill")
-    # Keep per-buffer canaries to detect intra-layer overruns in tests and production.
-    guard_buffers = bool(lowered.get("config", {}).get("guard_buffers", True))
-
-    canaries: List[v3.Canary] = []
-
-    header_canary_start = allocator.alloc_canary("header_start")
-    canaries.append(header_canary_start)
-    header_buffers = []
-    name_to_buffer = {}
-
-    def alloc_buffer(spec: Dict) -> v3.Buffer:
-        name = spec["name"]
-        tied_to = spec.get("tied_to")
-        if tied_to:
-            target = name_to_buffer.get(tied_to)
-            if not target:
-                raise KeyError(f"tied_to target not found: {tied_to}")
-            buf = v3.Buffer(
-                name=name,
-                shape=spec["resolved_shape"],
-                dtype=spec["dtype"],
-                role=spec["role"],
-                offset=target.offset,
-                size=0,
-                tied_to=tied_to,
-            )
-            name_to_buffer[name] = buf
-            return buf
-
-        if "file_size" in spec:
-            size = align_up_bytes(int(spec["file_size"]), v3.CACHE_LINE)
-        elif qt.is_quantized_dtype(spec["dtype"]):
-            elements = 1
-            for dim in spec["resolved_shape"]:
-                elements *= int(dim)
-            size = align_up_bytes(qt.calculate_quantized_size(spec["dtype"], elements),
-                                  v3.CACHE_LINE)
-        else:
-            size = v3.aligned_size(spec["resolved_shape"], spec["dtype"], v3.CACHE_LINE)
-        offset = allocator.alloc(size)
-        buf = v3.Buffer(
-            name=name,
-            shape=spec["resolved_shape"],
-            dtype=spec["dtype"],
-            role=spec["role"],
-            offset=offset,
-            size=size,
-            tied_to=spec.get("tied_to"),
-        )
-        name_to_buffer[name] = buf
-        if guard_buffers:
-            canary = allocator.alloc_canary(f"{name}_end")
-            canaries.append(canary)
-        return buf
-
-    # Training mode has a different structure: buffers are under "buffers" key
-    if mode == "training":
-        buffers_section = section.get("buffers", {})
-        header_buf_specs = buffers_section.get("header", [])
-        layer_buf_specs = buffers_section.get("layers", [])
-        footer_buf_specs = buffers_section.get("footer", [])
-    else:
-        header_buf_specs = section["header"]["buffers"]
-        layer_buf_specs = section["layers"]
-        footer_buf_specs = section["footer"]["buffers"]
-
-    for spec in header_buf_specs:
-        header_buffers.append(alloc_buffer(spec))
-    header_canary_end = allocator.alloc_canary("header_end")
-    canaries.append(header_canary_end)
-
-    layers = []
-    if mode == "training":
-        # Training mode: layers are in buffers.layers with {id, buffers}
-        for layer_entry in layer_buf_specs:
-            layer_id = layer_entry["id"]
-            canary_start = allocator.alloc_canary(f"layer_{layer_id}_start")
-            canaries.append(canary_start)
-            buffers = [alloc_buffer(spec) for spec in layer_entry.get("buffers", [])]
-            canary_end = allocator.alloc_canary(f"layer_{layer_id}_end")
-            canaries.append(canary_end)
-            start_offset = canary_start.offset
-            end_offset = allocator.offset
-            layers.append(
-                v3.LayerLayout(
-                    layer_id=layer_id,
-                    canary_start=canary_start,
-                    buffers=buffers,
-                    canary_end=canary_end,
-                    total_bytes=end_offset - start_offset,
-                )
-            )
-    else:
-        for layer in layer_buf_specs:
-            layer_id = layer["id"]
-            canary_start = allocator.alloc_canary(f"layer_{layer_id}_start")
-            canaries.append(canary_start)
-            buffers = [alloc_buffer(spec) for spec in layer["buffers"]]
-            canary_end = allocator.alloc_canary(f"layer_{layer_id}_end")
-            canaries.append(canary_end)
-            start_offset = canary_start.offset
-            end_offset = allocator.offset
-            layers.append(
-                v3.LayerLayout(
-                    layer_id=layer_id,
-                    canary_start=canary_start,
-                    buffers=buffers,
-                    canary_end=canary_end,
-                    total_bytes=end_offset - start_offset,
-                )
-            )
-
-    footer_canary_start = allocator.alloc_canary("footer_start")
-    canaries.append(footer_canary_start)
-    footer_buffers = [alloc_buffer(spec) for spec in footer_buf_specs]
-    footer_canary_end = allocator.alloc_canary("footer_end")
-    canaries.append(footer_canary_end)
-
-    globals_buffers = [alloc_buffer(spec) for spec in section.get("globals", [])]
-
-    # Count totals
-    weight_bytes = 0
-    activation_bytes = 0
-    def count_buffers(buffers: List[v3.Buffer]):
-        nonlocal weight_bytes, activation_bytes
-        for buf in buffers:
-            if buf.tied_to:
-                continue
-            if buf.role == "weight":
-                weight_bytes += buf.size
-            else:
-                activation_bytes += buf.size
-
-    count_buffers(header_buffers)
-    count_buffers(footer_buffers)
-    count_buffers(globals_buffers)
-    for layer in layers:
-        count_buffers(layer.buffers)
-
-    canary_count = len(canaries)
-
-    section_layout = v3.SectionLayout(
-        name=section["name"],
-        section_id=section["id"],
-        config=lowered["config"],
-        header_canary_start=header_canary_start,
-        header_buffers=header_buffers,
-        header_canary_end=header_canary_end,
-        layers=layers,
-        footer_canary_start=footer_canary_start,
-        footer_buffers=footer_buffers,
-        footer_canary_end=footer_canary_end,
-        globals=globals_buffers,
-        total_bytes=allocator.offset,
-    )
-
-    return v3.ModelLayout(
-        name=model_name,
-        config=lowered["config"],
-        sections=[section_layout],
-        magic_header_size=64,
-        total_bytes=allocator.offset,
-        weight_bytes=weight_bytes,
-        activation_bytes=activation_bytes,
-        canary_count=canary_count,
-        canaries=canaries,
-    )
-
-
-def build_layout_v6_native(config: Dict, model_name: str,
-                           include_training: bool = False,
-                           include_decode_scratch: bool = True) -> v6_low.ModelLayout:
-    """Build layout using v6_ir_lowering (per-layer buffers, training-compatible).
-
-    This is the v6 native layout builder that provides:
-    1. Per-layer activation buffers (no sharing between layers for backprop)
-    2. Per-layer decode scratch buffers in arena (not stack)
-    3. Complete training support with gradient and optimizer state buffers
-
-    Use this for training/backprop-compatible layouts. For inference-only
-    with shared buffers (smaller memory), use build_layout_from_lowered().
-
-    Args:
-        config: Model configuration dict
-        model_name: Model identifier
-        include_training: If True, include gradient and optimizer state buffers
-        include_decode_scratch: If True, include per-layer decode scratch buffers
-
-    Returns:
-        v6_low.ModelLayout with computed offsets
-    """
-    return v6_low.build_model_layout(
-        config, model_name,
-        include_training=include_training,
-        include_decode_scratch=include_decode_scratch,
-    )
-
-
-def emit_layout_v6_native(layout: v6_low.ModelLayout, output_dir: str):
-    """Emit v6 native layout files (JSON and human-readable map)."""
-    import os
-    json_path = os.path.join(output_dir, "layout_v6_native.json")
-    map_path = os.path.join(output_dir, "layout_v6_native.map")
-
-    v6_low.emit_layout_json(layout, json_path)
-    v6_low.emit_layout_map(layout, map_path)
-
-
-def get_decode_buffer_offset(layout: v6_low.ModelLayout, layer_id: int, buffer_name: str) -> Optional[int]:
-    """Get the arena offset for a per-layer decode scratch buffer.
-
-    This is used by codegen to emit arena pointers instead of stack arrays.
-
-    Args:
-        layout: v6 native ModelLayout
-        layer_id: Layer index
-        buffer_name: One of: q_token, k_token, v_token, attn_out, fc1_out, swiglu_out
-
-    Returns:
-        Offset in bytes from arena base, or None if not found
-    """
-    decode_bufs = v6_low.get_layer_decode_buffers(layout, layer_id)
-    if not decode_bufs:
-        return None
-
-    buf_map = {
-        "q_token": decode_bufs.q_token,
-        "k_token": decode_bufs.k_token,
-        "v_token": decode_bufs.v_token,
-        "attn_out": decode_bufs.attn_out,
-        "fc1_out": decode_bufs.fc1_out,
-        "swiglu_out": decode_bufs.swiglu_out,
-    }
-    buf = buf_map.get(buffer_name)
-    return buf.offset if buf else None
-
-
-def compute_decode_scratch_offsets(layout: v6_low.ModelLayout, layer_id: int) -> Dict[str, int]:
-    """Get all decode scratch buffer offsets for a layer.
-
-    Returns:
-        Dict mapping buffer names to arena offsets
-    """
-    decode_bufs = v6_low.get_layer_decode_buffers(layout, layer_id)
-    if not decode_bufs:
-        return {}
-
-    return {
-        "q_token": decode_bufs.q_token.offset,
-        "k_token": decode_bufs.k_token.offset,
-        "v_token": decode_bufs.v_token.offset,
-        "attn_out": decode_bufs.attn_out.offset,
-        "fc1_out": decode_bufs.fc1_out.offset,
-        "swiglu_out": decode_bufs.swiglu_out.offset,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Emitters
-# ---------------------------------------------------------------------------
-
-def emit_lowered_ir(lowered: Dict, path: str) -> None:
-    with open(path, "w") as f:
-        json.dump(lowered, f, indent=2)
-    print(f"[LOWERED] Written: {path}")
-
-
-def expected_hf_shape(ck_name: str, config: Dict) -> Optional[List[int]]:
-    E = config["embed_dim"]
-    H = config["num_heads"]
-    KV = config["num_kv_heads"]
-    D = config["head_dim"]
-    I = config["intermediate_dim"]
-    V = config["vocab_size"]
-
-    if ck_name in {"token_emb", "lm_head_weight"}:
-        return [V, E]
-    if ck_name.endswith("ln1_gamma") or ck_name.endswith("ln2_gamma") or ck_name == "final_ln_weight":
-        return [E]
-    if ck_name.endswith(".wq"):
-        return [H * D, E]
-    if ck_name.endswith(".wk") or ck_name.endswith(".wv"):
-        return [KV * D, E]
-    if ck_name.endswith(".wo"):
-        return [E, H * D]
-    if ck_name.endswith(".w1"):
-        return [2 * I, E]
-    if ck_name.endswith(".w2"):
-        return [E, I]
-    return None
-
-
-def build_weight_map_report(graph: Dict, weights_meta: Dict) -> Dict:
-    config = graph["config"]
-    num_layers = config["num_layers"]
-
-    header = weights_meta.get("header", {})
-    weight_names = set(extract_weight_names(weights_meta))
-
-    # Build a map of buffer specs for target shape lookup
-    buffer_specs = {}
-    section = graph["sections"][0]
-    for group in ("header", "layer", "footer"):
-        for buf in section["buffers"][group]:
-            buffer_specs[buf["name"]] = buf
-    for buf in section.get("globals", []):
-        buffer_specs[buf["name"]] = buf
-
-    entries = []
-    missing = []
     unmapped = []
-    seen = set()
-
-    weight_map = graph.get("weight_map", [])
-
-    def lookup_buffer_spec(name: str) -> Optional[Dict]:
-        if name in buffer_specs:
-            return buffer_specs[name]
-        if name.startswith("layer."):
-            tmpl = normalize_layer_template(name)
-            return buffer_specs.get(tmpl)
-        return None
-
-    def add_entry(hf_name: str, ck_name: str, meta: Dict) -> None:
-        entry = {
-            "hf_name": hf_name,
-            "ck_name": ck_name,
-            "optional": meta.get("optional", False),
-        }
-        if meta.get("pack"):
-            entry["pack"] = {
-                "type": meta["pack"],
-                "axis": meta.get("axis", 0),
-                "part": meta.get("part", ""),
-            }
-
-        spec = lookup_buffer_spec(ck_name)
-        if spec:
-            entry["target_shape"] = spec["resolved_shape"]
-
-        expected = expected_hf_shape(ck_name, config)
-        if expected:
-            entry["expected_hf_shape"] = expected
-
-        if hf_name in weight_names:
-            seen.add(hf_name)
-            entry["status"] = "ok"
-            if hf_name in header:
-                entry["hf_shape"] = header[hf_name].get("shape")
-                if expected and not meta.get("pack"):
-                    if entry["hf_shape"] == expected:
-                        entry["shape_ok"] = True
-                    elif entry["hf_shape"] == list(reversed(expected)):
-                        entry["shape_ok"] = True
-                        entry["transpose"] = True
-                    else:
-                        entry["shape_ok"] = False
-        else:
-            entry["status"] = "missing"
-            if not entry["optional"]:
-                missing.append(hf_name)
-        entries.append(entry)
-
-    for mapping in weight_map:
-        hf = mapping["hf"]
-        ck = mapping["ck"]
-        if "{layer}" in hf:
-            for layer_id in range(num_layers):
-                hf_name = hf.replace("{layer}", str(layer_id))
-                ck_name = ck.replace("{L}", str(layer_id))
-                add_entry(hf_name, ck_name, mapping)
-        else:
-            add_entry(hf, ck, mapping)
-
-    for name in weight_names:
-        if name not in seen:
-            unmapped.append(name)
-
-    return {
-        "model": graph["model"],
-        "generated": datetime.utcnow().isoformat() + "Z",
-        "missing": missing,
-        "unmapped": unmapped,
-        "entries": entries,
-    }
+    for op in template_ops:
+        if op not in TEMPLATE_TO_KERNEL_OP:
+            unmapped.append(op)
+    return unmapped
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+def validate_kernel_availability(registry: Dict, kernel_ops: List[str]) -> Dict[str, bool]:
+    """
+    Check which kernel ops are available in the registry.
+    Returns dict: {kernel_op: is_available}
+    """
+    available_ops = set()
+    for kernel in registry["kernels"]:
+        available_ops.add(kernel["op"])
 
-def parse_args(argv: List[str]) -> Dict:
-    def normalize_args(argv: List[str]) -> List[str]:
-        value_flags = {
-            "--config",
-            "--name",
-            "--prefix",
-            "--weights-header",
-            "--weights-index",
-            "--weights-manifest",
-            "--template",
-            "--emit",
-            "--tokens",
-            "--dtype",
-            "--weight-dtype",
-            "--modes",
-            "--preset",
-            "--fusion",
-            "--parallel",
-            "--memory",
-            "--batch-size",
-            "--micro-batch-size",
-            "--context-length",
-            "--max-layers",
-            "--optimizer",
-            "--learning-rate",
-            "--weight-decay",
-            "--data-parallel",
-            "--tensor-parallel",
-            "--codegen",
-            "--bump",
-        }
-        normalized: List[str] = []
-        i = 0
-        while i < len(argv):
-            arg = argv[i]
-            if arg in value_flags:
-                if i + 1 >= len(argv):
-                    raise ValueError(f"Expected value after {arg}")
-                value = argv[i + 1]
-                if value.startswith("--"):
-                    raise ValueError(f"Expected value after {arg}, got: {value}")
-                normalized.append(f"{arg}={value}")
-                i += 2
+    availability = {}
+    for op in kernel_ops:
+        availability[op] = op in available_ops
+
+    return availability
+
+
+def find_kernel(
+    registry: Dict,
+    op: str,
+    quant: Dict[str, str],
+    mode: str = "decode",
+    prefer_q8_activation: bool = False  # TEMP: disabled for debugging
+) -> Optional[str]:
+    """
+    Find kernel ID from registry.
+
+    Args:
+        registry: Kernel registry
+        op: Operation type (e.g., "qkv_projection", "matmul", "attention")
+        quant: Quantization dict (e.g., {"weight": "q5_0"})
+        mode: Execution mode ("decode" or "prefill")
+        prefer_q8_activation: If True, prefer Q8_0 activation kernels (V6.5 parity).
+                              If False, prefer FP32 activation kernels.
+
+    Returns:
+        Kernel ID (C function name) or None if not found
+
+    Note:
+        "matmul" is a logical op that maps to:
+        - gemv (matrix-vector) for decode mode (single token)
+        - gemm (matrix-matrix) for prefill mode (multiple tokens)
+    """
+    # Map logical "matmul" to concrete gemv/gemm based on mode
+    actual_op = op
+    if op == "matmul":
+        actual_op = "gemv" if mode == "decode" else "gemm"
+
+    candidates = [k for k in registry["kernels"] if k["op"] == actual_op]
+
+    # Filter and collect all matching candidates
+    matches = []
+    for candidate in candidates:
+        k_quant = candidate.get("quant", {})
+
+        # Match weight quantization
+        if "weight" in quant:
+            weight_quant = k_quant.get("weight", "")
+            # Support multi-quant kernels (e.g., "q5_0|q8_0|q4_k")
+            allowed_quants = weight_quant.split("|")
+            if quant["weight"] not in allowed_quants and weight_quant != "none":
                 continue
-            normalized.append(arg)
-            i += 1
-        return normalized
 
-    argv = normalize_args(argv)
-    args = {
-        "model": None,
-        "config": None,
-        "name": None,
-        "prefix": None,
-        "weights_header": None,
-        "weights_index": None,
-        "weights_manifest": None,
-        "tokens": None,
-        "dtype": None,
-        "weight_dtype": None,  # Quantized weight dtype (q4_k, q6_k, etc.)
-        "modes": ["prefill", "decode"],
-        "template": None,
-        "preset": None,
-        "emit": "exe",
-        "max_layers": None,
-        # Fusion options
-        "fusion": "auto",  # on/off/auto
-        "fusion_verbose": False,
-        # Parallel planning options
-        "parallel": "on",  # on/off
-        "parallel_verbose": False,
-        # Debug options
-        "debug": False,  # Emit debug prints in generated C code
-        "parity": False,  # Emit buffer saves for parity comparison with PyTorch
-        "int8": True,  # Use INT8 activations for faster decode (5-15x speedup)
-        "codegen": "v6",  # Codegen version: v6 (explicit unrolled, default) or v4 (loop-based)
-        "decode_layout": "prefill",  # Use prefill or decode layout for decode codegen
-        "skip_manifest_validation": False,  # Skip manifest validation (debug/testing)
-        # Training options
-        "memory": None,  # Available memory in GB (auto-detect if None)
-        "batch_size": None,  # Target batch size
-        "micro_batch_size": None,  # Micro-batch size for gradient accumulation
-        "context_length": None,  # Context length for training
-        "optimizer": "adamw",  # adamw or sgd
-        "learning_rate": 1e-4,
-        "weight_decay": 0.01,
-        "data_parallel": 1,  # Data parallel size
-        "tensor_parallel": 1,  # Tensor parallel size
-        # BUMPWGT5 weights file
-        "bump": None,  # Path to BUMPWGT5 weights file (reads metadata from EOF footer)
-    }
+        # Match mode (if kernel specifies it)
+        kernel_mode = candidate.get("mode", "")
+        variant = candidate.get("variant", "")
 
-    for arg in argv:
-        if arg in ("--help", "-h"):
-            args["help"] = True
+        # If kernel specifies a mode, it must match
+        if kernel_mode and kernel_mode != mode:
             continue
-        if arg.startswith("--config="):
-            args["config"] = arg.split("=", 1)[1]
-        elif arg.startswith("--name="):
-            args["name"] = arg.split("=", 1)[1]
-        elif arg.startswith("--prefix="):
-            args["prefix"] = arg.split("=", 1)[1]
-        elif arg.startswith("--weights-header="):
-            args["weights_header"] = arg.split("=", 1)[1]
-        elif arg.startswith("--weights-index="):
-            args["weights_index"] = arg.split("=", 1)[1]
-        elif arg.startswith("--weights-manifest="):
-            args["weights_manifest"] = arg.split("=", 1)[1]
-        elif arg.startswith("--template="):
-            args["template"] = arg.split("=", 1)[1]
-        elif arg == "--emit-lib":
-            args["emit"] = "lib"
-        elif arg == "--emit-exe":
-            args["emit"] = "exe"
-        elif arg.startswith("--emit="):
-            emit_val = arg.split("=", 1)[1].lower()
-            if emit_val not in ("lib", "exe"):
-                raise ValueError(f"--emit must be lib|exe, got: {emit_val}")
-            args["emit"] = emit_val
-        elif arg.startswith("--tokens="):
-            args["tokens"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--dtype="):
-            args["dtype"] = arg.split("=", 1)[1].lower()
-        elif arg.startswith("--decode-layout="):
-            layout_val = arg.split("=", 1)[1].lower()
-            if layout_val not in ("prefill", "decode"):
-                raise ValueError(f"--decode-layout must be prefill|decode, got: {layout_val}")
-            args["decode_layout"] = layout_val
-        elif arg.startswith("--weight-dtype="):
-            w_dtype = arg.split("=", 1)[1].lower()
-            # Normalize aliases
-            if w_dtype not in ("q4_0", "q4_k", "q4_k_m", "q6_k", "q8_0", "q8_k", "f32", "bf16"):
-                raise ValueError(f"--weight-dtype must be q4_0/q4_k/q4_k_m/q6_k/q8_0/q8_k/f32/bf16, got: {w_dtype}")
-            args["weight_dtype"] = w_dtype
-        elif arg.startswith("--modes="):
-            modes = arg.split("=", 1)[1]
-            args["modes"] = [m.strip() for m in modes.split(",") if m.strip()]
-        elif arg.startswith("--max-layers="):
-            args["max_layers"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--preset="):
-            args["preset"] = arg.split("=", 1)[1]
-        elif arg.startswith("--fusion="):
-            fusion_val = arg.split("=", 1)[1].lower()
-            if fusion_val not in ("on", "off", "auto"):
-                raise ValueError(f"--fusion must be on/off/auto, got: {fusion_val}")
-            args["fusion"] = fusion_val
-        elif arg == "--fusion-verbose":
-            args["fusion_verbose"] = True
-        elif arg.startswith("--parallel="):
-            parallel_val = arg.split("=", 1)[1].lower()
-            if parallel_val not in ("on", "off"):
-                raise ValueError(f"--parallel must be on/off, got: {parallel_val}")
-            args["parallel"] = parallel_val
-        elif arg == "--parallel-verbose":
-            args["parallel_verbose"] = True
-        elif arg == "--debug":
-            args["debug"] = True
-        elif arg == "--parity":
-            args["parity"] = True
-        elif arg == "--int8":
-            args["int8"] = True
-        elif arg == "--no-int8":
-            args["int8"] = False
-        elif arg.startswith("--codegen="):
-            codegen_val = arg.split("=", 1)[1].lower()
-            if codegen_val not in ("v4", "v6"):
-                raise ValueError(f"--codegen must be v4/v6, got: {codegen_val}")
-            args["codegen"] = codegen_val
-        elif arg == "--skip-manifest-validation":
-            args["skip_manifest_validation"] = True
-        # Training options
-        elif arg.startswith("--memory="):
-            args["memory"] = float(arg.split("=", 1)[1])
-        elif arg.startswith("--batch-size="):
-            args["batch_size"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--micro-batch-size="):
-            args["micro_batch_size"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--context-length="):
-            args["context_length"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--optimizer="):
-            opt = arg.split("=", 1)[1].lower()
-            if opt not in ("adamw", "sgd"):
-                raise ValueError(f"--optimizer must be adamw/sgd, got: {opt}")
-            args["optimizer"] = opt
-        elif arg.startswith("--learning-rate="):
-            args["learning_rate"] = float(arg.split("=", 1)[1])
-        elif arg.startswith("--weight-decay="):
-            args["weight_decay"] = float(arg.split("=", 1)[1])
-        elif arg.startswith("--data-parallel="):
-            args["data_parallel"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--tensor-parallel="):
-            args["tensor_parallel"] = int(arg.split("=", 1)[1])
-        elif arg.startswith("--bump="):
-            args["bump"] = arg.split("=", 1)[1]
-        elif arg.startswith("--"):
-            raise ValueError(f"Unknown option: {arg}")
+
+        # Also check variant name for mode hints
+        if mode == "decode" and "prefill" in variant:
+            continue
+        if mode == "prefill" and "decode" in variant:
+            continue
+
+        # Collect match
+        matches.append(candidate)
+
+    if not matches:
+        return None
+
+    # Sort by activation type preference
+    # When prefer_q8_activation=True (V6.5 parity): prefer Q8_0 activation kernels
+    # When prefer_q8_activation=False: prefer FP32 activation kernels
+    def activation_priority(k):
+        act = k.get("quant", {}).get("activation", "fp32")
+        if prefer_q8_activation:
+            # V6.5 parity mode: prefer Q8_0 activation (quantized input)
+            if act == "q8_0":
+                return 0  # Prefer Q8_0 activation
+            if act == "q8_k":
+                return 1  # Q8_K is second choice
+            return 2  # FP32 last
         else:
-            args["model"] = arg
+            # FP32 mode: prefer FP32 activation (original behavior)
+            if act == "fp32":
+                return 0  # Prefer FP32 activation
+            return 1  # Quantized last
 
-    if (not args.get("help") and not args["model"] and not args["config"] and
-            not args["preset"] and not args.get("weights_manifest") and not args.get("bump")):
-        raise ValueError("Must provide model ID/URL or --config=FILE or --preset=NAME")
-
-    return args
-
-
-def print_usage():
-    print("Usage:")
-    print("  python scripts/v6.6/build_ir_v6_6.py MODEL [OPTIONS]")
-    print("  python scripts/v6.6/build_ir_v6_6.py --config=FILE [OPTIONS]")
-    print("  python scripts/v6.6/build_ir_v6_6.py --preset=NAME [OPTIONS]")
-    print()
-    print("v6.6 Features:")
-    print("  - INT8 activations ENABLED by default (5-15x faster than FP32)")
-    print("  - Uses quantized kernels: gemv_q5_0_q8_0, gemv_q8_0_q8_0, gemv_q4_k_q8_k")
-    print("  - Mixed quantization support (Q5_0, Q8_0, Q4_K, Q6_K per layer)")
-    print()
-    print("Options:")
-    print("  --config=FILE           Use local config.json")
-    print("  --preset=NAME           Use local preset (qwen2-0.5b, smollm-135)")
-    print("  --weights-header=FILE   Safetensors header for weight mapping")
-    print("  --weights-index=FILE    model.safetensors.index.json")
-    print("  --weights-manifest=FILE Weights manifest (from convert_*_to_bump.py)")
-    print("  --bump=FILE             BUMPWGT5 weights file (reads template/config from footer)")
-    print("  --template=NAME         Template name (e.g., qwen2, llama) or path")
-    print("  --prefix=DIR            Output directory")
-    print("  --tokens=N              Tokens for prefill/backward (default: max_seq_len)")
-    print("  --dtype=fp32|bf16       Override dtype for activations (default: config dtype)")
-    print("  --weight-dtype=TYPE     Weight dtype for quantized inference (q4_k, q6_k, etc.)")
-    print("  --modes=MODE[,MODE...]  Modes to emit (default: prefill,decode)")
-    print("  --emit=lib|exe          Emit shared-library C (lib) or standalone main (exe)")
-    print("  --emit-lib              Shorthand for --emit=lib")
-    print("  --emit-exe              Shorthand for --emit=exe")
-    print("  --max-layers=N          Limit layers for quick parity tests")
-    print()
-    print("Available Modes:")
-    print("  prefill                 Forward pass for prompt processing (S=tokens)")
-    print("  decode                  Forward pass for token generation (S=1)")
-    print("  backward                Backward pass only (assumes activations cached)")
-    print("  training                Full training step: forward + loss + backward")
-    print()
-    print("Fusion Options:")
-    print("  --fusion=on|off|auto    Enable/disable fusion pass (default: auto)")
-    print("  --fusion-verbose        Print fusion decisions")
-    print()
-    print("Parallel Options:")
-    print("  --parallel=on|off       Enable/disable parallel planning (default: on)")
-    print("  --parallel-verbose      Print parallel strategy decisions")
-    print()
-    print("Codegen Options:")
-    print("  --codegen=v4|v6         Codegen version (default: v6)")
-    print("                          v6: Explicit unrolled (each layer separate, explicit kernels)")
-    print("                          v4: Loop-based with runtime dtype dispatch (legacy)")
-    print("  --decode-layout=prefill|decode  Layout to use for decode codegen (default: prefill)")
-    print("  --debug                 Emit debug prints in generated C code")
-    print("  --parity                Emit buffer saves for PyTorch comparison")
-    print()
-    print("Training Options (for --modes=training):")
-    print("  --memory=GB             Available memory in GB (auto-detect if not set)")
-    print("  --batch-size=N          Target effective batch size")
-    print("  --micro-batch-size=N    Micro-batch size (gradient accumulation)")
-    print("  --context-length=N      Training context length")
-    print("  --optimizer=adamw|sgd   Optimizer (default: adamw)")
-    print("  --learning-rate=LR      Learning rate (default: 1e-4)")
-    print("  --weight-decay=WD       Weight decay for AdamW (default: 0.01)")
-    print("  --data-parallel=N       Data parallel size (default: 1)")
-    print("  --tensor-parallel=N     Tensor parallel size (default: 1)")
-    print()
-    print("Quantization Options (llama.cpp compatible):")
-    print("  --weight-dtype=q4_k     Q4_K: 4-bit K-quant (4.5 bits/weight)")
-    print("  --weight-dtype=q4_k_m   Mixed GGUF; uses per-weight manifest dtypes")
-    print("  --weight-dtype=q6_k     Q6_K: 6-bit K-quant (6.6 bits/weight)")
-    print("  --weight-dtype=q4_0     Q4_0: Simple 4-bit (4.5 bits/weight)")
-    print("  --weight-dtype=q8_0     Q8_0: Simple 8-bit (8.5 bits/weight)")
-    print()
-    print("Notes:")
-    print("  Quantized inference uses --weight-dtype for weights, --dtype for activations.")
-    print("  q4_k_m requires --weights-manifest and does not force global K-alignment.")
-    print("  Block structures match llama.cpp/GGML for GGUF model compatibility.")
-    print("  Training mode auto-detects system memory and computes optimal config.")
-    print()
-    print("Examples:")
-    print("  # Generate prefill and decode schedules")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b")
-    print()
-    print("  # Generate training schedule (auto-detect memory, compute optimal batch)")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --modes=training")
-    print()
-    print("  # Training with specific memory budget and batch size")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --modes=training --memory=16 --batch-size=32")
-    print()
-    print("  # Generate backward only (for memory-efficient training)")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --modes=backward --fusion=on")
-    print()
-    print("  # Use custom config file")
-    print("  python scripts/v6/build_ir_v6.py --config=smolLM-135.json --modes=prefill,decode")
-    print()
-    print("  # Quantized inference with Q4_K weights (llama.cpp compatible)")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --weight-dtype=q4_k --dtype=f32")
-    print()
-    print("  # Verbose output for debugging")
-    print("  python scripts/v6/build_ir_v6.py --preset=qwen2-0.5b --fusion-verbose --parallel-verbose")
+    matches.sort(key=activation_priority)
+    return matches[0]["id"]
 
 
-# ============================================================================
-# BUMPWGT5 METADATA READING (EOF FOOTER)
-# ============================================================================
-#
-# BUMPWGT5 FILE STRUCTURE:
-# ========================
-#   [weights binary data...] + [metadata JSON] + [footer (48 bytes)]
-#
-# FOOTER FORMAT (little-endian, 48 bytes total):
-# +--------+--------+--------+----------------------------------------+
-# | Offset | Size   | Type   | Description                            |
-# +--------+--------+--------+----------------------------------------+
-# | 0      | 8      | u8[8]  | Magic: "BUMPV5MD" (8 bytes)            |
-# | 8      | 8      | uint64 | meta_size: size of metadata JSON bytes |
-# | 16     | 32     | u8[32] | SHA-256 hash of metadata JSON bytes    |
-# +--------+--------+--------+----------------------------------------+
-#
-# METADATA JSON CONTENTS:
-# =======================
-# {
-#   "version": 5,                           # BUMP format version
-#   "template": {                           # Full template (same as --template files)
-#     "name": "qwen2",
-#     "block_types": { "dense": { "ops": [...] } },
-#     "layer_map": { "default": "dense" },
-#     "flags": { "use_qkv_bias": "from_weights", ... }
-#   },
-#   "config": {                             # Model configuration
-#     "model_type": "qwen2",
-#     "embed_dim": 1024,
-#     "num_heads": 16,
-#     "num_kv_heads": 2,
-#     "head_dim": 64,
-#     "intermediate_size": 2816,
-#     "max_seq_len": 32768,
-#     "vocab_size": 151936,
-#     "num_layers": 24
-#   },
-#   "quant_summary": {                      # Per-tensor quantization info
-#     "model.layers.0.attn.wq": "q4_k",
-#     "model.layers.0.attn.wk": "q4_k",
-#     "model.layers.0.mlp.w1": "q5_0",
-#     ...
-#   },
-#   "manifest_hash": "abc123..."            # SHA-256 of weights_manifest.json
-# }
-#
-# WHY BUMP METADATA?
-# ==================
-# 1. Single source of truth: template, config, and weights are guaranteed to match
-# 2. No need for separate --template, --config, --weights-manifest arguments
-# 3. Enables validation: manifest_hash confirms manifest matches baked weights
-# 4. Self-describing: any BUMP file can be loaded without external files
-#
-# USAGE:
-# ======
-#   python build_ir_v6_6.py --bump=model.bump
-#
-# This will:
-#   1. Read template from BUMP metadata
-#   2. Apply config overrides from metadata
-#   3. Use quant_summary for kernel selection
-#   4. Validate manifest_hash if --weights-manifest is provided
-# ============================================================================
-
-import struct
-import hashlib
-
-BUMP_FOOTER_SIZE = 48  # Footer is always 48 bytes: 8 + 8 + 32
-BUMP_FOOTER_MAGIC = b"BUMPV5MD"  # Magic bytes to identify BUMPWGT5 format
-
-
-def read_bump_metadata(bump_path: str) -> Dict[str, Any]:
+def kernel_needs_q8_activation(registry: Dict, kernel_id: str) -> bool:
     """
-    Read metadata from BUMPWGT5 EOF footer.
-
-    This function reads the metadata embedded at the end of BUMPWGT5 files.
-    The metadata contains the template, model config, quantization info,
-    and a hash of the weights manifest for validation.
+    Check if a kernel requires Q8_0 quantized activation input.
 
     Args:
-        bump_path: Path to BUMPWGT5 weights file (e.g., "model.bump")
+        registry: Kernel registry
+        kernel_id: Kernel ID to check
 
     Returns:
-        Dict containing:
-        - version: BUMP format version (5)
-        - template: Full template JSON (same format as --template files)
-          - name: Template name (e.g., "qwen2", "llama")
-          - block_types: Dict of block definitions with "ops" lists
-          - layer_map: Dict mapping layer indices to block types
-          - flags: Architecture flags (use_qkv_bias, activation, rope)
-        - config: Model configuration dict
-          - embed_dim: Embedding dimension
-          - num_heads: Number of attention heads
-          - num_kv_heads: Number of key/value heads (for GQA)
-          - head_dim: Dimension per attention head
-          - intermediate_dim: MLP intermediate dimension
-          - max_seq_len: Maximum sequence length
-          - vocab_size: Vocabulary size
-          - num_layers: Number of transformer layers
-        - quant_summary: {tensor_name: dtype} map for quantized weights
-          - Maps full tensor paths to quantization types
-          - Used for kernel selection (q4_k, q5_0, q8_0, etc.)
-        - manifest_hash: SHA-256 hex string of canonical weights_manifest.json
-          - Used to validate that external manifest matches BUMP file
-
-    Raises:
-        ValueError: If file is too small, invalid magic, corrupted metadata,
-                    or SHA256 verification fails
-
-    Example:
-        >>> metadata = read_bump_metadata("model.bump")
-        >>> print(metadata["template"]["name"])
-        "qwen2"
-        >>> print(metadata["config"]["num_layers"])
-        24
+        True if kernel expects Q8_0 activation input, False otherwise
     """
-    with open(bump_path, "rb") as f:
-        # Get file size by seeking to end
-        f.seek(0, os.SEEK_END)
-        file_size = f.tell()
-
-        # Seek to start of footer (last 48 bytes)
-        f.seek(-BUMP_FOOTER_SIZE, os.SEEK_END)
-
-        footer = f.read(BUMP_FOOTER_SIZE)
-        if len(footer) != BUMP_FOOTER_SIZE:
-            raise ValueError(
-                f"BUMP file too small: cannot read footer "
-                f"(file is {file_size} bytes, need {BUMP_FOOTER_SIZE})"
-            )
-
-        # Parse footer: 8-byte magic + 8-byte size (little-endian) + 32-byte hash
-        # Format: "<8sQ32s" = little-endian, 8-byte string, unsigned long long, 32-byte string
-        magic, meta_size, expected_hash = struct.unpack("<8sQ32s", footer)
-
-        # Validate magic bytes
-        if magic != BUMP_FOOTER_MAGIC:
-            raise ValueError(
-                f"Not a BUMPWGT5 file: invalid magic {magic!r} "
-                f"(expected {BUMP_FOOTER_MAGIC!r})"
-            )
-
-        # Calculate offset to metadata JSON
-        # Metadata starts at: file_size - footer_size - meta_size
-        meta_offset = file_size - BUMP_FOOTER_SIZE - meta_size
-
-        if meta_offset < 0:
-            raise ValueError(
-                f"Invalid metadata: meta_size={meta_size} exceeds file bounds "
-                f"(file is {file_size} bytes)"
-            )
-
-        # Read metadata JSON bytes
-        f.seek(meta_offset)
-        meta_bytes = f.read(meta_size)
-        if len(meta_bytes) != meta_size:
-            raise ValueError(
-                f"Failed to read metadata: expected {meta_size} bytes, "
-                f"got {len(meta_bytes)}"
-            )
-
-        # Verify SHA256 of raw bytes (CRITICAL: don't re-serialize!)
-        # We hash the raw bytes we read, not json.dumps() output
-        actual_hash = hashlib.sha256(meta_bytes).digest()
-        if actual_hash != expected_hash:
-            # Show first 16 chars of hashes for debugging
-            raise ValueError(
-                f"Metadata SHA256 mismatch: file may be corrupted or tampered with "
-                f"(expected {expected_hash[:16].hex()}..., got {actual_hash[:16].hex()}...)"
-            )
-
-        # Parse metadata JSON
-        metadata = json.loads(meta_bytes.decode("utf-8"))
-
-        # Diagnostic output
-        config_meta = metadata.get("config", {}) if isinstance(metadata.get("config"), dict) else {}
-        model_name = config_meta.get("model_type") or config_meta.get("model") or "unknown"
-        template_name = metadata.get("template", {}).get("name", "unknown") if isinstance(metadata.get("template"), dict) else "unknown"
-        quant_count = len(metadata.get("quant_summary", {}))
-
-        print(f"[BUMP] Read metadata from {bump_path}")
-        print(f"[BUMP]   Template: {template_name}")
-        print(f"[BUMP]   Config: {model_name}")
-        print(f"[BUMP]   Quant types: {quant_count} tensors")
-
-        return metadata
-
-
-def canonical_json_bytes(payload: Dict[str, Any]) -> bytes:
-    """
-    Encode JSON with stable ordering for hashing.
-
-    This produces canonical JSON that can be hashed and compared across systems.
-    Key properties:
-    - sort_keys=True: Keys are sorted alphabetically
-    - separators=(",", ":"): No spaces after commas/colons
-    - ensure_ascii=True: ASCII output (no unicode escapes needed)
-
-    Args:
-        payload: Dict to serialize to canonical JSON bytes
-
-    Returns:
-        UTF-8 encoded JSON bytes with stable ordering
-
-    Example:
-        >>> canonical_json_bytes({"b": 1, "a": 2})
-        b'{"a":2,"b":1}'
-    """
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-
-
-def normalize_bump_config(raw_config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize a BUMP/manifest config dict into build_ir config keys.
-
-    Accepts both BUMPWGT5 field names (intermediate_size, context_length, model)
-    and build_ir names (intermediate_dim, max_seq_len, model_type).
-    """
-    bump_to_config = {
-        "embed_dim": "embed_dim",
-        "num_heads": "num_heads",
-        "num_kv_heads": "num_kv_heads",
-        "head_dim": "head_dim",
-        "intermediate_size": "intermediate_dim",
-        "intermediate_dim": "intermediate_dim",
-        "context_length": "max_seq_len",
-        "max_seq_len": "max_seq_len",
-        "max_position_embeddings": "max_seq_len",  # HF uses this key
-        "vocab_size": "vocab_size",
-        "num_layers": "num_layers",
-        "model": "model_type",
-        "model_type": "model_type",
-        "activation_fn": "activation_fn",
-        "rms_eps": "rms_eps",
-    }
-    normalized: Dict[str, Any] = {}
-    if not isinstance(raw_config, dict):
-        return normalized
-    for bump_key, cfg_key in bump_to_config.items():
-        if bump_key in raw_config:
-            normalized[cfg_key] = raw_config[bump_key]
-    return normalized
-
-
-def extract_config_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract a config dict from a weights manifest.
-
-    Supports either:
-    - manifest["config"] (preferred, full config dict), or
-    - top-level fields like embed_dim/num_heads/etc (legacy).
-    """
-    if not isinstance(manifest, dict):
-        return {}
-
-    if isinstance(manifest.get("config"), dict):
-        return normalize_bump_config(manifest["config"])
-
-    legacy_keys = (
-        "model",
-        "model_type",
-        "embed_dim",
-        "num_layers",
-        "num_heads",
-        "num_kv_heads",
-        "head_dim",
-        "intermediate_size",
-        "intermediate_dim",
-        "context_length",
-        "max_seq_len",
-        "vocab_size",
-        "rms_eps",
-    )
-    legacy_cfg = {key: manifest[key] for key in legacy_keys if key in manifest}
-    return normalize_bump_config(legacy_cfg)
-
-
-def extract_quant_summary(weights_manifest: Optional[Dict[str, Any]],
-                          bump_metadata: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
-    """Extract per-layer quant summary from manifest or BUMP metadata."""
-    if isinstance(weights_manifest, dict):
-        qs = weights_manifest.get("quant_summary")
-        if isinstance(qs, dict):
-            return qs
-    if isinstance(bump_metadata, dict):
-        qs = bump_metadata.get("quant_summary")
-        if isinstance(qs, dict):
-            return qs
-    return {}
-
-
-def lookup_quant_dtype(quant_summary: Dict[str, Dict[str, str]],
-                       layer_id: int,
-                       weight_key: str) -> Optional[str]:
-    """Lookup dtype from quant_summary for a given layer + weight key."""
-    if not quant_summary:
-        return None
-    layer_key = f"layer.{layer_id}"
-    layer_entry = quant_summary.get(layer_key)
-    if isinstance(layer_entry, dict):
-        dtype = layer_entry.get(weight_key)
-        if dtype:
-            return dtype
-
-    # Fallback: quant_summary might be a flat map with full tensor names
-    candidates = [
-        f"layer.{layer_id}.{weight_key}",
-        f"model.layer.{layer_id}.{weight_key}",
-        f"model.layers.{layer_id}.{weight_key}",
-    ]
-    for name in candidates:
-        dtype = quant_summary.get(name)
-        if dtype:
-            return dtype
-    return None
-
-
-def get_op_weight_dtypes(quant_summary: Dict[str, Dict[str, str]],
-                         layer_id: int,
-                         op_name: str) -> Optional[Dict[str, str]]:
-    """Return per-op weight dtypes from quant_summary (if available)."""
-    if not quant_summary:
-        return None
-    if op_name == "qkv_project":
-        return {
-            "wq": lookup_quant_dtype(quant_summary, layer_id, "wq"),
-            "wk": lookup_quant_dtype(quant_summary, layer_id, "wk"),
-            "wv": lookup_quant_dtype(quant_summary, layer_id, "wv"),
-        }
-    if op_name == "attn_proj":
-        return {"wo": lookup_quant_dtype(quant_summary, layer_id, "wo")}
-    if op_name == "mlp_up":
-        return {"w1": lookup_quant_dtype(quant_summary, layer_id, "w1")}
-    if op_name == "mlp_down":
-        return {"w2": lookup_quant_dtype(quant_summary, layer_id, "w2")}
-    return None
-
-
-def check_kernel_coverage(graph: Dict,
-                          registry: Dict[str, Dict],
-                          quant_summary: Dict[str, Dict[str, str]],
-                          mode: str) -> List[str]:
-    """Check that all required kernels exist in registry.
-
-    Returns list of missing kernels (empty = all present).
-    """
-    missing = []
-    config = graph["config"]
-    section = graph["sections"][0]
-    num_layers = config["num_layers"]
-
-    # Check header ops
-    for op in section.get("header", {}).get("ops", []):
-        op_name = op["op"]
-        if op_name in HOST_OPS or op_name == "lm_head":
-            continue
-
-        # Determine weight dtype
-        weight_dtypes = get_op_weight_dtypes(quant_summary, 0, op_name)
-        if weight_dtypes:
-            # Multi-weight op (e.g., qkv has wq, wk, wv)
-            for weight_name, weight_dtype in weight_dtypes.items():
-                if weight_dtype:
-                    if not kernel_exists_in_registry(op_name, weight_dtype, mode, registry):
-                        missing.append(
-                            f"{op_name}[{weight_name}] weight={weight_dtype} mode={mode}"
-                        )
-        else:
-            # Single-weight op
-            if not kernel_exists_in_registry(op_name, None, mode, registry):
-                missing.append(f"{op_name} mode={mode}")
-
-    # Check layer ops
-    for layer_id in range(num_layers):
-        # Use ops from template structure
-        template = graph.get("template", {})
-        if template and "block_types" in template:
-            default_block = template["block_types"].get("dense", {})
-            if "ops" in default_block:
-                # Template ops are strings like "rmsnorm", not dicts
-                for op_name in default_block["ops"]:
-                    if not op_name or op_name in HOST_OPS:
-                        continue
-
-                    weight_dtypes = get_op_weight_dtypes(quant_summary, layer_id, op_name)
-                    if weight_dtypes:
-                        for weight_name, weight_dtype in weight_dtypes.items():
-                            if weight_dtype:
-                                if not kernel_exists_in_registry(op_name, weight_dtype, mode, registry):
-                                    missing.append(
-                                        f"layer.{layer_id}.{op_name}[{weight_name}] weight={weight_dtype} mode={mode}"
-                                    )
-                    else:
-                        if not kernel_exists_in_registry(op_name, None, mode, registry):
-                            missing.append(f"layer.{layer_id}.{op_name} mode={mode}")
-
-    return missing
-
-
-def kernel_exists_in_registry(op_name: str,
-                              weight_dtype: Optional[str],
-                              mode: str,
-                              registry: Dict[str, Dict]) -> bool:
-    """Check if kernel exists in registry for (op, weight_dtype, mode)."""
-    if not registry:
-        return False
-
-    # Build registry index if not done
-    if not hasattr(kernel_exists_in_registry, "_index"):
-        kernel_exists_in_registry._index = {
-            k: v for k, v in registry.items()
-        }
-
-    registry_index = kernel_exists_in_registry._index
-
-    # Map template op to registry op name
-    op_map = {
-        "qkv_proj": "qkv_projection",
-        "attn_proj": "attention_projection",
-        "residual_add": "residual_add",
-        "rmsnorm": "rmsnorm",
-        "attention": "attention",
-        "rope_qk": "rope",
-        "mlp_gate_up": "gemm",
-        "mlp_up": "gemm",
-        "swiglu": "swiglu",
-        "mlp_down": "gemm",
-    }
-
-    registry_op = op_map.get(op_name, op_name)
-
-    # Find kernels matching this op
-    for kernel_id, entry in registry_index.items():
-        if entry.get("op") != registry_op:
-            continue
-
-        # Check dtype compatibility
-        quant = entry.get("quant", {})
-        weight_support = quant.get("weight", "")
-
-        if weight_dtype:
-            if "mixed" in weight_support.lower():
-                return True
-            if weight_dtype.lower() in weight_support.lower():
-                return True
-        else:
-            # No weight dtype constraint
-            if not weight_support or weight_support.lower() in ("", "none"):
-                return True
-
+    for k in registry.get("kernels", []):
+        if k.get("id") == kernel_id:
+            act = k.get("quant", {}).get("activation", "fp32")
+            return act in ("q8_0", "q8_k")
     return False
 
 
-def main(argv: List[str]) -> int:
-    try:
-        args = parse_args(argv)
-    except ValueError as e:
-        print(f"Error: {e}")
-        print_usage()
-        return 1
+def get_quantize_kernel_for_activation(activation_dtype: str) -> Optional[str]:
+    """
+    Get the appropriate quantize kernel for the target activation dtype.
 
-    if args.get("help"):
-        print_usage()
-        return 0
+    Args:
+        activation_dtype: Target activation dtype (e.g., "q8_0", "q8_k")
 
-    bootstrap_manifest = None
-    if args.get("weights_manifest"):
-        with open(args["weights_manifest"], "r") as f:
-            bootstrap_manifest = json.load(f)
+    Returns:
+        Quantize kernel ID or None if no quantization needed
+    """
+    if activation_dtype == "q8_0":
+        return "quantize_row_q8_0"
+    elif activation_dtype == "q8_k":
+        return "quantize_row_q8_k"
+    return None
 
-    bootstrap_bump_metadata = None
-    if args.get("bump"):
-        bootstrap_bump_metadata = read_bump_metadata(args["bump"])
 
-    if args.get("preset"):
-        preset = PRESETS.get(args["preset"])
-        if not preset:
-            print(f"Error: Unknown preset '{args['preset']}'")
-            print_usage()
-            return 1
-        if not args["config"]:
-            args["config"] = preset["config"]
-        if not args["name"]:
-            args["name"] = preset["name"]
+def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") -> List[str]:
+    """
+    Direct mapping: Template + Quant Summary → Kernel IDs.
 
-    if args["config"]:
-        config_path = args["config"]
-        if not os.path.exists(config_path):
-            preset = PRESETS.get(args.get("preset") or "")
-            hf_id = preset.get("hf") if preset else None
-            if hf_id:
-                print(f"[CONFIG] Local preset missing, fetching HF config: {hf_id}")
-                _, cached_path = v3.download_hf_config(hf_id)
-                config_path = cached_path
-            else:
-                raise FileNotFoundError(f"Config file not found: {config_path}")
-        print(f"[CONFIG] Reading local: {config_path}")
-        raw_config = v3.parse_config(config_path)
-        # Normalize config keys (HF uses different names than BUMP)
-        config = normalize_bump_config(raw_config)
-        try:
-            config["num_merges"] = int(raw_config.get("num_merges", config.get("num_merges", 0)) or 0)
-            config["total_vocab_bytes"] = int(raw_config.get("total_vocab_bytes", config.get("total_vocab_bytes", 0)) or 0)
-        except Exception:
-            pass
-        model_name = args["name"] or config.get("model_type", "model")
-    elif args.get("model"):
-        model_id = v3.parse_hf_model_id(args["model"])
-        raw_config, cached_path = v3.download_hf_config(model_id)
-        raw_config = v3.parse_config(cached_path)
-        config = normalize_bump_config(raw_config)
-        model_name = args["name"] or v3.model_id_to_name(model_id)
-    else:
-        manifest_cfg = extract_config_from_manifest(bootstrap_manifest)
-        bump_cfg = normalize_bump_config(
-            bootstrap_bump_metadata.get("config", {}) if isinstance(bootstrap_bump_metadata, dict) else {}
-        )
-        config = manifest_cfg or bump_cfg
-        if not config:
-            raise ValueError("No config found in manifest or BUMP metadata; pass --config or --preset")
-        if "dtype" not in config:
-            config["dtype"] = "fp32"
-        model_name = args["name"] or config.get("model_type", "model")
+    This is the CORRECT approach - no intermediate abstractions!
 
-    if args["dtype"]:
-        dtype = args["dtype"]
-        if dtype == "f32":
-            dtype = "fp32"
-        elif dtype == "f16":
-            dtype = "fp16"
-        if dtype not in ("fp32", "bf16", "fp16"):
-            raise ValueError(f"--dtype must be fp32|bf16|fp16, got: {dtype}")
-        config["dtype"] = dtype
+    Algorithm:
+        1. Validate template ops have kernel mappings
+        2. Validate all required kernels exist in registry
+        3. For each layer, map template ops → kernel IDs
+        4. Return list of kernel IDs (IR1)
 
-    if args.get("max_layers") is not None:
-        max_layers = int(args["max_layers"])
-        if max_layers <= 0:
-            raise ValueError(f"--max-layers must be >= 1 (got {max_layers})")
-        if max_layers < config["num_layers"]:
-            print(f"[CONFIG] Limiting layers: {max_layers}/{config['num_layers']}")
-            config["num_layers"] = max_layers
-        elif max_layers > config["num_layers"]:
-            print(f"[CONFIG] max-layers={max_layers} > num_layers={config['num_layers']} (using {config['num_layers']})")
+    Args:
+        manifest: Weights manifest with template and quant_summary
+        mode: Execution mode ("decode" or "prefill")
 
-    if args["tokens"]:
-        tokens = args["tokens"]
-    else:
-        tokens = config["max_seq_len"]
+    Returns:
+        List of kernel IDs (C function names) in execution order
 
-    if args["prefix"]:
-        output_dir = args["prefix"]
-    else:
-        safe_name = model_name.replace("-", "_").replace(".", "_")
-        output_dir = os.path.join("build", f"{safe_name}_v6")
-
-    print(f"[MODEL]  {model_name}")
-    print(f"[OUTPUT] {output_dir}/")
-
-    # =========================================================================
-    # KERNEL REGISTRY
-    # =========================================================================
-    # The kernel registry maps kernel names to their buffer specifications,
-    # constraints, and fusion relationships. It's used for:
-    # 1. Validating that required buffers are allocated
-    # 2. Selecting appropriate kernels for a given operation
-    # 3. Fusion pass (finding fused kernels that replace multiple ops)
+    Raises:
+        RuntimeError: If validation fails (missing mappings or kernels)
+    """
+    template = manifest.get("template", {})
+    quant_summary = manifest.get("quant_summary", {})
+    config = manifest.get("config", {})
     registry = load_kernel_registry()
-    print(f"[KERNELS] Loaded {len(registry)} kernel specs")
 
-    # =========================================================================
-    # TEMPLATE LOADING
-    # =========================================================================
-    # The template defines the IR graph structure:
-    # - block_types: Named operation sequences (e.g., "dense", "moe")
-    # - layer_map: Which block type to use per layer (with overrides)
-    # - flags: Architecture flags (use_qkv_bias, activation, rope, etc.)
-    #
-    # Priority for template source (highest to lowest):
-    # 1. --template=NAME/FILE: Explicit override from file system
-    # 2. --weights-manifest=FILE: Use embedded template (sidecar source of truth)
-    # 3. --bump=FILE: Read template from BUMPWGT5 EOF metadata
-    # 4. Default: Use hardcoded _get_default_body_ops()
-    #
-    # The weights manifest is the preferred source because it is produced
-    # alongside the weights and is used by the loader/runtime mapping.
-    # =========================================================================
-    template = None
-    bump_metadata = bootstrap_bump_metadata
+    num_layers = config.get("num_layers", 0)
 
-    # -------------------------------------------------------------------------
-    # STEP 1: If --bump is provided, read metadata from BUMPWGT5 EOF footer
-    # -------------------------------------------------------------------------
-    if args.get("bump") and bump_metadata is None:
-        print(f"[BUMP] Reading metadata from: {args['bump']}")
-        bump_metadata = read_bump_metadata(args["bump"])
+    # If template is missing or in old format, auto-bump to update it
+    # The converter will automatically pull the latest template from templates/ folder
+    if not template or "sequence" not in template:
+        print(f"\n⚠️  Template missing or outdated (no 'sequence' field)")
+        print(f"   Triggering auto-bump to update manifest with latest template...")
 
-    # -------------------------------------------------------------------------
-    # STEP 2: Read weights manifest early (drives template/config when present)
-    # -------------------------------------------------------------------------
-    weights_manifest = bootstrap_manifest
-    if args.get("weights_manifest") and weights_manifest is None:
-        print(f"[WEIGHTS] Reading manifest: {args['weights_manifest']}")
-        with open(args["weights_manifest"], "r") as f:
-            weights_manifest = json.load(f)
+        # Find the .bump or .gguf file (should be in same dir as manifest)
+        manifest_dir = manifest_path.parent
+        bump_file = None
 
-        # Validate manifest hash against BUMP metadata (if available)
-        if bump_metadata and bump_metadata.get("manifest_hash"):
-            expected_hash = bump_metadata["manifest_hash"]
-            actual_hash = hashlib.sha256(canonical_json_bytes(weights_manifest)).hexdigest()
-            if actual_hash != expected_hash:
-                raise ValueError(
-                    "weights_manifest.json hash mismatch for BUMPWGT5 metadata "
-                    f"(expected {expected_hash}, got {actual_hash})"
+        # Look for .bump file
+        for f in manifest_dir.glob("*.bump"):
+            bump_file = f
+            break
+
+        if not bump_file:
+            # Try looking for original GGUF
+            for f in manifest_dir.glob("*.gguf"):
+                gguf_file = f
+                print(f"   Found GGUF: {gguf_file}")
+                print(f"   Running converter...")
+
+                converter_script = SCRIPT_DIR / "convert_gguf_to_bump_v6_6.py"
+                bump_output = manifest_dir / "weights.bump"
+
+                cmd = [
+                    sys.executable,
+                    str(converter_script),
+                    str(gguf_file),
+                    "--output", str(bump_output),
+                    "--bump-version=5"
+                ]
+
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    print(f"\n❌ HARD FAULT: Converter failed!")
+                    print(result.stderr)
+                    raise RuntimeError("Failed to re-bump model")
+
+                print(f"   ✅ Converter succeeded - reloading manifest...")
+
+                # Reload manifest
+                manifest_path_new = manifest_dir / "weights_manifest.json"
+                manifest = load_manifest(manifest_path_new)
+                template = manifest.get("template", {})
+                quant_summary = manifest.get("quant_summary", {})
+                config = manifest.get("config", {})
+
+                break
+        else:
+            print(f"\n❌ HARD FAULT: Cannot auto-bump - no .gguf or .bump file found")
+            print(f"   Searched in: {manifest_dir}")
+            raise RuntimeError("Template missing and cannot auto-bump")
+
+    # Extract ops sequences from v2 template (header, body, footer)
+    block_name = template["sequence"][0]
+    block = template["block_types"][block_name]
+
+    header_ops = block.get("header", [])
+    body_ops = block["body"]["ops"] if isinstance(block["body"], dict) else block["body"]
+    footer_ops = block.get("footer", [])
+
+    # For validation, we need all ops
+    all_template_ops = header_ops + body_ops + footer_ops
+
+    print(f"\n{'='*60}")
+    print("VALIDATION PHASE")
+    print(f"{'='*60}")
+
+    # VALIDATION 1: Check template ops have kernel mappings
+    print(f"\n[1/2] Validating template ops...")
+    print(f"  Header: {header_ops}")
+    print(f"  Body: {body_ops}")
+    print(f"  Footer: {footer_ops}")
+
+    unmapped_ops = validate_template_ops(all_template_ops)
+    if unmapped_ops:
+        print(f"\n❌ HARD FAULT: Template ops have no kernel mapping!")
+        for op in unmapped_ops:
+            print(f"  - {op}")
+        print(f"\nAction required:")
+        print(f"  Add mappings to TEMPLATE_TO_KERNEL_OP in build_ir_v6_6.py")
+        raise RuntimeError(f"Missing kernel mappings for: {unmapped_ops}")
+
+    # Get required kernel ops (filter out None for metadata ops)
+    required_kernel_ops = set()
+    metadata_ops = []
+    for template_op in all_template_ops:
+        kernel_op = TEMPLATE_TO_KERNEL_OP[template_op]
+        if kernel_op is None:
+            metadata_ops.append(template_op)
+        else:
+            required_kernel_ops.add(kernel_op)
+
+    print(f"  ✅ All {len(all_template_ops)} template ops have mappings")
+    if metadata_ops:
+        print(f"  Metadata ops (no kernel): {', '.join(metadata_ops)}")
+    print(f"  Required kernel ops: {', '.join(sorted(required_kernel_ops))}")
+
+    # VALIDATION 2: Check kernels exist in registry
+    print(f"\n[2/2] Validating kernel availability...")
+
+    # Handle "matmul" specially - it maps to gemv (decode) or gemm (prefill)
+    validation_kernel_ops = []
+    for op in required_kernel_ops:
+        if op == "matmul":
+            validation_kernel_ops.extend(["gemv", "gemm"])
+        else:
+            validation_kernel_ops.append(op)
+
+    availability = validate_kernel_availability(registry, validation_kernel_ops)
+    missing_kernels = [op for op, avail in availability.items() if not avail]
+
+    if missing_kernels:
+        print(f"\n❌ HARD FAULT: Required kernels not found in registry!")
+        for op in missing_kernels:
+            print(f"  - {op}")
+        print(f"\nAction required:")
+        print(f"  1. Implement missing kernels")
+        print(f"  2. Add to kernel maps and regenerate KERNEL_REGISTRY.json")
+        raise RuntimeError(f"Missing kernels: {missing_kernels}")
+
+    print(f"  ✅ All required kernels available (matmul → gemv/gemm)")
+
+    print(f"\n{'='*60}")
+    print("IR1 GENERATION PHASE")
+    print(f"{'='*60}")
+
+    print(f"\nBuilding IR1 from template...")
+    print(f"  Mode: {mode}")
+    print(f"  Layers: {num_layers}")
+
+    arranged_kernels = []  # Pass 1: list of {kernel, op, section, layer, op_id, instance}
+    global_op_id = 0  # Global operation ID counter
+
+    # ═══════════════════════════════════════════════════════════
+    # IR1 is simple: just op_id, kernel, op, section, layer, instance
+    # Data flow (buffer connections) is handled in IR Lower (IR3)
+    # IR Lower uses op sequence + op types to determine buffer routing
+    # ═══════════════════════════════════════════════════════════
+
+    # Weight entries from manifest (for Pass 2 binding)
+    entries = manifest.get("entries", [])
+    weight_index = {e["name"]: e for e in entries}
+
+    # ═══════════════════════════════════════════════════════════
+    # Op → Weight mapping (which weights each op uses for quant lookup)
+    # ═══════════════════════════════════════════════════════════
+    OP_TO_WEIGHT_KEYS = {
+        # Ops with quantized weights - look up in quant_summary
+        "qkv_proj": ["wq", "wk", "wv"],  # Split into 3 matmuls if no fused kernel
+        "out_proj": ["wo"],
+        "mlp_gate_up": ["w1"],
+        "mlp_down": ["w2"],
+        "dense_embedding_lookup": [],  # Uses token_emb, usually q8_0
+        "logits": [],  # Uses lm_head/token_emb, usually q8_0
+
+        # Ops with fp32 weights (no quant lookup needed)
+        "rmsnorm": None,  # gamma is always fp32
+
+        # Ops without weights (compute-only)
+        "rope_qk": None,
+        "kv_cache_store": None,  # Store K,V to KV cache (no weights)
+        "attn": None,
+        "residual_add": None,
+        "silu_mul": None,
+
+        # Metadata ops (no kernel)
+        "tokenizer": "metadata",
+        "weight_tying": "metadata",
+    }
+
+    def map_op_to_kernel(op: str, layer_quant: Dict, mode: str) -> List[str]:
+        """
+        Map template op → kernel ID(s).
+
+        Logic:
+            1. If metadata op → return []
+            2. If has weight keys → lookup quant → find gemv/gemm kernel
+            3. If fp32-only → find fp32 kernel
+        """
+        kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
+        if not kernel_op:
+            return []
+
+        weight_info = OP_TO_WEIGHT_KEYS.get(op)
+
+        # Metadata ops - no kernel
+        if weight_info == "metadata":
+            return []
+
+        # Ops with quantized weights
+        if isinstance(weight_info, list) and weight_info:
+            # Prefill requires head-major QKV projection to populate KV cache
+            if op == "qkv_proj" and mode == "prefill":
+                kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "mixed"}, mode=mode)
+                if kernel_id:
+                    return [kernel_id]
+                raise RuntimeError(
+                    "Prefill requires head-major QKV projection kernel (ck_qkv_project_head_major_quant)."
                 )
-            print("[WEIGHTS] Manifest hash matches BUMP metadata")
 
-    # -------------------------------------------------------------------------
-    # STEP 3: Select template (CLI > manifest > BUMP > default)
-    # -------------------------------------------------------------------------
-    manifest_template = weights_manifest.get("template") if isinstance(weights_manifest, dict) else None
-    bump_template = bump_metadata.get("template") if isinstance(bump_metadata, dict) else None
+            # Prefill uses head-major attention projection for out_proj
+            if op == "out_proj" and mode == "prefill":
+                weight_dtype = layer_quant.get(weight_info[0], "fp32")
+                kernel_id = find_kernel(registry, op="attention_projection",
+                                        quant={"weight": weight_dtype}, mode=mode)
+                if kernel_id:
+                    return [kernel_id]
+                raise RuntimeError(
+                    "Prefill requires head-major attention projection kernel (ck_attention_project_head_major_quant)."
+                )
 
-    if args.get("template"):
-        template_path = args["template"]
-        if not os.path.exists(template_path):
-            template_path = os.path.join("version", "v6.6", "templates", f"{args['template']}.json")
-        if os.path.exists(template_path):
-            print(f"[TEMPLATE] Loading: {template_path}")
-            with open(template_path, "r") as f:
-                template = json.load(f)
-            print(f"[TEMPLATE] Loaded template: {template.get('name', 'unknown')}")
+            # Try fused kernel first (e.g., qkv_projection)
+            weight_dtype = layer_quant.get(weight_info[0], "fp32")
+            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode)
+            if kernel_id:
+                return [kernel_id]
+
+            # Fallback: split into individual matmuls
+            # Return list of (kernel_id, split_op_name) tuples
+            kernels = []
+            # Map weight key to split op name
+            weight_to_split_op = {
+                "wq": "q_proj", "wk": "k_proj", "wv": "v_proj",
+                "w1": "mlp_gate", "w3": "mlp_up", "w2": "mlp_down",
+            }
+            for w_key in weight_info:
+                w_dtype = layer_quant.get(w_key, "fp32")
+                k = find_kernel(registry, op="matmul", quant={"weight": w_dtype}, mode=mode)
+                if k:
+                    split_op = weight_to_split_op.get(w_key, op)
+                    kernels.append((k, split_op))
+            return kernels
+
+        # Header/footer ops with weights (embedding, logits)
+        if isinstance(weight_info, list) and not weight_info:
+            # These use fixed quant (typically q8_0)
+            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "q8_0"}, mode=mode)
+            return [kernel_id] if kernel_id else []
+
+        # Ops with fp32 weights or no weights
+        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "fp32"}, mode=mode)
+        if kernel_id:
+            return [kernel_id]
+
+        # Try without weight quant requirement
+        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "none"}, mode=mode)
+        return [kernel_id] if kernel_id else []
+
+    # ═══════════════════════════════════════════════════════════
+    # Parse template → Generate IR1
+    # ═══════════════════════════════════════════════════════════
+
+    # Track op instance counts during PASS 1 for data flow lookup
+    pass1_instance_counts: Dict[tuple, int] = {}  # (layer, op_type) -> count
+
+    def get_op_info(op_type: str, section: str, layer: int) -> dict:
+        """Get op_id and instance for an op. Data flow is handled in IR Lower."""
+        nonlocal pass1_instance_counts, global_op_id
+
+        # Track instance for body ops (for repeated ops like rmsnorm, residual_add)
+        if section == "body":
+            key = (layer, op_type)
+            instance = pass1_instance_counts.get(key, 0)
+            pass1_instance_counts[key] = instance + 1
         else:
-            print(f"[TEMPLATE] Warning: template not found: {template_path}")
-    elif isinstance(manifest_template, dict):
-        template = manifest_template
-        print(f"[TEMPLATE] Using template from weights manifest: {template.get('name', 'unknown')}")
-    elif isinstance(bump_template, dict):
-        template = bump_template
-        print(f"[TEMPLATE] Using template from BUMP metadata: {template.get('name', 'unknown')}")
-    else:
-        print("[TEMPLATE] Using default (hardcoded) graph structure")
+            instance = 0
 
-    if isinstance(manifest_template, dict) and isinstance(bump_template, dict):
-        manifest_name = manifest_template.get("name")
-        bump_name = bump_template.get("name")
-        if manifest_name and bump_name and manifest_name != bump_name:
-            raise ValueError(
-                f"Template mismatch: manifest '{manifest_name}' vs BUMP '{bump_name}'"
-            )
+        # Assign global op_id
+        op_id = global_op_id
+        global_op_id += 1
 
-    # -------------------------------------------------------------------------
-    # STEP 4: Apply config overrides (manifest takes precedence)
-    # -------------------------------------------------------------------------
-    manifest_cfg = normalize_bump_config(weights_manifest.get("config", {})) if isinstance(weights_manifest, dict) else {}
-    bump_cfg = normalize_bump_config(bump_metadata.get("config", {})) if isinstance(bump_metadata, dict) else {}
-
-    if manifest_cfg and bump_cfg:
-        mismatches = []
-        for key in sorted(set(manifest_cfg) & set(bump_cfg)):
-            if manifest_cfg[key] != bump_cfg[key]:
-                mismatches.append((key, manifest_cfg[key], bump_cfg[key]))
-        if mismatches:
-            msg = ", ".join(f"{k}={a} vs {b}" for k, a, b in mismatches)
-            raise ValueError(f"Config mismatch between manifest and BUMP metadata: {msg}")
-
-    if manifest_cfg:
-        print(f"[CONFIG] Applying {len(manifest_cfg)} fields from weights manifest")
-        for key, value in manifest_cfg.items():
-            if value != config.get(key):
-                print(f"[CONFIG]   Override {key}: {config.get(key)} -> {value}")
-                config[key] = value
-
-    if bump_cfg:
-        print(f"[CONFIG] Applying {len(bump_cfg)} fields from BUMP metadata")
-        for key, value in bump_cfg.items():
-            if key not in manifest_cfg and value != config.get(key):
-                print(f"[CONFIG]   Override {key}: {config.get(key)} -> {value}")
-                config[key] = value
-
-    # =========================================================================
-    # WEIGHTS METADATA
-    # =========================================================================
-    # Weights can come from multiple sources:
-    #   - Safetensors header (.safetensors)
-    #   - Weights index (model.safetensors.index.json)
-    #   - Weights manifest (weights_manifest.json from convert_*_to_bump.py)
-    #
-    # The manifest is critical for quantized inference:
-    #   - Maps tensor names to file offsets
-    #   - Specifies dtype per tensor (q4_k, q5_0, q8_0, etc.)
-    #   - Used by the weight loader to map tensors to memory
-    #
-    # If BUMP metadata is provided, we validate the manifest hash matches
-    # the canonical JSON hash stored in the BUMP footer.
-    # =========================================================================
-    weights_meta = {}
-    if args["weights_header"]:
-        print(f"[WEIGHTS] Reading safetensors header: {args['weights_header']}")
-        weights_meta["header"] = read_safetensors_header(args["weights_header"])
-    if args["weights_index"]:
-        print(f"[WEIGHTS] Reading index: {args['weights_index']}")
-        weights_meta["index"] = read_weights_index(args["weights_index"])
-    # Determine weight dtype from manifest if not explicitly specified
-    manifest_weight_dtype = None
-    if weights_manifest and isinstance(weights_manifest, dict):
-        dtype_set = {
-            entry.get("dtype")
-            for entry in weights_manifest.get("entries", [])
-            if entry.get("dtype")
+        return {
+            "op_id": op_id,
+            "instance": instance,
         }
-        non_fp = {
-            dtype for dtype in dtype_set
-            if dtype not in ("fp32", "f32", "bf16", "fp16")
-        }
-        if len(non_fp) == 1:
-            manifest_weight_dtype = next(iter(non_fp))
-        elif len(dtype_set) == 1:
-            manifest_weight_dtype = next(iter(dtype_set))
 
-    if args.get("weight_dtype") == "q4_k_m":
-        if weights_manifest:
-            print("[WEIGHTS] q4_k_m is mixed; using manifest dtypes for weights")
-            args["weight_dtype"] = None
+    for block_name in template["sequence"]:
+        block_def = template["block_types"][block_name]
+        block_sequence = block_def.get("sequence", ["header", "body", "footer"])
+
+        print(f"\n  Block: {block_name}")
+
+        for section_name in block_sequence:
+            section_def = block_def.get(section_name)
+            if section_def is None:
+                continue
+
+            # Get ops list
+            if isinstance(section_def, dict):
+                ops = section_def.get("ops", [])
+            else:
+                ops = section_def if isinstance(section_def, list) else []
+
+            # Body: loop over layers
+            if section_name == "body":
+                for layer_idx in range(num_layers):
+                    layer_key = f"layer.{layer_idx}"
+                    layer_quant = quant_summary.get(layer_key, {})
+                    # Reset instance counts for each layer
+                    pass1_instance_counts = {k: v for k, v in pass1_instance_counts.items()
+                                             if k[0] != layer_idx}
+
+                    print(f"\n    Layer {layer_idx}:")
+
+                    # Track rmsnorm instance for quantize insertion
+                    rmsnorm_instance = 0
+
+                    for op_idx, op in enumerate(ops):
+                        kernels = map_op_to_kernel(op, layer_quant, mode)
+
+                        # Check if we need to insert quantize op after rmsnorm
+                        # V6.5 compatibility: quantize activation before Q8_0 activation kernels
+                        if op == "rmsnorm" and op_idx + 1 < len(ops):
+                            next_op = ops[op_idx + 1]
+                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode)
+                            needs_quantize = False
+
+                            for nk in next_kernels:
+                                nk_id = nk[0] if isinstance(nk, tuple) else nk
+                                if kernel_needs_q8_activation(registry, nk_id):
+                                    needs_quantize = True
+                                    break
+
+                            if needs_quantize:
+                                # Insert quantize op after rmsnorm (will be appended after rmsnorm below)
+                                pass  # Flag is set, handled below
+
+                        # Check if we need to insert quantize op BEFORE out_proj or mlp_down
+                        # V6.5 compatibility: quantize activation output before these projections
+                        if op in ("out_proj", "mlp_down") and kernels:
+                            first_kernel = kernels[0]
+                            fk_id = first_kernel[0] if isinstance(first_kernel, tuple) else first_kernel
+                            if kernel_needs_q8_activation(registry, fk_id):
+                                # Get activation dtype from kernel
+                                for kreg in registry.get("kernels", []):
+                                    if kreg.get("id") == fk_id:
+                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
+                                        quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
+                                        if quantize_kernel:
+                                            quant_op_name = f"quantize_{op}_input"
+                                            quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
+                                            arranged_kernels.append({
+                                                "op_id": quant_op_info["op_id"],
+                                                "kernel": quantize_kernel,
+                                                "op": quant_op_name,
+                                                "section": "body",
+                                                "layer": layer_idx,
+                                                "instance": 0,
+                                            })
+                                            print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED]")
+                                        break
+
+                        for k in kernels:
+                            # Handle both plain kernel ID and (kernel_id, split_op) tuples
+                            if isinstance(k, tuple):
+                                kernel_id, split_op = k
+                            else:
+                                kernel_id, split_op = k, op
+
+                            # Get op_id and instance (data flow is handled in IR Lower)
+                            op_info = get_op_info(split_op, "body", layer_idx)
+
+                            arranged_kernels.append({
+                                "op_id": op_info["op_id"],
+                                "kernel": kernel_id,
+                                "op": split_op,
+                                "section": "body",
+                                "layer": layer_idx,
+                                "instance": op_info["instance"],
+                            })
+                            print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
+
+                        # Insert quantize op after rmsnorm if needed
+                        if op == "rmsnorm" and op_idx + 1 < len(ops):
+                            next_op = ops[op_idx + 1]
+                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode)
+
+                            for nk in next_kernels:
+                                nk_id = nk[0] if isinstance(nk, tuple) else nk
+                                if kernel_needs_q8_activation(registry, nk_id):
+                                    # Get activation dtype from kernel
+                                    for kreg in registry.get("kernels", []):
+                                        if kreg.get("id") == nk_id:
+                                            act_dtype = kreg.get("quant", {}).get("activation", "fp32")
+                                            quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
+                                            if quantize_kernel:
+                                                quant_op_name = f"quantize_input_{rmsnorm_instance}"
+                                                quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
+                                                arranged_kernels.append({
+                                                    "op_id": quant_op_info["op_id"],
+                                                    "kernel": quantize_kernel,
+                                                    "op": quant_op_name,
+                                                    "section": "body",
+                                                    "layer": layer_idx,
+                                                    "instance": rmsnorm_instance,
+                                                })
+                                                print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: {rmsnorm_instance}) [AUTO-INSERTED]")
+                                            break
+                                    break
+                            rmsnorm_instance += 1
+
+                        if not kernels and OP_TO_WEIGHT_KEYS.get(op) != "metadata":
+                            print(f"            {op:20s} → (no kernel)")
+
+            # Header/Footer: run once (no layer quant)
+            else:
+                print(f"\n    {section_name.capitalize()}:")
+                for op in ops:
+                    kernels = map_op_to_kernel(op, {}, mode)
+                    for k in kernels:
+                        # Handle both plain kernel ID and (kernel_id, split_op) tuples
+                        if isinstance(k, tuple):
+                            kernel_id, split_op = k
+                        else:
+                            kernel_id, split_op = k, op
+
+                        # Get op_id and instance (data flow is handled in IR Lower)
+                        op_info = get_op_info(split_op, section_name, -1)
+
+                        arranged_kernels.append({
+                            "op_id": op_info["op_id"],
+                            "kernel": kernel_id,
+                            "op": split_op,
+                            "section": section_name,
+                            "layer": -1,
+                            "instance": op_info["instance"],
+                        })
+                        print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
+                    if not kernels:
+                        if OP_TO_WEIGHT_KEYS.get(op) == "metadata":
+                            print(f"            {op:20s} → (metadata)")
+                        else:
+                            print(f"            {op:20s} → (no kernel)")
+
+    print(f"\n✓ Pass 1: Generated {len(arranged_kernels)} kernel calls")
+
+    # ═══════════════════════════════════════════════════════════
+    # PASS 2: Bind weights from sidecar entries
+    # Uses instance counts from PASS 1 (stored in ir_op["instance"])
+    # ═══════════════════════════════════════════════════════════
+    print(f"\n  Pass 2: Binding weights from sidecar...")
+
+    # Mapping for repeated ops: (op_type, instance_index) -> weight_keys
+    # Instance index is 0-based (first occurrence = 0)
+    REPEATED_OP_WEIGHTS = {
+        # rmsnorm: 1st (pre-attention) uses ln1_gamma, 2nd (pre-MLP) uses ln2_gamma
+        ("rmsnorm", 0): ["ln1_gamma"],      # Pre-attention norm
+        ("rmsnorm", 1): ["ln2_gamma"],      # Pre-MLP norm
+        # residual_add: both instances use same weights (none), but tracked for consistency
+        ("residual_add", 0): [],            # Post-attention residual
+        ("residual_add", 1): [],            # Post-MLP residual
+    }
+
+    # Footer-specific weights (no instance tracking needed)
+    FOOTER_OP_WEIGHTS = {
+        "rmsnorm": ["final_ln_weight", "final_ln_bias"],
+    }
+
+    for ir_op in arranged_kernels:
+        op = ir_op["op"]
+        layer = ir_op["layer"]
+        section = ir_op["section"]
+
+        # Use instance from PASS 1 (already computed with data flow)
+        instance_idx = ir_op.get("instance", 0)
+
+        # Get weight keys for this op - check repeated op mapping first
+        if section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
+            weight_keys = REPEATED_OP_WEIGHTS[(op, instance_idx)]
+        elif section == "footer" and op in FOOTER_OP_WEIGHTS:
+            weight_keys = FOOTER_OP_WEIGHTS[op]
         else:
-            raise ValueError("--weight-dtype=q4_k_m requires --weights-manifest")
+            weight_keys = TEMPLATE_OP_WEIGHTS.get(op, [])
 
-    if args.get("weight_dtype"):
-        config["weight_dtype"] = args["weight_dtype"]
-    elif manifest_weight_dtype:
-        config["weight_dtype"] = manifest_weight_dtype
+        ir_op["weights"] = {}
 
-    quant_summary = extract_quant_summary(weights_manifest, bump_metadata)
-    if quant_summary:
-        print(f"[QUANT] Loaded {len(quant_summary)} per-layer dtype entries")
+        for wkey in weight_keys:
+            # Build weight name based on section/layer
+            if section == "header":
+                # Header weights: token_emb, etc (no layer prefix)
+                weight_name = wkey
+            elif section == "footer":
+                # Footer weights: final_ln_weight, etc (no layer prefix)
+                weight_name = wkey
+            else:
+                # Body weights: layer.X.wq, etc
+                weight_name = f"layer.{layer}.{wkey}"
 
-    # Graph IR
-    graph = build_graph_ir_v6(config, model_name, template=template)
-    if quant_summary:
-        graph["quant_summary"] = quant_summary
-    if weights_meta:
-        graph["weights"] = weights_meta
-
-    # ---------------------------------------------------------------------------
-    # PREFLIGHT COVERAGE CHECK
-    # ---------------------------------------------------------------------------
-    # Validate that all required kernels exist in registry before lowering.
-    # This gives early feedback if kernels are missing.
-    if registry and quant_summary:
-        print("\n[PREFILL] Checking kernel coverage...")
-        missing_kernels = check_kernel_coverage(
-            graph, registry, quant_summary, mode="prefill"
-        )
-        if missing_kernels:
-            print(f"\n[WARNING] Missing {len(missing_kernels)} kernels for prefill mode (registry incomplete):")
-            for miss in missing_kernels[:10]:  # Show first 10
-                print(f"  - {miss}")
-            if len(missing_kernels) > 10:
-                print(f"  ... and {len(missing_kernels) - 10} more")
-            print("[WARNING] Skipping kernel coverage check - registry needs more kernels")
-            # raise RuntimeError("Kernel coverage check failed for prefill")
-
-        print(f"[PREFILL] Kernel coverage check skipped (incomplete registry)")
-
-        print("\n[DECODE] Checking kernel coverage...")
-        missing_kernels = check_kernel_coverage(
-            graph, registry, quant_summary, mode="decode"
-        )
-        if missing_kernels:
-            print(f"\n[WARNING] Missing {len(missing_kernels)} kernels for decode mode (registry incomplete):")
-            for miss in missing_kernels[:10]:
-                print(f"  - {miss}")
-            if len(missing_kernels) > 10:
-                print(f"  ... and {len(missing_kernels) - 10} more")
-            print("[WARNING] Skipping kernel coverage check - registry needs more kernels")
-            # raise RuntimeError("Kernel coverage check failed for decode")
-
-        print(f"[DECODE] Kernel coverage check skipped (incomplete registry)")
-    elif registry and not quant_summary:
-        print("\n[WARNING] Registry loaded but no quant_summary - skipping coverage check")
-
-    os.makedirs(output_dir, exist_ok=True)
-    graph_path = os.path.join(output_dir, "graph.json")
-    with open(graph_path, "w") as f:
-        json.dump(graph, f, indent=2)
-    print(f"[GRAPH] Written: {graph_path}")
-
-    if weights_meta:
-        weights_report = build_weight_map_report(graph, weights_meta)
-        weights_path = os.path.join(output_dir, "weights_map.json")
-        with open(weights_path, "w") as f:
-            json.dump(weights_report, f, indent=2)
-        print(f"[WEIGHTS] Written: {weights_path}")
-
-    def emit_weights_manifest(layout: v3.ModelLayout, manifest: Dict, out_dir: str) -> None:
-        entries_in = {e["name"]: e for e in manifest.get("entries", [])}
-        missing = []
-        merged = []
-
-        section = layout.sections[0]
-        buffers = []
-        buffers.extend(section.header_buffers)
-        for layer in section.layers:
-            buffers.extend(layer.buffers)
-        buffers.extend(section.footer_buffers)
-
-        for buf in buffers:
-            if buf.role != "weight":
-                continue
-            if buf.tied_to:
-                continue
-            entry = entries_in.get(buf.name)
-            if not entry:
-                missing.append(buf.name)
-                continue
-            merged.append(
-                {
-                    "name": buf.name,
-                    "dtype": entry.get("dtype", buf.dtype),
-                    "file_offset": entry.get("file_offset", 0),
+            # Look up in manifest entries
+            if weight_name in weight_index:
+                entry = weight_index[weight_name]
+                ir_op["weights"][wkey] = {
+                    "name": weight_name,
+                    "offset": entry.get("file_offset", 0),
                     "size": entry.get("size", 0),
-                    "runtime_offset": buf.offset,
+                    "dtype": entry.get("dtype", "unknown"),
                 }
+            else:
+                # Weight not found - might be optional (biases)
+                pass
+
+    # Count weights bound
+    total_weights = sum(len(op["weights"]) for op in arranged_kernels)
+    print(f"  ✓ Pass 2: Bound {total_weights} weights to {len(arranged_kernels)} ops")
+
+    return arranged_kernels
+
+
+def apply_fusion_pass(ir1_ops: List[Dict], registry: Dict, mode: str, no_fusion: bool = False) -> tuple[List[Dict], Dict]:
+    """
+    Apply fusion pass to combine consecutive kernels where fused versions exist.
+
+    Args:
+        ir1_ops: List of IR1 ops (each is {kernel, op, section, layer, weights})
+        registry: Kernel registry
+        mode: Execution mode (decode/prefill)
+        no_fusion: If True, skip fusion and return original ops
+
+    Returns:
+        (fused_ops, fusion_stats) - New op list after fusion and statistics
+
+    Fusion strategy:
+        1. Scan registry for kernels with "fuses" field
+        2. Match consecutive kernel sequences
+        3. Replace with fused kernel, merge weights
+        4. Track fusion statistics
+    """
+    print(f"\n{'='*60}")
+    print("FUSION PASS")
+    print(f"{'='*60}")
+
+    # Check for fusion disable flag (parameter only)
+    if no_fusion:
+        print("  ⚠️ Fusion DISABLED (--no-fusion)")
+        return ir1_ops, {"total_fusions": 0, "kernels_removed": 0, "fusions_applied": [], "disabled": True}
+
+    # Build fusion patterns from registry
+    fusion_patterns = []
+    for kernel in registry["kernels"]:
+        if "fuses" not in kernel:
+            continue
+
+        # Check if this fused kernel matches the mode
+        variant = kernel.get("variant", "")
+        if mode == "decode" and "prefill" in variant and "decode" not in variant:
+            continue
+        if mode == "prefill" and "decode" in variant and "prefill" not in variant:
+            continue
+
+        pattern = {
+            "fused_kernel": kernel["id"],
+            "fused_op": kernel.get("op", ""),
+            "sequence": kernel.get("fuses", []),
+            "variant": variant,
+        }
+        fusion_patterns.append(pattern)
+
+    print(f"\nFound {len(fusion_patterns)} fusion patterns in registry for {mode} mode")
+
+    # Apply fusion patterns
+    fused_ops = [op.copy() for op in ir1_ops]  # Deep copy to avoid mutation
+    for op in fused_ops:
+        op["weights"] = op.get("weights", {}).copy()
+
+    fusion_stats = {
+        "total_fusions": 0,
+        "kernels_removed": 0,
+        "fusions_applied": [],
+    }
+
+    # Sort patterns by sequence length (longest first) for greedy matching
+    fusion_patterns.sort(key=lambda p: -len(p["sequence"]))
+
+    changed = True
+    while changed:
+        changed = False
+        for pattern in fusion_patterns:
+            sequence = pattern["sequence"]
+            seq_len = len(sequence)
+
+            # Scan for matching sequences
+            i = 0
+            while i <= len(fused_ops) - seq_len:
+                # Check if sequence matches (compare kernel IDs)
+                match = True
+                for j in range(seq_len):
+                    if fused_ops[i + j]["kernel"] != sequence[j]:
+                        match = False
+                        break
+
+                if match:
+                    # Found a match - replace with fused kernel
+                    fused_id = pattern["fused_kernel"]
+                    removed_ops = fused_ops[i:i+seq_len]
+                    removed_kernels = [op["kernel"] for op in removed_ops]
+
+                    print(f"\n  Fusion opportunity at position {i}:")
+                    print(f"    Replacing: {' + '.join(removed_kernels)}")
+                    print(f"    With:      {fused_id}")
+
+                    # Merge weights from all fused ops
+                    merged_weights = {}
+                    for op in removed_ops:
+                        merged_weights.update(op.get("weights", {}))
+
+                    # Create fused op
+                    fused_op = {
+                        "kernel": fused_id,
+                        "op": "fused",
+                        "section": removed_ops[0]["section"],
+                        "layer": removed_ops[0]["layer"],
+                        "weights": merged_weights,
+                        "fused_from": removed_kernels,
+                    }
+
+                    # Replace sequence with fused op
+                    fused_ops[i:i+seq_len] = [fused_op]
+
+                    # Record fusion
+                    fusion_stats["fusions_applied"].append({
+                        "position": i,
+                        "pattern": pattern["fused_op"],
+                        "fused_kernel": fused_id,
+                        "replaced": removed_kernels,
+                    })
+                    fusion_stats["total_fusions"] += 1
+                    fusion_stats["kernels_removed"] += seq_len - 1
+
+                    changed = True
+                    break  # Restart scan after modification
+
+                i += 1
+
+            if changed:
+                break  # Restart with new fusion_patterns iteration
+
+    print(f"\n✓ Fusion complete:")
+    print(f"  Total fusions: {fusion_stats['total_fusions']}")
+    print(f"  Kernels removed: {fusion_stats['kernels_removed']}")
+    print(f"  Final kernel count: {len(fused_ops)} (was {len(ir1_ops)})")
+
+    return fused_ops, fusion_stats
+
+
+def insert_bias_add_ops(
+    ir_ops: List[Dict],
+    registry: Dict,
+    manifest: Dict,
+    mode: str,
+) -> List[Dict]:
+    """
+    Insert explicit bias_add ops after projections when kernels do not apply bias.
+
+    This keeps biases visible in the lowered IR and avoids hiding them in codegen.
+    """
+    # Only insert if bias_add kernel exists
+    if not any(k.get("id") == "bias_add" for k in registry.get("kernels", [])):
+        print("  Warning: bias_add kernel not found in registry; skipping bias ops")
+        return ir_ops
+
+    kernel_maps_dir = PROJECT_ROOT / "kernel_maps"
+    kernel_map_cache: Dict[str, Dict] = {}
+
+    def load_kernel_map(kernel_id: str) -> Optional[Dict]:
+        if kernel_id in kernel_map_cache:
+            return kernel_map_cache[kernel_id]
+        kernel_file = kernel_maps_dir / f"{kernel_id}.json"
+        if kernel_file.exists():
+            with open(kernel_file, "r") as f:
+                kernel_map_cache[kernel_id] = json.load(f)
+                return kernel_map_cache[kernel_id]
+        # fallback to registry entry
+        for k in registry.get("kernels", []):
+            if k.get("id") == kernel_id:
+                kernel_map_cache[kernel_id] = k
+                return k
+        kernel_map_cache[kernel_id] = {}
+        return {}
+
+    def kernel_supports_bias(kernel_id: str) -> bool:
+        km = load_kernel_map(kernel_id)
+        bias_inputs = {"bias", "bq", "bk", "bv", "bo", "b1", "b2"}
+        for inp in km.get("inputs", []):
+            name = inp.get("name", "")
+            if name in bias_inputs or "bias" in name:
+                return True
+        for w in km.get("weights", []):
+            name = w.get("name", "")
+            if name == "bias" or name.startswith("b") or "bias" in name:
+                return True
+        return False
+
+    bias_key_by_op = {
+        "q_proj": "bq",
+        "k_proj": "bk",
+        "v_proj": "bv",
+        "out_proj": "bo",
+        "mlp_gate_up": "b1",
+        "mlp_down": "b2",
+    }
+
+    config = manifest.get("config", {})
+    out: List[Dict] = []
+    inserted = 0
+
+    for op in ir_ops:
+        out.append(op)
+        op_type = op.get("op", "")
+        bias_key = bias_key_by_op.get(op_type)
+        if not bias_key:
+            continue
+        if bias_key not in op.get("weights", {}):
+            continue
+        if kernel_supports_bias(op.get("kernel", "")):
+            continue
+
+        out_dim, _ = compute_matmul_dims(op_type, config)
+        bias_op = {
+            "kernel": "bias_add",
+            "op": "bias_add",
+            "layer": op.get("layer", -1),
+            "section": op.get("section", ""),
+            "weights": {bias_key: op["weights"][bias_key]},
+            "params": {},
+            "bias_for": op_type,
+            "_auto_inserted": True,
+        }
+        if out_dim is not None:
+            bias_op["params"]["_output_dim"] = out_dim
+        out.append(bias_op)
+        inserted += 1
+
+    if inserted:
+        print(f"  Inserted {inserted} bias_add ops (mode={mode})")
+
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STAGE 3: IR LOWER 1 (Stitch kernel maps)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def generate_ir_lower_1(
+    fused_ops: List[Dict],
+    registry: Dict,
+    manifest: Dict,
+    mode: str
+) -> List[Dict]:
+    """
+    IR Lower 1: Stitch kernel maps with IR1 ops.
+
+    For each fused op:
+      1. Load the kernel map (inputs, outputs, scratch)
+      2. Map IR1 weights to kernel inputs
+      3. Track activation flow between kernels
+
+    This creates the buffer requirements that Memory Planner needs.
+
+    Args:
+        fused_ops: Fused IR1 ops from fusion pass
+        registry: Kernel registry
+        manifest: Model manifest
+        mode: decode/prefill
+
+    Returns:
+        List of lowered ops with input/output/scratch specs
+    """
+    print(f"\n{'='*60}")
+    print("IR LOWER 1 (Stitch kernel maps)")
+    print(f"{'='*60}")
+
+    config = manifest.get("config", {})
+
+    # Build kernel map index by loading individual kernel map files
+    # KERNEL_REGISTRY.json is only used for validation, not as source of truth
+    kernel_maps_dir = PROJECT_ROOT / "kernel_maps"
+    kernel_map_index = {}
+    for kernel in registry.get("kernels", []):
+        kernel_id = kernel["id"]
+        # Try to load individual kernel map file first
+        kernel_file = kernel_maps_dir / f"{kernel_id}.json"
+        if kernel_file.exists():
+            with open(kernel_file, 'r') as f:
+                kernel_map_index[kernel_id] = json.load(f)
+        else:
+            # Fallback to registry entry if no individual file
+            kernel_map_index[kernel_id] = kernel
+    # Use module-level WEIGHT_TO_KERNEL_INPUT for name mapping
+
+    lowered_ops = []
+
+    # Track activation buffers for dataflow
+    # The output of one kernel becomes the input of the next
+    current_activation = "input_tokens"  # Start with input token IDs
+
+    for idx, ir_op in enumerate(fused_ops):
+        kernel_id = ir_op["kernel"]
+        op_name = ir_op["op"]
+        layer = ir_op["layer"]
+        section = ir_op["section"]
+        ir_weights = ir_op.get("weights", {})
+
+        # Get kernel map
+        kernel_map = kernel_map_index.get(kernel_id)
+        if not kernel_map:
+            print(f"  Warning: Kernel '{kernel_id}' not in registry, skipping")
+            continue
+
+        # Build lowered op - preserve ALL weights from IR1
+        lowered_op = {
+            "idx": idx,
+            "kernel": kernel_id,
+            "op": op_name,
+            "layer": layer,
+            "section": section,
+            "function": kernel_map.get("impl", {}).get("function", kernel_id),
+            "weights": ir_weights,  # Preserve all IR1 weights
+            "inputs": {},  # Activation inputs only
+            "outputs": {},
+            "scratch": [],
+            "params": ir_op.get("params", {}),
+            "bias_for": ir_op.get("bias_for"),
+        }
+        if ir_op.get("_auto_inserted"):
+            lowered_op["_auto_inserted"] = True
+
+        # Map kernel input activations from kernel map
+        # New format has 4 sections:
+        #   - 'inputs': input activations from previous layer
+        #   - 'weights': static model parameters (already handled above)
+        #   - 'activations': intermediate scratch tensors
+        #   - 'outputs': output activations to next layer
+        kernel_inputs = kernel_map.get("inputs", [])
+
+        # Build set of weight names from kernel map to filter out weight inputs
+        # (handles legacy format where weights were mixed into 'inputs')
+        kernel_weight_names = set()
+        for kw in kernel_map.get("weights", []):
+            kernel_weight_names.add(kw["name"])
+        # Also check IR1 weights mapped to kernel input names
+        for wkey in ir_weights.keys():
+            kernel_weight_names.add(wkey)
+            mapped_name = WEIGHT_TO_KERNEL_INPUT.get(wkey)
+            if mapped_name:
+                kernel_weight_names.add(mapped_name)
+
+        for kernel_input in kernel_inputs:
+            input_name = kernel_input["name"]
+            input_dtype = kernel_input["dtype"]
+            input_shape = kernel_input.get("shape", [])
+
+            # Skip if this is actually a weight parameter
+            if input_name in kernel_weight_names:
+                continue
+
+            # Activation input (from previous kernel)
+            lowered_op["inputs"][input_name] = {
+                "type": "activation",
+                "source": current_activation,
+                "dtype": input_dtype,
+                "shape": input_shape,
+            }
+
+        # Map kernel outputs
+        for kernel_output in kernel_map.get("outputs", []):
+            output_name = kernel_output["name"]
+            output_dtype = kernel_output["dtype"]
+            output_shape = kernel_output.get("shape", [])
+
+            # Create output buffer name
+            output_buffer = f"buf_{idx}_{output_name}"
+
+            lowered_op["outputs"][output_name] = {
+                "type": "activation",
+                "buffer": output_buffer,
+                "dtype": output_dtype,
+                "shape": output_shape,
+            }
+
+            # Update current activation for next kernel
+            current_activation = output_buffer
+
+        # Map scratch buffers
+        for scratch in kernel_map.get("scratch", []):
+            lowered_op["scratch"].append({
+                "name": scratch.get("name", f"scratch_{idx}"),
+                "size": scratch.get("size", "dynamic"),
+                "dtype": scratch.get("dtype", "fp32"),
+            })
+
+        lowered_ops.append(lowered_op)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AUTOMATIC KV CACHE INSERTION (decode only)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Insert kv_cache_store ops after rope_qk to store K,V for use in subsequent decode.
+    # For decode, also update attention to use the decode kernel with KV cache.
+    print(f"\n  [{mode.capitalize()} mode] Inserting KV cache operations...")
+    final_ops = []
+    kv_store_count = 0
+
+    for i, op in enumerate(lowered_ops):
+        final_ops.append(op)
+
+        if mode == "decode":
+            # After rope_qk, insert kv_cache_store
+            if op["op"] == "rope_qk":
+                layer = op["layer"]
+                kv_store_op = {
+                    "idx": len(final_ops),  # Will be renumbered
+                    "kernel": "kv_cache_store",
+                    "op": "kv_cache_store",
+                    "layer": layer,
+                    "section": op["section"],
+                    "function": "kv_cache_store",
+                    "weights": {},
+                    "inputs": {
+                        "k": {"type": "scratch", "source": "k_scratch"},
+                        "v": {"type": "scratch", "source": "v_scratch"},
+                    },
+                    "outputs": {
+                        "kv_cache_k": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
+                        "kv_cache_v": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
+                    },
+                    "scratch": [],
+                    "_auto_inserted": True,
+                }
+                final_ops.append(kv_store_op)
+                kv_store_count += 1
+
+            # For decode mode, update attention ops to use decode kernel
+            if op["op"] == "attn" and "attention" in op["kernel"]:
+                # Switch to decode attention kernel
+                op["kernel"] = "attention_forward_decode_head_major_gqa_flash"
+                op["function"] = "attention_forward_decode_head_major_gqa_flash"
+                # Update inputs to use KV cache instead of scratch
+                op["inputs"]["k_cache"] = {"type": "kv_cache", "source": f"kv_cache_k_L{op['layer']}"}
+                op["inputs"]["v_cache"] = {"type": "kv_cache", "source": f"kv_cache_v_L{op['layer']}"}
+                # Remove scratch K/V references if present
+                op["inputs"].pop("k", None)
+                op["inputs"].pop("v", None)
+
+    # Renumber ops
+    for i, op in enumerate(final_ops):
+        op["idx"] = i
+
+    lowered_ops = final_ops
+    print(f"  Inserted {kv_store_count} kv_cache_store operations")
+    if mode == "decode":
+        print(f"  Updated {kv_store_count} attention ops to use decode kernel")
+
+    # Summary
+    total_weight_refs = sum(len(op.get("weights", {})) for op in lowered_ops)
+    total_activations = sum(len(op.get("inputs", {})) for op in lowered_ops)
+
+    print(f"\n✓ IR Lower 1 complete:")
+    print(f"  Lowered ops: {len(lowered_ops)}")
+    print(f"  Weight references: {total_weight_refs}")
+    print(f"  Activation inputs: {total_activations}")
+
+    return lowered_ops
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STAGE 4: MEMORY PLANNER (with aggressive validation)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Weight name patterns for matching IR1 ops to manifest entries
+# Maps: kernel weight ref → possible manifest entry patterns
+WEIGHT_PATTERNS = {
+    # QKV projection weights and biases
+    "wq": ["layer.{L}.wq", "layers.{L}.attention.wq"],
+    "wk": ["layer.{L}.wk", "layers.{L}.attention.wk"],
+    "wv": ["layer.{L}.wv", "layers.{L}.attention.wv"],
+    "bq": ["layer.{L}.bq", "layers.{L}.attention.bq"],
+    "bk": ["layer.{L}.bk", "layers.{L}.attention.bk"],
+    "bv": ["layer.{L}.bv", "layers.{L}.attention.bv"],
+
+    # Output projection
+    "wo": ["layer.{L}.wo", "layers.{L}.attention.wo"],
+    "bo": ["layer.{L}.bo", "layers.{L}.attention.bo"],
+
+    # MLP weights and biases
+    "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1"],
+    "w2": ["layer.{L}.w2", "layers.{L}.feed_forward.w2"],
+    "w3": ["layer.{L}.w3", "layers.{L}.feed_forward.w3"],
+    "b1": ["layer.{L}.b1", "layers.{L}.feed_forward.b1"],
+    "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2"],
+
+    # Layer norms
+    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight"],
+    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight"],
+
+    # Header weights
+    "token_emb": ["token_emb", "token_embd.weight", "embed_tokens.weight"],
+    "pos_emb": ["pos_emb", "pos_embd.weight", "position_embedding"],
+
+    # Vocab/tokenizer data (not model weights, but need to track)
+    "vocab_offsets": ["vocab_offsets"],
+    "vocab_strings": ["vocab_strings"],
+    "vocab_merges": ["vocab_merges"],
+
+    # Footer weights
+    "final_ln_weight": ["final_ln_weight", "norm.weight"],
+    "final_ln_bias": ["final_ln_bias", "norm.bias"],
+    "output_weight": ["output.weight", "lm_head.weight"],
+}
+
+# Template op → weight refs it uses
+# This tells us which weights each template op needs
+TEMPLATE_OP_WEIGHTS = {
+    # Header (tokenizer is metadata, not model weights)
+    "tokenizer": [],  # Tokenizer data handled separately (not model weights)
+    "dense_embedding_lookup": ["token_emb"],  # Token embeddings only (pos_emb for non-RoPE)
+
+    # Attention block (body + footer)
+    # Body: uses ln1_gamma, ln2_gamma (per-layer)
+    # Footer: uses final_ln_weight, final_ln_bias (once)
+    "rmsnorm": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "final_ln_bias"],
+    "qkv_proj": ["wq", "wk", "wv", "bq", "bk", "bv"],  # QKV + optional biases (for fused kernel)
+    "q_proj": ["wq", "bq"],  # Q projection only (when split)
+    "k_proj": ["wk", "bk"],  # K projection only (when split)
+    "v_proj": ["wv", "bv"],  # V projection only (when split)
+    "rope_qk": [],  # No model weights (uses precomputed tables)
+    "attn": [],  # No model weights
+    "out_proj": ["wo", "bo"],  # Output projection + optional bias
+    "residual_add": [],  # No model weights
+
+    # MLP block
+    "mlp_gate_up": ["w1", "w3", "b1"],  # Gate + up projection
+    "silu_mul": [],  # No model weights
+    "mlp_down": ["w2", "b2"],  # Down projection
+
+    # Footer
+    "weight_tying": [],  # Metadata only
+    # For weight tying: logits uses token_emb (embedding matrix) transposed
+    # output_weight is for models without weight tying
+    "logits": ["token_emb"],  # Uses embedding matrix for weight tying
+}
+
+
+def generate_memory_layout(
+    ir_lower_1_ops: List[Dict],
+    manifest: Dict,
+    registry: Dict,
+    mode: str,
+    context_len: int = None
+) -> Dict:
+    """
+    Generate memory layout with AGGRESSIVE VALIDATION.
+
+    Args:
+        ir_lower_1_ops: List of IR Lower 1 ops (each is {kernel, op, section, layer,
+                        inputs, outputs, scratch}). Inputs have type='weight' or
+                        type='activation'.
+
+    This function is a VALIDATION GATE:
+    - HARD FAULT if any manifest weight is unused
+    - HARD FAULT if any required weight is missing
+
+    Steps:
+    1. Build weight index from manifest entries (actual sizes)
+    2. Extract weight usage from IR Lower 1 inputs (type='weight')
+    3. Validate 100% weight coverage
+    4. Plan activation buffers from IR Lower 1 outputs
+    5. Return complete layout
+
+    Returns:
+        Layout dict with memory allocation plan and validation status
+
+    Raises:
+        RuntimeError: If validation fails (unused or missing weights)
+    """
+    print(f"\n{'='*60}")
+    print("MEMORY PLANNER (with validation)")
+    print(f"{'='*60}")
+
+    config = manifest.get("config", {})
+    entries = manifest.get("entries", [])
+    template = manifest.get("template", {})
+    num_layers = config.get("num_layers", 24)
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 1: Build weight index from manifest entries
+    # ═══════════════════════════════════════════════════════════
+
+    if not entries:
+        raise RuntimeError(
+            "HARD FAULT: Manifest has no 'entries' field!\n"
+            "  The manifest must contain weight tensor entries.\n"
+            "  Re-run converter with --bump-version=5"
+        )
+
+    all_weights = {}  # name -> {dtype, size, offset, ...}
+    total_weight_size = 0
+
+    # First pass: collect all entries and find min file_offset (weights base)
+    min_file_offset = None
+    for entry in entries:
+        fo = entry.get("file_offset", 0)
+        if min_file_offset is None or fo < min_file_offset:
+            min_file_offset = fo
+
+    weights_base_offset = min_file_offset or 0
+
+    for entry in entries:
+        name = entry["name"]
+        size = entry.get("size", entry.get("size_bytes", 0))
+        file_offset = entry.get("file_offset", 0)
+
+        # Compute relative offset from weights base
+        relative_offset = file_offset - weights_base_offset
+
+        all_weights[name] = {
+            "name": name,
+            "dtype": entry.get("dtype", "unknown"),
+            "size": size,
+            "file_offset": file_offset,
+            "relative_offset": relative_offset,  # Offset relative to weights_base_offset
+        }
+        total_weight_size = max(total_weight_size, relative_offset + size)
+
+    print(f"\n📦 Manifest weights:")
+    print(f"  Total entries: {len(all_weights)}")
+    print(f"  Weights base offset in file: {weights_base_offset}")
+    print(f"  Total size: {total_weight_size / 1024 / 1024:.1f} MB")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 2: Determine which weights SHOULD be used by template
+    # ═══════════════════════════════════════════════════════════
+
+    # Get template ops from template
+    block_name = template.get("sequence", ["decoder"])[0]
+    block = template.get("block_types", {}).get(block_name, {})
+
+    header_ops = block.get("header", [])
+    body_def = block.get("body", {})
+    body_ops = body_def.get("ops", []) if isinstance(body_def, dict) else body_def
+    footer_ops = block.get("footer", [])
+
+    print(f"\n📋 Template structure:")
+    print(f"  Header ops: {header_ops}")
+    print(f"  Body ops: {body_ops}")
+    print(f"  Footer ops: {footer_ops}")
+
+    # Calculate expected weights based on template
+    expected_weights = set()
+    weight_to_op = {}  # Track which op uses each weight
+
+    # Header weights (run once)
+    for op in header_ops:
+        weight_refs = TEMPLATE_OP_WEIGHTS.get(op, [])
+        for ref in weight_refs:
+            patterns = WEIGHT_PATTERNS.get(ref, [ref])
+            for pattern in patterns:
+                weight_name = pattern  # Header weights don't have layer index
+                if weight_name in all_weights:
+                    expected_weights.add(weight_name)
+                    weight_to_op[weight_name] = f"header:{op}"
+
+    # Body weights (run per layer)
+    for layer_idx in range(num_layers):
+        for op in body_ops:
+            weight_refs = TEMPLATE_OP_WEIGHTS.get(op, [])
+            for ref in weight_refs:
+                patterns = WEIGHT_PATTERNS.get(ref, [ref])
+                for pattern in patterns:
+                    weight_name = pattern.replace("{L}", str(layer_idx))
+                    if weight_name in all_weights:
+                        expected_weights.add(weight_name)
+                        weight_to_op[weight_name] = f"layer.{layer_idx}:{op}"
+
+    # Footer weights (run once)
+    for op in footer_ops:
+        weight_refs = TEMPLATE_OP_WEIGHTS.get(op, [])
+        for ref in weight_refs:
+            patterns = WEIGHT_PATTERNS.get(ref, [ref])
+            for pattern in patterns:
+                weight_name = pattern
+                if weight_name in all_weights:
+                    expected_weights.add(weight_name)
+                    weight_to_op[weight_name] = f"footer:{op}"
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 3: Extract weights from IR Lower 1 weights field
+    # ═══════════════════════════════════════════════════════════
+
+    # IR Lower 1 ops preserve the original IR1 weights field
+    ir1_used_weights = set()
+
+    for ir_op in ir_lower_1_ops:
+        weights = ir_op.get("weights", {})
+        for wkey, winfo in weights.items():
+            if isinstance(winfo, dict) and "name" in winfo:
+                ir1_used_weights.add(winfo["name"])
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 4: VALIDATION - Check weight coverage
+    # ═══════════════════════════════════════════════════════════
+
+    all_weight_names = set(all_weights.keys())
+
+    # Weights in manifest that are NOT model weights (tokenizer data)
+    non_model_weights = {"vocab_offsets", "vocab_strings", "vocab_merges"}
+    model_weights = all_weight_names - non_model_weights
+
+    # Weights expected but not used by IR1
+    unused_by_ir1 = expected_weights - ir1_used_weights
+
+    # Weights in manifest but not used at all
+    completely_unused = model_weights - expected_weights - ir1_used_weights
+
+    coverage = len(ir1_used_weights) / len(model_weights) * 100 if model_weights else 0
+
+    print(f"\n🔍 Weight validation:")
+    print(f"  Model weights in manifest: {len(model_weights)}")
+    print(f"  Expected by template: {len(expected_weights)}")
+    print(f"  Used by IR1 kernels: {len(ir1_used_weights)}")
+    print(f"  Coverage: {coverage:.1f}%")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 5: Report unused weights (potential bugs)
+    # ═══════════════════════════════════════════════════════════
+
+    validation_errors = []
+
+    if unused_by_ir1:
+        print(f"\n⚠️  WEIGHTS EXPECTED BUT NOT USED BY IR1 ({len(unused_by_ir1)}):")
+
+        # Categorize unused weights
+        header_unused = [w for w in unused_by_ir1 if weight_to_op.get(w, "").startswith("header:")]
+        footer_unused = [w for w in unused_by_ir1 if weight_to_op.get(w, "").startswith("footer:")]
+        body_unused = [w for w in unused_by_ir1 if "layer." in w]
+
+        if header_unused:
+            print(f"\n   Header weights (not processed by IR1):")
+            for w in sorted(header_unused)[:10]:
+                print(f"     - {w} (used by {weight_to_op.get(w, 'unknown')})")
+            if len(header_unused) > 10:
+                print(f"     ... and {len(header_unused) - 10} more")
+
+            validation_errors.append(
+                f"Header weights not used: {len(header_unused)} weights\n"
+                f"   FIX: Add header ops to IR1 generation (tokenizer, embedding)"
             )
 
-        manifest_out = {
-            "format": "ck-bumpwgt4-merged-v1",
-            "generated": datetime.utcnow().isoformat() + "Z",
-            "model": layout.name,
-            "has_attention_biases": manifest.get("has_attention_biases", False),
-            "missing": missing,
-            "entries": merged,
+        if footer_unused:
+            print(f"\n   Footer weights (not processed by IR1):")
+            for w in sorted(footer_unused)[:10]:
+                print(f"     - {w} (used by {weight_to_op.get(w, 'unknown')})")
+            if len(footer_unused) > 10:
+                print(f"     ... and {len(footer_unused) - 10} more")
+
+            validation_errors.append(
+                f"Footer weights not used: {len(footer_unused)} weights\n"
+                f"   FIX: Add footer ops to IR1 generation (final_norm, logits)"
+            )
+
+        if body_unused:
+            print(f"\n   Body weights (not processed by IR1):")
+            for w in sorted(body_unused)[:10]:
+                print(f"     - {w} (used by {weight_to_op.get(w, 'unknown')})")
+            if len(body_unused) > 10:
+                print(f"     ... and {len(body_unused) - 10} more")
+
+            validation_errors.append(
+                f"Body weights not used: {len(body_unused)} weights\n"
+                f"   FIX: Check body ops in IR1 are loading all required weights"
+            )
+
+    if completely_unused:
+        print(f"\n⚠️  WEIGHTS IN MANIFEST BUT NOT IN TEMPLATE ({len(completely_unused)}):")
+        for w in sorted(completely_unused)[:10]:
+            print(f"     - {w}")
+        if len(completely_unused) > 10:
+            print(f"     ... and {len(completely_unused) - 10} more")
+
+        validation_errors.append(
+            f"Weights not mapped to any template op: {len(completely_unused)} weights\n"
+            f"   FIX: Add TEMPLATE_OP_WEIGHTS mapping for these weight types"
+        )
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 6: HARD FAULT if validation fails
+    # ═══════════════════════════════════════════════════════════
+
+    if validation_errors:
+        print(f"\n{'='*60}")
+        print("❌ HARD FAULT: WEIGHT VALIDATION FAILED")
+        print(f"{'='*60}")
+
+        for i, err in enumerate(validation_errors, 1):
+            print(f"\n[{i}] {err}")
+
+        print(f"\n" + "="*60)
+        print("WHY THIS MATTERS:")
+        print("  - Unused weights = broken inference (wrong output)")
+        print("  - For backprop: gradients will be ZERO for these weights")
+        print("  - Model will not learn/work correctly")
+        print(f"{'='*60}")
+
+        raise RuntimeError(
+            f"Weight validation failed: {len(validation_errors)} issues found.\n"
+            f"Fix the issues above before proceeding."
+        )
+
+    print(f"\n✅ All {len(model_weights)} model weights are mapped!")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 7: Plan activation buffers from config + context_len
+    # ═══════════════════════════════════════════════════════════
+
+    embed_dim = config.get("embed_dim", 896)
+    num_heads = config.get("num_heads", 14)
+    num_kv_heads = config.get("num_kv_heads", 2)
+    head_dim = config.get("head_dim", 64)
+    intermediate_size = config.get("intermediate_size", 4864)
+    vocab_size = config.get("vocab_size", 151936)
+
+    # Use provided context_len or default from config
+    max_context = config.get("context_length", 32768)
+    if context_len is None:
+        context_len = max_context
+    else:
+        context_len = min(context_len, max_context)
+
+    # For decode mode, we process 1 token but need full KV cache
+    if mode == "decode":
+        seq_len = 1  # tokens per forward pass
+    else:
+        seq_len = context_len  # prefill processes all tokens
+
+    print(f"\n📊 Activation memory planning:")
+    print(f"  Mode: {mode}")
+    print(f"  Context length: {context_len}")
+    print(f"  Sequence length (per pass): {seq_len}")
+
+    # Calculate buffer sizes
+    activation_buffers = []
+    current_offset = 0
+
+    def add_buffer(name, size, shape_desc, dtype="fp32"):
+        nonlocal current_offset
+        activation_buffers.append({
+            "name": name,
+            "size": size,
+            "offset": current_offset,
+            "shape": shape_desc,
+            "dtype": dtype
+        })
+        current_offset += size
+
+    # ─────────────────────────────────────────────────────────────
+    # HEADER buffers: tokenizer → embedding
+    # ─────────────────────────────────────────────────────────────
+
+    # Text input buffer: UTF-8 bytes (estimate 4 bytes per token avg)
+    # For decode mode, only need 1 token; for prefill, need full context
+    max_input_bytes = seq_len * 16  # conservative estimate (avg token ~4 bytes, pad for unicode)
+    add_buffer("text_input", max_input_bytes, f"[{max_input_bytes}]", "u8")
+
+    # Token IDs buffer: tokenizer output [seq_len] as int32
+    token_ids_size = seq_len * 4  # int32
+    add_buffer("token_ids", token_ids_size, f"[{seq_len}]", "i32")
+
+    # Embedded input: embedding lookup output [seq_len, embed_dim]
+    # For decode: [1, embed_dim], for prefill: [context_len, embed_dim]
+    embedded_size = seq_len * embed_dim * 4
+    add_buffer("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+
+    # Layer input buffer (for ping-pong, same size as embedded)
+    add_buffer("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+
+    # Residual buffer (for residual connections - stores input before layer processing)
+    add_buffer("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
+
+    # ─────────────────────────────────────────────────────────────
+    # BODY buffers: KV cache + RoPE (shared across all layers)
+    # ─────────────────────────────────────────────────────────────
+
+    # KV cache: [num_layers, 2, num_kv_heads, context_len, head_dim]
+    # Stores K and V for all layers, indexed by position
+    kv_per_layer = num_kv_heads * context_len * head_dim * 4
+    total_kv_size = num_layers * 2 * kv_per_layer
+    add_buffer("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
+
+    # RoPE tables: precomputed cos/sin [2, context_len, head_dim/2]
+    rope_size = context_len * (head_dim // 2) * 4 * 2
+    add_buffer("rope_cache", rope_size, f"[2, {context_len}, {head_dim // 2}]")
+
+    # Layer scratch buffers (reused across layers)
+    # Q output: [num_heads, seq_len, head_dim]
+    q_size = num_heads * seq_len * head_dim * 4
+    add_buffer("q_scratch", q_size, f"[{num_heads}, {seq_len}, {head_dim}]")
+
+    # K output: [num_kv_heads, seq_len, head_dim]
+    k_size = num_kv_heads * seq_len * head_dim * 4
+    add_buffer("k_scratch", k_size, f"[{num_kv_heads}, {seq_len}, {head_dim}]")
+
+    # V output: [num_kv_heads, seq_len, head_dim]
+    v_size = num_kv_heads * seq_len * head_dim * 4
+    add_buffer("v_scratch", v_size, f"[{num_kv_heads}, {seq_len}, {head_dim}]")
+
+    # Attention output: [num_heads, seq_len, head_dim]
+    attn_out_size = num_heads * seq_len * head_dim * 4
+    add_buffer("attn_scratch", attn_out_size, f"[{num_heads}, {seq_len}, {head_dim}]")
+
+    # MLP scratch: [seq_len, intermediate_size * 2]
+    mlp_size = seq_len * intermediate_size * 2 * 4
+    # Fused attention scratch needs more space (Q, attn_out, proj, qkv_scratch)
+    # Formula: 3 * num_heads * seq_len * head_dim * 4 + qkv_scratch (embed_dim * 4 * tokens + overhead)
+    # For safety, use at least 350KB for decode fused attention
+    fused_attn_scratch = max(350 * 1024, 3 * num_heads * seq_len * head_dim * 4 + embed_dim * 4 * seq_len * 4)
+    scratch_size = max(mlp_size, fused_attn_scratch)
+    add_buffer("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn)]")
+
+    # Layer output: [seq_len, embed_dim]
+    layer_out_size = seq_len * embed_dim * 4
+    add_buffer("layer_output", layer_out_size, f"[{seq_len}, {embed_dim}]")
+
+    # ─────────────────────────────────────────────────────────────
+    # FOOTER buffers: final output
+    # ─────────────────────────────────────────────────────────────
+
+    # Logits: [seq_len, vocab_size] - for decode just 1 token
+    logits_seq = 1 if mode == "decode" else seq_len
+    logits_size = logits_seq * vocab_size * 4
+    add_buffer("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
+
+    total_activation_size = current_offset
+
+    print(f"\n  Buffer breakdown:")
+    for buf in activation_buffers:
+        size_mb = buf["size"] / (1024 * 1024)
+        print(f"    {buf['name']:<20} {buf['shape']:<40} {size_mb:>8.2f} MB")
+    print(f"  {'─' * 70}")
+    print(f"  {'Total':<20} {'':<40} {total_activation_size / (1024 * 1024):>8.2f} MB")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 8: Build final layout
+    # ═══════════════════════════════════════════════════════════
+
+    # Build weight layout with relative offsets (relative to weights_base_offset)
+    weight_layout = []
+    for name in sorted(all_weights.keys()):
+        w = all_weights[name]
+        rel_off = w["relative_offset"]
+        abs_off = weights_base_offset + rel_off
+        weight_layout.append({
+            "name": name,
+            "dtype": w["dtype"],
+            "size": w["size"],
+            "offset": rel_off,  # Offset relative to weights_base_offset
+            "abs_offset": abs_off,  # Offset relative to bump base (absolute)
+            "define": f"W_{_sanitize_macro(name)}",
+        })
+
+    # Add context_len to config for codegen
+    layout_config = dict(config)
+    if context_len is not None:
+        layout_config["context_length"] = context_len
+        layout_config["context_len"] = context_len
+    elif "context_length" not in layout_config:
+        layout_config["context_length"] = layout_config.get("max_seq_len", 32768)
+
+    # Get bump_layout from manifest (written by converter)
+    # This ensures codegen uses the same offsets as the converter
+    bump_layout = manifest.get("bump_layout", {
+        # Defaults if manifest doesn't have bump_layout (backward compat)
+        "header_size": 128,
+        "ext_metadata_size": 24,
+        "data_start": 152,
+        "description": "Offsets: [0..header_size) header, [header_size..data_start) ext_metadata, [data_start..] dtype_table + weights"
+    })
+
+    activations_base = weights_base_offset + total_weight_size
+    for buf in activation_buffers:
+        buf["define"] = f"A_{_sanitize_macro(buf.get('name', 'buffer'))}"
+        buf["abs_offset"] = activations_base + buf.get("offset", 0)
+
+    total_size = activations_base + total_activation_size
+    total_size = _align_up(total_size, 64)
+
+    layout = {
+        "format": "memory-layout-v6.6",
+        "version": 2,
+        "mode": mode,
+        "config": layout_config,
+        # BUMP file layout constants - passed from converter via manifest
+        # All downstream (codegen, C runtime) should use these, NOT hardcoded values
+        "bump_layout": bump_layout,
+        # Note: operations are NOT included here - use generate_ir_lower_2 for lowered ops with offsets
+        "validation": {
+            "status": "PASS",
+            "total_weights": len(model_weights),
+            "used_weights": len(ir1_used_weights),
+            "coverage_percent": coverage,
+        },
+        "memory": {
+            "weights": {
+                "size": total_weight_size,
+                "bump_size": total_weight_size,
+                "base_offset": weights_base_offset,  # File offset where weights start
+                "entries": weight_layout,
+            },
+            "activations": {
+                "size": total_activation_size,
+                "buffers": activation_buffers,
+            },
+            "arena": {
+                "mode": "region",
+                "weights_base": weights_base_offset,
+                "activations_base": activations_base,
+                "total_size": total_size,
+            },
+        },
+    }
+
+    print(f"\n✓ Memory layout complete")
+    print(f"  Bump (weights): {total_weight_size / 1024 / 1024:.1f} MB")
+    print(f"  Activations: {total_activation_size / 1024:.1f} KB")
+
+    return layout
+
+
+def generate_memory_layout_packed(
+    ir_lower_1_ops: List[Dict],
+    manifest: Dict,
+    registry: Dict,
+    mode: str,
+    context_len: int = None,
+    layer_limit: Optional[int] = None,
+) -> Dict:
+    """Generate a packed/streamed layout where weights + activations share one arena."""
+    print(f"\n{'='*60}")
+    print("MEMORY PLANNER (packed/streamed)")
+    print(f"{'='*60}")
+
+    config = dict(manifest.get("config", {}))
+    if layer_limit:
+        config["num_layers"] = int(layer_limit)
+
+    entries = manifest.get("entries", [])
+    if not entries:
+        raise RuntimeError("Manifest entries missing; cannot build packed layout.")
+    entry_by_name = {e["name"]: e for e in entries}
+
+    # Validate: every used weight exists in manifest
+    used_weights = set()
+    for op in ir_lower_1_ops:
+        for w in op.get("weights", {}).values():
+            if isinstance(w, dict) and "name" in w:
+                used_weights.add(w["name"])
+    missing = [w for w in sorted(used_weights) if w not in entry_by_name]
+    if missing:
+        raise RuntimeError(f"Packed layout: missing {len(missing)} weights in manifest: {missing[:5]}")
+
+    act_specs = build_activation_specs(config, mode, context_len, num_layers_override=layer_limit)
+
+    weight_offset = 0
+    act_offset = 0
+    weight_layout = []
+    weight_offsets = {}
+    activation_buffers = []
+    act_offsets = {}
+
+    weight_order = []
+    seen_weights = set()
+    for op in ir_lower_1_ops:
+        for w in op.get("weights", {}).values():
+            if not isinstance(w, dict):
+                continue
+            name = w.get("name")
+            if not name or name in seen_weights:
+                continue
+            seen_weights.add(name)
+            weight_order.append(name)
+
+    def alloc_weight(name: str) -> None:
+        nonlocal weight_offset
+        if name in weight_offsets:
+            return
+        entry = entry_by_name[name]
+        size = int(entry.get("size", entry.get("size_bytes", 0)))
+        off = _align_up(weight_offset, 64)
+        weight_offsets[name] = off
+        weight_layout.append({
+            "name": name,
+            "dtype": entry.get("dtype", "unknown"),
+            "size": size,
+            "offset": off,
+            "abs_offset": off,
+            "file_offset": entry.get("file_offset", 0),
+            "define": f"W_{_sanitize_macro(name)}",
+        })
+        weight_offset = off + size
+
+    def alloc_act(name: str) -> None:
+        nonlocal act_offset
+        if name in act_offsets:
+            return
+        spec = act_specs.get(name)
+        if not spec:
+            return
+        off = _align_up(act_offset, 64)
+        act_offsets[name] = off
+        activation_buffers.append({
+            "name": name,
+            "size": spec["size"],
+            "offset": off,
+            "abs_offset": off,
+            "shape": spec["shape"],
+            "dtype": spec["dtype"],
+            "define": f"A_{_sanitize_macro(name)}",
+        })
+        act_offset = off + spec["size"]
+
+    # Allocate all weights first (in order of first use)
+    for name in weight_order:
+        alloc_weight(name)
+
+    weights_end = _align_up(weight_offset, 64)
+    act_offset = weights_end
+
+    # Simulate op order (using same buffer naming logic as IR Lower 2)
+    current_input_buffer = "token_ids"
+    current_output_buffer = "embedded_input"
+    qkv_input_buffer = "token_ids"
+
+    for op in ir_lower_1_ops:
+        op_type = op.get("op", "")
+        kernel_type = op.get("kernel", "")
+
+        if op_type in ("q_proj", "k_proj", "v_proj"):
+            if op_type == "q_proj":
+                qkv_input_buffer = current_input_buffer
+            alloc_act(qkv_input_buffer)
+            if op_type == "q_proj":
+                alloc_act("q_scratch")
+            elif op_type == "k_proj":
+                alloc_act("k_scratch")
+            elif op_type == "v_proj":
+                alloc_act("v_scratch")
+        elif op_type == "qkv_proj":
+            qkv_input_buffer = current_input_buffer
+            alloc_act(qkv_input_buffer)
+            alloc_act("q_scratch")
+            alloc_act("k_scratch")
+            alloc_act("v_scratch")
+        else:
+            if "embedding" in kernel_type.lower():
+                alloc_act("token_ids")
+                alloc_act("embedded_input")
+            elif op_type == "logits":
+                alloc_act("logits")
+            else:
+                alloc_act(current_input_buffer)
+                alloc_act(current_output_buffer)
+
+            if op_type == "residual_add":
+                alloc_act("residual")
+
+        # Scratch buffers
+        if op.get("scratch"):
+            alloc_act("mlp_scratch")
+
+        if op_type == "rope_qk":
+            alloc_act("q_scratch")
+            alloc_act("k_scratch")
+            alloc_act("rope_cache")
+
+        if op_type == "kv_cache_store":
+            alloc_act("k_scratch")
+            alloc_act("v_scratch")
+            alloc_act("kv_cache")
+
+        if op_type == "attn" or "attention" in kernel_type:
+            alloc_act("q_scratch")
+            alloc_act("k_scratch")
+            alloc_act("v_scratch")
+            alloc_act("attn_scratch")
+
+        if op_type == "residual_add":
+            alloc_act("residual")
+
+        if op.get("section") == "body" and op_type == "rmsnorm":
+            alloc_act("layer_input")
+            alloc_act("residual")
+
+        # Ping-pong update (same as generate_ir_lower_2)
+        if "embedding" in kernel_type.lower():
+            current_input_buffer = "embedded_input"
+            current_output_buffer = "layer_input"
+        elif op_type in ("q_proj", "k_proj", "v_proj", "qkv_proj", "rope_qk", "bias_add") or \
+                (mode == "prefill" and op_type == "attn"):
+            pass
+        else:
+            current_input_buffer, current_output_buffer = current_output_buffer, current_input_buffer
+
+    # Ensure required buffers exist for runtime pointers
+    alloc_act("kv_cache")
+    alloc_act("rope_cache")
+    alloc_act("logits")
+
+    total_weight_bytes = weights_end
+    total_activation_bytes = act_offset - weights_end
+
+    layout_config = dict(config)
+    if context_len is not None:
+        layout_config["context_length"] = context_len
+        layout_config["context_len"] = context_len
+    elif "context_length" not in layout_config:
+        layout_config["context_length"] = layout_config.get("max_seq_len", 32768)
+
+    layout = {
+        "format": "memory-layout-v6.6",
+        "version": 3,
+        "mode": mode,
+        "config": layout_config,
+        "bump_layout": manifest.get("bump_layout", {
+            "header_size": 128,
+            "ext_metadata_size": 24,
+            "data_start": 152,
+        }),
+        "memory": {
+            "weights": {
+                "size": total_weight_bytes,
+                "bump_size": total_weight_bytes,
+                "base_offset": 0,
+                "entries": weight_layout,
+            },
+            "activations": {
+                "size": total_activation_bytes,
+                "buffers": activation_buffers,
+            },
+            "arena": {
+                "mode": "packed",
+                "weights_base": 0,
+                "activations_base": weights_end,
+                "total_size": total_size,
+            },
+        },
+    }
+
+    print(f"\n✓ Packed layout complete")
+    print(f"  Total arena: {total_size / 1024 / 1024:.1f} MB")
+    print(f"  Weights (used): {sum(e.get('size', 0) for e in weight_layout) / 1024 / 1024:.1f} MB")
+    print(f"  Activations (allocated): {total_activation_bytes / 1024 / 1024:.1f} MB")
+
+    return layout
+
+
+def write_manifest_map(layout: Dict, manifest: Dict, output_path: Path) -> None:
+    """Write weights_manifest.map with runtime offsets from layout."""
+    weights = layout.get("memory", {}).get("weights", {}).get("entries", [])
+    rt_by_name = {e["name"]: int(e.get("abs_offset", e.get("offset", 0))) for e in weights}
+    # Preserve ordering by runtime offset (stream-friendly)
+    ordered = sorted(weights, key=lambda e: int(e.get("abs_offset", e.get("offset", 0))))
+
+    entry_by_name = {e["name"]: e for e in manifest.get("entries", [])}
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as f:
+        f.write("# ck-bumpwgt5-manifest-map v1\n")
+        f.write("# name|dtype|file_offset|size|runtime_offset\n")
+        for w in ordered:
+            name = w["name"]
+            m = entry_by_name.get(name)
+            if not m:
+                continue
+            file_off = int(m.get("file_offset", 0))
+            size = int(m.get("size", m.get("size_bytes", 0)))
+            dtype = m.get("dtype", w.get("dtype", "unknown"))
+            rt_off = rt_by_name.get(name, 0)
+            f.write(f"{name}|{dtype}|0x{file_off:016X}|0x{size:016X}|0x{rt_off:016X}\n")
+
+
+def generate_ir_lower_2(
+    ir_lower_1_ops: List[Dict],
+    layout: Dict,
+    manifest: Dict,
+    registry: Dict,
+    mode: str
+) -> Dict:
+    """
+    IR Lower 2: Add concrete memory offsets to IR Lower 1 ops.
+
+    IR Lower 1 already has:
+    - inputs: {type='weight', name, offset, size} or {type='activation', source}
+    - outputs: {buffer, dtype, shape}
+    - scratch: [{name, size, dtype}]
+
+    This function adds:
+    - Concrete bump_offset for each weight input
+    - Concrete activation_offset for each activation input/output
+    - Pointer expressions for codegen
+
+    Args:
+        ir_lower_1_ops: IR Lower 1 ops with inputs/outputs/scratch
+        layout: Memory layout with weight offsets and activation buffers
+        manifest: Model manifest
+        registry: Kernel registry
+        mode: Execution mode
+
+    Returns:
+        Final lowered IR with explicit pointer expressions
+    """
+    print(f"\n{'='*60}")
+    print("IR LOWER 2 (Add memory offsets)")
+    print(f"{'='*60}")
+
+    config = manifest.get("config", {})
+
+    # Build weight offset lookup from layout
+    weight_offsets = {}
+    memory = layout.get("memory", {})
+    weight_entries = memory.get("weights", {}).get("entries", [])
+    for entry in weight_entries:
+        weight_offsets[entry["name"]] = {
+            "bump_offset": entry["offset"],
+            "dtype": entry["dtype"],
+            "size": entry["size"],
         }
 
-        json_path = os.path.join(out_dir, "weights_manifest.json")
-        with open(json_path, "w") as f:
-            json.dump(manifest_out, f, indent=2)
-        print(f"[WEIGHTS] Written: {json_path}")
+    # Activation buffer lookup
+    activation_buffers = {}
+    for buf in memory.get("activations", {}).get("buffers", []):
+        activation_buffers[buf["name"]] = buf
 
-        map_path = os.path.join(out_dir, "weights_manifest.map")
-        with open(map_path, "w") as f:
-            f.write("# ck-bumpwgt4-manifest-map v1\n")
-            f.write("# name|dtype|file_offset|size|runtime_offset\n")
-            for e in merged:
-                f.write(
-                    f"{e['name']}|{e['dtype']}|0x{e['file_offset']:016X}|0x{e['size']:016X}|0x{e['runtime_offset']:016X}\n"
-                )
-        print(f"[WEIGHTS] Written: {map_path}")
+    # KV cache slice helper (prefill path may write directly into KV cache)
+    layout_config = layout.get("config", {}) if isinstance(layout, dict) else {}
+    if layout_config:
+        merged = dict(config)
+        merged.update(layout_config)
+        config = merged
+    context_len = config.get("context_length", config.get("max_seq_len", config.get("context_len", 0)))
+    num_kv_heads = config.get("num_kv_heads", 0)
+    head_dim = config.get("head_dim", 0)
 
-    # Fusion configuration
-    fusion_mode = args.get("fusion", "auto")
-    fusion_verbose = args.get("fusion_verbose", False)
+    def kv_layer_offsets(layer: int) -> Optional[Tuple[int, int]]:
+        kv_buf = activation_buffers.get("kv_cache")
+        if not kv_buf or not context_len or not num_kv_heads or not head_dim:
+            return None
+        kv_per_layer = num_kv_heads * context_len * head_dim * 4
+        base = kv_buf["offset"] + layer * 2 * kv_per_layer
+        return base, base + kv_per_layer
 
-    # Parallel planning configuration
-    parallel_enabled = args.get("parallel", "on") == "on"
-    parallel_verbose = args.get("parallel_verbose", False)
+    lowered_ops = []
 
-    # Determine if fusion is enabled
-    # auto: enable for decode mode only (highest benefit)
-    # on: enable for all modes
-    # off: disable fusion
-    def should_fuse(mode: str) -> bool:
-        if fusion_mode == "off":
-            return False
-        if fusion_mode == "on":
-            return True
-        # auto: fuse for decode (best benefit), skip for prefill
-        return mode == "decode"
+    # Track activation buffer usage for ping-pong
+    # IMPORTANT: For decode mode, start with token_ids as input for embedding
+    current_input_buffer = "token_ids"
+    current_output_buffer = "embedded_input"  # Embedding outputs here (offset 20)
+    qkv_input_buffer = "token_ids"  # Track input buffer for Q/K/V projections
+    last_output_buffer: Optional[str] = None
 
-    # Training configuration (computed once if training mode requested)
-    training_cfg = None
-    if "training" in args["modes"]:
-        # Build training config from model
-        training_cfg = tc.TrainingConfig.from_model_config(config)
-        training_cfg.optimizer = args["optimizer"]
-        training_cfg.learning_rate = args["learning_rate"]
-        training_cfg.weight_decay = args["weight_decay"]
-        training_cfg.data_parallel_size = args["data_parallel"]
-        training_cfg.tensor_parallel_size = args["tensor_parallel"]
+    for ir_op in ir_lower_1_ops:
+        lowered_op = {
+            "idx": ir_op["idx"],
+            "kernel": ir_op["kernel"],
+            "op": ir_op["op"],
+            "layer": ir_op["layer"],
+            "section": ir_op["section"],
+            "function": ir_op.get("function", ir_op["kernel"]),
+            "weights": {},
+            "activations": {},
+            "outputs": {},
+            "params": {},
+        }
 
-        # Get available memory
-        if args["memory"]:
-            available_memory = int(args["memory"] * 1024**3)
-            print(f"[TRAINING] Using specified memory: {args['memory']:.1f} GB")
+        # Process weights - add concrete bump offsets
+        for wkey, winfo in ir_op.get("weights", {}).items():
+            weight_name = winfo.get("name", "")
+            weight_entry = weight_offsets.get(weight_name)
+
+            if weight_entry:
+                lowered_op["weights"][wkey] = {
+                    "name": weight_name,
+                    "bump_offset": weight_entry["bump_offset"],
+                    "size": weight_entry["size"],
+                    "dtype": weight_entry["dtype"],
+                    "ptr_expr": f"bump_weights + {weight_entry['bump_offset']}",
+                }
+            else:
+                # Weight not in layout - use file offset from IR1
+                lowered_op["weights"][wkey] = {
+                    "name": weight_name,
+                    "bump_offset": winfo.get("offset", 0),
+                    "size": winfo.get("size", 0),
+                    "dtype": winfo.get("dtype", "unknown"),
+                    "ptr_expr": f"bump_weights + {winfo.get('offset', 0)}",
+                }
+
+        # Special handling for Q/K/V projections: all read from same input, write to different outputs
+        op_type = ir_op.get("op", "")
+        if op_type == "bias_add":
+            bias_for = ir_op.get("bias_for")
+            target_buf = None
+            if bias_for in ("q_proj", "k_proj", "v_proj"):
+                target_buf = {
+                    "q_proj": "q_scratch",
+                    "k_proj": "k_scratch",
+                    "v_proj": "v_scratch",
+                }.get(bias_for)
+            else:
+                target_buf = last_output_buffer or current_output_buffer
+            buf = activation_buffers.get(target_buf) if target_buf else None
+            if buf:
+                lowered_op["activations"]["y"] = {
+                    "buffer": target_buf,
+                    "activation_offset": buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {buf['offset']}",
+                }
+                lowered_op["outputs"]["y"] = {
+                    "buffer": target_buf,
+                    "activation_offset": buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {buf['offset']}",
+                }
+            if target_buf:
+                last_output_buffer = target_buf
+        elif op_type == "qkv_proj":
+            # QKV fused projection (prefill uses head-major outputs)
+            buf = activation_buffers.get(current_input_buffer)
+            if buf:
+                for input_name, input_info in ir_op.get("inputs", {}).items():
+                    lowered_op["activations"][input_name] = {
+                        "buffer": current_input_buffer,
+                        "activation_offset": buf["offset"],
+                        "dtype": input_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    }
+
+            layer_idx = int(ir_op.get("layer", 0))
+            kv_offs = kv_layer_offsets(layer_idx) if mode == "prefill" else None
+            k_off = kv_offs[0] if kv_offs else None
+            v_off = kv_offs[1] if kv_offs else None
+
+            for output_name, output_info in ir_op.get("outputs", {}).items():
+                if output_name.startswith("q"):
+                    q_buf = activation_buffers.get("q_scratch")
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": "q_scratch",
+                        "activation_offset": q_buf["offset"] if q_buf else 0,
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {q_buf['offset'] if q_buf else 0}",
+                    }
+                    last_output_buffer = "q_scratch"
+                elif output_name.startswith("k"):
+                    if k_off is not None:
+                        lowered_op["outputs"][output_name] = {
+                            "buffer": f"kv_cache_k_L{layer_idx}",
+                            "activation_offset": k_off,
+                            "dtype": output_info.get("dtype", "fp32"),
+                            "ptr_expr": f"activations + {k_off}",
+                        }
+                    else:
+                        k_buf = activation_buffers.get("k_scratch")
+                        lowered_op["outputs"][output_name] = {
+                            "buffer": "k_scratch",
+                            "activation_offset": k_buf["offset"] if k_buf else 0,
+                            "dtype": output_info.get("dtype", "fp32"),
+                            "ptr_expr": f"activations + {k_buf['offset'] if k_buf else 0}",
+                        }
+                        last_output_buffer = "k_scratch"
+                elif output_name.startswith("v"):
+                    if v_off is not None:
+                        lowered_op["outputs"][output_name] = {
+                            "buffer": f"kv_cache_v_L{layer_idx}",
+                            "activation_offset": v_off,
+                            "dtype": output_info.get("dtype", "fp32"),
+                            "ptr_expr": f"activations + {v_off}",
+                        }
+                    else:
+                        v_buf = activation_buffers.get("v_scratch")
+                        lowered_op["outputs"][output_name] = {
+                            "buffer": "v_scratch",
+                            "activation_offset": v_buf["offset"] if v_buf else 0,
+                            "dtype": output_info.get("dtype", "fp32"),
+                            "ptr_expr": f"activations + {v_buf['offset'] if v_buf else 0}",
+                        }
+                        last_output_buffer = "v_scratch"
+        elif op_type in ("q_proj", "k_proj", "v_proj"):
+            # Track the RMSNorm output buffer (used by all Q/K/V ops)
+            if op_type == "q_proj":
+                # Q starts reading from current_input_buffer (RMSNorm output)
+                qkv_input_buffer = current_input_buffer
+            # All Q/K/V read from the same input (RMSNorm output)
+            buf = activation_buffers.get(qkv_input_buffer)
+            if buf:
+                for input_name, input_info in ir_op.get("inputs", {}).items():
+                    lowered_op["activations"][input_name] = {
+                        "buffer": qkv_input_buffer,
+                        "activation_offset": buf["offset"],
+                        "dtype": input_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    }
+            # Q writes to q_scratch
+            if op_type == "q_proj":
+                q_buf = activation_buffers.get("q_scratch")
+                for output_name, output_info in ir_op.get("outputs", {}).items():
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": "q_scratch",
+                        "activation_offset": q_buf["offset"] if q_buf else 0,
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {q_buf['offset'] if q_buf else 0}",
+                    }
+            # K/V write to their respective scratch buffers
+            elif op_type == "k_proj":
+                buf = activation_buffers.get("k_scratch")
+                for output_name, output_info in ir_op.get("outputs", {}).items():
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": "k_scratch",
+                        "activation_offset": buf["offset"] if buf else 0,
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset'] if buf else 0}",
+                    }
+            elif op_type == "v_proj":
+                buf = activation_buffers.get("v_scratch")
+                for output_name, output_info in ir_op.get("outputs", {}).items():
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": "v_scratch",
+                        "activation_offset": buf["offset"] if buf else 0,
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset'] if buf else 0}",
+                    }
+            if op_type == "q_proj":
+                last_output_buffer = "q_scratch"
+            elif op_type == "k_proj":
+                last_output_buffer = "k_scratch"
+            elif op_type == "v_proj":
+                last_output_buffer = "v_scratch"
         else:
-            sys_mem = tc.get_system_memory()
-            available_memory = sys_mem["ram_bytes"]
-            print(f"[TRAINING] Auto-detected RAM: {available_memory / 1024**3:.1f} GB")
-            if sys_mem["gpu_vram_bytes"] > 0:
-                print(f"[TRAINING] Detected {sys_mem['gpu_count']} GPU(s): "
-                      f"{sys_mem['gpu_vram_bytes'] / 1024**3:.1f} GB VRAM")
+            # Process activation inputs - add concrete buffer offsets
+            for input_name, input_info in ir_op.get("inputs", {}).items():
+                # Special case: embedding operation reads from token_ids, not layer_input
+                if "embedding" in ir_op.get("kernel", "").lower() and "token" in input_name.lower():
+                    buf = activation_buffers.get("token_ids")
+                    if buf:
+                        lowered_op["activations"][input_name] = {
+                            "buffer": "token_ids",
+                            "activation_offset": buf["offset"],
+                            "dtype": "int32",
+                            "ptr_expr": f"activations + {buf['offset']}",
+                        }
+                        continue
 
-        # Compute optimal configuration
-        breakdown, recommendations = tc.find_optimal_config(
-            training_cfg,
-            available_memory,
-            target_batch_size=args["batch_size"],
-            target_context_length=args["context_length"] or args["tokens"],
-            optimizer=args["optimizer"],
-        )
+                # Skip inputs that are actually weight parameters
+                # Check both direct match and mapped match via WEIGHT_TO_KERNEL_INPUT
+                # e.g., gamma maps to ln1_gamma/ln2_gamma, W maps to wq/wk/wv
+                is_weight_input = input_name in ir_op.get("weights", {})
+                if not is_weight_input:
+                    # Check if any weight key maps to this input name
+                    for wkey in ir_op.get("weights", {}).keys():
+                        if WEIGHT_TO_KERNEL_INPUT.get(wkey) == input_name:
+                            is_weight_input = True
+                            break
+                if is_weight_input:
+                    continue  # Weight is handled via weights dict
 
-        if breakdown is None:
-            print(f"[TRAINING] ERROR: {recommendations.get('error', 'Unknown error')}")
-            return 1
+                # All other inputs use current ping-pong buffer
+                # Special case: attention projection reads from head-major attention output
+                if input_name == "attn_out":
+                    buf = activation_buffers.get("attn_scratch")
+                    buf_name = "attn_scratch"
+                elif input_name == "scratch":
+                    buf = activation_buffers.get("mlp_scratch")
+                    buf_name = "mlp_scratch"
+                # Special case: residual_add needs different buffers for 'a' and 'b'
+                elif ir_op.get("op", "") == "residual_add":
+                    if input_name == "a":
+                        # 'a' is the current stream output (previous op)
+                        buf = activation_buffers.get(current_input_buffer)
+                        buf_name = current_input_buffer
+                    elif input_name == "b":
+                        # 'b' is the saved residual (from before attention)
+                        buf = activation_buffers.get("residual")
+                        buf_name = "residual"
+                    else:
+                        buf = activation_buffers.get(current_input_buffer)
+                        buf_name = current_input_buffer
+                elif ir_op.get("op", "") in ("silu_mul", "mlp_down"):
+                    # MLP path: swiglu + mlp_down consume mlp_scratch
+                    buf = activation_buffers.get("mlp_scratch")
+                    buf_name = "mlp_scratch"
+                else:
+                    buf = activation_buffers.get(current_input_buffer)
+                    buf_name = current_input_buffer
 
-        # Store computed values
-        training_cfg.batch_size = breakdown.batch_size
-        training_cfg.micro_batch_size = breakdown.micro_batch_size
-        training_cfg.context_length = breakdown.context_length
-        training_cfg.memory_breakdown = breakdown
+                if buf:
+                    lowered_op["activations"][input_name] = {
+                        "buffer": buf_name,
+                        "activation_offset": buf["offset"],
+                        "dtype": input_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    }
 
-        # Print summary
-        tc.print_memory_summary(breakdown, recommendations)
+            # Process outputs - add concrete offsets (for non-QKV ops)
+            for output_name, output_info in ir_op.get("outputs", {}).items():
+                # Special case: embedding outputs to embedded_input, not layer_output
+                if "embedding" in ir_op.get("kernel", "").lower():
+                    output_buf_name = "embedded_input"
+                # Special case: prefill attention outputs head-major to attn_scratch
+                elif ir_op.get("op") == "attn" and mode == "prefill":
+                    output_buf_name = "attn_scratch"
+                # Special case: logits outputs to logits buffer, not ping-pong buffer
+                elif ir_op.get("op") == "logits":
+                    output_buf_name = "logits"
+                # MLP gate/up + swiglu outputs go to mlp_scratch (intermediate size)
+                elif ir_op.get("op") in ("mlp_gate_up", "silu_mul"):
+                    output_buf_name = "mlp_scratch"
+                else:
+                    output_buf_name = current_output_buffer
 
-        # Compute reduction strategy
-        reduction = tc.compute_reduction_strategy(
-            training_cfg, args["data_parallel"], args["tensor_parallel"]
-        )
+                buf = activation_buffers.get(output_buf_name)
+                if buf:
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": output_buf_name,
+                        "activation_offset": buf["offset"],
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    }
+                    if not last_output_buffer:
+                        last_output_buffer = output_buf_name
+            if lowered_op["outputs"]:
+                last_output_buffer = next(iter(lowered_op["outputs"].values())).get("buffer", last_output_buffer)
 
-        # Emit training config
-        training_config_path = os.path.join(output_dir, "training_config.json")
-        tc.emit_training_config(training_cfg, breakdown, recommendations, reduction, training_config_path)
+        # Process scratch buffers
+        lowered_op["scratch"] = []
+        scratch_list = ir_op.get("scratch", [])
+        if scratch_list:
+            mlp_buf = activation_buffers.get("mlp_scratch")
+            for i, scratch in enumerate(scratch_list):
+                scratch_offset = mlp_buf["offset"] if mlp_buf else 0
+                lowered_op["scratch"].append({
+                    "name": scratch.get("name", f"scratch_{i}"),
+                    "scratch_offset": scratch_offset,
+                    "size": scratch.get("size", "dynamic"),
+                    "dtype": scratch.get("dtype", "fp32"),
+                    "ptr_expr": f"activations + {scratch_offset}",
+                })
 
-    # Lower + layout per mode
-    prefill_layout = None
-    for mode in args["modes"]:
-        mode_tokens = 1 if mode == "decode" else tokens
-
-        # For training mode, use computed context length
-        if mode == "training" and training_cfg:
-            mode_tokens = training_cfg.context_length
-
-        lowered = lower_graph_ir(graph, mode, mode_tokens, registry, training_cfg,
-                                 weights_manifest=weights_manifest,
-                                 weight_dtype=args.get("weight_dtype"))
-
-        def emit_mode_outputs(enable_fusion: bool) -> None:
-            nonlocal prefill_layout
-            fusion_config = {"enable_fusion": enable_fusion}
-            optimized, fusion_stats = apply_fusion_pass(lowered, mode, fusion_config)
-
-            if fusion_stats.fusions_applied:
-                print(f"[FUSION] {mode}: {len(fusion_stats.fusions_applied)} fusions applied, "
-                      f"{fusion_stats.ops_removed} ops removed, "
-                      f"{fusion_stats.buffers_removed} buffers removed")
-                if fusion_verbose:
-                    for f in fusion_stats.fusions_applied:
-                        print(f"  Layer {f['layer']}: {f['pattern']} ({f['ops_fused']} ops)")
-
-                fusion_report_path = os.path.join(output_dir, f"fusion_{mode}.json")
-                emit_fusion_report(fusion_stats, mode, fusion_report_path)
-            elif enable_fusion:
-                print(f"[FUSION] {mode}: no fusion patterns matched")
-
-            # Apply parallel planning pass
-            if parallel_enabled:
-                optimized, parallel_stats = pp.apply_parallel_planning(optimized, mode)
-                parallelized = parallel_stats["parallelized_ops"]
-                total = parallel_stats["total_ops"]
-                strategies = parallel_stats["strategies"]
-
-                print(f"[PARALLEL] {mode}: {parallelized}/{total} ops parallelized")
-                if parallel_verbose and strategies:
-                    for strat, count in sorted(strategies.items()):
-                        print(f"  {strat}: {count} ops")
-
-                parallel_report_path = os.path.join(output_dir, f"parallel_{mode}.json")
-                pp.emit_parallel_report(parallel_stats, mode, parallel_report_path)
-
-            lowered_path = os.path.join(output_dir, f"lowered_{mode}.json")
-            emit_lowered_ir(optimized, lowered_path)
-
-            layout_name = f"{model_name}_{mode}"
-            layout = build_layout_from_lowered(optimized, layout_name)
+        # Special handling for RoPE: add q_scratch and k_scratch buffers
+        if ir_op.get("op", "") == "rope_qk":
+            q_buf = activation_buffers.get("q_scratch")
+            if q_buf:
+                lowered_op["scratch"].append({
+                    "name": "q_scratch",
+                    "scratch_offset": q_buf["offset"],
+                    "size": q_buf["size"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {q_buf['offset']}",
+                })
 
             if mode == "prefill":
-                prefill_layout = layout
+                layer_idx = int(ir_op.get("layer", 0))
+                kv_offs = kv_layer_offsets(layer_idx)
+                if kv_offs:
+                    k_off = kv_offs[0]
+                    lowered_op["scratch"].append({
+                        "name": "k_scratch",
+                        "scratch_offset": k_off,
+                        "size": activation_buffers.get("k_scratch", {}).get("size", 0),
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {k_off}",
+                        "force_offset": True,
+                    })
+            else:
+                k_buf = activation_buffers.get("k_scratch")
+                if k_buf:
+                    lowered_op["scratch"].append({
+                        "name": "k_scratch",
+                        "scratch_offset": k_buf["offset"],
+                        "size": k_buf["size"],
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {k_buf['offset']}",
+                    })
 
-            layout_for_codegen = layout
-            if mode == "decode" and args.get("decode_layout") == "prefill":
-                if prefill_layout is None:
-                    print("[WARN] decode-layout=prefill requested but prefill layout not available; using decode layout.")
-                else:
-                    layout_for_codegen = copy.deepcopy(prefill_layout)
-                    layout_for_codegen.name = layout_name
+        # Special handling for kv_cache_store: add k_scratch and v_scratch buffers
+        if ir_op.get("op", "") == "kv_cache_store":
+            for scratch_name in ["k_scratch", "v_scratch"]:
+                buf = activation_buffers.get(scratch_name)
+                if buf:
+                    lowered_op["scratch"].append({
+                        "name": scratch_name,
+                        "scratch_offset": buf["offset"],
+                        "size": buf["size"],
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    })
 
-            layout_json_path = os.path.join(output_dir, f"layout_{mode}.json")
-            layout_map = os.path.join(output_dir, f"layout_{mode}.map")
-
-            v3.emit_layout_json(layout_for_codegen, layout_json_path)
-            v3.emit_layout_map(layout_for_codegen, layout_map)
-
-            if weights_manifest and mode in ("prefill", "decode"):
-                emit_weights_manifest(layout_for_codegen, weights_manifest, output_dir)
-
-            if parallel_enabled:
-                with open(layout_json_path, "r") as f:
-                    layout_dict = json.load(f)
-
-                layout_with_parallel = pp.annotate_layout_buffers(
-                    layout_dict, config, mode
-                )
-
-                schedule_path = os.path.join(output_dir, f"schedule_{mode}.json")
-                schedule = {
-                    "version": 4,
-                    "kind": "schedule",
-                    "mode": mode,
-                    "generated": datetime.utcnow().isoformat() + "Z",
-                    "model": model_name,
-                    "layout": layout_with_parallel,
-                    "ops": [],
-                }
-
-                section = optimized["sections"][0]
-                for layer in section.get("layers", []):
-                    for op in layer.get("ops", []):
-                        schedule["ops"].append({
-                            "layer": layer["id"],
-                            "op": op.get("op"),
-                            "kernel": op.get("kernel"),
-                            "parallel": op.get("parallel", {}),
+        # Special handling for attention: add q_scratch, k_scratch, v_scratch buffers
+        # Note: op type is "attn" but kernel contains "attention"
+        if ir_op.get("op", "") == "attn" or "attention" in ir_op.get("kernel", ""):
+            for scratch_name in ["q_scratch", "k_scratch", "v_scratch"]:
+                if mode == "prefill" and scratch_name in ("k_scratch", "v_scratch"):
+                    layer_idx = int(ir_op.get("layer", 0))
+                    kv_offs = kv_layer_offsets(layer_idx)
+                    if kv_offs:
+                        k_off, v_off = kv_offs
+                        off = k_off if scratch_name == "k_scratch" else v_off
+                        lowered_op["scratch"].append({
+                            "name": scratch_name,
+                            "scratch_offset": off,
+                            "size": activation_buffers.get(scratch_name, {}).get("size", 0),
+                            "dtype": "fp32",
+                            "ptr_expr": f"activations + {off}",
+                            "force_offset": True,
                         })
+                        continue
+                buf = activation_buffers.get(scratch_name)
+                if buf:
+                    lowered_op["scratch"].append({
+                        "name": scratch_name,
+                        "scratch_offset": buf["offset"],
+                        "size": buf["size"],
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    })
 
-                with open(schedule_path, "w") as f:
-                    json.dump(schedule, f, indent=2)
-                print(f"[SCHEDULE] Written: {schedule_path}")
+        # Special handling for residual_add: add residual buffer for the saved input
+        if ir_op.get("op", "") == "residual_add":
+            buf = activation_buffers.get("residual")
+            if buf:
+                lowered_op["scratch"].append({
+                    "name": "residual",
+                    "scratch_offset": buf["offset"],
+                    "size": buf["size"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {buf['offset']}",
+                })
 
-            safe_name = layout_name.replace("-", "_").replace(".", "_")
-            safe_name_upper = safe_name.upper()
-            kernel_base = {
-                "decode": "ck-kernel-inference",
-                "prefill": "ck-kernel-prefill",
-                "backward": "ck-kernel-backprop",
-                "training": "ck-kernel-backprop",
-            }.get(mode, f"ck-kernel-{mode}")
-            header_name = f"{kernel_base}.h"
-            source_name = f"{kernel_base}.c"
-            extra_api = None
-            if mode == "decode":
-                extra_api = [
-                    f"void {safe_name.lower()}_decode({safe_name_upper}Model *model, const int *token, int token_index);"
-                ]
-            v3.emit_c_header(layout_for_codegen, os.path.join(output_dir, header_name), extra_api=extra_api)
-            if mode in ("prefill", "decode"):
-                codegen_version = args.get("codegen", "v6")
-                int8_activations = args.get("int8", True)
-                if codegen_version == "v6":
-                    if int8_activations:
-                        print(f"[CODEGEN] Using v6.6 (explicit unrolled + INT8 activations) for {mode}")
-                        print("[CODEGEN] INT8 activations enabled (Q5_0 x Q8_0, Q8_0 x Q8_0, Q4_K x Q8_K)")
-                    else:
-                        print(f"[CODEGEN] Using v6.6 (explicit unrolled + FP32 activations) for {mode}")
-                        print("[CODEGEN] INT8 disabled, using FP32 GEMM kernels")
-                    codegen_v6.emit_c_source_v6(
-                        layout_for_codegen,
-                        os.path.join(output_dir, source_name),
-                        header_name,
-                        mode,
-                        emit_main=(args.get("emit") == "exe"),
-                        emit_debug=args.get("debug", False),
-                        emit_parity=args.get("parity", False),
-                        weights_manifest=weights_manifest if not args.get("skip_manifest_validation") else None,
-                        int8_activations=int8_activations,
-                    )
+        # Add model config parameters (merge with any op-specific params)
+        params = dict(ir_op.get("params", {}) or {})
+        params.setdefault("embed_dim", config.get("embed_dim", 896))
+        params.setdefault("num_heads", config.get("num_heads", 14))
+        params.setdefault("num_kv_heads", config.get("num_kv_heads", 2))
+        params.setdefault("head_dim", config.get("head_dim", 64))
+        params.setdefault("intermediate_size", config.get("intermediate_size", config.get("intermediate_dim", 4864)))
+        params.setdefault("num_layers", config.get("num_layers", 24))
+        params.setdefault("mode", mode)
+
+        if mode == "decode":
+            params.setdefault("seq_len", 1)
+        else:
+            params.setdefault("seq_len", config.get("max_seq_len", config.get("context_length", 2048)))
+
+        # Add matmul dims for IR Lower 3 bindings (_input_dim/_output_dim/_m)
+        out_dim, in_dim = compute_matmul_dims(op_type, config)
+        if out_dim is not None and "_output_dim" not in params:
+            params["_output_dim"] = out_dim
+        if in_dim is not None and "_input_dim" not in params:
+            params["_input_dim"] = in_dim
+
+        if op_type == "bias_add" and "_output_dim" not in params:
+            for w in lowered_op.get("weights", {}).values():
+                size = int(w.get("size", 0))
+                if size > 0 and size % 4 == 0:
+                    params["_output_dim"] = size // 4
+                    break
+
+        params.setdefault("_m", params.get("seq_len", 1))
+        lowered_op["params"] = params
+
+        lowered_ops.append(lowered_op)
+
+        # AUTO-INSERT: Save residual buffer after RMSNorm in body sections
+        # This saves the layer_input (RMSNorm output) before attention overwrites it
+        if ir_op.get("section") == "body" and ir_op.get("op") == "rmsnorm":
+            # Insert a residual save operation
+            residual_buf = activation_buffers.get("residual")
+            layer_input_buf = activation_buffers.get("layer_input")
+            if residual_buf and layer_input_buf:
+                residual_save_op = {
+                    "idx": len(lowered_ops),
+                    "kernel": "memcpy",
+                    "op": "residual_save",
+                    "layer": ir_op.get("layer", -1),
+                    "section": "body",
+                    "function": "memcpy",
+                    "weights": {},
+                    "activations": {
+                        "src": {
+                            "buffer": "layer_input",
+                            "activation_offset": layer_input_buf["offset"],
+                            "dtype": "fp32",
+                            "ptr_expr": f"activations + {layer_input_buf['offset']}",
+                        }
+                    },
+                    "outputs": {
+                        "dst": {
+                            "buffer": "residual",
+                            "activation_offset": residual_buf["offset"],
+                            "dtype": "fp32",
+                            "ptr_expr": f"activations + {residual_buf['offset']}",
+                        }
+                    },
+                    "scratch": [],
+                    "params": {
+                        "_memcpy_bytes": config.get("embed_dim", 896) * (1 if mode == "decode" else config.get("max_seq_len", config.get("context_length", 2048))) * 4
+                    },
+                    "_auto_inserted": True,
+                }
+                lowered_ops.append(residual_save_op)
+
+        # Ping-pong buffers for next op, UNLESS this is a Q/K/V projection
+        # Q/K/V all read from the same input (RMSNorm output), so skip ping-pong for K/V
+        op_type = ir_op.get("op", "")
+        kernel_type = ir_op.get("kernel", "")
+
+        if "embedding" in kernel_type.lower():
+            # Embedding: reads from token_ids, outputs to embedded_input
+            # Next op (RMSNorm/attention) reads from embedded_input, outputs to layer_input
+            current_input_buffer = "embedded_input"
+            current_output_buffer = "layer_input"
+        elif op_type in ("q_proj", "k_proj", "v_proj", "qkv_proj", "rope_qk",
+                         "mlp_gate_up", "silu_mul", "mlp_down", "bias_add") or \
+                (mode == "prefill" and op_type == "attn"):
+            # Ops that don't advance the token-major stream, don't ping-pong
+            pass
+        else:
+            current_input_buffer, current_output_buffer = current_output_buffer, current_input_buffer
+
+    print(f"\n✓ IR Lower 2 complete:")
+    print(f"  Lowered ops: {len(lowered_ops)}")
+    print(f"  Weight entries resolved: {len(weight_offsets)}")
+
+    lowered_ir = {
+        "format": "lowered-ir-v2",
+        "version": 2,
+        "mode": mode,
+        "config": config,
+        "memory": memory,
+        "operations": lowered_ops,
+    }
+
+    return lowered_ir
+
+
+def load_kernel_bindings() -> Dict[str, Dict]:
+    """Load kernel parameter bindings for IR Lower 3."""
+    bindings_path = PROJECT_ROOT / "kernel_maps" / "kernel_bindings.json"
+    with open(bindings_path, "r") as f:
+        data = json.load(f)
+    return data.get("bindings", {})
+
+
+def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
+    """
+    IR Lower 3: Emit call-ready ops with ordered args (function + expr list).
+    This removes all semantic ambiguity for codegen.
+    """
+    bindings = load_kernel_bindings()
+    ops = lowered_ir.get("operations", lowered_ir.get("ops", []))
+    config = lowered_ir.get("config", {})
+    dtype_map = {
+        "fp32": "0",
+        "bf16": "1",
+        "fp16": "2",
+        "int8": "3",
+        "int4": "4",
+        "q4_0": "5",
+        "q4_1": "6",
+        "q4_k": "7",
+        "q6_k": "8",
+        "q8_0": "9",
+        "q8_k": "10",
+        "q5_0": "11",
+        "q5_1": "12",
+    }
+
+    def ptr_expr(base: str, offset: object, cast: Optional[str]) -> str:
+        off = str(offset)
+        expr = f"{base} + {off}"
+        return f"({cast})({expr})" if cast else expr
+
+    def select_from_dict(name: str, dct: Dict, aliases: Dict[str, List[str]]) -> Optional[Dict]:
+        if name in dct:
+            return dct[name]
+        for alt in aliases.get(name, []):
+            if alt in dct:
+                return dct[alt]
+        if len(dct) == 1:
+            return next(iter(dct.values()))
+        return None
+
+    def select_weight(name: str, weights: Dict, alt: Optional[List[str]] = None) -> Optional[Tuple[str, Dict]]:
+        if name in weights:
+            return name, weights[name]
+        if alt:
+            for a in alt:
+                if a in weights:
+                    return a, weights[a]
+        if name == "_first_weight":
+            if weights:
+                k = next(iter(weights.keys()))
+                return k, weights[k]
+        if name == "_bias":
+            for k, v in weights.items():
+                if k.startswith("b") or "bias" in k:
+                    return k, v
+        # Try reverse map: kernel input name -> IR weight key
+        for k, v in weights.items():
+            if WEIGHT_TO_KERNEL_INPUT.get(k) == name:
+                return k, v
+        return None
+
+    call_ops = []
+    all_errors = []
+
+    memory = lowered_ir.get("memory", {})
+    arena = memory.get("arena", {})
+    weights_base = int(arena.get("weights_base", 0))
+    activations_base = int(arena.get("activations_base", 0))
+    layout_mode = arena.get("mode", "region")
+    weight_define = {e.get("name"): e.get("define") for e in memory.get("weights", {}).get("entries", [])}
+    act_define = {b.get("name"): b.get("define") for b in memory.get("activations", {}).get("buffers", [])}
+    use_bump_base = bool(arena) or any(weight_define.values()) or any(act_define.values())
+
+    for op in ops:
+        func = op.get("function", op.get("kernel", "unknown"))
+        binding = bindings.get(func)
+        op_errors = []
+        op_warnings = []
+
+        if not binding:
+            op_errors.append(f"Missing binding for function '{func}'")
+            call_ops.append({
+                "idx": op.get("idx", -1),
+                "function": func,
+                "op": op.get("op", ""),
+                "layer": op.get("layer", -1),
+                "section": op.get("section", ""),
+                "args": [],
+                "errors": op_errors,
+                "warnings": op_warnings,
+            })
+            all_errors.append({"idx": op.get("idx", -1), "function": func, "error": op_errors[0]})
+            continue
+
+        activations = op.get("activations", {})
+        outputs = op.get("outputs", {})
+        weights = op.get("weights", {})
+        scratch_list = op.get("scratch", [])
+        scratch = {s.get("name"): s for s in scratch_list if s.get("name")}
+        params = op.get("params", {})
+
+        # Aliases for activation/output key lookups (handles case differences between bindings and IR)
+        act_aliases = {
+            "tokens": ["token_ids", "tokens"],
+            "input": ["input", "a", "A", "x", "X"],
+            "a": ["A", "a", "input"],  # GEMM uses "A" in IR, "a" in binding
+            "x": ["x", "X", "input"],  # GEMV uses "x"
+            "src": ["src", "input", "a", "A"],  # memcpy source
+        }
+        out_aliases = {
+            "out": ["output", "out", "C", "c"],
+            "c": ["C", "c", "output"],  # GEMM uses "C" in IR, "c" in binding
+            "y": ["y", "Y", "output"],  # GEMV output
+            "dst": ["dst", "output"],  # memcpy destination
+        }
+
+        args = []
+        for param in binding.get("params", []):
+            src = param.get("source", "")
+            name = param.get("name", "")
+            cast = param.get("cast")
+
+            if src.startswith("activation:"):
+                key = src.split(":", 1)[1]
+                info = select_from_dict(key, activations, act_aliases)
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing activation '{key}'")
+                    expr = "NULL"
                 else:
-                    # Legacy v4 codegen (requires compat module)
-                    # codegen_v4.emit_c_source_v4(...)
-                    print("[ERROR] v4 codegen not available in this standalone build")
-                    raise NotImplementedError("v4 codegen requires compat_codegen_v4_v6_6 module")
-            else:
-                v3.emit_c_source(
-                    layout,
-                    os.path.join(output_dir, source_name),
-                    header_name,
-                    emit_main=(args.get("emit") == "exe"),
-                )
+                    offset = info.get("activation_offset", 0)
+                    buf_name = info.get("buffer", key)
+                    macro = act_define.get(buf_name)
+                    if use_bump_base:
+                        if macro:
+                            off_expr = macro
+                        else:
+                            off_expr = str(activations_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "const float*")
+                    else:
+                        expr = ptr_expr("ACT", offset, cast or "const float*")
 
-        try:
-            emit_mode_outputs(should_fuse(mode))
-        except ValueError as e:
-            if mode in ("prefill", "decode") and "needs unfused buffers" in str(e):
-                print(f"[FUSION] {mode}: codegen needs unfused buffers; regenerating with --fusion=off")
-                emit_mode_outputs(False)
-            else:
-                raise
+            elif src.startswith("output:"):
+                key = src.split(":", 1)[1]
+                info = select_from_dict(key, outputs, out_aliases)
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing output '{key}'")
+                    expr = "NULL"
+                else:
+                    offset = info.get("activation_offset", 0)
+                    buf_name = info.get("buffer", key)
+                    macro = act_define.get(buf_name)
+                    if use_bump_base:
+                        if macro:
+                            off_expr = macro
+                        else:
+                            off_expr = str(activations_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "float*")
+                    else:
+                        expr = ptr_expr("ACT", offset, cast or "float*")
 
-    print("[DONE] IR v6 pipeline complete")
+            elif src.startswith("scratch:"):
+                key = src.split(":", 1)[1]
+                info = scratch.get(key)
+                if not info and len(scratch) == 1:
+                    info = next(iter(scratch.values()))
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing scratch '{key}'")
+                    expr = "NULL"
+                else:
+                    offset = info.get("scratch_offset", 0)
+                    buf_name = info.get("name", key)
+                    macro = act_define.get(buf_name)
+                    if info.get("force_offset"):
+                        macro = None
+                    if use_bump_base:
+                        if macro:
+                            off_expr = macro
+                        else:
+                            off_expr = str(activations_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "float*")
+                    else:
+                        expr = ptr_expr("ACT", offset, cast or "float*")
+
+            elif src.startswith("weight_f:"):
+                key = src.split(":", 1)[1]
+                alt = param.get("alt", None)
+                sel = select_weight(key, weights, alt)
+                if not sel:
+                    op_warnings.append(f"{func}.{name}: missing weight_f '{key}', using NULL")
+                    expr = "NULL"
+                else:
+                    _, winfo = sel
+                    offset = winfo.get("bump_offset", 0)
+                    wname = winfo.get("name")
+                    macro = weight_define.get(wname)
+                    if use_bump_base:
+                        off_expr = macro if macro else str(weights_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "float*")
+                    else:
+                        expr = ptr_expr("model->bump_weights", offset, cast or "float*")
+
+            elif src.startswith("weight:"):
+                key = src.split(":", 1)[1]
+                sel = select_weight(key, weights)
+                if not sel:
+                    op_errors.append(f"{func}.{name}: missing weight '{key}'")
+                    expr = "NULL"
+                else:
+                    _, winfo = sel
+                    offset = winfo.get("bump_offset", 0)
+                    wname = winfo.get("name")
+                    macro = weight_define.get(wname)
+                    if use_bump_base:
+                        off_expr = macro if macro else str(weights_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "const void*")
+                    else:
+                        expr = ptr_expr("model->bump_weights", offset, cast or "const void*")
+
+            elif src.startswith("dim:"):
+                key = src.split(":", 1)[1]
+                if key in params:
+                    expr = str(params[key])
+                elif key in config:
+                    expr = str(config[key])
+                elif key == "max_seq_len" and "context_length" in config:
+                    expr = str(config["context_length"])
+                elif key == "intermediate_size" and "intermediate_dim" in config:
+                    expr = str(config["intermediate_dim"])
+                else:
+                    op_errors.append(f"{func}.{name}: missing dim '{key}'")
+                    expr = "0"
+
+            elif src.startswith("runtime:"):
+                key = src.split(":", 1)[1]
+                layer = op.get("layer", 0)
+                if key in ("kv_cache_k_layer", "kv_k"):
+                    expr = f"(model->kv_cache + ({layer}*2)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
+                elif key in ("kv_cache_v_layer", "kv_v"):
+                    expr = f"(model->kv_cache + ({layer}*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
+                elif key == "rope_cos":
+                    expr = "model->rope_cos"
+                elif key == "rope_sin":
+                    expr = "model->rope_sin"
+                elif key == "pos":
+                    expr = "model->pos"
+                elif key == "seq_len":
+                    if mode == "decode":
+                        expr = "model->pos + 1"
+                    else:
+                        expr = str(params.get("seq_len", 1))
+                elif key == "layer":
+                    expr = str(layer)
+                else:
+                    op_errors.append(f"{func}.{name}: unknown runtime '{key}'")
+                    expr = "0"
+                if cast:
+                    expr = f"({cast})({expr})"
+
+            elif src.startswith("const:"):
+                expr = src.split(":", 1)[1]
+
+            elif src == "null":
+                expr = "NULL"
+
+            elif src.startswith("dtype_weight:"):
+                key = src.split(":", 1)[1]
+                sel = select_weight(key, weights)
+                if not sel:
+                    op_errors.append(f"{func}.{name}: missing dtype weight '{key}'")
+                    expr = "0"
+                else:
+                    _, winfo = sel
+                    dtype_str = str(winfo.get("dtype", "")).lower()
+                    if dtype_str in dtype_map:
+                        expr = dtype_map[dtype_str]
+                    else:
+                        op_errors.append(f"{func}.{name}: unknown weight dtype '{dtype_str}'")
+                        expr = "0"
+
+            elif src.startswith("dtype:"):
+                key = src.split(":", 1)[1]
+                if key in dtype_map:
+                    expr = dtype_map[key]
+                else:
+                    op_errors.append(f"{func}.{name}: unknown dtype '{key}'")
+                    expr = "0"
+
+            else:
+                op_errors.append(f"{func}.{name}: unknown source '{src}'")
+                expr = "0"
+
+            args.append({
+                "name": name,
+                "source": src,
+                "expr": expr,
+            })
+
+        if op_errors:
+            all_errors.append({
+                "idx": op.get("idx", -1),
+                "function": func,
+                "errors": op_errors,
+            })
+
+        call_ops.append({
+            "idx": op.get("idx", -1),
+            "function": func,
+            "op": op.get("op", ""),
+            "layer": op.get("layer", -1),
+            "section": op.get("section", ""),
+            "args": args,
+            "errors": op_errors,
+            "warnings": op_warnings,
+        })
+
+    lowered_call = {
+        "format": "lowered-ir-v3",
+        "version": 3,
+        "mode": mode,
+        "config": lowered_ir.get("config", {}),
+        "memory": lowered_ir.get("memory", {}),
+        "operations": call_ops,
+        "errors": all_errors,
+    }
+
+    return lowered_call
+
+
+def main(args: List[str]) -> int:
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Build IR1: Direct template + quant → kernel IDs"
+    )
+
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        help="Path to weights manifest JSON"
+    )
+    parser.add_argument(
+        "--model",
+        type=int,
+        help="Use cached model by number (1, 2, ...)"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["decode", "prefill"],
+        default="decode",
+        help="Execution mode (default: decode)"
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Output IR1 JSON file (just kernel list)"
+    )
+    parser.add_argument(
+        "--layout-output",
+        type=Path,
+        help="Output memory layout JSON file (after fusion)"
+    )
+    parser.add_argument(
+        "--layout-input",
+        type=Path,
+        help="Use an existing memory layout JSON instead of generating a new one"
+    )
+    parser.add_argument(
+        "--lowered-output",
+        type=Path,
+        help="Output lowered IR JSON file (kernel maps stitched with memory layout)"
+    )
+    parser.add_argument(
+        "--manifest-map-output",
+        type=Path,
+        help="Output weights_manifest.map (uses runtime offsets from layout)"
+    )
+    parser.add_argument(
+        "--call-output",
+        type=Path,
+        help="Output call-ready IR JSON file (IR Lower 3)"
+    )
+    parser.add_argument(
+        "--context-len",
+        type=int,
+        default=None,
+        help="Context length for buffer allocation (default: from model config)"
+    )
+    parser.add_argument(
+        "--no-fusion",
+        action="store_true",
+        help="Disable kernel fusion pass (use unfused ops)"
+    )
+    parser.add_argument(
+        "--layout-mode",
+        choices=["region", "packed"],
+        default="region",
+        help="Memory layout mode (region=weights+activations, packed=single arena)"
+    )
+    parser.add_argument(
+        "--layer-limit",
+        type=int,
+        default=None,
+        help="Limit to first N layers (for packed layout prototypes)"
+    )
+
+    parsed_args = parser.parse_args(args)
+
+    # Load manifest
+    if parsed_args.manifest:
+        manifest_path = parsed_args.manifest
+    elif parsed_args.model:
+        # TODO: Find cached model
+        print("Error: --model not implemented yet, use --manifest")
+        return 1
+    else:
+        print("Error: Must specify --manifest or --model")
+        parser.print_help()
+        return 1
+
+    print(f"Loading manifest: {manifest_path}")
+    manifest = load_manifest(manifest_path)
+
+    # Build IR1
+    registry = load_kernel_registry()
+    ir1 = build_ir1_direct(manifest, manifest_path, mode=parsed_args.mode)
+
+    # Fusion pass: combine kernels (fused attention, fused MLP)
+    fused_ops, fusion_stats = apply_fusion_pass(ir1, registry, parsed_args.mode, no_fusion=parsed_args.no_fusion)
+    fused_ops = insert_bias_add_ops(fused_ops, registry, manifest, parsed_args.mode)
+
+    # IR Lower 1: Stitch kernel maps with fused ops
+    # This creates buffer requirements (inputs/outputs/scratch) for each kernel
+    ir_lower_1 = generate_ir_lower_1(fused_ops, registry, manifest, parsed_args.mode)
+
+    # Optional: limit to first N layers (keep header ops)
+    if parsed_args.layer_limit:
+        limit = int(parsed_args.layer_limit)
+        filtered = []
+        for op in ir_lower_1:
+            layer = op.get("layer", -1)
+            section = op.get("section", "")
+            if section == "header":
+                filtered.append(op)
+            elif section == "body" and layer >= 0 and layer < limit:
+                filtered.append(op)
+            elif section == "footer" and limit <= 0:
+                filtered.append(op)
+        ir_lower_1 = filtered
+
+    # Memory Planner: Plan memory layout using IR Lower 1 buffer requirements
+    context_len = parsed_args.context_len  # May be None, will use model default
+    if parsed_args.layout_input:
+        with open(parsed_args.layout_input, "r") as f:
+            layout = json.load(f)
+        if not layout.get("memory"):
+            raise RuntimeError(f"Invalid layout (missing 'memory'): {parsed_args.layout_input}")
+        # Keep layout offsets, but update mode for clarity in per-mode outputs
+        layout["mode"] = parsed_args.mode
+        if parsed_args.layout_mode:
+            arena_mode = layout.get("memory", {}).get("arena", {}).get("mode")
+            if arena_mode and arena_mode != parsed_args.layout_mode:
+                print(f"Warning: layout_input mode '{arena_mode}' != requested '{parsed_args.layout_mode}'")
+    else:
+        if parsed_args.layout_mode == "packed":
+            layout = generate_memory_layout_packed(
+                ir_lower_1, manifest, registry, parsed_args.mode, context_len, parsed_args.layer_limit
+            )
+        else:
+            layout = generate_memory_layout(ir_lower_1, manifest, registry, parsed_args.mode, context_len)
+
+    # IR Lower 2: Add concrete memory offsets to IR Lower 1
+    # This produces the final lowered IR with explicit pointer expressions
+    lowered_ir = generate_ir_lower_2(ir_lower_1, layout, manifest, registry, parsed_args.mode)
+
+    # CRITICAL: Update context_length in lowered_ir to match layout
+    # This ensures codegen uses the correct MAX_SEQ_LEN for KV cache strides
+    # Use context_len from layout config if available, otherwise from context_len variable
+    effective_context_len = context_len
+    if layout and "config" in layout and "context_length" in layout["config"]:
+        effective_context_len = layout["config"]["context_length"]
+    elif layout and "config" in layout and "context_len" in layout["config"]:
+        effective_context_len = layout["config"]["context_len"]
+
+    if effective_context_len:
+        if "config" not in lowered_ir:
+            lowered_ir["config"] = {}
+        lowered_ir["config"]["context_length"] = effective_context_len
+        lowered_ir["config"]["context_len"] = effective_context_len
+
+    lowered_call = None
+    if parsed_args.call_output:
+        lowered_call = generate_ir_lower_3(lowered_ir, parsed_args.mode)
+
+    # Once we have the right memory and lowered graph then we can do codegen
+    # codegen will read the lowered IR and memory layout to emit C code
+    # it should just see memory and parse the memory layout - allocate bump
+    # The code should then have a load weights and load then to the right bump offset.
+    # Then read lowered graph and generate c code sequentially for prefill and decode with
+    # right inputs and offset to weights read.
+    # and then generate tokens. We have all this working in v5 and v6 and v6.5. but v6.6
+    # is the first to have the full pipeline completely generated from template + quant summary
+    # and no hardcoded logic for a specific family.
+
+    # Output
+    if parsed_args.output:
+        output_data = {
+            "format": "ir1-structured",
+            "version": 2,
+            "mode": parsed_args.mode,
+            "ops": ir1  # Now a list of {kernel, op, section, layer, weights}
+        }
+        with open(parsed_args.output, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        print(f"\n✓ Wrote IR1 to: {parsed_args.output}")
+
+    if parsed_args.layout_output:
+        with open(parsed_args.layout_output, 'w') as f:
+            json.dump(layout, f, indent=2)
+        print(f"✓ Wrote memory layout to: {parsed_args.layout_output}")
+    if parsed_args.manifest_map_output:
+        write_manifest_map(layout, manifest, parsed_args.manifest_map_output)
+        print(f"✓ Wrote manifest map to: {parsed_args.manifest_map_output}")
+
+    if parsed_args.lowered_output:
+        with open(parsed_args.lowered_output, 'w') as f:
+            json.dump(lowered_ir, f, indent=2)
+        print(f"✓ Wrote lowered IR to: {parsed_args.lowered_output}")
+
+    if parsed_args.call_output and lowered_call is not None:
+        with open(parsed_args.call_output, 'w') as f:
+            json.dump(lowered_call, f, indent=2)
+        print(f"✓ Wrote call-ready IR to: {parsed_args.call_output}")
+
+    if not parsed_args.output and not parsed_args.layout_output and not parsed_args.lowered_output:
+        print(f"\nIR1 (first 10 ops):")
+        for i, op in enumerate(ir1[:10]):
+            kernel = op["kernel"]
+            weights = len(op.get("weights", {}))
+            print(f"  {i:3d}: {kernel} ({weights} weights)")
+        if len(ir1) > 10:
+            print(f"  ... ({len(ir1) - 10} more)")
+
+        print(f"\nFused ops (first 10):")
+        for i, op in enumerate(fused_ops[:10]):
+            kernel = op["kernel"]
+            weights = len(op.get("weights", {}))
+            print(f"  {i:3d}: {kernel} ({weights} weights)")
+        if len(fused_ops) > 10:
+            print(f"  ... ({len(fused_ops) - 10} more)")
+
     return 0
 
 

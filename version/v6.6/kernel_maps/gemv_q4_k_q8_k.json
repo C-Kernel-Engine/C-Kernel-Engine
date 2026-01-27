@@ -1,0 +1,61 @@
+{
+  "id": "gemv_q4_k_q8_k",
+  "op": "gemv",
+  "variant": "q4_k_w_q8_k_a_fp32_out",
+  "quant": {
+    "weight": "q4_k",
+    "activation": "q8_k",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "q8_k", "shape": ["K"], "desc": "Input vector [K] (quantized q8_k)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q4_k", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "parallelization": {
+    "supported": ["output"],
+    "preferred": {"prefill": "output", "decode": "output"},
+    "strategies": [
+      {
+        "name": "output",
+        "partition_dim": "M",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across output rows; each thread computes subset of y."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization."
+  },
+  "impl": {
+    "function": "gemv_q4_k_q8_k",
+    "c_declaration": "void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_q4k.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemv_q4_k_q8_k.py"],
+    "bench": ["scripts/bench_gemv_q4_k_q8_k.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemv_q4_k_q8_k.py --compare-numpy",
+        "tolerance": "1e-3",
+        "notes": "Compare dequantized output against numpy fp32 matmul"
+      }
+    ]
+  },
+  "notes": "Generalized matrix-vector multiplication for Q4_K weights with Q8_K activation input. Used for decode path with K-type quantization."
+}

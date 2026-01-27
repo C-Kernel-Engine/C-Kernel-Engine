@@ -9,7 +9,11 @@
   },
   "inputs": [
     {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"},
-    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [
     {"name": "cos_cache", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE cos cache [max_seq, head_dim/2]"},
     {"name": "sin_cache", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE sin cache [max_seq, head_dim/2]"}
   ],
@@ -47,6 +51,7 @@
   },
   "impl": {
     "function": "rope_forward_qk",
+    "c_declaration": "void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset);",
     "sources": ["src/kernels/rope_kernels.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},

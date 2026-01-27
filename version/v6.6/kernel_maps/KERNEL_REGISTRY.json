@@ -3,28 +3,101 @@
     "description": "Kernel registry generated from v6.6 kernel maps",
     "version": "v6.6",
     "generated_by": "gen_kernel_registry_from_maps.py",
-    "source_dir": "version/v6.6/kernel_maps",
+    "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 20,
+      "total": 36,
       "by_op": {
-        "attention": 1,
+        "attention": 2,
         "attention_projection": 1,
-        "embedding": 1,
-        "fused_attention_block": 1,
+        "bias_add": 1,
+        "embedding": 2,
+        "fused_attention_block": 2,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
-        "gemm": 5,
-        "gemv": 2,
+        "gemm": 9,
+        "gemv": 8,
+        "kv_cache_store": 1,
         "qkv_projection": 1,
         "quantize": 2,
         "residual_add": 1,
         "rmsnorm": 1,
         "rope": 1,
-        "swiglu": 1
+        "swiglu": 1,
+        "tokenizer": 1
       }
     }
   },
   "kernels": [
+    {
+      "id": "attention_forward_decode_head_major_gqa_flash",
+      "op": "attention",
+      "variant": "decode_head_major_gqa_flash",
+      "mode": "decode",
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "desc": "Query for single token [num_heads, head_dim]"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp32",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "desc": "K cache [num_kv_heads, max_seq_len, head_dim]"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp32",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "desc": "V cache [num_kv_heads, max_seq_len, head_dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "desc": "Output for single token [num_heads, head_dim]"
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "kv_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "impl": {
+        "function": "attention_forward_decode_head_major_gqa_flash",
+        "c_declaration": "void attention_forward_decode_head_major_gqa_flash(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "notes": "Flash attention for decode mode: single query token attends to all KV cache entries (0..kv_tokens-1).",
+      "name": "attention_forward_decode_head_major_gqa_flash",
+      "_source_file": "attention_decode_flash.json"
+    },
     {
       "id": "attention_forward_causal_head_major_gqa_flash_strided",
       "op": "attention",
@@ -44,7 +117,11 @@
             "D"
           ],
           "desc": "Query tensor [heads, tokens, head_dim]"
-        },
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
         {
           "name": "k",
           "dtype": "fp32",
@@ -53,7 +130,7 @@
             "S",
             "D"
           ],
-          "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout"
+          "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"
         },
         {
           "name": "v",
@@ -63,7 +140,7 @@
             "S",
             "D"
           ],
-          "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout"
+          "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"
         }
       ],
       "outputs": [
@@ -142,6 +219,7 @@
       },
       "impl": {
         "function": "attention_forward_causal_head_major_gqa_flash_strided",
+        "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
         "sources": [
           "src/kernels/attention_kernels.c",
           "src/kernels/softmax_kernels.c"
@@ -204,6 +282,59 @@
       "notes": "Causal multi-head attention with GQA support. Uses flash attention algorithm with strided KV cache layout for efficient KV cache updates. Supports grouped-query attention where H >= KV.",
       "name": "attention_forward_causal_head_major_gqa_flash_strided",
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided.json"
+    },
+    {
+      "id": "bias_add",
+      "op": "bias_add",
+      "variant": "fp32_inplace",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Input/output vector [N]"
+        }
+      ],
+      "weights": [
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Bias vector [N]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Output vector [N] (in-place)"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "add_inplace_f32",
+        "c_declaration": "void add_inplace_f32(float *a, const float *b, size_t n);",
+        "sources": [
+          "src/kernels/add_kernels_bf16.c"
+        ]
+      },
+      "notes": "In-place bias add: y += bias",
+      "name": "bias_add",
+      "_source_file": "bias_add.json"
     },
     {
       "id": "ck_attention_project_head_major_quant",
@@ -583,6 +714,8 @@
           "desc": "Residual input B [tokens, aligned_embed_dim]"
         }
       ],
+      "weights": [],
+      "activations": [],
       "outputs": [
         {
           "name": "out",
@@ -629,6 +762,7 @@
       },
       "impl": {
         "function": "ck_residual_add_token_major",
+        "c_declaration": "void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
         "sources": [
           "src/ckernel_orchestration.c"
         ],
@@ -667,6 +801,136 @@
       "_source_file": "ck_residual_add_token_major.json"
     },
     {
+      "id": "dense_embedding_lookup",
+      "kernel": "dense_embedding_lookup",
+      "op": "embedding",
+      "description": "Lookup dense embeddings from token IDs using embedding weight matrix",
+      "category": "embedding",
+      "section": "header",
+      "signature": {
+        "function": "embedding_forward_q8_0",
+        "params": [
+          {
+            "name": "token_ids",
+            "type": "const int32_t*",
+            "description": "Input token IDs"
+          },
+          {
+            "name": "num_tokens",
+            "type": "int32_t",
+            "description": "Number of tokens to embed"
+          },
+          {
+            "name": "vocab_size",
+            "type": "int32_t",
+            "description": "Vocabulary size"
+          },
+          {
+            "name": "token_emb",
+            "type": "const void*",
+            "description": "Embedding weight matrix (quantized)"
+          },
+          {
+            "name": "pos_emb",
+            "type": "const float*",
+            "description": "Position embeddings (NULL if using RoPE)"
+          },
+          {
+            "name": "output",
+            "type": "float*",
+            "description": "Output embeddings"
+          },
+          {
+            "name": "embed_dim",
+            "type": "int32_t",
+            "description": "Embedding dimension"
+          },
+          {
+            "name": "aligned_embed_dim",
+            "type": "int32_t",
+            "description": "Aligned embedding dimension"
+          },
+          {
+            "name": "context_len",
+            "type": "int32_t",
+            "description": "Maximum context length"
+          },
+          {
+            "name": "add_pos",
+            "type": "int32_t",
+            "description": "Whether to add position embeddings (0 or 1)"
+          }
+        ],
+        "return": {
+          "type": "void"
+        }
+      },
+      "inputs": {
+        "token_ids": {
+          "type": "activation",
+          "dtype": "i32",
+          "shape": [
+            "num_tokens"
+          ],
+          "description": "Token IDs from tokenizer"
+        }
+      },
+      "weights": {
+        "token_emb": {
+          "type": "weight",
+          "dtype": "quant",
+          "shape": [
+            "vocab_size",
+            "embed_dim"
+          ],
+          "description": "Token embedding matrix (may be quantized q8_0, q4_k, etc.)"
+        },
+        "pos_emb": {
+          "type": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "context_len",
+            "embed_dim"
+          ],
+          "optional": true,
+          "description": "Position embeddings (not used if model uses RoPE)"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "activation",
+          "dtype": "fp32",
+          "shape": [
+            "num_tokens",
+            "embed_dim"
+          ],
+          "description": "Dense embedding output"
+        }
+      },
+      "algorithm": {
+        "description": "Table lookup with optional dequantization",
+        "steps": [
+          "1. For each token_id in token_ids:",
+          "   a. Read row token_emb[token_id] (dequantize if needed)",
+          "   b. Optionally add pos_emb[position]",
+          "   c. Write to output[position]"
+        ],
+        "complexity": "O(num_tokens * embed_dim)"
+      },
+      "variants": {
+        "embedding_forward_fp32": "Float32 weights, no dequantization",
+        "embedding_forward_q8_0": "Q8_0 quantized weights",
+        "embedding_forward_q4_k": "Q4_K quantized weights"
+      },
+      "implementation_notes": [
+        "Memory bound operation - optimize for cache efficiency",
+        "Qwen2 uses RoPE, so pos_emb is NULL and add_pos=0",
+        "Output is always fp32 for downstream computation"
+      ],
+      "name": "dense_embedding_lookup",
+      "_source_file": "dense_embedding_lookup.json"
+    },
+    {
       "id": "embedding_forward_q8_0",
       "op": "embedding",
       "variant": "q8_0",
@@ -683,7 +947,9 @@
             "T"
           ],
           "desc": "Input token IDs [tokens]"
-        },
+        }
+      ],
+      "weights": [
         {
           "name": "weight",
           "dtype": "q8_0",
@@ -694,6 +960,7 @@
           "desc": "Embedding weights [vocab_size, embed_dim] (Q8_0 quantized)"
         }
       ],
+      "activations": [],
       "outputs": [
         {
           "name": "output",
@@ -740,6 +1007,7 @@
       },
       "impl": {
         "function": "embedding_forward_q8_0",
+        "c_declaration": "void embedding_forward_q8_0(const int32_t *token_ids, int token_count, int vocab_size, const void *token_embeddings, const float *pos_embeddings, float *output, int embed_dim, int aligned_embed_dim, int context_window, int add_pos);",
         "sources": [
           "src/kernels/embedding_kernels.c"
         ],
@@ -1129,6 +1397,78 @@
       "_source_file": "gemm_blocked_serial.json"
     },
     {
+      "id": "gemm_nt_q4_k",
+      "op": "gemm",
+      "variant": "q4_k_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (FP32)"
+        },
+        {
+          "name": "B",
+          "dtype": "q4_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q4_K quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q4_K uses 256-value super-blocks; K should be a multiple of 256."
+      },
+      "impl": {
+        "function": "gemm_nt_q4_k",
+        "c_declaration": "void gemm_nt_q4_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q4k.c"
+        ]
+      },
+      "notes": "GEMM for Q4_K weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemm_nt_q4_k",
+      "_source_file": "gemm_nt_q4_k.json"
+    },
+    {
       "id": "gemm_nt_q4_k_q8_k",
       "op": "gemm",
       "variant": "q4_k_w_q8_k_a",
@@ -1273,6 +1613,78 @@
       "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. Used for W2 (down) projection in MLP. High compression ratio.",
       "name": "gemm_nt_q4_k_q8_k",
       "_source_file": "gemm_nt_q4_k_q8_k.json"
+    },
+    {
+      "id": "gemm_nt_q5_0",
+      "op": "gemm",
+      "variant": "q5_0_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (FP32)"
+        },
+        {
+          "name": "B",
+          "dtype": "q5_0",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q5_0 quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q5_0 uses 32-value blocks; K should be a multiple of 32."
+      },
+      "impl": {
+        "function": "gemm_nt_q5_0",
+        "c_declaration": "void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "notes": "GEMM for Q5_0 weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemm_nt_q5_0",
+      "_source_file": "gemm_nt_q5_0.json"
     },
     {
       "id": "gemm_nt_q5_0_q8_0",
@@ -1421,6 +1833,78 @@
       "_source_file": "gemm_nt_q5_0_q8_0.json"
     },
     {
+      "id": "gemm_nt_q6_k",
+      "op": "gemm",
+      "variant": "q6_k_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q6_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (FP32)"
+        },
+        {
+          "name": "B",
+          "dtype": "q6_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q6_K quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q6_K uses 256-value super-blocks; K should be a multiple of 256."
+      },
+      "impl": {
+        "function": "gemm_nt_q6_k",
+        "c_declaration": "void gemm_nt_q6_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q6k.c"
+        ]
+      },
+      "notes": "GEMM for Q6_K weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemm_nt_q6_k",
+      "_source_file": "gemm_nt_q6_k.json"
+    },
+    {
       "id": "gemm_nt_q6_k_q8_k",
       "op": "gemm",
       "variant": "q6_k_w_q8_k_a",
@@ -1565,6 +2049,78 @@
       "notes": "General matrix multiplication with Q6_K weights and Q8_K activations. Used for W2 (down) projection in MLP when Q4_K accuracy is insufficient.",
       "name": "gemm_nt_q6_k_q8_k",
       "_source_file": "gemm_nt_q6_k_q8_k.json"
+    },
+    {
+      "id": "gemm_nt_q8_0",
+      "op": "gemm",
+      "variant": "q8_0_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Activation matrix [rows, cols] (FP32)"
+        },
+        {
+          "name": "B",
+          "dtype": "q8_0",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "optional": true,
+          "desc": "Bias [N] (optional)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "desc": "Result [M, N]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q8_0 uses 32-value blocks; K should be a multiple of 32."
+      },
+      "impl": {
+        "function": "gemm_nt_q8_0",
+        "c_declaration": "void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q8_0.c"
+        ]
+      },
+      "notes": "GEMM for Q8_0 weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemm_nt_q8_0",
+      "_source_file": "gemm_nt_q8_0.json"
     },
     {
       "id": "gemm_nt_q8_0_q8_0",
@@ -1713,6 +2269,335 @@
       "_source_file": "gemm_nt_q8_0_q8_0.json"
     },
     {
+      "id": "gemv_q4_k",
+      "op": "gemv",
+      "variant": "q4_k_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q4_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] Q4_K quantized"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q4_K uses 256-value super-blocks; K should be a multiple of 256."
+      },
+      "impl": {
+        "function": "gemv_q4_k",
+        "c_declaration": "void gemv_q4_k(float *y, const void *W, const float *x, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q4k.c"
+        ]
+      },
+      "notes": "GEMV for Q4_K weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemv_q4_k",
+      "_source_file": "gemv_q4_k.json"
+    },
+    {
+      "id": "gemv_q4_k_q8_k",
+      "op": "gemv",
+      "variant": "q4_k_w_q8_k_a_fp32_out",
+      "quant": {
+        "weight": "q4_k",
+        "activation": "q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "q8_k",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_k)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q4_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "output"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across output rows; each thread computes subset of y."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization."
+      },
+      "impl": {
+        "function": "gemv_q4_k_q8_k",
+        "c_declaration": "void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q4k.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemv_q4_k_q8_k.py"
+        ],
+        "bench": [
+          "scripts/bench_gemv_q4_k_q8_k.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemv_q4_k_q8_k.py --compare-numpy",
+            "tolerance": "1e-3",
+            "notes": "Compare dequantized output against numpy fp32 matmul"
+          }
+        ]
+      },
+      "notes": "Generalized matrix-vector multiplication for Q4_K weights with Q8_K activation input. Used for decode path with K-type quantization.",
+      "name": "gemv_q4_k_q8_k",
+      "_source_file": "gemv_q4_k_q8_k.json"
+    },
+    {
+      "id": "gemv_q5_0",
+      "op": "gemv",
+      "variant": "q5_0_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "output"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across output rows; each thread computes subset of y."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q5_0 uses 32-value blocks; K should be a multiple of 32 for correct layout."
+      },
+      "impl": {
+        "function": "gemv_q5_0",
+        "c_declaration": "void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q5_0.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "sse4_1",
+            "requires": [
+              "sse4_1"
+            ],
+            "compile_flags": [
+              "-msse4.1"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemv_q5_0.py"
+        ],
+        "bench": [
+          "scripts/bench_gemv_q5_0.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemv_q5_0.py --compare-numpy",
+            "tolerance": "1e-3",
+            "notes": "Compare dequantized output against numpy fp32 matmul"
+          }
+        ]
+      },
+      "notes": "Generalized matrix-vector multiplication for Q5_0 weights with FP32 activation input. Computes y = W @ x where W is stored transposed. Simpler than Q8 path - no activation quantization needed.",
+      "name": "gemv_q5_0",
+      "_source_file": "gemv_q5_0.json"
+    },
+    {
       "id": "gemv_q5_0_q8_0",
       "op": "gemv",
       "variant": "q5_0_w_q8_0_a_fp32_out",
@@ -1723,15 +2608,6 @@
       },
       "inputs": [
         {
-          "name": "W",
-          "dtype": "q5_0",
-          "shape": [
-            "M",
-            "K"
-          ],
-          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
-        },
-        {
           "name": "x",
           "dtype": "q8_0",
           "shape": [
@@ -1740,6 +2616,18 @@
           "desc": "Input vector [K] (quantized q8_0)"
         }
       ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        }
+      ],
+      "activations": [],
       "outputs": [
         {
           "name": "y",
@@ -1780,6 +2668,7 @@
       },
       "impl": {
         "function": "gemv_q5_0_q8_0",
+        "c_declaration": "void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);",
         "sources": [
           "src/kernels/gemm_kernels_q5_0.c"
         ],
@@ -1852,6 +2741,254 @@
       "_source_file": "gemv_q5_0_q8_0.json"
     },
     {
+      "id": "gemv_q6_k",
+      "op": "gemv",
+      "variant": "q6_k_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q6_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q6_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] Q6_K quantized"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q6_K uses 256-value super-blocks; K should be a multiple of 256."
+      },
+      "impl": {
+        "function": "gemv_q6_k",
+        "c_declaration": "void gemv_q6_k(float *y, const void *W, const float *x, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q6k.c"
+        ]
+      },
+      "notes": "GEMV for Q6_K weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemv_q6_k",
+      "_source_file": "gemv_q6_k.json"
+    },
+    {
+      "id": "gemv_q6_k_q8_k",
+      "op": "gemv",
+      "variant": "q6_k_w_q8_k_a_fp32_out",
+      "quant": {
+        "weight": "q6_k",
+        "activation": "q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "q8_k",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_k)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q6_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "preferred": {
+          "prefill": "output",
+          "decode": "output"
+        },
+        "strategies": [
+          {
+            "name": "output",
+            "partition_dim": "M",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across output rows; each thread computes subset of y."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Q6_K requires K dimension multiple of 256 for dequantization."
+      },
+      "impl": {
+        "function": "gemv_q6_k_q8_k",
+        "c_declaration": "void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q6k.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gemv_q6_k_q8_k.py"
+        ],
+        "bench": [
+          "scripts/bench_gemv_q6_k_q8_k.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_gemv_q6_k_q8_k.py --compare-numpy",
+            "tolerance": "1e-4",
+            "notes": "Compare dequantized output against numpy fp32 matmul"
+          }
+        ]
+      },
+      "notes": "Generalized matrix-vector multiplication for Q6_K weights with Q8_K activation input. Used for decode path with K-type quantization.",
+      "name": "gemv_q6_k_q8_k",
+      "_source_file": "gemv_q6_k_q8_k.json"
+    },
+    {
+      "id": "gemv_q8_0",
+      "op": "gemv",
+      "variant": "q8_0_w_fp32_a_fp32_out",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] Q8_0 quantized"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q8_0 uses 32-value blocks; K should be a multiple of 32."
+      },
+      "impl": {
+        "function": "gemv_q8_0",
+        "c_declaration": "void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_q8_0.c"
+        ]
+      },
+      "notes": "GEMV for Q8_0 weights with FP32 activation input. No activation quantization needed.",
+      "name": "gemv_q8_0",
+      "_source_file": "gemv_q8_0.json"
+    },
+    {
       "id": "gemv_q8_0_q8_0",
       "op": "gemv",
       "variant": "q8_0_w_q8_0_a_fp32_out",
@@ -1862,15 +2999,6 @@
       },
       "inputs": [
         {
-          "name": "W",
-          "dtype": "q8_0",
-          "shape": [
-            "M",
-            "K"
-          ],
-          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
-        },
-        {
           "name": "x",
           "dtype": "q8_0",
           "shape": [
@@ -1879,6 +3007,18 @@
           "desc": "Input vector [K] (quantized q8_0)"
         }
       ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"
+        }
+      ],
+      "activations": [],
       "outputs": [
         {
           "name": "y",
@@ -1919,6 +3059,7 @@
       },
       "impl": {
         "function": "gemv_q8_0_q8_0",
+        "c_declaration": "void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);",
         "sources": [
           "src/kernels/gemm_kernels_q8_0.c"
         ],
@@ -1991,6 +3132,327 @@
       "_source_file": "gemv_q8_0_q8_0.json"
     },
     {
+      "id": "kv_cache_store",
+      "op": "kv_cache_store",
+      "variant": "fp32",
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "num_kv_heads",
+            "head_dim"
+          ],
+          "desc": "K tensor after RoPE [num_kv_heads, head_dim]"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "num_kv_heads",
+            "head_dim"
+          ],
+          "desc": "V tensor [num_kv_heads, head_dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "kv_cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "num_layers",
+            "num_kv_heads",
+            "max_seq_len",
+            "head_dim"
+          ],
+          "desc": "K cache slice at current pos"
+        },
+        {
+          "name": "kv_cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "num_layers",
+            "num_kv_heads",
+            "max_seq_len",
+            "head_dim"
+          ],
+          "desc": "V cache slice at current pos"
+        }
+      ],
+      "dims": [
+        "num_kv_heads",
+        "head_dim",
+        "num_layers",
+        "max_seq_len"
+      ],
+      "impl": {
+        "function": "kv_cache_store",
+        "c_declaration": "void kv_cache_store(float *kv_cache_k, float *kv_cache_v, const float *k, const float *v, int layer, int pos, int num_kv_heads, int head_dim, int max_seq_len);",
+        "sources": [
+          "src/kernels/kv_cache.c"
+        ],
+        "inline": true,
+        "inline_code": "/* KV cache store is inlined as memcpy in codegen */"
+      },
+      "notes": "Store K and V to KV cache at current position. Typically inlined as memcpy in generated code.",
+      "name": "kv_cache_store",
+      "_source_file": "kv_cache_store.json"
+    },
+    {
+      "id": "mega_fused_attention_decode",
+      "op": "fused_attention_block",
+      "variant": "fp32_decode",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Input activation [1, aligned_embed_dim]"
+        },
+        {
+          "name": "residual",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Residual input [1, aligned_embed_dim]"
+        }
+      ],
+      "weights": [
+        {
+          "name": "ln1_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm gamma weight"
+        },
+        {
+          "name": "wq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD",
+            "AE"
+          ],
+          "desc": "Q projection weights"
+        },
+        {
+          "name": "bq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "Q bias (or NULL)"
+        },
+        {
+          "name": "wk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "K projection weights"
+        },
+        {
+          "name": "bk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "K bias (or NULL)"
+        },
+        {
+          "name": "wv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "V projection weights"
+        },
+        {
+          "name": "bv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "V bias (or NULL)"
+        },
+        {
+          "name": "wo",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AE",
+            "AD"
+          ],
+          "desc": "Output projection weights"
+        },
+        {
+          "name": "bo",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Output bias (or NULL)"
+        }
+      ],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "kv_cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "K cache"
+        },
+        {
+          "name": "kv_cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "V cache"
+        },
+        {
+          "name": "rope_cos",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE cos"
+        },
+        {
+          "name": "rope_sin",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            2
+          ],
+          "desc": "RoPE sin"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Output [1, aligned_embed_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "E",
+        "AE",
+        "H",
+        "KV",
+        "D",
+        "AD",
+        "max_T"
+      ],
+      "params": [
+        {
+          "name": "pos",
+          "dtype": "int32",
+          "desc": "Current position in sequence"
+        },
+        {
+          "name": "cache_capacity",
+          "dtype": "int32",
+          "desc": "KV cache capacity"
+        },
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "RMSNorm epsilon"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "none",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads for decode."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "notes": "Single-token decode path. FP32 weights for simplicity."
+      },
+      "impl": {
+        "function": "mega_fused_attention_decode",
+        "c_declaration": "void mega_fused_attention_decode(float *output, const float *input, const float *residual, const float *ln1_gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, const float *wo, const float *bo, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps);",
+        "sources": [
+          "src/kernels/fused/mega_fused_attention.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_mega_fused_attention_decode.py"
+        ],
+        "bench": [
+          "scripts/bench_mega_fused_attention_decode.py"
+        ],
+        "parity": []
+      },
+      "notes": "Mega-fused attention block for decode (single token). Fuses RMSNorm + QKV + RoPE + Attention + OutProj.",
+      "name": "mega_fused_attention_decode",
+      "_source_file": "mega_fused_attention_decode.json"
+    },
+    {
       "id": "mega_fused_attention_prefill",
       "op": "fused_attention_block",
       "variant": "q5_0_w_q8_0_v_fp32_out",
@@ -2018,7 +3480,9 @@
           ],
           "optional": true,
           "desc": "Residual input (or NULL)"
-        },
+        }
+      ],
+      "weights": [
         {
           "name": "ln_gamma",
           "dtype": "fp32",
@@ -2105,7 +3569,10 @@
           ],
           "optional": true,
           "desc": "Output bias (or NULL)"
-        },
+        }
+      ],
+      "activations": [],
+      "runtime_buffers": [
         {
           "name": "kv_cache_k",
           "dtype": "fp32",
@@ -2237,6 +3704,7 @@
       ],
       "impl": {
         "function": "mega_fused_attention_prefill",
+        "c_declaration": "void mega_fused_attention_prefill(float *output, const float *input, const float *residual, const float *ln1_gamma, const void *wq, const float *bq, CKDataType wq_dt, const void *wk, const float *bk, CKDataType wk_dt, const void *wv, const float *bv, CKDataType wv_dt, const void *wo, const float *bo, CKDataType wo_dt, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int start_pos, int tokens, int cache_capacity, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, float eps, void *scratch);",
         "sources": [
           "src/kernels/fused/mega_fused_attention_prefill.c",
           "src/kernels/fused/prefill_fused_gemm.c",
@@ -2298,7 +3766,9 @@
             "AE"
           ],
           "desc": "Residual input [tokens, aligned_embed_dim]"
-        },
+        }
+      ],
+      "weights": [
         {
           "name": "ln2_gamma",
           "dtype": "fp32",
@@ -2365,6 +3835,7 @@
           "desc": "MLP down bias [aligned_embed] (or NULL)"
         }
       ],
+      "activations": [],
       "outputs": [
         {
           "name": "output",
@@ -2437,6 +3908,7 @@
       ],
       "impl": {
         "function": "mega_fused_outproj_mlp_prefill",
+        "c_declaration": "void mega_fused_outproj_mlp_prefill(float *output, const float *attn_out, const float *residual, const float *ln2_gamma, const void *wo, const float *bo, CKDataType wo_dt, const void *w1, const float *b1, CKDataType w1_dt, const void *w2, const float *b2, CKDataType w2_dt, int tokens, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim, int intermediate_dim, int aligned_intermediate_dim, float eps, void *scratch);",
         "sources": [
           "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
           "src/kernels/fused/prefill_fused_gemm.c"
@@ -2673,7 +4145,9 @@
             "E"
           ],
           "desc": "Input activations [tokens, embed_dim]"
-        },
+        }
+      ],
+      "weights": [
         {
           "name": "gamma",
           "dtype": "fp32",
@@ -2683,6 +4157,7 @@
           "desc": "RMSNorm scale weight"
         }
       ],
+      "activations": [],
       "outputs": [
         {
           "name": "output",
@@ -2767,6 +4242,7 @@
       },
       "impl": {
         "function": "rmsnorm_forward",
+        "c_declaration": "void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
         "sources": [
           "src/kernels/rmsnorm_kernels.c"
         ],
@@ -2847,7 +4323,11 @@
             "D"
           ],
           "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
-        },
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
         {
           "name": "cos_cache",
           "dtype": "fp32",
@@ -2943,6 +4423,7 @@
       },
       "impl": {
         "function": "rope_forward_qk",
+        "c_declaration": "void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset);",
         "sources": [
           "src/kernels/rope_kernels.c"
         ],
@@ -3023,6 +4504,8 @@
           "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"
         }
       ],
+      "weights": [],
+      "activations": [],
       "outputs": [
         {
           "name": "out",
@@ -3078,6 +4561,7 @@
       },
       "impl": {
         "function": "swiglu_forward",
+        "c_declaration": "void swiglu_forward(const float *input, float *output, int tokens, int dim);",
         "sources": [
           "src/kernels/swiglu_kernels.c",
           "src/kernels/sigmoid_kernels.c"
@@ -3140,6 +4624,157 @@
       "notes": "SwiGLU activation: SiLU(gate) * up = gate * sigmoid(gate) * up. Used in LLaMA-style MLP blocks.",
       "name": "swiglu_forward",
       "_source_file": "swiglu_forward.json"
+    },
+    {
+      "id": "tokenizer_bpe_trie",
+      "kernel": "tokenizer_bpe_trie",
+      "op": "tokenizer",
+      "description": "BPE tokenizer using trie data structure for UTF-8 text to token ID conversion",
+      "category": "tokenizer",
+      "section": "header",
+      "signature": {
+        "init_function": "ck_tokenizer_load_binary",
+        "init_params": [
+          {
+            "name": "tok",
+            "type": "CKTokenizer*",
+            "description": "Tokenizer instance"
+          },
+          {
+            "name": "vocab_size",
+            "type": "int",
+            "description": "Number of tokens in vocabulary"
+          },
+          {
+            "name": "offsets",
+            "type": "const int32_t*",
+            "description": "vocab_offsets from bump"
+          },
+          {
+            "name": "strings",
+            "type": "const char*",
+            "description": "vocab_strings from bump"
+          },
+          {
+            "name": "num_merges",
+            "type": "int",
+            "description": "Number of merge rules"
+          },
+          {
+            "name": "merges",
+            "type": "const int32_t*",
+            "description": "vocab_merges from bump"
+          }
+        ],
+        "encode_function": "ck_tokenizer_encode",
+        "encode_params": [
+          {
+            "name": "tok",
+            "type": "const CKTokenizer*",
+            "description": "Tokenizer instance"
+          },
+          {
+            "name": "text",
+            "type": "const char*",
+            "description": "UTF-8 input text"
+          },
+          {
+            "name": "text_len",
+            "type": "int",
+            "description": "Length of input text in bytes (-1 for strlen)"
+          },
+          {
+            "name": "ids",
+            "type": "int32_t*",
+            "description": "Output token IDs buffer"
+          },
+          {
+            "name": "max_ids",
+            "type": "int",
+            "description": "Maximum tokens to output (context_len)"
+          }
+        ],
+        "return": {
+          "type": "int",
+          "description": "Number of tokens produced"
+        }
+      },
+      "inputs": {
+        "text_input": {
+          "type": "activation",
+          "dtype": "u8",
+          "shape": [
+            "text_len"
+          ],
+          "description": "UTF-8 encoded input text"
+        }
+      },
+      "weights": {
+        "vocab_offsets": {
+          "type": "weight",
+          "dtype": "i32",
+          "shape": [
+            "vocab_size"
+          ],
+          "description": "Offset into vocab_strings for each token"
+        },
+        "vocab_strings": {
+          "type": "weight",
+          "dtype": "u8",
+          "shape": [
+            "total_vocab_bytes"
+          ],
+          "description": "Packed vocabulary token strings"
+        },
+        "vocab_merges": {
+          "type": "weight",
+          "dtype": "i32",
+          "shape": [
+            "num_merges",
+            3
+          ],
+          "description": "BPE merge rules: [token_a, token_b, merged_token]"
+        }
+      },
+      "outputs": {
+        "token_ids": {
+          "type": "activation",
+          "dtype": "i32",
+          "shape": [
+            "num_tokens"
+          ],
+          "description": "Output token IDs (num_tokens <= max_tokens)"
+        }
+      },
+      "algorithm": {
+        "description": "Trie-based BPE tokenization",
+        "steps": [
+          "1. Build trie from vocab_offsets + vocab_strings (or use prebuilt)",
+          "2. For each position in text_input:",
+          "   a. Walk trie to find longest matching token",
+          "   b. If no match, apply BPE merges or use <unk>",
+          "   c. Output token_id, advance position",
+          "3. Return number of tokens produced"
+        ],
+        "complexity": "O(text_len * max_token_len)"
+      },
+      "implementation_notes": [
+        "Trie can be prebuilt at model load time from vocab_offsets/vocab_strings",
+        "BPE merges needed for handling out-of-vocabulary subwords",
+        "Special tokens: <pad>, <unk>, <bos>, <eos> typically at fixed IDs",
+        "UTF-8 aware: must handle multi-byte characters correctly"
+      ],
+      "source": {
+        "file": "src/tokenizer/tokenizer.c",
+        "header": "include/tokenizer/tokenizer.h",
+        "dependencies": [
+          "hash_table.c",
+          "murmurhash3.c",
+          "utf8.c"
+        ]
+      },
+      "name": "tokenizer_bpe_trie",
+      "_source_file": "tokenizer_bpe_trie.json"
     }
   ]
 }

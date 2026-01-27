@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-convert_gguf_to_bump.py
-=======================
+convert_gguf_to_bump_v6_6.py
+============================
 
 Converts a GGUF model file containing weight-only quantized tensors (e.g. Q4_K_M,
 Q6_K) into the C-Kernel-Engine `weights.bump` layout expected by the runtime.
@@ -10,6 +10,61 @@ BUMPWGT5 Support:
   - Version 5 adds embedded metadata JSON at EOF with hash verification
   - Maintains backward compatibility with BUMPWGT4 via magic-based detection
   - Metadata includes template, config, quant_summary for self-description
+
+================================================================================
+BUMP FILE LAYOUT (v6.6)
+================================================================================
+
+  Offset        Size        Content
+  ──────────────────────────────────────────────────────────────────────────────
+  0             128         Header (HEADER_SIZE)
+                            - magic[8]: "BUMPWGT4" or "BUMPWGT5"
+                            - version, model_type, num_layers, vocab_size, etc.
+                            - checksum[32]: SHA256 of weights data
+  ──────────────────────────────────────────────────────────────────────────────
+  128           24          Extended Metadata (EXT_METADATA_SIZE)
+                            - Reserved for future use (currently zeros)
+  ──────────────────────────────────────────────────────────────────────────────
+  152           4           dtype_table_len (DATA_START)
+  152+4         N           dtype_table (N = dtype_table_len bytes)
+  ──────────────────────────────────────────────────────────────────────────────
+  152+4+N       ...         Weights data:
+                            - token_emb
+                            - vocab_offsets, vocab_strings, vocab_merges (optional)
+                            - per-layer: ln1_gamma, ln2_gamma, wq, bq, wk, bk, ...
+                            - final_ln_weight, final_ln_bias
+  ──────────────────────────────────────────────────────────────────────────────
+  EOF-M         M           [BUMPWGT5 only] Metadata JSON
+  EOF-48        48          [BUMPWGT5 only] Footer: magic[8] + meta_size[8] + hash[32]
+  ──────────────────────────────────────────────────────────────────────────────
+
+  KEY CONSTANTS (defined below):
+    HEADER_SIZE       = 128   # Size of header placeholder
+    EXT_METADATA_SIZE = 24    # Size of extended metadata block
+    DATA_START        = 152   # HEADER_SIZE + EXT_METADATA_SIZE
+
+================================================================================
+DOWNSTREAM CONSISTENCY REQUIREMENTS
+================================================================================
+
+  IMPORTANT: All downstream consumers MUST use these same offsets!
+
+  This includes:
+    - Generated C code (in ~/.cache/ck-engine-v6.6/ or similar)
+    - codegen_v6_6.py - memory layout generation
+    - build_ir_v6_6.py - weight manifest offsets
+    - Any C runtime that reads .bump files
+
+  All generated files (ck-kernel-inference.c, layout.json, etc.) must use
+  offsets derived from these constants, NOT hardcoded values.
+
+  TODO: Create a validation script (test_bump_layout_sync.py) that:
+    - Reads HEADER_SIZE, EXT_METADATA_SIZE, DATA_START from this file
+    - Verifies generated C code defines match
+    - Verifies manifest.json offsets match actual file structure
+    - Run as part of CI to catch offset mismatches early
+
+================================================================================
 
 Notes:
   - This tool is intentionally "offline": it may convert/reshape tensors while
@@ -35,7 +90,19 @@ from typing import BinaryIO, Dict, Optional, Sequence, Tuple
 import numpy as np
 
 
-HEADER_SIZE = 128
+# ============================================================================
+# BUMP FILE LAYOUT CONSTANTS - SINGLE SOURCE OF TRUTH
+# ============================================================================
+# These constants define the .bump file structure. ALL downstream code
+# (generated C runtime, codegen, IR builder) must use values derived from these.
+#
+# If you change these, regenerate all dependent files!
+# ============================================================================
+
+HEADER_SIZE = 128                                    # Header placeholder size
+EXT_METADATA_SIZE = 24                               # Extended metadata block (v6.6+)
+DATA_START = HEADER_SIZE + EXT_METADATA_SIZE         # = 152, where dtype_table begins
+
 CACHE_ALIGN = 64
 
 # BUMP format versions
@@ -1059,10 +1126,13 @@ def verify_bump_parity(
             errors.append(f"Invalid bump magic: {bump_magic} (expected BUMPWGT4/BUMPWGT5)")
             return False
 
-        # Skip rest of header (120 bytes remaining)
+        # Read extended metadata (24 bytes at offset HEADER_SIZE)
         bf.seek(HEADER_SIZE)
+        ext_metadata = bf.read(EXT_METADATA_SIZE)
 
-        # Read dtype table
+        # BUMPWGT5 format: dtype_table_len is at DATA_START (HEADER_SIZE + EXT_METADATA_SIZE = 152)
+        # Layout: [header:128][ext_meta:24][dtype_table_len:4][dtype_table:N][weights:...]
+        bf.seek(DATA_START)
         dtype_table_len = struct.unpack("<I", bf.read(4))[0]
         dtype_table = bf.read(dtype_table_len)
 
@@ -1077,8 +1147,8 @@ def verify_bump_parity(
             gf.seek(data_start + tok_info.offset)
             gguf_sample = gf.read(34)  # Q8_0 first block
 
-            # After dtype table comes token embeddings
-            bump_tok_offset = HEADER_SIZE + 4 + dtype_table_len
+            # After dtype table comes token embeddings (at offset DATA_START + 4 + dtype_table_len)
+            bump_tok_offset = DATA_START + 4 + dtype_table_len
             bf.seek(bump_tok_offset)
             bump_sample = bf.read(34)
 
@@ -1421,6 +1491,17 @@ def main() -> None:
         r.seek(data_start)
 
         arch = str(meta.get("general.architecture", "llama"))
+
+        # Load template early to check for RoPE (determines if pos_emb is needed)
+        template_data = None
+        uses_rope = True  # Default: most modern models use RoPE
+        if args.bump_version == BUMP_VERSION_V5:
+            try:
+                template_data = load_template_for_arch(arch)
+                template_flags = template_data.get("flags", {})
+                uses_rope = template_flags.get("rope") in ["rope", "yarn", "llama", True, None]
+            except Exception as e:
+                print(f"[template] Warning: Could not load template for {arch}: {e}")
 
         if args.inspect or args.list:
             # Summarize tensor dtypes so you can confirm what is actually quantized
@@ -1829,7 +1910,7 @@ def main() -> None:
 
         # Track manifest entries as we write
         manifest_entries = []
-        current_offset = HEADER_SIZE
+        current_offset = DATA_START  # HEADER_SIZE + EXT_METADATA_SIZE = 152
         manifest_dict = None
 
         def record_entry(name: str, dtype: str, size: int):
@@ -1844,9 +1925,11 @@ def main() -> None:
 
         with open(args.output, "w+b") as out_f:
             out_f.write(b"\x00" * HEADER_SIZE)
+            # Write extended metadata at offset HEADER_SIZE
+            out_f.write(b"\x00" * EXT_METADATA_SIZE)
             w = HashingWriter(out_f)
 
-            # Dtype table
+            # Dtype table (at offset DATA_START = HEADER_SIZE + EXT_METADATA_SIZE = 152)
             dtype_table_header_size = 4 + len(dtype_table_bytes)
             current_offset += dtype_table_header_size
             w.write(struct.pack("<I", len(dtype_table_bytes)))
@@ -1873,10 +1956,14 @@ def main() -> None:
                 if merges_bytes:
                     w.write(merges_bytes)
 
-            # 2) pos_emb: not used by RoPE models; keep zeros for compatibility.
-            pos_emb_size = context_len * aligned_embed_dim * 4
-            record_entry("pos_emb", "fp32", pos_emb_size)
-            write_f32_zeros(w, context_len * aligned_embed_dim)
+            # 2) pos_emb: only for non-RoPE models (absolute position embeddings)
+            if not uses_rope:
+                pos_emb_size = context_len * aligned_embed_dim * 4
+                record_entry("pos_emb", "fp32", pos_emb_size)
+                write_f32_zeros(w, context_len * aligned_embed_dim)
+                print(f"[pos_emb] Written {pos_emb_size / 1024 / 1024:.1f} MB (non-RoPE model)")
+            else:
+                print(f"[pos_emb] Skipped (RoPE model - position computed, not learned)")
 
             # 3) per-layer
             for layer in range(num_layers):
@@ -2021,14 +2108,22 @@ def main() -> None:
                         "w2": get_quant_type_name(info["down"].ggml_type),
                     }
 
-                # Load template JSON
-                template_data = load_template_for_arch(arch)
+                # Template already loaded earlier (for RoPE check)
+                if template_data is None:
+                    template_data = load_template_for_arch(arch)
 
                 # Calculate hashes
                 if args.manifest_out:
                     manifest_dict = {
                         "version": 5,
                         "model": arch,
+                        # BUMP file layout constants - downstream consumers should read these
+                        "bump_layout": {
+                            "header_size": HEADER_SIZE,
+                            "ext_metadata_size": EXT_METADATA_SIZE,
+                            "data_start": DATA_START,
+                            "description": "Offsets: [0..header_size) header, [header_size..data_start) ext_metadata, [data_start..] dtype_table + weights"
+                        },
                         "config": config,
                         "template": template_data,
                         "quant_summary": quant_summary,
@@ -2166,6 +2261,13 @@ def main() -> None:
         manifest = manifest_dict or {
             "version": 5,
             "model": arch,
+            # BUMP file layout constants - downstream consumers should read these
+            "bump_layout": {
+                "header_size": HEADER_SIZE,
+                "ext_metadata_size": EXT_METADATA_SIZE,
+                "data_start": DATA_START,
+                "description": "Offsets: [0..header_size) header, [header_size..data_start) ext_metadata, [data_start..] dtype_table + weights"
+            },
             "config": config if args.bump_version == BUMP_VERSION_V5 else None,
             "template": template_data if args.bump_version == BUMP_VERSION_V5 else None,
             "quant_summary": quant_summary if args.bump_version == BUMP_VERSION_V5 else None,

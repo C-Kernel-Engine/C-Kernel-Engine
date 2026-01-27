@@ -370,7 +370,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              temperature: float = 0.7, verbose: bool = False,
              show_stats: bool = True,
              validator: Optional['AutoValidator'] = None,
-             check_every_n: int = 20) -> str:
+             check_every_n: int = 20,
+             no_prefill: bool = False) -> str:
     """Generate text from prompt.
 
     Args:
@@ -398,8 +399,16 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     if model.has_kv_decode and model.kv_cache_enable():
         # KV-cache path: prefill once, then decode token-by-token.
         t0 = time.time()
-        model.set_parity_token_index(0)  # Token 0 for prefill output
-        logits = model.prefill(token_ids)
+        if no_prefill:
+            # Slow path: feed prompt tokens via decode to avoid prefill crashes
+            model.kv_cache_reset()
+            logits = None
+            for idx, tok in enumerate(token_ids):
+                model.set_parity_token_index(idx)
+                logits = model.decode_step(tok)
+        else:
+            model.set_parity_token_index(0)  # Token 0 for prefill output
+            logits = model.prefill(token_ids)
         prefill_time = time.time() - t0
 
         # NaN detection
@@ -553,7 +562,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
 
 def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
-              show_stats: bool = True, validator: Optional['AutoValidator'] = None):
+              show_stats: bool = True, validator: Optional['AutoValidator'] = None,
+              no_prefill: bool = False):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
@@ -606,7 +616,8 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
         print("\033[94mAssistant: \033[0m", end='', flush=True)
         response = generate(model, prompt, max_tokens=max_tokens,
                           temperature=temperature, verbose=False,
-                          show_stats=show_stats, validator=validator)
+                          show_stats=show_stats, validator=validator,
+                          no_prefill=no_prefill)
         print()
 
 
@@ -630,6 +641,8 @@ def main():
                        help="Enable auto-validation: detect gibberish and run staged validation")
     parser.add_argument("--check-every", type=int, default=20,
                        help="Check for gibberish every N tokens (default: 20)")
+    parser.add_argument("--no-prefill", action="store_true",
+                       help="Disable prefill; feed prompt tokens via decode (slow)")
     args = parser.parse_args()
 
     # Determine parity directory
@@ -674,12 +687,14 @@ def main():
             generate(model, args.prompt, max_tokens=args.max_tokens,
                     temperature=args.temperature, verbose=args.verbose,
                     show_stats=args.stats, validator=validator,
-                    check_every_n=args.check_every)
+                    check_every_n=args.check_every,
+                    no_prefill=args.no_prefill)
             print()
         else:
             # Interactive chat mode
             chat_loop(model, temperature=args.temperature, max_tokens=args.max_tokens,
-                     show_stats=args.stats, validator=validator)
+                     show_stats=args.stats, validator=validator,
+                     no_prefill=args.no_prefill)
     finally:
         model.free()
 

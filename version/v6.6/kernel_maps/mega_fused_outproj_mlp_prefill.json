@@ -9,7 +9,9 @@
   },
   "inputs": [
     {"name": "attn_out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Attention output [heads, tokens, head_dim] (head-major)"},
-    {"name": "residual", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input [tokens, aligned_embed_dim]"},
+    {"name": "residual", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input [tokens, aligned_embed_dim]"}
+  ],
+  "weights": [
     {"name": "ln2_gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm gamma [embed_dim]"},
     {"name": "wo", "dtype": "q5_0", "shape": ["H", "AE", "D"], "desc": "Output projection weights [heads, aligned_embed, head_dim]"},
     {"name": "bo", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "Output bias [aligned_embed] (or NULL)"},
@@ -18,6 +20,7 @@
     {"name": "w2", "dtype": "q4_k|q6_k", "shape": ["AE", "AI"], "desc": "MLP down weights [aligned_embed, intermediate]"},
     {"name": "b2", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "MLP down bias [aligned_embed] (or NULL)"}
   ],
+  "activations": [],
   "outputs": [
     {"name": "output", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Final output [tokens, aligned_embed_dim] (includes residual add)"}
   ],
@@ -55,6 +58,7 @@
   ],
   "impl": {
     "function": "mega_fused_outproj_mlp_prefill",
+    "c_declaration": "void mega_fused_outproj_mlp_prefill(float *output, const float *attn_out, const float *residual, const float *ln2_gamma, const void *wo, const float *bo, CKDataType wo_dt, const void *w1, const float *b1, CKDataType w1_dt, const void *w2, const float *b2, CKDataType w2_dt, int tokens, int embed_dim, int aligned_embed_dim, int num_heads, int aligned_head_dim, int intermediate_dim, int aligned_intermediate_dim, float eps, void *scratch);",
     "sources": [
       "src/kernels/fused/mega_fused_outproj_mlp_prefill.c",
       "src/kernels/fused/prefill_fused_gemm.c"

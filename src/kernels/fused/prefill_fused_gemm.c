@@ -43,6 +43,7 @@
 #include <math.h>
 #include <string.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -169,6 +170,10 @@ static int qkv_q8_0_dtype_supported(CKDataType dt) {
     return (dt == CK_DT_Q5_0 || dt == CK_DT_Q8_0);
 }
 
+static int qkv_q8_k_dtype_supported(CKDataType dt) {
+    return (dt == CK_DT_Q4_K || dt == CK_DT_Q6_K);
+}
+
 static void gemm_nt_q8_0_dispatch(const void *A_q8,
                                  const void *B,
                                  const float *bias,
@@ -184,6 +189,27 @@ static void gemm_nt_q8_0_dispatch(const void *A_q8,
         break;
     case CK_DT_Q8_0:
         gemm_nt_q8_0_q8_0(A_q8, B, bias, C, M, N, K);
+        break;
+    default:
+        break;
+    }
+}
+
+static void gemm_nt_q8_k_qkv_dispatch(const void *A_q8k,
+                                      const void *B,
+                                      const float *bias,
+                                      float *C,
+                                      int M,
+                                      int N,
+                                      int K,
+                                      CKDataType dt)
+{
+    switch (dt) {
+    case CK_DT_Q4_K:
+        gemm_nt_q4_k_q8_k(A_q8k, B, bias, C, M, N, K);
+        break;
+    case CK_DT_Q6_K:
+        gemm_nt_q6_k_q8_k(A_q8k, B, bias, C, M, N, K);
         break;
     default:
         break;
@@ -524,14 +550,32 @@ void fused_rmsnorm_qkv_prefill_head_major_quant(
     if (kv_stride_tokens < seq_len) {
         return;
     }
-    if (!qkv_q8_0_dtype_supported(wq_dt) ||
-        !qkv_q8_0_dtype_supported(wk_dt) ||
-        !qkv_q8_0_dtype_supported(wv_dt)) {
+    /* Determine quantization path: Q8_0 activations for Q5_0/Q8_0 weights,
+     * Q8_K activations for Q4_K/Q6_K weights. All QKV weights must use
+     * the same quantization family. */
+    int use_q8_k_path = qkv_q8_k_dtype_supported(wq_dt);
+    int use_q8_0_path = qkv_q8_0_dtype_supported(wq_dt);
+
+    if (!use_q8_k_path && !use_q8_0_path) {
+        /* Unsupported dtype for wq */
         return;
     }
 
+    /* Verify all dtypes are from the same family */
+    if (use_q8_k_path) {
+        if (!qkv_q8_k_dtype_supported(wk_dt) || !qkv_q8_k_dtype_supported(wv_dt)) {
+            return;  /* Mixed Q8_K and Q8_0 paths not supported */
+        }
+    } else {
+        if (!qkv_q8_0_dtype_supported(wk_dt) || !qkv_q8_0_dtype_supported(wv_dt)) {
+            return;
+        }
+    }
+
     const size_t float_bytes = (size_t)PREFILL_TILE_M * (size_t)aligned_embed_dim * sizeof(float);
-    const size_t q8_row_bytes = ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)aligned_embed_dim);
+    /* Q8_K has larger blocks (256) than Q8_0 (32), so use appropriate size */
+    const CKDataType act_quant_type = use_q8_k_path ? CK_DT_Q8_K : CK_DT_Q8_0;
+    const size_t q8_row_bytes = ck_dtype_row_bytes(act_quant_type, (size_t)aligned_embed_dim);
     const size_t q8_bytes = (size_t)PREFILL_TILE_M * q8_row_bytes;
     const size_t q8_offset = align_up_size(float_bytes, 64);
 
@@ -553,11 +597,18 @@ void fused_rmsnorm_qkv_prefill_head_major_quant(
         const float *x_tile = x + (size_t)m_start * (size_t)aligned_embed_dim;
         rmsnorm_tile(x_tile, gamma, normed, tile_m, embed_dim, aligned_embed_dim, eps);
 
+        /* Quantize activations to appropriate format */
         for (int t = 0; t < tile_m; ++t) {
             const float *row = normed + (size_t)t * (size_t)aligned_embed_dim;
-            quantize_row_q8_0(row,
-                              q8_tile + (size_t)t * q8_row_bytes,
-                              aligned_embed_dim);
+            if (use_q8_k_path) {
+                quantize_row_q8_k(row,
+                                  q8_tile + (size_t)t * q8_row_bytes,
+                                  aligned_embed_dim);
+            } else {
+                quantize_row_q8_0(row,
+                                  q8_tile + (size_t)t * q8_row_bytes,
+                                  aligned_embed_dim);
+            }
         }
 
         for (int h = 0; h < num_heads; ++h) {
@@ -565,8 +616,13 @@ void fused_rmsnorm_qkv_prefill_head_major_quant(
             const float *bq_h = Bq ? (Bq + (size_t)h * (size_t)aligned_head_dim) : NULL;
             float *q_h = Q + (size_t)h * q_head_stride + (size_t)m_start * (size_t)aligned_head_dim;
 
-            gemm_nt_q8_0_dispatch(q8_tile, wq_h, bq_h, q_h,
-                                  tile_m, aligned_head_dim, aligned_embed_dim, wq_dt);
+            if (use_q8_k_path) {
+                gemm_nt_q8_k_qkv_dispatch(q8_tile, wq_h, bq_h, q_h,
+                                          tile_m, aligned_head_dim, aligned_embed_dim, wq_dt);
+            } else {
+                gemm_nt_q8_0_dispatch(q8_tile, wq_h, bq_h, q_h,
+                                      tile_m, aligned_head_dim, aligned_embed_dim, wq_dt);
+            }
         }
 
         for (int h = 0; h < num_kv_heads; ++h) {
@@ -577,10 +633,17 @@ void fused_rmsnorm_qkv_prefill_head_major_quant(
             float *k_h = K + (size_t)h * kv_head_stride + (size_t)m_start * (size_t)aligned_head_dim;
             float *v_h = V + (size_t)h * kv_head_stride + (size_t)m_start * (size_t)aligned_head_dim;
 
-            gemm_nt_q8_0_dispatch(q8_tile, wk_h, bk_h, k_h,
-                                  tile_m, aligned_head_dim, aligned_embed_dim, wk_dt);
-            gemm_nt_q8_0_dispatch(q8_tile, wv_h, bv_h, v_h,
-                                  tile_m, aligned_head_dim, aligned_embed_dim, wv_dt);
+            if (use_q8_k_path) {
+                gemm_nt_q8_k_qkv_dispatch(q8_tile, wk_h, bk_h, k_h,
+                                          tile_m, aligned_head_dim, aligned_embed_dim, wk_dt);
+                gemm_nt_q8_k_qkv_dispatch(q8_tile, wv_h, bv_h, v_h,
+                                          tile_m, aligned_head_dim, aligned_embed_dim, wv_dt);
+            } else {
+                gemm_nt_q8_0_dispatch(q8_tile, wk_h, bk_h, k_h,
+                                      tile_m, aligned_head_dim, aligned_embed_dim, wk_dt);
+                gemm_nt_q8_0_dispatch(q8_tile, wv_h, bv_h, v_h,
+                                      tile_m, aligned_head_dim, aligned_embed_dim, wv_dt);
+            }
         }
     }
 }
@@ -590,7 +653,10 @@ size_t fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size(int aligned_embed
         return 0;
     }
     const size_t float_bytes = (size_t)PREFILL_TILE_M * (size_t)aligned_embed_dim * sizeof(float);
-    const size_t q8_row_bytes = ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)aligned_embed_dim);
+    /* Use max of Q8_0 and Q8_K sizes to support both paths */
+    const size_t q8_0_row_bytes = ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)aligned_embed_dim);
+    const size_t q8_k_row_bytes = ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)aligned_embed_dim);
+    const size_t q8_row_bytes = (q8_k_row_bytes > q8_0_row_bytes) ? q8_k_row_bytes : q8_0_row_bytes;
     const size_t q8_bytes = (size_t)PREFILL_TILE_M * q8_row_bytes;
     return align_up_size(float_bytes, 64) + q8_bytes;
 }

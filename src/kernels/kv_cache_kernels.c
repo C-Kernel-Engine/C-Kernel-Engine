@@ -97,3 +97,23 @@ void kv_cache_write_head_major(const float *__restrict k_token,
         }
     }
 }
+
+void kv_cache_store(float *__restrict kv_cache_k,
+                    float *__restrict kv_cache_v,
+                    const float *__restrict k,
+                    const float *__restrict v,
+                    int layer,
+                    int pos,
+                    int num_kv_heads,
+                    int head_dim,
+                    int max_seq_len)
+{
+    (void)layer;
+    kv_cache_write_head_major(k, v,
+                              kv_cache_k, kv_cache_v,
+                              num_kv_heads,
+                              pos,
+                              max_seq_len,
+                              head_dim,
+                              head_dim);
+}

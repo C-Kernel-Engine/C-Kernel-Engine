@@ -34,6 +34,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static size_t align_up_size(size_t value, size_t align) {
     return (value + align - 1) & ~(align - 1);

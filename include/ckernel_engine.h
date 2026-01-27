@@ -1027,6 +1027,16 @@ void kv_cache_write_head_major(const float *__restrict k_token,
                                int head_dim,
                                int aligned_head_dim);
 
+void kv_cache_store(float *__restrict kv_cache_k,
+                    float *__restrict kv_cache_v,
+                    const float *__restrict k,
+                    const float *__restrict v,
+                    int layer,
+                    int pos,
+                    int num_kv_heads,
+                    int head_dim,
+                    int max_seq_len);
+
 // Repack a head-major tensor from a packed `[head, tokens, aligned_head_dim]`
 // layout into a KV-cache-compatible layout `[head, cache_capacity, aligned_head_dim]`
 // in-place. This is used after prefill when forward kernels write head slices

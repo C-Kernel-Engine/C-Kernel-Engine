@@ -74,40 +74,40 @@
                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 5. PARALLEL PLANNING                                                        │
-│    - Analyze GEMM shapes (M=tokens, N=features)                            │
-│    - Assign strategy: M_parallel (tokens) or H_parallel (heads)            │
+│    - Analyze GEMM shapes (M=tokens, N=features)                             │
+│    - Assign strategy: M_parallel (tokens) or H_parallel (heads)             │
 │                                                                             │
-│    Output: parallel_prefill.json, parallel_decode.json                     │
+│    Output: parallel_prefill.json, parallel_decode.json                      │
 └─────────────────────────┬───────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 6. LAYOUT + SCHEDULE                                                        │
-│    - Compute exact buffer offsets for all activations/weights              │
-│    - Account for quantization block sizes (Q4_K=256, Q8_0=32)             │
-│    - Generate kernel call sequence with buffer pointers                    │
+│    - Compute exact buffer offsets for all activations/weights               │
+│    - Account for quantization block sizes (Q4_K=256, Q8_0=32)               │
+│    - Generate kernel call sequence with buffer pointers                     │
 │                                                                             │
 │    Outputs:                                                                 │
-│      - layout_prefill.json  (prefill memory offsets)                       │
-│      - layout_decode.json   (decode memory offsets)                        │
-│      - schedule_prefill.json (kernel invocation order)                     │
-│      - schedule_decode.json  (kernel invocation order)                     │
+│      - layout_prefill.json  (prefill memory offsets)                        │
+│      - layout_decode.json   (decode memory offsets)                         │
+│      - schedule_prefill.json (kernel invocation order)                      │
+│      - schedule_decode.json  (kernel invocation order)                      │
 └─────────────────────────┬───────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 7. CODEGEN                                                                  │
-│    - Read: lowered_*.json, layout_*.json, parallel_*.json, weights_manifest│
-│    - Emit:                                                                    │
-│      - ck-kernel-prefill.c/h  (many-token forward pass)                    │
-│      - ck-kernel-inference.c/h (single-token decode)                       │
-│      - weights_manifest.map    (binary index for O(1) lookup)              │
+│    - Read: lowered_*.json, layout_*.json, parallel_*.json, weights_manifest │
+│    - Emit:                                                                  │
+│      - ck-kernel-prefill.c/h  (many-token forward pass)                     │
+│      - ck-kernel-inference.c/h (single-token decode)                        │
+│      - weights_manifest.map    (binary index for O(1) lookup)               │
 │                                                                             │
 │    Generated C includes:                                                    │
-│      - MagicHeader struct (64-byte metadata at file start)                 │
-│      - Model struct with all buffer pointers                               │
-│      - Per-layer kernel calls with correct strides/offsets                 │
-│      - OpenMP pragmas from parallel planning                               │
+│      - MagicHeader struct (64-byte metadata at file start)                  │
+│      - Model struct with all buffer pointers                                │
+│      - Per-layer kernel calls with correct strides/offsets                  │
+│      - OpenMP pragmas from parallel planning                                │
 └─────────────────────────┬───────────────────────────────────────────────────┘
                           │
                           ▼
@@ -115,10 +115,10 @@
 │ 8. COMPILE + RUN                                                            │
 │                                                                             │
 │    Compile:                                                                 │
-│      gcc -O3 -march=native -fopenmp ck-kernel-prefill.c ... -lckernel      │
+│      gcc -O3 -march=native -fopenmp ck-kernel-prefill.c ... -lckernel       │
 │                                                                             │
 │    Run:                                                                     │
-│      ./ck-engine-<model> weights.bump --prompt "Hello" --max-tokens 30     │
+│      ./ck-engine-<model> weights.bump --prompt "Hello" --max-tokens 30      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

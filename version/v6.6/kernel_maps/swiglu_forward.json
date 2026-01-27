@@ -11,6 +11,8 @@
     {"name": "gate", "dtype": "fp32", "shape": ["T", "I"], "desc": "Gate tensor [tokens, intermediate_dim] (first half of MLP intermediate)"},
     {"name": "up", "dtype": "fp32", "shape": ["T", "I"], "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"}
   ],
+  "weights": [],
+  "activations": [],
   "outputs": [
     {"name": "out", "dtype": "fp32", "shape": ["T", "I"], "desc": "SwiGLU output: silu(gate) * up"}
   ],
@@ -42,6 +44,7 @@
   },
   "impl": {
     "function": "swiglu_forward",
+    "c_declaration": "void swiglu_forward(const float *input, float *output, int tokens, int dim);",
     "sources": ["src/kernels/swiglu_kernels.c", "src/kernels/sigmoid_kernels.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},

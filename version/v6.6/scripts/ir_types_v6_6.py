@@ -567,7 +567,7 @@ OpType = build_op_type_enum()
 # =============================================================================
 #
 # Functions kept for backward compatibility with code that imports ir_types_v6_6 as v3.
-# These are simple wrappers that were previously in compat_ir_v4_v6_6.py.
+# These are simple wrappers that were previously in ir_core_v6_6.py.
 #
 # Usage:
 #     import ir_types_v6_6 as v3

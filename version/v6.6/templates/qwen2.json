@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "qwen2",
   "family": "llama",
   "flags": {
@@ -7,25 +7,35 @@
     "activation": "swiglu",
     "rope": "rope"
   },
+  "sequence": ["decoder"],
   "block_types": {
-    "dense": {
-      "ops": [
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "rmsnorm",
+          "qkv_proj",
+          "rope_qk",
+          "attn",
+          "out_proj",
+          "residual_add",
+          "rmsnorm",
+          "mlp_gate_up",
+          "silu_mul",
+          "mlp_down",
+          "residual_add"
+        ]
+      },
+      "footer": [
         "rmsnorm",
-        "qkv_proj",
-        "rope_qk",
-        "attn",
-        "out_proj",
-        "residual_add",
-        "rmsnorm",
-        "mlp_gate_up",
-        "silu_mul",
-        "mlp_down",
-        "residual_add"
+        "weight_tying",
+        "logits"
       ]
     }
-  },
-  "layer_map": {
-    "default": "dense",
-    "overrides": {}
   }
 }

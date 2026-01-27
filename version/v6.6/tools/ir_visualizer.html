@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C-Kernel-Engine IR Visualizer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; }
+        .header { background: #16213e; padding: 1rem 2rem; border-bottom: 2px solid #0f3460; }
+        .header h1 { font-size: 1.5rem; color: #e94560; }
+        .header .subtitle { color: #888; font-size: 0.9rem; }
+
+        .controls { padding: 1rem 2rem; background: #16213e; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        .controls input[type="file"] { display: none; }
+        .controls label, .controls button, .controls select {
+            padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;
+            background: #0f3460; color: #eee; border: 1px solid #1a1a2e;
+        }
+        .controls label:hover, .controls button:hover { background: #e94560; }
+        .controls select { background: #0f3460; }
+
+        .tabs { display: flex; background: #0f3460; }
+        .tab { padding: 0.75rem 1.5rem; cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab:hover { background: #16213e; }
+        .tab.active { border-bottom-color: #e94560; background: #1a1a2e; }
+
+        .panel { display: none; padding: 1rem 2rem; overflow: auto; height: calc(100vh - 180px); }
+        .panel.active { display: block; }
+
+        /* Memory Layout Tab */
+        .memory-region { margin: 1rem 0; }
+        .memory-region h3 { color: #e94560; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .memory-region h3 .size { font-size: 0.8rem; color: #888; font-weight: normal; }
+
+        .memory-bar { height: 40px; background: #0f3460; border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 0.5rem; }
+        .memory-block { position: absolute; height: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; cursor: pointer; border-right: 1px solid #1a1a2e; transition: filter 0.2s; }
+        .memory-block:hover { filter: brightness(1.3); z-index: 10; }
+        .memory-block.weights { background: #4a90d9; }
+        .memory-block.activation { background: #2ecc71; }
+        .memory-block.kv-cache { background: #9b59b6; }
+        .memory-block.scratch { background: #f39c12; }
+
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #333; }
+        th { background: #0f3460; position: sticky; top: 0; }
+        tr:hover { background: #16213e; }
+        .offset { font-family: monospace; color: #4a90d9; }
+        .size { font-family: monospace; color: #2ecc71; }
+        .dtype { padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; }
+        .dtype-fp32 { background: #27ae60; }
+        .dtype-q8_0 { background: #e74c3c; }
+        .dtype-q5_0 { background: #9b59b6; }
+        .dtype-q4_k { background: #f39c12; }
+        .dtype-q6_k { background: #3498db; }
+
+        /* Kernel Flow Tab */
+        .layer-container { margin: 1rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+        .layer-header { background: #0f3460; padding: 0.75rem 1rem; cursor: pointer; display: flex; justify-content: space-between; }
+        .layer-header:hover { background: #16213e; }
+        .layer-header .arrow { transition: transform 0.2s; }
+        .layer-header.collapsed .arrow { transform: rotate(-90deg); }
+        .layer-body { padding: 1rem; display: none; }
+        .layer-body.visible { display: block; }
+
+        .kernel-node { display: flex; gap: 1rem; margin: 0.5rem 0; padding: 0.75rem; background: #16213e; border-radius: 6px;
+            border-left: 4px solid #4a90d9; align-items: center; }
+        .kernel-node.quantize { border-left-color: #e74c3c; background: #2a1a2e; }
+        .kernel-node.gemv { border-left-color: #2ecc71; }
+        .kernel-node.attention { border-left-color: #f39c12; }
+        .kernel-node.rmsnorm { border-left-color: #9b59b6; }
+
+        .kernel-idx { font-family: monospace; color: #888; width: 40px; }
+        .kernel-name { font-weight: bold; flex: 1; }
+        .kernel-function { color: #4a90d9; font-family: monospace; font-size: 0.9rem; }
+        .kernel-dims { font-size: 0.8rem; color: #888; }
+
+        .data-flow { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .flow-item { padding: 2px 8px; border-radius: 3px; font-size: 0.75rem; font-family: monospace; }
+        .flow-input { background: #2980b9; }
+        .flow-output { background: #27ae60; }
+        .flow-weight { background: #8e44ad; }
+
+        /* Connection lines */
+        .connection { height: 20px; display: flex; align-items: center; padding-left: 20px; }
+        .connection::before { content: ''; width: 2px; height: 20px; background: #4a90d9; margin-right: 10px; }
+        .connection::after { content: '↓'; color: #4a90d9; }
+
+        /* Search/Filter */
+        .search-box { padding: 0.5rem; width: 300px; border-radius: 4px; border: 1px solid #333; background: #0f3460; color: #eee; }
+
+        /* Stats panel */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0; }
+        .stat-card { background: #16213e; padding: 1rem; border-radius: 8px; }
+        .stat-value { font-size: 1.5rem; color: #e94560; }
+        .stat-label { color: #888; font-size: 0.9rem; }
+
+        /* Parity Tab */
+        .parity-section { margin: 1rem 0; }
+        .tensor-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .tensor-panel { background: #16213e; padding: 1rem; border-radius: 8px; }
+        .tensor-panel h4 { margin-bottom: 0.5rem; }
+        .tensor-values { font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow: auto; background: #0f3460; padding: 0.5rem; border-radius: 4px; }
+        .diff-highlight { background: #e74c3c; color: white; padding: 0 2px; }
+
+        .tooltip { position: fixed; background: #16213e; border: 1px solid #e94560; padding: 0.5rem; border-radius: 4px;
+            font-size: 0.8rem; pointer-events: none; z-index: 1000; max-width: 300px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>C-Kernel-Engine IR Visualizer</h1>
+        <div class="subtitle">Memory Layout • Kernel Flow • Parity Debugging</div>
+    </div>
+
+    <div class="controls">
+        <label><input type="file" id="layoutFile" accept=".json" onchange="loadLayout(event)">Load Layout JSON</label>
+        <label><input type="file" id="loweredFile" accept=".json" onchange="loadLowered(event)">Load Lowered IR</label>
+        <label><input type="file" id="callFile" accept=".json" onchange="loadCallIR(event)">Load Call IR</label>
+        <button onclick="loadFromCache()">Load from Cache</button>
+        <select id="modeSelect" onchange="switchMode()">
+            <option value="decode">Decode Mode</option>
+            <option value="prefill">Prefill Mode</option>
+        </select>
+        <input type="text" class="search-box" placeholder="Search kernels..." oninput="filterKernels(this.value)">
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('memory')">Memory Layout</div>
+        <div class="tab" onclick="showTab('kernels')">Kernel Flow</div>
+        <div class="tab" onclick="showTab('parity')">Parity Debug</div>
+        <div class="tab" onclick="showTab('stats')">Statistics</div>
+    </div>
+
+    <div id="memory" class="panel active">
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value" id="totalWeights">-</div><div class="stat-label">Weights Size</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalActivations">-</div><div class="stat-label">Activations Size</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalKVCache">-</div><div class="stat-label">KV Cache Size</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalMemory">-</div><div class="stat-label">Total Memory</div></div>
+        </div>
+
+        <div class="memory-region">
+            <h3>Weights Region <span class="size" id="weightsRegionSize"></span></h3>
+            <div class="memory-bar" id="weightsBar"></div>
+            <table id="weightsTable">
+                <thead><tr><th>Name</th><th>Offset</th><th>Size</th><th>Dtype</th><th>Shape</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="memory-region">
+            <h3>Activations Region <span class="size" id="activationsRegionSize"></span></h3>
+            <div class="memory-bar" id="activationsBar"></div>
+            <table id="activationsTable">
+                <thead><tr><th>Buffer</th><th>Offset</th><th>Size</th><th>Shape</th><th>Usage</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="kernels" class="panel">
+        <div id="kernelFlow"></div>
+    </div>
+
+    <div id="parity" class="panel">
+        <h2>Parity Debugging</h2>
+        <p style="margin: 1rem 0; color: #888;">Compare tensor outputs between C-Kernel-Engine and reference implementations.</p>
+
+        <div class="parity-section">
+            <h3>Generate Debug Dumps</h3>
+            <p style="margin: 0.5rem 0; color: #888;">Add stop points to generated C code to dump intermediate tensors.</p>
+            <button onclick="generateDebugCode()">Generate Debug Code</button>
+            <pre id="debugCodeOutput" style="background: #0f3460; padding: 1rem; margin: 1rem 0; border-radius: 4px; max-height: 300px; overflow: auto;"></pre>
+        </div>
+
+        <div class="parity-section">
+            <h3>Compare Tensors</h3>
+            <div class="tensor-compare">
+                <div class="tensor-panel">
+                    <h4>C-Kernel-Engine</h4>
+                    <input type="file" id="ckTensorFile" accept=".bin,.npy">
+                    <div class="tensor-values" id="ckTensorValues">Load tensor file...</div>
+                </div>
+                <div class="tensor-panel">
+                    <h4>Reference (llama.cpp / PyTorch)</h4>
+                    <input type="file" id="refTensorFile" accept=".bin,.npy">
+                    <div class="tensor-values" id="refTensorValues">Load tensor file...</div>
+                </div>
+            </div>
+            <div id="parityResults" style="margin-top: 1rem;"></div>
+        </div>
+    </div>
+
+    <div id="stats" class="panel">
+        <h2>IR Statistics</h2>
+        <div class="stats-grid" id="statsGrid"></div>
+        <h3 style="margin-top: 2rem;">Kernel Usage</h3>
+        <table id="kernelStatsTable">
+            <thead><tr><th>Kernel</th><th>Count</th><th>Layers</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        let layoutData = null;
+        let loweredData = null;
+        let callData = null;
+
+        function formatBytes(bytes) {
+            if (bytes >= 1024*1024*1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
+            if (bytes >= 1024*1024) return (bytes / (1024*1024)).toFixed(2) + ' MB';
+            if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return bytes + ' B';
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.tab:nth-child(${['memory','kernels','parity','stats'].indexOf(tabId)+1})`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        async function loadFromCache() {
+            const mode = document.getElementById('modeSelect').value;
+            const base = '/home/antshiv/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF';
+
+            try {
+                // Try to load via fetch (works if served via HTTP)
+                const layoutResp = await fetch(`file://${base}/layout_${mode}.json`);
+                const loweredResp = await fetch(`file://${base}/lowered_${mode}.json`);
+                const callResp = await fetch(`file://${base}/lowered_${mode}_call.json`);
+
+                layoutData = await layoutResp.json();
+                loweredData = await loweredResp.json();
+                callData = await callResp.json();
+
+                renderAll();
+            } catch(e) {
+                alert('Cannot load files directly. Please use the file upload buttons, or serve this page via HTTP.\n\nTo serve: python -m http.server 8080');
+            }
+        }
+
+        function loadLayout(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                layoutData = JSON.parse(e.target.result);
+                renderMemory();
+                renderStats();
+            };
+            reader.readAsText(file);
+        }
+
+        function loadLowered(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                loweredData = JSON.parse(e.target.result);
+                renderKernelFlow();
+                renderStats();
+            };
+            reader.readAsText(file);
+        }
+
+        function loadCallIR(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                callData = JSON.parse(e.target.result);
+                renderKernelFlow();
+                renderStats();
+            };
+            reader.readAsText(file);
+        }
+
+        function renderAll() {
+            renderMemory();
+            renderKernelFlow();
+            renderStats();
+        }
+
+        function renderMemory() {
+            if (!layoutData) return;
+
+            const memory = layoutData.memory || layoutData;
+            const weights = memory.weights || {};
+            const activations = memory.activations || {};
+
+            // Calculate totals
+            let totalWeightSize = 0;
+            let totalActivationSize = 0;
+
+            // Render weights
+            const weightsEntries = weights.entries || [];
+            const weightsBody = document.querySelector('#weightsTable tbody');
+            weightsBody.innerHTML = '';
+
+            weightsEntries.forEach(w => {
+                const size = parseInt(w.size) || 0;
+                totalWeightSize += size;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${w.name || w.key || '-'}</td>
+                    <td class="offset">0x${(parseInt(w.offset) || 0).toString(16)}</td>
+                    <td class="size">${formatBytes(size)}</td>
+                    <td><span class="dtype dtype-${(w.dtype || 'unknown').replace('_', '_')}">${w.dtype || '-'}</span></td>
+                    <td>${JSON.stringify(w.shape || [])}</td>
+                `;
+                weightsBody.appendChild(row);
+            });
+
+            // Render activations
+            const activationBuffers = activations.buffers || [];
+            const activationsBody = document.querySelector('#activationsTable tbody');
+            activationsBody.innerHTML = '';
+
+            activationBuffers.forEach(a => {
+                const size = parseInt(a.size) || 0;
+                totalActivationSize += size;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${a.name || '-'}</td>
+                    <td class="offset">0x${(parseInt(a.offset) || 0).toString(16)}</td>
+                    <td class="size">${formatBytes(size)}</td>
+                    <td>${JSON.stringify(a.shape || [])}</td>
+                    <td>${a.usage || '-'}</td>
+                `;
+                activationsBody.appendChild(row);
+            });
+
+            // Update stats
+            document.getElementById('totalWeights').textContent = formatBytes(totalWeightSize);
+            document.getElementById('totalActivations').textContent = formatBytes(totalActivationSize);
+            document.getElementById('weightsRegionSize').textContent = formatBytes(totalWeightSize);
+            document.getElementById('activationsRegionSize').textContent = formatBytes(totalActivationSize);
+
+            // Find KV cache
+            const kvCache = activationBuffers.find(b => b.name === 'kv_cache');
+            const kvSize = kvCache ? parseInt(kvCache.size) : 0;
+            document.getElementById('totalKVCache').textContent = formatBytes(kvSize);
+            document.getElementById('totalMemory').textContent = formatBytes(totalWeightSize + totalActivationSize);
+
+            // Render memory bars
+            renderMemoryBar('weightsBar', weightsEntries, totalWeightSize, 'weights');
+            renderMemoryBar('activationsBar', activationBuffers, totalActivationSize, 'activation');
+        }
+
+        function renderMemoryBar(barId, entries, totalSize, type) {
+            const bar = document.getElementById(barId);
+            bar.innerHTML = '';
+
+            if (totalSize === 0) return;
+
+            let currentOffset = 0;
+            entries.slice(0, 50).forEach((entry, i) => {
+                const size = parseInt(entry.size) || 0;
+                const width = (size / totalSize) * 100;
+                if (width < 0.5) return; // Skip tiny blocks
+
+                const block = document.createElement('div');
+                block.className = `memory-block ${type}`;
+                if (entry.name === 'kv_cache') block.className += ' kv-cache';
+                if (entry.name && entry.name.includes('scratch')) block.className += ' scratch';
+
+                block.style.left = `${(currentOffset / totalSize) * 100}%`;
+                block.style.width = `${width}%`;
+                block.textContent = width > 5 ? (entry.name || entry.key || '').substring(0, 10) : '';
+                block.title = `${entry.name || entry.key}\nOffset: 0x${(entry.offset || 0).toString(16)}\nSize: ${formatBytes(size)}`;
+
+                block.onmouseenter = (e) => showTooltip(e, entry);
+                block.onmouseleave = hideTooltip;
+
+                bar.appendChild(block);
+                currentOffset += size;
+            });
+        }
+
+        function renderKernelFlow() {
+            const data = callData || loweredData;
+            if (!data) return;
+
+            const ops = data.operations || data.ops || [];
+            const container = document.getElementById('kernelFlow');
+            container.innerHTML = '';
+
+            // Group by layer
+            const layers = {};
+            ops.forEach(op => {
+                const layer = op.layer !== undefined ? op.layer : -1;
+                const section = op.section || 'body';
+                const key = section === 'header' ? 'Header' : section === 'footer' ? 'Footer' : `Layer ${layer}`;
+                if (!layers[key]) layers[key] = [];
+                layers[key].push(op);
+            });
+
+            Object.entries(layers).forEach(([layerName, layerOps]) => {
+                const layerDiv = document.createElement('div');
+                layerDiv.className = 'layer-container';
+
+                const header = document.createElement('div');
+                header.className = 'layer-header';
+                header.innerHTML = `<span>${layerName} (${layerOps.length} ops)</span><span class="arrow">▼</span>`;
+                header.onclick = () => {
+                    header.classList.toggle('collapsed');
+                    body.classList.toggle('visible');
+                };
+
+                const body = document.createElement('div');
+                body.className = 'layer-body visible';
+
+                layerOps.forEach((op, i) => {
+                    const node = document.createElement('div');
+                    const kernelType = getKernelType(op.function || op.kernel_id || '');
+                    node.className = `kernel-node ${kernelType}`;
+
+                    const dims = [];
+                    if (op.params) {
+                        if (op.params._input_dim) dims.push(`in: ${op.params._input_dim}`);
+                        if (op.params._output_dim) dims.push(`out: ${op.params._output_dim}`);
+                        if (op.params.embed_dim) dims.push(`embed: ${op.params.embed_dim}`);
+                    }
+
+                    node.innerHTML = `
+                        <span class="kernel-idx">#${op.idx !== undefined ? op.idx : i}</span>
+                        <span class="kernel-name">${op.op || op.kernel_id || '-'}</span>
+                        <span class="kernel-function">${op.function || op.kernel_id || '-'}</span>
+                        <span class="kernel-dims">${dims.join(' | ')}</span>
+                    `;
+
+                    // Add data flow info
+                    if (op.args || op.activations || op.outputs) {
+                        const flow = document.createElement('div');
+                        flow.className = 'data-flow';
+
+                        if (op.args) {
+                            op.args.forEach(arg => {
+                                const item = document.createElement('span');
+                                item.className = 'flow-item ' + (arg.source.includes('output') ? 'flow-output' :
+                                    arg.source.includes('weight') ? 'flow-weight' : 'flow-input');
+                                item.textContent = `${arg.name}: ${arg.expr ? arg.expr.substring(0, 30) : arg.source}`;
+                                flow.appendChild(item);
+                            });
+                        }
+
+                        node.appendChild(flow);
+                    }
+
+                    // Show errors
+                    if (op.errors && op.errors.length > 0) {
+                        const errors = document.createElement('div');
+                        errors.style.color = '#e74c3c';
+                        errors.textContent = 'Errors: ' + op.errors.join(', ');
+                        node.appendChild(errors);
+                    }
+
+                    body.appendChild(node);
+
+                    // Add connection line between ops
+                    if (i < layerOps.length - 1) {
+                        const conn = document.createElement('div');
+                        conn.className = 'connection';
+                        body.appendChild(conn);
+                    }
+                });
+
+                layerDiv.appendChild(header);
+                layerDiv.appendChild(body);
+                container.appendChild(layerDiv);
+            });
+        }
+
+        function getKernelType(name) {
+            if (name.includes('quantize')) return 'quantize';
+            if (name.includes('gemv') || name.includes('gemm')) return 'gemv';
+            if (name.includes('attention')) return 'attention';
+            if (name.includes('rmsnorm') || name.includes('layernorm')) return 'rmsnorm';
+            return '';
+        }
+
+        function renderStats() {
+            const data = callData || loweredData;
+            if (!data) return;
+
+            const ops = data.operations || data.ops || [];
+            const config = data.config || {};
+
+            // Count kernels
+            const kernelCounts = {};
+            ops.forEach(op => {
+                const kernel = op.function || op.kernel_id || 'unknown';
+                if (!kernelCounts[kernel]) kernelCounts[kernel] = { count: 0, layers: new Set() };
+                kernelCounts[kernel].count++;
+                if (op.layer !== undefined) kernelCounts[kernel].layers.add(op.layer);
+            });
+
+            // Render stats grid
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card"><div class="stat-value">${ops.length}</div><div class="stat-label">Total Operations</div></div>
+                <div class="stat-card"><div class="stat-value">${Object.keys(kernelCounts).length}</div><div class="stat-label">Unique Kernels</div></div>
+                <div class="stat-card"><div class="stat-value">${config.num_layers || '-'}</div><div class="stat-label">Layers</div></div>
+                <div class="stat-card"><div class="stat-value">${config.embed_dim || '-'}</div><div class="stat-label">Embed Dim</div></div>
+                <div class="stat-card"><div class="stat-value">${config.num_heads || '-'}</div><div class="stat-label">Attention Heads</div></div>
+                <div class="stat-card"><div class="stat-value">${config.vocab_size || '-'}</div><div class="stat-label">Vocab Size</div></div>
+            `;
+
+            // Render kernel table
+            const tbody = document.querySelector('#kernelStatsTable tbody');
+            tbody.innerHTML = '';
+            Object.entries(kernelCounts)
+                .sort((a, b) => b[1].count - a[1].count)
+                .forEach(([kernel, info]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="kernel-function">${kernel}</td>
+                        <td>${info.count}</td>
+                        <td>${info.layers.size > 0 ? `${Math.min(...info.layers)}-${Math.max(...info.layers)}` : '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+        }
+
+        function filterKernels(query) {
+            const nodes = document.querySelectorAll('.kernel-node');
+            nodes.forEach(node => {
+                const text = node.textContent.toLowerCase();
+                node.style.display = text.includes(query.toLowerCase()) ? 'flex' : 'none';
+            });
+        }
+
+        function showTooltip(event, data) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <strong>${data.name || data.key}</strong><br>
+                Offset: 0x${(data.offset || 0).toString(16)}<br>
+                Size: ${formatBytes(data.size || 0)}<br>
+                ${data.dtype ? `Dtype: ${data.dtype}<br>` : ''}
+                ${data.shape ? `Shape: ${JSON.stringify(data.shape)}` : ''}
+            `;
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY + 10 + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function generateDebugCode() {
+            const data = callData || loweredData;
+            if (!data) {
+                document.getElementById('debugCodeOutput').textContent = 'Load an IR file first.';
+                return;
+            }
+
+            const ops = data.operations || data.ops || [];
+            let code = `// Debug dump code - add to model_v6_6.c\n\n`;
+            code += `#include <stdio.h>\n`;
+            code += `static void dump_tensor(const char* name, const float* data, int size, int layer) {\n`;
+            code += `    char filename[256];\n`;
+            code += `    snprintf(filename, sizeof(filename), "debug_%s_L%d.bin", name, layer);\n`;
+            code += `    FILE* f = fopen(filename, "wb");\n`;
+            code += `    if (f) { fwrite(data, sizeof(float), size, f); fclose(f); }\n`;
+            code += `    printf("Dumped %s layer %d: min=%.4f max=%.4f\\n", name, layer, \n`;
+            code += `           min_float(data, size), max_float(data, size));\n`;
+            code += `}\n\n`;
+
+            // Find key ops to dump
+            const dumpPoints = ['embedding', 'rmsnorm', 'q_proj', 'attention', 'out_proj', 'mlp_gate_up', 'mlp_down', 'logits'];
+            code += `// Insert these calls at appropriate points:\n`;
+
+            ops.filter(op => dumpPoints.some(d => (op.op || '').includes(d)))
+               .slice(0, 20)
+               .forEach(op => {
+                   const output = op.args?.find(a => a.source?.includes('output'));
+                   if (output) {
+                       code += `dump_tensor("${op.op}", ${output.expr?.split(',')[0] || 'output'}, ${op.params?._output_dim || 'size'}, ${op.layer || 0});\n`;
+                   }
+               });
+
+            document.getElementById('debugCodeOutput').textContent = code;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+  [Pasted text #1 +56 lines]
+
+  in version 6.6 in version/v6.6 we ahve a few step process:
+  1. we ahve all kernel maps and the generated kerenl registry from our kernel maps. We also ahve kernel map validator to make sure the lkernsl maps that re a meta data of teh actual kernel in src/kernls are represted right.
+  2. We have a gguf to bump convertter that creates a bump format with the right sidecar which imports the template of the mdoel form the tempalte folder if it matches it. It also generates quants summary and entries which are used
+  down stream.
+  2. we then have build_ir_v6_6.py in scripts that builds ir1 lower, then we do the fusion then we build ir_2 lower then memory alyout then ir_lower final and then codegen.
+
+  we are at ta stage that the codgen gnerates code but it crashes:
+  [Pasted text #2 +40 lines]
+
+  you can look at teh earlier version in v6.5 adn v6 to see a working version of this but thoes version had hardcoded a lot of the qwen in the codegen. In v 6.6 we want this to be dynamic and gneratted completely from a few meta data
+  like tempalte and the sidecar. have a look and let me know?
+  for one.
+  we should not ahve mroe than one malloc. always one contingious block. so if we are allocating for kv cache or embed etc the memory layout should plan this properly and teh codegen must respect contingious blocks:
+  ideally we would have :
+
+  1. madvise or huge pavge alloc of say 500MB which is precomputed by the memory layout.
+  2. then we load all the weigths, vocab, dense embedding in the rigth offset pre computed by the memory layout
+  3. then we pass the pointer address + offset directly to each function since this is all rpecomputed.
+  4. so if we have a memeory issue then the memory layout needs some robust testing. such as how are things going to be loaded at what offset, are they cache aligned. do they have parallizm backed in etc.
+

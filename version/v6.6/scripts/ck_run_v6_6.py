@@ -31,12 +31,38 @@ from typing import Optional
 # ═══════════════════════════════════════════════════════════════════════════════
 
 V6_MODE = True  # Always v6 in this standalone script
-CACHE_DIR = Path.home() / ".cache/ck-engine-v6.6/models"
-SCRIPTS_DIR = Path(__file__).parent
-PROJECT_ROOT = SCRIPTS_DIR.parents[1]
-ROOT_SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+
+SCRIPTS_DIR = Path(__file__).parent  # version/v6.6/scripts/
+V66_ROOT = SCRIPTS_DIR.parent        # version/v6.6/
+PROJECT_ROOT = SCRIPTS_DIR.parents[2]  # C-Kernel-Engine/
+ROOT_SCRIPTS_DIR = PROJECT_ROOT / "scripts"  # Main scripts (for ck_chat.py etc)
 BUILD_DIR = PROJECT_ROOT / "build"
 HEADER_SIZE = 128
+KERNEL_MAPS_DIR = V66_ROOT / "kernel_maps"
+KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
+
+def _get_cache_dir() -> Path:
+    """Pick a writable cache dir (env override, default ~/.cache, fallback to repo)."""
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        path = Path(env).expanduser()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    default = Path.home() / ".cache/ck-engine-v6.6/models"
+    try:
+        default.mkdir(parents=True, exist_ok=True)
+        probe = default / ".ck_write_probe"
+        with open(probe, "w") as f:
+            f.write("ok")
+        probe.unlink()
+        return default
+    except Exception:
+        fallback = PROJECT_ROOT / ".ck_cache"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+CACHE_DIR = _get_cache_dir()
 
 # Colors
 C_RESET = "\033[0m"
@@ -411,6 +437,44 @@ def step_convert_gguf(gguf_path: Path,
     return weights_path, config_path
 
 
+def step_regenerate_kernel_registry(force: bool = False) -> Path:
+    """Regenerate KERNEL_REGISTRY.json from kernel maps if needed."""
+    if not KERNEL_MAPS_DIR.exists():
+        log(f"  Warning: kernel_maps directory not found at {KERNEL_MAPS_DIR}", C_DIM)
+        return KERNEL_REGISTRY_PATH
+
+    # Check if registry needs regeneration
+    registry_mtime = 0
+    if KERNEL_REGISTRY_PATH.exists() and not force:
+        registry_mtime = KERNEL_REGISTRY_PATH.stat().st_mtime
+
+    # Check if any kernel map file is newer than registry
+    needs_regen = not KERNEL_REGISTRY_PATH.exists() or force
+    if not needs_regen:
+        for map_file in KERNEL_MAPS_DIR.glob("*.json"):
+            # Skip registry files themselves
+            if map_file.name.upper().startswith("KERNEL_"):
+                continue
+            if map_file.stat().st_mtime > registry_mtime:
+                needs_regen = True
+                log(f"  {map_file.name} is newer than registry", C_DIM)
+                break
+
+    if not needs_regen:
+        return KERNEL_REGISTRY_PATH
+
+    log(f"  Regenerating kernel registry from kernel maps", C_DIM)
+    cmd = [
+        sys.executable,
+        str(SCRIPTS_DIR / "gen_kernel_registry_from_maps.py"),
+        f"--dir={KERNEL_MAPS_DIR}",
+        f"--output={KERNEL_REGISTRY_PATH}",
+    ]
+    run_cmd(cmd)
+    log(f"  Updated {KERNEL_REGISTRY_PATH.name}", C_GREEN)
+    return KERNEL_REGISTRY_PATH
+
+
 def step_inspect_weights_v6(input_type: str, model_dir: Optional[Path], gguf_path: Optional[Path],
                             output_dir: Path, force: bool = False) -> Path:
     """Emit a lightweight weights manifest for v6 (no conversion)."""
@@ -454,467 +518,314 @@ def _prefill_codegen_is_stub(output_dir: Path) -> bool:
 
 
 def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = None,
+                  bump_path: Path = None,
                   weight_dtype: str = None, modes: list = None, force: bool = False,
                   debug: bool = False, parity: bool = False,
                   codegen_version: str = "v6",
-                  int8_activations: bool = False) -> Path:
-    """Build IR and generate layout JSON.
+                  int8_activations: bool = False,
+                  context_len: int = None,
+                  no_fusion: bool = False,
+                  layout_mode: str = "region",
+                  layer_limit: int = None) -> Path:
+    """Build IR1: Direct template + quant → kernel IDs (v6.6 new pipeline).
 
     Args:
-        debug: If True, emit debug prints in generated C code to trace NaN/zero issues.
-        parity: If True, save intermediate buffers for parity comparison with PyTorch.
-        codegen_version: "v6" for explicit unrolled (default), "v4" for loop-based (legacy).
-        int8_activations: If True, use INT8 activation path (Q5_0×Q8_0 kernels).
+        manifest_path: Path to weights_manifest.json (required for v6.6).
+        modes: Execution modes (generates IR1 for all requested modes).
+        force: If True, regenerate even if cached IR1 exists.
+
+    Returns:
+        Path to primary IR1 file (decode mode).
+
+    Note:
+        v6.6 pipeline stages (only IR1 is implemented):
+        - IR1: Template + Quant → Kernel IDs (current)
+        - IR2: Add tensor metadata (shapes, memory layout) - TODO
+        - Memory Planning: Allocate buffers, plan reuse - TODO
+        - Code Generation: Generate C code that calls kernels - TODO
     """
-    log_step(3, f"Building IR v6 and layout (codegen={codegen_version})")
+    log_step(3, "Building IR1 (Template + Quant → Kernel IDs)")
 
-    preferred_mode = "decode" if not modes or "decode" in modes else modes[0]
-    layout_path = output_dir / f"layout_{preferred_mode}.json"
+    # Validate that manifest exists (required for v6.6)
+    if not manifest_path or not manifest_path.exists():
+        log_error("Manifest path required for v6.6 pipeline")
+        sys.exit(1)
 
-    if layout_path.exists() and not force:
-        if _prefill_codegen_is_stub(output_dir):
-            log("  Cached prefill stub detected; regenerating IR/codegen", C_DIM)
-        else:
-            log(f"  Using cached layout at {layout_path}", C_DIM)
-            return layout_path
+    # Determine which modes to generate (default: both prefill and decode)
+    target_modes = modes if modes else ["prefill", "decode"]
+    # Use a shared layout across modes to avoid offset mismatches
+    shared_layout_mode = None
+    if len(target_modes) > 1:
+        shared_layout_mode = "prefill" if "prefill" in target_modes else target_modes[0]
+        # Ensure the layout-producing mode runs first
+        if target_modes[0] != shared_layout_mode:
+            target_modes = [shared_layout_mode] + [m for m in target_modes if m != shared_layout_mode]
+    log(f"  Generating IR1 for modes: {', '.join(target_modes)}", C_DIM)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    build_script = "build_ir_v6_6.py" if V6_MODE else "v4/build_ir_v4.py"
-    cmd = [
-        sys.executable,
-        str(SCRIPTS_DIR / build_script),
-        f"--config={config_path}",
-        f"--prefix={output_dir}",
-        "--emit=lib",
-        "--dtype=fp32",
-    ]
+    ir1_paths = {}
 
-    if manifest_path and manifest_path.exists():
-        cmd.append(f"--weights-manifest={manifest_path}")
+    # Generate IR1 for each mode
+    shared_layout_path = output_dir / f"layout_{shared_layout_mode}.json" if shared_layout_mode else None
+    for mode in target_modes:
+        ir1_path = output_dir / f"ir1_{mode}.json"
+        layout_path = output_dir / f"layout_{mode}.json"
+        lowered_path = output_dir / f"lowered_{mode}.json"
+        lowered_call_path = output_dir / f"lowered_{mode}_call.json"
+        manifest_map_path = output_dir / "weights_manifest.map"
+        layout_input = None
+        if shared_layout_mode and mode != shared_layout_mode:
+            layout_input = shared_layout_path
 
-    if weight_dtype:
-        cmd.append(f"--weight-dtype={weight_dtype}")
+        # Check if we can reuse existing IR outputs
+        if not force:
+            outputs_exist = all([
+                ir1_path.exists(),
+                layout_path.exists(),
+                lowered_path.exists(),
+                lowered_call_path.exists(),
+                manifest_map_path.exists(),
+            ])
+            if layout_input and not layout_input.exists():
+                outputs_exist = False
+            manifest_newer = False
+            context_len_mismatch = False
+            if outputs_exist:
+                manifest_mtime = manifest_path.stat().st_mtime
+                layout_input_mtime = 0
+                if layout_input and layout_input.exists():
+                    layout_input_mtime = layout_input.stat().st_mtime
+                manifest_newer = (
+                    manifest_mtime > ir1_path.stat().st_mtime or
+                    manifest_mtime > layout_path.stat().st_mtime or
+                    manifest_mtime > lowered_path.stat().st_mtime or
+                    manifest_mtime > lowered_call_path.stat().st_mtime or
+                    manifest_mtime > manifest_map_path.stat().st_mtime or
+                    layout_input_mtime > ir1_path.stat().st_mtime or
+                    layout_input_mtime > layout_path.stat().st_mtime or
+                    layout_input_mtime > lowered_path.stat().st_mtime or
+                    layout_input_mtime > lowered_call_path.stat().st_mtime
+                )
+                # Check if context_len or layout_mode matches cached layout
+                if layout_path.exists():
+                    try:
+                        import json
+                        with open(layout_path, 'r') as f:
+                            cached_layout = json.load(f)
+                        # Check context_len
+                        if context_len is not None:
+                            cached_ctx = cached_layout.get("config", {}).get("context_length")
+                            if cached_ctx is not None and cached_ctx != context_len:
+                                context_len_mismatch = True
+                                log(f"  Context length changed: cached={cached_ctx}, requested={context_len}", C_YELLOW)
+                        # Check layout_mode
+                        cached_mode = cached_layout.get("memory", {}).get("arena", {}).get("mode")
+                        if cached_mode and cached_mode != layout_mode:
+                            context_len_mismatch = True  # Reuse flag for any config change
+                            log(f"  Layout mode changed: cached={cached_mode}, requested={layout_mode}", C_YELLOW)
+                    except Exception:
+                        pass
 
-    if modes:
-        cmd.append(f"--modes={','.join(modes)}")
-    else:
-        cmd.append("--modes=prefill,decode")
+            if outputs_exist and not manifest_newer and not context_len_mismatch:
+                log(f"  Using cached IR outputs for {mode} at {ir1_path}", C_DIM)
+                ir1_paths[mode] = ir1_path
+                continue
+            if manifest_newer:
+                log(f"  Manifest updated, rebuilding IR outputs for {mode}", C_DIM)
+            if context_len_mismatch:
+                log(f"  Context length changed, rebuilding IR outputs for {mode}", C_DIM)
 
-    if debug:
-        cmd.append("--debug")
+        cmd = [
+            sys.executable,
+            str(SCRIPTS_DIR / "build_ir_v6_6.py"),
+            f"--manifest={manifest_path}",
+            f"--mode={mode}",
+            f"--output={ir1_path}",
+            f"--layout-output={layout_path}",
+            f"--lowered-output={lowered_path}",
+            f"--call-output={lowered_call_path}",
+            f"--manifest-map-output={manifest_map_path}",
+            f"--layout-mode={layout_mode}",
+        ]
+        if layout_input:
+            cmd.append(f"--layout-input={layout_input}")
+        if layer_limit is not None:
+            cmd.append(f"--layer-limit={layer_limit}")
+        if context_len is not None:
+            cmd.append(f"--context-len={context_len}")
+        if no_fusion:
+            cmd.append("--no-fusion")
 
-    if parity:
-        cmd.append("--parity")
+        log(f"  Generating IR1 + {'NO fusion' if no_fusion else 'fusion'} + layout + lowered + call IR for mode: {mode}", C_DIM)
+        run_cmd(cmd)
+        log(f"  Created IR1 for {mode} at {ir1_path}", C_GREEN)
+        log(f"  Created layout for {mode} at {layout_path}", C_GREEN)
+        log(f"  Created lowered IR for {mode} at {lowered_path}", C_GREEN)
+        log(f"  Created call-ready IR for {mode} at {lowered_call_path}", C_GREEN)
 
-    # INT8 activations are enabled by default in v6.6
-    # The --int8-activations flag is now a no-op (always on in v6.6)
+        # Generate human-readable .map file
+        map_path = output_dir / f"layout_{mode}.map"
+        map_cmd = [
+            sys.executable,
+            str(SCRIPTS_DIR / "generate_memory_map_v6_6.py"),
+            str(layout_path),
+            "-o", str(map_path)
+        ]
+        run_cmd(map_cmd)
+        log(f"  Created memory map at {map_path}", C_GREEN)
 
-    # v6 codegen: explicit unrolled kernels (requires --fusion=off)
-    if codegen_version == "v6":
-        cmd.append("--codegen=v6")
-        cmd.append("--fusion=off")
-        log(f"  Using v6 explicit codegen (fusion disabled)", C_DIM)
+        ir1_paths[mode] = ir1_path
 
-    run_cmd(cmd)
-    log(f"  Created {layout_path}", C_GREEN)
-    return layout_path
+    # Return decode IR1 as primary (for compatibility)
+    return ir1_paths.get("decode", ir1_paths[target_modes[0]])
 
 
-def step_codegen(layout_path: Path, output_dir: Path, force: bool = False) -> Path:
-    """Generate v6 wrapper C code that exposes the ck_model_* API."""
+def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False) -> Path:
+    """Generate v6.6 C code from lowered IR.
+
+    The lowered IR contains everything needed for codegen:
+    - Explicit pointer expressions for weights and activations
+    - Function names for each kernel
+    - Model config parameters
+    """
     log_step(4, "Generating C code")
 
-    model_c_path = output_dir / "model.c"
-    if model_c_path.exists() and not force:
-        log(f"  Using cached C code at {model_c_path}", C_DIM)
-        return model_c_path
+    # Check for call-ready lowered IR files
+    lowered_decode = output_dir / "lowered_decode_call.json"
+    lowered_prefill = output_dir / "lowered_prefill_call.json"
+    model_c_path = output_dir / "model_v6_6.c"
 
-    inference_header_path = output_dir / "ck-kernel-inference.h"
-    inference_source_path = output_dir / "ck-kernel-inference.c"
-    decode_header_path = output_dir / "ck-kernel-decode.h"
-    decode_source_path = output_dir / "ck-kernel-decode.c"
-    if inference_header_path.exists() and inference_source_path.exists():
-        kernel_header_path = inference_header_path
-        kernel_source_path = inference_source_path
-    elif decode_header_path.exists() and decode_source_path.exists():
-        kernel_header_path = decode_header_path
-        kernel_source_path = decode_source_path
-    else:
-        log_error("Missing ck-kernel-inference/ck-kernel-decode C/H files. Run build_ir_v6_6.py first.")
+    if not lowered_decode.exists():
+        log_error(f"Lowered IR not found: {lowered_decode}")
+        log_error("Run step_build_ir first to generate call-ready lowered IR")
         sys.exit(1)
 
-    model_name = None
-    try:
-        with layout_path.open("r", encoding="utf-8") as f:
-            layout_json = json.load(f)
-        model_name = layout_json.get("model")
-    except Exception:
-        model_name = None
+    # Show stats
+    import json
+    with open(lowered_decode, 'r') as f:
+        decode_ir = json.load(f)
+    decode_ops = len(decode_ir.get('operations', []))
 
-    if not model_name:
-        log_error(f"Unable to resolve model name from {layout_path}")
-        sys.exit(1)
+    prefill_ops = 0
+    if lowered_prefill.exists():
+        with open(lowered_prefill, 'r') as f:
+            prefill_ir = json.load(f)
+        prefill_ops = len(prefill_ir.get('operations', []))
 
-    safe_name = re.sub(r"[^A-Za-z0-9]", "_", model_name).upper()
-    prefix = safe_name.lower()
-    kernel_header = kernel_header_path.name
-    kernel_source = kernel_source_path.name
+    log(f"  Decode: {decode_ops} ops", C_DIM)
+    log(f"  Prefill: {prefill_ops} ops", C_DIM)
 
-    # Extract config values for wrapper
-    config = layout_json.get("config", {})
-    max_seq_len = config.get("max_seq_len", 32768)
-    vocab_size = config.get("vocab_size", 151936)
-    num_layers = config.get("num_layers", 24)
-    num_merges = config.get("num_merges", 151387)
-    total_vocab_bytes = config.get("total_vocab_bytes", 1527572)
-    embed_dim = config.get("embed_dim", 896)
-    num_heads = config.get("num_heads", 14)
-    head_dim = config.get("head_dim", 64)
-    intermediate_dim = config.get("intermediate_dim", 4864)
-    total_bytes = layout_json.get("total_bytes", 0)
-    footer_offset = total_bytes - 4096 if total_bytes > 4096 else 0
+    # Call codegen
+    cmd = [
+        sys.executable,
+        str(SCRIPTS_DIR / "codegen_v6_6.py"),
+        f"--decode={lowered_decode}",
+        f"--prefill={lowered_prefill}" if lowered_prefill.exists() else "",
+        f"--output={model_c_path}"
+    ]
+    # Filter empty args
+    cmd = [c for c in cmd if c]
 
-    wrapper = f"""\
-// AUTO-GENERATED v6 wrapper: {model_name}
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+    run_cmd(cmd)
+    log(f"  Created C code at {model_c_path}", C_GREEN)
 
-#include "{kernel_header}"
-#include "ckernel_model_load_v6.6.h"
-
-/* Model constants from layout */
-#define {safe_name}_MAX_SEQ_LEN {max_seq_len}
-#define {safe_name}_VOCAB_SIZE {vocab_size}
-#define {safe_name}_NUM_LAYERS {num_layers}
-#define {safe_name}_NUM_MERGES {num_merges}
-#define {safe_name}_TOTAL_VOCAB_BYTES {total_vocab_bytes}
-#define {safe_name}_EMBED_DIM {embed_dim}
-#define {safe_name}_NUM_HEADS {num_heads}
-#define {safe_name}_HEAD_DIM {head_dim}
-#define {safe_name}_INTERMEDIATE_DIM {intermediate_dim}
-
-/* Magic header/footer offsets */
-#define {safe_name}_HEADER_OFFSET 0
-#define {safe_name}_FOOTER_OFFSET {footer_offset}
-
-/* HEADER struct for accessing header fields */
-typedef struct {{
-    uint64_t vocab_offsets;
-    uint64_t vocab_strings;
-    uint64_t vocab_merges;
-}} {safe_name}_HEADER_T;
-
-/* FOOTER struct for accessing footer fields */
-typedef struct {{
-    uint64_t logits;
-}} {safe_name}_FOOTER_T;
-
-/* Pointer macro for accessing model data - handles HEADER.field pattern */
-/* The field parameter should be an offset value, not a struct member access */
-/* For QWEN2_DECODE_HEADER.vocab_offsets, we use the model's vocab_offsets field */
-#define {safe_name}_DECODE_PTR(model, field) \\
-    ((void*)((uint8_t*)(model)->weights_base + (field)))
-
-/* Direct field access - just use the field value as offset */
-#define {safe_name}_PTR(model, offset) \\
-    ((void*)((uint8_t*)(model)->weights_base + (offset)))
-
-/* Model struct for {model_name} */
-typedef struct {{
-    void *weights_base;
-    size_t weights_size;
-    /* Direct offsets for header/footer fields */
-    uint64_t vocab_offsets;
-    uint64_t vocab_strings;
-    uint64_t vocab_merges;
-    uint64_t logits;
-}} {safe_name}Model;
-
-/* Shorthand macros for generated code compatibility */
-/* For QWEN2_DECODE_HEADER.vocab_offsets pattern, we use model's direct field value */
-#define {safe_name}_HEADER_FIELD(field) ((model)->field)
-
-/* Global model instance */
-static {safe_name}Model g_model;
-static int g_initialized = 0;
-static int g_active_tokens = 0;
-static int g_kv_cache_enabled = 0;
-static int g_kv_cache_capacity = {safe_name}_MAX_SEQ_LEN;
-static int g_kv_cache_tokens = 0;
-
-/* Global model instance */
-static {safe_name}Model g_model;
-static int g_initialized = 0;
-static int g_active_tokens = 0;
-static int g_kv_cache_enabled = 0;
-static int g_kv_cache_capacity = {safe_name}_MAX_SEQ_LEN;
-static int g_kv_cache_tokens = 0;
-
-static int32_t *g_tokens = NULL;
-static int g_tokens_cap = 0;
-
-static float *g_logits = NULL;
-static size_t g_logits_cap = 0;
-
-static int ensure_tokens_capacity(int n) {{
-    if (n <= g_tokens_cap) return 0;
-    int32_t *buf = (int32_t *)realloc(g_tokens, (size_t)n * sizeof(int32_t));
-    if (!buf) return -1;
-    g_tokens = buf;
-    g_tokens_cap = n;
-    return 0;
-}}
-
-static int ensure_logits_capacity(int n) {{
-    size_t needed = (size_t)n * (size_t){safe_name}_VOCAB_SIZE;
-    if (needed <= g_logits_cap) return 0;
-    float *buf = (float *)realloc(g_logits, needed * sizeof(float));
-    if (!buf) return -1;
-    g_logits = buf;
-    g_logits_cap = needed;
-    return 0;
-}}
-
-static const char *manifest_path_from_weights(const char *weights_path,
-                                             char *out,
-                                             size_t out_len) {{
-    if (!weights_path || !out || out_len == 0) return NULL;
-    const char *slash = strrchr(weights_path, '/');
-    size_t dir_len = slash ? (size_t)(slash - weights_path + 1) : 0;
-    const char *fname = "weights_manifest.map";
-    size_t need = dir_len + strlen(fname) + 1;
-    if (need > out_len) return NULL;
-    if (dir_len) {{
-        memcpy(out, weights_path, dir_len);
-    }}
-    strcpy(out + dir_len, fname);
-    return out;
-}}
-
-int ck_model_init(const char *weights_path) {{
-    if (g_initialized) return 0;
-    if ({prefix}_model_allocate(&g_model) != 0) return -1;
-    char manifest[4096];
-    const char *manifest_path = manifest_path_from_weights(weights_path, manifest, sizeof(manifest));
-    if (!manifest_path) return -2;
-    if (ck_load_weights_manifest_v4(g_model.base, weights_path, manifest_path) != 0) return -3;
-    {prefix}_precompute_rope(&g_model);
-    g_initialized = 1;
-    return 0;
-}}
-
-void ck_model_free(void) {{
-    if (!g_initialized) return;
-    {prefix}_model_free(&g_model);
-    free(g_tokens);
-    g_tokens = NULL;
-    g_tokens_cap = 0;
-    free(g_logits);
-    g_logits = NULL;
-    g_logits_cap = 0;
-    g_initialized = 0;
-    g_active_tokens = 0;
-    g_kv_cache_tokens = 0;
-}}
-
-int ck_model_embed_tokens(const int32_t *tokens, int num_tokens) {{
-    if (!g_initialized || !tokens) return -1;
-    int cap = {safe_name}_MAX_SEQ_LEN;
-    if (g_kv_cache_enabled && g_kv_cache_capacity > 0 && g_kv_cache_capacity < cap) {{
-        cap = g_kv_cache_capacity;
-    }}
-    if (num_tokens > cap) num_tokens = cap;
-    if (num_tokens < 1) num_tokens = 1;
-    if (ensure_tokens_capacity(num_tokens) != 0) return -2;
-    memcpy(g_tokens, tokens, (size_t)num_tokens * sizeof(int32_t));
-    g_active_tokens = num_tokens;
-    if (g_kv_cache_enabled) {{
-        g_kv_cache_tokens = 0;
-    }}
-    return 0;
-}}
-
-int ck_model_forward(float *logits_out) {{
-    if (!g_initialized) return -1;
-    if (!g_tokens || g_active_tokens <= 0) return -2;
-    if (ensure_logits_capacity(g_active_tokens) != 0) return -3;
-    {prefix}_forward(&g_model, (const int *)g_tokens, g_active_tokens);
-    float *model_logits = {safe_name}_PTR(&g_model, {safe_name}_FOOTER.logits);
-    memcpy(g_logits,
-           model_logits,
-           (size_t)g_active_tokens * (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
-    if (g_kv_cache_enabled) {{
-        g_kv_cache_tokens = g_active_tokens;
-    }}
-    if (logits_out) {{
-        memcpy(logits_out, g_logits,
-               (size_t)g_active_tokens * (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
-    }}
-    return 0;
-}}
-
-int ck_model_kv_cache_enable(int capacity) {{
-    if (!g_initialized) return -1;
-    g_kv_cache_enabled = 1;
-    int cap = capacity;
-    if (cap <= 0 || cap > {safe_name}_MAX_SEQ_LEN) cap = {safe_name}_MAX_SEQ_LEN;
-    g_kv_cache_capacity = cap;
-    g_kv_cache_tokens = 0;
-    g_active_tokens = 0;
-    return 0;
-}}
-
-void ck_model_kv_cache_reset(void) {{
-    g_kv_cache_tokens = 0;
-    g_active_tokens = 0;
-}}
-
-int ck_model_decode(int32_t token, float *logits_out) {{
-    if (!g_initialized) return -1;
-    int token_index = g_kv_cache_tokens;
-    if (token_index < 0 || token_index >= g_kv_cache_capacity) return -2;
-    if (ensure_logits_capacity(token_index + 1) != 0) return -3;
-    {prefix}_decode(&g_model, (const int *)&token, token_index);
-    float *model_logits = {safe_name}_PTR(&g_model, {safe_name}_FOOTER.logits);
-    memcpy(g_logits + (size_t)token_index * {safe_name}_VOCAB_SIZE,
-           model_logits,
-           (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
-    g_kv_cache_tokens = token_index + 1;
-    g_active_tokens = g_kv_cache_tokens;
-    if (logits_out) {{
-        memcpy(logits_out,
-               g_logits + (size_t)token_index * {safe_name}_VOCAB_SIZE,
-               (size_t){safe_name}_VOCAB_SIZE * sizeof(float));
-    }}
-    return 0;
-}}
-
-float *ck_model_get_logits(void) {{
-    return g_logits;
-}}
-
-int ck_model_get_vocab_size(void) {{
-    return {safe_name}_VOCAB_SIZE;
-}}
-
-int ck_model_get_num_merges(void) {{
-    return {safe_name}_NUM_MERGES;
-}}
-
-int ck_model_get_vocab_strings_size(void) {{
-    return {safe_name}_TOTAL_VOCAB_BYTES;
-}}
-
-int ck_model_get_context_window(void) {{
-    return {safe_name}_MAX_SEQ_LEN;
-}}
-
-int ck_model_get_active_tokens(void) {{
-    return g_active_tokens;
-}}
-
-int ck_model_sample_argmax(void) {{
-    if (!g_initialized || !g_logits) return -1;
-    int vocab_size = {safe_name}_VOCAB_SIZE;
-    float *logits = g_logits + (size_t)(g_active_tokens - 1) * vocab_size;
-    int best_token = 0;
-    float max_logit = -1e30f;
-    for (int i = 0; i < vocab_size; i++) {{
-        if (logits[i] > max_logit) {{
-            max_logit = logits[i];
-            best_token = i;
-        }}
-    }}
-    return best_token;
-}}
-
-void *ck_model_get_vocab_offsets(void) {{
-    if (!g_initialized) return NULL;
-    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_offsets);
-}}
-
-void *ck_model_get_vocab_strings(void) {{
-    if (!g_initialized) return NULL;
-    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_strings);
-}}
-
-void *ck_model_get_vocab_merges(void) {{
-    if (!g_initialized) return NULL;
-    return {safe_name}_PTR(&g_model, {safe_name}_HEADER.vocab_merges);
-}}
-
-int ck_model_verify_canaries(void) {{
-    if (!g_initialized) return -1;
-    return {prefix}_verify_canaries(&g_model);
-}}
-"""
-
-    model_c_path.write_text(wrapper)
-    log(f"  Created {model_c_path}", C_GREEN)
     return model_c_path
 
 
 def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> Path:
-    """Compile C code to shared library."""
+    """Compile C code to shared library linked against libckernel_engine.so."""
     log_step(5, "Compiling to shared library")
 
-    if (output_dir / "ck-kernel-inference.c").exists():
-        lib_path = output_dir / "ck-kernel-inference.so"
-        cmd_cache_path = output_dir / "ck-kernel-inference.build.cmd"
-    else:
-        lib_path = output_dir / "ck-kernel-decode.so"
-        cmd_cache_path = output_dir / "ck-kernel-decode.build.cmd"
+    # Output library name (ck_chat.py expects libmodel.so or ck-kernel-inference.so)
+    lib_path = output_dir / "libmodel.so"
+    kernel_lib = BUILD_DIR / "libckernel_engine.so"
 
-    # Find kernel sources
-    kernel_list_path = model_c_path.with_suffix('.c.kernels')
-    kernel_sources = []
-    if kernel_list_path.exists():
-        kernel_sources = kernel_list_path.read_text().strip().split('\n')
+    log(f"  Source: {model_c_path}", C_DIM)
+    log(f"  Lines: {sum(1 for _ in open(model_c_path))}", C_DIM)
 
-    # Default kernel sources if not specified
-    # For v6.6, we only need the generated kernel and minimal runtime
-    if not kernel_sources:
-        # Only include minimal v6.6 runtime, not all infrastructure
-        kernel_sources = [
-            "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/src/ckernel_model_load_v6_6.c",
-        ]
+    # Check if kernel library exists
+    if not kernel_lib.exists():
+        log(f"  Kernel library not found: {kernel_lib}", C_RED)
+        log(f"  Run 'make' in project root to build libckernel_engine.so", C_DIM)
+        return model_c_path
 
-    # Build command
-    cflags = ["-O3", "-march=native", "-mtune=native", "-DNDEBUG"]
-    if os.environ.get("CK_V6_FAST_MATH") == "1":
-        cflags += ["-ffast-math", "-funroll-loops"]
-    extra_cflags = os.environ.get("CK_V6_EXTRA_CFLAGS", "").strip()
-    if extra_cflags:
-        cflags += extra_cflags.split()
+    # Skip if already compiled and not forcing
+    if lib_path.exists() and not force:
+        src_mtime = model_c_path.stat().st_mtime
+        lib_mtime = lib_path.stat().st_mtime
+        if lib_mtime > src_mtime:
+            log(f"  Using cached: {lib_path}", C_GREEN)
+            return lib_path
 
+    # Compile to shared library
+    # -fvisibility=default ensures CK_EXPORT symbols are exported
+    include_dir = PROJECT_ROOT / "include"
+    v66_include = V66_ROOT / "include"
+    v66_src = V66_ROOT / "src"
+    loader_src = V66_ROOT / "src" / "ckernel_model_load_v6_6.c"
     cmd = [
-        "gcc", *cflags, "-fPIC", "-fopenmp", "-shared",
-        "-I/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/src",
+        "gcc",
+        "-shared", "-fPIC",
+        "-O3", "-march=native",
+        "-std=c11",
+        "-fvisibility=default",  # Export CK_EXPORT symbols
+        f"-I{include_dir}",
+        f"-I{v66_include}",
+        f"-I{v66_src}",
         "-o", str(lib_path),
         str(model_c_path),
-    ] + kernel_sources + ["-lm"]
+        str(loader_src),
+        f"-L{BUILD_DIR}",
+        f"-L{output_dir}",  # Also look in output_dir for libckernel_engine.so
+        "-lckernel_engine",
+        "-lm",
+        f"-Wl,-rpath,$ORIGIN",  # Use $ORIGIN so library can find deps in same dir
+        f"-Wl,-rpath,{BUILD_DIR}",
+    ]
 
-    cmd_str = " ".join(cmd)
+    log(f"  Compiling...", C_DIM)
+    try:
+        import subprocess
+        import os
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            log(f"  Compiled: {lib_path}", C_GREEN)
+            # Create symlink for ck-kernel-inference.so (legacy name)
+            symlink_path = output_dir / "ck-kernel-inference.so"
+            try:
+                if symlink_path.exists() or symlink_path.is_symlink():
+                    os.unlink(symlink_path)
+                os.symlink("libmodel.so", symlink_path)
+                log(f"  Created symlink: ck-kernel-inference.so -> libmodel.so", C_DIM)
+            except Exception:
+                pass  # Symlink creation is optional
+            return lib_path
+        else:
+            log(f"  Compilation failed:", C_RED)
+            # Show first few errors
+            for line in result.stderr.split('\n')[:10]:
+                if line.strip():
+                    log(f"    {line}", C_DIM)
+            log(f"  Falling back to syntax check...", C_ORANGE)
+    except Exception as e:
+        log(f"  Compilation error: {e}", C_RED)
 
-    if lib_path.exists() and not force:
-        try:
-            lib_mtime = lib_path.stat().st_mtime
-            src_mtime = max([model_c_path.stat().st_mtime] + [Path(s).stat().st_mtime for s in kernel_sources])
-            cached_cmd = cmd_cache_path.read_text() if cmd_cache_path.exists() else ""
-            if cached_cmd == cmd_str and src_mtime <= lib_mtime:
-                log(f"  Using cached library at {lib_path}", C_DIM)
-                return lib_path
-        except Exception:
-            pass
+    # Fallback: syntax check only
+    cmd = ["gcc", "-fsyntax-only", "-std=c11", f"-I{include_dir}", str(model_c_path)]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            log(f"  Syntax check: PASSED", C_GREEN)
+        else:
+            log(f"  Syntax check failed:", C_ORANGE)
+            for line in result.stderr.split('\n')[:5]:
+                if line.strip():
+                    log(f"    {line}", C_DIM)
+    except Exception:
+        pass
 
-    log(f"  Compiling with {len(kernel_sources)} kernel sources", C_DIM)
-    run_cmd(cmd)
-    cmd_cache_path.write_text(cmd_str)
-    log(f"  Created {lib_path}", C_GREEN)
-    return lib_path
+    return model_c_path
 
 
 def _layout_weight_buffers(layout: dict) -> list[dict]:
@@ -1096,9 +1007,105 @@ def run_parity_tests() -> None:
         sys.exit(1)
 
 
+def run_reverse_validation(work_dir: Path, verbose: bool = False) -> bool:
+    """Run IR reverse validation to check IR Lower 3 consistency.
+
+    Validates:
+    - Buffer completeness (all references have definitions)
+    - Manifest coverage (all weights are used)
+    - Bias accounting (biases in manifest appear in ops)
+    - Op sequence (no read-before-write)
+    - Size consistency (file_size matches shape+dtype)
+    - Kernel signatures (ops match kernel map signatures)
+
+    Returns True if all checks pass.
+    """
+    log(f"{C_ORANGE}[reverse-test]{C_RESET} Running IR reverse validation")
+
+    # Import the validator
+    try:
+        from ir_reverse_validator import run_validation
+    except ImportError:
+        # Try relative import
+        validator_path = SCRIPTS_DIR / "ir_reverse_validator.py"
+        if validator_path.exists():
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("ir_reverse_validator", validator_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            run_validation = module.run_validation
+        else:
+            log_error("ir_reverse_validator.py not found")
+            return False
+
+    # Find lowered IR files
+    lowered_decode = work_dir / "lowered_decode_call.json"
+    lowered_prefill = work_dir / "lowered_prefill_call.json"
+    manifest_path = work_dir / "weights_manifest.json"
+
+    all_passed = True
+
+    # Validate decode IR
+    if lowered_decode.exists():
+        log(f"  Validating decode IR: {lowered_decode.name}", C_DIM)
+        passed, report = run_validation(
+            lowered_path=lowered_decode,
+            manifest_path=manifest_path if manifest_path.exists() else None,
+            kernel_maps_dir=KERNEL_MAPS_DIR,
+            verbose=verbose,
+        )
+        if not passed:
+            all_passed = False
+            log(f"  {C_RED}Decode validation FAILED{C_RESET}")
+        else:
+            log(f"  {C_GREEN}Decode validation PASSED{C_RESET}")
+
+        if verbose or not passed:
+            print(report)
+    else:
+        log(f"  {C_DIM}Skipping decode validation (no lowered_decode_call.json){C_RESET}")
+
+    # Validate prefill IR
+    if lowered_prefill.exists():
+        log(f"  Validating prefill IR: {lowered_prefill.name}", C_DIM)
+        passed, report = run_validation(
+            lowered_path=lowered_prefill,
+            manifest_path=manifest_path if manifest_path.exists() else None,
+            kernel_maps_dir=KERNEL_MAPS_DIR,
+            verbose=verbose,
+        )
+        if not passed:
+            all_passed = False
+            log(f"  {C_RED}Prefill validation FAILED{C_RESET}")
+        else:
+            log(f"  {C_GREEN}Prefill validation PASSED{C_RESET}")
+
+        if verbose or not passed:
+            print(report)
+    else:
+        log(f"  {C_DIM}Skipping prefill validation (no lowered_prefill_call.json){C_RESET}")
+
+    return all_passed
+
+
 def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = None):
     """Run chat interface."""
     log_step(6, "Starting chat")
+
+    # Ensure libckernel_engine.so is findable
+    kernel_lib = BUILD_DIR / "libckernel_engine.so"
+    if kernel_lib.exists():
+        # Copy to model dir so it's always available
+        dst_lib = model_dir / "libckernel_engine.so"
+        if not dst_lib.exists():
+            import shutil
+            shutil.copy(kernel_lib, dst_lib)
+            log(f"  Copied libckernel_engine.so to {model_dir}", C_DIM)
+
+        # Also set LD_LIBRARY_PATH for the subprocess
+        ld_path = str(BUILD_DIR)
+        current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{model_dir}:{current_ld}"
 
     cmd = [
         sys.executable,
@@ -1183,6 +1190,9 @@ def run_pipeline(args: argparse.Namespace):
     manifest_input_path = None
     gguf_path_for_tokenizer = None  # Track GGUF path for tokenizer extraction
     v6_mode = V6_MODE
+
+    # Step 0: Regenerate kernel registry from kernel maps if needed
+    step_regenerate_kernel_registry(force=getattr(args, 'force_compile', False))
 
     # Detect input type
     input_type, info = detect_input_type(model_input)
@@ -1388,19 +1398,36 @@ def run_pipeline(args: argparse.Namespace):
             pass
 
     weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_for_dtype)
+    bump_path = work_dir / "weights.bump"
     layout_path = step_build_ir(
         config_path, work_dir,
         manifest_path=manifest_path or manifest_input_path,
+        bump_path=bump_path if bump_path.exists() else None,
         weight_dtype=weight_dtype,
         force=force_for_debug,
         debug=getattr(args, 'debug', False),
         parity=getattr(args, 'parity', False),
         codegen_version=getattr(args, 'codegen', 'v6'),
         int8_activations=getattr(args, 'int8_activations', False),
+        context_len=getattr(args, 'context_len', None),
+        no_fusion=getattr(args, 'no_fusion', False),
+        layout_mode=getattr(args, 'layout_mode', 'region'),
+        layer_limit=getattr(args, 'layer_limit', None),
     )
 
     # Generate C code
     model_c_path = step_codegen(layout_path, work_dir, force=force_for_debug)
+
+    # Run reverse validation if requested (validates IR Lower 3 before compile)
+    if getattr(args, 'reverse_test', False):
+        reverse_verbose = getattr(args, 'reverse_test_verbose', False)
+        if not run_reverse_validation(work_dir, verbose=reverse_verbose):
+            log_error("IR reverse validation failed - IR Lower 3 has consistency issues")
+            if not getattr(args, 'force_compile', False):
+                log(f"  {C_DIM}Use --force-compile to continue anyway{C_RESET}")
+                sys.exit(1)
+            else:
+                log(f"  {C_ORANGE}Continuing due to --force-compile{C_RESET}")
 
     # Compile
     lib_path = step_compile(model_c_path, work_dir, force=force_for_debug)
@@ -1660,6 +1687,9 @@ Examples:
                            choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
                                     'q5_0', 'q5_1', 'q6_k', 'q8_0'],
                            help='Weight dtype override (default: auto). q4_k_m uses mixed GGUF dtypes.')
+    run_parser.add_argument('--context-len', type=int, default=None,
+                           help='Context length for generation (default: from model config, max 32768). '
+                                'All buffers (KV cache, activations, RoPE) sized accordingly.')
     run_parser.add_argument('--temperature', type=float, default=0.7,
                            help='Sampling temperature (default: 0.7)')
     run_parser.add_argument('--max-tokens', type=int, default=512,
@@ -1689,12 +1719,22 @@ Examples:
                            help='Codegen version: v6=explicit unrolled (default), v4=loop-based (legacy)')
     run_parser.add_argument('--int8-activations', action='store_true',
                            help='Use INT8 activation path (5-15x faster for Q5_0/Q8_0/Q4_K models)')
+    run_parser.add_argument('--no-fusion', action='store_true',
+                           help='Disable kernel fusion (use unfused ops for debugging)')
+    run_parser.add_argument('--layout-mode', choices=['region', 'packed'], default='region',
+                           help='Memory layout mode (region=weights+activations, packed=single arena)')
+    run_parser.add_argument('--layer-limit', type=int, default=None,
+                           help='Limit to first N layers (packed layout prototype)')
     run_parser.add_argument('--c-cli-smoke', action='store_true',
                            help='Run native v6 CLI once (true-BPE smoke test)')
     run_parser.add_argument('--c-cli-prompt', default='Hello',
                            help='Prompt for native v6 CLI smoke test (default: Hello)')
     run_parser.add_argument('--c-cli-max-tokens', type=int, default=16,
                            help='Max tokens for native v6 CLI smoke test (default: 16)')
+    run_parser.add_argument('--reverse-test', action='store_true',
+                           help='Run IR reverse validation after codegen (validates IR Lower 3 consistency)')
+    run_parser.add_argument('--reverse-test-verbose', action='store_true',
+                           help='Show detailed info from reverse validation')
 
     # Interactive command (also default when no command given)
     interactive_parser = subparsers.add_parser('interactive', aliases=['i'],

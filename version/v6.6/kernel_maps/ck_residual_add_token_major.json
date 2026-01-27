@@ -11,6 +11,8 @@
     {"name": "a", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input A [tokens, aligned_embed_dim]"},
     {"name": "b", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input B [tokens, aligned_embed_dim]"}
   ],
+  "weights": [],
+  "activations": [],
   "outputs": [
     {"name": "out", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Output [tokens, aligned_embed_dim]"}
   ],
@@ -36,6 +38,7 @@
   },
   "impl": {
     "function": "ck_residual_add_token_major",
+    "c_declaration": "void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
     "sources": ["src/ckernel_orchestration.c"],
     "variants": [
       {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}

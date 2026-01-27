@@ -8,9 +8,12 @@
     "output": "fp32"
   },
   "inputs": [
-    {"name": "input", "dtype": "fp32", "shape": ["T", "E"], "desc": "Input activations [tokens, embed_dim]"},
+    {"name": "input", "dtype": "fp32", "shape": ["T", "E"], "desc": "Input activations [tokens, embed_dim]"}
+  ],
+  "weights": [
     {"name": "gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm scale weight"}
   ],
+  "activations": [],
   "outputs": [
     {"name": "output", "dtype": "fp32", "shape": ["T", "E"], "desc": "Normalized output"},
     {"name": "rstd", "dtype": "fp32", "shape": ["T"], "desc": "Running stddev (can be used for backward pass)"}
@@ -49,6 +52,7 @@
   },
   "impl": {
     "function": "rmsnorm_forward",
+    "c_declaration": "void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
     "sources": ["src/kernels/rmsnorm_kernels.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},

@@ -32,7 +32,7 @@ for path in (_SCRIPT_DIR, _V4_DIR):
         if path_str not in sys.path:
             sys.path.insert(0, path_str)
 
-import compat_ir_v4_v6_6 as v4
+import ir_core_v6_6 as v4
 from convert_hf_to_bump import (
     HashingWriter,
     align_up_elems,

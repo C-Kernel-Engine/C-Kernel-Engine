@@ -1,0 +1,581 @@
+›   This commits the runtime to manifest‑only and still loads weights directly from the bump file via the manifest offsets.
+  so we use the ir memory layout for the other memory planner for actiavtion and inputs and ouptus and the manifest for teh weights loading? can we do all this directly from the memory plannar?
+  see the build ir v6
+  we ahve ir1  - this should generate the actual sequence of all oepratioon from the sidecar and quant file with input sand outptuts and what kenrsl we ahe and should use.
+  then we have  fuison pass to comrpess the kenrsl to fused kernels
+  then we generate ir lwoer which has all the information of each of thsoe ekrnsl inptus adn outptus adn activation giving the mmeory plannre all the info to gneerat tthe layout.
+  then we all the layout to palna ll the memroy
+  then ir2 lower 2 does teh fianlly with the memroy offewwts.
+  the c codge gen should ahev all teh ifnroamtion from ir lwoer to process this. it shoudl not read fromt eh mainifest agian except the weigths to load during runtime.
+ 
+  are we on teh same page. or not at all?
+
+
+Does thsi even make sense or what we ahve for ir_lower2 i much more bette than my mumbo umo below?
+    - IR Lower (2): final offsets baked into ops
+    so for ir lowe to amke sure teh c codegen is dump but pwoerful it needs to be able to parse thsi jsuojn ir lower file:
+
+    parse memroy layout:
+    {name: value, offset in seqence}
+    #DEFINE TOKEN_EMBED 0x5 e.g // these are offsets.
+    ....
+    #DEFINE LAYER_2_Q_WEIGHTS 0x555
+    #DEFINE LAYER_15_Q_WEIGHTS 0x1555
+
+    once teh memroty offst is absolutely cleanly generated:
+
+    then the codrege reads tehj rpefill
+    parse {
+    ir lower shouild ahve :
+    function name,
+    params: [ //inputs
+    (uint8_t)&bump[LAYER_2_Q_WEIGHTS],
+    (uint8_t)&bump[LAYER_2_Q_PROJ], // output to store if not fused
+    and all the other variables this nfucntion eneds ir lowe should ahev all thsie xplcit.
+    ],
+    comments: "This si layer 2 q projection or qkv fused since they sharte same inputs"
+
+    },
+    //function: residual add,
+    param: [
+    uint8_t)&bump[LAYER_2_RMSNORM_1],
+    size EMBED_DIM,
+    uint8_t)&bump[LAYER_2_ATTEN_PROJ]
+    ]
+
+    c codegen should be spoon fed this and if not training generate for decode.
+    wher are we on this. i should be able to read ir lwoer 2 and be like thsi si simple. we can cathc bugs easily.
+
+
+• Yes — your “dumb but powerful” codegen idea makes perfect sense, and it’s exactly what IR‑Lower‑2 should enable.
+
+  Think of it like this:
+
+  - IR‑Lower‑2 is the single source of truth.
+  - Codegen should be a dumb printer: read IR‑Lower‑2 and emit function calls with the exact pointers and params listed.
+
+  That’s the right architecture.
+
+  ### Where you are already close
+
+  In version/v6.6/scripts/build_ir_v6_6.py, IR‑Lower‑2 already writes:
+
+  - weights: { … bump_offset, ptr_expr }
+  - activations: { … activation_offset, ptr_expr }
+  - outputs: { … activation_offset, ptr_expr }
+  - scratch: { … scratch_offset, ptr_expr }
+
+  So the data you want already exists — it just isn’t being fully consumed by codegen yet.
+
+  }
+
+  Then codegen literally does:
+
+    (float*)(activations + 2048),
+    (float*)(activations + 4096),
+    896, 896
+  );
+
+  No inference. No “if op is embedding”. No hardcoded offsets.
+
+  ### Where v6.6 still violates that
+
+  version/v6.6/scripts/codegen_v6_6.py still has special cases:
+
+  - embedding input/output overrides
+  - residual save special casing
+  - attention scratch mapping
+  - Q/K/V handling
+
+  Those can be removed if IR‑Lower‑2 always provides explicit pointer expressions for each input/output/scratch.
+
+  ### What I recommend
+
+  If you want this to be simple, debuggable, and correct:
+
+  1. Make IR‑Lower‑2 fully explicit
+      - Every kernel op has a full ordered list of call args.
+      - Each arg has a resolved pointer (weight or activation) or literal (dim).
+  2. Make codegen a dumb printer
+      - No conditionals. Just emit function + args in order.
+
+  ### So yes: your vision is correct
+
+  The key is not your “mumbo jumbo” — it’s exactly the right end state.
+
+  If you want, I can implement the next step:
+
+  - Extend IR‑Lower‑2 to include a call_args list.
+  - Update codegen to consume only call_args with zero special‑casing.
+
+  That will make it trivial to read IR‑Lower‑2 and spot bugs.
+
+
+› IR‑Lower‑2 must contain all fields needed to emit the function call without any special cases:
+
+    {
+      "function": "gemv_q5_0",
+      "params": { "M": 896, "K": 896 },
+      "weights": { "W": { "ptr_expr": "bump_weights + 123456" } },
+      "activations": { "x": { "ptr_expr": "activations + 2048" } },
+• The user wants IR-Lower-2 to avoid activations/inputs/outputs as labels and instead have exact function parameters as explicit ordered call arguments. I'll propose keeping semantic metadata for validation but adding a "call_args" list
+  for codegen clarity, suggesting layered IR versions to balance simplicity and debug needs. Implementation involves updating the IR build to produce typed call_args while keeping validation metadata optional.
+
+  Clarifying call-only IR structure
+  semantic IR-Lower-2 for validation and generating a streamlined IR-Lower-3 with call-only args for codegen, optionally preserving comments for debugging. This layered approach balances clarity, correctness, and tooling flexibility.
+
+• You’re not wrong. For a dumb codegen, the final IR should be call‑ready: function name + ordered arguments exactly as the C signature expects. No “inputs/outputs/activations” semantics required at that stage.
+
+  The trade‑off is: those semantic labels are useful earlier for validation (dtype checks, residual flow, IO chain). So the cleanest design is:
+
+  - IR‑Lower‑2 (semantic): keeps weights/activations/outputs/scratch for validation.
+  - IR‑Lower‑3 (call‑ready): strips semantics and emits only function + args.
+
+  Codegen consumes only IR‑Lower‑3. Tests consume IR‑Lower‑2.
+
+  If you want to drop semantics entirely in IR‑Lower‑2, you can — but you’ll lose easy validation. I’d keep both.
+
+  A call‑ready op could look like this:
+
+  {
+    "function": "gemv_q5_0",
+    "args": [
+      {"kind":"ptr","base":"bump_weights","offset":123456,"ctype":"const void*"},
+      {"kind":"ptr","base":"activations","offset":2048,"ctype":"const float*"},
+      {"kind":"ptr","base":"activations","offset":4096,"ctype":"float*"},
+      {"kind":"imm","ctype":"int","value":"EMBED_DIM"},
+      {"kind":"imm","ctype":"int","value":"EMBED_DIM"}
+    ],
+    "comment": "layer 2 q_proj"
+  }
+
+  Codegen then literally prints:
+
+  gemv_q5_0(
+    (const void*)(bump_weights + 123456),
+    EMBED_DIM,
+    EMBED_DIM
+  );
+
+  No special casing, no inference.
+
+  So: your idea is correct — just decide whether you want to keep the semantic IR for validation or replace it with a pure call‑ready IR. I recommend keeping semantic IR + generating a call‑ready IR.
+
+  If you want, I can implement the IR‑Lower‑3 pass + change codegen to read it only.
+
+
+› "args": [
+        {"kind":"imm","ctype":"int","value":"EMBED_DIM"}
+      ],
+• Including parameter names for each argument in the registry alongside potentially the signature improves clarity and enables better validation with minimal schema changes; I'll provide an example to illustrate this.
+
+• Yes — that’s a great idea, and it’s worth doing.
+
+  Add parameter names (and optionally expected types) to each arg so codegen is 100% spoon‑fed and validations get easier.
+
+
+############ MEMORY PLANNAR and LAYOUT:
+❯       function: rmsnorm_forward,                                                                                                     
+  args: [                                                                                                                              
+  {                                                                                                                                    
+  name: input,                                                                                                                         
+  kind: ptr,                                                                                                                           
+  ctype: const float *,                                                                                                                
+  base: activations,                                                                                                                   
+  offset: 814072340,                                                                                                                   
+  ptr_expr: activations + 814072340,                                                                                                   
+  source: activations.input                                                                                                            
+  },                                                                                                                                   
+  but what si this?                                                                                                                    
+  how does a c fucntion care if ti sia ccitvation or not. futher if we doul offset. then it should be explciity. &bump +               
+  LAYER_1_FORWARD_GAMMA etc. thsi has to be desifned from teh memory planner first. or else thsi si to be is not quite useul.          
+  what is teha ctual a#dfefine the c code si going to use? what poiter are we even talking about. what offset?                         
+                                                                                                                                       
+● You're absolutely right. The current output is useless for debugging:                                                                
+                                                                                                                                       
+  offset: 814072340   // WHAT IS THIS? A MAGIC NUMBER                                                                                  
+  ptr_expr: activations + 814072340  // STILL A MAGIC NUMBER                                                                           
+                                                                                                                                       
+  What You Want (and what makes sense)                                                                                                 
+                                                                                                                                       
+  Step 1: Memory planner outputs named constants                                                                                       
+  {                                                                                                                                    
+    "defines": {                                                                                                                       
+      "LAYER_0_RMSNORM_INPUT": 814072340,                                                                                              
+      "LAYER_0_RMSNORM_GAMMA": 148595032,                                                                                              
+      "LAYER_0_RMSNORM_OUTPUT": 3604,                                                                                                  
+      "LAYER_0_Q_PROJ_WEIGHT": 148602200,                                                                                              
+      "LAYER_0_Q_PROJ_OUTPUT": 813705748                                                                                               
+    }                                                                                                                                  
+  }                                                                                                                                    
+                                                                                                                                       
+  Step 2: IR-Lower-3 uses names, not numbers                                                                                           
+  {                                                                                                                                    
+    "function": "rmsnorm_forward",                                                                                                     
+    "args": [                                                                                                                          
+      {"name": "input",  "ptr_expr": "activations + LAYER_0_RMSNORM_INPUT"},                                                           
+      {"name": "gamma",  "ptr_expr": "bump_weights + LAYER_0_RMSNORM_GAMMA"},                                                          
+      {"name": "output", "ptr_expr": "activations + LAYER_0_RMSNORM_OUTPUT"},                                                          
+      {"name": "tokens", "value": "SEQ_LEN"},                                                                                          
+      {"name": "d_model", "value": "EMBED_DIM"}                                                                                        
+    ]                                                                                                                                  
+  }                                                                                                                                    
+                                                                                                                                       
+  Step 3: Codegen emits readable C                                                                                                     
+  // Memory layout defines (from memory planner)                                                                                       
+  #define LAYER_0_RMSNORM_INPUT   814072340                                                                                            
+  #define LAYER_0_RMSNORM_GAMMA   148595032                                                                                            
+  #define LAYER_0_RMSNORM_OUTPUT  3604                                                                                                 
+  #define EMBED_DIM               896                                                                                                  
+  #define SEQ_LEN                 1                                                                                                    
+                                                                                                                                       
+  // Layer 0 RMSNorm                                                                                                                   
+  rmsnorm_forward(                                                                                                                     
+      (const float*)(activations + LAYER_0_RMSNORM_INPUT),                                                                             
+      (const float*)(bump_weights + LAYER_0_RMSNORM_GAMMA),                                                                            
+      (float*)(activations + LAYER_0_RMSNORM_OUTPUT),                                                                                  
+      SEQ_LEN,                                                                                                                         
+      EMBED_DIM                                                                                                                        
+  );                                                                                                                                   
+                                                                                                                                       
+  Current Problem                                                                                                                      
+                                                                                                                                       
+  The memory planner outputs raw offsets. Nobody generates the #define names. So IR-Lower-3 can only use magic numbers.                
+                                                                                                                                       
+  The Fix                                                                                                                              
+                                                                                                                                       
+  1. Memory planner must output a defines section with symbolic names                                                                  
+  2. IR-Lower-3 uses those names in ptr_expr                                                                                           
+  3. Codegen emits the #define block first, then function calls using names                                                            
+                                                                                                                                       
+  Want me to update the memory planner to generate named defines?                                                                      
+                                                                                                                                       
+❯                                                                                                                                      
+                                                                                                                                       
+  Step 2: IR-Lower-3 uses names, not numbers                                                                                           
+                                                                                                                                       
+  {                                                                                                                                    
+                                                                                                                                       
+  "function": "rmsnorm_forward",                                                                                                       
+                                                                                                                                       
+  "args": [                                                                                                                            
+                                                                                                                                       
+  {"name": "input",  "ptr_expr": "activations + LAYER_0_RMSNORM_INPUT"},                                                               
+                                                                                                                                       
+  {"name": "gamma",  "ptr_expr": "bump_weights + LAYER_0_RMSNORM_GAMMA"},                                                              
+                                                                                                                                       
+  {"name": "output", "ptr_expr": "activations + LAYER_0_RMSNORM_OUTPUT"},                                                              
+                                                                                                                                       
+  {"name": "tokens", "value": "SEQ_LEN"},                                                                                              
+                                                                                                                                       
+  {"name": "d_model", "value": "EMBED_DIM"}                                                                                            
+  but this tehn assuems two allocs. we only need one alloc. oen big contirngious blocs. actiavation is litearlly aprt of teh           
+  sequence. unelss you mean scrathc pad. but that should still be part of teh contrigious block wtiht teh scrathc offset.              
+                                                                                                                                       
+● You're right. ONE contiguous block, ONE base pointer:                                                                                
+                                                                                                                                       
+  ┌─────────────────────────────────────────────────────────────┐                                                                      
+  │                    SINGLE MEMORY BLOCK                       │                                                                     
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+  │ [0x00000000] WEIGHTS START                                   │                                                                     
+  │   EMBED_WEIGHT          = 0x00000000                         │                                                                     
+  │   LAYER_0_RMSNORM_GAMMA = 0x00A12340                         │                                                                     
+  │   LAYER_0_Q_WEIGHT      = 0x00A12F00                         │                                                                     
+  │   ...                                                        │                                                                     
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+  │ [ACTIVATIONS_START] ACTIVATIONS REGION                       │                                                                     
+  │   LAYER_0_RMSNORM_INPUT  = ACTIVATIONS_START + 0             │                                                                     
+  │   LAYER_0_RMSNORM_OUTPUT = ACTIVATIONS_START + 3584          │                                                                     
+  │   LAYER_0_Q_OUTPUT       = ACTIVATIONS_START + 7168          │                                                                     
+  │   ...                                                        │                                                                     
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+  │ [SCRATCH_START] SCRATCH REGION                               │                                                                     
+  │   SCRATCH_0 = SCRATCH_START + 0                              │                                                                     
+  │   SCRATCH_1 = SCRATCH_START + 4096                           │                                                                     
+  │   ...                                                        │                                                                     
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+  │ [KV_CACHE_START] KV CACHE REGION                             │                                                                     
+  │   ...                                                        │                                                                     
+  └─────────────────────────────────────────────────────────────┘                                                                      
+                                                                                                                                       
+  IR-Lower-3 becomes:                                                                                                                  
+  {                                                                                                                                    
+    "function": "rmsnorm_forward",                                                                                                     
+    "args": [                                                                                                                          
+      {"name": "input",  "ptr_expr": "&mem[LAYER_0_RMSNORM_INPUT]"},                                                                   
+      {"name": "gamma",  "ptr_expr": "&mem[LAYER_0_RMSNORM_GAMMA]"},                                                                   
+      {"name": "output", "ptr_expr": "&mem[LAYER_0_RMSNORM_OUTPUT]"},                                                                  
+      {"name": "tokens", "value": "SEQ_LEN"},                                                                                          
+      {"name": "d_model", "value": "EMBED_DIM"}                                                                                        
+    ]                                                                                                                                  
+  }                                                                                                                                    
+                                                                                                                                       
+  Generated C:                                                                                                                         
+  // One block, all offsets absolute                                                                                                   
+  #define LAYER_0_RMSNORM_GAMMA   0x00A12340                                                                                           
+  #define LAYER_0_RMSNORM_INPUT   0x30000000  // ACTIVATIONS_START                                                                     
+  #define LAYER_0_RMSNORM_OUTPUT  0x30000E00                                                                                           
+                                                                                                                                       
+  void run_inference(uint8_t *mem) {                                                                                                   
+      rmsnorm_forward(                                                                                                                 
+          (const float*)&mem[LAYER_0_RMSNORM_INPUT],                                                                                   
+          (const float*)&mem[LAYER_0_RMSNORM_GAMMA],                                                                                   
+          (float*)&mem[LAYER_0_RMSNORM_OUTPUT],                                                                                        
+          SEQ_LEN,                                                                                                                     
+          EMBED_DIM                                                                                                                    
+      );                                                                                                                               
+  }                                                                                                                                    
+                                                                                                                                       
+  One malloc. One pointer. All defines are absolute offsets into that block.                                                           
+                                                                                                                                       
+  Want me to update the memory planner to output this unified layout with named defines?                                               
+                                                                                                                                       
+❯ ● You're right. ONE contiguous block, ONE base pointer:                                                                              
+                                                                                                                                       
+                                                                                                                                       
+                                                                                                                                       
+  ┌─────────────────────────────────────────────────────────────┐                                                                      
+                                                                                                                                       
+  │                    SINGLE MEMORY BLOCK                       │                                                                     
+                                                                                                                                       
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+                                                                                                                                       
+  │ [0x00000000] WEIGHTS START                                   │                                                                     
+                                                                                                                                       
+  │   EMBED_WEIGHT          = 0x00000000                         │                                                                     
+                                                                                                                                       
+  │   LAYER_0_RMSNORM_GAMMA = 0x00A12340                         │                                                                     
+                                                                                                                                       
+  │   LAYER_0_Q_WEIGHT      = 0x00A12F00                         │                                                                     
+                                                                                                                                       
+  │   ...                                                        │                                                                     
+                                                                                                                                       
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+                                                                                                                                       
+  │ [ACTIVATIONS_START] ACTIVATIONS REGION                       │                                                                     
+                                                                                                                                       
+  │   LAYER_0_RMSNORM_INPUT  = ACTIVATIONS_START + 0             │                                                                     
+                                                                                                                                       
+  │   LAYER_0_RMSNORM_OUTPUT = ACTIVATIONS_START + 3584          │                                                                     
+                                                                                                                                       
+  │   LAYER_0_Q_OUTPUT       = ACTIVATIONS_START + 7168          │                                                                     
+                                                                                                                                       
+  │   ...                                                        │                                                                     
+                                                                                                                                       
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+                                                                                                                                       
+  │ [SCRATCH_START] SCRATCH REGION                               │                                                                     
+                                                                                                                                       
+  │   SCRATCH_0 = SCRATCH_START + 0                              │                                                                     
+                                                                                                                                       
+  │   SCRATCH_1 = SCRATCH_START + 4096                           │                                                                     
+                                                                                                                                       
+  │   ...                                                        │                                                                     
+                                                                                                                                       
+  ├─────────────────────────────────────────────────────────────┤                                                                      
+                                                                                                                                       
+  │ [KV_CACHE_START] KV CACHE REGION                             │                                                                     
+                                                                                                                                       
+  │   ...                                                        │                                                                     
+                                                                                                                                       
+  └─────────────────────────────────────────────────────────────┘                                                                      
+  we defintely dont need this:                                                                                                         
+  everything should be contingous.                                                                                                     
+  a kenel has inout, actication fi seud, weigths and offsets.  alls houdl be in taht order.                                            
+  so the cpu can predict these offsts.                                                                                                 
+                                                                                                                                       
+● Got it. Layout by kernel execution order, not by data type:                                                                          
+                                                                                                                                       
+  KERNEL 0 (embedding):                                                                                                                
+    K0_INPUT       = 0x00000000   // token_ids                                                                                         
+    K0_WEIGHT      = 0x00000010   // embed table                                                                                       
+    K0_OUTPUT      = 0x02000000                                                                                                        
+                                                                                                                                       
+  KERNEL 1 (rmsnorm L0):                                                                                                               
+    K1_INPUT       = 0x02000000   // = K0_OUTPUT                                                                                       
+    K1_WEIGHT      = 0x02001000   // gamma                                                                                             
+    K1_OUTPUT      = 0x02002000                                                                                                        
+                                                                                                                                       
+  KERNEL 2 (q_proj L0):                                                                                                                
+    K2_INPUT       = 0x02002000   // = K1_OUTPUT                                                                                       
+    K2_WEIGHT      = 0x02003000   // Wq                                                                                                
+    K2_OUTPUT      = 0x02500000                                                                                                        
+                                                                                                                                       
+  KERNEL 3 (k_proj L0):                                                                                                                
+    K3_INPUT       = 0x02002000   // = K1_OUTPUT (same as K2)                                                                          
+    K3_WEIGHT      = 0x02500100   // Wk                                                                                                
+    K3_OUTPUT      = 0x02600000                                                                                                        
+  ...                                                                                                                                  
+                                                                                                                                       
+  IR-Lower-3:                                                                                                                          
+  [                                                                                                                                    
+    {"function": "embedding_forward", "args": ["&mem[K0_INPUT]", "&mem[K0_WEIGHT]", "&mem[K0_OUTPUT]", "..."]},                        
+    {"function": "rmsnorm_forward",   "args": ["&mem[K1_INPUT]", "&mem[K1_WEIGHT]", "&mem[K1_OUTPUT]", "..."]},                        
+    {"function": "gemv_q5_0",         "args": ["&mem[K2_INPUT]", "&mem[K2_WEIGHT]", "&mem[K2_OUTPUT]", "..."]},                        
+    ...                                                                                                                                
+  ]                                                                                                                                    
+                                                                                                                                       
+  CPU sees: K0_INPUT → K0_WEIGHT → K0_OUTPUT → K1_INPUT → K1_WEIGHT → K1_OUTPUT → ...                                                  
+                                                                                                                                       
+  Sequential. Predictable. Prefetchable.                                                                                               
+                                                                                                                                       
+  The memory planner walks the kernel list in order and assigns offsets sequentially. No regions. No categories. Just kernel-by-kernel,
+   buffer-by-buffer.                                                                                                                   
+                         
+
+
+
+1. Make sure all ops from json to downstream are consnste - noot one using atten and the other attention.
+2. Memory layout must follow what the kernels need t - input, activation if any, weights needed, output.  
+3. Need to cehck in teh generated code and ir that the ouput fo teh rpevious kenrel is the input to the enxt kerenl. this consnstencey cannot be defeated.
+4. Check if teh scrathc buffer is properly allocated and used.
+5. make sure q k and v of attention all are processing from the same inputs. 
+6. current the fused kernel have an issue.
+7. when a bug is found add this to the test in v6.6
+● Found the root cause! The fused kernel is returning early because the weight dtypes (wq=4, wk=4, wv=3) are not supported by          
+  qkv_q8_0_dtype_supported(). Let me check what those dtypes are and fix the support function. 
+8. It is important to amke sure all the dtypes of each kenrla dn the code gen and the ir for evrey part from input to weights to activation to output to what the next kenrel needs are all in sync. 
+9. the validation must test everythign from embedding layer cehck if it is in sync with pytorch or llama.cpp then the first laeyrs inputs and  norm or attention adn edhcek each kenrsl input adn pouput to see if we have a mismatcha  a bug
+10.   v6.5 generates code that:                                                                           1. Calls quantize_row_q8_0() to convert FP32 activations to Q8_0 format  
+       2. Then calls gemv_q5_0_q8_0() with the quantized data v6.6 generates code thati:                  1. Directly calls gemv_q5_0_q8_0() with FP32 data (missing quantization step!)  
+       Thasnk emasn for kernsl selection we need to see if the inputs to all the kernls adn the outputs they gneerate fit nicely. if not then we will ahve garbage output. 
+
+  ⎿  Found 41 lines (ctrl+o to expand)                                                                                                 
+11. ● This is a larger architectural issue. The v6.6 pipeline doesn't have proper KV cache integration yet - it's marked as "TEMP: using   
+  scratch buffers instead of KV cache for testing".                                                                                    
+  For autoregressive decoding to work correctly:                                                                                       
+  1. K and V must be stored in KV cache at each position                                                                               
+  2. Attention must be computed over all previous K/V (positions 0 to current)                                                         
+  Currently the code only does single-token attention against itself, which produces garbage.                                          
+  Summary of fixes made:                                                                                                               
+  1. Added FP32-activation GEMV kernels (gemv_q5_0, gemv_q4_k, gemv_q6_k, gemv_q8_0)                                                   
+  2. Added FP32-activation GEMM kernels (gemm_nt_q5_0, gemm_nt_q4_k, gemm_nt_q6_k, gemm_nt_q8_0)                                       
+  3. Fixed codegen to use correct buffer offsets for residual save                                                                     
+  Remaining issue:                                                                                                                     
+  The v6.6 pipeline needs KV cache management code. This requires:                                                                     
+  - Adding KV cache store operations after K/V projections in the codegen                                                              
+  - Updating attention kernel bindings to use KV cache                                                                                 
+  - Modifying the attention call to pass KV cache pointers and sequence lengths                                                        
+  This is the same approach v6.5 uses. Should I implement the KV cache integration, or would you prefer to handle this separately?
+
+11. ● I see the problem. The ck_model_decode function has signature (int32_t token, float* output) but I was calling it with only one      
+  argument. The second argument (output) was garbage, causing the memcpy to crash.  
+
+12. ● I found major issues. The logits kernel (Op 338) has problems:                                                                       
+  1. Output goes to activation buffer instead of model->logits                                                                         
+  2. Using final_ln_weight instead of embedding matrix for weight tying                                                                
+  3. Output dimension is EMBED_DIM instead of VOCAB_SIZE     
+
+12. Let me check if there's a mismatch between HEAD_DIM and aligned_head_dim in the attention kernel.  
+
+13. ● I found a potential bug in the residual handling. The second residual_add uses the original layer input (7188) instead of the        
+  post-attention output. Let me verify by checking the residual flow across a full layer.       
+14. The Q/K/V projections are missing bias terms which is causing the garbage output. I need to add bias after each projection. Let me   
+  add this to the codegen.  
+
+14.  This is the key finding. v6.5 decode mode:                                                                                           
+                                                                                                                                       
+  1. Uses per-layer KV cache stored in L->k and L->v                                                                                   
+  2. Projects K/V directly into the cache at k_cache + h * kv_head_stride + token_index * aligned_head_dim                             
+  3. KV stride: kv_head_stride = aligned_context_window * aligned_head_dim                                                             
+  4. Uses attention_forward_decode_head_major_gqa_flash kernel             
+
+15.
+● I see the issue now. v6.6 computes KV cache offsets as:                                                                              
+  - K: layer * 2 * MAX_SEQ_LEN * NUM_KV_HEADS * HEAD_DIM                                                                               
+  - V: (layer * 2 + 1) * MAX_SEQ_LEN * NUM_KV_HEADS * HEAD_DIM                                                                         
+                                                                                                                                       
+  This implies layout [layer][k/v][seq_pos][kv_head][head_dim] which is token-major, but v6.5 uses head-major: [head, token, head_dim].
+                                                                                                                                       
+  Let me check the attention_forward_causal_head_major_gqa_flash_strided kernel to see what layout it expects.      
+
+
+16. ● I see a critical bug! Look at lines 876 vs 880:                                                                                      
+  - Line 876: token stored at ((int32_t*)model->activations)[0] (offset 0)                                                             
+  - Line 880: embedding reads from model->activations + 3604 - WRONG offset!                                                           
+                                                                                                                                       
+  The token is stored at byte 0 but the embedding reads from byte 3604. Let me also check the mega_fused_attention_prefill kernel. 
+
+i17. I see a critical issue! Look at line 926 in the generated code - scratch is NULL:                                                    
+                                                                                                                                       
+  mega_fused_attention_prefill(                                                                                                        
+      ...                                                                                                                              
+      NULL  /* scratch - THIS IS THE PROBLEM! */                                                                                       
+  );                                                                                                                                   
+                                                                                                                                       
+  The kernel checks for NULL scratch on line 186-187 and returns early. Let me verify this is the issue.                               
+                                                                                                                                       
+ Bug Summary                                                                                                                          
+                                                                                                                                       
+  1. Embedding reads from wrong offset (Line 879-880)                                                                                  
+    - Token stored at: ((int32_t*)model->activations)[0] = byte offset 0                                                               
+    - Embedding reads from: model->activations + 3604 = byte offset 3604                                                               
+    - The token is at offset 0 but embedding reads from offset 3604!                                                                   
+  2. NULL scratch (Line 925)                                                                                                           
+    - mega_fused_attention_prefill receives NULL scratch                                                                               
+    - The kernel returns immediately when scratch is NULL (line 186-187 of the kernel)                                                 
+    - The fused attention kernel does nothing!                                                                                         
+  3. (Confirmed from v6.5 comparison)                                                                                                  
+    - v6.5 works because it uses non-fused kernels with correct buffer handling                                                        
+    - v6.6 uses fused kernels but doesn't set up the scratch buffer                                                                    
+                                                                                                                                       
+  Let me look at the codegen to understand what's generating these offset bugs.                                                        
+                                                                                               
+ I see the problem. The codegen uses hardcoded defaults:                                                                              
+  - Line 851: input_offset = 3604  # default: scratch buffer                                                                           
+  - Line 1353: token_offset = 16  # Default                                                                                            
+                                                                                                                                       
+  These hardcoded defaults don't match the actual memory layout. Let me look at how the embedding call is generated.                   
+                                                                                                                                  
+                                                                                                                                       
+  ❯ look like codegen is again ignoring ir lower etc. simiarl to v6.5 . the whole diea of v6.6. si to amke codegen respec ir lower.
+
+● You're right. The codegen is doing exactly what v6.5 did - ignoring the IR lower and using hardcoded special cases. That defeats the whole purpose of v6.6.                                                                                
+                                                                                                                                                                                                                                             
+  Looking at the code flow:                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                             
+  1. Lowered IR has correct unfused ops (rmsnorm, gemv, etc.) with proper buffer offsets                                                                                                                                                     
+  2. Codegen ignores these and:                                                                                                                                                                                                              
+    - Uses hardcoded fallback functions (line 959-961)                                                                                                                                                                                       
+    - Has special handling for bias_ops (line 870-932)                                                                                                                                                                                       
+    - Uses mega_fused kernels not even in the IR                                                                                                                                                                                             
+                                                                                                                                                                                                                                             
+  The fundamental problem is that codegen should be a pure translation layer:                                                                                                                                                                
+  - Read ops from lowered IR                                                                                                                                                                                                                 
+  - Map each op to its kernel binding                                                                                                                                                                                                        
+  - Generate C code with exact offsets from IR                                                                                                                                                                                               
+                                                                                                                                                                                                                                             
+  But instead it's:                                                                                                                                                                                                                          
+  - Reading IR partially                                                                                                                                                                                                                     
+  - Adding its own logic (fusion decisions, special cases)                                                                                                                                                                                   
+  - Ignoring scratch allocations                                                                                                                                                                                                             
+  - Hardcoding offsets                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                             
+  Let me check what the lowered IR actually produces to understand the correct path.                   
+
+
+is this accurate?
+● No problem! We found a critical bug in the converter:
+
+  Summary of What We Found
+
+  The BUMPWGT5 converter reads dtype_table_len from the wrong offset:
+  ┌──────────────────────────────────────┬──────────────────────┐
+  │               Location               │        Value         │
+  ├──────────────────────────────────────┼──────────────────────┤
+  │ Code reads at offset 100             │ 3344151108 (garbage) │
+  ├──────────────────────────────────────┼──────────────────────┤
+  │ Actual dtype_table_len at offset 128 │ 340 (correct)        │
+  └──────────────────────────────────────┴──────────────────────┘
+  This caused weights to be read from the wrong location, resulting in all-zeros logits.
+
+  Fixes Made
+
+  1. convert_gguf_to_bump_v6_6.py - Fixed to read dtype_table_len from offset 128 instead of 104
+  2. build_ir_v6_6.py - Added:
+    - Correct initial ping-pong buffers (token_ids → embedded_input)
+    - Residual save (memcpy) after RMSNorm
+    - Fixed residual_add to read from residual buffer
+  3. codegen_v6_6.py - Added memcpy handling for residual saves
+
+

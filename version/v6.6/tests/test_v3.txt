@@ -1,0 +1,23 @@
+● Read 2 files (ctrl+o to expand)                                                                                                     
+                                                                                                                                      
+● Now I have a clear picture. Let me summarize the issues and create a plan to help you debug this systematically.                    
+                                                                                                                                      
+  Summary of Issues Found                                                                                                             
+                                                                                                                                      
+  Critical Bug #1: Context Length Mismatch                                                                                            
+  - The layout is computed for context_length: 32768 (from model config)                                                              
+  - But you're running with --context-len 10                                                                                          
+  - The generated C code has hardcoded offsets like activations + 813751828 based on 32768 context                                    
+  - When allocating for smaller context, these offsets point to invalid memory → segfault                                             
+                                                                                                                                      
+  Critical Bug #2: Interleaved Memory Layout                                                                                          
+  - V6.6 uses "packed" mode: activations_base: 144643072 (right after token_emb weight)                                               
+  - Activations and weights overlap in the same arena                                                                                 
+  - V6.5 used separate regions which is safer                                                                                         
+                                                                                                                                      
+  Memory Size for context_len=10:                                                                                                     
+  Logits: 10 * 151936 * 4 = ~6MB (vs 19GB for 32768)                                                                                  
+  KV Cache: 24 * 2 * 2 * 10 * 64 * 4 = ~245KB (vs 314MB)                                                                              
+  Total: ~400MB (vs 22GB)                                                                                                             
+                                                                                                                                      
+  Let me create the debugging tools you requested.            

@@ -36,6 +36,10 @@
  * This file handles BOTH BUMPWGT4 and BUMPWGT5 formats for backward compatibility.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "ckernel_model_load_v6.6.h"
 
 #include <errno.h>
@@ -69,6 +73,26 @@ static unsigned long long parse_u64(const char *s) {
     return strtoull(s, NULL, 0);
 }
 
+static int dtype_from_str(const char *s) {
+    if (!s) return 0;
+    if (strcmp(s, "fp32") == 0 || strcmp(s, "f32") == 0) return 0;
+    if (strcmp(s, "bf16") == 0) return 1;
+    if (strcmp(s, "fp16") == 0 || strcmp(s, "f16") == 0) return 2;
+    if (strcmp(s, "int8") == 0 || strcmp(s, "i8") == 0) return 3;
+    if (strcmp(s, "int4") == 0 || strcmp(s, "i4") == 0) return 4;
+    if (strcmp(s, "q4_0") == 0) return 5;
+    if (strcmp(s, "q4_1") == 0) return 6;
+    if (strcmp(s, "q4_k") == 0 || strcmp(s, "q4k") == 0) return 7;
+    if (strcmp(s, "q6_k") == 0 || strcmp(s, "q6k") == 0) return 8;
+    if (strcmp(s, "q8_0") == 0 || strcmp(s, "q8_0") == 0) return 9;
+    if (strcmp(s, "q8_k") == 0 || strcmp(s, "q8k") == 0) return 10;
+    if (strcmp(s, "q5_0") == 0) return 11;
+    if (strcmp(s, "q5_1") == 0) return 12;
+    if (strcmp(s, "u8") == 0) return 13;
+    if (strcmp(s, "i32") == 0) return 14;
+    return 0;
+}
+
 /*
  * ck_load_weights_manifest_v6.6()
  * ===============================
@@ -88,7 +112,7 @@ static unsigned long long parse_u64(const char *s) {
  *   manifest_path: Path to .manifest file (maps tensor names to offsets)
  *
  * Returns:
- *   0 on success, -1 on error
+ *   Manifest map handle or NULL on error
  *
  * MEMORY LAYOUT:
  * ==============
@@ -138,6 +162,15 @@ ck_manifest_map_t *ck_load_weights_manifest_v66(void *base,
         return NULL;
     }
 
+    ck_manifest_map_t *manifest = calloc(1, sizeof(*manifest));
+    if (!manifest) {
+        fprintf(stderr, "ck_load_weights_manifest_v6.6: manifest alloc failed\n");
+        fclose(mf);
+        fclose(wf);
+        return NULL;
+    }
+    manifest->mapped_base = (uint8_t *)base;
+
     /* STEP 4: Allocate chunk buffer for streaming copies
      * Using 1MB chunks avoids allocating massive single buffers
      * and works well with OS read-ahead caching */
@@ -145,10 +178,15 @@ ck_manifest_map_t *ck_load_weights_manifest_v66(void *base,
     unsigned char *buf = malloc(COPY_CHUNK);
     if (!buf) {
         fprintf(stderr, "ck_load_weights_manifest_v6.6: malloc failed\n");
+        free(manifest);
         fclose(mf);
         fclose(wf);
         return NULL;
     }
+
+    size_t cap = 0;
+    size_t count = 0;
+    ck_weight_info_t *entries = NULL;
 
     /* STEP 5: Process each line in the manifest
      * Format: name|dtype|file_offset|size|runtime_offset */
@@ -179,14 +217,36 @@ ck_manifest_map_t *ck_load_weights_manifest_v66(void *base,
             return NULL;
         }
 
-        /* name and dtype are logged for debugging but not used in loading */
-        (void)name;
-        (void)dtype;
-
         /* Parse numeric fields as unsigned 64-bit integers */
         unsigned long long file_offset = parse_u64(file_off);
         unsigned long long size = parse_u64(size_str);
         unsigned long long runtime_offset = parse_u64(rt_off);
+
+        if (count == cap) {
+            size_t next = cap ? cap * 2 : 256;
+            ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
+            if (!grow) {
+                fprintf(stderr, "ck_load_weights_manifest_v6.6: realloc failed\n");
+                free(buf);
+                fclose(mf);
+                fclose(wf);
+                for (size_t i = 0; i < count; ++i) {
+                    free((void *)entries[i].name);
+                }
+                free(entries);
+                free(manifest);
+                return NULL;
+            }
+            entries = grow;
+            cap = next;
+        }
+
+        entries[count].name = strdup(name);
+        entries[count].dtype = dtype_from_str(dtype);
+        entries[count].file_offset = file_offset;
+        entries[count].size = size;
+        entries[count].runtime_offset = runtime_offset;
+        count++;
 
         /* STEP 6: Seek to tensor location in weights file */
         if (fseek(wf, (long)file_offset, SEEK_SET) != 0) {
@@ -216,6 +276,11 @@ ck_manifest_map_t *ck_load_weights_manifest_v66(void *base,
                 free(buf);
                 fclose(mf);
                 fclose(wf);
+                for (size_t i = 0; i < count; ++i) {
+                    free((void *)entries[i].name);
+                }
+                free(entries);
+                free(manifest);
                 return NULL;
             }
 
@@ -234,5 +299,108 @@ ck_manifest_map_t *ck_load_weights_manifest_v66(void *base,
     free(buf);
     fclose(mf);
     fclose(wf);
+    manifest->entries = entries;
+    manifest->count = (int)count;
+    return manifest;
+}
+
+void ck_unload_manifest_map(ck_manifest_map_t *manifest) {
+    if (!manifest) return;
+    if (manifest->entries) {
+        for (int i = 0; i < manifest->count; ++i) {
+            free((void *)manifest->entries[i].name);
+        }
+        free(manifest->entries);
+    }
+    if (manifest->file) fclose(manifest->file);
+    free(manifest);
+}
+
+ck_weight_info_t *ck_get_weight_info(ck_manifest_map_t *manifest, const char *name) {
+    if (!manifest || !name) return NULL;
+    for (int i = 0; i < manifest->count; ++i) {
+        if (manifest->entries[i].name && strcmp(manifest->entries[i].name, name) == 0) {
+            return &manifest->entries[i];
+        }
+    }
+    return NULL;
+}
+
+int ck_load_weights(ck_manifest_map_t *manifest,
+                    const char *bump_path,
+                    void *arena,
+                    size_t arena_size)
+{
+    if (!manifest || !bump_path || !arena) return -1;
+    (void)arena_size;
+    FILE *wf = fopen(bump_path, "rb");
+    if (!wf) return -1;
+
+    char magic[8] = {0};
+    if (fread(magic, 1, 8, wf) != 8 ||
+        (memcmp(magic, "BUMPWGT4", 8) != 0 && memcmp(magic, "BUMPWGT5", 8) != 0)) {
+        fclose(wf);
+        return -1;
+    }
+
+    unsigned char *buf = malloc(COPY_CHUNK);
+    if (!buf) {
+        fclose(wf);
+        return -1;
+    }
+
+    for (int i = 0; i < manifest->count; ++i) {
+        ck_weight_info_t *e = &manifest->entries[i];
+        if (fseek(wf, (long)e->file_offset, SEEK_SET) != 0) {
+            free(buf);
+            fclose(wf);
+            return -1;
+        }
+        unsigned char *dst = (unsigned char *)arena + e->runtime_offset;
+        unsigned long long remaining = e->size;
+        while (remaining > 0) {
+            size_t take = remaining > COPY_CHUNK ? COPY_CHUNK : (size_t)remaining;
+            size_t n = fread(buf, 1, take, wf);
+            if (n != take) {
+                free(buf);
+                fclose(wf);
+                return -1;
+            }
+            memcpy(dst, buf, take);
+            dst += take;
+            remaining -= take;
+        }
+    }
+
+    free(buf);
+    fclose(wf);
     return 0;
+}
+
+int64_t ck_load_weight_by_name(ck_manifest_map_t *manifest,
+                               const char *bump_path,
+                               const char *weight_name,
+                               void *dest)
+{
+    if (!manifest || !bump_path || !weight_name || !dest) return -1;
+    ck_weight_info_t *e = ck_get_weight_info(manifest, weight_name);
+    if (!e) return -1;
+
+    FILE *wf = fopen(bump_path, "rb");
+    if (!wf) return -1;
+
+    char magic[8] = {0};
+    if (fread(magic, 1, 8, wf) != 8 ||
+        (memcmp(magic, "BUMPWGT4", 8) != 0 && memcmp(magic, "BUMPWGT5", 8) != 0)) {
+        fclose(wf);
+        return -1;
+    }
+
+    if (fseek(wf, (long)e->file_offset, SEEK_SET) != 0) {
+        fclose(wf);
+        return -1;
+    }
+    size_t n = fread(dest, 1, (size_t)e->size, wf);
+    fclose(wf);
+    return (n == (size_t)e->size) ? (int64_t)n : -1;
 }
