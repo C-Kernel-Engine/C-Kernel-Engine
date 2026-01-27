@@ -18,10 +18,12 @@ var prefill__fused__gemm_8c =
     [ "gemm_nt_q8_0_dispatch", "prefill__fused__gemm_8c.html#a0e9c7f8af15518baef7855f11cc7dc83", null ],
     [ "gemm_nt_q8_0_mlp_dispatch", "prefill__fused__gemm_8c.html#a0162ee60cbc1f12d4fbec5215075c35f", null ],
     [ "gemm_nt_q8_k_mlp_dispatch", "prefill__fused__gemm_8c.html#abafc3abe1909ec3e623f7b14ccffff93", null ],
+    [ "gemm_nt_q8_k_qkv_dispatch", "prefill__fused__gemm_8c.html#a615bac7d9294b6bfd0cc45e0c1e2efcb", null ],
     [ "gemm_tile_nt_strided", "prefill__fused__gemm_8c.html#aa9e4ace727b9f9ed693383744ec13dca", null ],
     [ "mlp_q8_0_dtype_supported", "prefill__fused__gemm_8c.html#aa38e5bb5a253cd8b19d47e6e7bcad57c", null ],
     [ "mlp_q8_k_dtype_supported", "prefill__fused__gemm_8c.html#a2b4421b1a9483deb705e46069d87844a", null ],
     [ "qkv_q8_0_dtype_supported", "prefill__fused__gemm_8c.html#a9b9524d15e40280143e7b765ecb0418a", null ],
+    [ "qkv_q8_k_dtype_supported", "prefill__fused__gemm_8c.html#a1d851f3de1b977cd68171e227d0b86cf", null ],
     [ "rmsnorm_tile", "prefill__fused__gemm_8c.html#ada39c49b5289c4dbb57ce241ed03d7bc", null ],
     [ "silu_prefill", "prefill__fused__gemm_8c.html#a314debc713536801afb2b4c13bede6fd", null ],
     [ "unfused_rmsnorm_qkv_prefill", "prefill__fused__gemm_8c.html#a96082b299d4fa9b2e3cfcd6077b22ca3", null ]

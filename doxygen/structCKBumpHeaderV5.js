@@ -15,6 +15,7 @@ var structCKBumpHeaderV5 =
     [ "num_kv_heads", "structCKBumpHeaderV5.html#a9a68a418088e75ae9bc3ff643c021f0c", null ],
     [ "num_layers", "structCKBumpHeaderV5.html#aa6180be6914b09dc9d1466caa7402c75", null ],
     [ "num_merges", "structCKBumpHeaderV5.html#ab651af5f16a75f2103c2279da33b1834", null ],
+    [ "reserved", "structCKBumpHeaderV5.html#a26da4b574a720c2727e31646d2fdd300", null ],
     [ "total_vocab_bytes", "structCKBumpHeaderV5.html#ad4442506feb0743741ccc07af81a049d", null ],
     [ "version", "structCKBumpHeaderV5.html#ac9d9d27ee6b660da40e40517b5cc6a36", null ],
     [ "vocab_size", "structCKBumpHeaderV5.html#a1d7ceb3da86e1cc40493cf185e486507", null ]
