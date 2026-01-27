@@ -526,9 +526,31 @@ else
     incr_skipped
 fi
 
-# Step 3c: Performance benchmarks (if --perf specified)
+# Step 3c: Batch quantization parity tests (quantize_batch_q8_0, quantize_batch_q8_k)
+log_step "[3c/5] Running batch quantization parity tests..."
+BATCH_QUANT_TEST="$ROOT_DIR/unittest/test_quantize_batch_parity.py"
+
+if [ -f "$BATCH_QUANT_TEST" ]; then
+    set +e
+    python3 "$BATCH_QUANT_TEST"
+    RET=$?
+    set -e
+
+    if [ $RET -eq 0 ]; then
+        log_success "Batch quantization parity tests passed"
+        incr_passed
+    else
+        log_error "Batch quantization parity tests failed"
+        incr_failed
+    fi
+else
+    log_warn "Batch quantization parity test not found: $BATCH_QUANT_TEST"
+    incr_skipped
+fi
+
+# Step 3d: Performance benchmarks (if --perf specified)
 if [ "$PERF_MODE" = true ]; then
-    log_step "[3c/5] Running performance benchmarks..."
+    log_step "[3d/5] Running performance benchmarks..."
 
     # Try native C++ perf comparison first (most accurate)
     PERF_COMPARE="$LLAMA_DIR/build/bin/ck-perf-compare"

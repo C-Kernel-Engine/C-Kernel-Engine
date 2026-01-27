@@ -55,6 +55,16 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
 
         args.append(expr)
 
+    # For quantize ops: use batch versions which output row-major Q8 data
+    # quantize_row_q8_0(x, y, k) -> quantize_batch_q8_0(x, y, num_tokens, k)
+    if func == "quantize_row_q8_0":
+        func = "quantize_batch_q8_0"
+        # Insert num_tokens as 3rd argument (before k)
+        args.insert(2, "num_tokens")
+    elif func == "quantize_row_q8_k":
+        func = "quantize_batch_q8_k"
+        args.insert(2, "num_tokens")
+
     # Format the function call
     if len(args) <= 3:
         # Short call on one line

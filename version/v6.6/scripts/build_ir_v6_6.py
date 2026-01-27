@@ -295,7 +295,7 @@ def find_kernel(
     op: str,
     quant: Dict[str, str],
     mode: str = "decode",
-    prefer_q8_activation: bool = False  # TEMP: disabled for debugging
+    prefer_q8_activation: bool = True  # V6.5 parity: use Q8_0 activation kernels
 ) -> Optional[str]:
     """
     Find kernel ID from registry.
@@ -635,25 +635,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
 
         # Ops with quantized weights
         if isinstance(weight_info, list) and weight_info:
-            # Prefill requires head-major QKV projection to populate KV cache
-            if op == "qkv_proj" and mode == "prefill":
-                kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "mixed"}, mode=mode)
-                if kernel_id:
-                    return [kernel_id]
-                raise RuntimeError(
-                    "Prefill requires head-major QKV projection kernel (ck_qkv_project_head_major_quant)."
-                )
+            # NOTE: For v6.6, qkv_proj uses standard gemm_nt_* (prefill) or gemv_* (decode)
+            # The head-major QKV projection kernel (ck_qkv_project_head_major_quant)
+            # was from ckernel_orchestration.c which is not used in v6.6.
+            # Fall through to standard matmul handling which splits into q_proj, k_proj, v_proj.
 
-            # Prefill uses head-major attention projection for out_proj
-            if op == "out_proj" and mode == "prefill":
-                weight_dtype = layer_quant.get(weight_info[0], "fp32")
-                kernel_id = find_kernel(registry, op="attention_projection",
-                                        quant={"weight": weight_dtype}, mode=mode)
-                if kernel_id:
-                    return [kernel_id]
-                raise RuntimeError(
-                    "Prefill requires head-major attention projection kernel (ck_attention_project_head_major_quant)."
-                )
+            # NOTE: For v6.6, out_proj uses standard gemm_nt_* (prefill) or gemv_* (decode)
+            # The head-major attention projection kernel (ck_attention_project_head_major_quant)
+            # was from ckernel_orchestration.c which is not used in v6.6.
+            # Fall through to standard matmul handling below.
 
             # Try fused kernel first (e.g., qkv_projection)
             weight_dtype = layer_quant.get(weight_info[0], "fp32")
@@ -851,7 +841,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
             # Header/Footer: run once (no layer quant)
             else:
                 print(f"\n    {section_name.capitalize()}:")
-                for op in ops:
+                for op_idx, op in enumerate(ops):
                     kernels = map_op_to_kernel(op, {}, mode)
                     for k in kernels:
                         # Handle both plain kernel ID and (kernel_id, split_op) tuples
@@ -872,6 +862,35 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
                             "instance": op_info["instance"],
                         })
                         print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
+
+                    # Footer: Insert quantize op after rmsnorm if next op needs Q8 activation
+                    if section_name == "footer" and op == "rmsnorm" and op_idx + 1 < len(ops):
+                        next_op = ops[op_idx + 1]
+                        next_kernels = map_op_to_kernel(next_op, {}, mode)
+
+                        for nk in next_kernels:
+                            nk_id = nk[0] if isinstance(nk, tuple) else nk
+                            if kernel_needs_q8_activation(registry, nk_id):
+                                # Get activation dtype from kernel
+                                for kreg in registry.get("kernels", []):
+                                    if kreg.get("id") == nk_id:
+                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
+                                        quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
+                                        if quantize_kernel:
+                                            quant_op_name = "quantize_final_output"
+                                            quant_op_info = get_op_info(quant_op_name, section_name, -1)
+                                            arranged_kernels.append({
+                                                "op_id": quant_op_info["op_id"],
+                                                "kernel": quantize_kernel,
+                                                "op": quant_op_name,
+                                                "section": section_name,
+                                                "layer": -1,
+                                                "instance": 0,
+                                            })
+                                            print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED for footer]")
+                                        break
+                                break
+
                     if not kernels:
                         if OP_TO_WEIGHT_KEYS.get(op) == "metadata":
                             print(f"            {op:20s} → (metadata)")
@@ -987,9 +1006,13 @@ def apply_fusion_pass(ir1_ops: List[Dict], registry: Dict, mode: str, no_fusion:
             continue
 
         # Check if this fused kernel matches the mode
+        # NOTE: Allow prefill fused kernels in decode mode (v6.5 parity)
+        # The fused prefill kernels work for tokens=1 (decode) and are more accurate
+        # because they handle quantization internally.
         variant = kernel.get("variant", "")
-        if mode == "decode" and "prefill" in variant and "decode" not in variant:
-            continue
+        # Don't skip prefill kernels in decode mode - they work with tokens=1
+        # if mode == "decode" and "prefill" in variant and "decode" not in variant:
+        #     continue
         if mode == "prefill" and "decode" in variant and "prefill" not in variant:
             continue
 

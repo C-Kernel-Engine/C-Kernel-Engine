@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['gemmparams_2285',['GEMMParams',['../structGEMMParams.html',1,'']]]
+  ['gemmparams_2382',['GEMMParams',['../structGEMMParams.html',1,'']]]
 ];

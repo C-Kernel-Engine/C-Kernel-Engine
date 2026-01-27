@@ -126,6 +126,9 @@ $(document).ready(function(){initNavTree('gelu__kernels__bf16_8c.html',''); init
 <div class="title">gelu_kernels_bf16.c File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>GELU activation kernels for BF16 tensors.  
+<a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &lt;string.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
@@ -142,7 +145,21 @@ Functions</h2></td></tr>
 <tr class="memitem:a9f5d586b285fab4efe8b7223748f9d00"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gelu__kernels__bf16_8c.html#a9f5d586b285fab4efe8b7223748f9d00">gelu_fast_inplace_bf16</a> (uint16_t *data, size_t n, float *scratch)</td></tr>
 <tr class="separator:a9f5d586b285fab4efe8b7223748f9d00"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Function Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>GELU activation kernels for BF16 tensors. </p>
+<h1><a class="anchor" id="autotoc_md32"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
+<p>GELU: y = x * 0.5 * (1 + erf(x / sqrt(2))) </p>
+
+<p class="definition">Definition in file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
+</div><h2 class="groupheader">Function Documentation</h2>
 <a id="a79b99577c3b4e080aa37e41ffa43c46f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a79b99577c3b4e080aa37e41ffa43c46f">&#9670;&nbsp;</a></span>gelu_backward_exact_bf16()</h2>
 
@@ -199,24 +216,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00030">30</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;{</div>
-<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160; </div>
-<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
-<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160; </div>
-<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;    <span class="comment">// Use scalar exact version to avoid fast tanh approximation error</span></div>
-<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;    <span class="comment">// accumulating with BF16 precision loss.</span></div>
-<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;    <a class="code" href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
-<div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160; </div>
-<div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
-<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00046">46</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;{</div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160; </div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160; </div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;    <span class="comment">// Use scalar exact version to avoid fast tanh approximation error</span></div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;    <span class="comment">// accumulating with BF16 precision loss.</span></div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    <a class="code" href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160; </div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;}</div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition:</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4d3711dee095194f24437af73ad1763"><div class="ttname"><a href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a></div><div class="ttdeci">void gelu_backward_scalar(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00433">gelu_kernels.c:433</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4d3711dee095194f24437af73ad1763"><div class="ttname"><a href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a></div><div class="ttdeci">void gelu_backward_scalar(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00458">gelu_kernels.c:458</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00433">gelu_backward_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00458">gelu_backward_scalar()</a>.</p>
 
 </div>
 </div>
@@ -276,20 +293,20 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00053">53</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;{</div>
-<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160; </div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160; </div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    <a class="code" href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160; </div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;}</div>
-<div class="ttc" id="ackernel__engine_8h_html_aeaf518a5239f4588f8c28b05b96d5478"><div class="ttname"><a href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a></div><div class="ttdeci">void gelu_backward_fast(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00457">gelu_kernels.c:457</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00069">69</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;{</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    <span class="keywordflow">if</span> (!scratch_input || !scratch_d_output || !scratch_d_input) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160; </div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(input, scratch_input, n);</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(d_output, scratch_d_output, n);</div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160; </div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;    <a class="code" href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a>(scratch_input, scratch_d_output, scratch_d_input, n);</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160; </div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch_d_input, d_input, n);</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;}</div>
+<div class="ttc" id="ackernel__engine_8h_html_aeaf518a5239f4588f8c28b05b96d5478"><div class="ttname"><a href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a></div><div class="ttdeci">void gelu_backward_fast(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00482">gelu_kernels.c:482</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00457">gelu_backward_fast()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00482">gelu_backward_fast()</a>.</p>
 
 </div>
 </div>
@@ -325,19 +342,19 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00015">15</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;{</div>
-<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;    <span class="keywordflow">if</span> (!scratch) <span class="keywordflow">return</span>;</div>
-<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160; </div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(data, scratch, n);</div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;    <span class="comment">// Use exact version to avoid fast tanh approximation error accumulating</span></div>
-<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;    <span class="comment">// with BF16 precision loss. Conversion overhead dominates anyway.</span></div>
-<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a>(scratch, n);</div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch, data, n);</div>
-<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a315f43ac44656b5d77360d9879c5f122"><div class="ttname"><a href="ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a></div><div class="ttdeci">void gelu_exact_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00417">gelu_kernels.c:417</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gelu__kernels__bf16_8c_source.html#l00031">31</a> of file <a class="el" href="gelu__kernels__bf16_8c_source.html">gelu_kernels_bf16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;{</div>
+<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;    <span class="keywordflow">if</span> (!scratch) <span class="keywordflow">return</span>;</div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160; </div>
+<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;    <a class="code" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(data, scratch, n);</div>
+<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;    <span class="comment">// Use exact version to avoid fast tanh approximation error accumulating</span></div>
+<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;    <span class="comment">// with BF16 precision loss. Conversion overhead dominates anyway.</span></div>
+<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;    <a class="code" href="ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a>(scratch, n);</div>
+<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;    <a class="code" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(scratch, data, n);</div>
+<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;}</div>
+<div class="ttc" id="ackernel__engine_8h_html_a315f43ac44656b5d77360d9879c5f122"><div class="ttname"><a href="ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a></div><div class="ttdeci">void gelu_exact_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition:</b> <a href="gelu__kernels_8c_source.html#l00442">gelu_kernels.c:442</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00417">gelu_exact_inplace()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00442">gelu_exact_inplace()</a>.</p>
 
 </div>
 </div>

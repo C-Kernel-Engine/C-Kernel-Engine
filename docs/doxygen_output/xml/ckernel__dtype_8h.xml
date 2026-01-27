@@ -7,10 +7,12 @@
     <includedby refid="ckernel__kernel__specs_8h" local="yes">ckernel_kernel_specs.h</includedby>
     <includedby refid="ckernel__orchestration_8h" local="yes">ckernel_orchestration.h</includedby>
     <includedby refid="ckernel__quant_8h" local="yes">ckernel_quant.h</includedby>
+    <includedby refid="mega__fused__attention_8h" local="yes">mega_fused_attention.h</includedby>
     <includedby refid="ckernel__mem__plan_8c" local="yes">ckernel_mem_plan.c</includedby>
     <includedby refid="ckernel__orchestration_8c" local="yes">ckernel_orchestration.c</includedby>
     <includedby refid="dequant__kernels_8c" local="yes">dequant_kernels.c</includedby>
     <includedby refid="embedding__kernels_8c" local="yes">embedding_kernels.c</includedby>
+    <includedby refid="gemm__head__major__output_8c" local="yes">gemm_head_major_output.c</includedby>
     <includedby refid="ckernel__codegen__v2__sections_8c" local="yes">ckernel_codegen_v2_sections.c</includedby>
     <includedby refid="v6_86_2generated_2ck-kernel-inference_8h" local="yes">ck-kernel-inference.h</includedby>
     <incdepgraph>
@@ -34,7 +36,11 @@
         <label>ckernel_ir_v2_lower.c</label>
         <link refid="ckernel__ir__v2__lower_8c"/>
       </node>
-      <node id="49">
+      <node id="83">
+        <label>fused_rmsnorm_linear.c</label>
+        <link refid="fused__rmsnorm__linear_8c"/>
+      </node>
+      <node id="54">
         <label>rmsnorm_kernels_int8.c</label>
         <link refid="rmsnorm__kernels__int8_8c"/>
       </node>
@@ -42,11 +48,11 @@
         <label>ckernel_codegen_v2.c</label>
         <link refid="ckernel__codegen__v2_8c"/>
       </node>
-      <node id="67">
+      <node id="72">
         <label>parallel_orchestration.c</label>
         <link refid="parallel__orchestration_8c"/>
       </node>
-      <node id="50">
+      <node id="55">
         <label>rope_kernels_bf16.c</label>
         <link refid="rope__kernels__bf16_8c"/>
       </node>
@@ -58,34 +64,34 @@
         <childnode refid="8" relation="include">
         </childnode>
       </node>
-      <node id="68">
+      <node id="73">
         <label>ck-kernel-inference.c</label>
         <link refid="v6_86_2test__generated_2ck-kernel-inference_8c"/>
       </node>
-      <node id="26">
+      <node id="28">
         <label>ckernel_quant.h</label>
         <link refid="ckernel__quant_8h"/>
-        <childnode refid="27" relation="include">
-        </childnode>
-        <childnode refid="75" relation="include">
-        </childnode>
-        <childnode refid="24" relation="include">
-        </childnode>
-        <childnode refid="76" relation="include">
-        </childnode>
-        <childnode refid="77" relation="include">
-        </childnode>
-        <childnode refid="78" relation="include">
-        </childnode>
-        <childnode refid="79" relation="include">
+        <childnode refid="29" relation="include">
         </childnode>
         <childnode refid="80" relation="include">
+        </childnode>
+        <childnode refid="24" relation="include">
         </childnode>
         <childnode refid="81" relation="include">
         </childnode>
         <childnode refid="82" relation="include">
         </childnode>
         <childnode refid="83" relation="include">
+        </childnode>
+        <childnode refid="36" relation="include">
+        </childnode>
+        <childnode refid="26" relation="include">
+        </childnode>
+        <childnode refid="27" relation="include">
+        </childnode>
+        <childnode refid="37" relation="include">
+        </childnode>
+        <childnode refid="38" relation="include">
         </childnode>
         <childnode refid="84" relation="include">
         </childnode>
@@ -121,10 +127,22 @@
         </childnode>
         <childnode refid="100" relation="include">
         </childnode>
-        <childnode refid="67" relation="include">
+        <childnode refid="101" relation="include">
+        </childnode>
+        <childnode refid="102" relation="include">
+        </childnode>
+        <childnode refid="103" relation="include">
+        </childnode>
+        <childnode refid="104" relation="include">
+        </childnode>
+        <childnode refid="105" relation="include">
+        </childnode>
+        <childnode refid="106" relation="include">
+        </childnode>
+        <childnode refid="72" relation="include">
         </childnode>
       </node>
-      <node id="46">
+      <node id="51">
         <label>relu_kernels_bf16.c</label>
         <link refid="relu__kernels__bf16_8c"/>
       </node>
@@ -135,38 +153,44 @@
         </childnode>
         <childnode refid="23" relation="include">
         </childnode>
-        <childnode refid="26" relation="include">
+        <childnode refid="28" relation="include">
+        </childnode>
+        <childnode refid="107" relation="include">
         </childnode>
         <childnode refid="10" relation="include">
         </childnode>
         <childnode refid="24" relation="include">
         </childnode>
-        <childnode refid="76" relation="include">
+        <childnode refid="81" relation="include">
         </childnode>
-        <childnode refid="32" relation="include">
+        <childnode refid="34" relation="include">
+        </childnode>
+        <childnode refid="87" relation="include">
         </childnode>
         <childnode refid="14" relation="include">
         </childnode>
-        <childnode refid="101" relation="include">
+        <childnode refid="108" relation="include">
         </childnode>
       </node>
-      <node id="72">
+      <node id="107">
+        <label>mega_fused_attention.h</label>
+        <link refid="mega__fused__attention_8h"/>
+        <childnode refid="29" relation="include">
+        </childnode>
+      </node>
+      <node id="77">
         <label>v6.6_cli.c</label>
         <link refid="v6_86__cli_8c"/>
       </node>
-      <node id="79">
-        <label>fused_rmsnorm_linear.c</label>
-        <link refid="fused__rmsnorm__linear_8c"/>
-      </node>
-      <node id="60">
+      <node id="65">
         <label>generic_api_test.c</label>
         <link refid="v6_85_2test__generated_2generic__api__test_8c"/>
       </node>
-      <node id="64">
+      <node id="69">
         <label>v6.5_inference.c</label>
         <link refid="v6_85__inference_8c"/>
       </node>
-      <node id="51">
+      <node id="56">
         <label>sigmoid_kernels_bf16.c</label>
         <link refid="sigmoid__kernels__bf16_8c"/>
       </node>
@@ -174,27 +198,27 @@
         <label>ckernel_codegen_v6.6.c</label>
         <link refid="ckernel__codegen__v6_86_8c"/>
       </node>
-      <node id="65">
+      <node id="70">
         <label>v6.5_simple.c</label>
         <link refid="v6_85__simple_8c"/>
       </node>
-      <node id="93">
+      <node id="100">
         <label>gemm_kernels_q5_0_sse_v2.c</label>
         <link refid="gemm__kernels__q5__0__sse__v2_8c"/>
       </node>
-      <node id="70">
+      <node id="75">
         <label>int8_q4k_test.c</label>
         <link refid="v6_86_2test__generated_2int8__q4k__test_8c"/>
       </node>
-      <node id="28">
+      <node id="30">
         <label>backend_native.c</label>
         <link refid="backend__native_8c"/>
       </node>
-      <node id="53">
+      <node id="58">
         <label>swiglu_kernels.c</label>
         <link refid="swiglu__kernels_8c"/>
       </node>
-      <node id="73">
+      <node id="78">
         <label>v6.6_inference.c</label>
         <link refid="v6_86__inference_8c"/>
       </node>
@@ -202,23 +226,27 @@
         <label>ckernel_codegen_v2_dispatch.c</label>
         <link refid="ckernel__codegen__v2__dispatch_8c"/>
       </node>
-      <node id="29">
+      <node id="31">
         <label>ckernel_strict.c</label>
         <link refid="ckernel__strict_8c"/>
       </node>
-      <node id="42">
+      <node id="26">
+        <label>mega_fused_attention_prefill.c</label>
+        <link refid="mega__fused__attention__prefill_8c"/>
+      </node>
+      <node id="47">
         <label>loss_kernels_bf16.c</label>
         <link refid="loss__kernels__bf16_8c"/>
       </node>
-      <node id="61">
+      <node id="66">
         <label>int8_q4k_test.c</label>
         <link refid="v6_85_2test__generated_2int8__q4k__test_8c"/>
       </node>
-      <node id="36">
+      <node id="41">
         <label>gemm_kernels.c</label>
         <link refid="gemm__kernels_8c"/>
       </node>
-      <node id="59">
+      <node id="64">
         <label>ck-kernel-inference.c</label>
         <link refid="v6_85_2test__generated_2ck-kernel-inference_8c"/>
       </node>
@@ -226,11 +254,15 @@
         <label>ckernel_mem_plan.c</label>
         <link refid="ckernel__mem__plan_8c"/>
       </node>
-      <node id="86">
+      <node id="37">
+        <label>mega_fused_outproj_mlp_prefill.c</label>
+        <link refid="mega__fused__outproj__mlp__prefill_8c"/>
+      </node>
+      <node id="93">
         <label>gemm_kernels_q4k_avx.c</label>
         <link refid="gemm__kernels__q4k__avx_8c"/>
       </node>
-      <node id="92">
+      <node id="99">
         <label>gemm_kernels_q5_0_sse.c</label>
         <link refid="gemm__kernels__q5__0__sse_8c"/>
       </node>
@@ -238,11 +270,11 @@
         <label>ckernel_ir_v2_builder.c</label>
         <link refid="ckernel__ir__v2__builder_8c"/>
       </node>
-      <node id="75">
+      <node id="80">
         <label>ck_parity_api.c</label>
         <link refid="ck__parity__api_8c"/>
       </node>
-      <node id="56">
+      <node id="61">
         <label>v6_cli.c</label>
         <link refid="v6__cli_8c"/>
       </node>
@@ -264,44 +296,40 @@
         <childnode refid="6" relation="include">
         </childnode>
       </node>
-      <node id="31">
+      <node id="33">
         <label>attention_kernels.c</label>
         <link refid="attention__kernels_8c"/>
       </node>
-      <node id="37">
+      <node id="42">
         <label>gemm_kernels_bf16.c</label>
         <link refid="gemm__kernels__bf16_8c"/>
       </node>
-      <node id="66">
+      <node id="71">
         <label>ck-kernel-inference.c</label>
         <link refid="v6_86_2generated_2ck-kernel-inference_8c"/>
       </node>
-      <node id="101">
+      <node id="108">
         <label>ck-kernel-inference.h</label>
         <link refid="v6_86_2generated_2ck-kernel-inference_8h"/>
-        <childnode refid="66" relation="include">
+        <childnode refid="71" relation="include">
         </childnode>
       </node>
       <node id="25">
         <label>attention_decode_fused.c</label>
         <link refid="attention__decode__fused_8c"/>
       </node>
-      <node id="27">
+      <node id="29">
         <label>ckernel_engine.h</label>
         <link refid="ckernel__engine_8h"/>
-        <childnode refid="28" relation="include">
-        </childnode>
-        <childnode refid="24" relation="include">
-        </childnode>
-        <childnode refid="29" relation="include">
-        </childnode>
         <childnode refid="30" relation="include">
         </childnode>
-        <childnode refid="25" relation="include">
+        <childnode refid="24" relation="include">
         </childnode>
         <childnode refid="31" relation="include">
         </childnode>
         <childnode refid="32" relation="include">
+        </childnode>
+        <childnode refid="25" relation="include">
         </childnode>
         <childnode refid="33" relation="include">
         </childnode>
@@ -310,6 +338,10 @@
         <childnode refid="35" relation="include">
         </childnode>
         <childnode refid="36" relation="include">
+        </childnode>
+        <childnode refid="26" relation="include">
+        </childnode>
+        <childnode refid="27" relation="include">
         </childnode>
         <childnode refid="37" relation="include">
         </childnode>
@@ -387,32 +419,42 @@
         </childnode>
         <childnode refid="74" relation="include">
         </childnode>
+        <childnode refid="75" relation="include">
+        </childnode>
+        <childnode refid="76" relation="include">
+        </childnode>
+        <childnode refid="77" relation="include">
+        </childnode>
+        <childnode refid="78" relation="include">
+        </childnode>
+        <childnode refid="79" relation="include">
+        </childnode>
       </node>
       <node id="14">
         <label>ckernel_codegen_v2_sections.c</label>
         <link refid="ckernel__codegen__v2__sections_8c"/>
       </node>
-      <node id="35">
+      <node id="40">
         <label>gemm_fused_kernels.c</label>
         <link refid="gemm__fused__kernels_8c"/>
       </node>
-      <node id="89">
+      <node id="96">
         <label>gemm_kernels_q4k_q8k_vnni.c</label>
         <link refid="gemm__kernels__q4k__q8k__vnni_8c"/>
       </node>
-      <node id="57">
+      <node id="62">
         <label>v6_inference.c</label>
         <link refid="v6__inference_8c"/>
       </node>
-      <node id="44">
+      <node id="49">
         <label>mlp_kernels.c</label>
         <link refid="mlp__kernels_8c"/>
       </node>
-      <node id="54">
+      <node id="59">
         <label>swiglu_kernels_bf16.c</label>
         <link refid="swiglu__kernels__bf16_8c"/>
       </node>
-      <node id="77">
+      <node id="82">
         <label>attention_mlp_fused.c</label>
         <link refid="attention__mlp__fused_8c"/>
       </node>
@@ -426,6 +468,10 @@
         <childnode refid="24" relation="include">
         </childnode>
         <childnode refid="25" relation="include">
+        </childnode>
+        <childnode refid="26" relation="include">
+        </childnode>
+        <childnode refid="27" relation="include">
         </childnode>
       </node>
       <node id="2">
@@ -454,43 +500,47 @@
         <childnode refid="6" relation="include">
         </childnode>
       </node>
-      <node id="98">
+      <node id="105">
         <label>gemm_kernels_q8_0.c</label>
         <link refid="gemm__kernels__q8__0_8c"/>
       </node>
-      <node id="40">
+      <node id="45">
         <label>layernorm_kernels_bf16.c</label>
         <link refid="layernorm__kernels__bf16_8c"/>
       </node>
-      <node id="81">
+      <node id="36">
+        <label>mega_fused_attention_avx.c</label>
+        <link refid="mega__fused__attention__avx_8c"/>
+      </node>
+      <node id="88">
         <label>gemm_kernels_amx.c</label>
         <link refid="gemm__kernels__amx_8c"/>
       </node>
-      <node id="76">
+      <node id="81">
         <label>dequant_kernels.c</label>
         <link refid="dequant__kernels_8c"/>
       </node>
-      <node id="43">
+      <node id="48">
         <label>mlp_fused_decode.c</label>
         <link refid="mlp__fused__decode_8c"/>
       </node>
-      <node id="90">
+      <node id="97">
         <label>gemm_kernels_q4k_sse.c</label>
         <link refid="gemm__kernels__q4k__sse_8c"/>
       </node>
-      <node id="91">
+      <node id="98">
         <label>gemm_kernels_q5_0.c</label>
         <link refid="gemm__kernels__q5__0_8c"/>
       </node>
-      <node id="33">
+      <node id="35">
         <label>embedding_kernels_bf16.c</label>
         <link refid="embedding__kernels__bf16_8c"/>
       </node>
-      <node id="69">
+      <node id="74">
         <label>generic_api_test.c</label>
         <link refid="v6_86_2test__generated_2generic__api__test_8c"/>
       </node>
-      <node id="99">
+      <node id="106">
         <label>quantize_row_q8_k_sse.c</label>
         <link refid="quantize__row__q8__k__sse_8c"/>
       </node>
@@ -498,7 +548,7 @@
         <label>ckernel_codegen_v2_struct.c</label>
         <link refid="ckernel__codegen__v2__struct_8c"/>
       </node>
-      <node id="97">
+      <node id="104">
         <label>gemm_kernels_q6k_sse.c</label>
         <link refid="gemm__kernels__q6k__sse_8c"/>
       </node>
@@ -516,31 +566,27 @@
         <childnode refid="15" relation="include">
         </childnode>
       </node>
-      <node id="100">
-        <label>rmsnorm_q8_k_fused.c</label>
-        <link refid="rmsnorm__q8__k__fused_8c"/>
-      </node>
       <node id="16">
         <label>ckernel_ir_v2.c</label>
         <link refid="ckernel__ir__v2_8c"/>
       </node>
-      <node id="30">
+      <node id="32">
         <label>add_kernels_bf16.c</label>
         <link refid="add__kernels__bf16_8c"/>
       </node>
-      <node id="38">
+      <node id="43">
         <label>gemm_microkernel.c</label>
         <link refid="gemm__microkernel_8c"/>
       </node>
-      <node id="83">
+      <node id="90">
         <label>gemm_kernels_q4_0.c</label>
         <link refid="gemm__kernels__q4__0_8c"/>
       </node>
-      <node id="45">
+      <node id="50">
         <label>mlp_kernels_bf16.c</label>
         <link refid="mlp__kernels__bf16_8c"/>
       </node>
-      <node id="52">
+      <node id="57">
         <label>softmax_kernels_bf16.c</label>
         <link refid="softmax__kernels__bf16_8c"/>
       </node>
@@ -558,15 +604,19 @@
         <childnode refid="16" relation="include">
         </childnode>
       </node>
+      <node id="38">
+        <label>prefill_fused_gemm.c</label>
+        <link refid="prefill__fused__gemm_8c"/>
+      </node>
       <node id="21">
         <label>ckernel_codegen_v6.5.c</label>
         <link refid="ckernel__codegen__v6_85_8c"/>
       </node>
-      <node id="41">
+      <node id="46">
         <label>loss_kernels.c</label>
         <link refid="loss__kernels_8c"/>
       </node>
-      <node id="78">
+      <node id="85">
         <label>rmsnorm_qkv.c</label>
         <link refid="rmsnorm__qkv_8c"/>
       </node>
@@ -574,9 +624,13 @@
         <label>ckernel_ir_v2_demo.c</label>
         <link refid="ckernel__ir__v2__demo_8c"/>
       </node>
-      <node id="85">
+      <node id="92">
         <label>gemm_kernels_q4k.c</label>
         <link refid="gemm__kernels__q4k_8c"/>
+      </node>
+      <node id="27">
+        <label>mega_fused_attention_prefill_q8_0.c</label>
+        <link refid="mega__fused__attention__prefill__q8__0_8c"/>
       </node>
       <node id="13">
         <label>ckernel_codegen_v2_schedule.c</label>
@@ -586,11 +640,11 @@
         <label>ckernel_kernel_specs.c</label>
         <link refid="ckernel__kernel__specs_8c"/>
       </node>
-      <node id="82">
+      <node id="89">
         <label>gemm_kernels_f16.c</label>
         <link refid="gemm__kernels__f16_8c"/>
       </node>
-      <node id="74">
+      <node id="79">
         <label>v6.6_simple.c</label>
         <link refid="v6_86__simple_8c"/>
       </node>
@@ -598,63 +652,67 @@
         <label>ckernel_codegen_v6.c</label>
         <link refid="ckernel__codegen__v6_8c"/>
       </node>
-      <node id="94">
+      <node id="87">
+        <label>gemm_head_major_output.c</label>
+        <link refid="gemm__head__major__output_8c"/>
+      </node>
+      <node id="101">
         <label>gemm_kernels_q5_1.c</label>
         <link refid="gemm__kernels__q5__1_8c"/>
       </node>
-      <node id="34">
+      <node id="39">
         <label>gelu_kernels_bf16.c</label>
         <link refid="gelu__kernels__bf16_8c"/>
       </node>
-      <node id="71">
+      <node id="76">
         <label>qwen2_int8.c</label>
         <link refid="v6_86_2test__generated_2qwen2__int8_8c"/>
       </node>
-      <node id="39">
+      <node id="44">
         <label>kv_cache_kernels.c</label>
         <link refid="kv__cache__kernels_8c"/>
       </node>
-      <node id="95">
+      <node id="102">
         <label>gemm_kernels_q6k.c</label>
         <link refid="gemm__kernels__q6k_8c"/>
       </node>
-      <node id="63">
+      <node id="68">
         <label>v6.5_cli.c</label>
         <link refid="v6_85__cli_8c"/>
       </node>
-      <node id="87">
+      <node id="94">
         <label>gemm_kernels_q4k_q8k.c</label>
         <link refid="gemm__kernels__q4k__q8k_8c"/>
       </node>
-      <node id="47">
+      <node id="52">
         <label>rmsnorm_kernels_bf16.c</label>
         <link refid="rmsnorm__kernels__bf16_8c"/>
       </node>
-      <node id="96">
+      <node id="103">
         <label>gemm_kernels_q6k_q8k.c</label>
         <link refid="gemm__kernels__q6k__q8k_8c"/>
       </node>
-      <node id="58">
+      <node id="63">
         <label>v6_simple.c</label>
         <link refid="v6__simple_8c"/>
       </node>
-      <node id="80">
+      <node id="86">
         <label>gemm_batch_int8.c</label>
         <link refid="gemm__batch__int8_8c"/>
       </node>
-      <node id="55">
+      <node id="60">
         <label>vision_kernels_bf16.c</label>
         <link refid="vision__kernels__bf16_8c"/>
       </node>
-      <node id="88">
+      <node id="95">
         <label>gemm_kernels_q4k_q8k_avx2.c</label>
         <link refid="gemm__kernels__q4k__q8k__avx2_8c"/>
       </node>
-      <node id="84">
+      <node id="91">
         <label>gemm_kernels_q4_1.c</label>
         <link refid="gemm__kernels__q4__1_8c"/>
       </node>
-      <node id="32">
+      <node id="34">
         <label>embedding_kernels.c</label>
         <link refid="embedding__kernels_8c"/>
       </node>
@@ -662,11 +720,15 @@
         <label>ckernel_codegen.c</label>
         <link refid="ckernel__codegen_8c"/>
       </node>
-      <node id="48">
+      <node id="84">
+        <label>rmsnorm_q8_k_fused.c</label>
+        <link refid="rmsnorm__q8__k__fused_8c"/>
+      </node>
+      <node id="53">
         <label>rmsnorm_kernels_int4.c</label>
         <link refid="rmsnorm__kernels__int4_8c"/>
       </node>
-      <node id="62">
+      <node id="67">
         <label>qwen2_int8.c</label>
         <link refid="v6_85_2test__generated_2qwen2__int8_8c"/>
       </node>
@@ -976,9 +1038,15 @@
         <referencedby refid="ckernel__orchestration_8c_1ad492e291abbf309f2332cdf955597083" compoundref="ckernel__orchestration_8c" startline="1572" endline="1615">ck_qkv_project_head_major_token_q4_k</referencedby>
         <referencedby refid="ckernel__orchestration_8c_1a3a2f1ed53c42b0003b637f0020c419f9" compoundref="ckernel__orchestration_8c" startline="1617" endline="1660">ck_qkv_project_head_major_token_q4_k_q8_k</referencedby>
         <referencedby refid="ckernel__orchestration_8c_1ad9e143397c01620ba314aa448ed922a1" compoundref="ckernel__orchestration_8c" startline="1825" endline="1876">ck_qkv_project_head_major_token_quant</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a476c5068e2670813bcd9d5fd0ae6d0b4" compoundref="embedding__kernels_8c" startline="60" endline="113">embedding_forward_q4_k</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a04f715861b61ca2e811fc14112f1083e" compoundref="embedding__kernels_8c" startline="170" endline="223">embedding_forward_q6_k</referencedby>
-        <referencedby refid="ckernel__engine_8h_1ace8166ca41fc55267666032365c330a4" compoundref="embedding__kernels_8c" startline="115" endline="168">embedding_forward_q8_0</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a476c5068e2670813bcd9d5fd0ae6d0b4" compoundref="embedding__kernels_8c" startline="76" endline="129">embedding_forward_q4_k</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a04f715861b61ca2e811fc14112f1083e" compoundref="embedding__kernels_8c" startline="186" endline="239">embedding_forward_q6_k</referencedby>
+        <referencedby refid="ckernel__engine_8h_1ace8166ca41fc55267666032365c330a4" compoundref="embedding__kernels_8c" startline="131" endline="184">embedding_forward_q8_0</referencedby>
+        <referencedby refid="ckernel__engine_8h_1ada60aced9f99494621f97100803ccde8" compoundref="prefill__fused__gemm_8c" startline="965" endline="1061">fused_mlp_swiglu_prefill_w1w2_quant</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a3d6e23529a459885aef87c78fb8b4466" compoundref="prefill__fused__gemm_8c" startline="1063" endline="1080">fused_mlp_swiglu_prefill_w1w2_quant_scratch_size</referencedby>
+        <referencedby refid="ckernel__engine_8h_1afd9005557cdc687d7911f97f0bd01fbf" compoundref="prefill__fused__gemm_8c" startline="519" endline="649">fused_rmsnorm_qkv_prefill_head_major_quant</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a153e9de294cb072631d85f152c121785" compoundref="prefill__fused__gemm_8c" startline="651" endline="662">fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size</referencedby>
+        <referencedby refid="mega__fused__attention_8h_1a88f688b6b8916971950e975f3f6ee650" compoundref="mega__fused__outproj__mlp__prefill_8c" startline="184" endline="310">mega_fused_outproj_mlp_prefill</referencedby>
+        <referencedby refid="mega__fused__attention_8h_1aca1476c2ed7a5ed20fd199f597a67149" compoundref="mega__fused__outproj__mlp__prefill_8c" startline="159" endline="182">mega_fused_outproj_mlp_prefill_scratch_size</referencedby>
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a2d09a8a009c9dfdc93dbd737fd3d0b80" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4148" endline="4396">model_forward_prefill_impl</referencedby>
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a1f366f5af792066942b1a20c0a0f9da6" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="4405" endline="4569">model_layer_0_decode</referencedby>
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1ae297e4193654fc2efb7c2a061abbd011" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="211" endline="370">model_layer_0_prefill</referencedby>
@@ -1028,6 +1096,9 @@
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1a254adaead0beb36acee84c1a0d3dea5f" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1523" endline="1682">model_layer_8_prefill</referencedby>
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1afd4a0ad91d058028c6438774b207fd4a" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="5926" endline="6090">model_layer_9_decode</referencedby>
         <referencedby refid="v6_85_2test__generated_2generic__api__test_8c_1afa7ed236a766adfaeeffa865ab2cfdc1" compoundref="v6_85_2test__generated_2generic__api__test_8c" startline="1687" endline="1846">model_layer_9_prefill</referencedby>
+        <referencedby refid="mega__fused__attention__prefill_8c_1a6a5da63aac6821fd65ed403bb1546577" compoundref="mega__fused__attention__prefill_8c" startline="104" endline="137">out_proj_head_major_q5_0_q8_0</referencedby>
+        <referencedby refid="mega__fused__attention__prefill__q8__0_8c_1a0404c43ebf752ec2c2f54ead81036f30" compoundref="mega__fused__attention__prefill__q8__0_8c" startline="49" endline="82">out_proj_head_major_q8_0_q8_0</referencedby>
+        <referencedby refid="mega__fused__attention__prefill_8c_1a883b9f36dd8db8e37e5df4037f25b86e" compoundref="mega__fused__attention__prefill_8c" startline="84" endline="102">quantize_attn_out_head_major_q8_0</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a83526729f733fbd311a503bf661132b6" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="4076" endline="4636">qwen2_0_5b_decode_forward_prefill_impl</referencedby>
         <referencedby refid="v6_85_2test__generated_2qwen2__int8_8c_1a54e2aba39375fd8df03520d41ee5acff" compoundref="v6_85_2test__generated_2qwen2__int8_8c" startline="4405" endline="4581">qwen2_0_5b_decode_layer_0_decode</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a171746e628c6a4bf197f2181af543218" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="211" endline="367">qwen2_0_5b_decode_layer_0_prefill</referencedby>

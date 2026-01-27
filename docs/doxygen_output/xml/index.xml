@@ -141,6 +141,32 @@
     <member refid="structCKBufferSpec_1a81f2619d250bfb5c7401070c0345353a" kind="variable"><name>scope</name></member>
     <member refid="structCKBufferSpec_1ae34b00c892e6e3ffd7928a0a31924b59" kind="variable"><name>shape</name></member>
   </compound>
+  <compound refid="structCKBumpHeaderV5" kind="struct"><name>CKBumpHeaderV5</name>
+    <member refid="structCKBumpHeaderV5_1af4bdac04a2bdcef7589256ef352321ee" kind="variable"><name>aligned_context</name></member>
+    <member refid="structCKBumpHeaderV5_1a2a92218149c8c8944fc3ed09a19b31a5" kind="variable"><name>aligned_embed_dim</name></member>
+    <member refid="structCKBumpHeaderV5_1a386daca855110634a91f576358285725" kind="variable"><name>aligned_head_dim</name></member>
+    <member refid="structCKBumpHeaderV5_1a78cf59a40d01f7905c75e7d809fdf6e5" kind="variable"><name>aligned_intermediate</name></member>
+    <member refid="structCKBumpHeaderV5_1addaed139241f58dc329c9227aeb21cbb" kind="variable"><name>checksum</name></member>
+    <member refid="structCKBumpHeaderV5_1a2bd2228d0a6b39db1149c477bf24b436" kind="variable"><name>context_length</name></member>
+    <member refid="structCKBumpHeaderV5_1a34256a5791efef6fd0acb56bc485de48" kind="variable"><name>embed_dim</name></member>
+    <member refid="structCKBumpHeaderV5_1ad0b6a32b8d1ed0f867e9c16c2d87d410" kind="variable"><name>head_dim</name></member>
+    <member refid="structCKBumpHeaderV5_1a39f4fdd08a53aa82afcbd0c838f01100" kind="variable"><name>intermediate_size</name></member>
+    <member refid="structCKBumpHeaderV5_1a113ec8251095c1a8650a93e1c3855701" kind="variable"><name>magic</name></member>
+    <member refid="structCKBumpHeaderV5_1af48d4003b64b150726f101a8e1136285" kind="variable"><name>model_type</name></member>
+    <member refid="structCKBumpHeaderV5_1a058e1844933d1781580b4693be8be8bc" kind="variable"><name>num_heads</name></member>
+    <member refid="structCKBumpHeaderV5_1a9a68a418088e75ae9bc3ff643c021f0c" kind="variable"><name>num_kv_heads</name></member>
+    <member refid="structCKBumpHeaderV5_1aa6180be6914b09dc9d1466caa7402c75" kind="variable"><name>num_layers</name></member>
+    <member refid="structCKBumpHeaderV5_1ab651af5f16a75f2103c2279da33b1834" kind="variable"><name>num_merges</name></member>
+    <member refid="structCKBumpHeaderV5_1a26da4b574a720c2727e31646d2fdd300" kind="variable"><name>reserved</name></member>
+    <member refid="structCKBumpHeaderV5_1ad4442506feb0743741ccc07af81a049d" kind="variable"><name>total_vocab_bytes</name></member>
+    <member refid="structCKBumpHeaderV5_1ac9d9d27ee6b660da40e40517b5cc6a36" kind="variable"><name>version</name></member>
+    <member refid="structCKBumpHeaderV5_1a1d7ceb3da86e1cc40493cf185e486507" kind="variable"><name>vocab_size</name></member>
+  </compound>
+  <compound refid="structCKBumpMetaFooterV5" kind="struct"><name>CKBumpMetaFooterV5</name>
+    <member refid="structCKBumpMetaFooterV5_1abfa91da71ba88c4f26b60f2a945aca03" kind="variable"><name>magic</name></member>
+    <member refid="structCKBumpMetaFooterV5_1a4bc1f2b2775c0de9d20b6f8a5a8077ed" kind="variable"><name>meta_sha256</name></member>
+    <member refid="structCKBumpMetaFooterV5_1a2177646d88cf83b601f0e4bb309d9696" kind="variable"><name>meta_size</name></member>
+  </compound>
   <compound refid="structCKDimToken" kind="struct"><name>CKDimToken</name>
     <member refid="structCKDimToken_1a39ef233b6095ec24fa1374c9f6cd93d3" kind="variable"><name>dim</name></member>
     <member refid="structCKDimToken_1a64516b544f8812fc3b3c24ddb472bcb7" kind="variable"><name>div</name></member>
@@ -1764,10 +1790,12 @@
     <member refid="ck__model__api_8h_1a76b07dd39597b6760b3d5307f53aa453" kind="function"><name>ck_model_verify_canaries</name></member>
   </compound>
   <compound refid="ck__parity__api_8c" kind="file"><name>ck_parity_api.c</name>
+    <member refid="ck__parity__api_8c_1a09d8f520b4991ea1b8b75891b1baf59e" kind="function"><name>attention_forward_causal_head_major_gqa_flash_strided</name></member>
     <member refid="ck__parity__api_8c_1ae3f2ecb6eac88dd8df6785319196b3ae" kind="function"><name>ck_get_block_q4_k_size</name></member>
     <member refid="ck__parity__api_8c_1ae5f78ab1af3e1f44d57f284cfe068ed3" kind="function"><name>ck_get_block_q6_k_size</name></member>
     <member refid="ck__parity__api_8c_1a12d459a543e9e2753fe5f6d0f70f1c7b" kind="function"><name>ck_get_block_q8_k_size</name></member>
     <member refid="ck__parity__api_8c_1a95cddf8f78737e393631663f79da52c1" kind="function"><name>ck_get_qk_k</name></member>
+    <member refid="ck__parity__api_8c_1a5c4d08fced7821fcb646b347b72b865b" kind="function"><name>ck_test_attention_causal</name></member>
     <member refid="ck__parity__api_8c_1a437f320412acb3a395d3d4388a65df8c" kind="function"><name>ck_test_dequant_q4_0</name></member>
     <member refid="ck__parity__api_8c_1a57f071bb10b877ef28d5803dc97111aa" kind="function"><name>ck_test_dequant_q4_k</name></member>
     <member refid="ck__parity__api_8c_1a1376a32f86dfadb9480147809ea95f29" kind="function"><name>ck_test_dequant_q6_k</name></member>
@@ -1781,6 +1809,7 @@
     <member refid="ck__parity__api_8c_1afa96b526d228d061c98b81d813c9093a" kind="function"><name>ck_test_gemv_q6_k</name></member>
     <member refid="ck__parity__api_8c_1ae6b6e7d7848157d54ba75f661fe9ca39" kind="function"><name>ck_test_gemv_q8_0</name></member>
     <member refid="ck__parity__api_8c_1a6c5534c711d8306cf8973670bc9d3cfc" kind="function"><name>ck_test_gemv_q8_0_q8_0</name></member>
+    <member refid="ck__parity__api_8c_1afb09a29d3caada83d9e84efed6209fec" kind="function"><name>ck_test_outproj_mlp_fused_q5_0</name></member>
     <member refid="ck__parity__api_8c_1a0294dd45ee3d2fd2f25f2e586b1b9311" kind="function"><name>ck_test_quantize_q8_k</name></member>
     <member refid="ck__parity__api_8c_1a4cdbef772ebe98f21f9e3a026300982a" kind="function"><name>ck_test_rmsnorm</name></member>
     <member refid="ck__parity__api_8c_1a15e78c3b254565f6061c47cc878b9209" kind="function"><name>ck_test_rope</name></member>
@@ -1802,6 +1831,8 @@
     <member refid="ck__parity__api_8c_1a7b78875a957c11b30c9f7170b6c87c45" kind="function"><name>gemv_q6_k_q8_k</name></member>
     <member refid="ck__parity__api_8c_1a3e0166eab910ca7f003602c29f428cb1" kind="function"><name>gemv_q8_0</name></member>
     <member refid="ck__parity__api_8c_1ab56038b4e1cf73692b6be9c28ada9023" kind="function"><name>gemv_q8_0_q8_0</name></member>
+    <member refid="ck__parity__api_8c_1a5d7c4d5f6bccab4053d2b263ef156c68" kind="function"><name>mega_fused_outproj_mlp_prefill</name></member>
+    <member refid="ck__parity__api_8c_1aca1476c2ed7a5ed20fd199f597a67149" kind="function"><name>mega_fused_outproj_mlp_prefill_scratch_size</name></member>
     <member refid="ck__parity__api_8c_1adf8ea140a408f51698d95718f1d8db49" kind="function"><name>quantize_row_q8_0</name></member>
     <member refid="ck__parity__api_8c_1a64b28ca8a25883986a0d22e39a574a32" kind="function"><name>quantize_row_q8_k</name></member>
     <member refid="ck__parity__api_8c_1a9a068ed02d809a81a23f09e61b820baf" kind="function"><name>rmsnorm_forward</name></member>
@@ -1823,6 +1854,7 @@
     <member refid="ck__parity__api_8h_1ae5f78ab1af3e1f44d57f284cfe068ed3" kind="function"><name>ck_get_block_q6_k_size</name></member>
     <member refid="ck__parity__api_8h_1a12d459a543e9e2753fe5f6d0f70f1c7b" kind="function"><name>ck_get_block_q8_k_size</name></member>
     <member refid="ck__parity__api_8h_1a95cddf8f78737e393631663f79da52c1" kind="function"><name>ck_get_qk_k</name></member>
+    <member refid="ck__parity__api_8h_1a5c4d08fced7821fcb646b347b72b865b" kind="function"><name>ck_test_attention_causal</name></member>
     <member refid="ck__parity__api_8h_1a437f320412acb3a395d3d4388a65df8c" kind="function"><name>ck_test_dequant_q4_0</name></member>
     <member refid="ck__parity__api_8h_1a57f071bb10b877ef28d5803dc97111aa" kind="function"><name>ck_test_dequant_q4_k</name></member>
     <member refid="ck__parity__api_8h_1a1376a32f86dfadb9480147809ea95f29" kind="function"><name>ck_test_dequant_q6_k</name></member>
@@ -1836,6 +1868,7 @@
     <member refid="ck__parity__api_8h_1afa96b526d228d061c98b81d813c9093a" kind="function"><name>ck_test_gemv_q6_k</name></member>
     <member refid="ck__parity__api_8h_1ae6b6e7d7848157d54ba75f661fe9ca39" kind="function"><name>ck_test_gemv_q8_0</name></member>
     <member refid="ck__parity__api_8h_1a6c5534c711d8306cf8973670bc9d3cfc" kind="function"><name>ck_test_gemv_q8_0_q8_0</name></member>
+    <member refid="ck__parity__api_8h_1afb09a29d3caada83d9e84efed6209fec" kind="function"><name>ck_test_outproj_mlp_fused_q5_0</name></member>
     <member refid="ck__parity__api_8h_1a0294dd45ee3d2fd2f25f2e586b1b9311" kind="function"><name>ck_test_quantize_q8_k</name></member>
     <member refid="ck__parity__api_8h_1a4cdbef772ebe98f21f9e3a026300982a" kind="function"><name>ck_test_rmsnorm</name></member>
     <member refid="ck__parity__api_8h_1a15e78c3b254565f6061c47cc878b9209" kind="function"><name>ck_test_rope</name></member>
@@ -1956,6 +1989,14 @@
     <member refid="ckernel__alloc__v6_8c_1af814a916b578d2824aa0e9ec230ea166" kind="function"><name>ck_huge_free</name></member>
     <member refid="ckernel__alloc__v6_8c_1a1e5036eee15a005216b507a534db66b6" kind="function"><name>detach_allocation</name></member>
     <member refid="ckernel__alloc__v6_8c_1a78d026646faf03ea83ff458d93f99b6a" kind="function"><name>record_allocation</name></member>
+  </compound>
+  <compound refid="ckernel__bump__v5_8h" kind="file"><name>ckernel_bump_v5.h</name>
+    <member refid="ckernel__bump__v5_8h_1af892a4a0c6e275fe63e9db5e9a2ad2db" kind="define"><name>CK_BUMP_DATA_START</name></member>
+    <member refid="ckernel__bump__v5_8h_1a85b113bf20faeace175745144c5030a3" kind="define"><name>CK_BUMP_EXT_META_SIZE</name></member>
+    <member refid="ckernel__bump__v5_8h_1a88faa468d8c4c796b97a1e13e9fb0338" kind="define"><name>CK_BUMP_HEADER_SIZE</name></member>
+    <member refid="ckernel__bump__v5_8h_1a8bd9f4bdfe9e2dfea822660594d741cd" kind="define"><name>CK_BUMP_MAGIC_V5</name></member>
+    <member refid="ckernel__bump__v5_8h_1ae212b5397cfab8996a2cb283321d4e9e" kind="define"><name>CK_BUMP_META_FOOTER_MAGIC</name></member>
+    <member refid="ckernel__bump__v5_8h_1a928bfa8880defa8286c5666386cd18e0" kind="define"><name>CK_BUMP_META_FOOTER_SIZE</name></member>
   </compound>
   <compound refid="ckernel__codegen_8c" kind="file"><name>ckernel_codegen.c</name>
     <member refid="ckernel__codegen_8c_1a9f6b5ba2373060f9e3c58c05b2deb62f" kind="function"><name>ck_buffer_should_alloc</name></member>
@@ -2193,6 +2234,8 @@
     <member refid="ckernel__engine_8h_1aac849c8be1c936169d2f525ac0f3d87e" kind="function"><name>ck_attention_flash_decode_wrapper</name></member>
     <member refid="ckernel__engine_8h_1a0a172ab2e2319c20408ffdc9e98b3b42" kind="function"><name>ck_flash_attn_choose_tile_k</name></member>
     <member refid="ckernel__engine_8h_1ad2a838269326bb70a8ced00de62d69b8" kind="function"><name>ck_flash_attn_fast_exp_kind</name></member>
+    <member refid="ckernel__engine_8h_1a30955da0f71b6a46475df846ee7ef144" kind="function"><name>ck_gemm_nt_head_major_q5_0</name></member>
+    <member refid="ckernel__engine_8h_1a083471cd407d1f7ece23be4340e640bb" kind="function"><name>ck_gemm_nt_head_major_q8_0</name></member>
     <member refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" kind="function"><name>ck_get_num_threads</name></member>
     <member refid="ckernel__engine_8h_1a7ff78bf68a9657c2d6858b64df79f7ae" kind="function"><name>ck_get_physical_cores</name></member>
     <member refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" kind="function"><name>ck_set_num_threads</name></member>
@@ -2218,6 +2261,16 @@
     <member refid="ckernel__engine_8h_1a3897324e415431e53b4dba88a774e804" kind="function"><name>fused_mlp_swiglu_decode</name></member>
     <member refid="ckernel__engine_8h_1a36d3ddf5aa9f0d689888e2782eb9e608" kind="function"><name>fused_mlp_swiglu_decode_tiled</name></member>
     <member refid="ckernel__engine_8h_1ac7e379fa8eb4c8b963e70daf7e761277" kind="function"><name>fused_mlp_swiglu_decode_v2</name></member>
+    <member refid="ckernel__engine_8h_1a312f98bb70a4da17154acc7b78bfbb1f" kind="function"><name>fused_mlp_swiglu_prefill</name></member>
+    <member refid="ckernel__engine_8h_1ace18b7bc5b9b7708bd0e4316181c87e9" kind="function"><name>fused_mlp_swiglu_prefill_bias</name></member>
+    <member refid="ckernel__engine_8h_1ada60aced9f99494621f97100803ccde8" kind="function"><name>fused_mlp_swiglu_prefill_w1w2_quant</name></member>
+    <member refid="ckernel__engine_8h_1a3d6e23529a459885aef87c78fb8b4466" kind="function"><name>fused_mlp_swiglu_prefill_w1w2_quant_scratch_size</name></member>
+    <member refid="ckernel__engine_8h_1af5f2587e0d0324d1b2b342d1526c33a6" kind="function"><name>fused_mlp_swiglu_scratch_size</name></member>
+    <member refid="ckernel__engine_8h_1a88d8c0c539707aaaa9e1275f3c6c0807" kind="function"><name>fused_rmsnorm_qkv_prefill</name></member>
+    <member refid="ckernel__engine_8h_1a40eb980b78fea10775ca56b350f2230a" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major</name></member>
+    <member refid="ckernel__engine_8h_1afd9005557cdc687d7911f97f0bd01fbf" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major_quant</name></member>
+    <member refid="ckernel__engine_8h_1a153e9de294cb072631d85f152c121785" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size</name></member>
+    <member refid="ckernel__engine_8h_1ab482f93509482dcc7028eb32424ce6cd" kind="function"><name>fused_rmsnorm_qkv_scratch_size</name></member>
     <member refid="ckernel__engine_8h_1a3075b77764b4b408e3c1c9b89a2822ad" kind="function"><name>gelu_backward_exact</name></member>
     <member refid="ckernel__engine_8h_1a79b99577c3b4e080aa37e41ffa43c46f" kind="function"><name>gelu_backward_exact_bf16</name></member>
     <member refid="ckernel__engine_8h_1aeaf518a5239f4588f8c28b05b96d5478" kind="function"><name>gelu_backward_fast</name></member>
@@ -2278,6 +2331,7 @@
     <member refid="ckernel__engine_8h_1a86aec042bcceb0bd8955f0daf0d986c4" kind="function"><name>im2patch</name></member>
     <member refid="ckernel__engine_8h_1a57139580e075be2d5a65cfffc8e84898" kind="function"><name>im2patch_bf16</name></member>
     <member refid="ckernel__engine_8h_1a377bab84fd3d4ba79cf92024615c240a" kind="function"><name>kv_cache_repack_head_major_inplace</name></member>
+    <member refid="ckernel__engine_8h_1ae9fc8e88b12cec4fcfbdb30b602bf7ef" kind="function"><name>kv_cache_store</name></member>
     <member refid="ckernel__engine_8h_1a6add8eaed40b7a32a537cf4cffb39709" kind="function"><name>kv_cache_write_head_major</name></member>
     <member refid="ckernel__engine_8h_1a8d349f047d6654b3a351fb62e0b20e87" kind="function"><name>layernorm_backward_kernel</name></member>
     <member refid="ckernel__engine_8h_1aa7733a43d00131cdc95692c34076b02e" kind="function"><name>layernorm_backward_kernel_bf16</name></member>
@@ -2294,6 +2348,8 @@
     <member refid="ckernel__engine_8h_1a0df9f0994c879eaa00c6ba9c0867bbec" kind="function"><name>moe_accumulate_expert_f32</name></member>
     <member refid="ckernel__engine_8h_1a3ffa58aab7da5c6e77096ad19385329a" kind="function"><name>patch2im</name></member>
     <member refid="ckernel__engine_8h_1aee95c2d2b45191471be617739a41ac0d" kind="function"><name>patch2im_bf16</name></member>
+    <member refid="ckernel__engine_8h_1af9d9ddf0d4084d8eaa67118ffefc60bb" kind="function"><name>quantize_batch_q8_0</name></member>
+    <member refid="ckernel__engine_8h_1a88de36293908b707c8c1663805dafae2" kind="function"><name>quantize_batch_q8_k</name></member>
     <member refid="ckernel__engine_8h_1aaed08819c4a21e49ca43bc3094022eaa" kind="function"><name>quantize_row_q8_0</name></member>
     <member refid="ckernel__engine_8h_1a8a2064dd87b86a56f41b163bef7bdd9d" kind="function"><name>quantize_row_q8_k</name></member>
     <member refid="ckernel__engine_8h_1a434da7f0647cdada09cd6ad435560467" kind="function"><name>relu_backward</name></member>
@@ -2339,6 +2395,7 @@
     <member refid="ckernel__engine_8h_1a3ced6292072f7fb17630a298120e04d2" kind="function"><name>topk_batched_f32</name></member>
     <member refid="ckernel__engine_8h_1adcd797bc726d0f95fd659787fad1db52" kind="function"><name>topk_f32</name></member>
     <member refid="ckernel__engine_8h_1ae80a999dd7d7242eda4ef1e50e1aa09c" kind="function"><name>topk_softmax_f32</name></member>
+    <member refid="ckernel__engine_8h_1a96082b299d4fa9b2e3cfcd6077b22ca3" kind="function"><name>unfused_rmsnorm_qkv_prefill</name></member>
     <member refid="ckernel__engine_8h_1a892b783bece286ef3d51dfef42017ac5" kind="function"><name>vec_dot_q6_k_q8_k</name></member>
     <member refid="ckernel__engine_8h_1a6923864d9edb216c4938436cd74a4823" kind="function"><name>weighted_sum_f32</name></member>
   </compound>
@@ -2798,6 +2855,7 @@
     <member refid="ckernel__quant_8h_1a92b59a0fe356901c8aaabfe548a4add6" kind="function"><name>rmsnorm_q8_k_fused</name></member>
     <member refid="ckernel__quant_8h_1adc037213865781c5c1ea63708ef94307" kind="function"><name>unpack_q4_k_scales</name></member>
     <member refid="ckernel__quant_8h_1a8744a3b1e4d1dc928fce050f111414a6" kind="function"><name>vec_dot_q5_0_q8_0</name></member>
+    <member refid="ckernel__quant_8h_1aea5f7a52ed3f21e0c6795766cfb28751" kind="function"><name>vec_dot_q8_0_q8_0</name></member>
   </compound>
   <compound refid="ckernel__registry_8c" kind="file"><name>ckernel_registry.c</name>
     <member refid="ckernel__registry_8c_1a099423d6ff299adc431de6513f61c7e9" kind="function"><name>ck_ir_validate_supported</name></member>
@@ -2904,6 +2962,17 @@
     <member refid="embedding__kernels__bf16_8c_1a7c57b105fb88eb4165a0c649932be08d" kind="function"><name>embedding_backward_bf16</name></member>
     <member refid="embedding__kernels__bf16_8c_1a6d58689c662e670a5423eedd0291d6b5" kind="function"><name>embedding_forward_bf16</name></member>
   </compound>
+  <compound refid="fp16__convert_8c" kind="file"><name>fp16_convert.c</name>
+    <member refid="fp16__convert_8c_1a96dabb7c81bd8038c26f047e9b41d545" kind="function"><name>ck_fma_f32_to_f16</name></member>
+    <member refid="fp16__convert_8c_1a2f7c2536c526cc2a4cc3773133814002" kind="function"><name>ck_fp16_to_fp32_2d</name></member>
+    <member refid="fp16__convert_8c_1ab58798e93abadd2c3bb44e500da557d0" kind="function"><name>ck_fp16_to_fp32_row</name></member>
+    <member refid="fp16__convert_8c_1af6d772e480abb26bbd5533edb5e7e4dd" kind="function"><name>ck_fp16_to_fp32_scalar</name></member>
+    <member refid="fp16__convert_8c_1a46d1de9776d12042ae9491264f297264" kind="function"><name>ck_fp32_to_fp16_2d</name></member>
+    <member refid="fp16__convert_8c_1a98a2231fa755660dcd687dc30b32af6f" kind="function"><name>ck_fp32_to_fp16_inplace</name></member>
+    <member refid="fp16__convert_8c_1af7424d60e8ca1ef00a889407399ccf1f" kind="function"><name>ck_fp32_to_fp16_row</name></member>
+    <member refid="fp16__convert_8c_1aed49219356425016b516da85e93a05fd" kind="function"><name>ck_fp32_to_fp16_scalar</name></member>
+    <member refid="fp16__convert_8c_1a12577269c5f3d0e090c2f0190966d306" kind="function"><name>ck_scale_f32_to_f16</name></member>
+  </compound>
   <compound refid="fused__kernels_8h" kind="file"><name>fused_kernels.h</name>
     <member refid="fused__kernels_8h_1a3be8400817c3258c25718a7ca1ab7e05" kind="function"><name>fused_flash_attention_all_heads</name></member>
     <member refid="fused__kernels_8h_1a5d7b187c9d96d9bb671dc428889d6f17" kind="function"><name>fused_flash_attention_head</name></member>
@@ -2952,6 +3021,12 @@
     <member refid="gemm__fused__kernels_8c_1a3b3b32e0000c63586cddb9be0eda5daf" kind="function"><name>gemm_bias_relu_fused</name></member>
     <member refid="gemm__fused__kernels_8c_1a26763168556236dee899fe08699cc826" kind="function"><name>gemm_bias_silu_fused</name></member>
     <member refid="gemm__fused__kernels_8c_1a2ae3bbf03cebc529c1e7962a7dba2568" kind="function"><name>gemm_swiglu_fused</name></member>
+  </compound>
+  <compound refid="gemm__head__major__output_8c" kind="file"><name>gemm_head_major_output.c</name>
+    <member refid="gemm__head__major__output_8c_1a30955da0f71b6a46475df846ee7ef144" kind="function"><name>ck_gemm_nt_head_major_q5_0</name></member>
+    <member refid="gemm__head__major__output_8c_1a083471cd407d1f7ece23be4340e640bb" kind="function"><name>ck_gemm_nt_head_major_q8_0</name></member>
+    <member refid="gemm__head__major__output_8c_1a4b1482bd60f21521ba08b497c5289770" kind="function"><name>dequant_q5_0_row</name></member>
+    <member refid="gemm__head__major__output_8c_1a4b4b40c7902e0c70ced8df11bd3fa236" kind="function"><name>gemv_nt_q5_0_head_major_output</name></member>
   </compound>
   <compound refid="gemm__kernels_8c" kind="file"><name>gemm_kernels.c</name>
     <member refid="gemm__kernels_8c_1ad7789976472e68f59b1604811f4648f2" kind="function"><name>ck_gemm_add_bias</name></member>
@@ -3147,6 +3222,8 @@
     <member refid="gemm__kernels__q8__0_8c_1af81f5e920a8025d1f3034b56b43f42dc" kind="function"><name>gemv_q8_0_backward_ref</name></member>
     <member refid="gemm__kernels__q8__0_8c_1ab56038b4e1cf73692b6be9c28ada9023" kind="function"><name>gemv_q8_0_q8_0</name></member>
     <member refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" kind="function"><name>gemv_q8_0_ref</name></member>
+    <member refid="gemm__kernels__q8__0_8c_1a454391a623a91879cf0a9b4e457e5cf7" kind="function"><name>quantize_batch_q8_0</name></member>
+    <member refid="gemm__kernels__q8__0_8c_1a6319eb9192df15549a476f85f52cd806" kind="function"><name>quantize_batch_q8_k</name></member>
     <member refid="gemm__kernels__q8__0_8c_1adf8ea140a408f51698d95718f1d8db49" kind="function"><name>quantize_row_q8_0</name></member>
     <member refid="gemm__kernels__q8__0_8c_1a64b28ca8a25883986a0d22e39a574a32" kind="function"><name>quantize_row_q8_k</name></member>
     <member refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kind="function"><name>vec_dot_q8_0_q8_0</name></member>
@@ -3490,6 +3567,7 @@
   </compound>
   <compound refid="kv__cache__kernels_8c" kind="file"><name>kv_cache_kernels.c</name>
     <member refid="kv__cache__kernels_8c_1a377bab84fd3d4ba79cf92024615c240a" kind="function"><name>kv_cache_repack_head_major_inplace</name></member>
+    <member refid="kv__cache__kernels_8c_1ae9fc8e88b12cec4fcfbdb30b602bf7ef" kind="function"><name>kv_cache_store</name></member>
     <member refid="kv__cache__kernels_8c_1a6add8eaed40b7a32a537cf4cffb39709" kind="function"><name>kv_cache_write_head_major</name></member>
   </compound>
   <compound refid="layernorm__kernels_8c" kind="file"><name>layernorm_kernels.c</name>
@@ -3519,11 +3597,58 @@
     <member refid="mega__fused__attention_8h_1a37f0664c9146b0e5a80624fdaffbb1f5" kind="function"><name>mega_fuse_report_stats</name></member>
     <member refid="mega__fused__attention_8h_1aeeb0cc88f51b1af24d80deeea9bae2b4" kind="function"><name>mega_fuse_rmsnorm_qkv</name></member>
     <member refid="mega__fused__attention_8h_1a45deca0f8d6b12dd912c6b76dd49d80c" kind="function"><name>mega_fuse_rmsnorm_qkv_rope</name></member>
-    <member refid="mega__fused__attention_8h_1a626ea4f03fa804f5db76618f0bcfb9a1" kind="function"><name>mega_fused_attention_decode</name></member>
-    <member refid="mega__fused__attention_8h_1ab29476f695d711722430d9a03ad2072e" kind="function"><name>mega_fused_attention_prefill</name></member>
+    <member refid="mega__fused__attention_8h_1a7b2cd3664e2858631e67aebb6576b1e2" kind="function"><name>mega_fused_attention_decode</name></member>
+    <member refid="mega__fused__attention_8h_1a27249851108497d6b5fb85c55450dcc1" kind="function"><name>mega_fused_attention_prefill</name></member>
+    <member refid="mega__fused__attention_8h_1acdd13869b94d435a14a0ada232c66e71" kind="function"><name>mega_fused_attention_prefill_q8_0</name></member>
+    <member refid="mega__fused__attention_8h_1a00f6e544eff204d7567bfe46076d3533" kind="function"><name>mega_fused_attention_prefill_q8_0_scratch_size</name></member>
+    <member refid="mega__fused__attention_8h_1a1bcc7ea2d222390ac04fd37f3d8081df" kind="function"><name>mega_fused_attention_prefill_scratch_size</name></member>
+    <member refid="mega__fused__attention_8h_1a88f688b6b8916971950e975f3f6ee650" kind="function"><name>mega_fused_outproj_mlp_prefill</name></member>
+    <member refid="mega__fused__attention_8h_1aca1476c2ed7a5ed20fd199f597a67149" kind="function"><name>mega_fused_outproj_mlp_prefill_scratch_size</name></member>
   </compound>
   <compound refid="mega__fused__attention__avx_8c" kind="file"><name>mega_fused_attention_avx.c</name>
-    <member refid="mega__fused__attention__avx_8c_1a4a4f18b041230f8b2bad59054566a75c" kind="function"><name>mega_fuse_rope_inplace_avx</name></member>
+    <member refid="mega__fused__attention__avx_8c_1aec2d9f29e69cc84b40b2a6504a54d812" kind="define"><name>MEGA_KV_TILE</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a0f1bc2213a8b5b37144943e6da1eb48a" kind="define"><name>MEGA_Q_TILE</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a6dd8daa8898ca7794478edaf671f906a" kind="define"><name>MEGA_REGS</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a83b70777dc5595bab8c9060d83e4bd91" kind="define"><name>MEGA_STACK_MAX</name></member>
+    <member refid="mega__fused__attention__avx_8c_1afb10ce2e9784bf731312a52032176aaa" kind="define"><name>MEGA_VLEN</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a8dac2945f1e6614acad014658a67c25c" kind="define"><name>REG_K_TILE</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a52c92872d38a4803efac3d10b8daae8c" kind="define"><name>REG_O_ACCUM</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a0493a1e92829e37919fe80374ddf06d9" kind="define"><name>REG_Q_ACCUM</name></member>
+    <member refid="mega__fused__attention__avx_8c_1abb23ccebfb6305a7d1b4f76e35587484" kind="define"><name>REG_SOFTMAX</name></member>
+    <member refid="mega__fused__attention__avx_8c_1ad3b0b6d8d5d3de58e5d56ce84e667b20" kind="define"><name>REG_TEMP</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a0dfb0d638f2eaaba130772508d90f5e8" kind="define"><name>REG_V_TILE</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a481d5a4d4ee37e40f432109b3873bc05" kind="function"><name>ck_dot_f32</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a460bd562be1b122ecd6f7a1ed67278db" kind="function"><name>mega_fuse_flash_attention_avx</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a28f0a742d715a18075ec198b4bc1a725" kind="function"><name>mega_fuse_output_proj_residual</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a50a36bdd7432b126d7dfc71e897cef71" kind="function"><name>mega_fuse_rmsnorm_qkv_avx</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a5ebf03c32d62ddf588b8525437ab2ebf" kind="function"><name>mega_fuse_rope_inplace_avx</name></member>
+    <member refid="mega__fused__attention__avx_8c_1a7b2cd3664e2858631e67aebb6576b1e2" kind="function"><name>mega_fused_attention_decode</name></member>
+  </compound>
+  <compound refid="mega__fused__attention__prefill_8c" kind="file"><name>mega_fused_attention_prefill.c</name>
+    <member refid="mega__fused__attention__prefill_8c_1a2945c133b2cc63cb2f516c55e359ffba" kind="function"><name>align_up_size</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a9fdbcc38d87e3452b8f466ae91e17c5b" kind="function"><name>ck_q8_0_outproj_enabled</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a3c0ac15e87fbf875bd91aad8288b7e7c" kind="function"><name>flatten_head_major</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a27249851108497d6b5fb85c55450dcc1" kind="function"><name>mega_fused_attention_prefill</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a1bcc7ea2d222390ac04fd37f3d8081df" kind="function"><name>mega_fused_attention_prefill_scratch_size</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a6a5da63aac6821fd65ed403bb1546577" kind="function"><name>out_proj_head_major_q5_0_q8_0</name></member>
+    <member refid="mega__fused__attention__prefill_8c_1a883b9f36dd8db8e37e5df4037f25b86e" kind="function"><name>quantize_attn_out_head_major_q8_0</name></member>
+  </compound>
+  <compound refid="mega__fused__attention__prefill__q8__0_8c" kind="file"><name>mega_fused_attention_prefill_q8_0.c</name>
+    <member refid="mega__fused__attention__prefill__q8__0_8c_1a2945c133b2cc63cb2f516c55e359ffba" kind="function"><name>align_up_size</name></member>
+    <member refid="mega__fused__attention__prefill__q8__0_8c_1acdd13869b94d435a14a0ada232c66e71" kind="function"><name>mega_fused_attention_prefill_q8_0</name></member>
+    <member refid="mega__fused__attention__prefill__q8__0_8c_1a00f6e544eff204d7567bfe46076d3533" kind="function"><name>mega_fused_attention_prefill_q8_0_scratch_size</name></member>
+    <member refid="mega__fused__attention__prefill__q8__0_8c_1a0404c43ebf752ec2c2f54ead81036f30" kind="function"><name>out_proj_head_major_q8_0_q8_0</name></member>
+    <member refid="mega__fused__attention__prefill__q8__0_8c_1a883b9f36dd8db8e37e5df4037f25b86e" kind="function"><name>quantize_attn_out_head_major_q8_0</name></member>
+  </compound>
+  <compound refid="mega__fused__outproj__mlp__prefill_8c" kind="file"><name>mega_fused_outproj_mlp_prefill.c</name>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a957557433ef72c3e677bd6b34be2d662" kind="define"><name>OUTPROJ_TILE_N</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a957557433ef72c3e677bd6b34be2d662" kind="define"><name>OUTPROJ_TILE_N</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a2945c133b2cc63cb2f516c55e359ffba" kind="function"><name>align_up_size</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a88f688b6b8916971950e975f3f6ee650" kind="function"><name>mega_fused_outproj_mlp_prefill</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1aca1476c2ed7a5ed20fd199f597a67149" kind="function"><name>mega_fused_outproj_mlp_prefill_scratch_size</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a6a5da63aac6821fd65ed403bb1546577" kind="function"><name>out_proj_head_major_q5_0_q8_0</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a0404c43ebf752ec2c2f54ead81036f30" kind="function"><name>out_proj_head_major_q8_0_q8_0</name></member>
+    <member refid="mega__fused__outproj__mlp__prefill_8c_1a883b9f36dd8db8e37e5df4037f25b86e" kind="function"><name>quantize_attn_out_head_major_q8_0</name></member>
   </compound>
   <compound refid="memory__pool_8c" kind="file"><name>memory_pool.c</name>
     <member refid="memory__pool_8c_1a11253de42680a321ded636e9e3e0bb2c" kind="function"><name>align_up</name></member>
@@ -3612,6 +3737,35 @@
     <member refid="parallel__orchestration_8c_1a85445a786f077a766e57196679bbafac" kind="function"><name>residual_add_parallel</name></member>
     <member refid="parallel__orchestration_8c_1a16e02661985307528fd35a40fa83135f" kind="function"><name>vec_scale_parallel</name></member>
     <member refid="parallel__orchestration_8c_1a049cc63ce5dd8458256cf3e21a343163" kind="function"><name>vec_zero_parallel</name></member>
+  </compound>
+  <compound refid="prefill__fused__gemm_8c" kind="file"><name>prefill_fused_gemm.c</name>
+    <member refid="prefill__fused__gemm_8c_1a27912bbb68970a254a4222e66be7bf98" kind="define"><name>PREFILL_TILE_M</name></member>
+    <member refid="prefill__fused__gemm_8c_1a77d5e9fd2c94d63935abf32e5584251b" kind="define"><name>PREFILL_TILE_N</name></member>
+    <member refid="prefill__fused__gemm_8c_1a7c104f1e02b86be82622733c343bcfd3" kind="function"><name>add_bias_tile</name></member>
+    <member refid="prefill__fused__gemm_8c_1a2945c133b2cc63cb2f516c55e359ffba" kind="function"><name>align_up_size</name></member>
+    <member refid="prefill__fused__gemm_8c_1a312f98bb70a4da17154acc7b78bfbb1f" kind="function"><name>fused_mlp_swiglu_prefill</name></member>
+    <member refid="prefill__fused__gemm_8c_1ace18b7bc5b9b7708bd0e4316181c87e9" kind="function"><name>fused_mlp_swiglu_prefill_bias</name></member>
+    <member refid="prefill__fused__gemm_8c_1ada60aced9f99494621f97100803ccde8" kind="function"><name>fused_mlp_swiglu_prefill_w1w2_quant</name></member>
+    <member refid="prefill__fused__gemm_8c_1a3d6e23529a459885aef87c78fb8b4466" kind="function"><name>fused_mlp_swiglu_prefill_w1w2_quant_scratch_size</name></member>
+    <member refid="prefill__fused__gemm_8c_1af5f2587e0d0324d1b2b342d1526c33a6" kind="function"><name>fused_mlp_swiglu_scratch_size</name></member>
+    <member refid="prefill__fused__gemm_8c_1a37f81ee7436379c0f97ebd7f475b57c3" kind="function"><name>fused_rmsnorm_gemm_2d_tiled</name></member>
+    <member refid="prefill__fused__gemm_8c_1a88d8c0c539707aaaa9e1275f3c6c0807" kind="function"><name>fused_rmsnorm_qkv_prefill</name></member>
+    <member refid="prefill__fused__gemm_8c_1a40eb980b78fea10775ca56b350f2230a" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major</name></member>
+    <member refid="prefill__fused__gemm_8c_1afd9005557cdc687d7911f97f0bd01fbf" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major_quant</name></member>
+    <member refid="prefill__fused__gemm_8c_1a153e9de294cb072631d85f152c121785" kind="function"><name>fused_rmsnorm_qkv_prefill_head_major_quant_scratch_size</name></member>
+    <member refid="prefill__fused__gemm_8c_1ab482f93509482dcc7028eb32424ce6cd" kind="function"><name>fused_rmsnorm_qkv_scratch_size</name></member>
+    <member refid="prefill__fused__gemm_8c_1a0e9c7f8af15518baef7855f11cc7dc83" kind="function"><name>gemm_nt_q8_0_dispatch</name></member>
+    <member refid="prefill__fused__gemm_8c_1a0162ee60cbc1f12d4fbec5215075c35f" kind="function"><name>gemm_nt_q8_0_mlp_dispatch</name></member>
+    <member refid="prefill__fused__gemm_8c_1abafc3abe1909ec3e623f7b14ccffff93" kind="function"><name>gemm_nt_q8_k_mlp_dispatch</name></member>
+    <member refid="prefill__fused__gemm_8c_1a615bac7d9294b6bfd0cc45e0c1e2efcb" kind="function"><name>gemm_nt_q8_k_qkv_dispatch</name></member>
+    <member refid="prefill__fused__gemm_8c_1aa9e4ace727b9f9ed693383744ec13dca" kind="function"><name>gemm_tile_nt_strided</name></member>
+    <member refid="prefill__fused__gemm_8c_1aa38e5bb5a253cd8b19d47e6e7bcad57c" kind="function"><name>mlp_q8_0_dtype_supported</name></member>
+    <member refid="prefill__fused__gemm_8c_1a2b4421b1a9483deb705e46069d87844a" kind="function"><name>mlp_q8_k_dtype_supported</name></member>
+    <member refid="prefill__fused__gemm_8c_1a9b9524d15e40280143e7b765ecb0418a" kind="function"><name>qkv_q8_0_dtype_supported</name></member>
+    <member refid="prefill__fused__gemm_8c_1a1d851f3de1b977cd68171e227d0b86cf" kind="function"><name>qkv_q8_k_dtype_supported</name></member>
+    <member refid="prefill__fused__gemm_8c_1ada39c49b5289c4dbb57ce241ed03d7bc" kind="function"><name>rmsnorm_tile</name></member>
+    <member refid="prefill__fused__gemm_8c_1a314debc713536801afb2b4c13bede6fd" kind="function"><name>silu_prefill</name></member>
+    <member refid="prefill__fused__gemm_8c_1a96082b299d4fa9b2e3cfcd6077b22ca3" kind="function"><name>unfused_rmsnorm_qkv_prefill</name></member>
   </compound>
   <compound refid="quantize__row__q8__k__sse_8c" kind="file"><name>quantize_row_q8_k_sse.c</name>
     <member refid="quantize__row__q8__k__sse_8c_1ab5a6ee098afcfc17f8e2da12535945aa" kind="function"><name>ck_nearest_int</name></member>
@@ -4438,6 +4592,8 @@
   <compound refid="vision__kernels__bf16_8c" kind="file"><name>vision_kernels_bf16.c</name>
     <member refid="vision__kernels__bf16_8c_1a57139580e075be2d5a65cfffc8e84898" kind="function"><name>im2patch_bf16</name></member>
     <member refid="vision__kernels__bf16_8c_1aee95c2d2b45191471be617739a41ac0d" kind="function"><name>patch2im_bf16</name></member>
+  </compound>
+  <compound refid="test" kind="page"><name>test</name>
   </compound>
   <compound refid="dir_ebed218ca042e0cae3861bf18b14f766" kind="dir"><name>data_structures</name>
   </compound>

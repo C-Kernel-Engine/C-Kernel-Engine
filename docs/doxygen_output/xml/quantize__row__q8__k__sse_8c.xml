@@ -75,7 +75,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" line="8" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" bodystart="8" bodyend="13"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" line="22" column="19" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" bodystart="22" bodyend="27"/>
       </memberdef>
       <memberdef kind="function" id="quantize__row__q8__k__sse_8c_1ad7fa7d735b58b52c90cbd6160676e86f" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -100,99 +100,125 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" line="15" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" bodystart="15" bodyend="81"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" line="29" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c" bodystart="29" bodyend="95"/>
         <references refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" compoundref="ckernel__quant_8h" startline="155">block_q8_K::bsums</references>
         <references refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" compoundref="ckernel__quant_8h" startline="153">block_q8_K::d</references>
         <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
-        <referencedby refid="ckernel__engine_8h_1a8a2064dd87b86a56f41b163bef7bdd9d" compoundref="gemm__kernels__q4k__q8k_8c" startline="98" endline="104">quantize_row_q8_k</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a8a2064dd87b86a56f41b163bef7bdd9d" compoundref="gemm__kernels__q4k__q8k_8c" startline="107" endline="113">quantize_row_q8_k</referencedby>
       </memberdef>
       </sectiondef>
     <briefdescription>
+<para>SSE-optimized Q8_K row quantization kernel. </para>
     </briefdescription>
     <detaileddescription>
+<sect1 id="quantize__row__q8__k__sse_8c_1autotoc_md68">
+<title>CK-ENGINE KERNEL RULES:</title>
+<para><orderedlist>
+<listitem><para>NO malloc/free - memory via bump allocator, pointers passed in</para>
+</listitem><listitem><para>NO OpenMP - parallelization at orchestrator/codegen layer</para>
+</listitem><listitem><para>API must define: inputs, outputs, workspace, and memory layouts</para>
+</listitem><listitem><para>Pure computation - deterministic, no side effects</para>
+</listitem></orderedlist>
+</para>
+<para>After changes: make test &amp;&amp; make llamacpp-parity-full </para>
+</sect1>
     </detaileddescription>
     <programlisting>
-<codeline lineno="1"><highlight class="preprocessor">#include<sp/>&lt;assert.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;math.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="5"><highlight class="normal"></highlight></codeline>
-<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__quant_8h" kindref="compound">ckernel_quant.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="7"><highlight class="normal"></highlight></codeline>
-<codeline lineno="8" refid="quantize__row__q8__k__sse_8c_1ab5a6ee098afcfc17f8e2da12535945aa" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="quantize__row__q8__k__sse_8c_1ab5a6ee098afcfc17f8e2da12535945aa" kindref="member">ck_nearest_int</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>fval)<sp/>{</highlight></codeline>
-<codeline lineno="9"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>val<sp/>=<sp/>fval<sp/>+<sp/>12582912.f;</highlight></codeline>
-<codeline lineno="10"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i;</highlight></codeline>
-<codeline lineno="11"><highlight class="normal"><sp/><sp/><sp/><sp/>memcpy(&amp;i,<sp/>&amp;val,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal">));</highlight></codeline>
-<codeline lineno="12"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(i<sp/>&amp;<sp/>0x007fffff)<sp/>-<sp/>0x00400000;</highlight></codeline>
-<codeline lineno="13"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>quantize_row_q8_k_sse.c</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>SSE-optimized<sp/>Q8_K<sp/>row<sp/>quantization<sp/>kernel</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>CK-ENGINE<sp/>KERNEL<sp/>RULES:</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>=======================</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>1.<sp/>NO<sp/>malloc/free<sp/>-<sp/>memory<sp/>via<sp/>bump<sp/>allocator,<sp/>pointers<sp/>passed<sp/>in</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>2.<sp/>NO<sp/>OpenMP<sp/>-<sp/>parallelization<sp/>at<sp/>orchestrator/codegen<sp/>layer</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>3.<sp/>API<sp/>must<sp/>define:<sp/>inputs,<sp/>outputs,<sp/>workspace,<sp/>and<sp/>memory<sp/>layouts</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>4.<sp/>Pure<sp/>computation<sp/>-<sp/>deterministic,<sp/>no<sp/>side<sp/>effects</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>After<sp/>changes:<sp/>make<sp/>test<sp/>&amp;&amp;<sp/>make<sp/>llamacpp-parity-full</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="14"><highlight class="normal"></highlight></codeline>
-<codeline lineno="15" refid="ckernel__quant_8h_1ad7fa7d735b58b52c90cbd6160676e86f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="quantize__row__q8__k__sse_8c_1ad7fa7d735b58b52c90cbd6160676e86f" kindref="member">quantize_row_q8_k_sse</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k)<sp/>{</highlight></codeline>
-<codeline lineno="16"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!x<sp/>||<sp/>!vy<sp/>||<sp/>k<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="17"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="18"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="19"><highlight class="normal"><sp/><sp/><sp/><sp/>assert(k<sp/>%<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref><sp/>==<sp/>0);</highlight></codeline>
-<codeline lineno="20"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nb<sp/>=<sp/>k<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
-<codeline lineno="21"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*y<sp/>=<sp/>(<ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*)vy;</highlight></codeline>
-<codeline lineno="22"><highlight class="normal"></highlight></codeline>
-<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>nb;<sp/>++i)<sp/>{</highlight></codeline>
-<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>max<sp/>=<sp/>0.0f;</highlight></codeline>
-<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
-<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>SSE<sp/>max<sp/>absolute<sp/>value</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_max<sp/>=<sp/>_mm_setzero_ps();</highlight></codeline>
-<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>j<sp/>+=<sp/>4)<sp/>{</highlight></codeline>
-<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j);</highlight></codeline>
-<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_abs<sp/>=<sp/>_mm_andnot_ps(_mm_set1_ps(-0.0f),<sp/>v);</highlight></codeline>
-<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>v_abs);</highlight></codeline>
-<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
-<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Horizontal<sp/>max</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>_mm_shuffle_ps(v_max,<sp/>v_max,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
-<codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>_mm_shuffle_ps(v_max,<sp/>v_max,<sp/>_MM_SHUFFLE(0,<sp/>1,<sp/>0,<sp/>1)));</highlight></codeline>
-<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_store_ss(&amp;max,<sp/>v_max);</highlight></codeline>
-<codeline lineno="38"><highlight class="normal"></highlight></codeline>
-<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max<sp/>==<sp/>0.0f)<sp/>{</highlight></codeline>
-<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref><sp/>=<sp/>0.0f;</highlight></codeline>
-<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memset(y[i].qs,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(y[i].qs));</highlight></codeline>
-<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memset(y[i].bsums,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(y[i].bsums));</highlight></codeline>
-<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x<sp/>+=<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
-<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="46"><highlight class="normal"></highlight></codeline>
-<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>iscale<sp/>=<sp/>-127.0f<sp/>/<sp/>max;</highlight></codeline>
-<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_iscale<sp/>=<sp/>_mm_set1_ps(iscale);</highlight></codeline>
-<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
-<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Quantize<sp/>and<sp/>compute<sp/>bsums<sp/>in<sp/>SSE</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>j<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
-<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x0<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>0);</highlight></codeline>
-<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x1<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>4);</highlight></codeline>
-<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x2<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>8);</highlight></codeline>
-<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x3<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>12);</highlight></codeline>
-<codeline lineno="56"><highlight class="normal"></highlight></codeline>
-<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q0<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x0,<sp/>v_iscale));</highlight></codeline>
-<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q1<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x1,<sp/>v_iscale));</highlight></codeline>
-<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q2<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x2,<sp/>v_iscale));</highlight></codeline>
-<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q3<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x3,<sp/>v_iscale));</highlight></codeline>
-<codeline lineno="61"><highlight class="normal"></highlight></codeline>
-<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Pack<sp/>i32<sp/>-&gt;<sp/>i16<sp/>-&gt;<sp/>i8</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q01<sp/>=<sp/>_mm_packs_epi32(q0,<sp/>q1);</highlight></codeline>
-<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q23<sp/>=<sp/>_mm_packs_epi32(q2,<sp/>q3);</highlight></codeline>
-<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q0123<sp/>=<sp/>_mm_packs_epi16(q01,<sp/>q23);</highlight></codeline>
-<codeline lineno="66"><highlight class="normal"></highlight></codeline>
-<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_storeu_si128((__m128i<sp/>*)(y[i].qs<sp/>+<sp/>j),<sp/>q0123);</highlight></codeline>
-<codeline lineno="68"><highlight class="normal"></highlight></codeline>
-<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>bsum<sp/>for<sp/>these<sp/>16<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Each<sp/>bsum[j/16]<sp/>covers<sp/>16<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>p01<sp/>=<sp/>_mm_add_epi16(q01,<sp/>q23);</highlight></codeline>
-<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p01<sp/>=<sp/>_mm_add_epi16(p01,<sp/>_mm_shuffle_epi32(p01,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
-<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p01<sp/>=<sp/>_mm_add_epi16(p01,<sp/>_mm_shufflelo_epi16(p01,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
-<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int16_t<sp/>bsum<sp/>=<sp/>(int16_t)_mm_extract_epi16(p01,<sp/>0)<sp/>+<sp/>(int16_t)_mm_extract_epi16(p01,<sp/>1);</highlight></codeline>
-<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[j<sp/>/<sp/>16]<sp/>=<sp/>bsum;</highlight></codeline>
-<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="77"><highlight class="normal"></highlight></codeline>
-<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref><sp/>=<sp/>1.0f<sp/>/<sp/>iscale;</highlight></codeline>
-<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x<sp/>+=<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
-<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="81"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;assert.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;math.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;string.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;immintrin.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__quant_8h" kindref="compound">ckernel_quant.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="quantize__row__q8__k__sse_8c_1ab5a6ee098afcfc17f8e2da12535945aa" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="quantize__row__q8__k__sse_8c_1ab5a6ee098afcfc17f8e2da12535945aa" kindref="member">ck_nearest_int</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>fval)<sp/>{</highlight></codeline>
+<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>val<sp/>=<sp/>fval<sp/>+<sp/>12582912.f;</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/>memcpy(&amp;i,<sp/>&amp;val,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(i<sp/>&amp;<sp/>0x007fffff)<sp/>-<sp/>0x00400000;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="29" refid="ckernel__quant_8h_1ad7fa7d735b58b52c90cbd6160676e86f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="quantize__row__q8__k__sse_8c_1ad7fa7d735b58b52c90cbd6160676e86f" kindref="member">quantize_row_q8_k_sse</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k)<sp/>{</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!x<sp/>||<sp/>!vy<sp/>||<sp/>k<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/>assert(k<sp/>%<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref><sp/>==<sp/>0);</highlight></codeline>
+<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nb<sp/>=<sp/>k<sp/>/<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*y<sp/>=<sp/>(<ref refid="structblock__q8__K" kindref="compound">block_q8_K</ref><sp/>*)vy;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/>nb;<sp/>++i)<sp/>{</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>max<sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>SSE<sp/>max<sp/>absolute<sp/>value</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_max<sp/>=<sp/>_mm_setzero_ps();</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>j<sp/>+=<sp/>4)<sp/>{</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j);</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_abs<sp/>=<sp/>_mm_andnot_ps(_mm_set1_ps(-0.0f),<sp/>v);</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>v_abs);</highlight></codeline>
+<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Horizontal<sp/>max</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>_mm_shuffle_ps(v_max,<sp/>v_max,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>v_max<sp/>=<sp/>_mm_max_ps(v_max,<sp/>_mm_shuffle_ps(v_max,<sp/>v_max,<sp/>_MM_SHUFFLE(0,<sp/>1,<sp/>0,<sp/>1)));</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_store_ss(&amp;max,<sp/>v_max);</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"></highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(max<sp/>==<sp/>0.0f)<sp/>{</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref><sp/>=<sp/>0.0f;</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memset(y[i].qs,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(y[i].qs));</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>memset(y[i].bsums,<sp/>0,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(y[i].bsums));</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x<sp/>+=<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="59"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>iscale<sp/>=<sp/>-127.0f<sp/>/<sp/>max;</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>v_iscale<sp/>=<sp/>_mm_set1_ps(iscale);</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Quantize<sp/>and<sp/>compute<sp/>bsums<sp/>in<sp/>SSE</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>j<sp/>=<sp/>0;<sp/>j<sp/>&lt;<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;<sp/>j<sp/>+=<sp/>16)<sp/>{</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x0<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>0);</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x1<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>4);</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x2<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>8);</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128<sp/>x3<sp/>=<sp/>_mm_loadu_ps(x<sp/>+<sp/>j<sp/>+<sp/>12);</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q0<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x0,<sp/>v_iscale));</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q1<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x1,<sp/>v_iscale));</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q2<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x2,<sp/>v_iscale));</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q3<sp/>=<sp/>_mm_cvtps_epi32(_mm_mul_ps(x3,<sp/>v_iscale));</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Pack<sp/>i32<sp/>-&gt;<sp/>i16<sp/>-&gt;<sp/>i8</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q01<sp/>=<sp/>_mm_packs_epi32(q0,<sp/>q1);</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q23<sp/>=<sp/>_mm_packs_epi32(q2,<sp/>q3);</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>q0123<sp/>=<sp/>_mm_packs_epi16(q01,<sp/>q23);</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"></highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_storeu_si128((__m128i<sp/>*)(y[i].qs<sp/>+<sp/>j),<sp/>q0123);</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Compute<sp/>bsum<sp/>for<sp/>these<sp/>16<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Each<sp/>bsum[j/16]<sp/>covers<sp/>16<sp/>elements</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>__m128i<sp/>p01<sp/>=<sp/>_mm_add_epi16(q01,<sp/>q23);</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p01<sp/>=<sp/>_mm_add_epi16(p01,<sp/>_mm_shuffle_epi32(p01,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
+<codeline lineno="87"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>p01<sp/>=<sp/>_mm_add_epi16(p01,<sp/>_mm_shufflelo_epi16(p01,<sp/>_MM_SHUFFLE(1,<sp/>0,<sp/>3,<sp/>2)));</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int16_t<sp/>bsum<sp/>=<sp/>(int16_t)_mm_extract_epi16(p01,<sp/>0)<sp/>+<sp/>(int16_t)_mm_extract_epi16(p01,<sp/>1);</highlight></codeline>
+<codeline lineno="89"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1ad3e3b87f42780053e576d03c01ac4176" kindref="member">bsums</ref>[j<sp/>/<sp/>16]<sp/>=<sp/>bsum;</highlight></codeline>
+<codeline lineno="90"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight></codeline>
+<codeline lineno="92"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>y[i].<ref refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" kindref="member">d</ref><sp/>=<sp/>1.0f<sp/>/<sp/>iscale;</highlight></codeline>
+<codeline lineno="93"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x<sp/>+=<sp/><ref refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" kindref="member">QK_K</ref>;</highlight></codeline>
+<codeline lineno="94"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="95"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/quantize_row_q8_k_sse.c"/>
   </compounddef>

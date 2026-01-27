@@ -172,6 +172,70 @@ void quantize_row_q8_0(const float *x, void *vy, int k)
 #endif
 }
 
+/**
+ * @brief Batch quantize FP32 to Q8_0 format (row-major output)
+ *
+ * Quantizes multiple rows of FP32 data to Q8_0 format, placing each row's
+ * Q8_0 output at the correct byte offset for GEMM compatibility.
+ *
+ * Memory layout:
+ *   Input:  [num_rows, k] FP32, row-major (stride = k * sizeof(float))
+ *   Output: [num_rows, q8_row_bytes] Q8_0, row-major (stride = q8_row_bytes)
+ *
+ * where q8_row_bytes = (k / 32) * sizeof(block_q8_0) = (k / 32) * 34
+ *
+ * @param x Input FP32 values [num_rows * k]
+ * @param vy Output Q8_0 blocks [num_rows * (k/32) blocks]
+ * @param num_rows Number of rows (batch size / tokens)
+ * @param k Elements per row (must be multiple of 32)
+ */
+void quantize_batch_q8_0(const float *x, void *vy, int num_rows, int k)
+{
+    const size_t row_bytes_in = (size_t)k * sizeof(float);
+    const size_t row_bytes_out = (size_t)(k / QK8_0) * sizeof(block_q8_0);
+
+    uint8_t *out = (uint8_t *)vy;
+    const uint8_t *in = (const uint8_t *)x;
+
+    for (int row = 0; row < num_rows; ++row) {
+        quantize_row_q8_0(
+            (const float *)(in + row * row_bytes_in),
+            (void *)(out + row * row_bytes_out),
+            k
+        );
+    }
+}
+
+/**
+ * @brief Batch quantize FP32 to Q8_K format (row-major output)
+ *
+ * Same as quantize_batch_q8_0 but for Q8_K format (super-blocks).
+ *
+ * @param x Input FP32 values [num_rows * k]
+ * @param vy Output Q8_K blocks
+ * @param num_rows Number of rows (batch size / tokens)
+ * @param k Elements per row (must be multiple of 256)
+ */
+void quantize_batch_q8_k(const float *x, void *vy, int num_rows, int k)
+{
+    /* Q8_K: 256 elements per super-block, each block is larger */
+    const size_t row_bytes_in = (size_t)k * sizeof(float);
+    /* Q8_K block size = 2 (d) + 256 (qs) + 32 (bsums/2) = ~274 bytes for 256 elements */
+    /* Actual: sizeof(block_q8_K) from ckernel_quant.h */
+    const size_t row_bytes_out = (size_t)(k / 256) * sizeof(block_q8_K);
+
+    uint8_t *out = (uint8_t *)vy;
+    const uint8_t *in = (const uint8_t *)x;
+
+    for (int row = 0; row < num_rows; ++row) {
+        quantize_row_q8_k(
+            (const float *)(in + row * row_bytes_in),
+            (void *)(out + row * row_bytes_out),
+            k
+        );
+    }
+}
+
 /* ============================================================================
  * Forward Pass: GEMV y = W @ x
  * ============================================================================ */

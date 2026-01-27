@@ -177,6 +177,15 @@ Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>GEMM kernels with FP16 (half-precision) weights. </p>
+<h1><a class="anchor" id="autotoc_md40"></a>
+CK-ENGINE KERNEL RULES:</h1>
+<ol type="1">
+<li>NO malloc/free - memory via bump allocator, pointers passed in</li>
+<li>NO OpenMP - parallelization at orchestrator/codegen layer</li>
+<li>API must define: inputs, outputs, workspace, and memory layouts</li>
+<li>Pure computation - deterministic, no side effects</li>
+</ol>
+<p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
 <p>Implements matrix multiplication where:</p><ul>
 <li>Weights: FP16 (IEEE half-precision, used by vision encoders)</li>
 <li>Activations: FP32</li>
@@ -202,7 +211,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00027">27</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00036">36</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
 
 </div>
 </div>
@@ -222,7 +231,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00028">28</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00037">37</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
 
 </div>
 </div>
@@ -261,29 +270,29 @@ Functions</h2></td></tr>
 
 <p>Convert FP16 tensor to FP32. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00217">217</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160;{</div>
-<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count16 = count / 16 * 16;</div>
-<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160; </div>
-<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count16; i += 16) {</div>
-<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;        __m256i f16 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)&amp;src[i]);</div>
-<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;        __m512 f32 = _mm512_cvtph_ps(f16);</div>
-<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;        _mm512_storeu_ps(&amp;dst[i], f32);</div>
-<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;    }</div>
-<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160; </div>
-<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = count16; i &lt; count; i++) {</div>
-<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(src[i]);</div>
-<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;    }</div>
-<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; i++) {</div>
-<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(src[i]);</div>
-<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;    }</div>
-<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_a5f379940f9b0147bf4f339d732f3341d"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a></div><div class="ttdeci">#define fp16_to_fp32(x)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00027">gemm_kernels_f16.c:27</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00226">226</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;{</div>
+<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count16 = count / 16 * 16;</div>
+<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160; </div>
+<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count16; i += 16) {</div>
+<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;        __m256i f16 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)&amp;src[i]);</div>
+<div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;        __m512 f32 = _mm512_cvtph_ps(f16);</div>
+<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;        _mm512_storeu_ps(&amp;dst[i], f32);</div>
+<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;    }</div>
+<div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160; </div>
+<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = count16; i &lt; count; i++) {</div>
+<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(src[i]);</div>
+<div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;    }</div>
+<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; i++) {</div>
+<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(src[i]);</div>
+<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;    }</div>
+<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_a5f379940f9b0147bf4f339d732f3341d"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a></div><div class="ttdeci">#define fp16_to_fp32(x)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00036">gemm_kernels_f16.c:36</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00027">fp16_to_fp32</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00036">fp16_to_fp32</a>.</p>
 
 </div>
 </div>
@@ -321,29 +330,29 @@ Functions</h2></td></tr>
 
 <p>Convert FP32 tensor to FP16. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00241">241</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;{</div>
-<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count16 = count / 16 * 16;</div>
-<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160; </div>
-<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count16; i += 16) {</div>
-<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;        __m512 f32 = _mm512_loadu_ps(&amp;src[i]);</div>
-<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;        __m256i f16 = _mm512_cvtps_ph(f32, 0);</div>
-<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;        _mm256_storeu_si256((__m256i *)&amp;dst[i], f16);</div>
-<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;    }</div>
-<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160; </div>
-<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = count16; i &lt; count; i++) {</div>
-<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a>(src[i]);</div>
-<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;    }</div>
-<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; i++) {</div>
-<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a>(src[i]);</div>
-<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160;    }</div>
-<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_ae9f44b9540b2b8d83760c1941ce8ccd2"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a></div><div class="ttdeci">#define fp32_to_fp16(x)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00028">gemm_kernels_f16.c:28</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00250">250</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;{</div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count16 = count / 16 * 16;</div>
+<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160; </div>
+<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count16; i += 16) {</div>
+<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;        __m512 f32 = _mm512_loadu_ps(&amp;src[i]);</div>
+<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;        __m256i f16 = _mm512_cvtps_ph(f32, 0);</div>
+<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160;        _mm256_storeu_si256((__m256i *)&amp;dst[i], f16);</div>
+<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;    }</div>
+<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160; </div>
+<div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = count16; i &lt; count; i++) {</div>
+<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a>(src[i]);</div>
+<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;    }</div>
+<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; i++) {</div>
+<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;        dst[i] = <a class="code" href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a>(src[i]);</div>
+<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;    }</div>
+<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_ae9f44b9540b2b8d83760c1941ce8ccd2"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ae9f44b9540b2b8d83760c1941ce8ccd2">fp32_to_fp16</a></div><div class="ttdeci">#define fp32_to_fp16(x)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00037">gemm_kernels_f16.c:37</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00028">fp32_to_fp16</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00037">fp32_to_fp16</a>.</p>
 
 </div>
 </div>
@@ -379,15 +388,15 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00378">378</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00379"></a><span class="lineno">  379</span>&#160;{</div>
-<div class="line"><a name="l00380"></a><span class="lineno">  380</span>&#160;    <span class="keywordtype">float</span> result;</div>
-<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a3718c32b9aaa8acd213a9e1cc4238220">gemv_f16</a>(&amp;result, w_f16, x, 1, K);</div>
-<div class="line"><a name="l00382"></a><span class="lineno">  382</span>&#160;    <span class="keywordflow">return</span> result;</div>
-<div class="line"><a name="l00383"></a><span class="lineno">  383</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_a3718c32b9aaa8acd213a9e1cc4238220"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a3718c32b9aaa8acd213a9e1cc4238220">gemv_f16</a></div><div class="ttdeci">void gemv_f16(float *y, const uint16_t *W, const float *x, int M, int K)</div><div class="ttdoc">Auto-dispatch GEMV based on available SIMD.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00119">gemm_kernels_f16.c:119</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00387">387</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00388"></a><span class="lineno">  388</span>&#160;{</div>
+<div class="line"><a name="l00389"></a><span class="lineno">  389</span>&#160;    <span class="keywordtype">float</span> result;</div>
+<div class="line"><a name="l00390"></a><span class="lineno">  390</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a3718c32b9aaa8acd213a9e1cc4238220">gemv_f16</a>(&amp;result, w_f16, x, 1, K);</div>
+<div class="line"><a name="l00391"></a><span class="lineno">  391</span>&#160;    <span class="keywordflow">return</span> result;</div>
+<div class="line"><a name="l00392"></a><span class="lineno">  392</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_a3718c32b9aaa8acd213a9e1cc4238220"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a3718c32b9aaa8acd213a9e1cc4238220">gemv_f16</a></div><div class="ttdeci">void gemv_f16(float *y, const uint16_t *W, const float *x, int M, int K)</div><div class="ttdoc">Auto-dispatch GEMV based on available SIMD.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00128">gemm_kernels_f16.c:128</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00119">gemv_f16()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00128">gemv_f16()</a>.</p>
 
 </div>
 </div>
@@ -443,17 +452,17 @@ Functions</h2></td></tr>
 
 <p>Auto-dispatch GEMM based on available SIMD. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00198">198</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;{</div>
-<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;    gemm_f16_avx512(Y, W, X, M, N, K);</div>
-<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a0989256b6558ca88475731f3fd05d699">gemm_f16_ref</a>(Y, W, X, M, N, K);</div>
-<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_a0989256b6558ca88475731f3fd05d699"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a0989256b6558ca88475731f3fd05d699">gemm_f16_ref</a></div><div class="ttdeci">void gemm_f16_ref(float *Y, const uint16_t *W, const float *X, int M, int N, int K)</div><div class="ttdoc">Matrix-matrix multiply with FP16 weights (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00145">gemm_kernels_f16.c:145</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00207">207</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;{</div>
+<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;    gemm_f16_avx512(Y, W, X, M, N, K);</div>
+<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a0989256b6558ca88475731f3fd05d699">gemm_f16_ref</a>(Y, W, X, M, N, K);</div>
+<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_a0989256b6558ca88475731f3fd05d699"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a0989256b6558ca88475731f3fd05d699">gemm_f16_ref</a></div><div class="ttdeci">void gemm_f16_ref(float *Y, const uint16_t *W, const float *X, int M, int N, int K)</div><div class="ttdoc">Matrix-matrix multiply with FP16 weights (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00154">gemm_kernels_f16.c:154</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00145">gemm_f16_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00154">gemm_f16_ref()</a>.</p>
 
 </div>
 </div>
@@ -509,15 +518,15 @@ Functions</h2></td></tr>
 
 <p>Batched backward pass. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00364">364</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00368"></a><span class="lineno">  368</span>&#160;{</div>
-<div class="line"><a name="l00369"></a><span class="lineno">  369</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a name="l00370"></a><span class="lineno">  370</span>&#160;        <a class="code" href="gemm__kernels__f16_8c.html#ab64031adeb76f584f88d8b4f29c37466">gemv_f16_backward</a>(&amp;dX[n * K], W, &amp;dY[n * M], M, K);</div>
-<div class="line"><a name="l00371"></a><span class="lineno">  371</span>&#160;    }</div>
-<div class="line"><a name="l00372"></a><span class="lineno">  372</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_ab64031adeb76f584f88d8b4f29c37466"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ab64031adeb76f584f88d8b4f29c37466">gemv_f16_backward</a></div><div class="ttdeci">void gemv_f16_backward(float *dX, const uint16_t *W, const float *dY, int M, int K)</div><div class="ttdoc">Auto-dispatch backward.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00349">gemm_kernels_f16.c:349</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00373">373</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00377"></a><span class="lineno">  377</span>&#160;{</div>
+<div class="line"><a name="l00378"></a><span class="lineno">  378</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a name="l00379"></a><span class="lineno">  379</span>&#160;        <a class="code" href="gemm__kernels__f16_8c.html#ab64031adeb76f584f88d8b4f29c37466">gemv_f16_backward</a>(&amp;dX[n * K], W, &amp;dY[n * M], M, K);</div>
+<div class="line"><a name="l00380"></a><span class="lineno">  380</span>&#160;    }</div>
+<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_ab64031adeb76f584f88d8b4f29c37466"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ab64031adeb76f584f88d8b4f29c37466">gemv_f16_backward</a></div><div class="ttdeci">void gemv_f16_backward(float *dX, const uint16_t *W, const float *dY, int M, int K)</div><div class="ttdoc">Auto-dispatch backward.</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00358">gemm_kernels_f16.c:358</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00349">gemv_f16_backward()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00358">gemv_f16_backward()</a>.</p>
 
 </div>
 </div>
@@ -584,17 +593,17 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00145">145</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00149"></a><span class="lineno">  149</span>&#160;{</div>
-<div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a name="l00151"></a><span class="lineno">  151</span>&#160;        <a class="code" href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a>(&amp;Y[n * M], W, &amp;X[n * K], M, K);</div>
-<div class="line"><a name="l00152"></a><span class="lineno">  152</span>&#160;    }</div>
-<div class="line"><a name="l00153"></a><span class="lineno">  153</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_ad6d51484dcc39875b14497382eebf7f4"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a></div><div class="ttdeci">void gemv_f16_ref(float *y, const uint16_t *W, const float *x, int M, int K)</div><div class="ttdoc">Matrix-vector multiply with FP16 weights (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00053">gemm_kernels_f16.c:53</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00154">154</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00158"></a><span class="lineno">  158</span>&#160;{</div>
+<div class="line"><a name="l00159"></a><span class="lineno">  159</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a name="l00160"></a><span class="lineno">  160</span>&#160;        <a class="code" href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a>(&amp;Y[n * M], W, &amp;X[n * K], M, K);</div>
+<div class="line"><a name="l00161"></a><span class="lineno">  161</span>&#160;    }</div>
+<div class="line"><a name="l00162"></a><span class="lineno">  162</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_ad6d51484dcc39875b14497382eebf7f4"><div class="ttname"><a href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a></div><div class="ttdeci">void gemv_f16_ref(float *y, const uint16_t *W, const float *x, int M, int K)</div><div class="ttdoc">Matrix-vector multiply with FP16 weights (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00062">gemm_kernels_f16.c:62</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00053">gemv_f16_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00062">gemv_f16_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00198">gemm_f16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00207">gemm_f16()</a>.</p>
 
 </div>
 </div>
@@ -644,18 +653,18 @@ Functions</h2></td></tr>
 
 <p>Auto-dispatch GEMV based on available SIMD. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00119">119</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00123"></a><span class="lineno">  123</span>&#160;{</div>
-<div class="line"><a name="l00124"></a><span class="lineno">  124</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><a name="l00125"></a><span class="lineno">  125</span>&#160;    gemv_f16_avx512(y, W, x, M, K);</div>
-<div class="line"><a name="l00126"></a><span class="lineno">  126</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00127"></a><span class="lineno">  127</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a>(y, W, x, M, K);</div>
-<div class="line"><a name="l00128"></a><span class="lineno">  128</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00129"></a><span class="lineno">  129</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00128">128</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00132"></a><span class="lineno">  132</span>&#160;{</div>
+<div class="line"><a name="l00133"></a><span class="lineno">  133</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><a name="l00134"></a><span class="lineno">  134</span>&#160;    gemv_f16_avx512(y, W, x, M, K);</div>
+<div class="line"><a name="l00135"></a><span class="lineno">  135</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00136"></a><span class="lineno">  136</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#ad6d51484dcc39875b14497382eebf7f4">gemv_f16_ref</a>(y, W, x, M, K);</div>
+<div class="line"><a name="l00137"></a><span class="lineno">  137</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00138"></a><span class="lineno">  138</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00053">gemv_f16_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00062">gemv_f16_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00378">dot_f16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00387">dot_f16()</a>.</p>
 
 </div>
 </div>
@@ -705,19 +714,19 @@ Functions</h2></td></tr>
 
 <p>Auto-dispatch backward. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00349">349</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00353"></a><span class="lineno">  353</span>&#160;{</div>
-<div class="line"><a name="l00354"></a><span class="lineno">  354</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
-<div class="line"><a name="l00355"></a><span class="lineno">  355</span>&#160;    gemv_f16_backward_avx512(dX, W, dY, M, K);</div>
-<div class="line"><a name="l00356"></a><span class="lineno">  356</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00357"></a><span class="lineno">  357</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a62a8b3fa0008f9ee7f3db6585b470b4a">gemv_f16_backward_ref</a>(dX, W, dY, M, K);</div>
-<div class="line"><a name="l00358"></a><span class="lineno">  358</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00359"></a><span class="lineno">  359</span>&#160;}</div>
-<div class="ttc" id="agemm__kernels__f16_8c_html_a62a8b3fa0008f9ee7f3db6585b470b4a"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a62a8b3fa0008f9ee7f3db6585b470b4a">gemv_f16_backward_ref</a></div><div class="ttdeci">void gemv_f16_backward_ref(float *dX, const uint16_t *W, const float *dY, int M, int K)</div><div class="ttdoc">Backward pass: compute input gradient (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00280">gemm_kernels_f16.c:280</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00358">358</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00362"></a><span class="lineno">  362</span>&#160;{</div>
+<div class="line"><a name="l00363"></a><span class="lineno">  363</span>&#160;<span class="preprocessor">#ifdef __AVX512F__</span></div>
+<div class="line"><a name="l00364"></a><span class="lineno">  364</span>&#160;    gemv_f16_backward_avx512(dX, W, dY, M, K);</div>
+<div class="line"><a name="l00365"></a><span class="lineno">  365</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00366"></a><span class="lineno">  366</span>&#160;    <a class="code" href="gemm__kernels__f16_8c.html#a62a8b3fa0008f9ee7f3db6585b470b4a">gemv_f16_backward_ref</a>(dX, W, dY, M, K);</div>
+<div class="line"><a name="l00367"></a><span class="lineno">  367</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00368"></a><span class="lineno">  368</span>&#160;}</div>
+<div class="ttc" id="agemm__kernels__f16_8c_html_a62a8b3fa0008f9ee7f3db6585b470b4a"><div class="ttname"><a href="gemm__kernels__f16_8c.html#a62a8b3fa0008f9ee7f3db6585b470b4a">gemv_f16_backward_ref</a></div><div class="ttdeci">void gemv_f16_backward_ref(float *dX, const uint16_t *W, const float *dY, int M, int K)</div><div class="ttdoc">Backward pass: compute input gradient (scalar reference)</div><div class="ttdef"><b>Definition:</b> <a href="gemm__kernels__f16_8c_source.html#l00289">gemm_kernels_f16.c:289</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00280">gemv_f16_backward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00289">gemv_f16_backward_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00364">gemm_f16_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00373">gemm_f16_backward()</a>.</p>
 
 </div>
 </div>
@@ -777,28 +786,28 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00280">280</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00284"></a><span class="lineno">  284</span>&#160;{</div>
-<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;    <span class="comment">/* Zero output gradient */</span></div>
-<div class="line"><a name="l00286"></a><span class="lineno">  286</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
-<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;        dX[k] = 0.0f;</div>
-<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;    }</div>
-<div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160; </div>
-<div class="line"><a name="l00290"></a><span class="lineno">  290</span>&#160;    <span class="comment">/* Accumulate: dX += W^T @ dY */</span></div>
-<div class="line"><a name="l00291"></a><span class="lineno">  291</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
-<div class="line"><a name="l00292"></a><span class="lineno">  292</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = dY[row];</div>
-<div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;        <span class="keyword">const</span> uint16_t *w_row = &amp;W[row * K];</div>
-<div class="line"><a name="l00294"></a><span class="lineno">  294</span>&#160; </div>
-<div class="line"><a name="l00295"></a><span class="lineno">  295</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
-<div class="line"><a name="l00296"></a><span class="lineno">  296</span>&#160;            <span class="keywordtype">float</span> w = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(w_row[k]);</div>
-<div class="line"><a name="l00297"></a><span class="lineno">  297</span>&#160;            dX[k] += w * dy;</div>
-<div class="line"><a name="l00298"></a><span class="lineno">  298</span>&#160;        }</div>
-<div class="line"><a name="l00299"></a><span class="lineno">  299</span>&#160;    }</div>
-<div class="line"><a name="l00300"></a><span class="lineno">  300</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00289">289</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;{</div>
+<div class="line"><a name="l00294"></a><span class="lineno">  294</span>&#160;    <span class="comment">/* Zero output gradient */</span></div>
+<div class="line"><a name="l00295"></a><span class="lineno">  295</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
+<div class="line"><a name="l00296"></a><span class="lineno">  296</span>&#160;        dX[k] = 0.0f;</div>
+<div class="line"><a name="l00297"></a><span class="lineno">  297</span>&#160;    }</div>
+<div class="line"><a name="l00298"></a><span class="lineno">  298</span>&#160; </div>
+<div class="line"><a name="l00299"></a><span class="lineno">  299</span>&#160;    <span class="comment">/* Accumulate: dX += W^T @ dY */</span></div>
+<div class="line"><a name="l00300"></a><span class="lineno">  300</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
+<div class="line"><a name="l00301"></a><span class="lineno">  301</span>&#160;        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = dY[row];</div>
+<div class="line"><a name="l00302"></a><span class="lineno">  302</span>&#160;        <span class="keyword">const</span> uint16_t *w_row = &amp;W[row * K];</div>
+<div class="line"><a name="l00303"></a><span class="lineno">  303</span>&#160; </div>
+<div class="line"><a name="l00304"></a><span class="lineno">  304</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
+<div class="line"><a name="l00305"></a><span class="lineno">  305</span>&#160;            <span class="keywordtype">float</span> w = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(w_row[k]);</div>
+<div class="line"><a name="l00306"></a><span class="lineno">  306</span>&#160;            dX[k] += w * dy;</div>
+<div class="line"><a name="l00307"></a><span class="lineno">  307</span>&#160;        }</div>
+<div class="line"><a name="l00308"></a><span class="lineno">  308</span>&#160;    }</div>
+<div class="line"><a name="l00309"></a><span class="lineno">  309</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00027">fp16_to_fp32</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00036">fp16_to_fp32</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00349">gemv_f16_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00358">gemv_f16_backward()</a>.</p>
 
 </div>
 </div>
@@ -858,24 +867,24 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00053">53</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
-<div class="fragment"><div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;{</div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
-<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;        <span class="keyword">const</span> uint16_t *w_row = &amp;W[row * K];</div>
-<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160; </div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;            <span class="keywordtype">float</span> w = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(w_row[k]);</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;            sum += w * x[k];</div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;        }</div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160; </div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;        y[row] = sum;</div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;    }</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__f16_8c_source.html#l00062">62</a> of file <a class="el" href="gemm__kernels__f16_8c_source.html">gemm_kernels_f16.c</a>.</p>
+<div class="fragment"><div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;{</div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
+<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;        <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;        <span class="keyword">const</span> uint16_t *w_row = &amp;W[row * K];</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160; </div>
+<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; K; k++) {</div>
+<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;            <span class="keywordtype">float</span> w = <a class="code" href="gemm__kernels__f16_8c.html#a5f379940f9b0147bf4f339d732f3341d">fp16_to_fp32</a>(w_row[k]);</div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;            sum += w * x[k];</div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;        }</div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160; </div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;        y[row] = sum;</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    }</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00027">fp16_to_fp32</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__f16_8c_source.html#l00036">fp16_to_fp32</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00145">gemm_f16_ref()</a>, and <a class="el" href="gemm__kernels__f16_8c_source.html#l00119">gemv_f16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__f16_8c_source.html#l00154">gemm_f16_ref()</a>, and <a class="el" href="gemm__kernels__f16_8c_source.html#l00128">gemv_f16()</a>.</p>
 
 </div>
 </div>

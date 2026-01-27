@@ -1,7 +1,7 @@
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-17 04:46</span>
+        <span class="folder-updated">Updated: 2026-01-27 07:13</span>
     </div>
     <pre class="tree-output">
 .
@@ -17,14 +17,8 @@
 |-- assets
 |   `-- cover_image.png
 |-- benchmarks
-|   |-- bench_gemm_vs_onednn.c
-|   |-- bench_gemm_vs_pytorch.py
 |   |-- bench_parallel_gemv.c
-|   |-- compare_gemm.py
-|   |-- perf_flash_attn_micro.c
-|   |-- perf_gemm_micro.c
-|   |-- perf_q4k
-|   `-- perf_q4k.c
+|   `-- perf_flash_attn_micro.c
 |-- docs
 |   |-- adr
 |   |   |-- 0001-ir-v4-pipeline.md
@@ -36,25 +30,33 @@
 |   |   `-- README.md
 |   |-- notes
 |   |   |-- ADD_INT8_KERNEL.md
+|   |   |-- BUMPWGT5_IMPLEMENTATION_PLAN.md
+|   |   |-- BUMPWGT5_REVISED_SPEC.md
+|   |   |-- CODEGEN_HANG_FIX.md
+|   |   |-- COMPARISON_PLAN.md
 |   |   |-- CONVERTER-SOLUTION.md
 |   |   |-- FILES_CREATED.md
 |   |   |-- fix_q4k_packing.md
 |   |   |-- FOCUS_INT8_ONLY.md
+|   |   |-- FUSION_ANALYSIS_SUMMARY.md
+|   |   |-- FUSION_BENCHMARK_TOOLKIT.md
 |   |   |-- GGUF-CONVERSION-SOLUTION.md
 |   |   |-- GGUF_CONVERTER_FIX_SUMMARY.md
 |   |   |-- IMMEDIATE_ACTION_PLAN.md
 |   |   |-- IMPLEMENTATION_READY.md
 |   |   |-- IMPLEMENT_NOW.md
+|   |   |-- MEGA_FUSION_OPTIMIZATION_SUMMARY.md
 |   |   |-- MULTI_ARCH_CONVERSION_SUMMARY.md
 |   |   |-- NEXT_STEPS.md
+|   |   |-- PERFORMANCE_ANALYSIS.md
 |   |   |-- PERFORMANCE_OPTIMIZATION_COMPLETE_REPORT.md
 |   |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
 |   |   |-- performance_V6.5_qwen.md
+|   |   |-- PHASE2_ANALYSIS_REPORT.md
 |   |   |-- PREFILL_ACTION_PLAN.md
 |   |   |-- PREFILL_ANALYSIS.md
 |   |   |-- QUICK_SUMMARY.md
 |   |   |-- README-BUMP-CONVERTER.md
-|   |   |-- README.md
 |   |   |-- scaling_v2.md
 |   |   |-- START_HERE.md
 |   |   |-- SUMMARY.md
@@ -62,7 +64,8 @@
 |   |   |-- V6.5_CLOSURE_PLAN.md
 |   |   |-- V6.5_PERFORMANCE_ANALYSIS_REPORT.md
 |   |   |-- vibe_docs.md
-|   |   `-- VIBE_GENERATED_CONTENT.md
+|   |   |-- VIBE_GENERATED_CONTENT.md
+|   |   `-- VTUNE_GUIDE.md
 |   |-- site
 |   |   |-- assets
 |   |   |-- doxygen -&gt; ../doxygen_output/html
@@ -150,7 +153,9 @@
 |   |-- MEGA_FUSED.md
 |   |-- mega_fused_test_plan.md
 |   |-- MEGA_FUSION_CALCULATIONS.md
+|   |-- MEGA_FUSION_PREFILL_PLAN.md
 |   |-- memory_layout_demo.md
+|   |-- MEMORY_PROFILING_GUIDE.md
 |   |-- navigation-map.html
 |   |-- PARITY_TESTING_PLAN.md
 |   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
@@ -170,6 +175,7 @@
 |   |-- tokenizer.md
 |   |-- tokenizer-performance-comparison.svg
 |   |-- v4-design.md
+|   |-- V6_6_FUSION_PLAN.md
 |   |-- v6_plan_inkscape.svg
 |   `-- v6_plan.svg
 |-- errata
@@ -281,6 +287,7 @@
 |   |   `-- utf8.h
 |   |-- bf16_utils.h
 |   |-- ckernel_alloc.h
+|   |-- ckernel_bump_v5.h
 |   |-- ckernel_codegen.h
 |   |-- ckernel_codegen_v2.h
 |   |-- ckernel_dtype.h
@@ -491,6 +498,7 @@
 |   |   |-- LICENSE-jsonhpp
 |   |   `-- LICENSE-linenoise
 |   |-- llama_dump
+|   |   `-- prompt_tokens.json
 |   |-- media
 |   |   |-- llama0-banner.png
 |   |   |-- llama0-logo.png
@@ -750,7 +758,6 @@
 |   |-- README.md
 |   |-- requirements.txt
 |   `-- SECURITY.md
-|-- llama_dump
 |-- logs
 |   |-- 2025-12-26-training-fix
 |   |   |-- CHANGES.md
@@ -785,7 +792,13 @@
 |   |-- Screenshot 2026-01-16 at 15-16-27 Pages.png
 |   |-- Screenshot 2026-01-16 at 19-53-01 Settings · Rulesets · C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-16 at 19-56-41 Settings · Rulesets · C-Kernel-Engine.png
-|   `-- Screenshot 2026-01-17 at 04-45-59 Pages.png
+|   |-- Screenshot 2026-01-17 at 04-45-59 Pages.png
+|   |-- Screenshot 2026-01-17 at 04-49-01 Pages.png
+|   |-- Screenshot 2026-01-17 at 04-49-51 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-17 at 04-54-27 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-22 at 05-15-39 C-Kernel-Engine_site_nightly-results at gh-pages · antshiv_C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-22 at 05-20-39 antshiv_C-Kernel-Engine at gh-pages.png
+|   `-- Screenshot 2026-01-27 at 06-57-43 IR Visualizer C-Kernel-Engine.png
 |-- scripts
 |   |-- test
 |   |   |-- compare_perf_results.py
@@ -872,6 +885,7 @@
 |   |   |-- convert_hf_to_bump_v6_6.py
 |   |   |-- fusion_patterns.py
 |   |   |-- inspect_weights_v6_6.py
+|   |   |-- kernel_registry.py
 |   |   |-- parallel_planner.py
 |   |   |-- profile_inference.py
 |   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
@@ -885,8 +899,13 @@
 |   |-- analyze_parity.py
 |   |-- benchmark_avx512.sh
 |   |-- benchmark_vs_llamacpp.py
+|   |-- bench_mega_fused_attention_prefill.py
+|   |-- bench_mega_fused_outproj_mlp_prefill.py
+|   |-- bench_prefill_fused_mlp.py
+|   |-- bench_prefill_fused_qkv.py
 |   |-- build_ir_v5.py
 |   |-- build_ir_v5_wrapper_backup.py
+|   |-- build_model.py
 |   |-- ck_chat.py
 |   |-- ck_chat_validated.py
 |   |-- ck_download.py
@@ -917,9 +936,12 @@
 |   |-- extract_gguf_vocab.py
 |   |-- fix_gguf_converter.py
 |   |-- full_integration_testing.sh
+|   |-- fusion_pass.py
 |   |-- fusion_patterns.py
 |   |-- generate_test_report.py
+|   |-- gen_kernel_registry.py
 |   |-- gen_kernel_specs.py
+|   |-- gen_memory_layout.py
 |   |-- gen_random_bump.py
 |   |-- gen_random_tokens.py
 |   |-- gguf_tokenizer.py
@@ -947,6 +969,7 @@
 |   |-- run_all_tests.sh
 |   |-- run_full_validation.sh
 |   |-- run_litmus_demo.sh
+|   |-- run_mega_fusion_test.sh
 |   |-- run_parity_smoketest.sh
 |   |-- run_perf.sh
 |   |-- simple_perf.sh
@@ -970,9 +993,11 @@
 |   |-- test_kernels_real_weights.py
 |   |-- test_kernels_vs_llamacpp.py
 |   |-- test_layer0_parity.py
+|   |-- test_layer0_parity_streamed.py
 |   |-- test_low_level_kernels.py
 |   |-- test_parity_direct.py
 |   |-- test_performance.sh
+|   |-- test_prefill_fusion.py
 |   |-- test_pytorch_parity.sh
 |   |-- test_q6k_kernels.py
 |   |-- test_q_kernel_direct.py
@@ -1000,11 +1025,12 @@
 |   |   |-- dequant_kernels.c
 |   |   |-- embedding_kernels_bf16.c
 |   |   |-- embedding_kernels.c
-|   |   |-- fused_rmsnorm_linear.c
+|   |   |-- fp16_convert.c
 |   |   |-- gelu_kernels_bf16.c
 |   |   |-- gelu_kernels.c
 |   |   |-- gemm_batch_int8.c
 |   |   |-- gemm_fused_kernels.c
+|   |   |-- gemm_head_major_output.c
 |   |   |-- gemm_kernels_amx.c
 |   |   |-- gemm_kernels_bf16.c
 |   |   |-- gemm_kernels.c
@@ -1026,12 +1052,12 @@
 |   |   |-- gemm_kernels_q6k_sse.c
 |   |   |-- gemm_kernels_q8_0.c
 |   |   |-- gemm_microkernel.c
+|   |   |-- KERNEL_STATUS.md
 |   |   |-- kv_cache_kernels.c
 |   |   |-- layernorm_kernels_bf16.c
 |   |   |-- layernorm_kernels.c
 |   |   |-- loss_kernels_bf16.c
 |   |   |-- loss_kernels.c
-|   |   |-- mega_fused_attention_avx.c
 |   |   |-- mlp_fused_decode.c
 |   |   |-- mlp_kernels_bf16.c
 |   |   |-- mlp_kernels.c
@@ -1039,13 +1065,13 @@
 |   |   |-- optimizer_kernels.c
 |   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
 |   |   |-- quantize_row_q8_k_sse.c
+|   |   |-- README.md
 |   |   |-- relu_kernels_bf16.c
 |   |   |-- relu_kernels.c
 |   |   |-- rmsnorm_kernels_bf16.c
 |   |   |-- rmsnorm_kernels.c
 |   |   |-- rmsnorm_kernels_int4.c
 |   |   |-- rmsnorm_kernels_int8.c
-|   |   |-- rmsnorm_q8_k_fused.c
 |   |   |-- rope_kernels_bf16.c
 |   |   |-- rope_kernels.c
 |   |   |-- sigmoid_kernels_bf16.c
@@ -1144,7 +1170,9 @@
 |   |   |-- ck_format.md
 |   |   |-- ck_tokenizer_v6.6.c
 |   |   |-- FUSION_FINDINGS.md
+|   |   |-- IMPLEMENTATION_STATUS.md
 |   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- IR_FUSION_OPENMP_PLAN.md
 |   |   |-- MEMORY_BANDWIDTH_ANALYSIS.md
 |   |   |-- PARALLELISM_PLAN.md
 |   |   |-- parallel_orchestration.c
@@ -1209,6 +1237,14 @@
 |   |   `-- test_swiglu_bf16.py
 |   |-- fixtures
 |   |   `-- mini_v4.config.json
+|   |-- fusion
+|   |   |-- test_gemm_vs_gemv.c
+|   |   |-- test_mega_fused_attention_prefill.py
+|   |   |-- test_mega_fused_attention_prefill_q8_0.py
+|   |   |-- test_mega_fused_attention.py
+|   |   |-- test_mega_fused_outproj_mlp_prefill.py
+|   |   |-- test_mega_fusion_outproj_mlp_parity.py
+|   |   `-- test_mega_fusion_parity.py
 |   |-- validation
 |   |   |-- auto_validate.py
 |   |   |-- base.py
@@ -1262,7 +1298,6 @@
 |   |-- test_layernorm.py
 |   |-- test_layer_weights_parity.py
 |   |-- test_lm_head_litmus.py
-|   |-- test_mega_fused_attention.py
 |   |-- test_mlp_fusion_benchmark.py
 |   |-- test_mlp.py
 |   |-- test_multi_layer_parity.py
@@ -1270,6 +1305,8 @@
 |   |-- test_orchestration_layer.py
 |   |-- test_parallel_gemv.py
 |   |-- test_parity.py
+|   |-- test_prefill_fused_mlp_quant.py
+|   |-- test_prefill_fused_rmsnorm_qkv_quant.py
 |   |-- test_pytorch_parity.py
 |   |-- test_q4k_debug.py
 |   |-- test_q4_k_dequant_match.py
@@ -1281,6 +1318,7 @@
 |   |-- test_q6k_fused.py
 |   |-- test_q6k_kernels.py
 |   |-- test_q6k_q8k_parity.py
+|   |-- test_quantize_batch_parity.py
 |   |-- test_quant_kernels.py
 |   |-- test_quant_vs_llamacpp.py
 |   |-- test_relu.py
@@ -1303,163 +1341,67 @@
 |   |-- test_v4_conversion.py
 |   |-- test_vision.py
 |   `-- validate_kernel.py
-|-- vtune_fresh_20260113_171807
-|   |-- archive
-|   |   `-- binaries
-|   |-- config
-|   |   |-- analysis_type.cfg
-|   |   |-- collection.cfg
-|   |   |-- context_values.cfg
-|   |   |-- log.cfg
-|   |   |-- runss.options
-|   |   |-- search_dir.cfg
-|   |   `-- state.cfg
-|   |-- data.0
-|   |   |-- 568673-568686.0-568686.0.th
-|   |   |-- 568673-568686.0-568686.0.th.aux
-|   |   |-- 568673-568686.0.pytrace
-|   |   |-- 568673-568686.0.pytrace-sym
-|   |   |-- 568673-568686.0.trace
-|   |   |-- 568673-568686.0.trace.aux
-|   |   |-- antshiv-ThinkPad-W530.568686.jit
-|   |   |-- pytrace-568686-0x9b2f0a18.log
-|   |   `-- systemcollector-568673-antshiv-ThinkPad-W530.sc
-|   |-- log
-|   |   |-- mrtehelpers-2026.01.13-17h18m08s.568673.log
-|   |   |-- mrtehelpers-2026.01.13-17h18m08s.568689.log
-|   |   |-- perfrun-2026.01.13-17h18m08s.568673.log
-|   |   |-- perfrun-2026.01.13-17h18m08s.568687.log
-|   |   `-- perfrun-2026.01.13-17h18m08s.568689.log
-|   |-- sqlite-db
-|   |   |-- _cache_grouper_data4_dd_thread
-|   |   |-- _cache_grouper_data4_global_data_grouper
-|   |   |-- _cache_grouper_data4_global_time_interval_metrics
-|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
-|   |   |-- timelinedb
-|   |   |-- dicer.db
-|   |   `-- grouper.metadata
-|   `-- vtune_fresh_20260113_171807.vtune
-|-- vtune_hotspots_20260113_171400
-|   |-- archive
-|   |   `-- binaries
-|   |-- config
-|   |   |-- analysis_type.cfg
-|   |   |-- collection.cfg
-|   |   |-- context_values.cfg
-|   |   |-- log.cfg
-|   |   |-- runss.options
-|   |   |-- search_dir.cfg
-|   |   `-- state.cfg
-|   |-- data.0
-|   |   |-- 566500-566510.0-566510.0.th
-|   |   |-- 566500-566510.0-566510.0.th.aux
-|   |   |-- 566500-566510.0.pytrace
-|   |   |-- 566500-566510.0.pytrace-sym
-|   |   |-- 566500-566510.0.trace
-|   |   |-- 566500-566510.0.trace.aux
-|   |   |-- antshiv-ThinkPad-W530.566510.jit
-|   |   |-- pytrace-566510-0x7cfc5f85.log
-|   |   `-- systemcollector-566500-antshiv-ThinkPad-W530.sc
-|   |-- log
-|   |   |-- mrtehelpers-2026.01.13-17h14m02s.566500.log
-|   |   |-- mrtehelpers-2026.01.13-17h14m02s.566513.log
-|   |   |-- perfrun-2026.01.13-17h14m02s.566500.log
-|   |   |-- perfrun-2026.01.13-17h14m02s.566511.log
-|   |   `-- perfrun-2026.01.13-17h14m02s.566513.log
-|   |-- sqlite-db
-|   |   |-- _cache_grouper_data4_dd_thread
-|   |   |-- _cache_grouper_data4_global_data_grouper
-|   |   |-- _cache_grouper_data4_global_time_interval_metrics
-|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
-|   |   |-- timelinedb
-|   |   |-- dicer.db
-|   |   `-- grouper.metadata
-|   `-- vtune_hotspots_20260113_171400.vtune
-|-- vtune_llamacpp
-|   |-- archive
-|   |   `-- binaries
-|   |-- config
-|   |   |-- analysis_type.cfg
-|   |   |-- collection.cfg
-|   |   |-- context_values.cfg
-|   |   |-- log.cfg
-|   |   |-- runss.options
-|   |   |-- search_dir.cfg
-|   |   `-- state.cfg
-|   |-- data.0
-|   |   |-- 582212-582217.0-582217.0.th
-|   |   |-- 582212-582217.0-582217.0.th.aux
-|   |   |-- 582212-582217.0-582237.0.th
-|   |   |-- 582212-582217.0-582237.0.th.aux
-|   |   |-- 582212-582217.0-582238.0.th
-|   |   |-- 582212-582217.0-582238.0.th.aux
-|   |   |-- 582212-582217.0-582239.0.th
-|   |   |-- 582212-582217.0-582239.0.th.aux
-|   |   |-- 582212-582217.0.trace
-|   |   |-- 582212-582217.0.trace.aux
-|   |   |-- pytrace-582217-0xad8d88ba.log
-|   |   `-- systemcollector-582212-antshiv-ThinkPad-W530.sc
-|   |-- log
-|   |   |-- mrtehelpers-2026.01.13-17h48m53s.582212.log
-|   |   |-- mrtehelpers-2026.01.13-17h48m53s.582220.log
-|   |   |-- perfrun-2026.01.13-17h48m53s.582212.log
-|   |   |-- perfrun-2026.01.13-17h48m53s.582218.log
-|   |   `-- perfrun-2026.01.13-17h48m53s.582220.log
-|   |-- sqlite-db
-|   |   |-- _cache_grouper_data4_dd_thread
-|   |   |-- _cache_grouper_data4_global_data_grouper
-|   |   |-- _cache_grouper_data4_global_time_interval_metrics
-|   |   |-- _cache_grouper_data4_sched_and_counter_metrics
-|   |   |-- timelinedb
-|   |   |-- dicer.db
-|   |   `-- grouper.metadata
-|   `-- vtune_llamacpp.vtune
-|-- vtune_results
-|   `-- hotspots_20260114-070548
-|       |-- archive
-|       |-- config
-|       |-- data.0
-|       |-- log
-|       |-- sqlite-db
-|       `-- hotspots_20260114-070548.vtune
+|-- version
+|   `-- v6.6
+|       |-- cache
+|       |-- docs
+|       |-- include
+|       |-- kernel_maps
+|       |-- patches
+|       |-- scripts
+|       |-- src
+|       |-- templates
+|       |-- test
+|       |-- tests
+|       |-- tools
+|       |-- IR_FIX_RECOMMENDATIONS.md
+|       |-- MEMORY_PLANNING_SPEC.md
+|       |-- notes.txt
+|       |-- PIPELINE.md
+|       |-- prompt_init.txt
+|       |-- README.md
+|       |-- run_me.read.md
+|       |-- V6_5_VS_V6_6_COMPARISON.md
+|       `-- V6_6_UPGRADE_PLAN.md
 |-- add_int8_kernel.sh
 |-- benchmark_gemm_vs_fp32.py
-|-- benchmark_v65.py
-|-- ck-engine-v6
 |-- c-kernel-engine-power-infographic.svg
 |-- ck-kernel-inference-int8.c
-|-- ck-perf-cli.data
-|-- ck-perf-cli.data.old
-|-- ck-perf.data
-|-- ck-perf-v65-20260112-105225.svg
-|-- ck-v4
-|-- CODEGEN_HANG_FIX.md
+|-- compare_vs_llamacpp.py
+|-- compare_with_llamacpp.py
 |-- config.json
 |-- CONTRIBUTING.md
 |-- debug_code.c
+|-- debug_v6_compare.py
 |-- debug_v6_output.py
 |-- default.config.json
 |-- default.json
-|-- devstral2.json
 |-- interactive-infographic.html
-|-- llama_dump_logits
+|-- llama.cpp_comparison_test.cpp
 |-- Makefile
+|-- profile_vs_llamacpp.sh
+|-- quick_perf_compare.sh
+|-- README.md
 |-- requirements.txt
 |-- run_flamegraph_v6.sh
-|-- small10mb.config.json
-|-- smolLM-135.json
-|-- test_gemm_vs_gemv
-|-- test_gemm_vs_gemv.c
-|-- test_gemv
-|-- test_gemv.c
+|-- test_kernel_compare
+|-- test_kernel_compare.c
+|-- test_layer_by_layer.py
 |-- test_out.log
 |-- test_q4k_packing.py
-|-- tiny.config.json
+|-- test_qproj_compare.py
+|-- test_v65_detailed
+|-- test_v65_detailed.c
+|-- test_v66_detailed
+|-- test_v66_detailed.c
+|-- test_v66_inference.py
+|-- test_v66_runtime_load
+|-- test_v66_runtime_load.c
+|-- test_vs_llamacpp.cpp
 |-- v6.5-profile.svg
-|-- valgrind.supp
-`-- VTUNE_GUIDE.md
+`-- verify_numerical_parity.py
 
-228 directories, 1225 files
+198 directories, 1197 files
 </pre>
 </div>
 

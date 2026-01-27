@@ -158,6 +158,10 @@ void dequant_q8_0_row(const void *src, float *dst, size_t n_elements);
 // Q8_0 quantization (32 elements per block, 34 bytes: 2-byte scale + 32 int8)
 void quantize_row_q8_0(const float *x, void *y, int k);
 
+// Batch Q8_0 quantization (row-major output for GEMM compatibility)
+// Output: each row at offset row * ((k/32) * 34) bytes
+void quantize_batch_q8_0(const float *x, void *y, int num_rows, int k);
+
 // Q5_0 weights x Q8_0 activations
 void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 
@@ -166,6 +170,9 @@ void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 
 // Q8_K quantization (256 elements per block, super-block format)
 void quantize_row_q8_k(const float *x, void *y, int k);
+
+// Batch Q8_K quantization (row-major output for GEMM compatibility)
+void quantize_batch_q8_k(const float *x, void *y, int num_rows, int k);
 
 void gemv_q4_k_q8_k(float *y,
                     const void *W,

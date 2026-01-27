@@ -1,0 +1,58 @@
+{
+  "id": "quantize_batch_q8_k",
+  "op": "quantize_batch",
+  "variant": "fp32_to_q8_k_batch",
+  "mode": "prefill",
+  "quant": {
+    "weight": "fp32",
+    "activation": "q8_k",
+    "output": "q8_k"
+  },
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["num_rows", "K"], "desc": "Input matrix [num_rows, K] (FP32)"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "q8_k", "shape": ["num_rows", "K"], "desc": "Quantized output [num_rows, K] (Q8_K row-major)"}
+  ],
+  "scratch": [],
+  "dims": ["num_rows", "K"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "num_rows",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Process rows in parallel; each thread handles a slice of rows."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "K should be multiple of 256 for Q8_K block quantization."
+  },
+  "impl": {
+    "function": "quantize_batch_q8_k",
+    "c_declaration": "void quantize_batch_q8_k(const float *x, void *vy, int num_rows, int k);",
+    "sources": ["src/kernels/gemm_kernels_q8_0.c"],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_quantize_batch.py"],
+    "bench": ["scripts/bench_quantize.py"],
+    "parity": [
+      {
+        "kind": "llama_cpp",
+        "command": "python unittest/test_quantize_batch_llama_parity.py",
+        "tolerance": "1e-5",
+        "notes": "Compare batch quantized output against row-by-row quantization"
+      }
+    ]
+  },
+  "notes": "Batch quantize FP32 matrix to Q8_K format. Outputs row-major layout for GEMM compatibility. Used in prefill mode for multi-token activation quantization."
+}

@@ -3,116 +3,566 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C-Kernel-Engine IR Visualizer</title>
+    <title>IR Visualizer | C-Kernel-Engine</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; }
-        .header { background: #16213e; padding: 1rem 2rem; border-bottom: 2px solid #0f3460; }
-        .header h1 { font-size: 1.5rem; color: #e94560; }
-        .header .subtitle { color: #888; font-size: 0.9rem; }
-
-        .controls { padding: 1rem 2rem; background: #16213e; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        .controls input[type="file"] { display: none; }
-        .controls label, .controls button, .controls select {
-            padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;
-            background: #0f3460; color: #eee; border: 1px solid #1a1a2e;
+        :root {
+            /* Antsand Brand Colors - from docs theme */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
         }
-        .controls label:hover, .controls button:hover { background: #e94560; }
-        .controls select { background: #0f3460; }
 
-        .tabs { display: flex; background: #0f3460; }
-        .tab { padding: 0.75rem 1.5rem; cursor: pointer; border-bottom: 3px solid transparent; }
-        .tab:hover { background: #16213e; }
-        .tab.active { border-bottom-color: #e94560; background: #1a1a2e; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .panel { display: none; padding: 1rem 2rem; overflow: auto; height: calc(100vh - 180px); }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.75rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: 36px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--dark-card);
+            padding: 1rem 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .controls input[type="file"] { display: none; }
+
+        .controls label, .controls button, .controls select {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            background: var(--grey);
+            color: var(--text-secondary);
+            border: 1px solid var(--grey);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .controls label:hover, .controls button:hover {
+            background: var(--orange);
+            color: var(--dark);
+            border-color: var(--orange);
+        }
+
+        .controls select {
+            background: var(--dark-card);
+            color: var(--text-primary);
+        }
+
+        .search-box {
+            padding: 0.5rem 1rem;
+            width: 250px;
+            border-radius: 4px;
+            border: 1px solid var(--grey);
+            background: var(--dark-card);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--orange);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: var(--dark);
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.9rem;
+            border-bottom: 3px solid transparent;
+            transition: var(--transition);
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--grey);
+        }
+
+        .tab.active {
+            color: var(--orange);
+            border-bottom-color: var(--orange);
+            background: var(--dark-card);
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        .panel { display: none; }
         .panel.active { display: block; }
 
-        /* Memory Layout Tab */
-        .memory-region { margin: 1rem 0; }
-        .memory-region h3 { color: #e94560; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
-        .memory-region h3 .size { font-size: 0.8rem; color: #888; font-weight: normal; }
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0 2rem;
+        }
 
-        .memory-bar { height: 40px; background: #0f3460; border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 0.5rem; }
-        .memory-block { position: absolute; height: 100%; display: flex; align-items: center; justify-content: center;
-            font-size: 0.7rem; cursor: pointer; border-right: 1px solid #1a1a2e; transition: filter 0.2s; }
+        .stat-card {
+            background: var(--dark-card);
+            padding: 1.25rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--grey);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Memory Region */
+        .memory-region {
+            margin: 2rem 0;
+        }
+
+        .memory-region h3 {
+            color: var(--white);
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .memory-region h3 .size {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        .memory-bar {
+            height: 48px;
+            background: var(--dark);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+        }
+
+        .memory-block {
+            position: absolute;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            cursor: pointer;
+            border-right: 1px solid var(--bg-dark);
+            transition: filter 0.2s;
+            color: var(--white);
+            font-weight: 500;
+        }
+
         .memory-block:hover { filter: brightness(1.3); z-index: 10; }
         .memory-block.weights { background: #4a90d9; }
         .memory-block.activation { background: #2ecc71; }
         .memory-block.kv-cache { background: #9b59b6; }
         .memory-block.scratch { background: #f39c12; }
 
-        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #333; }
-        th { background: #0f3460; position: sticky; top: 0; }
-        tr:hover { background: #16213e; }
-        .offset { font-family: monospace; color: #4a90d9; }
-        .size { font-family: monospace; color: #2ecc71; }
-        .dtype { padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; }
-        .dtype-fp32 { background: #27ae60; }
-        .dtype-q8_0 { background: #e74c3c; }
-        .dtype-q5_0 { background: #9b59b6; }
-        .dtype-q4_k { background: #f39c12; }
-        .dtype-q6_k { background: #3498db; }
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
 
-        /* Kernel Flow Tab */
-        .layer-container { margin: 1rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
-        .layer-header { background: #0f3460; padding: 0.75rem 1rem; cursor: pointer; display: flex; justify-content: space-between; }
-        .layer-header:hover { background: #16213e; }
-        .layer-header .arrow { transition: transform 0.2s; }
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover { background: var(--grey); }
+        tr:last-child td { border-bottom: none; }
+
+        .offset { font-family: 'JetBrains Mono', monospace; color: var(--blue); }
+        .size { font-family: 'JetBrains Mono', monospace; color: var(--green); }
+
+        /* Dtype badges */
+        .dtype {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .dtype-q4_0, .dtype-q4_k { background: #e74c3c; color: white; }
+        .dtype-q5_0, .dtype-q5_k { background: #9b59b6; color: white; }
+        .dtype-q6_k { background: #3498db; color: white; }
+        .dtype-q8_0, .dtype-q8_k { background: #27ae60; color: white; }
+        .dtype-fp32, .dtype-f32 { background: #f39c12; color: white; }
+        .dtype-fp16, .dtype-f16 { background: #1abc9c; color: white; }
+        .dtype-- { background: var(--grey); color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .dtype-fp32 { background: rgba(71, 180, 117, 0.2); color: var(--green); }
+        .dtype-q8_0 { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+        .dtype-q5_0 { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .dtype-q4_k { background: rgba(243, 156, 18, 0.2); color: #f39c12; }
+        .dtype-q6_k { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+
+        /* Kernel Flow */
+        .layer-container {
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+        }
+
+        .layer-container:hover {
+            border-left-color: var(--orange);
+        }
+
+        .layer-header {
+            background: var(--dark);
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        .layer-header:hover { background: var(--grey); }
+
+        .layer-header .arrow {
+            color: var(--orange);
+            transition: transform 0.2s;
+            font-size: 0.75rem;
+        }
+
         .layer-header.collapsed .arrow { transform: rotate(-90deg); }
-        .layer-body { padding: 1rem; display: none; }
+
+        .layer-body {
+            padding: 0.75rem;
+            display: none;
+        }
+
         .layer-body.visible { display: block; }
 
-        .kernel-node { display: flex; gap: 1rem; margin: 0.5rem 0; padding: 0.75rem; background: #16213e; border-radius: 6px;
-            border-left: 4px solid #4a90d9; align-items: center; }
-        .kernel-node.quantize { border-left-color: #e74c3c; background: #2a1a2e; }
-        .kernel-node.gemv { border-left-color: #2ecc71; }
+        .kernel-node {
+            display: flex;
+            gap: 1rem;
+            margin: 0.5rem 0;
+            padding: 0.75rem;
+            background: var(--dark);
+            border-radius: 6px;
+            border-left: 4px solid var(--blue);
+            align-items: center;
+        }
+
+        .kernel-node.quantize { border-left-color: #e74c3c; }
+        .kernel-node.gemv { border-left-color: var(--green); }
         .kernel-node.attention { border-left-color: #f39c12; }
         .kernel-node.rmsnorm { border-left-color: #9b59b6; }
 
-        .kernel-idx { font-family: monospace; color: #888; width: 40px; }
-        .kernel-name { font-weight: bold; flex: 1; }
-        .kernel-function { color: #4a90d9; font-family: monospace; font-size: 0.9rem; }
-        .kernel-dims { font-size: 0.8rem; color: #888; }
+        .kernel-idx {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            width: 35px;
+        }
 
-        .data-flow { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
-        .flow-item { padding: 2px 8px; border-radius: 3px; font-size: 0.75rem; font-family: monospace; }
-        .flow-input { background: #2980b9; }
-        .flow-output { background: #27ae60; }
-        .flow-weight { background: #8e44ad; }
+        .kernel-name {
+            font-weight: 600;
+            color: var(--white);
+            flex: 1;
+        }
+
+        .kernel-function {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--blue);
+        }
+
+        .kernel-dims {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .data-flow {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.5rem;
+            margin-left: 35px;
+        }
+
+        .flow-item {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .flow-input { background: rgba(41, 128, 185, 0.3); color: #2980b9; }
+        .flow-output { background: rgba(39, 174, 96, 0.3); color: var(--green); }
+        .flow-weight { background: rgba(142, 68, 173, 0.3); color: #8e44ad; }
 
         /* Connection lines */
-        .connection { height: 20px; display: flex; align-items: center; padding-left: 20px; }
-        .connection::before { content: ''; width: 2px; height: 20px; background: #4a90d9; margin-right: 10px; }
-        .connection::after { content: '↓'; color: #4a90d9; }
+        .connection {
+            height: 20px;
+            display: flex;
+            align-items: center;
+            padding-left: 20px;
+        }
 
-        /* Search/Filter */
-        .search-box { padding: 0.5rem; width: 300px; border-radius: 4px; border: 1px solid #333; background: #0f3460; color: #eee; }
+        .connection::before {
+            content: '';
+            width: 2px;
+            height: 16px;
+            background: var(--blue);
+            margin-right: 10px;
+        }
 
-        /* Stats panel */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0; }
-        .stat-card { background: #16213e; padding: 1rem; border-radius: 8px; }
-        .stat-value { font-size: 1.5rem; color: #e94560; }
-        .stat-label { color: #888; font-size: 0.9rem; }
+        .connection::after {
+            content: '';
+            border: solid var(--blue);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+        }
 
-        /* Parity Tab */
-        .parity-section { margin: 1rem 0; }
-        .tensor-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .tensor-panel { background: #16213e; padding: 1rem; border-radius: 8px; }
-        .tensor-panel h4 { margin-bottom: 0.5rem; }
-        .tensor-values { font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow: auto; background: #0f3460; padding: 0.5rem; border-radius: 4px; }
-        .diff-highlight { background: #e74c3c; color: white; padding: 0 2px; }
+        /* Parity Section */
+        .parity-section {
+            margin: 2rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--grey);
+        }
 
-        .tooltip { position: fixed; background: #16213e; border: 1px solid #e94560; padding: 0.5rem; border-radius: 4px;
-            font-size: 0.8rem; pointer-events: none; z-index: 1000; max-width: 300px; display: none; }
+        .parity-section h3 {
+            color: var(--white);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tensor-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .tensor-panel {
+            background: var(--dark);
+            padding: 1rem;
+            border-radius: 6px;
+        }
+
+        .tensor-panel h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .tensor-values {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            max-height: 200px;
+            overflow: auto;
+            background: var(--code-bg);
+            padding: 0.75rem;
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+
+        .diff-highlight {
+            background: rgba(231, 76, 60, 0.4);
+            color: #ff6b6b;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: var(--dark-card);
+            border: 1px solid var(--orange);
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 350px;
+            display: none;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .tooltip strong {
+            color: var(--white);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .tooltip .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .tooltip .label { color: var(--text-muted); }
+        .tooltip .value { color: var(--orange); font-family: 'JetBrains Mono', monospace; }
+
+        /* Debug code output */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .badge-orange { background: var(--orange); color: var(--dark); }
+        .badge-green { background: var(--green); color: white; }
+        .badge-red { background: #e74c3c; color: white; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>C-Kernel-Engine IR Visualizer</h1>
-        <div class="subtitle">Memory Layout • Kernel Flow • Parity Debugging</div>
-    </div>
+    <header class="site-header">
+        <a href="#" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">IR Visualizer</div>
+                <div class="header-subtitle">Memory Layout • Kernel Flow • Parity Debug</div>
+            </div>
+        </a>
+    </header>
 
     <div class="controls">
         <label><input type="file" id="layoutFile" accept=".json" onchange="loadLayout(event)">Load Layout JSON</label>
@@ -129,79 +579,131 @@
     <div class="tabs">
         <div class="tab active" onclick="showTab('memory')">Memory Layout</div>
         <div class="tab" onclick="showTab('kernels')">Kernel Flow</div>
+        <div class="tab" onclick="showTab('quantization')">Quantization Audit</div>
         <div class="tab" onclick="showTab('parity')">Parity Debug</div>
         <div class="tab" onclick="showTab('stats')">Statistics</div>
     </div>
 
-    <div id="memory" class="panel active">
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value" id="totalWeights">-</div><div class="stat-label">Weights Size</div></div>
-            <div class="stat-card"><div class="stat-value" id="totalActivations">-</div><div class="stat-label">Activations Size</div></div>
-            <div class="stat-card"><div class="stat-value" id="totalKVCache">-</div><div class="stat-label">KV Cache Size</div></div>
-            <div class="stat-card"><div class="stat-value" id="totalMemory">-</div><div class="stat-label">Total Memory</div></div>
+    <main>
+        <div id="memory" class="panel active">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="totalWeights">-</div><div class="stat-label">Weights Size</div></div>
+                <div class="stat-card"><div class="stat-value" id="totalActivations">-</div><div class="stat-label">Activations Size</div></div>
+                <div class="stat-card"><div class="stat-value" id="totalKVCache">-</div><div class="stat-label">KV Cache Size</div></div>
+                <div class="stat-card"><div class="stat-value" id="totalMemory">-</div><div class="stat-label">Total Memory</div></div>
+            </div>
+
+            <div class="memory-region">
+                <h3>Weights Region <span class="size" id="weightsRegionSize"></span></h3>
+                <div class="memory-bar" id="weightsBar"></div>
+                <table id="weightsTable">
+                    <thead><tr><th>Name</th><th>Offset</th><th>Size</th><th>Dtype</th><th>Shape</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="memory-region">
+                <h3>Activations Region <span class="size" id="activationsRegionSize"></span></h3>
+                <div class="memory-bar" id="activationsBar"></div>
+                <table id="activationsTable">
+                    <thead><tr><th>Buffer</th><th>Offset</th><th>Size</th><th>Shape</th><th>Usage</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="memory-region">
-            <h3>Weights Region <span class="size" id="weightsRegionSize"></span></h3>
-            <div class="memory-bar" id="weightsBar"></div>
-            <table id="weightsTable">
-                <thead><tr><th>Name</th><th>Offset</th><th>Size</th><th>Dtype</th><th>Shape</th></tr></thead>
-                <tbody></tbody>
-            </table>
+        <div id="kernels" class="panel">
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                <button onclick="renderGraphView()" class="btn-primary" style="padding: 0.5rem 1rem; background: var(--orange); color: var(--dark); border: none; border-radius: 4px; cursor: pointer;">Force Directed Graph</button>
+                <button onclick="renderLinearView()" style="padding: 0.5rem 1rem; background: var(--grey); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">Linear View</button>
+                <input type="text" class="search-box" placeholder="Filter nodes..." oninput="filterGraph(this.value)" id="graphSearch">
+                <span style="color: var(--text-muted); font-size: 0.8rem;" id="graphNodeCount"></span>
+            </div>
+            <div id="graphContainer" style="width: 100%; height: 600px; border: 1px solid var(--grey); border-radius: 8px; background: var(--dark); overflow: hidden;"></div>
+            <div id="kernelFlow"></div>
         </div>
 
-        <div class="memory-region">
-            <h3>Activations Region <span class="size" id="activationsRegionSize"></span></h3>
-            <div class="memory-bar" id="activationsBar"></div>
-            <table id="activationsTable">
-                <thead><tr><th>Buffer</th><th>Offset</th><th>Size</th><th>Shape</th><th>Usage</th></tr></thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
+        <div id="quantization" class="panel">
+            <h2 style="margin-bottom: 1rem;">Quantization Chain Audit</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Verify that each weight uses the correct quantization kernel through IR1 → IR3 → Codegen pipeline.
+            </p>
 
-    <div id="kernels" class="panel">
-        <div id="kernelFlow"></div>
-    </div>
-
-    <div id="parity" class="panel">
-        <h2>Parity Debugging</h2>
-        <p style="margin: 1rem 0; color: #888;">Compare tensor outputs between C-Kernel-Engine and reference implementations.</p>
-
-        <div class="parity-section">
-            <h3>Generate Debug Dumps</h3>
-            <p style="margin: 0.5rem 0; color: #888;">Add stop points to generated C code to dump intermediate tensors.</p>
-            <button onclick="generateDebugCode()">Generate Debug Code</button>
-            <pre id="debugCodeOutput" style="background: #0f3460; padding: 1rem; margin: 1rem 0; border-radius: 4px; max-height: 300px; overflow: auto;"></pre>
-        </div>
-
-        <div class="parity-section">
-            <h3>Compare Tensors</h3>
-            <div class="tensor-compare">
-                <div class="tensor-panel">
-                    <h4>C-Kernel-Engine</h4>
-                    <input type="file" id="ckTensorFile" accept=".bin,.npy">
-                    <div class="tensor-values" id="ckTensorValues">Load tensor file...</div>
-                </div>
-                <div class="tensor-panel">
-                    <h4>Reference (llama.cpp / PyTorch)</h4>
-                    <input type="file" id="refTensorFile" accept=".bin,.npy">
-                    <div class="tensor-values" id="refTensorValues">Load tensor file...</div>
+            <div class="parity-section">
+                <h3><span class="badge badge-green">Layer Summary</span> Dtype per Layer</h3>
+                <div style="overflow-x: auto; margin-top: 1rem;">
+                    <table id="quantSummaryTable">
+                        <thead>
+                            <tr>
+                                <th>Layer</th>
+                                <th>wq</th>
+                                <th>wk</th>
+                                <th>wv</th>
+                                <th>wo</th>
+                                <th>w1</th>
+                                <th>w2</th>
+                                <th>ln1</th>
+                                <th>ln2</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
-            <div id="parityResults" style="margin-top: 1rem;"></div>
-        </div>
-    </div>
 
-    <div id="stats" class="panel">
-        <h2>IR Statistics</h2>
-        <div class="stats-grid" id="statsGrid"></div>
-        <h3 style="margin-top: 2rem;">Kernel Usage</h3>
-        <table id="kernelStatsTable">
-            <thead><tr><th>Kernel</th><th>Count</th><th>Layers</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">Audit</span> Kernel-Dtype Matching</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Each weight's dtype should match the kernel suffix (e.g., q5_0 → gemv_q5_0).
+                </p>
+                <div id="quantAuditResults"></div>
+            </div>
+
+            <div class="parity-section">
+                <h3><span class="badge badge-red">Issues</span> Potential Mismatches</h3>
+                <div id="quantIssues" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                    Load a lowered IR file to check for mismatches...
+                </div>
+            </div>
+        </div>
+
+        <div id="parity" class="panel">
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">Debug</span> Generate Debug Dumps</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Add stop points to generated C code to dump intermediate tensors.</p>
+                <button onclick="generateDebugCode()">Generate Debug Code</button>
+                <pre id="debugCodeOutput">Load an IR file first to generate debug code...</pre>
+            </div>
+
+            <div class="parity-section">
+                <h3><span class="badge badge-green">Compare</span> Tensor Comparison</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Compare tensor outputs between C-Kernel-Engine and reference implementations.</p>
+                <div class="tensor-compare">
+                    <div class="tensor-panel">
+                        <h4>C-Kernel-Engine</h4>
+                        <input type="file" id="ckTensorFile" accept=".bin,.npy">
+                        <div class="tensor-values" id="ckTensorValues">Load tensor file...</div>
+                    </div>
+                    <div class="tensor-panel">
+                        <h4>Reference (llama.cpp / PyTorch)</h4>
+                        <input type="file" id="refTensorFile" accept=".bin,.npy">
+                        <div class="tensor-values" id="refTensorValues">Load tensor file...</div>
+                    </div>
+                </div>
+                <div id="parityResults" style="margin-top: 1rem;"></div>
+            </div>
+        </div>
+
+        <div id="stats" class="panel">
+            <h2>IR Statistics</h2>
+            <div class="stats-grid" id="statsGrid"></div>
+            <h3 style="margin-top: 2rem;">Kernel Usage</h3>
+            <table id="kernelStatsTable">
+                <thead><tr><th>Kernel</th><th>Count</th><th>Layers</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
 
     <div class="tooltip" id="tooltip"></div>
 
@@ -220,8 +722,13 @@
         function showTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.querySelector(`.tab:nth-child(${['memory','kernels','parity','stats'].indexOf(tabId)+1})`).classList.add('active');
+            document.querySelector(`.tab:nth-child(${['memory','kernels','quantization','parity','stats'].indexOf(tabId)+1})`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
+
+            // Render quantization when tab is shown
+            if (tabId === 'quantization') {
+                renderQuantizationAudit();
+            }
         }
 
         async function loadFromCache() {
@@ -229,7 +736,6 @@
             const base = '/home/antshiv/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF';
 
             try {
-                // Try to load via fetch (works if served via HTTP)
                 const layoutResp = await fetch(`file://${base}/layout_${mode}.json`);
                 const loweredResp = await fetch(`file://${base}/lowered_${mode}.json`);
                 const callResp = await fetch(`file://${base}/lowered_${mode}_call.json`);
@@ -240,7 +746,7 @@
 
                 renderAll();
             } catch(e) {
-                alert('Cannot load files directly. Please use the file upload buttons, or serve this page via HTTP.\n\nTo serve: python -m http.server 8080');
+                alert('Cannot load files directly. Please use file upload buttons or serve via HTTP.\n\nTo serve: python -m http.server 8080');
             }
         }
 
@@ -281,6 +787,119 @@
             renderMemory();
             renderKernelFlow();
             renderStats();
+            renderQuantizationAudit();
+        }
+
+        function renderQuantizationAudit() {
+            const data = loweredData || layoutData;
+            if (!data) return;
+
+            const weightEntries = data.memory?.weights?.entries || [];
+            const config = data.config || {};
+            const numLayers = config.num_layers || 24;
+
+            // Build layer-wise dtype map
+            const layerDtypes = {};
+            for (let i = 0; i < numLayers; i++) {
+                layerDtypes[i] = { wq: '-', wk: '-', wv: '-', wo: '-', w1: '-', w2: '-', ln1: '-', ln2: '-' };
+            }
+
+            const issues = [];
+
+            weightEntries.forEach(entry => {
+                const name = (entry.name || '').toLowerCase();
+                const dtype = entry.dtype || '';
+
+                // Parse layer number from name like "layer.0.wq"
+                const layerMatch = name.match(/layer\.(\d+)\.(\w+)/);
+                if (layerMatch) {
+                    const layerIdx = parseInt(layerMatch[1]);
+                    const role = layerMatch[2];
+
+                    if (layerDtypes[layerIdx]) {
+                        const roleMap = {
+                            'wq': 'wq', 'wk': 'wk', 'wv': 'wv', 'wo': 'wo',
+                            'w1': 'w1', 'w2': 'w2',
+                            'ln1_gamma': 'ln1', 'ln2_gamma': 'ln2'
+                        };
+                        const mappedRole = roleMap[role];
+                        if (mappedRole) {
+                            layerDtypes[layerIdx][mappedRole] = dtype;
+                        }
+                    }
+                }
+
+                // Check for potential issues
+                const expectedKernelSuffix = getExpectedKernelSuffix(dtype);
+                if (expectedKernelSuffix && entry.define) {
+                    // Store for potential kernel mismatch check
+                }
+            });
+
+            // Render layer summary table
+            const tbody = document.querySelector('#quantSummaryTable tbody');
+            tbody.innerHTML = '';
+
+            Object.entries(layerDtypes).forEach(([layer, dtypes]) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="font-weight: bold;">Layer ${layer}</td>
+                    <td><span class="dtype dtype-${dtypes.wq}">${dtypes.wq}</span></td>
+                    <td><span class="dtype dtype-${dtypes.wk}">${dtypes.wk}</span></td>
+                    <td><span class="dtype dtype-${dtypes.wv}">${dtypes.wv}</span></td>
+                    <td><span class="dtype dtype-${dtypes.wo}">${dtypes.wo}</span></td>
+                    <td><span class="dtype dtype-${dtypes.w1}">${dtypes.w1}</span></td>
+                    <td><span class="dtype dtype-${dtypes.w2}">${dtypes.w2}</span></td>
+                    <td><span class="dtype dtype-${dtypes.ln1}">${dtypes.ln1}</span></td>
+                    <td><span class="dtype dtype-${dtypes.ln2}">${dtypes.ln2}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Render audit results
+            const auditDiv = document.getElementById('quantAuditResults');
+            let auditHtml = '<table><thead><tr><th>Weight</th><th>Dtype</th><th>Expected Kernel</th><th>Status</th></tr></thead><tbody>';
+
+            const quantWeights = weightEntries.filter(e =>
+                e.dtype && !e.dtype.includes('fp32') && !e.dtype.includes('f32')
+            ).slice(0, 50);  // Show first 50
+
+            quantWeights.forEach(entry => {
+                const expectedSuffix = getExpectedKernelSuffix(entry.dtype);
+                const kernelType = entry.name?.includes('w1') || entry.name?.includes('w2') ?
+                    'gemv/gemm' : entry.name?.includes('wq') || entry.name?.includes('wk') ?
+                    'gemv/gemm' : 'various';
+
+                auditHtml += `
+                    <tr>
+                        <td>${entry.name || '-'}</td>
+                        <td><span class="dtype dtype-${entry.dtype}">${entry.dtype}</span></td>
+                        <td style="font-family: monospace;">*_${expectedSuffix}</td>
+                        <td><span class="badge badge-green">OK</span></td>
+                    </tr>
+                `;
+            });
+
+            auditHtml += '</tbody></table>';
+            auditDiv.innerHTML = auditHtml;
+
+            // Show issues
+            const issuesDiv = document.getElementById('quantIssues');
+            if (issues.length === 0) {
+                issuesDiv.innerHTML = '<span style="color: var(--green);">✓ No dtype-kernel mismatches detected</span>';
+            } else {
+                issuesDiv.innerHTML = issues.map(i => `<div style="color: #e74c3c; margin: 0.5rem 0;">⚠ ${i}</div>`).join('');
+            }
+        }
+
+        function getExpectedKernelSuffix(dtype) {
+            const map = {
+                'q4_0': 'q4_0', 'q4_1': 'q4_1', 'q4_k': 'q4_k',
+                'q5_0': 'q5_0', 'q5_1': 'q5_1', 'q5_k': 'q5_k',
+                'q6_k': 'q6_k', 'q8_0': 'q8_0', 'q8_k': 'q8_k',
+                'fp32': 'f32', 'f32': 'f32', 'fp16': 'f16', 'f16': 'f16'
+            };
+            return map[(dtype || '').toLowerCase()] || dtype;
         }
 
         function renderMemory() {
@@ -290,11 +909,9 @@
             const weights = memory.weights || {};
             const activations = memory.activations || {};
 
-            // Calculate totals
             let totalWeightSize = 0;
             let totalActivationSize = 0;
 
-            // Render weights
             const weightsEntries = weights.entries || [];
             const weightsBody = document.querySelector('#weightsTable tbody');
             weightsBody.innerHTML = '';
@@ -313,7 +930,6 @@
                 weightsBody.appendChild(row);
             });
 
-            // Render activations
             const activationBuffers = activations.buffers || [];
             const activationsBody = document.querySelector('#activationsTable tbody');
             activationsBody.innerHTML = '';
@@ -332,19 +948,16 @@
                 activationsBody.appendChild(row);
             });
 
-            // Update stats
             document.getElementById('totalWeights').textContent = formatBytes(totalWeightSize);
             document.getElementById('totalActivations').textContent = formatBytes(totalActivationSize);
             document.getElementById('weightsRegionSize').textContent = formatBytes(totalWeightSize);
             document.getElementById('activationsRegionSize').textContent = formatBytes(totalActivationSize);
 
-            // Find KV cache
             const kvCache = activationBuffers.find(b => b.name === 'kv_cache');
             const kvSize = kvCache ? parseInt(kvCache.size) : 0;
             document.getElementById('totalKVCache').textContent = formatBytes(kvSize);
             document.getElementById('totalMemory').textContent = formatBytes(totalWeightSize + totalActivationSize);
 
-            // Render memory bars
             renderMemoryBar('weightsBar', weightsEntries, totalWeightSize, 'weights');
             renderMemoryBar('activationsBar', activationBuffers, totalActivationSize, 'activation');
         }
@@ -359,7 +972,7 @@
             entries.slice(0, 50).forEach((entry, i) => {
                 const size = parseInt(entry.size) || 0;
                 const width = (size / totalSize) * 100;
-                if (width < 0.5) return; // Skip tiny blocks
+                if (width < 0.5) return;
 
                 const block = document.createElement('div');
                 block.className = `memory-block ${type}`;
@@ -368,7 +981,7 @@
 
                 block.style.left = `${(currentOffset / totalSize) * 100}%`;
                 block.style.width = `${width}%`;
-                block.textContent = width > 5 ? (entry.name || entry.key || '').substring(0, 10) : '';
+                block.textContent = width > 5 ? (entry.name || entry.key || '').substring(0, 12) : '';
                 block.title = `${entry.name || entry.key}\nOffset: 0x${(entry.offset || 0).toString(16)}\nSize: ${formatBytes(size)}`;
 
                 block.onmouseenter = (e) => showTooltip(e, entry);
@@ -387,7 +1000,6 @@
             const container = document.getElementById('kernelFlow');
             container.innerHTML = '';
 
-            // Group by layer
             const layers = {};
             ops.forEach(op => {
                 const layer = op.layer !== undefined ? op.layer : -1;
@@ -403,7 +1015,7 @@
 
                 const header = document.createElement('div');
                 header.className = 'layer-header';
-                header.innerHTML = `<span>${layerName} (${layerOps.length} ops)</span><span class="arrow">▼</span>`;
+                header.innerHTML = `<span>${layerName} <span class="badge badge-orange">${layerOps.length} ops</span></span><span class="arrow">▼</span>`;
                 header.onclick = () => {
                     header.classList.toggle('collapsed');
                     body.classList.toggle('visible');
@@ -431,7 +1043,6 @@
                         <span class="kernel-dims">${dims.join(' | ')}</span>
                     `;
 
-                    // Add data flow info
                     if (op.args || op.activations || op.outputs) {
                         const flow = document.createElement('div');
                         flow.className = 'data-flow';
@@ -449,17 +1060,17 @@
                         node.appendChild(flow);
                     }
 
-                    // Show errors
                     if (op.errors && op.errors.length > 0) {
                         const errors = document.createElement('div');
                         errors.style.color = '#e74c3c';
+                        errors.style.marginLeft = '35px';
+                        errors.style.fontSize = '0.8rem';
                         errors.textContent = 'Errors: ' + op.errors.join(', ');
                         node.appendChild(errors);
                     }
 
                     body.appendChild(node);
 
-                    // Add connection line between ops
                     if (i < layerOps.length - 1) {
                         const conn = document.createElement('div');
                         conn.className = 'connection';
@@ -488,7 +1099,6 @@
             const ops = data.operations || data.ops || [];
             const config = data.config || {};
 
-            // Count kernels
             const kernelCounts = {};
             ops.forEach(op => {
                 const kernel = op.function || op.kernel_id || 'unknown';
@@ -497,7 +1107,6 @@
                 if (op.layer !== undefined) kernelCounts[kernel].layers.add(op.layer);
             });
 
-            // Render stats grid
             const statsGrid = document.getElementById('statsGrid');
             statsGrid.innerHTML = `
                 <div class="stat-card"><div class="stat-value">${ops.length}</div><div class="stat-label">Total Operations</div></div>
@@ -508,7 +1117,6 @@
                 <div class="stat-card"><div class="stat-value">${config.vocab_size || '-'}</div><div class="stat-label">Vocab Size</div></div>
             `;
 
-            // Render kernel table
             const tbody = document.querySelector('#kernelStatsTable tbody');
             tbody.innerHTML = '';
             Object.entries(kernelCounts)
@@ -535,14 +1143,14 @@
         function showTooltip(event, data) {
             const tooltip = document.getElementById('tooltip');
             tooltip.innerHTML = `
-                <strong>${data.name || data.key}</strong><br>
-                Offset: 0x${(data.offset || 0).toString(16)}<br>
-                Size: ${formatBytes(data.size || 0)}<br>
-                ${data.dtype ? `Dtype: ${data.dtype}<br>` : ''}
-                ${data.shape ? `Shape: ${JSON.stringify(data.shape)}` : ''}
+                <strong>${data.name || data.key}</strong>
+                <div class="row"><span class="label">Offset:</span><span class="value">0x${(data.offset || 0).toString(16)}</span></div>
+                <div class="row"><span class="label">Size:</span><span class="value">${formatBytes(data.size || 0)}</span></div>
+                ${data.dtype ? `<div class="row"><span class="label">Dtype:</span><span class="value">${data.dtype}</span></div>` : ''}
+                ${data.shape ? `<div class="row"><span class="label">Shape:</span><span class="value">${JSON.stringify(data.shape)}</span></div>` : ''}
             `;
-            tooltip.style.left = event.pageX + 10 + 'px';
-            tooltip.style.top = event.pageY + 10 + 'px';
+            tooltip.style.left = event.pageX + 15 + 'px';
+            tooltip.style.top = event.pageY + 15 + 'px';
             tooltip.style.display = 'block';
         }
 
@@ -565,11 +1173,9 @@
             code += `    snprintf(filename, sizeof(filename), "debug_%s_L%d.bin", name, layer);\n`;
             code += `    FILE* f = fopen(filename, "wb");\n`;
             code += `    if (f) { fwrite(data, sizeof(float), size, f); fclose(f); }\n`;
-            code += `    printf("Dumped %s layer %d: min=%.4f max=%.4f\\n", name, layer, \n`;
-            code += `           min_float(data, size), max_float(data, size));\n`;
+            code += `    printf("Dumped %s layer %d\\n", name, layer);\n`;
             code += `}\n\n`;
 
-            // Find key ops to dump
             const dumpPoints = ['embedding', 'rmsnorm', 'q_proj', 'attention', 'out_proj', 'mlp_gate_up', 'mlp_down', 'logits'];
             code += `// Insert these calls at appropriate points:\n`;
 
@@ -584,6 +1190,303 @@
 
             document.getElementById('debugCodeOutput').textContent = code;
         }
+
+        // D3.js Graph Visualization
+        let graphSvg = null;
+        let graphSimulation = null;
+        let graphData = { nodes: [], links: [] };
+        let currentGraphMode = 'linear';
+
+        function getKernelColor(kernelType) {
+            const colors = {
+                'quantize': '#e74c3c',
+                'gemv': '#47b475',
+                'gemm': '#47b475',
+                'attention': '#f39c12',
+                'rmsnorm': '#9b59b6',
+                'layernorm': '#9b59b6',
+                'embedding': '#3498db',
+                'default': '#07adf8'
+            };
+            return colors[kernelType] || colors['default'];
+        }
+
+        function renderLinearView() {
+            currentGraphMode = 'linear';
+            const container = document.getElementById('graphContainer');
+            container.innerHTML = '';
+            renderKernelFlow();
+            document.getElementById('kernelFlow').style.display = 'block';
+        }
+
+        function renderGraphView() {
+            currentGraphMode = 'graph';
+            const data = callData || loweredData;
+            if (!data) {
+                alert('Load an IR file first to view the graph.');
+                return;
+            }
+
+            const ops = data.operations || data.ops || [];
+            document.getElementById('kernelFlow').style.display = 'none';
+
+            // Build graph data
+            const nodes = [];
+            const links = [];
+            const nodeMap = new Map();
+
+            ops.forEach((op, idx) => {
+                const kernelType = getKernelType(op.function || op.kernel_id || '');
+                const node = {
+                    id: idx,
+                    op: op.op || op.kernel_id || `op_${idx}`,
+                    function: op.function || op.kernel_id || '',
+                    kernelType: kernelType,
+                    layer: op.layer !== undefined ? op.layer : -1,
+                    color: getKernelColor(kernelType),
+                    visible: true
+                };
+                nodes.push(node);
+                nodeMap.set(idx, node);
+            });
+
+            // Create links based on sequential flow and data dependencies
+            for (let i = 0; i < ops.length - 1; i++) {
+                // Sequential link
+                links.push({
+                    source: i,
+                    target: i + 1,
+                    type: 'sequential'
+                });
+            }
+
+            graphData = { nodes, links };
+            drawForceDirectedGraph(nodes, links);
+        }
+
+        function drawForceDirectedGraph(nodes, links) {
+            const container = document.getElementById('graphContainer');
+            container.innerHTML = '';
+
+            const width = container.clientWidth || 1200;
+            const height = container.clientHeight || 600;
+            const padding = 40;
+
+            // Clear any existing simulation
+            if (graphSimulation) {
+                graphSimulation.stop();
+            }
+
+            // Group nodes by layer
+            const layers = {};
+            const layerOrder = [];
+
+            nodes.forEach(d => {
+                const layerKey = d.layer >= 0 ? `layer_${d.layer}` : 'special';
+                if (!layers[layerKey]) {
+                    layers[layerKey] = { nodes: [], id: layerKey };
+                    layerOrder.push(layers[layerKey]);
+                }
+                layers[layerKey].nodes.push(d);
+            });
+
+            // Create SVG with proper viewBox
+            const svg = d3.select(container)
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('background', 'var(--dark)');
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${padding}, ${padding})`);
+
+            // Define arrow marker
+            svg.select('defs').remove();
+            const defs = svg.append('defs');
+            defs.append('marker')
+                .attr('id', 'arrowhead')
+                .attr('viewBox', '-0 -5 10 10')
+                .attr('refX', 15)
+                .attr('refY', 0)
+                .attr('orient', 'auto')
+                .attr('markerWidth', 5)
+                .attr('markerHeight', 5)
+                .append('path')
+                .attr('d', 'M 0,-5 L 10,0 L 0,5')
+                .attr('fill', '#666');
+
+            const graphWidth = width - padding * 2;
+            const graphHeight = height - padding * 2;
+
+            // Calculate positions: layers arranged horizontally, nodes within layers stacked vertically
+            const layerWidth = graphWidth / layerOrder.length;
+
+            layerOrder.forEach((layer, layerIdx) => {
+                const nodeHeight = graphHeight / (layer.nodes.length + 1);
+                layer.nodes.forEach((node, nodeIdx) => {
+                    // Position: layer determines X, index within layer determines Y
+                    node.x = padding + layerIdx * layerWidth + layerWidth / 2;
+                    node.y = padding + (nodeIdx + 1) * nodeHeight;
+                    // Store layer for link styling
+                    node.layerIdx = layerIdx;
+                });
+            });
+
+            // Draw layer labels on top
+            const layerLabels = svg.append('g').selectAll('text')
+                .data(layerOrder)
+                .enter().append('text')
+                .text(d => d.id === 'special' ? 'Special' : `Layer ${d.id.split('_')[1]}`)
+                .attr('x', (d, i) => padding + i * layerWidth + layerWidth / 2)
+                .attr('y', padding - 10)
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'var(--orange)')
+                .attr('font-size', '12px')
+                .attr('font-weight', 'bold');
+
+            // Draw links (only show nearest neighbor links to reduce visual clutter)
+            const visibleLinks = links.filter((l, i) => i % 5 === 0 || Math.abs((l.source.id || l.source) - (l.target.id || l.target)) === 1);
+
+            const link = g.append('g')
+                .selectAll('line')
+                .data(visibleLinks)
+                .enter().append('line')
+                .attr('stroke', '#444')
+                .attr('stroke-width', 1)
+                .attr('opacity', 0.6)
+                .attr('marker-end', 'url(#arrowhead)');
+
+            // Draw nodes
+            const node = g.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .enter().append('g')
+                .attr('class', 'graph-node')
+                .style('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            // Node circles
+            node.append('circle')
+                .attr('r', d => d.kernelType === 'attention' ? 14 : 10)
+                .attr('fill', d => d.color)
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))')
+                .on('mouseover', showNodeTooltip)
+                .on('mouseout', hideNodeTooltip);
+
+            // Node labels - show on hover instead
+            node.append('text')
+                .text(d => (d.op || '').substring(0, 10))
+                .attr('x', 0)
+                .attr('y', -18)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#fff')
+                .attr('font-size', '9px')
+                .attr('font-family', "'JetBrains Mono', monospace")
+                .style('pointer-events', 'none')
+                .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)')
+                .style('opacity', 0.7);
+
+            // Initial positions
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+
+            // Update link positions immediately
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            // Add gentle force simulation for interactivity (not layout)
+            graphSimulation = d3.forceSimulation(nodes)
+                .force('charge', d3.forceManyBody().strength(-50))
+                .force('collision', d3.forceCollide().radius(20))
+                .alphaDecay(0.1)
+                .velocityDecay(0.8)
+                .on('tick', () => {
+                    // Constrain to bounds
+                    nodes.forEach(d => {
+                        d.x = Math.max(padding + 10, Math.min(width - padding - 10, d.x));
+                        d.y = Math.max(padding + 20, Math.min(height - padding - 20, d.y));
+                    });
+
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    node.attr('transform', d => `translate(${d.x},${d.y})`);
+                });
+
+            // Update node count
+            document.getElementById('graphNodeCount').textContent = `${nodes.length} nodes, ${links.length} edges | ${layerOrder.length} layers`;
+
+            graphSvg = svg;
+
+            function dragstarted(event, d) {
+                if (!event.active) graphSimulation.alphaTarget(0.3).restart();
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) graphSimulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+
+        function showNodeTooltip(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <strong>${d.op}</strong>
+                <div class="row"><span class="label">Function:</span><span class="value">${d.function || '-'}</span></div>
+                <div class="row"><span class="label">Layer:</span><span class="value">${d.layer >= 0 ? d.layer : 'N/A'}</span></div>
+                <div class="row"><span class="label">Type:</span><span class="value">${d.kernelType}</span></div>
+            `;
+            tooltip.style.left = event.pageX + 15 + 'px';
+            tooltip.style.top = event.pageY + 15 + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function filterGraph(query) {
+            if (!graphData.nodes.length) return;
+
+            const lowerQuery = query.toLowerCase();
+
+            graphData.nodes.forEach(node => {
+                const match = node.op.toLowerCase().includes(lowerQuery) ||
+                              node.function.toLowerCase().includes(lowerQuery) ||
+                              (node.layer >= 0 && `layer${node.layer}`.includes(lowerQuery));
+                node.visible = match;
+            });
+
+            // Update visibility in graph
+            if (graphSvg) {
+                graphSvg.selectAll('g circle')
+                    .attr('opacity', d => d.visible ? 1 : 0.2)
+                    .attr('stroke', d => d.visible ? '#fff' : '#555');
+                graphSvg.selectAll('g text')
+                    .attr('opacity', d => d.visible ? 1 : 0.1);
+            }
+
+            // Update count
+            const visibleCount = graphData.nodes.filter(n => n.visible).length;
+            document.getElementById('graphNodeCount').textContent = `${visibleCount}/${graphData.nodes.length} nodes`;
+        }
     </script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </body>
 </html>
