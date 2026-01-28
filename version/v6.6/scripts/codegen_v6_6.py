@@ -804,6 +804,9 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include "ckernel_model_load_v6.6.h"
 #include "ckernel_engine.h"  /* Kernel declarations */
 ''')

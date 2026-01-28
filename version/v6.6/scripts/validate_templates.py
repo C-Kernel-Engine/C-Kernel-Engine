@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+EXPERIMENTAL/FUTURE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file is a standalone validation utility for template schemas.
+It is NOT called by ck_run_v6_6.py or the current build pipeline.
+
+Part of the experimental template system for future IR2 work.
+Current pipeline uses: build_ir_v6_6.py with kernel maps directly.
+=============================================================================
+
 validate_templates.py
 =====================
 

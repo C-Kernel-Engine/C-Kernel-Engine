@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+EXPERIMENTAL/FUTURE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file is a standalone validation utility for template schema v2.
+It is NOT called by ck_run_v6_6.py or the current build pipeline.
+
+Part of the experimental op_builders/template system for future IR2 work.
+Current pipeline uses: build_ir_v6_6.py with kernel maps directly.
+=============================================================================
+
 validate_template_v2.py - Validator for template schema v2
 
 Validates template JSON files against the v2 schema defined in templates/README.md.

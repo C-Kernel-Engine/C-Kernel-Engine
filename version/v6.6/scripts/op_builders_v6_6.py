@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+EXPERIMENTAL/FUTURE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file is part of the experimental op_builders system for future IR2 work.
+It is NOT called by ck_run_v6_6.py or the current build pipeline.
+
+Related files: parse_template_v2.py, op_builders_auto.py, op_builders_hybrid_v6_6.py
+Current pipeline uses: build_ir_v6_6.py with kernel maps directly.
+=============================================================================
+
 op_builders_v6_6.py - Op Builders for Template v2
 
 Maps template operations (OpNode) to GraphIR Op objects with symbolic tensor names.

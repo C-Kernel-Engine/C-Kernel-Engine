@@ -3927,6 +3927,11 @@ def main(args: List[str]) -> int:
         type=Path,
         help="Output init IR JSON file (one-time initialization ops like rope_init)"
     )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Enable OpenMP parallelization annotations in lowered IR"
+    )
 
     parsed_args = parser.parse_args(args)
 
@@ -4015,6 +4020,24 @@ def main(args: List[str]) -> int:
     lowered_call = None
     if parsed_args.call_output:
         lowered_call = generate_ir_lower_3(lowered_ir, parsed_args.mode)
+
+        # Apply OpenMP parallelization pass if enabled
+        # This is a SEPARATE PASS that analyzes the full graph and makes
+        # centralized decisions about what to parallelize.
+        # See parallel_pass.py for why this is centralized (false sharing, etc.)
+        if getattr(parsed_args, 'parallel', False) and lowered_call:
+            try:
+                from parallel_pass import run_parallel_pass
+                lowered_call, parallel_stats = run_parallel_pass(
+                    lowered_call, parsed_args.mode
+                )
+                print(f"  [PARALLEL PASS] {parallel_stats['parallelized_ops']}/{parallel_stats['total_ops']} ops annotated")
+                for strat, count in parallel_stats.get('strategies', {}).items():
+                    print(f"    - {strat}: {count} ops")
+            except ImportError as e:
+                print(f"  [PARALLEL PASS] Warning: parallel_pass.py not found ({e})")
+            except Exception as e:
+                print(f"  [PARALLEL PASS] Warning: parallelization failed: {e}")
 
     # Once we have the right memory and lowered graph then we can do codegen
     # codegen will read the lowered IR and memory layout to emit C code

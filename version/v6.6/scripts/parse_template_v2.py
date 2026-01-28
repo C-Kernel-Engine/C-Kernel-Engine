@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+EXPERIMENTAL/FUTURE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file is part of the experimental op_builders system for future IR2 work.
+It is NOT called by ck_run_v6_6.py or the current build pipeline.
+
+Used by: op_builders_auto.py, op_builders_v6_6.py, op_builders_hybrid_v6_6.py
+         gen_op_builders_from_registry.py
+
+Current pipeline uses: build_ir_v6_6.py with kernel maps directly.
+=============================================================================
+
 parse_template_v2.py - Parser for template schema v2
 
 Parses template JSON files and generates operation sequences for IR1 generation.

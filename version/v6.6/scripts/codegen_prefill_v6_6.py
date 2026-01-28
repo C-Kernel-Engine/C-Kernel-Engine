@@ -5,6 +5,38 @@ codegen_prefill_v6_6.py - Generate C code for PREFILL mode from lowered IR.
 This generates ck_prefill() which processes multiple tokens at once.
 The IR (lowered_prefill_call.json) already has function names and expressions.
 We just substitute num_tokens for const:1 sources.
+
+=============================================================================
+IMPORTANT: CODEGEN IS DUMB - NO PARALLELIZATION LOGIC HERE
+=============================================================================
+
+When you look at this code, you'll see many `for` loops that LOOK like they
+could be parallelized with `#pragma omp parallel for`. You might be tempted
+to add pragmas here. DON'T.
+
+WHY NOT?
+
+1. Codegen has NO global view of the computation graph
+2. Adding pragmas here could cause FALSE SHARING between ops
+3. Two adjacent ops might both parallelize the same buffer = cache thrashing
+4. Thread over-subscription if multiple ops spawn threads
+
+WHERE DOES PARALLELIZATION COME FROM?
+
+The parallel_pass.py runs BEFORE codegen and makes centralized decisions:
+- Analyzes the full op graph
+- Detects false sharing risks
+- Decides which ops to parallelize
+- Writes op["parallel"]["pragma"] with the EXACT pragma to emit
+
+WHAT CODEGEN DOES:
+
+Codegen BLINDLY reads op["parallel"]["pragma"] and emits it.
+No intelligence. No decisions. Just emit what IR says.
+
+If you need to change parallelization strategy, modify parallel_pass.py,
+NOT this file.
+=============================================================================
 """
 
 import argparse
@@ -12,7 +44,23 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+
+def get_parallel_pragma(op: Dict) -> str:
+    """
+    Get OpenMP pragma from op's parallel annotation.
+
+    This function does NOT make decisions - it just reads what parallel_pass.py
+    wrote to the IR. If no pragma exists, returns empty string.
+    """
+    parallel = op.get("parallel", {})
+    if not parallel.get("enabled", False):
+        return ""
+    pragma = parallel.get("pragma", "")
+    if pragma and not pragma.startswith("//"):
+        return pragma
+    return ""
 
 
 def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
@@ -84,6 +132,9 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
         is_k = op.get("_is_k", True)
         scratch_name = "A_K_SCRATCH" if is_k else "A_V_SCRATCH"
         max_tokens = config.get("context_len", config.get("context_length", 1024))
+        omp_pragma = get_parallel_pragma(op)
+        if omp_pragma:
+            omp_pragma = f"\n        {omp_pragma}"
         return f"""    /* Op {seq_idx}: transpose_{("k" if is_k else "v")}_to_head_major layer={layer} */
     /* Transpose from [T, Hkv*D] (token-major GEMM output) to [Hkv, T, D] (head-major for attention) */
     {{
@@ -92,7 +143,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
         float *buf = (float*)(model->bump + {scratch_name});
         /* Use temp buffer for out-of-place transpose (safe, no aliasing) */
         static float _temp_buf[{num_kv_heads * max_tokens * head_dim}];
-        /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */
+        /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */{omp_pragma}
         for (int t = 0; t < num_tokens; t++) {{
             for (int h = 0; h < Hkv; h++) {{
                 memcpy(_temp_buf + h * num_tokens * D + t * D,
@@ -112,6 +163,9 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
             head_dim = config.get("head_dim", 64)
             scratch_name = "A_Q_SCRATCH"
             max_tokens = config.get("context_len", config.get("context_length", 1024))
+            omp_pragma = get_parallel_pragma(op)
+            if omp_pragma:
+                omp_pragma = f"\n        {omp_pragma}"
             return f"""    /* Op {seq_idx}: transpose_q_to_head_major layer={layer} */
     /* Transpose from [T, H*D] (token-major GEMM output) to [H, T, D] (head-major for attention) */
     {{
@@ -120,7 +174,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
         float *buf = (float*)(model->bump + {scratch_name});
         /* Use temp buffer for out-of-place transpose */
         static float _temp_buf[{num_heads * max_tokens * head_dim}];
-        /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */
+        /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */{omp_pragma}
         for (int t = 0; t < num_tokens; t++) {{
             for (int h = 0; h < H; h++) {{
                 memcpy(_temp_buf + h * num_tokens * D + t * D,
@@ -138,6 +192,10 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
         num_heads = config.get("num_heads", 14)
         head_dim = config.get("head_dim", 64)
         max_tokens = config.get("context_len", config.get("context_length", 1024))
+        # Parallelize over heads (outer loop)
+        omp_pragma = get_parallel_pragma(op)
+        if omp_pragma:
+            omp_pragma = f"\n        {omp_pragma}"
         return f"""    /* Op {seq_idx}: transpose_attn_out_to_token_major layer={layer} */
     /* Transpose from [H, T, D] (head-major attention output) to [T, H*D] (token-major for out_proj) */
     {{
@@ -146,7 +204,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
         float *buf = (float*)(model->bump + A_ATTN_SCRATCH);
         /* Use temp buffer for out-of-place transpose */
         static float _temp_buf[{num_heads * max_tokens * head_dim}];
-        /* Copy with transpose: src[h, t, d] -> dst[t, h*D+d] */
+        /* Copy with transpose: src[h, t, d] -> dst[t, h*D+d] */{omp_pragma}
         for (int h = 0; h < H; h++) {{
             for (int t = 0; t < num_tokens; t++) {{
                 memcpy(_temp_buf + t * H * D + h * D,

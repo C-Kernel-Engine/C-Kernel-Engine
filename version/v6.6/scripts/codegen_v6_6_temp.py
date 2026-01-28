@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+LEGACY FILE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file has been superseded by: codegen_v6_6.py
+
+This was a temporary/experimental codegen variant created during development.
+The current v6.6 pipeline uses codegen_v6_6.py.
+
+To use the current pipeline: python ck_run_v6_6.py run <model>
+=============================================================================
+
 codegen_v6_6.py - Generate unrolled C code from lowered IR.
 
 DATA-DRIVEN APPROACH:

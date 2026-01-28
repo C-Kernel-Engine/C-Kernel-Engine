@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+EXPERIMENTAL/FUTURE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file generates op_builders_auto.py for future IR2 work.
+It is NOT called by ck_run_v6_6.py or the current build pipeline.
+
+Related files: op_builders_auto.py, op_builders_v6_6.py, parse_template_v2.py
+Current pipeline uses: build_ir_v6_6.py with kernel maps directly.
+=============================================================================
+
 gen_op_builders_from_registry.py - Auto-generate op builders from kernel registry
 
 This script analyzes the kernel registry and generates op builder functions that

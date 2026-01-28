@@ -661,6 +661,10 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         if no_fusion:
             cmd.append("--no-fusion")
 
+        # Enable OpenMP parallelization annotations for prefill mode
+        if mode == "prefill":
+            cmd.append("--parallel")
+
         log(f"  Generating IR1 + {'NO fusion' if no_fusion else 'fusion'} + layout + lowered + call IR for mode: {mode}", C_DIM)
         run_cmd(cmd)
         log(f"  Created IR1 for {mode} at {ir1_path}", C_GREEN)
@@ -770,12 +774,22 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     v66_include = V66_ROOT / "include"
     v66_src = V66_ROOT / "src"
     loader_src = V66_ROOT / "src" / "ckernel_model_load_v6_6.c"
+
+    # Detect compiler for OpenMP flag
+    import shutil
+    compiler = "gcc"
+    omp_flag = "-fopenmp"
+    if shutil.which("icx"):
+        compiler = "icx"
+        omp_flag = "-qopenmp"
+
     cmd = [
-        "gcc",
+        compiler,
         "-shared", "-fPIC",
         "-O3", "-march=native",
         "-std=c11",
         "-fvisibility=default",  # Export CK_EXPORT symbols
+        omp_flag,  # OpenMP for parallelization
         f"-I{include_dir}",
         f"-I{v66_include}",
         f"-I{v66_src}",

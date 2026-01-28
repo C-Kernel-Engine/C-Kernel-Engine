@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 """
+=============================================================================
+LEGACY FILE - NOT USED BY CURRENT v6.6 PIPELINE
+=============================================================================
+This file has been superseded by: build_ir_v6_6.py
+
+The current v6.6 pipeline uses build_ir_v6_6.py which is called from
+ck_run_v6_6.py. This legacy version is kept for reference only.
+
+Key differences from current version:
+- Uses older IR format (sections/layers/ops vs flat operations list)
+- Different fusion/lowering approach
+- Not integrated with parallel_pass.py
+
+To use the current pipeline: python ck_run_v6_6.py run <model>
+=============================================================================
+
 build_ir_v6_6.py - IR v6.6 pipeline (standalone, manifest-first, registry-driven)
 
 config.json + weights_manifest.json + KERNEL_REGISTRY.json -> graph IR -> lowered IR -> layout -> generated C
