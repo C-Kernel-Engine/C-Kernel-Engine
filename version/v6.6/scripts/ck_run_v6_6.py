@@ -786,6 +786,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     cmd = [
         compiler,
         "-shared", "-fPIC",
+        "-mcmodel=large",  # Handle large static data in v6.6 models
         "-O3", "-march=native",
         "-std=c11",
         "-fvisibility=default",  # Export CK_EXPORT symbols
@@ -799,6 +800,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         f"-L{BUILD_DIR}",
         f"-L{output_dir}",  # Also look in output_dir for libckernel_engine.so
         "-lckernel_engine",
+        "-lckernel_tokenizer",  # BPE tokenizer library
         "-lm",
         f"-Wl,-rpath,$ORIGIN",  # Use $ORIGIN so library can find deps in same dir
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -1122,6 +1124,16 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
             shutil.copy(kernel_lib, dst_lib)
             log(f"  Copied libckernel_engine.so to {model_dir}", C_DIM)
 
+    # Ensure libckernel_tokenizer.so is findable (for BPE tokenizer)
+    tokenizer_lib = BUILD_DIR / "libckernel_tokenizer.so"
+    if tokenizer_lib.exists():
+        dst_tok = model_dir / "libckernel_tokenizer.so"
+        if not dst_tok.exists():
+            import shutil
+            shutil.copy(tokenizer_lib, dst_tok)
+            log(f"  Copied libckernel_tokenizer.so to {model_dir}", C_DIM)
+
+    if kernel_lib.exists():
         # Also set LD_LIBRARY_PATH for the subprocess
         ld_path = str(BUILD_DIR)
         current_ld = os.environ.get("LD_LIBRARY_PATH", "")

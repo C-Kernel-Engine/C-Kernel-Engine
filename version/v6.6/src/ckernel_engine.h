@@ -120,6 +120,12 @@ void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, in
 void gemm_nt_q6_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 
+/* INT8 activation GEMM variants (quantized input for prefill) */
+void gemm_nt_q4_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q6_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q8_0_q8_0(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
+
 /* ============================================================================
  * ROPE KERNELS
  * ============================================================================ */

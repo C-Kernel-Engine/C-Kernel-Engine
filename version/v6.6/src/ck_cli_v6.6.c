@@ -72,11 +72,17 @@ typedef int (*forward_t)(float *logits_out);
 typedef int (*kv_enable_t)(int capacity);
 typedef void (*kv_reset_t)(void);
 typedef int (*decode_t)(int32_t token, float *logits_out);
-typedef int (*sample_argmax_t)(void);
 typedef float *(*get_logits_t)(void);
 typedef int (*get_int_t)(void);
-typedef void *(*get_ptr_t)(void);
 typedef void (*free_t)(void);
+
+/* Tokenizer API - uses model's built-in tokenizer (one source of truth) */
+typedef int (*encode_text_t)(const char *text, int text_len);
+typedef int (*decode_tokens_t)(const int32_t *ids, int num_ids, char *text, int max_len);
+typedef int (*has_tokenizer_t)(void);
+typedef int32_t (*lookup_token_t)(const char *text);
+typedef const char *(*id_to_token_t)(int32_t id);
+typedef const int32_t *(*get_token_buffer_t)(void);
 
 typedef struct {
     void *handle;
@@ -86,17 +92,19 @@ typedef struct {
     kv_enable_t kv_enable;
     kv_reset_t kv_reset;
     decode_t decode;
-    sample_argmax_t sample;
     get_logits_t get_logits;
     get_int_t get_context;
     get_int_t get_vocab_size;
-    get_int_t get_num_merges;
-    get_int_t get_vocab_bytes;
     get_int_t get_active_tokens;
-    get_ptr_t get_offsets;
-    get_ptr_t get_strings;
-    get_ptr_t get_merges;
     free_t free_fn;
+
+    /* Built-in tokenizer API (from generated model) */
+    encode_text_t encode_text;
+    decode_tokens_t decode_tokens;
+    has_tokenizer_t has_tokenizer;
+    lookup_token_t lookup_token;
+    id_to_token_t id_to_token;
+    get_token_buffer_t get_token_buffer;
 } ModelAPI;
 
 /* ============================================================================
@@ -545,24 +553,25 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     if (!resolve_symbol(api->handle, "ck_model_embed_tokens", (void **)&api->embed, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, true)) return false;
-    if (!resolve_symbol(api->handle, "ck_model_sample_argmax", (void **)&api->sample, true)) return false;
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
     resolve_symbol(api->handle, "ck_model_get_context_window", (void **)&api->get_context, false);
     resolve_symbol(api->handle, "ck_model_get_vocab_size", (void **)&api->get_vocab_size, false);
-    resolve_symbol(api->handle, "ck_model_get_num_merges", (void **)&api->get_num_merges, false);
-    resolve_symbol(api->handle, "ck_model_get_vocab_strings_size", (void **)&api->get_vocab_bytes, false);
     resolve_symbol(api->handle, "ck_model_get_active_tokens", (void **)&api->get_active_tokens, false);
-    resolve_symbol(api->handle, "ck_model_get_vocab_offsets", (void **)&api->get_offsets, false);
-    resolve_symbol(api->handle, "ck_model_get_vocab_strings", (void **)&api->get_strings, false);
-    resolve_symbol(api->handle, "ck_model_get_vocab_merges", (void **)&api->get_merges, false);
     resolve_symbol(api->handle, "ck_model_free", (void **)&api->free_fn, false);
 
-    if (!api->get_vocab_size || !api->get_vocab_bytes || !api->get_offsets || !api->get_strings) {
-        fprintf(stderr, "Error: vocab accessors missing from model\n");
-        return false;
-    }
+    /* Built-in tokenizer API (v6.6 models have tokenizer in generated code) */
+    resolve_symbol(api->handle, "ck_model_encode_text", (void **)&api->encode_text, false);
+    resolve_symbol(api->handle, "ck_model_decode_tokens", (void **)&api->decode_tokens, false);
+    resolve_symbol(api->handle, "ck_model_has_tokenizer", (void **)&api->has_tokenizer, false);
+    resolve_symbol(api->handle, "ck_model_lookup_token", (void **)&api->lookup_token, false);
+    resolve_symbol(api->handle, "ck_model_get_token_buffer", (void **)&api->get_token_buffer, false);
+
+    /* For id_to_token, we need to load the tokenizer's function from the model */
+    /* The model uses ck_true_bpe_id_to_token internally, but we need direct access */
+    /* For now, we'll handle this via decode_tokens with single token */
+
     return true;
 }
 
@@ -789,8 +798,8 @@ static bool parse_eos_ids(const char *arg, CLIOptions *opt) {
  * Prompt Execution
  * ============================================================================ */
 
-static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, const char *input) {
-    if (!api || !tokenizer || !opt || !input) return -1;
+static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
+    if (!api || !opt || !input) return -1;
     if (g_exit_requested) return -1;
 
     int ctx = opt->context_override;
@@ -861,25 +870,32 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
     /* Get vocab size for sampling */
     int vocab_size = api->get_vocab_size ? api->get_vocab_size() : 0;
 
+    /* Helper: sample next token from logits */
+    #define SAMPLE_NEXT_TOKEN() do { \
+        if (api->get_logits && vocab_size > 0) { \
+            float *logits = api->get_logits(); \
+            if (logits) { \
+                int active = api->get_active_tokens ? api->get_active_tokens() : 1; \
+                float *last_logits = logits + (size_t)(active - 1) * vocab_size; \
+                float *logits_copy = (float *)malloc(vocab_size * sizeof(float)); \
+                memcpy(logits_copy, last_logits, vocab_size * sizeof(float)); \
+                next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p); \
+                free(logits_copy); \
+            } else if (api->sample) { \
+                next_token = api->sample(); \
+            } else { \
+                next_token = -1; \
+            } \
+        } else if (api->sample) { \
+            next_token = api->sample(); \
+        } else { \
+            next_token = -1; \
+        } \
+    } while(0)
+
     /* Sample first token */
     int next_token;
-    if (opt->temperature > 0.0f && api->get_logits && vocab_size > 0) {
-        float *logits = api->get_logits();
-        if (logits) {
-            /* Get logits for last position */
-            int active = api->get_active_tokens ? api->get_active_tokens() : 1;
-            float *last_logits = logits + (size_t)(active - 1) * vocab_size;
-            /* Make a copy since sampling modifies in place */
-            float *logits_copy = (float *)malloc(vocab_size * sizeof(float));
-            memcpy(logits_copy, last_logits, vocab_size * sizeof(float));
-            next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p);
-            free(logits_copy);
-        } else {
-            next_token = api->sample();
-        }
-    } else {
-        next_token = api->sample();
-    }
+    SAMPLE_NEXT_TOKEN();
 
     char out_buf[CK_CLI_OUTPUT_BUF_SIZE];
     size_t out_len = 0;
@@ -936,23 +952,10 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
         g_decode_count++;
 
         /* Sample next token */
-        if (opt->temperature > 0.0f && api->get_logits && vocab_size > 0) {
-            float *logits = api->get_logits();
-            if (logits) {
-                int active = api->get_active_tokens ? api->get_active_tokens() : 1;
-                float *last_logits = logits + (size_t)(active - 1) * vocab_size;
-                float *logits_copy = (float *)malloc(vocab_size * sizeof(float));
-                memcpy(logits_copy, last_logits, vocab_size * sizeof(float));
-                next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p);
-                free(logits_copy);
-            } else {
-                next_token = api->sample();
-            }
-        } else {
-            next_token = api->sample();
-        }
+        SAMPLE_NEXT_TOKEN();
     }
 
+    #undef SAMPLE_NEXT_TOKEN
     g_generation_active = 0;
     output_flush(out_buf, &out_len);
     printf("\n");
@@ -1222,29 +1225,41 @@ int main(int argc, char **argv) {
         api.kv_enable(ctx);
     }
 
-    CKTrueBPE *tokenizer = ck_true_bpe_create();
-    if (!tokenizer) {
-        fprintf(stderr, "[Tokenizer] failed to create\n");
+    /* Check for model's built-in tokenizer (v6.6 models have tokenizer in generated code) */
+    if (!api.has_tokenizer || !api.has_tokenizer()) {
+        fprintf(stderr, "[Tokenizer] Model does not have built-in tokenizer\n");
+        fprintf(stderr, "            v6.6 models should have ck_model_encode_text/decode_tokens\n");
+        return 1;
+    }
+
+    if (!api.encode_text || !api.decode_tokens) {
+        fprintf(stderr, "[Tokenizer] Model missing encode/decode functions\n");
         return 1;
     }
 
     int vocab_size = api.get_vocab_size ? api.get_vocab_size() : 0;
-    int vocab_bytes = api.get_vocab_bytes ? api.get_vocab_bytes() : 0;
-    int num_merges = api.get_num_merges ? api.get_num_merges() : 0;
-    const int32_t *offsets = (const int32_t *)api.get_offsets();
-    const char *strings = (const char *)api.get_strings();
-    const int32_t *merges = api.get_merges ? (const int32_t *)api.get_merges() : NULL;
 
-    if (vocab_size <= 0 || vocab_bytes <= 0 || !offsets || !strings) {
-        fprintf(stderr, "[Tokenizer] missing vocab data in model\n");
-        ck_true_bpe_free(tokenizer);
-        return 1;
-    }
-
-    if (ck_true_bpe_load_binary(tokenizer, vocab_size, offsets, strings, num_merges, merges) != 0) {
-        fprintf(stderr, "[Tokenizer] failed to load vocab\n");
-        ck_true_bpe_free(tokenizer);
-        return 1;
+    /* Lookup EOS tokens using model's tokenizer */
+    if (api.lookup_token) {
+        static const char *eos_tokens[] = {
+            "<|im_end|>", "<|endoftext|>", "<|im_start|>",  /* Qwen/ChatML */
+            "<|eot_id|>", "<|end_of_text|>",  /* Llama 3 */
+            "</s>",  /* Generic */
+            NULL
+        };
+        opt.eos_count = 0;
+        for (int i = 0; eos_tokens[i] != NULL && opt.eos_count < CK_CLI_EOS_MAX; i++) {
+            int32_t id = api.lookup_token(eos_tokens[i]);
+            if (id >= 0) {
+                opt.eos_ids[opt.eos_count++] = id;
+                if (opt.verbose) {
+                    printf("[Tokenizer] EOS token: %s -> %d\n", eos_tokens[i], id);
+                }
+            }
+        }
+        if (opt.verbose && opt.eos_count > 0) {
+            printf("[Tokenizer] Found %d EOS tokens\n", opt.eos_count);
+        }
     }
 
     printf("Ready! Vocab: %d, Context: %d, Template: %s\n",

@@ -518,7 +518,14 @@ test-tokenizer-llama: $(LIB_TOKENIZER)
 	@echo "========================================"
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_llamacpp.py
 
-.PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama
+test-tokenizer-special: $(LIB_TOKENIZER)
+	@echo ""
+	@echo "========================================"
+	@echo "  Special Token & Byte Decode Tests"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_true_bpe_special_tokens.py
+
+.PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama test-tokenizer-special
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEGA-FUSED ATTENTION TESTS (DRAM Pressure & Flamegraph)

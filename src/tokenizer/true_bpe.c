@@ -77,6 +77,15 @@ typedef struct {
     size_t capacity;
 } CKBPETokenList;
 
+#define MAX_SPECIAL_TOKENS 32  /* Maximum number of special tokens */
+
+/* Special token entry for pre-BPE matching */
+typedef struct {
+    char *token;      /* Token string to match */
+    int32_t id;       /* Token ID to output */
+    int len;          /* Length of token string (for faster matching) */
+} CKSpecialToken;
+
 /* Main True BPE tokenizer structure */
 struct CKTrueBPE {
     /* Vocabulary: token string -> token ID */
@@ -96,6 +105,10 @@ struct CKTrueBPE {
     int32_t bos_id;
     int32_t eos_id;
     int32_t pad_id;
+
+    /* Special tokens to match before BPE (sorted by length, longest first) */
+    CKSpecialToken special_tokens[MAX_SPECIAL_TOKENS];
+    int num_special_tokens;
 
     /* Configuration */
     CKBPEConfig config;
@@ -344,6 +357,14 @@ CKTrueBPE *ck_true_bpe_create(void) {
     bpe->eos_id = -1;
     bpe->pad_id = -1;
 
+    /* Initialize special tokens array */
+    bpe->num_special_tokens = 0;
+    for (int i = 0; i < MAX_SPECIAL_TOKENS; i++) {
+        bpe->special_tokens[i].token = NULL;
+        bpe->special_tokens[i].id = -1;
+        bpe->special_tokens[i].len = 0;
+    }
+
     /* Default config */
     bpe->config.add_bos = false;
     bpe->config.add_eos = false;
@@ -375,6 +396,13 @@ void ck_true_bpe_free(CKTrueBPE *bpe) {
 
     if (bpe->str_buffer) {
         free(bpe->str_buffer);
+    }
+
+    /* Free special tokens */
+    for (int i = 0; i < bpe->num_special_tokens; i++) {
+        if (bpe->special_tokens[i].token) {
+            free(bpe->special_tokens[i].token);
+        }
     }
 
     free(bpe);
@@ -504,6 +532,47 @@ void ck_true_bpe_set_special_ids(CKTrueBPE *bpe, int32_t unk, int32_t bos, int32
 void ck_true_bpe_set_config(CKTrueBPE *bpe, const CKBPEConfig *config) {
     if (!bpe || !config) return;
     bpe->config = *config;
+}
+
+int ck_true_bpe_add_special_token(CKTrueBPE *bpe, const char *token, int32_t id) {
+    if (!bpe || !token || id < 0) return -1;
+    if (bpe->num_special_tokens >= MAX_SPECIAL_TOKENS) return -1;
+
+    int token_len = (int)strlen(token);
+    if (token_len == 0) return -1;
+
+    /* Check if already exists */
+    for (int i = 0; i < bpe->num_special_tokens; i++) {
+        if (bpe->special_tokens[i].token &&
+            strcmp(bpe->special_tokens[i].token, token) == 0) {
+            /* Update ID for existing token */
+            bpe->special_tokens[i].id = id;
+            return 0;
+        }
+    }
+
+    /* Find insertion point (keep sorted by length, longest first) */
+    int insert_idx = bpe->num_special_tokens;
+    for (int i = 0; i < bpe->num_special_tokens; i++) {
+        if (token_len > bpe->special_tokens[i].len) {
+            insert_idx = i;
+            break;
+        }
+    }
+
+    /* Shift existing entries down */
+    for (int i = bpe->num_special_tokens; i > insert_idx; i--) {
+        bpe->special_tokens[i] = bpe->special_tokens[i - 1];
+    }
+
+    /* Insert new entry */
+    bpe->special_tokens[insert_idx].token = strdup(token);
+    if (!bpe->special_tokens[insert_idx].token) return -1;
+    bpe->special_tokens[insert_idx].id = id;
+    bpe->special_tokens[insert_idx].len = token_len;
+    bpe->num_special_tokens++;
+
+    return 0;
 }
 
 int ck_true_bpe_load_binary(CKTrueBPE *bpe,
@@ -1167,30 +1236,22 @@ static int encode_chunk(CKTrueBPE *bpe, const char *chunk, int chunk_len,
     return out_idx;
 }
 
-int ck_true_bpe_encode(CKTrueBPE *bpe, const char *text, int text_len, int32_t *ids, int max_ids) {
-    if (!bpe || !text || !ids || max_ids <= 0) return 0;
-    if (text_len < 0) text_len = (int)strlen(text);
-    if (text_len == 0) return 0;
-
-    /* Auto-detect space style if needed */
-    if (bpe->config.space_prefix_style == CK_SPACE_PREFIX_AUTO) {
-        ck_true_bpe_detect_space_style(bpe);
-    }
+/*
+ * Helper: Encode a segment of text (no special tokens) using BPE
+ */
+static int encode_text_segment(CKTrueBPE *bpe, const char *text, int text_len,
+                                int32_t *ids, int max_ids) {
+    if (text_len <= 0) return 0;
 
     /* Preprocess text (byte-level encoding) */
     char preprocessed[16384];
     int pp_len = preprocess_text(bpe, text, text_len, preprocessed, sizeof(preprocessed) - 1);
     if (pp_len < 0) {
-        return 0;  /* Preprocessing failed */
+        return 0;
     }
     preprocessed[pp_len] = '\0';
 
     int out_idx = 0;
-
-    /* Add BOS token if configured */
-    if (bpe->config.add_bos && bpe->bos_id >= 0 && out_idx < max_ids) {
-        ids[out_idx++] = bpe->bos_id;
-    }
 
     /* For GPT-2 style, use pretokenizer to split into chunks */
     if (bpe->config.space_prefix_style == CK_SPACE_PREFIX_GPT2 ||
@@ -1224,6 +1285,85 @@ int ck_true_bpe_encode(CKTrueBPE *bpe, const char *text, int text_len, int32_t *
         token_list_free(list);
     }
 
+    return out_idx;
+}
+
+/*
+ * Check if text at position matches a special token
+ * Returns: matched special token index, or -1 if no match
+ */
+static int match_special_token(const CKTrueBPE *bpe, const char *text, int text_len, int pos) {
+    int remaining = text_len - pos;
+    const char *cur = text + pos;
+
+    /* Special tokens are sorted longest first, so first match is best */
+    for (int i = 0; i < bpe->num_special_tokens; i++) {
+        int tok_len = bpe->special_tokens[i].len;
+        if (tok_len <= remaining &&
+            memcmp(cur, bpe->special_tokens[i].token, tok_len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int ck_true_bpe_encode(CKTrueBPE *bpe, const char *text, int text_len, int32_t *ids, int max_ids) {
+    if (!bpe || !text || !ids || max_ids <= 0) return 0;
+    if (text_len < 0) text_len = (int)strlen(text);
+    if (text_len == 0) return 0;
+
+    /* Auto-detect space style if needed */
+    if (bpe->config.space_prefix_style == CK_SPACE_PREFIX_AUTO) {
+        ck_true_bpe_detect_space_style(bpe);
+    }
+
+    int out_idx = 0;
+
+    /* Add BOS token if configured */
+    if (bpe->config.add_bos && bpe->bos_id >= 0 && out_idx < max_ids) {
+        ids[out_idx++] = bpe->bos_id;
+    }
+
+    /* If no special tokens registered, use fast path */
+    if (bpe->num_special_tokens == 0) {
+        out_idx += encode_text_segment(bpe, text, text_len, ids + out_idx, max_ids - out_idx);
+    } else {
+        /* Scan for special tokens and encode segments between them */
+        int pos = 0;
+        int segment_start = 0;
+
+        while (pos < text_len && out_idx < max_ids) {
+            int match = match_special_token(bpe, text, text_len, pos);
+
+            if (match >= 0) {
+                /* Found special token - first encode any text before it */
+                if (pos > segment_start) {
+                    int seg_len = pos - segment_start;
+                    out_idx += encode_text_segment(bpe, text + segment_start, seg_len,
+                                                   ids + out_idx, max_ids - out_idx);
+                }
+
+                /* Output the special token ID */
+                if (out_idx < max_ids) {
+                    ids[out_idx++] = bpe->special_tokens[match].id;
+                }
+
+                /* Advance past the special token */
+                pos += bpe->special_tokens[match].len;
+                segment_start = pos;
+            } else {
+                /* No special token here, advance to next character */
+                pos++;
+            }
+        }
+
+        /* Encode any remaining text after last special token */
+        if (segment_start < text_len && out_idx < max_ids) {
+            out_idx += encode_text_segment(bpe, text + segment_start, text_len - segment_start,
+                                           ids + out_idx, max_ids - out_idx);
+        }
+    }
+
     /* Add EOS token if configured */
     if (bpe->config.add_eos && bpe->eos_id >= 0 && out_idx < max_ids) {
         ids[out_idx++] = bpe->eos_id;
@@ -1235,6 +1375,38 @@ int ck_true_bpe_encode(CKTrueBPE *bpe, const char *text, int text_len, int32_t *
 /* ═══════════════════════════════════════════════════════════════════════════════
  * Decoding
  * ═══════════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Decode GPT-2 byte-level BPE character back to original byte
+ *
+ * GPT-2 maps control characters and special bytes to Unicode codepoints:
+ * - U+0100 to U+011F: bytes 0x00 to 0x1F (control chars)
+ * - U+0120: byte 0x20 (space) -> Ġ
+ * - U+017F to U+01A0: bytes 0x7F to 0xA0
+ *
+ * Returns: decoded byte, or -1 if not a GPT-2 byte encoding
+ */
+static int gpt2_decode_byte(const unsigned char *s, int len) {
+    if (len < 2) return -1;
+
+    /* Check for 2-byte UTF-8 sequence: 110xxxxx 10xxxxxx */
+    if ((s[0] & 0xE0) == 0xC0 && (s[1] & 0xC0) == 0x80) {
+        unsigned int codepoint = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+
+        /* GPT-2 byte range: U+0100 to U+01FF */
+        if (codepoint >= 0x100 && codepoint <= 0x1FF) {
+            /* Decode back to original byte */
+            if (codepoint <= 0x120) {
+                /* U+0100-U+0120 -> bytes 0x00-0x20 */
+                return codepoint - 0x100;
+            } else if (codepoint >= 0x17F && codepoint <= 0x1A0) {
+                /* U+017F-U+01A0 -> bytes 0x7F-0xA0 */
+                return codepoint - 0x100;
+            }
+        }
+    }
+    return -1;
+}
 
 int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, char *text, int max_len) {
     if (!bpe || !ids || !text || max_len <= 0) return 0;
@@ -1253,25 +1425,45 @@ int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, ch
         if (!token) continue;
 
         int token_len = (int)strlen(token);
-        unsigned char c0 = (unsigned char)token[0];
-        unsigned char c1 = (unsigned char)token[1];
 
-        /* Convert space prefix markers back to space */
-        if (c0 == 0xC4 && c1 == 0xA0) {
-            /* Ġ -> space */
-            if (len < max_len - 1) text[len++] = ' ';
-            token += 2;
-            token_len -= 2;
-        } else if (c0 == 0xE2 && c1 == 0x96 && (unsigned char)token[2] == 0x81) {
+        /* Check for SentencePiece space marker ▁ (U+2581) at start */
+        if (token_len >= 3 &&
+            (unsigned char)token[0] == 0xE2 &&
+            (unsigned char)token[1] == 0x96 &&
+            (unsigned char)token[2] == 0x81) {
             /* ▁ -> space */
             if (len < max_len - 1) text[len++] = ' ';
             token += 3;
             token_len -= 3;
         }
 
-        /* Copy rest of token */
-        for (int j = 0; j < token_len && len < max_len - 1; j++) {
-            text[len++] = token[j];
+        /* Process rest of token, decoding GPT-2 byte-level encoding */
+        int pos = 0;
+        while (pos < token_len && len < max_len - 1) {
+            unsigned char c0 = (unsigned char)token[pos];
+
+            /* Try GPT-2 byte decoding for 2-byte UTF-8 sequences */
+            if (pos + 1 < token_len && (c0 & 0xE0) == 0xC0) {
+                int decoded = gpt2_decode_byte((unsigned char*)token + pos, token_len - pos);
+                if (decoded >= 0) {
+                    text[len++] = (char)decoded;
+                    pos += 2;
+                    continue;
+                }
+            }
+
+            /* Regular character - copy as-is */
+            int char_len = 1;
+            if ((c0 & 0x80) == 0) char_len = 1;       /* ASCII */
+            else if ((c0 & 0xE0) == 0xC0) char_len = 2;
+            else if ((c0 & 0xF0) == 0xE0) char_len = 3;
+            else if ((c0 & 0xF8) == 0xF0) char_len = 4;
+
+            /* Copy the character */
+            for (int j = 0; j < char_len && pos + j < token_len && len < max_len - 1; j++) {
+                text[len++] = token[pos + j];
+            }
+            pos += char_len;
         }
     }
 

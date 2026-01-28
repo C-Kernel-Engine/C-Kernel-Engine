@@ -209,6 +209,132 @@ OP_DATAFLOW = {
 #   3. Clean separation of concerns
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges: int) -> Optional[Dict]:
+    """
+    Generate tokenizer-specific C code based on tokenizer type from template.
+
+    The tokenizer type comes from template flags (e.g., "bpe", "wordpiece", "sentencepiece").
+    This function generates ALL the C code - codegen just emits it blindly.
+
+    For future tokenizer types, add a new elif branch here.
+    """
+    if tokenizer_type == "bpe":
+        return {
+            "type": "bpe",
+            "include": '#include "tokenizer/true_bpe.h"',
+            "struct_field": "CKTrueBPE *tokenizer;    /* BPE tokenizer */",
+            "init": f"""
+    /* Initialize BPE tokenizer from bump data */
+    g_model->tokenizer = ck_true_bpe_create();
+    if (g_model->tokenizer) {{
+        ck_true_bpe_load_binary(
+            g_model->tokenizer,
+            {vocab_size},
+            (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS),
+            (const char*)(g_model->bump + W_VOCAB_STRINGS),
+            {num_merges},
+            (const int32_t*)(g_model->bump + W_VOCAB_MERGES)
+        );
+
+        /* Register special tokens for pre-BPE matching.
+         * Without this, <|im_end|> gets broken into characters by BPE.
+         */
+        static const char *special_tokens[] = {{
+            "<|im_start|>", "<|im_end|>", "<|endoftext|>",
+            "<|eot_id|>", "<|begin_of_text|>", "<|end_of_text|>",
+            "</s>", "<s>",
+            NULL
+        }};
+        for (int i = 0; special_tokens[i] != NULL; i++) {{
+            int32_t id = ck_true_bpe_lookup(g_model->tokenizer, special_tokens[i]);
+            const char *check = ck_true_bpe_id_to_token(g_model->tokenizer, id);
+            if (check && strcmp(check, special_tokens[i]) == 0) {{
+                ck_true_bpe_add_special_token(g_model->tokenizer, special_tokens[i], id);
+                #ifdef CK_DEBUG_TOKENIZER
+                printf("[Tokenizer] Registered special: %s -> %d\\n", special_tokens[i], id);
+                #endif
+            }}
+        }}
+    }}""",
+            "free": """
+    if (g_model->tokenizer) {
+        ck_true_bpe_free(g_model->tokenizer);
+        g_model->tokenizer = NULL;
+    }""",
+            "api_functions": """
+/* ============================================================================
+ * TOKENIZER API - Encode text to tokens using C tokenizer
+ * ============================================================================
+ * Returns: number of tokens written to internal buffer
+ * The tokens are written to the same buffer that prefill() reads from.
+ * After encoding, call ck_model_prefill() with the returned count.
+ */
+CK_EXPORT int ck_model_encode_text(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return 0;
+    if (text_len < 0) text_len = (int)strlen(text);
+    if (text_len == 0) return 0;
+
+    /* Encode directly into the token_ids buffer that prefill uses */
+    int32_t *token_buf = (int32_t*)(g_model->bump + A_TOKEN_IDS);
+    int max_tokens = MAX_SEQ_LEN;
+
+    int num_tokens = ck_true_bpe_encode(
+        g_model->tokenizer,
+        text,
+        text_len,
+        token_buf,
+        max_tokens
+    );
+
+    return num_tokens;
+}
+
+/* Decode tokens back to text */
+CK_EXPORT int ck_model_decode_tokens(const int32_t *ids, int num_ids, char *text, int max_len) {
+    if (!g_model || !g_model->tokenizer || !ids || !text || max_len <= 0) return 0;
+    return ck_true_bpe_decode(g_model->tokenizer, ids, num_ids, text, max_len);
+}
+
+/* Check if tokenizer is available */
+CK_EXPORT int ck_model_has_tokenizer(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Get pointer to token buffer (for reading encoded tokens) */
+CK_EXPORT const int32_t* ck_model_get_token_buffer(void) {
+    return g_model ? (const int32_t*)(g_model->bump + A_TOKEN_IDS) : NULL;
+}
+
+/* Lookup single token by text (returns token ID or -1 if not found)
+ * Uses DIRECT vocabulary lookup, not encoding.
+ * This is important for special tokens like <|im_end|> which should NOT
+ * be encoded through BPE (which would break them into characters).
+ */
+CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    /* Direct vocabulary lookup - returns token ID or unk_id if not found */
+    int32_t id = ck_true_bpe_lookup(g_model->tokenizer, text);
+    /* unk_id is 0 by default, but we want to return -1 for "not found" */
+    /* Check if the token is actually in vocab by verifying round-trip */
+    const char *token_str = ck_true_bpe_id_to_token(g_model->tokenizer, id);
+    if (token_str && strcmp(token_str, text) == 0) {
+        return id;  /* Found exact match */
+    }
+    return -1;  /* Not found or matched to different token */
+}
+"""
+        }
+
+    # Future: Add other tokenizer types here
+    # elif tokenizer_type == "wordpiece":
+    #     return { ... wordpiece c_code ... }
+    # elif tokenizer_type == "sentencepiece":
+    #     return { ... sentencepiece c_code ... }
+
+    # Unknown tokenizer type
+    return None
+
+
 def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     """
     Generate initialization ops based on model config and template flags.
@@ -274,6 +400,57 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
         op_id += 1
 
     # ═══════════════════════════════════════════════════════════
+    # TOKENIZER INIT: Load tokenizer from bump data
+    # ═══════════════════════════════════════════════════════════
+    # Tokenizer type comes from template flags: "bpe", "wordpiece", "sentencepiece", etc.
+    tokenizer_type = flags.get("tokenizer", None)
+
+    # Check if vocab data is in manifest (entries list, not weights dict)
+    entries = manifest.get("entries", [])
+    entry_names = {e.get("name") for e in entries}
+    has_vocab = all(k in entry_names for k in ["vocab_offsets", "vocab_strings", "vocab_merges"])
+
+    if has_vocab and tokenizer_type:
+        vocab_size = config.get("vocab_size", 151936)
+        # Build entry lookup dict
+        entry_by_name = {e.get("name"): e for e in entries}
+        vocab_offsets_info = entry_by_name.get("vocab_offsets", {})
+        vocab_strings_info = entry_by_name.get("vocab_strings", {})
+        vocab_merges_info = entry_by_name.get("vocab_merges", {})
+
+        # Calculate number of merges from size (each merge is 3 int32s = 12 bytes)
+        merges_size = vocab_merges_info.get("size", 0)
+        num_merges = merges_size // 12  # 3 * sizeof(int32_t)
+
+        # Generate tokenizer-specific c_code based on type from template
+        c_code = _generate_tokenizer_c_code(tokenizer_type, vocab_size, num_merges)
+
+        if c_code:
+            init_ops.append({
+                "op_id": op_id,
+                "kernel": f"tokenizer_{tokenizer_type}_init",
+                "op": "tokenizer_init",
+                "section": "init",
+                "layer": -1,
+                "instance": 0,
+                "dataflow": {
+                    "inputs": {
+                        "vocab_offsets": {"dtype": "i32", "source": "weight:vocab_offsets"},
+                        "vocab_strings": {"dtype": "u8", "source": "weight:vocab_strings"},
+                        "vocab_merges": {"dtype": "i32", "source": "weight:vocab_merges"},
+                    },
+                    "outputs": {}
+                },
+                "params": {
+                    "vocab_size": {"source": "config:vocab_size", "value": vocab_size},
+                    "num_merges": {"source": "computed", "value": num_merges},
+                },
+                "c_code": c_code,
+                "notes": f"{tokenizer_type.upper()} tokenizer init: vocab_size={vocab_size}, num_merges={num_merges}"
+            })
+            op_id += 1
+
+    # ═══════════════════════════════════════════════════════════
     # FUTURE: Add other init ops here
     # ═══════════════════════════════════════════════════════════
     # Examples:
@@ -293,10 +470,15 @@ def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
             "format": "ir1-init-v6.6",
             "version": 1,
             "config": {...},
+            "special_tokens": {...},  # EOS, BOS, etc. from GGUF
             "ops": [...]
         }
     """
     init_ops = generate_init_ops(manifest, config)
+
+    # Extract special tokens from manifest for propagation to generated code
+    # These come from GGUF metadata (tokenizer.ggml.eos_token_id, etc.)
+    special_tokens = manifest.get("special_tokens", {})
 
     return {
         "format": "ir1-init-v6.6",
@@ -310,6 +492,8 @@ def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
             "num_heads": config.get("num_heads", 0),
             "num_kv_heads": config.get("num_kv_heads", 0),
         },
+        # Special tokens from GGUF - used by orchestrator for EOS detection
+        "special_tokens": special_tokens if special_tokens else None,
         "ops": init_ops,
         "stats": {
             "total_ops": len(init_ops),
@@ -525,7 +709,10 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 # Note: "matmul" is a logical op that maps to gemv (decode) or gemm (prefill) based on mode
 TEMPLATE_TO_KERNEL_OP = {
     # Header ops
-    "tokenizer": None,  # Metadata op - no kernel
+    "tokenizer": None,  # Metadata op - no kernel (deprecated, use bpe_tokenizer)
+    "bpe_tokenizer": None,  # BPE tokenizer - init handled separately
+    "wordpiece_tokenizer": None,  # WordPiece tokenizer - init handled separately
+    "patch_embeddings": None,  # Vision model patches - init handled separately
     "dense_embedding_lookup": "embedding",  # Token embedding lookup
     "embedding": "embedding",
 
@@ -978,7 +1165,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
         "silu_mul": None,
 
         # Metadata ops (no kernel)
-        "tokenizer": "metadata",
+        "tokenizer": "metadata",  # Deprecated, use bpe_tokenizer
+        "bpe_tokenizer": "metadata",  # BPE tokenizer init
+        "wordpiece_tokenizer": "metadata",  # WordPiece tokenizer init
+        "patch_embeddings": "metadata",  # Vision model patches
         "weight_tying": "metadata",
     }
 
@@ -2030,7 +2220,10 @@ WEIGHT_PATTERNS = {
 # This tells us which weights each template op needs
 TEMPLATE_OP_WEIGHTS = {
     # Header (tokenizer is metadata, not model weights)
-    "tokenizer": [],  # Tokenizer data handled separately (not model weights)
+    "tokenizer": [],  # Deprecated, use bpe_tokenizer
+    "bpe_tokenizer": [],  # BPE tokenizer data handled separately (not model weights)
+    "wordpiece_tokenizer": [],  # WordPiece tokenizer data handled separately
+    "patch_embeddings": [],  # Vision model patches handled separately
     "dense_embedding_lookup": ["token_emb"],  # Token embeddings only (pos_emb for non-RoPE)
 
     # Attention block (body + footer)
@@ -3812,6 +4005,11 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
                 "expr": f"{rope_theta}f",  # Emit as float literal
             })
 
+        elif op_type == "tokenizer_init":
+            # Tokenizer init has explicit c_code - pass it through directly
+            # Codegen will emit the c_code["init"] and c_code["free"] directly
+            pass  # No args needed - c_code contains everything
+
         else:
             # Generic handling for future init ops
             op_errors.append(f"Unknown init op type: {op_type}")
@@ -3823,7 +4021,7 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
                 "errors": op_errors,
             })
 
-        call_ops.append({
+        call_op = {
             "idx": op.get("op_id", -1),
             "function": func,
             "op": op_type,
@@ -3832,12 +4030,21 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
             "args": args,
             "errors": op_errors,
             "notes": op.get("notes", ""),
-        })
+        }
+        # Pass through c_code for ops that have explicit C code (tokenizer_init, etc.)
+        if "c_code" in op:
+            call_op["c_code"] = op["c_code"]
+        call_ops.append(call_op)
+
+    # Pass through special_tokens from init_ir for code generation
+    special_tokens = init_ir.get("special_tokens")
 
     return {
         "format": "lowered-init-v3",
         "version": 1,
         "config": config,
+        # Special tokens (EOS, BOS, etc.) from GGUF - codegen generates stop token API
+        "special_tokens": special_tokens,
         "operations": call_ops,
         "errors": all_errors,
         "stats": {

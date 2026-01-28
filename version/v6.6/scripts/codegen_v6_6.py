@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!nusr/bin/env python3
 from __future__ import annotations
 """
 codegen_v6_6.py - Generate C code from lowered IR.
@@ -496,11 +496,41 @@ static void ck_decode(CKModel *model, int32_t token) {
 # =============================================================================
 
 def emit_init_call(op: Dict) -> str:
-    """Emit a single init op call from lowered init IR."""
+    """Emit a single init op call from lowered init IR.
+
+    Handles two cases:
+    1. Ops with c_code field - emit the C code directly (tokenizer_init, etc.)
+    2. Ops with function/args - emit as function call (rope_init, etc.)
+    """
+    # Case 1: Direct C code (tokenizer_init, etc.)
+    c_code = op.get("c_code")
+    if c_code:
+        if isinstance(c_code, dict):
+            # Return the init portion of the c_code
+            return c_code.get("init", "    /* No init code */")
+        else:
+            return c_code
+
+    # Case 2: Function call (rope_init, etc.)
     func = op.get("function", "unknown")
     args = op.get("args", [])
     arg_exprs = [arg.get("expr", "0") for arg in args]
     return f"    {func}({', '.join(arg_exprs)});"
+
+
+def get_init_free_code(init_call: Dict) -> str:
+    """Get cleanup code for init ops that have free code."""
+    if not init_call:
+        return ""
+
+    ops = init_call.get("operations", [])
+    free_lines = []
+    for op in ops:
+        c_code = op.get("c_code")
+        if isinstance(c_code, dict) and c_code.get("free"):
+            free_lines.append(c_code["free"])
+
+    return "\n".join(free_lines)
 
 
 def emit_model_and_api(init_call: Dict = None) -> str:
@@ -510,23 +540,128 @@ def emit_model_and_api(init_call: Dict = None) -> str:
         init_call: Lowered init IR (init_call.json) with call-ready ops.
                    If provided, emits init ops from IR (no hardcoding).
                    If None, emits empty init (no rope precompute).
+
+    IMPORTANT: Codegen is DUMB. All tokenizer-specific code comes from IR.
+    - Tokenizer struct field: from op["c_code"]["struct_field"]
+    - Tokenizer init code: from op["c_code"]["init"]
+    - Tokenizer free code: from op["c_code"]["free"]
+    - Tokenizer API functions: from op["c_code"]["api_functions"]
+
+    INIT ORDERING:
+    - Pre-weights init (rope_init): Runs in do_init() BEFORE weights loaded.
+      These ops have function/args but no c_code.
+    - Post-weights init (tokenizer_init): Runs AFTER do_load_manifest().
+      These ops have c_code that reads from bump memory (needs loaded weights).
     """
     # Generate init ops code from lowered IR
-    init_ops_code = ""
+    # Separate into pre-weights (rope, etc.) and post-weights (tokenizer, etc.)
+    pre_weights_init_code = ""
+    post_weights_init_code = ""
+    free_ops_code = ""
+    tokenizer_struct_field = ""
+    tokenizer_api_functions = ""
+    tokenizer_include = ""
+    stop_tokens_api = ""
+
     if init_call:
+        # Generate stop tokens API from special_tokens in init_call
+        # These come from GGUF metadata (tokenizer.ggml.eos_token_id, etc.)
+        special_tokens = init_call.get("special_tokens", {})
+        if special_tokens:
+            eos_id = special_tokens.get("eos_token_id", -1)
+            bos_id = special_tokens.get("bos_token_id", -1)
+            # Build stop tokens array (for now just EOS, could add more)
+            stop_ids = []
+            if eos_id is not None and eos_id >= 0:
+                stop_ids.append(eos_id)
+
+            stop_tokens_api = f"""
+/* ============================================================================
+ * STOP TOKENS API - Extracted from GGUF metadata
+ * ============================================================================
+ * These token IDs signal end-of-generation. Orchestrator should check if
+ * sampled token matches any stop token and terminate the autoregressive loop.
+ */
+static const int32_t g_stop_tokens[] = {{ {', '.join(str(x) for x in stop_ids) if stop_ids else '-1'} }};
+static const int g_num_stop_tokens = {len(stop_ids)};
+static const int32_t g_eos_token_id = {eos_id if eos_id is not None else -1};
+static const int32_t g_bos_token_id = {bos_id if bos_id is not None else -1};
+
+/* Get number of stop tokens */
+CK_EXPORT int ck_model_get_num_stop_tokens(void) {{
+    return g_num_stop_tokens;
+}}
+
+/* Get stop tokens array (read-only) */
+CK_EXPORT const int32_t* ck_model_get_stop_tokens(void) {{
+    return g_stop_tokens;
+}}
+
+/* Check if a token is a stop token */
+CK_EXPORT int ck_model_is_stop_token(int32_t token_id) {{
+    for (int i = 0; i < g_num_stop_tokens; i++) {{
+        if (g_stop_tokens[i] == token_id) return 1;
+    }}
+    return 0;
+}}
+
+/* Get EOS token ID (-1 if not set) */
+CK_EXPORT int32_t ck_model_get_eos_token_id(void) {{
+    return g_eos_token_id;
+}}
+
+/* Get BOS token ID (-1 if not set) */
+CK_EXPORT int32_t ck_model_get_bos_token_id(void) {{
+    return g_bos_token_id;
+}}
+"""
         ops = init_call.get("operations", [])
         if ops:
-            init_lines = ["    /* Init ops from init_call.json */"]
+            pre_weights_lines = ["    /* Pre-weights init ops (do not depend on loaded weights) */"]
+            post_weights_lines = ["    /* Post-weights init ops (depend on loaded weights) */"]
+            free_lines = []
             for op in ops:
                 if not op.get("errors"):
-                    init_lines.append(emit_init_call(op))
+                    c_code = op.get("c_code")
+                    if isinstance(c_code, dict):
+                        # Post-weights init: ops with c_code (tokenizer_init reads from bump)
+                        post_weights_lines.append(emit_init_call(op))
+                        if c_code.get("free"):
+                            free_lines.append(c_code["free"])
+                        if c_code.get("struct_field"):
+                            tokenizer_struct_field = c_code["struct_field"]
+                        if c_code.get("api_functions"):
+                            tokenizer_api_functions = c_code["api_functions"]
+                        if c_code.get("include"):
+                            tokenizer_include = c_code["include"]
+                    else:
+                        # Pre-weights init: ops without c_code (rope_init, etc.)
+                        pre_weights_lines.append(emit_init_call(op))
                 else:
-                    init_lines.append(f"    /* ERROR: {op.get('function')} - {op.get('errors')} */")
-            init_ops_code = "\n".join(init_lines)
+                    pre_weights_lines.append(f"    /* ERROR: {op.get('function')} - {op.get('errors')} */")
 
-    # If no init_call provided, leave a placeholder comment
-    if not init_ops_code:
-        init_ops_code = "    /* No init ops (init_call.json not provided) */"
+            # Only include if we have actual ops
+            if len(pre_weights_lines) > 1:
+                pre_weights_init_code = "\n".join(pre_weights_lines)
+            if len(post_weights_lines) > 1:
+                post_weights_init_code = "\n".join(post_weights_lines)
+            if free_lines:
+                free_ops_code = "\n".join(free_lines)
+
+    # Provide placeholder comments if no ops
+    init_ops_code = pre_weights_init_code if pre_weights_init_code else "    /* No pre-weights init ops */"
+    if not post_weights_init_code:
+        post_weights_init_code = "    /* No post-weights init ops (no tokenizer) */"
+
+    # Build optional tokenizer struct field (comes from IR, not hardcoded)
+    tokenizer_field_line = ""
+    if tokenizer_struct_field:
+        tokenizer_field_line = f"    {tokenizer_struct_field}"
+
+    # Build optional tokenizer include (comes from IR, not hardcoded)
+    tokenizer_include_line = ""
+    if tokenizer_include:
+        tokenizer_include_line = tokenizer_include
 
     return f'''
 /* ============================================================================
@@ -542,6 +677,7 @@ typedef struct {{
     float *rope_sin;         /* RoPE sin table */
     float *logits;           /* Output logits */
     int pos;                 /* Current position */
+{tokenizer_field_line}
 }} CKModel;
 
 static CKModel *g_model = NULL;
@@ -590,14 +726,14 @@ static int do_init(void) {{
 
     return 0;
 }}
-''' + '''
-static int build_manifest_path(const char *weights_path, char *out, size_t out_sz) {
+''' + f'''
+static int build_manifest_path(const char *weights_path, char *out, size_t out_sz) {{
     const char *slash = strrchr(weights_path, '/');
 #ifdef _WIN32
     const char *bslash = strrchr(weights_path, '\\\\');
     if (!slash || (bslash && bslash > slash)) slash = bslash;
 #endif
-    if (slash) {
+    if (slash) {{
         size_t dir_len = (size_t)(slash - weights_path + 1);
         const char *fname = "weights_manifest.map";
         size_t need = dir_len + strlen(fname) + 1;
@@ -605,91 +741,102 @@ static int build_manifest_path(const char *weights_path, char *out, size_t out_s
         memcpy(out, weights_path, dir_len);
         memcpy(out + dir_len, fname, strlen(fname) + 1);
         return 0;
-    }
+    }}
     if (strlen("weights_manifest.map") + 1 > out_sz) return -1;
     strcpy(out, "weights_manifest.map");
     return 0;
-}
+}}
 
-static int do_load_manifest(const char *weights_path, const char *manifest_path) {
+static int do_load_manifest(const char *weights_path, const char *manifest_path) {{
     #if MANIFEST_OFFSETS_ABSOLUTE
     g_manifest = ck_load_weights_manifest_v66(g_model->bump, weights_path, manifest_path);
     #else
     g_manifest = ck_load_weights_manifest_v66(g_model->bump_weights, weights_path, manifest_path);
     #endif
     return g_manifest ? 0 : -1;
-}
+}}
+
+/* Post-weights initialization (tokenizer, etc.)
+ * MUST be called AFTER do_load_manifest() because these ops read from bump memory */
+static void do_post_weights_init(void) {{
+{post_weights_init_code}
+}}
 
 /* Combined init + load (ck_chat.py expects this signature) */
-CK_EXPORT int ck_model_init(const char *weights_path) {
+CK_EXPORT int ck_model_init(const char *weights_path) {{
     char manifest_path[4096];
     if (do_init() != 0) return -1;
     if (build_manifest_path(weights_path, manifest_path, sizeof(manifest_path)) != 0) return -1;
-    return do_load_manifest(weights_path, manifest_path);
-}
+    if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
+    do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
+    return 0;
+}}
 
 /* Explicit manifest path (preferred) */
-CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *manifest_path) {
+CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *manifest_path) {{
     if (do_init() != 0) return -1;
-    return do_load_manifest(weights_path, manifest_path);
-}
+    if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
+    do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
+    return 0;
+}}
 
-CK_EXPORT void ck_model_free(void) {
+CK_EXPORT void ck_model_free(void) {{
     if (!g_model) return;
-    if (g_manifest) {
+{free_ops_code}
+    if (g_manifest) {{
         ck_unload_manifest_map(g_manifest);
         g_manifest = NULL;
-    }
+    }}
     if (g_model->bump) free(g_model->bump);
     free(g_model);
     g_model = NULL;
-}
+}}
 
-CK_EXPORT void ck_model_kv_cache_reset(void) {
+CK_EXPORT void ck_model_kv_cache_reset(void) {{
     if (!g_model) return;
     memset(g_model->kv_cache, 0, KV_CACHE_SIZE);
     g_model->pos = 0;
-}
+}}
 
-CK_EXPORT int ck_model_kv_cache_enable(int capacity) {
+CK_EXPORT int ck_model_kv_cache_enable(int capacity) {{
     /* KV cache is always enabled in v6.6 */
     (void)capacity;
     return 0;
-}
+}}
 
 /* ============================================================================
  * PUBLIC API (compatible with ck_chat.py)
  * ============================================================================ */
 
 /* Embed tokens (prefill) - stores embeddings in activation buffer */
-CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {
+CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {{
     if (!g_model || !tokens || count <= 0) return -1;
 
 #ifdef CK_HAS_PREFILL
     /* Use batched prefill for multiple tokens */
-    if (count > 1) {
+    if (count > 1) {{
         ck_prefill(g_model, tokens, count);
         return 0;
-    }
+    }}
 #endif
 
     /* Single token or no prefill: process one by one via decode */
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {{
         ck_decode(g_model, tokens[i]);
-    }
+    }}
     return 0;
-}
+}}
 
 /* Forward pass (after embed_tokens) */
-CK_EXPORT int ck_model_forward(float *output) {
+CK_EXPORT int ck_model_forward(float *output) {{
     if (!g_model) return -1;
     /* Logits are already computed by embed_tokens/decode */
     if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));
     return 0;
-}
+}}
 
 /* Decode single token */
-CK_EXPORT int ck_model_decode(int32_t token, float *output) {
+CK_EXPORT int ck_model_decode(int32_t token, float *output) {{
     if (!g_model) return -1;
     /* Capture position before decode (ck_decode increments pos at end) */
     int token_pos = g_model->pos;
@@ -697,30 +844,33 @@ CK_EXPORT int ck_model_decode(int32_t token, float *output) {
     /* Copy logits from position 0 to position token_pos in the logits buffer.
      * This makes the logits buffer match what ck_chat.py expects:
      * logits[token_pos * VOCAB_SIZE .. (token_pos+1) * VOCAB_SIZE] */
-    if (token_pos > 0) {
+    if (token_pos > 0) {{
         memmove(
             g_model->logits + (size_t)token_pos * VOCAB_SIZE,
             g_model->logits,
             VOCAB_SIZE * sizeof(float)
         );
-    }
+    }}
     if (output) memcpy(output, g_model->logits + (size_t)token_pos * VOCAB_SIZE, VOCAB_SIZE * sizeof(float));
     return 0;
-}
+}}
 
 /* Getters */
-CK_EXPORT int ck_model_get_vocab_size(void) { return VOCAB_SIZE; }
-CK_EXPORT const int32_t* ck_model_get_vocab_offsets(void) {
+CK_EXPORT int ck_model_get_vocab_size(void) {{ return VOCAB_SIZE; }}
+CK_EXPORT const int32_t* ck_model_get_vocab_offsets(void) {{
     return g_model ? (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS) : NULL;
-}
-CK_EXPORT const uint8_t* ck_model_get_vocab_strings(void) {
+}}
+CK_EXPORT const uint8_t* ck_model_get_vocab_strings(void) {{
     return g_model ? (const uint8_t*)(g_model->bump + W_VOCAB_STRINGS) : NULL;
-}
-CK_EXPORT int ck_model_get_num_merges(void) { return VOCAB_MERGES_COUNT; }
-CK_EXPORT int ck_model_get_context_window(void) { return MAX_SEQ_LEN; }
-CK_EXPORT int ck_model_get_active_tokens(void) { return g_model ? g_model->pos : 0; }
-CK_EXPORT float* ck_model_get_logits(void) { return g_model ? g_model->logits : NULL; }
-CK_EXPORT uintptr_t ck_model_get_base_ptr(void) { return (uintptr_t)(g_model ? g_model->bump : NULL); }
+}}
+CK_EXPORT int ck_model_get_num_merges(void) {{ return VOCAB_MERGES_COUNT; }}
+CK_EXPORT int ck_model_get_context_window(void) {{ return MAX_SEQ_LEN; }}
+CK_EXPORT int ck_model_get_active_tokens(void) {{ return g_model ? g_model->pos : 0; }}
+CK_EXPORT float* ck_model_get_logits(void) {{ return g_model ? g_model->logits : NULL; }}
+CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? g_model->bump : NULL); }}
+
+{tokenizer_api_functions}
+{stop_tokens_api}
 '''
 
 
@@ -788,6 +938,16 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+    # Extract tokenizer include from init_call (if present)
+    # Codegen is DUMB - we read the include from IR, not hardcode it
+    tokenizer_include = ""
+    if init_call:
+        for op in init_call.get("operations", []):
+            c_code = op.get("c_code", {})
+            if isinstance(c_code, dict) and c_code.get("include"):
+                tokenizer_include = c_code["include"]
+                break
+
     parts = []
     parts.append(f'''/*
  * Auto-generated by codegen_v6_6.py
@@ -809,6 +969,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 #endif
 #include "ckernel_model_load_v6.6.h"
 #include "ckernel_engine.h"  /* Kernel declarations */
+{tokenizer_include}
 ''')
 
     parts.append(emit_memory_layout(layout, config))
@@ -918,7 +1079,15 @@ def main():
         with open(args.layout) as f:
             layout_obj = json.load(f)
         _guard_bump_offsets(layout_obj, [ir_obj])
-        code = generate(Path(args.ir), Path(args.layout), debug=args.debug)
+
+        # Load init_call.json for stop tokens API (if available)
+        init_call_obj = None
+        init_call_path = Path(args.init) if args.init else Path(args.ir).parent / "init_call.json"
+        if init_call_path.exists():
+            with open(init_call_path) as f:
+                init_call_obj = json.load(f)
+
+        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj)
         with open(args.output, 'w') as f:
             f.write(code)
         print(f"Generated: {args.output}")

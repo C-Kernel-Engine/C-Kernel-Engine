@@ -1421,6 +1421,13 @@ def main() -> None:
         "tokenizer.ggml.merges",
         "tokenizer.ggml.scores",
         "tokenizer.ggml.token_type",
+        # Special token IDs (EOS, BOS, etc.) - propagated to manifest for orchestrator
+        "tokenizer.ggml.eos_token_id",
+        "tokenizer.ggml.bos_token_id",
+        "tokenizer.ggml.unknown_token_id",
+        "tokenizer.ggml.padding_token_id",
+        "tokenizer.ggml.add_bos_token",
+        "tokenizer.ggml.add_eos_token",
     }
 
     if args.extract_vocab:
@@ -2112,6 +2119,27 @@ def main() -> None:
                 if template_data is None:
                     template_data = load_template_for_arch(arch)
 
+                # Extract special tokens from GGUF metadata for propagation to manifest
+                special_tokens = {}
+                eos_id = meta.get("tokenizer.ggml.eos_token_id")
+                bos_id = meta.get("tokenizer.ggml.bos_token_id")
+                unk_id = meta.get("tokenizer.ggml.unknown_token_id")
+                pad_id = meta.get("tokenizer.ggml.padding_token_id")
+                if eos_id is not None:
+                    special_tokens["eos_token_id"] = int(eos_id)
+                if bos_id is not None:
+                    special_tokens["bos_token_id"] = int(bos_id)
+                if unk_id is not None:
+                    special_tokens["unk_token_id"] = int(unk_id)
+                if pad_id is not None:
+                    special_tokens["pad_token_id"] = int(pad_id)
+                add_bos = meta.get("tokenizer.ggml.add_bos_token")
+                add_eos = meta.get("tokenizer.ggml.add_eos_token")
+                if add_bos is not None:
+                    special_tokens["add_bos_token"] = bool(add_bos)
+                if add_eos is not None:
+                    special_tokens["add_eos_token"] = bool(add_eos)
+
                 # Calculate hashes
                 if args.manifest_out:
                     manifest_dict = {
@@ -2127,6 +2155,8 @@ def main() -> None:
                         "config": config,
                         "template": template_data,
                         "quant_summary": quant_summary,
+                        # Special tokens from GGUF - used by orchestrator for stopping
+                        "special_tokens": special_tokens if special_tokens else None,
                         "num_layers": num_layers,
                         "embed_dim": embed_dim,
                         "num_heads": num_heads,
@@ -2258,6 +2288,28 @@ def main() -> None:
     # Write manifest JSON if requested
     if args.manifest_out:
         os.makedirs(os.path.dirname(args.manifest_out) or ".", exist_ok=True)
+        # Extract special tokens from GGUF metadata for propagation to generated code
+        special_tokens = {}
+        eos_id = meta.get("tokenizer.ggml.eos_token_id")
+        bos_id = meta.get("tokenizer.ggml.bos_token_id")
+        unk_id = meta.get("tokenizer.ggml.unknown_token_id")
+        pad_id = meta.get("tokenizer.ggml.padding_token_id")
+        if eos_id is not None:
+            special_tokens["eos_token_id"] = int(eos_id)
+        if bos_id is not None:
+            special_tokens["bos_token_id"] = int(bos_id)
+        if unk_id is not None:
+            special_tokens["unk_token_id"] = int(unk_id)
+        if pad_id is not None:
+            special_tokens["pad_token_id"] = int(pad_id)
+        # Also extract add_bos/add_eos flags
+        add_bos = meta.get("tokenizer.ggml.add_bos_token")
+        add_eos = meta.get("tokenizer.ggml.add_eos_token")
+        if add_bos is not None:
+            special_tokens["add_bos_token"] = bool(add_bos)
+        if add_eos is not None:
+            special_tokens["add_eos_token"] = bool(add_eos)
+
         manifest = manifest_dict or {
             "version": 5,
             "model": arch,
@@ -2271,6 +2323,8 @@ def main() -> None:
             "config": config if args.bump_version == BUMP_VERSION_V5 else None,
             "template": template_data if args.bump_version == BUMP_VERSION_V5 else None,
             "quant_summary": quant_summary if args.bump_version == BUMP_VERSION_V5 else None,
+            # Special tokens from GGUF - used by orchestrator for stopping
+            "special_tokens": special_tokens if special_tokens else None,
             "num_layers": num_layers,
             "embed_dim": embed_dim,
             "num_heads": num_heads,

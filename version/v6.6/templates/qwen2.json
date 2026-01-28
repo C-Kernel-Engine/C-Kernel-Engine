@@ -5,14 +5,15 @@
   "flags": {
     "use_qkv_bias": "from_weights",
     "activation": "swiglu",
-    "rope": "rope"
+    "rope": "rope",
+    "tokenizer": "bpe"
   },
   "sequence": ["decoder"],
   "block_types": {
     "decoder": {
       "sequence": ["header", "body", "footer"],
       "header": [
-        "tokenizer",
+        "bpe_tokenizer",
         "dense_embedding_lookup"
       ],
       "body": {

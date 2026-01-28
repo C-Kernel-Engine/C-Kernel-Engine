@@ -61,43 +61,27 @@ class CKModel:
         self.model_dir = Path(model_dir)
         self.parity_dir = Path(parity_dir) if parity_dir else None
         self.lib = None
-        self.tokenizer = None
+        self.tokenizer = None  # Python tokenizer (fallback)
+        self.use_c_tokenizer = False  # Use C tokenizer if available
         self.vocab_size = 0
         self.context_window = 0
         self.has_kv_decode = False
         self.has_parity = False
         self.eos_tokens = set()  # Will be populated during load
 
-    def load(self, gguf_path: str = None) -> bool:
-        """Load model library and tokenizer."""
-        # Load tokenizer - try multiple sources
-        tokenizer_json = self.model_dir / "tokenizer.json"
-        vocab_json = self.model_dir / "vocab.json"
+    def load(self, gguf_path: str = None, force_python_tokenizer: bool = False) -> bool:
+        """Load model library and tokenizer.
 
-        if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
-            # Use HuggingFace tokenizer if available
-            self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
-            print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
-        elif vocab_json.exists():
-            # Use extracted vocab JSON
-            self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
-            print(f"Loaded GGUF tokenizer from {vocab_json}")
-        elif gguf_path and Path(gguf_path).exists():
-            # Extract directly from GGUF
-            print(f"Extracting tokenizer from GGUF: {gguf_path}")
-            self.tokenizer = GGUFTokenizerWrapper(GGUFTokenizer.from_gguf(gguf_path))
-            # Save for next time
-            self.tokenizer._tokenizer.save(str(vocab_json))
-            print(f"Saved vocab to {vocab_json}")
-        else:
-            print(f"Error: No tokenizer found. Tried:")
-            print(f"  - {tokenizer_json}")
-            print(f"  - {vocab_json}")
-            if gguf_path:
-                print(f"  - {gguf_path}")
-            return False
+        Tokenizer priority (unless force_python_tokenizer=True):
+        1. C tokenizer (BPE built into the model library) - fastest, preferred
+        2. Python HuggingFace tokenizer - if available
+        3. Python GGUF tokenizer - fallback
 
-        # Load C library
+        Args:
+            gguf_path: Path to GGUF file for tokenizer extraction
+            force_python_tokenizer: If True, skip C tokenizer even if available
+        """
+        # Load C library first (needed to check for C tokenizer)
         lib_path = self.model_dir / "ck-kernel-inference.so"
         if not lib_path.exists():
             lib_path = self.model_dir / "ck-kernel-decode.so"
@@ -156,6 +140,43 @@ class CKModel:
         except AttributeError:
             self.has_parity = False
 
+        # Optional C tokenizer API (BPE tokenizer built into the model).
+        # If available, we use it instead of Python tokenizers for better performance.
+        try:
+            self.lib.ck_model_has_tokenizer.argtypes = []
+            self.lib.ck_model_has_tokenizer.restype = ctypes.c_int
+            self.lib.ck_model_encode_text.argtypes = [ctypes.c_char_p, ctypes.c_int]
+            self.lib.ck_model_encode_text.restype = ctypes.c_int
+            self.lib.ck_model_decode_tokens.argtypes = [
+                ctypes.POINTER(ctypes.c_int32), ctypes.c_int,
+                ctypes.c_char_p, ctypes.c_int
+            ]
+            self.lib.ck_model_decode_tokens.restype = ctypes.c_int
+            self.lib.ck_model_get_token_buffer.argtypes = []
+            self.lib.ck_model_get_token_buffer.restype = ctypes.POINTER(ctypes.c_int32)
+            self.lib.ck_model_lookup_token.argtypes = [ctypes.c_char_p]
+            self.lib.ck_model_lookup_token.restype = ctypes.c_int32
+            self._has_c_tokenizer_api = True
+        except AttributeError:
+            self._has_c_tokenizer_api = False
+
+        # Optional Stop Tokens API (exported from GGUF metadata via codegen).
+        # This is the cleanest way to get EOS/BOS tokens - model exports them directly.
+        try:
+            self.lib.ck_model_get_num_stop_tokens.argtypes = []
+            self.lib.ck_model_get_num_stop_tokens.restype = ctypes.c_int
+            self.lib.ck_model_get_stop_tokens.argtypes = []
+            self.lib.ck_model_get_stop_tokens.restype = ctypes.POINTER(ctypes.c_int32)
+            self.lib.ck_model_is_stop_token.argtypes = [ctypes.c_int32]
+            self.lib.ck_model_is_stop_token.restype = ctypes.c_int
+            self.lib.ck_model_get_eos_token_id.argtypes = []
+            self.lib.ck_model_get_eos_token_id.restype = ctypes.c_int32
+            self.lib.ck_model_get_bos_token_id.argtypes = []
+            self.lib.ck_model_get_bos_token_id.restype = ctypes.c_int32
+            self._has_stop_tokens_api = True
+        except AttributeError:
+            self._has_stop_tokens_api = False
+
         # Setup parity dir if requested
         if self.parity_dir and self.has_parity:
             self.parity_dir.mkdir(parents=True, exist_ok=True)
@@ -176,6 +197,42 @@ class CKModel:
 
         self.vocab_size = self.lib.ck_model_get_vocab_size()
         self.context_window = self.lib.ck_model_get_context_window()
+
+        # Check if C tokenizer is available (preferred - faster)
+        if self._has_c_tokenizer_api and self.lib.ck_model_has_tokenizer() and not force_python_tokenizer:
+            self.use_c_tokenizer = True
+            print(f"Using C BPE tokenizer (built into model)")
+        else:
+            if force_python_tokenizer:
+                print(f"Forcing Python tokenizer (--python-tokenizer flag)")
+            # Fall back to Python tokenizer
+            self.use_c_tokenizer = False
+            tokenizer_json = self.model_dir / "tokenizer.json"
+            vocab_json = self.model_dir / "vocab.json"
+
+            if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
+                # Use HuggingFace tokenizer if available
+                self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
+                print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
+            elif vocab_json.exists():
+                # Use extracted vocab JSON
+                self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
+                print(f"Loaded GGUF tokenizer from {vocab_json}")
+            elif gguf_path and Path(gguf_path).exists():
+                # Extract directly from GGUF
+                print(f"Extracting tokenizer from GGUF: {gguf_path}")
+                self.tokenizer = GGUFTokenizerWrapper(GGUFTokenizer.from_gguf(gguf_path))
+                # Save for next time
+                self.tokenizer._tokenizer.save(str(vocab_json))
+                print(f"Saved vocab to {vocab_json}")
+            else:
+                print(f"Error: No tokenizer found. Tried:")
+                print(f"  - C tokenizer (not available)")
+                print(f"  - {tokenizer_json}")
+                print(f"  - {vocab_json}")
+                if gguf_path:
+                    print(f"  - {gguf_path}")
+                return False
 
         # Detect EOS tokens from tokenizer
         self._detect_eos_tokens()
@@ -204,35 +261,82 @@ class CKModel:
         So if model generated "Hello!" -> token "!" (ID=0) -> treated as EOS -> STOP
         Result: Only generated one token before stopping.
 
-        FIX: Only use 0,1,2 as fallback if NO model-specific EOS tokens found.
+        FIX (2026-01): Model now exports stop tokens directly from GGUF metadata!
+        Flow: GGUF -> manifest -> IR -> generated code -> ck_model_get_stop_tokens()
+        This is the cleanest approach - no guessing, model tells us its stop tokens.
+
+        Fallback: Only use low token IDs as fallback if NO model-specific EOS tokens found.
         """
         self.eos_tokens = set()
 
-        # Try to get vocab from tokenizer
-        vocab = None
-        try:
-            # HuggingFace tokenizer
-            if hasattr(self.tokenizer, 'get_vocab'):
-                vocab = self.tokenizer.get_vocab()
-            # Our GGUF tokenizer wrapper
-            elif hasattr(self.tokenizer, '_tokenizer') and hasattr(self.tokenizer._tokenizer, 'vocab'):
-                vocab = self.tokenizer._tokenizer.vocab
-        except Exception:
-            pass
+        # PREFERRED: Use model's exported stop tokens API (from GGUF metadata)
+        # This is the cleanest approach - model tells us its EOS tokens directly.
+        if hasattr(self, '_has_stop_tokens_api') and self._has_stop_tokens_api:
+            try:
+                num_stop = self.lib.ck_model_get_num_stop_tokens()
+                if num_stop > 0:
+                    stop_tokens_ptr = self.lib.ck_model_get_stop_tokens()
+                    for i in range(num_stop):
+                        self.eos_tokens.add(stop_tokens_ptr[i])
 
-        if vocab:
-            # Look for known EOS token names (model-specific)
+                # Also get explicit EOS/BOS IDs
+                eos_id = self.lib.ck_model_get_eos_token_id()
+                bos_id = self.lib.ck_model_get_bos_token_id()
+                if eos_id >= 0:
+                    self.eos_tokens.add(eos_id)
+
+                # If we got stop tokens from the model, we're done
+                if self.eos_tokens:
+                    return
+            except Exception as e:
+                print(f"Warning: Failed to get stop tokens from model: {e}")
+
+        # FALLBACK: Use tokenizer lookup (original method)
+        if self.use_c_tokenizer:
+            # For C tokenizer, use ck_model_lookup_token to find EOS IDs
             for name in self.EOS_TOKEN_NAMES:
-                if name in vocab:
-                    self.eos_tokens.add(vocab[name])
+                try:
+                    text_bytes = name.encode('utf-8')
+                    token_id = self.lib.ck_model_lookup_token(text_bytes)
+                    if token_id >= 0:  # Valid token found
+                        self.eos_tokens.add(token_id)
+                except Exception:
+                    pass
+        else:
+            # Try to get vocab from Python tokenizer
+            vocab = None
+            try:
+                # HuggingFace tokenizer
+                if hasattr(self.tokenizer, 'get_vocab'):
+                    vocab = self.tokenizer.get_vocab()
+                # Our GGUF tokenizer wrapper
+                elif hasattr(self.tokenizer, '_tokenizer') and hasattr(self.tokenizer._tokenizer, 'vocab'):
+                    vocab = self.tokenizer._tokenizer.vocab
+            except Exception:
+                pass
+
+            if vocab:
+                # Look for known EOS token names (model-specific)
+                for name in self.EOS_TOKEN_NAMES:
+                    if name in vocab:
+                        self.eos_tokens.add(vocab[name])
+
+        # Model-family specific EOS tokens (when C tokenizer lookup fails)
+        # These are hardcoded because special tokens like <|im_end|> may not
+        # be findable via direct vocab lookup (encoding/string differences)
+        QWEN_EOS_TOKENS = {151643, 151645}  # <|endoftext|>, <|im_end|>
+        LLAMA_EOS_TOKENS = {128001, 128009}  # <|end_of_text|>, <|eot_id|>
+
+        # Add model-specific EOS tokens based on vocab size
+        if self.vocab_size > 150000:  # Qwen family (151936 vocab)
+            self.eos_tokens.update(QWEN_EOS_TOKENS)
+        elif self.vocab_size > 127000:  # Llama 3 family (128256 vocab)
+            self.eos_tokens.update(LLAMA_EOS_TOKENS)
 
         # IMPORTANT: Only use low token IDs as fallback if we found NOTHING
         # Different tokenizers assign different meanings to low IDs!
         if not self.eos_tokens:
-            print(f"Warning: No EOS tokens detected, using conservative defaults")
             self.eos_tokens.update([0, 1, 2])
-
-        print(f"EOS tokens: {sorted(self.eos_tokens)}")
 
     def is_eos_token(self, token_id: int) -> bool:
         """Check if token is an EOS token."""
@@ -256,12 +360,48 @@ class CKModel:
             self.lib.parity_set_token_index(idx)
 
     def encode(self, text: str) -> list:
-        """Tokenize text."""
-        return self.tokenizer.encode(text).ids
+        """Tokenize text.
+
+        Uses C tokenizer if available (faster), otherwise Python tokenizer.
+        """
+        if self.use_c_tokenizer:
+            # Use C tokenizer - encode directly into model's token buffer
+            text_bytes = text.encode('utf-8')
+            num_tokens = self.lib.ck_model_encode_text(text_bytes, len(text_bytes))
+            # Read tokens back from model's internal buffer
+            token_buf_ptr = self.lib.ck_model_get_token_buffer()
+            if token_buf_ptr and num_tokens > 0:
+                return [token_buf_ptr[i] for i in range(num_tokens)]
+            return []
+        else:
+            return self.tokenizer.encode(text).ids
+
+    def encode_to_buffer(self, text: str) -> int:
+        """Encode text directly into model's token buffer (C tokenizer only).
+
+        Returns: number of tokens encoded
+        """
+        if self.use_c_tokenizer:
+            text_bytes = text.encode('utf-8')
+            return self.lib.ck_model_encode_text(text_bytes, len(text_bytes))
+        else:
+            # Fallback: encode with Python, then we'd need to copy to buffer
+            # This path shouldn't be hit in normal usage
+            token_ids = self.tokenizer.encode(text).ids
+            return len(token_ids)
 
     def decode(self, token_ids: list) -> str:
         """Decode token IDs to text."""
-        return self.tokenizer.decode(token_ids)
+        if self.use_c_tokenizer:
+            # Use C tokenizer for decoding
+            num_ids = len(token_ids)
+            ids_array = (ctypes.c_int32 * num_ids)(*token_ids)
+            # Allocate output buffer (generous size)
+            out_buf = ctypes.create_string_buffer(num_ids * 16)
+            out_len = self.lib.ck_model_decode_tokens(ids_array, num_ids, out_buf, len(out_buf))
+            return out_buf.value[:out_len].decode('utf-8', errors='replace')
+        else:
+            return self.tokenizer.decode(token_ids)
 
     def format_chat_prompt(self, user_message: str, system_prompt: str = None) -> str:
         """Format user message with chat template for instruction models.
@@ -643,6 +783,8 @@ def main():
                        help="Check for gibberish every N tokens (default: 20)")
     parser.add_argument("--no-prefill", action="store_true",
                        help="Disable prefill; feed prompt tokens via decode (slow)")
+    parser.add_argument("--python-tokenizer", action="store_true",
+                       help="Force Python tokenizer instead of C tokenizer")
     args = parser.parse_args()
 
     # Determine parity directory
@@ -674,7 +816,7 @@ def main():
     print(f"Loading model from {args.model_dir}...")
     model = CKModel(args.model_dir, parity_dir=parity_dir)
 
-    if not model.load(gguf_path=args.gguf):
+    if not model.load(gguf_path=args.gguf, force_python_tokenizer=args.python_tokenizer):
         sys.exit(1)
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")

@@ -147,6 +147,22 @@ CK_TRUE_BPE_API void ck_true_bpe_set_special_ids(CKTrueBPE *bpe,
                                                   int32_t pad);
 
 /**
+ * Add a special token that should be matched BEFORE BPE encoding.
+ *
+ * Special tokens like <|im_start|>, <|im_end|>, <|endoftext|> are matched
+ * literally in the input text before BPE processing. Without this, BPE would
+ * break them into individual characters.
+ *
+ * @param bpe    Tokenizer
+ * @param token  Token string to match literally (e.g., "<|im_end|>")
+ * @param id     Token ID to output when matched
+ * @return       0 on success, -1 on error
+ */
+CK_TRUE_BPE_API int ck_true_bpe_add_special_token(CKTrueBPE *bpe,
+                                                   const char *token,
+                                                   int32_t id);
+
+/**
  * Set tokenizer configuration.
  *
  * @param bpe     Tokenizer

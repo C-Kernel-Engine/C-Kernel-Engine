@@ -545,7 +545,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     if (!resolve_symbol(api->handle, "ck_model_embed_tokens", (void **)&api->embed, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, true)) return false;
-    if (!resolve_symbol(api->handle, "ck_model_sample_argmax", (void **)&api->sample, true)) return false;
+    resolve_symbol(api->handle, "ck_model_sample_argmax", (void **)&api->sample, false);  /* Optional - we can sample from logits */
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
@@ -559,7 +559,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_get_vocab_merges", (void **)&api->get_merges, false);
     resolve_symbol(api->handle, "ck_model_free", (void **)&api->free_fn, false);
 
-    if (!api->get_vocab_size || !api->get_vocab_bytes || !api->get_offsets || !api->get_strings) {
+    if (!api->get_vocab_size || !api->get_offsets || !api->get_strings) {
         fprintf(stderr, "Error: vocab accessors missing from model\n");
         return false;
     }
@@ -861,25 +861,32 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
     /* Get vocab size for sampling */
     int vocab_size = api->get_vocab_size ? api->get_vocab_size() : 0;
 
+    /* Helper: sample next token from logits */
+    #define SAMPLE_NEXT_TOKEN() do { \
+        if (api->get_logits && vocab_size > 0) { \
+            float *logits = api->get_logits(); \
+            if (logits) { \
+                int active = api->get_active_tokens ? api->get_active_tokens() : 1; \
+                float *last_logits = logits + (size_t)(active - 1) * vocab_size; \
+                float *logits_copy = (float *)malloc(vocab_size * sizeof(float)); \
+                memcpy(logits_copy, last_logits, vocab_size * sizeof(float)); \
+                next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p); \
+                free(logits_copy); \
+            } else if (api->sample) { \
+                next_token = api->sample(); \
+            } else { \
+                next_token = -1; \
+            } \
+        } else if (api->sample) { \
+            next_token = api->sample(); \
+        } else { \
+            next_token = -1; \
+        } \
+    } while(0)
+
     /* Sample first token */
     int next_token;
-    if (opt->temperature > 0.0f && api->get_logits && vocab_size > 0) {
-        float *logits = api->get_logits();
-        if (logits) {
-            /* Get logits for last position */
-            int active = api->get_active_tokens ? api->get_active_tokens() : 1;
-            float *last_logits = logits + (size_t)(active - 1) * vocab_size;
-            /* Make a copy since sampling modifies in place */
-            float *logits_copy = (float *)malloc(vocab_size * sizeof(float));
-            memcpy(logits_copy, last_logits, vocab_size * sizeof(float));
-            next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p);
-            free(logits_copy);
-        } else {
-            next_token = api->sample();
-        }
-    } else {
-        next_token = api->sample();
-    }
+    SAMPLE_NEXT_TOKEN();
 
     char out_buf[CK_CLI_OUTPUT_BUF_SIZE];
     size_t out_len = 0;
@@ -936,23 +943,10 @@ static int run_prompt(ModelAPI *api, CKTrueBPE *tokenizer, CLIOptions *opt, cons
         g_decode_count++;
 
         /* Sample next token */
-        if (opt->temperature > 0.0f && api->get_logits && vocab_size > 0) {
-            float *logits = api->get_logits();
-            if (logits) {
-                int active = api->get_active_tokens ? api->get_active_tokens() : 1;
-                float *last_logits = logits + (size_t)(active - 1) * vocab_size;
-                float *logits_copy = (float *)malloc(vocab_size * sizeof(float));
-                memcpy(logits_copy, last_logits, vocab_size * sizeof(float));
-                next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p);
-                free(logits_copy);
-            } else {
-                next_token = api->sample();
-            }
-        } else {
-            next_token = api->sample();
-        }
+        SAMPLE_NEXT_TOKEN();
     }
 
+    #undef SAMPLE_NEXT_TOKEN
     g_generation_active = 0;
     output_flush(out_buf, &out_len);
     printf("\n");
@@ -1245,6 +1239,41 @@ int main(int argc, char **argv) {
         fprintf(stderr, "[Tokenizer] failed to load vocab\n");
         ck_true_bpe_free(tokenizer);
         return 1;
+    }
+
+    /* Register special tokens for pre-BPE matching.
+     * This is done in the CLI (orchestrator), NOT the generated model code.
+     * The generated model code stays "dumb" - just inference.
+     * Model-specific token handling is the CLI's responsibility.
+     */
+    {
+        /* Common special tokens across model families */
+        static const char *special_tokens[] = {
+            /* Qwen/ChatML */
+            "<|im_start|>", "<|im_end|>", "<|endoftext|>",
+            /* Llama 3 */
+            "<|eot_id|>", "<|begin_of_text|>", "<|end_of_text|>",
+            "<|start_header_id|>", "<|end_header_id|>",
+            /* Generic */
+            "</s>", "<s>", "<pad>", "<unk>",
+            NULL
+        };
+        int registered = 0;
+        for (int i = 0; special_tokens[i] != NULL; i++) {
+            int32_t id = ck_true_bpe_lookup(tokenizer, special_tokens[i]);
+            /* Verify it's actually this token (not unk) via round-trip */
+            const char *check = ck_true_bpe_id_to_token(tokenizer, id);
+            if (check && strcmp(check, special_tokens[i]) == 0) {
+                ck_true_bpe_add_special_token(tokenizer, special_tokens[i], id);
+                registered++;
+                if (opt.verbose) {
+                    printf("[Tokenizer] Registered special: %s -> %d\n", special_tokens[i], id);
+                }
+            }
+        }
+        if (opt.verbose) {
+            printf("[Tokenizer] Registered %d special tokens for pre-BPE matching\n", registered);
+        }
     }
 
     printf("Ready! Vocab: %d, Context: %d, Template: %s\n",
