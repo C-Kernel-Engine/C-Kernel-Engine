@@ -60,20 +60,20 @@ NOTE: Init ops (rope_init, etc.) now use init_call.json pattern:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. ACTIVATION FUNCTION - CRITICAL                                           │
+│ 3. ACTIVATION FUNCTION - IR LOWER ISSUE (NOT CODEGEN)                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ Location: emit_model_and_api() kernel declarations, line ~413               │
-│ Hardcoded: swiglu_forward() only                                            │
-│ Should be: Based on config.get("hidden_act")                                │
+│ Status: Codegen is CORRECT - emits whatever kernel IR specifies             │
+│ Fix needed in: build_ir_v6_6.py (IR Lower)                                  │
 │                                                                             │
-│ Impact: WRONG MLP activation for non-SwiGLU models                          │
+│ Issue: IR Lower hardcodes silu_mul -> swiglu mapping                        │
+│ Should: Read hidden_act from config and map to correct kernel               │
+│   - hidden_act: "silu" -> swiglu_forward                                    │
+│   - hidden_act: "gelu" -> gelu_forward                                      │
+│   - hidden_act: "relu" -> relu_forward                                      │
+│                                                                             │
+│ Impact: Non-SwiGLU models get wrong activation                              │
 │   - GPT-2, GPT-Neo, OPT: GELU                                               │
-│   - Older GPT: ReLU                                                         │
-│   - Some models: SiLU (without gating)                                      │
-│   - Qwen2, Llama, Mistral: SwiGLU (current hardcoded)                       │
-│                                                                             │
-│ Fix: IR should specify activation kernel, codegen emits what IR says        │
-│ Note: IR does map silu_mul -> swiglu, but codegen doesn't check hidden_act  │
+│   - Qwen2, Llama, Mistral: SwiGLU (works today)                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -146,6 +146,8 @@ WHAT CODEGEN DOES CORRECTLY (keep these patterns)
 ✓ Reads ops directly from IR - emit_op() emits exactly what IR Lower provides
 ✓ Uses layout.json for memory offsets - no offset calculations in codegen
 ✓ Kernel function names from IR - doesn't hardcode which kernel to call
+✓ Kernel declarations from ckernel_engine.h - no inline declarations
+✓ Init ops from init_call.json - RoPE theta, etc. come from IR
 ✓ Layer count from config - unrolls based on num_layers from manifest
 ✓ Token offset from layout - gets from token_ids buffer in layout.json
 ✓ Weight offsets from layout - all W_* macros come from layout
@@ -550,41 +552,7 @@ static ck_manifest_map_t *g_manifest = NULL;
 /* Manifest runtime offsets are absolute (bump base) */
 #define MANIFEST_OFFSETS_ABSOLUTE 1
 
-/* ============================================================================
- * KERNEL DECLARATIONS
- * ============================================================================ */
-void embedding_forward_q8_0(const int32_t *tokens, int count, int vocab, const void *emb, const float *pos, float *out, int dim, int adim, int ctx, int add_pos);
-void rmsnorm_forward(const float *in, const float *gamma, float *out, float *rstd, int T, int D, int AD, float eps);
-void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
-void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
-void gemv_q6_k(float *y, const void *W, const float *x, int M, int K);
-void gemv_q4_k(float *y, const void *W, const float *x, int M, int K);
-void gemm_nt_q5_0(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
-void gemm_nt_q8_0(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
-void gemm_nt_q6_k(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
-void gemm_nt_q4_k(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
-void rope_forward_qk(float *q, float *k, const float *cos, const float *sin, int H, int Hkv, int T, int D, int AD, int pos);
-void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base);
-void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *out, int H, int Hkv, int T, int D, int AD, int stride);
-void attention_forward_decode_head_major_gqa_flash(const float *q, const float *k, const float *v, float *out, int H, int Hkv, int T, int D, int AD, int stride);
-void kv_cache_store(float *k_cache, float *v_cache, const float *k_new, const float *v_new, int layer, int pos, int Hkv, int D, int stride);
-void ck_qkv_project_head_major_quant(const float *input,
-                                     const void *wq, const float *bq, int wq_dtype,
-                                     const void *wk, const float *bk, int wk_dtype,
-                                     const void *wv, const float *bv, int wv_dtype,
-                                     float *q, float *k, float *v,
-                                     int tokens, int kv_stride_tokens,
-                                     int aligned_embed_dim, int num_heads,
-                                     int num_kv_heads, int aligned_head_dim);
-void ck_attention_project_head_major_quant(const float *attn_out,
-                                           const void *wo, const float *bo,
-                                           float *out, float *scratch,
-                                           int tokens, int aligned_embed_dim,
-                                           int num_heads, int aligned_head_dim,
-                                           int wo_dtype);
-void ck_residual_add_token_major(const float *a, const float *b, float *out, int T, int D);
-void add_inplace_f32(float *a, const float *b, size_t n);
-void swiglu_forward(const float *in, float *out, int T, int D);
+/* Kernel declarations from ckernel_engine.h (included above) */
 
 /* ============================================================================
  * INIT / LOAD / FREE

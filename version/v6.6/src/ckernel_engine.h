@@ -1,13 +1,15 @@
 /*
- * ckernel_engine.h - Minimal v6.6 engine definitions
+ * ckernel_engine.h - v6.6 kernel declarations
  *
- * Provides dtype enums and helper functions for generated code.
+ * Provides all kernel function prototypes needed by generated v6.6 code.
+ * This is the complete set used by codegen_v6_6.py output.
  */
 
 #ifndef CKERNEL_ENGINE_H
 #define CKERNEL_ENGINE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* ============================================================================
  * DATA TYPE ENUMS
@@ -27,7 +29,6 @@
  * DTYPE HELPERS
  * ============================================================================ */
 
-/* Get bytes per element for a dtype */
 static inline size_t ck_dtype_bytes(int dtype) {
     switch (dtype) {
         case CK_DT_FP32:  return 4;
@@ -35,21 +36,19 @@ static inline size_t ck_dtype_bytes(int dtype) {
         case CK_DT_BF16:  return 2;
         case CK_DT_I8:    return 1;
         case CK_DT_INT32: return 4;
-        case CK_DT_Q8_0:  return 1.0625f;  /* 34 bytes per 32 elements */
-        case CK_DT_Q5_0:  return 0.6875f;  /* 22 bytes per 32 elements */
-        case CK_DT_Q4_K:  return 0.5625f;  /* 144 bytes per 256 elements */
-        case CK_DT_Q6_K:  return 0.8203125f; /* 210 bytes per 256 elements */
+        case CK_DT_Q8_0:  return 1.0625f;
+        case CK_DT_Q5_0:  return 0.6875f;
+        case CK_DT_Q4_K:  return 0.5625f;
+        case CK_DT_Q6_K:  return 0.8203125f;
         default:          return 4;
     }
 }
 
-/* Get bytes for a row of given element count and dtype */
 static inline size_t ck_dtype_row_bytes(int dtype, size_t elements) {
     float bytes_per_elem = ck_dtype_bytes(dtype);
     return (size_t)(elements * bytes_per_elem);
 }
 
-/* Get block size for quantized dtypes */
 static inline size_t ck_dtype_block_size(int dtype) {
     switch (dtype) {
         case CK_DT_Q8_0:  return 32;
@@ -61,7 +60,89 @@ static inline size_t ck_dtype_block_size(int dtype) {
 }
 
 /* ============================================================================
- * KERNEL PROTOTYPES (subset used by generated code)
+ * EMBEDDING KERNELS
+ * ============================================================================ */
+
+void embedding_forward_q8_0(const int32_t *token_ids,
+                            int num_tokens,
+                            int vocab_size,
+                            const void *embedding_table,
+                            const float *pos_embed,
+                            float *output,
+                            int embed_dim,
+                            int aligned_embed_dim,
+                            int context_size,
+                            int add_pos_embed);
+
+/* ============================================================================
+ * NORMALIZATION KERNELS
+ * ============================================================================ */
+
+void rmsnorm_forward(const float *input,
+                     const float *gamma,
+                     float *output,
+                     float *rstd,
+                     int num_tokens,
+                     int embed_dim,
+                     int aligned_embed_dim,
+                     float eps);
+
+/* ============================================================================
+ * QUANTIZATION KERNELS
+ * ============================================================================ */
+
+void quantize_row_q8_0(const float *x, void *y, int k);
+void quantize_batch_q8_0(const float *x, void *y, int num_rows, int k);
+void quantize_row_q8_k(const float *x, void *y, int k);
+void quantize_batch_q8_k(const float *x, void *y, int num_rows, int k);
+
+/* ============================================================================
+ * GEMV KERNELS (decode mode - single token)
+ * ============================================================================ */
+
+void gemv_q4_k(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q6_k(float *y, const void *W, const float *x, int M, int K);
+void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
+
+/* INT8 activation variants */
+void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
+
+/* ============================================================================
+ * GEMM KERNELS (prefill mode - multiple tokens)
+ * ============================================================================ */
+
+void gemm_nt_q4_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q6_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+
+/* ============================================================================
+ * ROPE KERNELS
+ * ============================================================================ */
+
+void rope_precompute_cache(float *cos_cache,
+                           float *sin_cache,
+                           int max_seq_len,
+                           int head_dim,
+                           float base);
+
+void rope_forward_qk(float *q,
+                     float *k,
+                     const float *cos_cache,
+                     const float *sin_cache,
+                     int num_heads,
+                     int num_kv_heads,
+                     int num_tokens,
+                     int head_dim,
+                     int aligned_head_dim,
+                     int pos);
+
+/* ============================================================================
+ * ATTENTION KERNELS
  * ============================================================================ */
 
 void attention_forward_decode_head_major_gqa_flash(const float *q_token,
@@ -75,6 +156,21 @@ void attention_forward_decode_head_major_gqa_flash(const float *q_token,
                                                    int head_dim,
                                                    int aligned_head_dim);
 
+void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
+                                                           const float *k,
+                                                           const float *v,
+                                                           float *out,
+                                                           int num_heads,
+                                                           int num_kv_heads,
+                                                           int num_tokens,
+                                                           int head_dim,
+                                                           int aligned_head_dim,
+                                                           int stride);
+
+/* ============================================================================
+ * KV CACHE KERNELS
+ * ============================================================================ */
+
 void kv_cache_store(float *__restrict kv_cache_k,
                     float *__restrict kv_cache_v,
                     const float *__restrict k,
@@ -84,5 +180,24 @@ void kv_cache_store(float *__restrict kv_cache_k,
                     int num_kv_heads,
                     int head_dim,
                     int max_seq_len);
+
+/* ============================================================================
+ * ACTIVATION KERNELS
+ * ============================================================================ */
+
+void swiglu_forward(const float *input, float *output, int num_tokens, int dim);
+
+/* ============================================================================
+ * RESIDUAL KERNELS
+ * ============================================================================ */
+
+void ck_residual_add_token_major(const float *a, const float *b, float *out,
+                                 int tokens, int aligned_embed_dim);
+
+/* ============================================================================
+ * UTILITY KERNELS
+ * ============================================================================ */
+
+void add_inplace_f32(float *a, const float *b, size_t n);
 
 #endif /* CKERNEL_ENGINE_H */
