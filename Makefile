@@ -962,6 +962,33 @@ e2e-smollm:
 	@echo "Running E2E test with SmolLM2-360M..."
 	@$(PYTHON) scripts/v6.5/ck_run_v6_5.py run "hf://itlwas/SmolLM2-360M-Q4_K_M-GGUF/smollm2-360m-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 10
 
+# v6.6 E2E test - runs full pipeline: download -> convert -> IR -> codegen -> compile -> test
+e2e-v66:
+	@echo "========================================"
+	@echo "  CK-Engine v6.6 E2E Test"
+	@echo "========================================"
+	@echo "[1/3] Download model (if needed)..."
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --download-only || { echo "Download failed"; exit 1; }
+	@echo "[2/3] Build v6.6 (IR -> codegen -> compile)..."
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --build-only || { echo "Build failed"; exit 1; }
+	@echo "[3/3] Run quick sanity tests..."
+	@cd version/v6.6/test && $(MAKE) quick || { echo "Tests failed"; exit 1; }
+	@echo "========================================"
+	@echo "  v6.6 E2E Test PASSED"
+	@echo "========================================"
+
+# v6.6 E2E with full test suite
+e2e-v66-full:
+	@echo "========================================"
+	@echo "  CK-Engine v6.6 Full E2E Test"
+	@echo "========================================"
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --download-only
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --build-only
+	@cd version/v6.6/test && $(MAKE) all
+	@echo "========================================"
+	@echo "  v6.6 Full E2E Test PASSED"
+	@echo "========================================"
+
 # =============================================================================
 # LAYERED PIPELINE TESTS
 # =============================================================================
@@ -2644,7 +2671,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)

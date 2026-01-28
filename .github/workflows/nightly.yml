@@ -123,6 +123,20 @@ jobs:
             python3 -c "import json; d=json.load(open('docs/site/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
           fi
 
+      - name: Run v6.6 E2E Tests
+        run: |
+          echo "=== Running v6.6 E2E Tests ==="
+          echo "Tests the v6.6 pipeline: download -> convert -> IR -> codegen -> compile -> test"
+
+          # Run v6.6 E2E test
+          make e2e-v66 2>&1 | tee build/v66_e2e.log || {
+            echo "::warning::v6.6 E2E tests had issues"
+            # Don't fail the build yet - v6.6 is still being stabilized
+          }
+
+          echo ""
+          echo "=== v6.6 E2E Test Complete ==="
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -141,11 +155,34 @@ jobs:
             DATE=$(date +%Y-%m-%d)
             cp docs/site/site/nightly-results/latest.json "docs/site/site/nightly-results/report-${DATE}.json"
 
-            # Update index.json with all report summaries
+            # Fetch existing historical reports from gh-pages to preserve history
+            echo "Fetching historical reports from gh-pages..."
+            PAGES_URL="https://raw.githubusercontent.com/${{ github.repository }}/gh-pages"
+
+            # Fetch existing index to get list of historical reports
+            if curl -sf "${PAGES_URL}/site/nightly-results/index.json" -o /tmp/existing_index.json; then
+              echo "Found existing index with historical data"
+
+              # Download each historical report file that we don't already have
+              for report_file in $(jq -r '.reports[].file' /tmp/existing_index.json 2>/dev/null); do
+                if [ ! -f "docs/site/site/nightly-results/${report_file}" ]; then
+                  echo "  Fetching ${report_file}..."
+                  curl -sf "${PAGES_URL}/site/nightly-results/${report_file}" \
+                    -o "docs/site/site/nightly-results/${report_file}" || true
+                fi
+              done
+            else
+              echo "No existing index found (first run or new repo)"
+            fi
+
+            # Update index.json with all report summaries (now includes historical)
             python3 scripts/nightly_runner.py --update-index --results-dir docs/site/site/nightly-results
 
             echo "=== Nightly results prepared ==="
+            echo "Reports in directory:"
             ls -la docs/site/site/nightly-results/
+            echo ""
+            echo "Index contains $(jq '.reports | length' docs/site/site/nightly-results/index.json) reports"
           fi
 
       - name: Deploy to GitHub Pages
