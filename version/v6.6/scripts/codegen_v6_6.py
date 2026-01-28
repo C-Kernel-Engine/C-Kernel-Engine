@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 codegen_v6_6.py - Generate C code from lowered IR.
 
