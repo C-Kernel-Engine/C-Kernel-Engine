@@ -9,6 +9,148 @@ RESPONSIBILITIES:
 
 If there are memory issues → fix the memory layout builder, not codegen.
 If there are kernel issues → fix the IR lower, not codegen.
+
+===============================================================================
+HARDCODED VALUES & MODEL-SPECIFIC ASSUMPTIONS - TECHNICAL DEBT TRACKER
+===============================================================================
+
+This section documents values that are hardcoded in codegen but should come from
+IR config or dedicated kernels. These WILL BREAK for non-Qwen2 models.
+
+Delete entries from this list as they are properly fixed.
+
+NOTE: Init ops (rope_init, etc.) now use init_call.json pattern:
+  manifest.config → init.json → init_call.json → codegen emits calls
+  This is the correct pattern for model-specific initialization.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. ROPE SCALING TYPE - MEDIUM                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: rope_precompute_cache kernel                                      │
+│ Current: Standard RoPE only (no scaling)                                    │
+│ Should be: Support for rope_scaling_type from config:                       │
+│   - "linear": freq *= 1/scaling_factor                                      │
+│   - "dynamic": NTK-aware dynamic scaling                                    │
+│   - "yarn": YaRN (Yet another RoPE extensioN)                               │
+│                                                                             │
+│ Impact: Context extension won't work for models using scaled RoPE           │
+│   - Llama 3.1 uses scaled RoPE for 128K context                             │
+│   - Code Llama uses linear scaling                                          │
+│                                                                             │
+│ Fix: Extend rope_precompute_cache kernel to accept scaling_type param       │
+│      init.json already has rope_scaling_type field ready to use             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. ROPE MEMORY LAYOUT - MEDIUM                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: init_call.json args for rope_precompute_cache                     │
+│ Current: Half-dimension interleaved layout                                  │
+│   sin_cache = cos_cache + MAX_SEQ_LEN * HEAD_DIM / 2                        │
+│                                                                             │
+│ Should be: Layout from config.get("rope_layout") or rotary_dim              │
+│   - Some models use full HEAD_DIM (not HEAD_DIM/2)                          │
+│   - Some use [cos, sin] interleaved per position                            │
+│   - rotary_dim may be < head_dim (partial rotation)                         │
+│                                                                             │
+│ Impact: Wrong RoPE application for models with different layouts            │
+│                                                                             │
+│ Fix: generate_init_ir_lower_3() should read rotary_dim from config          │
+│      and adjust buffer expressions accordingly                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. ACTIVATION FUNCTION - CRITICAL                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: emit_model_and_api() kernel declarations, line ~413               │
+│ Hardcoded: swiglu_forward() only                                            │
+│ Should be: Based on config.get("hidden_act")                                │
+│                                                                             │
+│ Impact: WRONG MLP activation for non-SwiGLU models                          │
+│   - GPT-2, GPT-Neo, OPT: GELU                                               │
+│   - Older GPT: ReLU                                                         │
+│   - Some models: SiLU (without gating)                                      │
+│   - Qwen2, Llama, Mistral: SwiGLU (current hardcoded)                       │
+│                                                                             │
+│ Fix: IR should specify activation kernel, codegen emits what IR says        │
+│ Note: IR does map silu_mul -> swiglu, but codegen doesn't check hidden_act  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. ATTENTION SOFTMAX SCALE - LOW                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: Implicit in attention kernels                                     │
+│ Hardcoded: 1/sqrt(head_dim) in kernel implementation                        │
+│ Should be: config.get("attention_scale") or computed from head_dim          │
+│                                                                             │
+│ Impact: Minor - most models use 1/sqrt(d), but some override                │
+│   - Falcon uses different scaling                                           │
+│   - Some models use learned scale parameter                                 │
+│                                                                             │
+│ Fix: Attention kernel should accept scale parameter from IR                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. KV CACHE LAYOUT - MEDIUM                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: do_init() line ~440, kv_cache_store kernel calls                  │
+│ Hardcoded: Head-major layout [num_layers, 2, num_kv_heads, seq_len, head_d] │
+│ Should be: config.get("kv_layout") or IR memory spec                        │
+│                                                                             │
+│ Impact: Incompatible with paged attention or different cache layouts        │
+│   - vLLM uses paged KV cache                                                │
+│   - Some implementations use [batch, layers, heads, seq, dim]               │
+│                                                                             │
+│ Fix: KV cache layout should be defined in memory_planner, not codegen       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. DEFAULT CONFIG VALUES (Qwen2-0.5B specific) - LOW                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: emit_memory_layout() lines ~96-103                                │
+│ Hardcoded defaults:                                                         │
+│   embed_dim: 896          (Qwen2-0.5B, Llama-7B uses 4096)                  │
+│   num_heads: 14           (Qwen2-0.5B, Llama-7B uses 32)                    │
+│   num_kv_heads: 2         (Qwen2-0.5B GQA 7:1, Llama-2 uses MHA)            │
+│   head_dim: 64            (common, but some use 128)                        │
+│   intermediate_size: 4864 (Qwen2-0.5B, Llama-7B uses 11008)                 │
+│   vocab_size: 151936      (Qwen family, Llama uses 32000-128256)            │
+│   context_length: 32768   (Qwen2, varies widely)                            │
+│                                                                             │
+│ Impact: LOW if config is properly provided (defaults only used as fallback) │
+│ These are just defaults - real values should always come from manifest      │
+│                                                                             │
+│ Fix: Change defaults to more conservative/common values, or remove defaults │
+│ and fail explicitly if config missing                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. BUMP FILE LAYOUT DEFAULTS - LOW                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Location: emit_memory_layout() lines ~68-72                                 │
+│ Hardcoded defaults:                                                         │
+│   header_size: 128                                                          │
+│   ext_metadata_size: 24                                                     │
+│   data_start: 152                                                           │
+│                                                                             │
+│ Impact: LOW - converter should always provide these in layout.json          │
+│ These should NEVER be used; if they are, converter is broken                │
+│                                                                             │
+│ Fix: Remove defaults and fail explicitly if bump_layout missing             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+WHAT CODEGEN DOES CORRECTLY (keep these patterns)
+===============================================================================
+
+✓ Reads ops directly from IR - emit_op() emits exactly what IR Lower provides
+✓ Uses layout.json for memory offsets - no offset calculations in codegen
+✓ Kernel function names from IR - doesn't hardcode which kernel to call
+✓ Layer count from config - unrolls based on num_layers from manifest
+✓ Token offset from layout - gets from token_ids buffer in layout.json
+✓ Weight offsets from layout - all W_* macros come from layout
+
+===============================================================================
 """
 
 import argparse
@@ -350,13 +492,44 @@ static void ck_decode(CKModel *model, int32_t token) {
 # PART 3: CLEAN API WITH POINTER PASSING
 # =============================================================================
 
-def emit_model_and_api() -> str:
-    """Emit model struct and clean API functions."""
-    return '''
+def emit_init_call(op: Dict) -> str:
+    """Emit a single init op call from lowered init IR."""
+    func = op.get("function", "unknown")
+    args = op.get("args", [])
+    arg_exprs = [arg.get("expr", "0") for arg in args]
+    return f"    {func}({', '.join(arg_exprs)});"
+
+
+def emit_model_and_api(init_call: Dict = None) -> str:
+    """Emit model struct and clean API functions.
+
+    Args:
+        init_call: Lowered init IR (init_call.json) with call-ready ops.
+                   If provided, emits init ops from IR (no hardcoding).
+                   If None, emits empty init (no rope precompute).
+    """
+    # Generate init ops code from lowered IR
+    init_ops_code = ""
+    if init_call:
+        ops = init_call.get("operations", [])
+        if ops:
+            init_lines = ["    /* Init ops from init_call.json */"]
+            for op in ops:
+                if not op.get("errors"):
+                    init_lines.append(emit_init_call(op))
+                else:
+                    init_lines.append(f"    /* ERROR: {op.get('function')} - {op.get('errors')} */")
+            init_ops_code = "\n".join(init_lines)
+
+    # If no init_call provided, leave a placeholder comment
+    if not init_ops_code:
+        init_ops_code = "    /* No init ops (init_call.json not provided) */"
+
+    return f'''
 /* ============================================================================
  * MODEL STRUCT
  * ============================================================================ */
-typedef struct {
+typedef struct {{
     uint8_t *bump;           /* Single contiguous allocation */
     size_t bump_size;
     uint8_t *bump_weights;   /* Weights section */
@@ -366,7 +539,7 @@ typedef struct {
     float *rope_sin;         /* RoPE sin table */
     float *logits;           /* Output logits */
     int pos;                 /* Current position */
-} CKModel;
+}} CKModel;
 
 static CKModel *g_model = NULL;
 static ck_manifest_map_t *g_manifest = NULL;
@@ -391,6 +564,7 @@ void gemm_nt_q8_0(const float *a, const void *W, float *bias, float *out, int M,
 void gemm_nt_q6_k(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
 void gemm_nt_q4_k(const float *a, const void *W, float *bias, float *out, int M, int N, int K);
 void rope_forward_qk(float *q, float *k, const float *cos, const float *sin, int H, int Hkv, int T, int D, int AD, int pos);
+void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base);
 void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *out, int H, int Hkv, int T, int D, int AD, int stride);
 void attention_forward_decode_head_major_gqa_flash(const float *q, const float *k, const float *v, float *out, int H, int Hkv, int T, int D, int AD, int stride);
 void kv_cache_store(float *k_cache, float *v_cache, const float *k_new, const float *v_new, int layer, int pos, int Hkv, int D, int stride);
@@ -425,14 +599,14 @@ void swiglu_forward(const float *in, float *out, int T, int D);
 static void ck_decode(CKModel *model, int32_t token);
 static void ck_prefill(CKModel *model, const int32_t *tokens, int count);
 
-static int do_init(void) {
+static int do_init(void) {{
     if (g_model) return 0;
     g_model = calloc(1, sizeof(CKModel));
     if (!g_model) return -1;
 
     g_model->bump_size = BUMP_TOTAL_SIZE;
     g_model->bump = aligned_alloc(64, g_model->bump_size);
-    if (!g_model->bump) { free(g_model); g_model = NULL; return -1; }
+    if (!g_model->bump) {{ free(g_model); g_model = NULL; return -1; }}
     memset(g_model->bump, 0, g_model->bump_size);
 
     g_model->bump_weights = g_model->bump + BUMP_WEIGHTS_OFFSET;
@@ -443,22 +617,15 @@ static int do_init(void) {
     g_model->logits = (float*)(g_model->bump + A_LOGITS);
     g_model->pos = 0;
 
-    /* Precompute RoPE */
-    for (int p = 0; p < MAX_SEQ_LEN; p++) {
-        for (int i = 0; i < HEAD_DIM / 2; i++) {
-            float freq = 1.0f / powf(1000000.0f, (float)(2*i) / HEAD_DIM);
-            float angle = (float)p * freq;
-            g_model->rope_cos[p * HEAD_DIM / 2 + i] = cosf(angle);
-            g_model->rope_sin[p * HEAD_DIM / 2 + i] = sinf(angle);
-        }
-    }
-    return 0;
-}
+{init_ops_code}
 
+    return 0;
+}}
+''' + '''
 static int build_manifest_path(const char *weights_path, char *out, size_t out_sz) {
     const char *slash = strrchr(weights_path, '/');
 #ifdef _WIN32
-    const char *bslash = strrchr(weights_path, '\\');
+    const char *bslash = strrchr(weights_path, '\\\\');
     if (!slash || (bslash && bslash > slash)) slash = bslash;
 #endif
     if (slash) {
@@ -592,8 +759,14 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) { return (uintptr_t)(g_model ? g
 # MAIN
 # =============================================================================
 
-def generate(ir_path: Path, layout_path: Path, debug: bool = False) -> str:
+def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None) -> str:
     """Generate complete C code.
+
+    Args:
+        ir_path: Path to lowered IR JSON
+        layout_path: Path to layout JSON
+        debug: If True, emit printf statements to dump tensor values after each op
+        init_call: Lowered init IR dict (from init_call.json) with call-ready ops
 
     If debug=True, emit printf statements to dump tensor values after each op.
     """
@@ -611,6 +784,14 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False) -> str:
         config = merged
     ops = ir.get("ops", ir.get("operations", []))  # Support both "ops" and "operations"
     memory = layout.get("memory", ir.get("memory", {}))  # Use layout memory for offsets
+
+    # Extract rope_theta from init_call config for header comment
+    rope_theta = 10000.0  # Safe default (Llama 2)
+    if init_call:
+        init_config = init_call.get("config", {})
+        rope_theta = init_config.get("rope_theta", rope_theta)
+    elif "rope_theta" in config:
+        rope_theta = config.get("rope_theta", rope_theta)
 
     # Fail fast if IR Lower 3 has errors or missing args
     ir_errors = ir.get("errors", [])
@@ -645,6 +826,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False) -> str:
  * Model: {config.get("model", "unknown")}
  * Mode: {ir.get("mode", "decode")}
  * Layers: {config.get("num_layers", 0)} (unrolled)
+ * RoPE theta: {rope_theta}
  */
 
 #define _GNU_SOURCE
@@ -658,7 +840,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False) -> str:
 ''')
 
     parts.append(emit_memory_layout(layout, config))
-    parts.append(emit_model_and_api())  # Defines CKModel and forward declares ck_decode
+    parts.append(emit_model_and_api(init_call=init_call))  # Pass lowered init IR for init ops
     parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug))
 
     return "\n".join(parts)
@@ -672,6 +854,8 @@ def main():
     # Legacy API (decode + prefill combined)
     parser.add_argument("--decode", help="Lowered decode IR JSON")
     parser.add_argument("--prefill", help="Lowered prefill IR JSON (optional)")
+    # Init IR (rope_init, etc.)
+    parser.add_argument("--init", help="Init IR JSON (rope_init, etc.) - uses rope_theta from here")
     # Output
     parser.add_argument("-o", "--output", required=True, help="Output C file")
     # Debug
@@ -686,6 +870,25 @@ def main():
         if not layout_decode.exists():
             print(f"Error: Could not find layout at {layout_decode}")
             sys.exit(1)
+
+        # Load lowered init IR (init_call.json) if available
+        init_call_obj = None
+        init_call_path = Path(args.init) if args.init else decode_ir.parent / "init_call.json"
+        if init_call_path.exists():
+            with open(init_call_path) as f:
+                init_call_obj = json.load(f)
+            print(f"  Loaded init_call IR from {init_call_path}")
+            init_ops = init_call_obj.get("operations", [])
+            if init_ops:
+                rope_theta = init_call_obj.get("config", {}).get("rope_theta", 10000.0)
+                print(f"  - {len(init_ops)} init ops (rope_theta={rope_theta})")
+        else:
+            # Try legacy init.json path
+            init_path = decode_ir.parent / "init.json"
+            if init_path.exists():
+                print(f"  Warning: Found init.json but not init_call.json - run build_ir with --init-output to generate")
+            else:
+                print(f"  Warning: No init_call.json found at {init_call_path}, init ops will be empty")
 
         # Load IRs for guard
         with open(decode_ir) as f:
@@ -702,7 +905,7 @@ def main():
         _guard_bump_offsets(layout_obj, ir_list)
 
         # Generate decode code
-        code = generate(decode_ir, layout_decode, debug=args.debug)
+        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj)
 
         # Generate prefill code if provided
         prefill_code = ""

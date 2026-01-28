@@ -202,6 +202,218 @@ def run_cache_tests(max_seq_len=128, head_dim=64, warmup=10, iterations=1000):
     return report
 
 
+def run_cache_tests_multi_theta():
+    """
+    Test cos/sin cache precomputation with different theta values.
+
+    CRITICAL: Different models use different RoPE theta (base frequency):
+      - Llama 2:     10,000
+      - Llama 3:    500,000
+      - Qwen2:    1,000,000
+      - Mistral:     10,000
+
+    This test ensures our kernel produces correct results for all variants.
+    """
+    report = TestReport(
+        test_name="RoPE Cache Multi-Theta Parity",
+        dtype="fp32",
+        shape="Various theta values",
+        cpu_info=get_cpu_info()
+    )
+
+    # Test configurations: (theta, model_name, head_dim, max_seq_len)
+    test_configs = [
+        (10000.0, "Llama2/Mistral", 64, 256),
+        (10000.0, "Llama2/Mistral (128d)", 128, 256),
+        (500000.0, "Llama3", 64, 256),
+        (500000.0, "Llama3 (128d)", 128, 256),
+        (1000000.0, "Qwen2", 64, 256),
+        (1000000.0, "Qwen2 (128d)", 128, 256),
+        # Edge cases
+        (10000.0, "Small context", 64, 32),
+        (1000000.0, "Large context", 64, 2048),
+    ]
+
+    for theta, model_name, head_dim, max_seq_len in test_configs:
+        half_dim = head_dim // 2
+
+        # Allocate buffers
+        cos_np = np.zeros((max_seq_len, half_dim), dtype=np.float32)
+        sin_np = np.zeros((max_seq_len, half_dim), dtype=np.float32)
+
+        # C kernel
+        lib.rope_precompute_cache(
+            numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(max_seq_len), ctypes.c_int(head_dim),
+            ctypes.c_float(theta)
+        )
+
+        # PyTorch reference (high precision)
+        cos_ref, sin_ref = precompute_freqs_cis_pytorch(head_dim, max_seq_len, base=theta)
+
+        cos_c = torch.from_numpy(cos_np)
+        sin_c = torch.from_numpy(sin_np)
+
+        diff_cos = max_diff(cos_c, cos_ref)
+        diff_sin = max_diff(sin_c, sin_ref)
+        max_diff_val = max(diff_cos, diff_sin)
+
+        # Tolerance: larger theta can have slightly more numerical error
+        # due to the exp(-exponent * log_base) computation
+        tolerance = 1e-5 if theta <= 100000 else 5e-5
+
+        report.add_result(TestResult(
+            name=f"{model_name} (θ={theta:.0f}, d={head_dim})",
+            passed=max_diff_val <= tolerance,
+            max_diff=max_diff_val,
+            tolerance=tolerance,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+
+        # Also verify specific positions have reasonable values
+        # Position 0 should have cos=1, sin=0 for all frequencies
+        if max_seq_len > 0:
+            pos0_cos_diff = float(torch.max(torch.abs(cos_c[0] - 1.0)))
+            pos0_sin_diff = float(torch.max(torch.abs(sin_c[0])))
+            pos0_ok = pos0_cos_diff < 1e-6 and pos0_sin_diff < 1e-6
+            if not pos0_ok:
+                print(f"  WARNING: {model_name} pos=0 sanity check failed: cos_diff={pos0_cos_diff}, sin_diff={pos0_sin_diff}")
+
+    return report
+
+
+def run_rope_forward_multi_theta():
+    """
+    Test RoPE forward pass with different theta values.
+
+    Ensures that applying RoPE with different base frequencies
+    produces correct rotations compared to PyTorch reference.
+    """
+    report = TestReport(
+        test_name="RoPE Forward Multi-Theta",
+        dtype="fp32",
+        shape="Various theta values",
+        cpu_info=get_cpu_info()
+    )
+
+    test_configs = [
+        (10000.0, "Llama2", 8, 32, 64),     # (theta, name, H, T, D)
+        (500000.0, "Llama3", 8, 32, 64),
+        (1000000.0, "Qwen2", 14, 32, 64),   # Qwen2-0.5B has 14 heads
+        (1000000.0, "Qwen2-1.5B", 12, 32, 128),  # head_dim=128
+    ]
+
+    for theta, model_name, H, T, D in test_configs:
+        np.random.seed(42)
+        half_dim = D // 2
+
+        # Random input
+        x_np = np.random.randn(H, T, D).astype(np.float32)
+        cos_np = np.zeros((T, half_dim), dtype=np.float32)
+        sin_np = np.zeros((T, half_dim), dtype=np.float32)
+
+        # Precompute cache with this theta
+        lib.rope_precompute_cache(
+            numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(theta)
+        )
+
+        # PyTorch reference
+        x = torch.from_numpy(x_np.copy())
+        cos_cache = torch.from_numpy(cos_np.copy())
+        sin_cache = torch.from_numpy(sin_np.copy())
+        ref = rope_forward_pytorch_vectorized(x, cos_cache, sin_cache)
+
+        # C kernel (in-place)
+        x_c_np = x_np.copy()
+        lib.rope_forward(
+            numpy_to_ptr(x_c_np), numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(H), ctypes.c_int(T), ctypes.c_int(D),
+            ctypes.c_int(D), ctypes.c_int(0)
+        )
+
+        out = torch.from_numpy(x_c_np)
+        diff = max_diff(out, ref)
+
+        report.add_result(TestResult(
+            name=f"{model_name} (θ={theta:.0f})",
+            passed=diff <= 1e-5,
+            max_diff=diff,
+            tolerance=1e-5,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+
+    return report
+
+
+def run_rope_decode_positions_test():
+    """
+    Test RoPE at various decode positions (KV cache continuation).
+
+    When decoding token N, we apply RoPE at position N, not position 0.
+    This tests the pos_offset parameter works correctly.
+    """
+    report = TestReport(
+        test_name="RoPE Decode Positions",
+        dtype="fp32",
+        shape="Various positions",
+        cpu_info=get_cpu_info()
+    )
+
+    H, T, D = 8, 1, 64  # Single token decode
+    half_dim = D // 2
+    max_cache_len = 2048
+
+    # Precompute full cache
+    cos_np = np.zeros((max_cache_len, half_dim), dtype=np.float32)
+    sin_np = np.zeros((max_cache_len, half_dim), dtype=np.float32)
+    lib.rope_precompute_cache(
+        numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+        ctypes.c_int(max_cache_len), ctypes.c_int(D), ctypes.c_float(10000.0)
+    )
+
+    cos_cache = torch.from_numpy(cos_np)
+    sin_cache = torch.from_numpy(sin_np)
+
+    # Test various positions
+    test_positions = [0, 1, 10, 100, 500, 1000, 2000]
+
+    for pos in test_positions:
+        if pos >= max_cache_len:
+            continue
+
+        np.random.seed(pos)
+        x_np = np.random.randn(H, T, D).astype(np.float32)
+
+        # PyTorch reference
+        x = torch.from_numpy(x_np.copy())
+        ref = rope_forward_pytorch_vectorized(x, cos_cache, sin_cache, pos_offset=pos)
+
+        # C kernel
+        x_c_np = x_np.copy()
+        lib.rope_forward(
+            numpy_to_ptr(x_c_np), numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(H), ctypes.c_int(T), ctypes.c_int(D),
+            ctypes.c_int(D), ctypes.c_int(pos)
+        )
+
+        out = torch.from_numpy(x_c_np)
+        diff = max_diff(out, ref)
+
+        report.add_result(TestResult(
+            name=f"pos={pos}",
+            passed=diff <= 1e-5,
+            max_diff=diff,
+            tolerance=1e-5,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+
+    return report
+
+
 def run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500):
     """Run forward pass tests with accuracy and timing."""
     np.random.seed(0)
@@ -397,24 +609,53 @@ def run_accuracy_tests():
 if __name__ == "__main__":
     print_system_info()
 
-    # Cache tests
+    all_reports = []
+
+    # Cache tests (default theta=10000)
     cache_report = run_cache_tests()
     cache_report.print_report()
+    all_reports.append(cache_report)
+
+    # Multi-theta cache tests (Llama2, Llama3, Qwen2, Mistral)
+    # CRITICAL: This tests that rope_precompute_cache works with different
+    # model architectures that use different RoPE theta values.
+    multi_theta_report = run_cache_tests_multi_theta()
+    multi_theta_report.print_report()
+    all_reports.append(multi_theta_report)
+
+    # Multi-theta forward tests
+    multi_theta_fwd_report = run_rope_forward_multi_theta()
+    multi_theta_fwd_report.print_report()
+    all_reports.append(multi_theta_fwd_report)
+
+    # Decode position tests (KV cache continuation)
+    decode_pos_report = run_rope_decode_positions_test()
+    decode_pos_report.print_report()
+    all_reports.append(decode_pos_report)
 
     # Accuracy tests
     acc_report = run_accuracy_tests()
     acc_report.print_report()
+    all_reports.append(acc_report)
 
     # Forward performance tests
     fwd_report = run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500)
     fwd_report.print_report()
+    all_reports.append(fwd_report)
 
     # Backward tests
     bwd_report = run_backward_tests(H=8, T=64, D=64, warmup=10, iterations=500)
     bwd_report.print_report()
+    all_reports.append(bwd_report)
 
     # Exit with error if any tests failed
-    all_passed = (cache_report.all_passed() and acc_report.all_passed() and
-                  fwd_report.all_passed() and bwd_report.all_passed())
+    all_passed = all(r.all_passed() for r in all_reports)
     if not all_passed:
+        print("\n" + "="*60)
+        print("SOME TESTS FAILED!")
+        print("="*60)
         exit(1)
+    else:
+        print("\n" + "="*60)
+        print("ALL TESTS PASSED")
+        print("="*60)

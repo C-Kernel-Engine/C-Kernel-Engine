@@ -684,6 +684,7 @@
         <div class="tab" onclick="showTab('quantization')">Quantization Audit</div>
         <div class="tab" onclick="showTab('parity')">Parity Debug</div>
         <div class="tab" onclick="showTab('dataflow')">Dataflow Graph</div>
+        <div class="tab" onclick="showTab('tests')">Tests</div>
         <div class="tab" onclick="showTab('stats')">Statistics</div>
     </div>
 
@@ -889,6 +890,210 @@
             </div>
         </div>
 
+        <div id="tests" class="panel">
+            <h2 style="margin-bottom: 1rem;">v6.6 Test Suite</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Run tests to validate your model. Tests are organized by purpose.
+                For full documentation, see <code>version/v6.6/test/TEST_README.py</code>.
+            </p>
+
+            <!-- Quick Test Runner -->
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">Quick</span> Quick Sanity Check</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Minimal test: embedding, weight offsets, memory layout.
+                </p>
+                <pre style="background: var(--code-bg); padding: 1rem; border-radius: 6px; margin: 0.5rem 0;">
+cd version/v6.6/test
+python ck_test_runner.py --quick</pre>
+            </div>
+
+            <!-- Numerical Parity Tests -->
+            <div class="parity-section">
+                <h3><span class="badge badge-green">Parity</span> Numerical Parity Tests</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Compare v6.6 output against llama.cpp or PyTorch reference.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Test</th><th>Purpose</th><th>Usage</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>test_layer_by_layer.py</code></td>
+                            <td>Layer-by-layer comparison to find first divergence</td>
+                            <td><code>python test_layer_by_layer.py --model $MODEL --token 25</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>test_numerical_parity.py</code></td>
+                            <td>Full checkpoint comparison with stats</td>
+                            <td><code>python test_numerical_parity.py --model $MODEL</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>trace_divergence.py</code></td>
+                            <td>Find v6.5/v6.6 divergence point</td>
+                            <td><code>python trace_divergence.py --token 25</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>v6_6_comprehensive_debug.py</code></td>
+                            <td>Step-by-step debugging with stop points</td>
+                            <td><code>python v6_6_comprehensive_debug.py --stop-at 5</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Memory Validation Tests -->
+            <div class="parity-section">
+                <h3><span class="badge badge-blue">Memory</span> Memory & Layout Validation</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Validate memory layout, offsets, and BUMP file integrity.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Test</th><th>Purpose</th><th>Usage</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>test_weight_offset_consistency.py</code></td>
+                            <td>Verify weight offsets match actual BUMP data</td>
+                            <td><code>python test_weight_offset_consistency.py --model-dir $MODEL</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>test_memory_planner.py</code></td>
+                            <td>Quick layout invariant checks</td>
+                            <td><code>python test_memory_planner.py --layout=layout.json</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>advanced_memory_validator.py</code></td>
+                            <td>Deep memory validation with --deep</td>
+                            <td><code>python advanced_memory_validator.py --model $MODEL</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>test_kv_cache.py</td>
+                            <td>KV cache layout and access validation</td>
+                            <td><code>python test_kv_cache.py --model $MODEL</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Debugging Tests -->
+            <div class="parity-section">
+                <h3><span class="badge badge-red">Debug</span> NaN/Debug Tracing</h3>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
+                    Find where NaN/Inf appear or where values diverge.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Test</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>trace_nan_layer.py</code></td><td>Find layer with NaN</td></tr>
+                        <tr><td><code>trace_nan_source.py</code></td><td>Find source of NaN</td></tr>
+                        <tr><td><code>trace_mlp_path.py</code></td><td>Trace MLP computation</td></tr>
+                        <tr><td><code>trace_residual.py</code></td><td>Track residual flow</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Test Categories Summary -->
+            <div class="parity-section">
+                <h3><span class="badge badge-green">All Tests</span> Test Categories</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">9</div>
+                        <div class="stat-label">Numerical Parity</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">7</div>
+                        <div class="stat-label">Memory/Layout</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">9</div>
+                        <div class="stat-label">IR/Codegen</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">6</div>
+                        <div class="stat-label">Kernel Tests</div>
+                    </div>
+                </div>
+                <p style="color: var(--text-muted); margin-top: 1rem;">
+                    Run all tests: <code>cd version/v6.6/test && python ck_test_runner.py --all</code>
+                </p>
+            </div>
+
+            <!-- Common Workflows -->
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">Workflows</span> Common Debugging Workflows</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
+                        <h4 style="color: var(--orange); margin-bottom: 0.5rem;">New Parity Issue</h4>
+                        <pre style="font-size: 0.8rem;">
+# 1. Find first failure
+python test_layer_by_layer.py --token 25
+
+# 2. Debug at that layer
+python v6_6_comprehensive_debug.py --stop-at LAYER
+
+# 3. Trace divergence
+python trace_divergence.py --token 25</pre>
+                    </div>
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
+                        <h4 style="color: var(--orange); margin-bottom: 0.5rem;">NaN Detected</h4>
+                        <pre style="font-size: 0.8rem;">
+# 1. Find layer with NaN
+python trace_nan_layer.py --token 25
+
+# 2. Find exact op with NaN
+python trace_nan_step.py --token 25
+
+# 3. Check weight integrity
+python test_weight_offset_consistency.py</pre>
+                    </div>
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
+                        <h4 style="color: var(--orange); margin-bottom: 0.5rem;">Memory Corruption</h4>
+                        <pre style="font-size: 0.8rem;">
+# 1. Quick memory check
+python test_memory_planner.py --layout=...
+
+# 2. Deep validation
+python advanced_memory_validator.py --deep
+
+# 3. BUMP sync check
+python test_bump_layout_sync.py</pre>
+                    </div>
+                    <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
+                        <h4 style="color: var(--orange); margin-bottom: 0.5rem;">Converter Bug</h4>
+                        <pre style="font-size: 0.8rem;">
+# 1. Check weight offsets
+python test_weight_offset_consistency.py
+
+# 2. Verify dtype consistency
+python test_dtype_consistency.py
+
+# 3. GEMV specific test
+python test_gemv_q8_0_q8_0.py</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environment Variables -->
+            <div class="parity-section">
+                <h3><span class="badge badge-green">Env Vars</span> Environment Variables</h3>
+                <table>
+                    <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>CK_MODEL_DIR</code></td><td>Override default model cache path</td></tr>
+                        <tr><td><code>CK_STOP_OP</code></td><td>Stop at specific operation index</td></tr>
+                        <tr><td><code>CK_DUMP_ACTIVATIONS</code></td><td>Dump all activations to files</td></tr>
+                        <tr><td><code>CK_LOG_LEVEL</code></td><td>0=quiet, 1=info, 2=debug, 3=trace</td></tr>
+                        <tr><td><code>LD_LIBRARY_PATH</code></td><td>Add .so search paths</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div id="stats" class="panel">
             <h2>IR Statistics</h2>
             <div class="stats-grid" id="statsGrid"></div>
@@ -941,7 +1146,7 @@
         function showTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            const tabOrder = ['memory','kernels','quantization','parity','dataflow','stats'];
+            const tabOrder = ['memory','kernels','quantization','parity','dataflow','tests','stats'];
             document.querySelector(`.tab:nth-child(${tabOrder.indexOf(tabId)+1})`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
 

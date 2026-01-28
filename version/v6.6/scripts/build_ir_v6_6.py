@@ -197,6 +197,127 @@ OP_DATAFLOW = {
 }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# INIT OPS GENERATION
+# ═══════════════════════════════════════════════════════════════════════════════
+# Init ops are run ONCE at model load time (not per-token).
+# Examples: rope_init (precompute cos/sin tables), ALiBi init, etc.
+#
+# The init.json file is separate from decode.json and prefill.json because:
+#   1. Init ops run once, inference ops run per-token
+#   2. Different architectures may need different init ops
+#   3. Clean separation of concerns
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
+    """
+    Generate initialization ops based on model config and template flags.
+
+    Returns list of init ops in IR1 format:
+        {
+            "op_id": 0,
+            "kernel": "rope_precompute_cache",
+            "op": "rope_init",
+            "section": "init",
+            "layer": -1,
+            "instance": 0,
+            "params": {...},
+            "outputs": {...}
+        }
+    """
+    init_ops = []
+    op_id = 0
+
+    template = manifest.get("template", {})
+    flags = template.get("flags", {})
+
+    # ═══════════════════════════════════════════════════════════
+    # ROPE INIT: Precompute cos/sin tables if model uses RoPE
+    # ═══════════════════════════════════════════════════════════
+    rope_type = flags.get("rope", None)
+    if rope_type in ("rope", "rope_qk", True):
+        # Get config values
+        rope_theta = config.get("rope_theta", 10000.0)
+        head_dim = config.get("head_dim", 64)
+        max_seq_len = config.get("context_length", config.get("max_seq_len", 32768))
+
+        # RoPE scaling (for extended context models like Llama 3.1)
+        rope_scaling_type = config.get("rope_scaling_type", "none")
+        rope_scaling_factor = config.get("rope_scaling_factor", 1.0)
+
+        init_ops.append({
+            "op_id": op_id,
+            "kernel": "rope_precompute_cache",
+            "op": "rope_init",
+            "section": "init",
+            "layer": -1,
+            "instance": 0,
+            "dataflow": {
+                "inputs": {},  # No inputs - pure computation from config
+                "outputs": {
+                    "cos_cache": {"dtype": "fp32", "buffer": "rope_cache"},
+                    "sin_cache": {"dtype": "fp32", "buffer": "rope_cache"},
+                }
+            },
+            "params": {
+                "max_seq_len": {"source": "dim:max_seq_len", "value": max_seq_len},
+                "head_dim": {"source": "dim:head_dim", "value": head_dim},
+                "base": {"source": "config:rope_theta", "value": rope_theta},
+            },
+            "config": {
+                "rope_theta": rope_theta,
+                "rope_scaling_type": rope_scaling_type,
+                "rope_scaling_factor": rope_scaling_factor,
+            },
+            "notes": f"RoPE cache init: theta={rope_theta}, head_dim={head_dim}, max_seq={max_seq_len}"
+        })
+        op_id += 1
+
+    # ═══════════════════════════════════════════════════════════
+    # FUTURE: Add other init ops here
+    # ═══════════════════════════════════════════════════════════
+    # Examples:
+    #   - ALiBi slope computation (for models using ALiBi instead of RoPE)
+    #   - Learned positional embedding init
+    #   - Custom attention bias init
+
+    return init_ops
+
+
+def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
+    """
+    Generate the complete init IR (init.json) with all initialization ops.
+
+    Returns:
+        {
+            "format": "ir1-init-v6.6",
+            "version": 1,
+            "config": {...},
+            "ops": [...]
+        }
+    """
+    init_ops = generate_init_ops(manifest, config)
+
+    return {
+        "format": "ir1-init-v6.6",
+        "version": 1,
+        "description": "Model initialization ops (run once at load time)",
+        "config": {
+            "model": config.get("model", "unknown"),
+            "rope_theta": config.get("rope_theta", 10000.0),
+            "head_dim": config.get("head_dim", 64),
+            "max_seq_len": config.get("context_length", 32768),
+            "num_heads": config.get("num_heads", 0),
+            "num_kv_heads": config.get("num_kv_heads", 0),
+        },
+        "ops": init_ops,
+        "stats": {
+            "total_ops": len(init_ops),
+            "has_rope_init": any(op["op"] == "rope_init" for op in init_ops),
+        }
+    }
+
+
 class DataflowTracker:
     """
     Tracks dataflow during IR1 generation.
@@ -3616,6 +3737,116 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
     return lowered_call
 
 
+def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
+    """
+    IR Lower 3 for init ops: Emit call-ready ops with ordered args.
+
+    Init ops are simpler than inference ops - they typically just have:
+    - Output buffers (rope_cos, rope_sin)
+    - Dimension params (max_seq_len, head_dim)
+    - Config params (rope_theta)
+
+    Codegen just reads this and emits the function calls sequentially.
+    """
+    if not init_ir:
+        return {"format": "lowered-init-v3", "version": 1, "operations": [], "errors": []}
+
+    ops = init_ir.get("ops", [])
+    config = init_ir.get("config", {})
+    memory = layout.get("memory", {}) if layout else {}
+    act_buffers = {b.get("name"): b for b in memory.get("activations", {}).get("buffers", [])}
+
+    call_ops = []
+    all_errors = []
+
+    for op in ops:
+        func = op.get("kernel", "unknown")
+        op_type = op.get("op", "")
+        params = op.get("params", {})
+        op_config = op.get("config", {})
+        op_errors = []
+
+        args = []
+
+        # Handle rope_init specifically
+        if op_type == "rope_init" and func == "rope_precompute_cache":
+            # rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base)
+
+            # cos_cache output buffer
+            rope_cache_buf = act_buffers.get("rope_cache", act_buffers.get("rope_cos_cache", {}))
+            rope_cache_define = rope_cache_buf.get("define", "A_ROPE_CACHE")
+            args.append({
+                "name": "cos_cache",
+                "source": "output:rope_cos",
+                "expr": f"(float*)(g_model->bump + {rope_cache_define})",
+            })
+
+            # sin_cache output buffer (offset by half)
+            args.append({
+                "name": "sin_cache",
+                "source": "output:rope_sin",
+                "expr": f"(float*)(g_model->bump + {rope_cache_define}) + MAX_SEQ_LEN * HEAD_DIM / 2",
+            })
+
+            # max_seq_len from params or config
+            max_seq = params.get("max_seq_len", {}).get("value", config.get("max_seq_len", 32768))
+            args.append({
+                "name": "max_seq_len",
+                "source": "dim:max_seq_len",
+                "expr": "MAX_SEQ_LEN",  # Use the #define for consistency
+            })
+
+            # head_dim from params or config
+            head_dim = params.get("head_dim", {}).get("value", config.get("head_dim", 64))
+            args.append({
+                "name": "head_dim",
+                "source": "dim:head_dim",
+                "expr": "HEAD_DIM",  # Use the #define for consistency
+            })
+
+            # base (rope_theta) from params or config - THIS IS THE KEY VALUE
+            rope_theta = params.get("base", {}).get("value", op_config.get("rope_theta", 10000.0))
+            args.append({
+                "name": "base",
+                "source": "config:rope_theta",
+                "expr": f"{rope_theta}f",  # Emit as float literal
+            })
+
+        else:
+            # Generic handling for future init ops
+            op_errors.append(f"Unknown init op type: {op_type}")
+
+        if op_errors:
+            all_errors.append({
+                "idx": op.get("op_id", -1),
+                "function": func,
+                "errors": op_errors,
+            })
+
+        call_ops.append({
+            "idx": op.get("op_id", -1),
+            "function": func,
+            "op": op_type,
+            "section": "init",
+            "layer": -1,
+            "args": args,
+            "errors": op_errors,
+            "notes": op.get("notes", ""),
+        })
+
+    return {
+        "format": "lowered-init-v3",
+        "version": 1,
+        "config": config,
+        "operations": call_ops,
+        "errors": all_errors,
+        "stats": {
+            "total_ops": len(call_ops),
+            "errors": len(all_errors),
+        }
+    }
+
+
 def main(args: List[str]) -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -3690,6 +3921,11 @@ def main(args: List[str]) -> int:
         type=int,
         default=None,
         help="Limit to first N layers (for packed layout prototypes)"
+    )
+    parser.add_argument(
+        "--init-output",
+        type=Path,
+        help="Output init IR JSON file (one-time initialization ops like rope_init)"
     )
 
     parsed_args = parser.parse_args(args)
@@ -3819,6 +4055,24 @@ def main(args: List[str]) -> int:
         with open(parsed_args.call_output, 'w') as f:
             json.dump(lowered_call, f, indent=2)
         print(f"✓ Wrote call-ready IR to: {parsed_args.call_output}")
+
+    # Generate and write init IR (rope_init, etc.)
+    if parsed_args.init_output:
+        config = manifest.get("config", {})
+        init_ir = generate_init_ir(manifest, config)
+        with open(parsed_args.init_output, 'w') as f:
+            json.dump(init_ir, f, indent=2)
+        print(f"✓ Wrote init IR to: {parsed_args.init_output}")
+        if init_ir["stats"]["has_rope_init"]:
+            rope_theta = init_ir["config"].get("rope_theta", 10000.0)
+            print(f"  - rope_init: theta={rope_theta}")
+
+        # Also generate lowered init IR (init_call.json)
+        init_call_path = parsed_args.init_output.parent / "init_call.json"
+        init_call = generate_init_ir_lower_3(init_ir, layout)
+        with open(init_call_path, 'w') as f:
+            json.dump(init_call, f, indent=2)
+        print(f"✓ Wrote init call IR to: {init_call_path}")
 
     if not parsed_args.output and not parsed_args.layout_output and not parsed_args.lowered_output:
         print(f"\nIR1 (first 10 ops):")

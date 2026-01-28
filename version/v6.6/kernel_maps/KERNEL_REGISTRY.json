@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 39,
+      "total": 41,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
@@ -17,6 +17,7 @@
         "gemm": 9,
         "gemv": 8,
         "kv_cache_store": 1,
+        "logits_store_indexed": 1,
         "qkv_projection": 1,
         "quantize": 2,
         "quantize_batch": 2,
@@ -24,6 +25,7 @@
         "residual_save": 1,
         "rmsnorm": 1,
         "rope": 1,
+        "rope_init": 1,
         "swiglu": 1,
         "tokenizer": 1
       }
@@ -3205,6 +3207,62 @@
       "_source_file": "kv_cache_store.json"
     },
     {
+      "id": "logits_copy_to_position",
+      "op": "logits_store_indexed",
+      "variant": "fp32",
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "src",
+          "dtype": "fp32",
+          "shape": [
+            "vocab_size"
+          ],
+          "desc": "Source logits buffer (single token) [vocab_size]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dst",
+          "dtype": "fp32",
+          "shape": [
+            "max_seq_len",
+            "vocab_size"
+          ],
+          "desc": "Destination logits buffer (position-indexed) [max_seq_len, vocab_size]"
+        }
+      ],
+      "dims": [
+        "vocab_size",
+        "position"
+      ],
+      "params": [
+        {
+          "name": "position",
+          "type": "int",
+          "desc": "Token position index to copy logits to"
+        },
+        {
+          "name": "vocab_size",
+          "type": "int",
+          "desc": "Vocabulary size (number of floats to copy)"
+        }
+      ],
+      "impl": {
+        "function": "logits_copy_to_position",
+        "c_declaration": "void logits_copy_to_position(const float *src, float *dst, int position, int vocab_size);",
+        "sources": [
+          "src/kernels/kv_cache_kernels.c"
+        ]
+      },
+      "notes": "Copy logits from scratch buffer to position-indexed location in logits buffer. Used in decode mode to place single-token logits at the correct sequence position. This allows codegen to be 'dumb' - just emit kernel calls, no runtime if-statements.",
+      "name": "logits_copy_to_position",
+      "_source_file": "logits_copy_to_position.json"
+    },
+    {
       "id": "mega_fused_attention_decode",
       "op": "fused_attention_block",
       "variant": "fp32_decode",
@@ -4739,6 +4797,109 @@
       "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta)",
       "name": "rope_forward_qk",
       "_source_file": "rope_forward_qk.json"
+    },
+    {
+      "id": "rope_precompute_cache",
+      "op": "rope_init",
+      "variant": "fp32",
+      "mode": "init",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_seq_len",
+            "half_head_dim"
+          ],
+          "desc": "RoPE cos cache [max_seq_len, head_dim/2]"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_seq_len",
+            "half_head_dim"
+          ],
+          "desc": "RoPE sin cache [max_seq_len, head_dim/2]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "max_seq_len",
+        "head_dim"
+      ],
+      "params": [
+        {
+          "name": "base",
+          "dtype": "fp32",
+          "desc": "RoPE theta/base frequency (10000.0 for Llama2, 500000.0 for Llama3, 1000000.0 for Qwen2)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "position"
+        ],
+        "preferred": {
+          "init": "position"
+        },
+        "strategies": [
+          {
+            "name": "position",
+            "partition_dim": "max_seq_len",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 64
+            },
+            "notes": "Parallelize across positions; each thread computes a range of positions."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "head_dim": 64
+        },
+        "notes": "head_dim should be even (uses head_dim/2 for rotation). Common values: 64, 128."
+      },
+      "impl": {
+        "function": "rope_precompute_cache",
+        "c_declaration": "void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rope.py"
+        ],
+        "bench": [],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": "python unittest/test_rope.py",
+            "tolerance": "5e-5",
+            "notes": "Verify cos/sin cache matches PyTorch reference for multiple theta values (10K, 500K, 1M)"
+          }
+        ]
+      },
+      "notes": "Precompute RoPE cos/sin cache for rotary position embeddings. Called ONCE at model init, not per-token. Different models use different base/theta values:\n- Llama 2, Mistral: 10000.0\n- Llama 3: 500000.0\n- Qwen2: 1000000.0\n\nUsage: codegen should call this in do_init() with the model's rope_theta from config, NOT hardcode the value.",
+      "name": "rope_precompute_cache",
+      "_source_file": "rope_precompute_cache.json"
     },
     {
       "id": "swiglu_forward",

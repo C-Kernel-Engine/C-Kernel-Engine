@@ -2,8 +2,29 @@
 """
 TEST_SUITE_README.md - C-Kernel-Engine v6.6 Test Suite Documentation
 
-This document describes all test scripts in the test/ directory, organized by
-their purpose and usage scenario.
+This document describes all test scripts in the version/v6.6/test/ directory,
+organized by their purpose and usage scenario.
+
+================================================================================
+DIRECTORY STRUCTURE
+================================================================================
+
+version/v6.6/test/
+├── TEST_README.py              # This documentation
+├── ck_test_runner.py           # Convenience wrapper for common workflows
+├── *.py                        # v6.6-specific tests (74 files)
+├── integration/                # Integration tests (to be organized)
+│   └── ...
+├── debugging/                  # Debugging/tracing scripts (to be organized)
+│   └── ...
+└── unittest/                   # Generic unit tests (28 files)
+    ├── test_attention.py
+    ├── test_embedding.py
+    ├── test_layernorm.py
+    ├── test_gemm.py
+    └── ...
+
+unittest/ (at repo root)        # Empty - moved to version/v6.6/test/unittest/
 
 ================================================================================
 TABLE OF CONTENTS
@@ -13,6 +34,7 @@ TABLE OF CONTENTS
 3. Detailed Test Descriptions
 4. Common Debugging Workflows
 5. Exit Codes Reference
+6. Environment Variables
 
 ================================================================================
 1. QUICK START GUIDE
@@ -23,13 +45,14 @@ FIRST TIME SETUP:
     export CK_MODEL_DIR=~/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF
 
 RUN ALL TESTS:
+    cd version/v6.6/test
     python run_all_v66_tests.py --model $CK_MODEL_DIR
 
 QUICK PARITY CHECK:
-    python test_layer_by_layer.py --model $CK_MODEL_DIR --token 25
+    python ck_test_runner.py --quick
 
 MEMORY LAYOUT VALIDATION:
-    python test_memory_planner.py --layout $CK_MODEL_DIR/layout_decode.json
+    python test_memory_planner.py --layout=$CK_MODEL_DIR/layout_decode.json
 
 WEIGHT OFFSET CHECK:
     python test_weight_offset_consistency.py --model-dir $CK_MODEL_DIR
@@ -39,7 +62,7 @@ WEIGHT OFFSET CHECK:
 ================================================================================
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 1: NUMERICAL PARITY                                                │
+│ CATEGORY 1: NUMERICAL PARITY (9 tests)                                      │
 │ Purpose: Compare v6.6 output against reference implementations              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ test_numerical_parity.py           | Layer-by-layer v6.5/v6.6 comparison   │
@@ -54,7 +77,7 @@ WEIGHT OFFSET CHECK:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 2: MEMORY & LAYOUT VALIDATION                                      │
+│ CATEGORY 2: MEMORY & LAYOUT VALIDATION (7 tests)                            │
 │ Purpose: Verify memory layout, offsets, and buffer assignments              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ test_memory_planner.py            | Quick layout invariant checks          │
@@ -67,7 +90,7 @@ WEIGHT OFFSET CHECK:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 3: IR & CODE GENERATION                                            │
+│ CATEGORY 3: IR & CODE GENERATION (9 tests)                                  │
 │ Purpose: Validate IR structure and generated code correctness               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ test_codegen_ir_builder.py        | IR builder correctness                 │
@@ -82,7 +105,7 @@ WEIGHT OFFSET CHECK:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 4: KERNEL-SPECIFIC TESTS                                           │
+│ CATEGORY 4: KERNEL-SPECIFIC TESTS (6 tests)                                 │
 │ Purpose: Validate individual kernel implementations                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ test_kernel_validation.py         | Kernel validation framework            │
@@ -94,7 +117,7 @@ WEIGHT OFFSET CHECK:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 5: TRACING & DEBUGGING                                             │
+│ CATEGORY 5: TRACING & DEBUGGING (11 scripts)                                │
 │ Purpose: Trace execution to find divergence points                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ trace_divergence.py               | Find v6.5/v6.6 divergence point        │
@@ -111,18 +134,18 @@ WEIGHT OFFSET CHECK:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CATEGORY 6: INTEGRATION & COMPARISON                                        │
-│ Purpose: Full integration tests and external comparisons                    │
+│ CATEGORY 6: UNITTEST/ (28 generic tests)                                    │
+│ Purpose: Reusable tests for kernels and operations                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ test_embedding_only.py            | Embedding path only                    │
-│ test_decode_only.py               | Decode path only (not implemented)     │
-│ test_footer_input.py              | Footer input validation                │
-│ test_logits_data.py               | Logits output validation               │
-│ test_qproj_compare.py             | Q projection comparison                │
-│ test_kv.py                        | KV cache operations                    │
-│ validate_against_pytorch.py       | PyTorch reference comparison           │
-│ test_vs_llamacpp.cpp              | C++ vs llama.cpp comparison            │
-│ test_hello.py                     | Basic sanity check                     │
+│ test_attention.py                 | Attention kernel tests                 │
+│ test_embedding.py                 | Embedding tests                        │
+│ test_layernorm.py                 | Layer norm tests                       │
+│ test_gemm.py                      | GEMM kernel tests                      │
+│ test_softmax.py                   | Softmax tests                         │
+│ test_swiglu.py                    | SwiGLU tests                          │
+│ test_rope.py                      | RoPE tests                            │
+│ test_quant_kernels.py             | Quantization kernel tests              │
+│ ... and 20 more                                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ================================================================================
@@ -194,8 +217,8 @@ TEST: test_memory_planner.py
 │   5. All layers present                                                      │
 │   6. Activation buffers exist                                                │
 │   7. Canary markers (if present)                                             │
-│   8. Data flow (no dangling tensors)                                         │
-└──────────────────────────────────────────────────────────────────────────────┘
+│   8. Data flow (no dangling tensors)                                        ────────────── │
+└────────────────────────────────────────────────────────────────┘
 
 TEST: trace_divergence.py
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -234,38 +257,6 @@ TEST: v6_6_comprehensive_debug.py
 │                                                                              │
 │ TIP: Use CK_STOP_OP environment variable to stop at specific op:             │
 │   CK_STOP_OP=5 python v6_6_comprehensive_debug.py                            │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-TEST: test_numerical_parity.py
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ PURPOSE:                                                                      │
-│   Full numerical parity test between v6.6 and v6.5/llama.cpp/PyTorch.        │
-│   Captures intermediate activations at each checkpoint.                      │
-│                                                                              │
-│ USAGE:                                                                        │
-│   python test_numerical_parity.py --model $MODEL                             │
-│   python test_numerical_parity.py --model $MODEL --reference llamacpp        │
-│   python test_numerical_parity.py --model $MODEL --reference v6.5            │
-│                                                                              │
-│ OUTPUT:                                                                       │
-│   - LayerSnapshot for each checkpoint (min, max, mean, std)                  │
-│   - ComparisonResult for each checkpoint (max diff, first diff index)        │
-│   - PipelineTrace with full execution history                                │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-TEST: advanced_memory_validator.py
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ PURPOSE:                                                                      │
-│   Deep memory validation including:                                          │
-│   - Weight offset verification against actual BUMP data                      │
-│   - Activation buffer write/read patterns                                    │
-│   - Quantization block integrity                                             │
-│   - Memory alignment checks                                                  │
-│                                                                              │
-│ USAGE:                                                                        │
-│   python advanced_memory_validator.py --model $MODEL                         │
-│   python advanced_memory_validator.py --model $MODEL --verbose               │
-│   python advanced_memory_validator.py --model $MODEL --deep                  │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ================================================================================
@@ -327,20 +318,6 @@ WORKFLOW D: Converter Bug Found
 
     4. Run GEMV specific test:
        python test_gemv_q8_0_q8_0.py --model $MODEL
-
-WORKFLOW E: IR → Codegen Mismatch
-─────────────────────────────────
-    1. Validate IR structure:
-       python test_codegen_ir_builder.py --model $MODEL
-
-    2. Check codegen respects IR:
-       python test_codegen_respects_ir.py --model $MODEL
-
-    3. Verify op naming:
-       python test_op_naming_consistency.py --model $MODEL
-
-    4. Check single layer completeness:
-       python test_single_layer_completeness.py --layer 0 --model $MODEL
 
 ================================================================================
 5. EXIT CODES REFERENCE

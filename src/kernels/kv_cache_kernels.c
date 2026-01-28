@@ -117,3 +117,31 @@ void kv_cache_store(float *__restrict kv_cache_k,
                               head_dim,
                               head_dim);
 }
+
+/**
+ * @brief Copy logits to position-indexed location in output buffer.
+ *
+ * Used in decode mode to copy single-token logits from position 0 to
+ * the correct sequence position. This moves buffer management logic
+ * from codegen to the IR layer, making codegen "dumb" - just emit
+ * kernel calls, no runtime if-statements.
+ *
+ * @param src       Source logits buffer (single token) [vocab_size]
+ * @param dst       Destination logits buffer [max_seq_len, vocab_size]
+ * @param position  Token position index (0-based)
+ * @param vocab_size Number of logits per token
+ */
+void logits_copy_to_position(const float *__restrict src,
+                              float *__restrict dst,
+                              int position,
+                              int vocab_size)
+{
+    if (!src || !dst || position < 0 || vocab_size <= 0) {
+        return;
+    }
+
+    // Copy logits to dst[position * vocab_size : (position+1) * vocab_size]
+    // Use memmove for safety in case src and dst overlap (e.g., src == dst)
+    float *dst_pos = dst + (size_t)position * (size_t)vocab_size;
+    memmove(dst_pos, src, (size_t)vocab_size * sizeof(float));
+}

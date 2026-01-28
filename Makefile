@@ -2644,4 +2644,64 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer
+
+# ============================================================================
+# v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
+# ============================================================================
+# Usage:
+#   make v6.6-test-quick        - Quick sanity check
+#   make v6.6-test-parity       - Layer-by-layer parity
+#   make v6.6-test-memory       - Memory validation
+#   make v6.6-test-all          - Run all v6.6 tests
+#   make v6.6-download          - Download model
+#   make v6.6-build             - Build v6.6
+#   make v6.6                   - Download, build, test
+# ============================================================================
+
+v6.6-test-help:
+	@cd version/v6.6/test && make help
+
+v6.6-test-quick v6.6-sanity:
+	@cd version/v6.6/test && $(MAKE) quick
+
+v6.6-test-parity:
+	@cd version/v6.6/test && $(MAKE) parity
+
+v6.6-test-memory:
+	@cd version/v6.6/test && $(MAKE) memory
+
+v6.6-test-divergence:
+	@cd version/v6.6/test && $(MAKE) divergence
+
+v6.6-test-nan:
+	@cd version/v6.6/test && $(MAKE) nan
+
+v6.6-test-all:
+	@cd version/v6.6/test && $(MAKE) all
+
+v6.6-test-trace:
+	@cd version/v6.6/test && $(MAKE) trace ARGS=$(ARGS)
+
+v6.6-test: v6.6-test-quick
+	@echo "Run 'make v6.6-test-all' for comprehensive testing"
+
+v6.6-download:
+	@cd version/v6.6 && scripts/ck_run_v6_6.py --download-only
+
+v6.6-build:
+	@cd version/v6.6 && scripts/ck_run_v6_6.py --build-only
+
+v6.6: v6.6-download v6.6-build v6.6-test
+
+v6.6-full: v6.6-download v6.6-build v6.6-test-all
+
+v6.6-ir-visualizer:
+	@if command -v python3 >/dev/null 2>&1; then \
+		echo "Opening IR visualizer..."; \
+		python3 -m http.server 8080 --directory version/v6.6/tools & \
+		sleep 2 && xdg-open http://localhost:8080/ir_visualizer.html 2>/dev/null || \
+		open http://localhost:8080/ir_visualizer.html 2>/dev/null || \
+		echo "Open http://localhost:8080/ir_visualizer.html in your browser"; \
+	fi
+

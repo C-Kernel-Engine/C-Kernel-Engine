@@ -1,0 +1,26 @@
+{
+  "id": "logits_copy_to_position",
+  "op": "logits_store_indexed",
+  "variant": "fp32",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "src", "dtype": "fp32", "shape": ["vocab_size"], "desc": "Source logits buffer (single token) [vocab_size]"}
+  ],
+  "outputs": [
+    {"name": "dst", "dtype": "fp32", "shape": ["max_seq_len", "vocab_size"], "desc": "Destination logits buffer (position-indexed) [max_seq_len, vocab_size]"}
+  ],
+  "dims": ["vocab_size", "position"],
+  "params": [
+    {"name": "position", "type": "int", "desc": "Token position index to copy logits to"},
+    {"name": "vocab_size", "type": "int", "desc": "Vocabulary size (number of floats to copy)"}
+  ],
+  "impl": {
+    "function": "logits_copy_to_position",
+    "c_declaration": "void logits_copy_to_position(const float *src, float *dst, int position, int vocab_size);",
+    "sources": ["src/kernels/kv_cache_kernels.c"]
+  },
+  "notes": "Copy logits from scratch buffer to position-indexed location in logits buffer. Used in decode mode to place single-token logits at the correct sequence position. This allows codegen to be 'dumb' - just emit kernel calls, no runtime if-statements."
+}

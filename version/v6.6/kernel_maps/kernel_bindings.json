@@ -459,6 +459,33 @@
         {"name": "k", "source": "dim:_input_dim"}
       ],
       "notes": "Quantize FP32 activation to Q8_K format. Output buffer must be sized for Q8_K blocks."
+    },
+    "memmove": {
+      "params": [
+        {"name": "dst", "source": "output:dst", "cast": "void*"},
+        {"name": "src", "source": "activation:src", "cast": "const void*"},
+        {"name": "size", "source": "param:_copy_size"}
+      ],
+      "notes": "Memory move for overlapping buffers. Used for copy_last_logits in prefill mode."
+    },
+    "logits_copy_to_position": {
+      "params": [
+        {"name": "src", "source": "activation:src", "cast": "const float*"},
+        {"name": "dst", "source": "output:dst", "cast": "float*"},
+        {"name": "position", "source": "runtime:pos"},
+        {"name": "vocab_size", "source": "dim:vocab_size"}
+      ],
+      "notes": "Copy logits from scratch to position-indexed location. Used in decode mode."
+    },
+    "rope_precompute_cache": {
+      "params": [
+        {"name": "cos_cache", "source": "output:rope_cos", "cast": "float*"},
+        {"name": "sin_cache", "source": "output:rope_sin", "cast": "float*"},
+        {"name": "max_seq_len", "source": "dim:max_seq_len"},
+        {"name": "head_dim", "source": "dim:head_dim"},
+        {"name": "base", "source": "dim:rope_theta", "cast": "float"}
+      ],
+      "notes": "Precompute RoPE cos/sin cache. Called ONCE at model init with rope_theta from config. Different models use different theta: Llama2=10000, Llama3=500000, Qwen2=1000000."
     }
   }
 }

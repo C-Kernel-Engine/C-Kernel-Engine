@@ -574,6 +574,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         lowered_path = output_dir / f"lowered_{mode}.json"
         lowered_call_path = output_dir / f"lowered_{mode}_call.json"
         manifest_map_path = output_dir / "weights_manifest.map"
+        init_path = output_dir / "init.json"  # Init ops (rope_init, etc.) - shared across modes
         layout_input = None
         if shared_layout_mode and mode != shared_layout_mode:
             layout_input = shared_layout_path
@@ -648,6 +649,9 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
             f"--manifest-map-output={manifest_map_path}",
             f"--layout-mode={layout_mode}",
         ]
+        # Generate init.json only once (first mode) - it's shared across modes
+        if not init_path.exists() or force:
+            cmd.append(f"--init-output={init_path}")
         if layout_input:
             cmd.append(f"--layout-input={layout_input}")
         if layer_limit is not None:
@@ -663,6 +667,8 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         log(f"  Created layout for {mode} at {layout_path}", C_GREEN)
         log(f"  Created lowered IR for {mode} at {lowered_path}", C_GREEN)
         log(f"  Created call-ready IR for {mode} at {lowered_call_path}", C_GREEN)
+        if init_path.exists():
+            log(f"  Created init IR at {init_path}", C_GREEN)
 
         # Generate human-readable .map file
         map_path = output_dir / f"layout_{mode}.map"

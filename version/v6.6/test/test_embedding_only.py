@@ -1,265 +1,143 @@
 #!/usr/bin/env python3
 """
-test_embedding_only.py - Test JUST the embedding layer
-
-This is the first checkpoint test. If embedding fails, nothing else matters.
-
-USAGE:
-    cd ~/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF
-    LD_LIBRARY_PATH=. python /path/to/test_embedding_only.py --token 25
+Test just the embedding lookup to verify basic functionality.
 """
 
-import argparse
 import ctypes
-import json
 import numpy as np
-import os
-import struct
 from pathlib import Path
 
+cache_dir = Path.home() / ".cache/ck-engine-v6.6/models"
+model_dirs = list(cache_dir.glob("*Qwen*")) + list(cache_dir.glob("*qwen*"))
 
-def load_v66_model(model_path: Path):
-    """Load v6.6 model and return library handle."""
-    # Load kernel engine first
-    engine_path = model_path / "libckernel_engine.so"
-    if engine_path.exists():
-        ctypes.CDLL(str(engine_path), mode=ctypes.RTLD_GLOBAL)
+if not model_dirs:
+    print("Error: No Qwen model found in cache")
+    exit(1)
 
-    lib_path = model_path / "libmodel.so"
-    lib = ctypes.CDLL(str(lib_path))
+model_dir = model_dirs[0]
+lib_path = model_dir / "libmodel.so"
+weights_path = model_dir / "weights.bump"
 
-    # Setup function signatures
-    lib.ck_model_init.argtypes = [ctypes.c_char_p]
-    lib.ck_model_init.restype = ctypes.c_int
-    lib.ck_model_decode.argtypes = [ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
-    lib.ck_model_decode.restype = ctypes.c_int
-    lib.ck_model_get_logits.argtypes = []
-    lib.ck_model_get_logits.restype = ctypes.POINTER(ctypes.c_float)
-    lib.ck_model_free.argtypes = []
-    lib.ck_model_free.restype = None
+# Read layout to get buffer offsets
+import json
+layout_path = model_dir / "layout_decode.json"
+with open(layout_path) as f:
+    layout = json.load(f)
 
-    return lib
+config = layout.get("config", {})
+embed_dim = config.get("embed_dim", 896)
+vocab_size = config.get("vocab_size", 151936)
 
+# Get activation buffer offsets
+act_buffers = {}
+for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
+    act_buffers[buf["name"]] = buf["abs_offset"]
 
-def get_pytorch_embedding(token: int, model_name: str = "Qwen/Qwen2-0.5B-Instruct") -> np.ndarray:
-    """Get embedding from PyTorch/HuggingFace."""
-    try:
-        import torch
-        from transformers import AutoModelForCausalLM
-    except ImportError:
-        print("ERROR: PyTorch/transformers not installed")
-        print("  pip install torch transformers")
-        return None
+print(f"Embed dim: {embed_dim}")
+print(f"Vocab size: {vocab_size}")
+print(f"Activation buffers: {list(act_buffers.keys())}")
 
-    print(f"Loading PyTorch model: {model_name}")
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float32,
-        trust_remote_code=True
-    )
-    model.eval()
+# Get token embedding weight offset
+weights_info = layout.get("memory", {}).get("weights", {})
+token_emb_offset = None
+for entry in weights_info.get("entries", []):
+    if entry.get("name") == "token_emb":
+        token_emb_offset = entry.get("abs_offset", 0)
+        token_emb_dtype = entry.get("dtype", "unknown")
+        token_emb_size = entry.get("size", 0)
+        break
 
-    # Get embedding weight and look up token
-    embed_weight = model.model.embed_tokens.weight.detach().numpy()
-    print(f"  Embedding shape: {embed_weight.shape}")
+print(f"Token embedding: offset={token_emb_offset}, dtype={token_emb_dtype}, size={token_emb_size}")
 
-    embedding = embed_weight[token].copy()
-    print(f"  Token {token} embedding: [{embedding[:5]}...]")
-    print(f"  Range: [{embedding.min():.6f}, {embedding.max():.6f}]")
+# Load library
+lib = ctypes.CDLL(str(lib_path))
+lib.ck_model_init.argtypes = [ctypes.c_char_p]
+lib.ck_model_init.restype = ctypes.c_int
+lib.ck_model_get_base_ptr.restype = ctypes.c_void_p
+lib.ck_model_get_vocab_size.restype = ctypes.c_int
 
-    return embedding
+# Initialize
+print("\n--- Initializing model ---")
+ret = lib.ck_model_init(str(weights_path).encode())
+print(f"Init result: {ret}")
 
+if ret != 0:
+    print("Error: Model init failed")
+    exit(1)
 
-def get_v66_embedding_from_weights(model_path: Path, token: int, config: dict) -> np.ndarray:
-    """
-    Directly read embedding from weights file.
-    This bypasses the inference code to test just the data.
-    """
-    weights_path = model_path / "weights.bump"
-    manifest_path = model_path / "weights_manifest.json"
+base_ptr = lib.ck_model_get_base_ptr()
+print(f"Base ptr: {hex(base_ptr)}")
 
-    with open(manifest_path) as f:
-        manifest = json.load(f)
+# Read first few values of token embedding weights
+print("\n--- Checking token embedding weights ---")
+if token_emb_offset is not None:
+    # Token embeddings are Q8_0 quantized
+    # Q8_0 block: 2 bytes (fp16 scale) + 32 bytes (int8 values) = 34 bytes per 32 elements
+    # Let's read the raw bytes for token 9707
+    token_id = 9707
+    block_size = 34
+    elements_per_block = 32
+    blocks_per_row = embed_dim // elements_per_block  # 896 / 32 = 28 blocks
+    bytes_per_row = blocks_per_row * block_size  # 28 * 34 = 952 bytes
 
-    # Find token_emb in manifest (v6.6 uses "entries" not "weights")
-    token_emb_info = None
-    for entry in manifest.get("entries", manifest.get("weights", [])):
-        if entry.get("name") == "token_emb":
-            token_emb_info = entry
-            break
+    row_offset = token_emb_offset + token_id * bytes_per_row
 
-    if not token_emb_info:
-        print("ERROR: token_emb not found in manifest")
-        return None
+    # Read the first block of this token's embedding
+    ptr = ctypes.cast(base_ptr + row_offset, ctypes.POINTER(ctypes.c_uint8))
+    raw_bytes = bytes([ptr[i] for i in range(block_size)])
 
-    # v6.6 uses "file_offset", older versions use "offset"
-    offset = token_emb_info.get("file_offset", token_emb_info.get("offset", 0))
-    dtype = token_emb_info.get("dtype", "q8_0")
-    embed_dim = config.get("embed_dim", 896)
-    vocab_size = config.get("vocab_size", 151936)
+    # Parse Q8_0 block: first 2 bytes are fp16 scale
+    scale_bytes = raw_bytes[:2]
+    scale = np.frombuffer(scale_bytes, dtype=np.float16)[0]
+    quants = np.frombuffer(raw_bytes[2:], dtype=np.int8)
 
-    print(f"  token_emb: offset={offset}, dtype={dtype}, vocab={vocab_size}, embed={embed_dim}")
+    print(f"Token {token_id} embedding (first block):")
+    print(f"  Scale (fp16): {scale}")
+    print(f"  Quants (int8): {quants[:8]}...")
+    print(f"  Dequantized: {(quants[:8].astype(np.float32) * float(scale))}")
 
-    # Read the embedding for this token
-    with open(weights_path, "rb") as f:
-        if dtype == "q8_0":
-            # Q8_0: 32 elements per block, 34 bytes per block (32 int8 + 1 fp16 scale)
-            block_size = 32
-            bytes_per_block = 34
-            blocks_per_row = embed_dim // block_size
+    if np.isnan(scale) or np.isinf(scale):
+        print("  WARNING: Scale is NaN/Inf!")
 
-            # Calculate byte offset for this token's row
-            row_bytes = blocks_per_row * bytes_per_block
-            token_offset = offset + token * row_bytes
+# Read embedded_input buffer after a decode call
+print("\n--- Running single decode and checking buffers ---")
+import os
+os.environ['CK_STOP_OP'] = '1'  # Stop after first op (embedding)
 
-            f.seek(token_offset)
-            row_data = f.read(row_bytes)
+lib.ck_model_decode.argtypes = [ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
+lib.ck_model_decode.restype = ctypes.c_int
 
-            # Dequantize Q8_0
-            embedding = np.zeros(embed_dim, dtype=np.float32)
-            for b in range(blocks_per_row):
-                block_start = b * bytes_per_block
-                # Scale is fp16 at start of block
-                scale_bytes = row_data[block_start:block_start+2]
-                scale = struct.unpack('<e', scale_bytes)[0]  # fp16
+vocab = lib.ck_model_get_vocab_size()
+logits = (ctypes.c_float * vocab)()
+lib.ck_model_decode(9707, logits)
 
-                # Quantized values are int8
-                quants = np.frombuffer(
-                    row_data[block_start+2:block_start+34],
-                    dtype=np.int8
-                )
+del os.environ['CK_STOP_OP']
 
-                # Dequantize: val = quant * scale
-                start_idx = b * block_size
-                embedding[start_idx:start_idx+block_size] = quants.astype(np.float32) * scale
+# Check embedded_input buffer
+if "embedded_input" in act_buffers:
+    emb_offset = act_buffers["embedded_input"]
+    ptr = ctypes.cast(base_ptr + emb_offset, ctypes.POINTER(ctypes.c_float))
+    emb_arr = np.ctypeslib.as_array(ptr, shape=(embed_dim,))
 
-            return embedding
+    print(f"\nEmbedded input buffer (after embedding op):")
+    print(f"  Offset: {emb_offset}")
+    print(f"  Shape: {emb_arr.shape}")
+    print(f"  NaN count: {np.isnan(emb_arr).sum()}")
+    print(f"  Inf count: {np.isinf(emb_arr).sum()}")
+    print(f"  Range: [{emb_arr.min():.6f}, {emb_arr.max():.6f}]")
+    print(f"  Mean: {emb_arr.mean():.6f}")
+    print(f"  First 10: {emb_arr[:10]}")
 
-        elif dtype == "fp32":
-            token_offset = offset + token * embed_dim * 4
-            f.seek(token_offset)
-            return np.frombuffer(f.read(embed_dim * 4), dtype=np.float32)
+# Check layer_input buffer
+if "layer_input" in act_buffers:
+    li_offset = act_buffers["layer_input"]
+    ptr = ctypes.cast(base_ptr + li_offset, ctypes.POINTER(ctypes.c_float))
+    li_arr = np.ctypeslib.as_array(ptr, shape=(embed_dim,))
 
-        else:
-            print(f"ERROR: Unsupported dtype {dtype}")
-            return None
+    print(f"\nLayer input buffer:")
+    print(f"  Offset: {li_offset}")
+    print(f"  NaN count: {np.isnan(li_arr).sum()}")
+    print(f"  Range: [{li_arr.min():.6f}, {li_arr.max():.6f}]")
+    print(f"  First 10: {li_arr[:10]}")
 
-
-def run_v66_and_get_embedding_output(model_path: Path, token: int, config: dict) -> np.ndarray:
-    """
-    Run v6.6 inference and read the embedding output from activations.
-    """
-    lib = load_v66_model(model_path)
-
-    weights_path = model_path / "weights.bump"
-    result = lib.ck_model_init(str(weights_path).encode())
-    if result != 0:
-        print(f"ERROR: init failed with {result}")
-        return None
-
-    # Run one decode step
-    vocab_size = config.get("vocab_size", 151936)
-    output = (ctypes.c_float * vocab_size)()
-
-    print(f"  Running decode with token {token}...")
-    result = lib.ck_model_decode(token, output)
-    print(f"  Decode result: {result}")
-
-    # Try to read embedding output from activations
-    # The embedding output goes to layer_output at offset 813751828
-    # But we need to access model->activations which we can't directly...
-
-    # For now, just check logits
-    logits_ptr = lib.ck_model_get_logits()
-    logits = np.ctypeslib.as_array(logits_ptr, shape=(vocab_size,)).copy()
-
-    lib.ck_model_free()
-
-    return logits
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Test embedding layer only")
-    parser.add_argument("--model", type=Path,
-                        default=Path.home() / ".cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF")
-    parser.add_argument("--token", type=int, default=25)
-    parser.add_argument("--skip-pytorch", action="store_true", help="Skip PyTorch comparison")
-
-    args = parser.parse_args()
-
-    # Load config
-    config_path = args.model / "lowered_decode.json"
-    with open(config_path) as f:
-        data = json.load(f)
-        config = data.get("config", {})
-
-    print(f"\n{'='*70}")
-    print(f"EMBEDDING TEST: token={args.token}")
-    print(f"{'='*70}")
-    print(f"  embed_dim: {config.get('embed_dim')}")
-    print(f"  vocab_size: {config.get('vocab_size')}")
-
-    # Test 1: Read embedding directly from weights
-    print(f"\n{'='*70}")
-    print("TEST 1: Direct weight read (bypass inference)")
-    print(f"{'='*70}")
-
-    v66_emb_direct = get_v66_embedding_from_weights(args.model, args.token, config)
-    if v66_emb_direct is not None:
-        print(f"  v6.6 embedding: [{v66_emb_direct[:5]}...]")
-        print(f"  Range: [{v66_emb_direct.min():.6f}, {v66_emb_direct.max():.6f}]")
-        print(f"  All zeros: {np.all(v66_emb_direct == 0)}")
-
-    # Test 2: Compare with PyTorch
-    if not args.skip_pytorch:
-        print(f"\n{'='*70}")
-        print("TEST 2: PyTorch comparison")
-        print(f"{'='*70}")
-
-        pytorch_emb = get_pytorch_embedding(args.token)
-        if pytorch_emb is not None and v66_emb_direct is not None:
-            # Compare
-            diff = np.abs(pytorch_emb - v66_emb_direct)
-            max_diff = np.max(diff)
-            mean_diff = np.mean(diff)
-
-            print(f"\n  Comparison:")
-            print(f"    Max diff: {max_diff:.6f}")
-            print(f"    Mean diff: {mean_diff:.6f}")
-
-            if max_diff < 0.01:
-                print(f"    [PASS] Embeddings match within tolerance")
-            else:
-                print(f"    [FAIL] Embeddings differ significantly")
-                # Find where they differ
-                diff_idx = np.argmax(diff)
-                print(f"    First big diff at index {diff_idx}:")
-                print(f"      PyTorch: {pytorch_emb[diff_idx]:.6f}")
-                print(f"      v6.6:    {v66_emb_direct[diff_idx]:.6f}")
-
-    # Test 3: Run v6.6 inference and check output
-    print(f"\n{'='*70}")
-    print("TEST 3: v6.6 inference output")
-    print(f"{'='*70}")
-
-    os.environ["LD_LIBRARY_PATH"] = str(args.model) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
-
-    logits = run_v66_and_get_embedding_output(args.model, args.token, config)
-    if logits is not None:
-        print(f"  Logits range: [{logits.min():.6f}, {logits.max():.6f}]")
-        print(f"  Argmax: {np.argmax(logits)}")
-        print(f"  All zeros: {np.all(logits == 0)}")
-
-        if np.all(logits == 0):
-            print("\n  [FAIL] Logits are all zeros!")
-            print("  This means something in the inference pipeline is broken.")
-            print("  The embedding data itself looks OK, so the bug is in:")
-            print("    1. How the token is stored/read")
-            print("    2. How embedding output is passed to next layer")
-            print("    3. Some layer zeroing out the values")
-        else:
-            print("\n  [PASS] Logits are non-zero!")
-
-
-if __name__ == "__main__":
-    main()
+print("\n--- Done ---")
