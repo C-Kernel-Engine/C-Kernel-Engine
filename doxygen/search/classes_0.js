@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['affinityinfo_0',['AffinityInfo',['../structAffinityInfo.html',1,'']]]
+  ['affinityinfo_2321',['AffinityInfo',['../structAffinityInfo.html',1,'']]]
 ];
