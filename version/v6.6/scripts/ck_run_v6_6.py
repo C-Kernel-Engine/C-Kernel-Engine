@@ -397,9 +397,14 @@ def validate_gguf_kernel_coverage(gguf_path: Path) -> bool:
 def step_convert_gguf(gguf_path: Path,
                       output_dir: Path,
                       force: bool = False,
-                      validate: bool = True,
-                      tokenizer_json: Optional[Path] = None) -> tuple[Path, Path]:
-    """Convert GGUF to bump format."""
+                      validate: bool = True) -> tuple[Path, Path]:
+    """Convert GGUF to bump format.
+
+    Note: GGUF contains complete vocab including special tokens.
+    We no longer pass tokenizer.json to the converter - that was causing
+    vocab corruption where gaps in tokenizer.json created <|ck_missing_N|>
+    placeholders that overwrote proper GGUF vocab entries like <|im_end|>.
+    """
     log_step(2, f"Converting GGUF to bump format")
 
     # Validate kernel coverage first
@@ -421,6 +426,7 @@ def step_convert_gguf(gguf_path: Path,
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use GGUF vocab directly - it has complete vocab including special tokens
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / "convert_gguf_to_bump_v6_6.py"),
@@ -429,8 +435,6 @@ def step_convert_gguf(gguf_path: Path,
         f"--config-out={config_path}",
         f"--manifest-out={manifest_path}",
     ]
-    if tokenizer_json and tokenizer_json.exists():
-        cmd.append(f"--tokenizer-json={tokenizer_json}")
 
     run_cmd(cmd)
     log(f"  Created {weights_path}", C_GREEN)
@@ -833,8 +837,10 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     except Exception as e:
         log(f"  Compilation error: {e}", C_RED)
 
-    # Fallback: syntax check only
-    cmd = ["gcc", "-fsyntax-only", "-std=c11", f"-I{include_dir}", str(model_c_path)]
+    # Fallback: syntax check only (include all paths)
+    cmd = ["gcc", "-fsyntax-only", "-std=c11",
+           f"-I{include_dir}", f"-I{v66_include}", f"-I{v66_src}",
+           str(model_c_path)]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
@@ -1265,12 +1271,12 @@ def run_pipeline(args: argparse.Namespace):
                 )
                 if args.inspect_only:
                     return
+            # ensure_tokenizer_files still fetches tokenizer.json for ck_chat.py BPE encoding
+            # but we no longer pass it to the converter - GGUF has complete vocab
             ensure_tokenizer_files(model_id, work_dir)
-            tokenizer_json = work_dir / "tokenizer.json"
             weights_path, config_path = step_convert_gguf(
                 gguf_path, work_dir,
                 force=args.force_convert,
-                tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
             )
             manifest_path = work_dir / "weights_manifest.json"
         else:
@@ -1300,16 +1306,12 @@ def run_pipeline(args: argparse.Namespace):
             )
             if args.inspect_only:
                 return
-        tokenizer_json = gguf_path.parent / "tokenizer.json"
-        if not tokenizer_json.exists():
-            tokenizer_json = work_dir / "tokenizer.json"
+        # Local GGUF - use GGUF vocab directly (no tokenizer.json override)
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
             force=args.force_convert,
-            tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
         )
         manifest_path = work_dir / "weights_manifest.json"
-        # Local GGUF has no repo to fetch tokenizer; user must supply it.
 
     elif input_type == 'local_dir':
         model_dir = info['path']
@@ -1357,12 +1359,12 @@ def run_pipeline(args: argparse.Namespace):
             )
             if args.inspect_only:
                 return
+        # ensure_tokenizer_files still fetches tokenizer.json for ck_chat.py BPE encoding
+        # but we no longer pass it to the converter - GGUF has complete vocab
         ensure_tokenizer_files(repo_id, work_dir)
-        tokenizer_json = work_dir / "tokenizer.json"
         weights_path, config_path = step_convert_gguf(
             gguf_path, work_dir,
             force=args.force_convert,
-            tokenizer_json=tokenizer_json if tokenizer_json.exists() else None
         )
         manifest_path = work_dir / "weights_manifest.json"
 

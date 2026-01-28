@@ -29,24 +29,26 @@
  * DTYPE HELPERS
  * ============================================================================ */
 
-static inline size_t ck_dtype_bytes(int dtype) {
+static inline float ck_dtype_bytes_per_elem(int dtype) {
     switch (dtype) {
-        case CK_DT_FP32:  return 4;
+        case CK_DT_FP32:  return 4.0f;
         case CK_DT_FP16:
-        case CK_DT_BF16:  return 2;
-        case CK_DT_I8:    return 1;
-        case CK_DT_INT32: return 4;
-        case CK_DT_Q8_0:  return 1.0625f;
-        case CK_DT_Q5_0:  return 0.6875f;
-        case CK_DT_Q4_K:  return 0.5625f;
-        case CK_DT_Q6_K:  return 0.8203125f;
-        default:          return 4;
+        case CK_DT_BF16:  return 2.0f;
+        case CK_DT_I8:    return 1.0f;
+        case CK_DT_INT32: return 4.0f;
+        case CK_DT_Q8_0:  return 1.0625f;   /* 32 bytes + 2 byte scale per 32 elements */
+        case CK_DT_Q5_0:  return 0.6875f;   /* 20 bytes + 2 byte scale per 32 elements */
+        case CK_DT_Q4_K:  return 0.5625f;   /* 144 bytes per 256 elements */
+        case CK_DT_Q6_K:  return 0.8203125f; /* 210 bytes per 256 elements */
+        default:          return 4.0f;
     }
 }
 
+/* Legacy alias for compatibility */
+#define ck_dtype_bytes(dtype) ((size_t)ck_dtype_bytes_per_elem(dtype))
+
 static inline size_t ck_dtype_row_bytes(int dtype, size_t elements) {
-    float bytes_per_elem = ck_dtype_bytes(dtype);
-    return (size_t)(elements * bytes_per_elem);
+    return (size_t)(elements * ck_dtype_bytes_per_elem(dtype));
 }
 
 static inline size_t ck_dtype_block_size(int dtype) {
