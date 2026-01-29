@@ -1,5 +1,9 @@
 var NAVTREEINDEX11 =
 {
+"structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56":[1,0,41,3],
+"structCKMetric.html#a113674774faddfa6441f1da3a19ffe92":[1,0,41,2],
+"structCKMetric.html#a303423e9bf3c73c0111cfc897e515f40":[1,0,41,0],
+"structCKMetric.html#a66cf826792831f5ee95765f637ca795c":[1,0,41,1],
 "structCKMetric.html#ac7fc629fa6869ee876ee3cdb097ebd38":[1,0,41,4],
 "structCKMetric.html#ad0ca8343bf6c7d34f380835d0d7ec484":[1,0,41,5],
 "structCKMetricsContext.html":[1,0,42],
@@ -129,8 +133,8 @@ var NAVTREEINDEX11 =
 "structCKTokenizer.html#a1ef21faeef58ae6154e1f03fe76e3377":[1,0,51,13],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,51,26],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,51,27],
-"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,19],
 "structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,20],
+"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,19],
 "structCKTokenizer.html#a35f73551a504361ab117452f40fe81bf":[1,0,51,21],
 "structCKTokenizer.html#a52c39349a30ea0dfb6ab48fa975e6fed":[1,0,51,24],
 "structCKTokenizer.html#a64d0be7dac3d476548e873e3f2d05d50":[1,0,51,16],
@@ -245,9 +249,5 @@ var NAVTREEINDEX11 =
 "structGEMMParams.html":[1,0,61],
 "structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,61,1],
 "structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,61,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,61,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,61,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,61,4],
-"structMemoryInfo.html":[1,0,62],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,62,10]
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,61,2]
 };
