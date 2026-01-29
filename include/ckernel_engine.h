@@ -168,6 +168,14 @@ void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 // Q8_0 weights x Q8_0 activations
 void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
 
+// Fused GEMV: quantize(FP32->Q8_0) + GEMV(Q5_0 weights) + bias add
+void gemv_fused_q5_0_bias_dispatch(float *y, const void *W, const float *x,
+                                    const float *bias, int M, int K);
+
+// Fused GEMV: quantize(FP32->Q8_0) + GEMV(Q8_0 weights) + bias add
+void gemv_fused_q8_0_bias_dispatch(float *y, const void *W, const float *x,
+                                    const float *bias, int M, int K);
+
 // Q8_K quantization (256 elements per block, super-block format)
 void quantize_row_q8_k(const float *x, void *y, int k);
 

@@ -114,6 +114,7 @@ var files_dup =
     [ "gemm_kernels_q6k_sse.c", "gemm__kernels__q6k__sse_8c.html", "gemm__kernels__q6k__sse_8c" ],
     [ "gemm_kernels_q8_0.c", "gemm__kernels__q8__0_8c.html", "gemm__kernels__q8__0_8c" ],
     [ "gemm_microkernel.c", "gemm__microkernel_8c.html", "gemm__microkernel_8c" ],
+    [ "gemv_fused_quant_bias.c", "gemv__fused__quant__bias_8c.html", "gemv__fused__quant__bias_8c" ],
     [ "v6.5/test_generated/generic_api_test.c", "v6_85_2test__generated_2generic__api__test_8c.html", "v6_85_2test__generated_2generic__api__test_8c" ],
     [ "v6.6/test_generated/generic_api_test.c", "v6_86_2test__generated_2generic__api__test_8c.html", "v6_86_2test__generated_2generic__api__test_8c" ],
     [ "hash_table.c", "hash__table_8c.html", "hash__table_8c" ],

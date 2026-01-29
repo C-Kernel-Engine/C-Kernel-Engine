@@ -179,5 +179,6 @@ var menudata={children:[
 {text:"p",url:"globals_defs_p.html#index_p"},
 {text:"q",url:"globals_defs_q.html#index_q"},
 {text:"r",url:"globals_defs_r.html#index_r"},
+{text:"s",url:"globals_defs_s.html#index_s"},
 {text:"w",url:"globals_defs_w.html#index_w"},
 {text:"y",url:"globals_defs_y.html#index_y"}]}]}]}]}

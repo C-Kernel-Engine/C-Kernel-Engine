@@ -893,10 +893,10 @@
     <main>
 
 <div class="container">
-  <h1>Version History</h1>
+  <h1>Version History & Roadmap</h1>
   <p class="lead">
-    Track C-Kernel-Engine development milestones and planned features.
-    Updated automatically from CI runs.
+    C-Kernel-Engine development roadmap. Every version builds on the IR graph
+    and kernel foundation, enabling new capabilities without breaking existing code.
   </p>
 
   <style>
@@ -921,9 +921,15 @@
       min-width: 80px;
       text-align: center;
     }
+    .version-badge.v14 { background: #9b59b6; color: white; }
+    .version-badge.v13 { background: #e74c3c; color: white; }
+    .version-badge.v12 { background: #3498db; color: white; }
+    .version-badge.v11 { background: #1abc9c; color: white; }
+    .version-badge.v10 { background: #e91e63; color: white; }
+    .version-badge.v9 { background: #ff9800; color: white; }
+    .version-badge.v8 { background: #00bcd4; color: white; }
     .version-badge.v7 { background: #47b475; color: white; }
     .version-badge.v6 { background: #07adf8; color: white; }
-    .version-badge.v5 { background: #a0aec0; color: white; }
 
     .version-content {
       flex: 1;
@@ -947,11 +953,19 @@
     }
     .status-released { background: #47b475; color: white; }
     .status-current { background: #ffb400; color: var(--dark); }
+    .status-building { background: #07adf8; color: white; }
     .status-planned { background: var(--grey); color: var(--text-secondary); }
 
     .version-date {
       font-size: 0.85rem;
       color: var(--text-muted);
+    }
+
+    .version-tagline {
+      color: var(--orange);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      font-style: italic;
     }
 
     .milestone-list {
@@ -983,6 +997,7 @@
     }
     .milestone-icon.done { background: #47b475; color: white; }
     .milestone-icon.current { background: #ffb400; color: var(--dark); }
+    .milestone-icon.building { background: #07adf8; color: white; }
     .milestone-icon.planned { background: var(--grey); color: var(--text-muted); }
 
     .milestone-text {
@@ -995,170 +1010,614 @@
       font-weight: 500;
     }
 
-    /* Progress Chart */
-    .progress-overview {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
+    /* Roadmap Table */
+    .roadmap-table {
+      width: 100%;
+      border-collapse: collapse;
       margin: 2rem 0;
     }
-
-    .progress-card {
+    .roadmap-table th, .roadmap-table td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--grey);
+    }
+    .roadmap-table th {
       background: var(--dark-card);
-      border: 1px solid var(--grey);
-      border-radius: 8px;
-      padding: 1.5rem;
-      text-align: center;
-    }
-    .progress-card .value {
-      font-size: 2rem;
-      font-weight: bold;
       color: var(--orange);
+      font-weight: 600;
     }
-    .progress-card .label {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-    }
-
-    /* Roadmap Chart */
-    .roadmap-chart {
-      margin: 2rem 0;
-      padding: 1.5rem;
+    .roadmap-table tr:hover {
       background: var(--dark-card);
-      border-radius: 8px;
-      border: 1px solid var(--grey);
     }
-
-    .roadmap-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-
-    .roadmap-version {
-      width: 60px;
-      font-weight: bold;
-      color: var(--orange);
-    }
-
-    .roadmap-bar-container {
-      flex: 1;
-      height: 32px;
-      background: var(--dark-lighter);
-      border-radius: 4px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .roadmap-bar {
-      height: 100%;
-      display: flex;
-      align-items: center;
-      padding: 0 0.75rem;
-      font-size: 0.8rem;
-      color: white;
-    }
-    .roadmap-bar.done { background: #47b475; }
-    .roadmap-bar.current { background: #ffb400; color: var(--dark); }
-    .roadmap-bar.planned { background: #07adf8; }
-    .roadmap-bar.empty { background: var(--grey); color: var(--text-muted); }
-
-    .roadmap-date {
-      width: 100px;
-      text-align: right;
-      font-size: 0.8rem;
+    .roadmap-table .dep-cell {
+      font-size: 0.85rem;
       color: var(--text-muted);
     }
   </style>
 
-  <!-- Progress Overview -->
-  <div class="progress-overview">
-    <div class="progress-card">
-      <div class="value">v6.6</div>
-      <div class="label">Current Version</div>
+  <!-- Compact Architecture Path -->
+  <h2>Architecture Evolution</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+    Every version builds on the <strong>IR graph + kernel foundation</strong>.
+    Click to explore the journey from C orchestrator to pure IR-driven code generation.
+  </p>
+
+  <div class="arch-timeline">
+    <div class="arch-node current">
+      <div class="arch-node-badge arch-v66">v6.6</div>
+      <div class="arch-node-label">IR-Driven</div>
+      <div class="arch-node-dot"></div>
     </div>
-    <div class="progress-card">
-      <div class="value">v7.0</div>
-      <div class="label">Next Major</div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v7">v7</div>
+      <div class="arch-node-label">Training</div>
+      <div class="arch-node-dot"></div>
     </div>
-    <div class="progress-card">
-      <div class="value">24</div>
-      <div class="label">Total Milestones</div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v8">v8-9</div>
+      <div class="arch-node-label">MoE</div>
+      <div class="arch-node-dot"></div>
     </div>
-    <div class="progress-card">
-      <div class="value">8</div>
-      <div class="label">Completed</div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v10">v10</div>
+      <div class="arch-node-label">LoRA</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v11">v11</div>
+      <div class="arch-node-label">Vision</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v13">v13</div>
+      <div class="arch-node-label">Audio</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v14">v14</div>
+      <div class="arch-node-label">Audio Train</div>
+      <div class="arch-node-dot"></div>
     </div>
   </div>
 
-  <!-- Roadmap Chart -->
-  <h2>Development Roadmap</h2>
-  <div class="roadmap-chart">
-    <div class="roadmap-row">
-      <div class="roadmap-version">v7.5</div>
-      <div class="roadmap-bar-container">
-        <div class="roadmap-bar empty" style="width: 100%;">Training Complete + Optimizations</div>
+  <style>
+    .arch-timeline {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.25rem;
+      padding: 1.5rem 1rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+    }
+    .arch-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 70px;
+    }
+    .arch-node.current .arch-node-badge {
+      box-shadow: 0 0 0 3px rgba(255, 180, 0, 0.4);
+    }
+    .arch-node.current .arch-node-dot {
+      background: #ffb400;
+      box-shadow: 0 0 8px #ffb400;
+    }
+    .arch-node-badge {
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .arch-node-badge.arch-v66 { background: #ffb400; color: var(--dark); }
+    .arch-node-badge.arch-v7 { background: #47b475; color: white; }
+    .arch-node-badge.arch-v8 { background: #00bcd4; color: white; }
+    .arch-node-badge.arch-v10 { background: #e91e63; color: white; }
+    .arch-node-badge.arch-v11 { background: #1abc9c; color: white; }
+    .arch-node-badge.arch-v13 { background: #e74c3c; color: white; }
+    .arch-node-badge.arch-v14 { background: #9b59b6; color: white; }
+    .arch-node-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .arch-node-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--grey);
+      margin-top: 0.25rem;
+    }
+    .arch-arrow-right {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      margin: 0 0.5rem;
+      padding: 0 0.25rem;
+    }
+  </style>
+
+  <!-- IR Evolution Accordion -->
+  <h2>IR Evolution: From Hardcoded to Graph-Driven</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+    See how v6.6 achieves true IR-driven code generation, eliminating hardcoded paths.
+  </p>
+
+  <style>
+    .ir-accordion {
+      margin: 1.5rem 0;
+    }
+    .ir-accordion-item {
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .ir-accordion-header {
+      display: flex;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .ir-accordion-header:hover {
+      background: var(--dark-card);
+    }
+    .ir-accordion-header.current {
+      background: linear-gradient(90deg, rgba(255,180,0,0.15) 0%, transparent 100%);
+      border-left: 4px solid var(--orange);
+    }
+    .ir-version-badge {
+      min-width: 70px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      padding: 0.35rem 0.75rem;
+    }
+    .ir-version-badge.v6-0 { background: #555; color: white; }
+    .ir-version-badge.v6-5 { background: #666; color: white; }
+    .ir-version-badge.v6-6 { background: #ffb400; color: var(--dark); }
+    .ir-title {
+      flex: 1;
+      font-weight: 500;
+      margin-left: 1rem;
+    }
+    .ir-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      margin-left: 0.75rem;
+    }
+    .ir-badge-hardcoded { background: #e74c3c; color: white; }
+    .ir-badge-hybrid { background: #f39c12; color: white; }
+    .ir-badge-ir { background: #47b475; color: white; }
+    .ir-toggle {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      transition: transform 0.3s;
+      margin-left: 0.75rem;
+      padding: 0.25rem;
+    }
+    .ir-accordion-item.open .ir-toggle {
+      transform: rotate(180deg);
+    }
+    .ir-accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+      background: var(--darker);
+    }
+    .ir-accordion-item.open .ir-accordion-content {
+      max-height: 1000px;
+    }
+    .ir-details {
+      padding: 1.5rem;
+    }
+    .ir-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+    .ir-column {
+      background: var(--dark-card);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+    .ir-column h4 {
+      margin: 0 0 1rem 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--grey);
+    }
+    .ir-feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .ir-feature-list li {
+      padding: 0.5rem 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--grey);
+    }
+    .ir-feature-list li:last-child {
+      border-bottom: none;
+    }
+    .ir-feature-list .yes { color: #47b475; }
+    .ir-feature-list .no { color: #e74c3c; }
+    .ir-example {
+      background: var(--dark);
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .ir-stats {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--grey);
+    }
+    .ir-stat {
+      text-align: center;
+      padding: 0 1rem;
+    }
+    .ir-stat:not(:last-child) {
+      border-right: 1px solid var(--grey);
+    }
+    .ir-stat-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--orange);
+    }
+    .ir-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .current-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #47b475;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+
+  <div class="ir-accordion">
+    <!-- v6.x - C Orchestrator -->
+    <div class="ir-accordion-item">
+      <div class="ir-accordion-header" onclick="toggleIrAccordion(this)">
+        <span class="ir-version-badge v6-0">v6.x</span>
+        <span class="ir-title">C Orchestrator: Kernel Dispatch</span>
+        <span class="ir-badge ir-badge-hardcoded">Orchestrator</span>
+        <span class="ir-toggle">▼</span>
       </div>
-      <div class="roadmap-date">~6 months</div>
+      <div class="ir-accordion-content">
+        <div class="ir-details">
+          <p style="color: var(--text-secondary);">
+            v6.x used a <strong>C orchestrator</strong> that dispatched to kernels based on operation type.
+            No code generation - the orchestrator called kernels directly.
+          </p>
+          <div class="ir-comparison">
+            <div class="ir-column">
+              <h4>Code Path</h4>
+              <ul class="ir-feature-list">
+                <li><span class="no">✗</span> Code generation</li>
+                <li><span class="yes">✓</span> C orchestrator</li>
+                <li><span class="yes">✓</span> Kernel dispatch</li>
+                <li><span class="no">✗</span> IR graph</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>Kernels</h4>
+              <ul class="ir-feature-list">
+                <li>gemm_nt_q4_k</li>
+                <li>gemv_q8_0</li>
+                <li>attention_decode</li>
+                <li>rope_forward_qk</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>Limitations</h4>
+              <ul class="ir-feature-list">
+                <li>No fusion patterns</li>
+                <li>Fixed execution order</li>
+                <li>Manual kernel dispatch</li>
+              </ul>
+            </div>
+          </div>
+          <div class="ir-example">
+            // v6.x style: C orchestrator dispatches
+            ckernel_orchestrator_run(ctx, CK_MODE_DECODE);
+            // Dispatcher calls kernels based on op_type
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="roadmap-row">
-      <div class="roadmap-version">v7.0</div>
-      <div class="roadmap-bar-container">
-        <div class="roadmap-bar planned" style="width: 40%;">Full Training Loop</div>
+
+    <!-- v6.5 - Generated C with Hardcoded Logic -->
+    <div class="ir-accordion-item">
+      <div class="ir-accordion-header" onclick="toggleIrAccordion(this)">
+        <span class="ir-version-badge v6-5">v6.5</span>
+        <span class="ir-title">Generated C: IR with Hardcoded Paths</span>
+        <span class="ir-badge ir-badge-hybrid">Generated C</span>
+        <span class="ir-toggle">▼</span>
       </div>
-      <div class="roadmap-date">~2 months</div>
+      <div class="ir-accordion-content">
+        <div class="ir-details">
+          <p style="color: var(--text-secondary);">
+            v6.5 introduced <strong>code generation</strong> from IR, but the generated C code
+            contained hardcoded logic paths. Templates determined structure, not the IR.
+          </p>
+          <div class="ir-comparison">
+            <div class="ir-column">
+              <h4>Code Generation</h4>
+              <ul class="ir-feature-list">
+                <li><span class="no">✗</span> Pure IR-driven</li>
+                <li><span class="yes">✓</span> Template-based gen</li>
+                <li><span class="yes">✓</span> IR v1 defined</li>
+                <li><span class="no">✗</span> Fusion detection</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>IR Structure</h4>
+              <ul class="ir-feature-list">
+                <li>ops: ["layer_norm", "matmul"]</li>
+                <li>attrs: {eps, n_heads}</li>
+                <li>No fusion annotations</li>
+                <li>Templates hardcoded</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>New in v6.5</h4>
+              <ul class="ir-feature-list">
+                <li>Memory layout defined</li>
+                <li>Weight manifest</li>
+                <li>BUMP format</li>
+                <li>Template codegen</li>
+              </ul>
+            </div>
+          </div>
+          <div class="ir-example">
+            // v6.5 style: Template generates C with hardcoded paths
+            generate_code(ir, template_decode);
+            // Output has if(mode==DECODE) { ... hardcoded ... }
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="roadmap-row">
-      <div class="roadmap-version">v6.9</div>
-      <div class="roadmap-bar-container">
-        <div class="roadmap-bar planned" style="width: 70%;">Multi-Token + Speculative</div>
+
+    <!-- v6.6 - Pure IR-Driven -->
+    <div class="ir-accordion-item open">
+      <div class="ir-accordion-header current" onclick="toggleIrAccordion(this)">
+        <span class="ir-version-badge v6-6">v6.6</span>
+        <span class="ir-title">
+          <span class="current-indicator"></span>
+          Pure IR-Driven: Core Inference Flow
+        </span>
+        <span class="ir-badge ir-badge-ir">Current</span>
+        <span class="ir-toggle">▼</span>
       </div>
-      <div class="roadmap-date">~1 month</div>
-    </div>
-    <div class="roadmap-row">
-      <div class="roadmap-version">v6.7</div>
-      <div class="roadmap-bar-container">
-        <div class="roadmap-bar planned" style="width: 85%;">Flash Attention 2</div>
+      <div class="ir-accordion-content">
+        <div class="ir-details">
+          <p style="color: var(--text-secondary);">
+            <strong>v6.6</strong> achieves <strong>pure IR-driven code generation</strong> for the
+            core inference flow. Ops are emitted from IR, kernels selected automatically,
+            memory from layout.json. Small technical debt remains for model-specific values.
+          </p>
+          <div class="ir-comparison">
+            <div class="ir-column">
+              <h4>IR-Driven (Correct)</h4>
+              <ul class="ir-feature-list">
+                <li><span class="yes">✓</span> Ops from IR</li>
+                <li><span class="yes">✓</span> Kernel selection auto</li>
+                <li><span class="yes">✓</span> Memory from layout.json</li>
+                <li><span class="yes">✓</span> Fusion patterns</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>MEGA Kernels</h4>
+              <ul class="ir-feature-list">
+                <li>mega_fused_attention_prefill</li>
+                <li>mega_fused_outproj_mlp</li>
+                <li>Norm + QKV + RoPE fuse</li>
+                <li>MLP + Residual fuse</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>Tech Debt (Qwen2-specific)</h4>
+              <ul class="ir-feature-list">
+                <li>RoPE scaling type</li>
+                <li>KV cache layout</li>
+                <li>Default config values</li>
+                <li>Activation function</li>
+              </ul>
+            </div>
+          </div>
+          <div class="ir-stats">
+            <div class="ir-stat">
+              <div class="ir-stat-value">100%</div>
+              <div class="ir-stat-label">IR Coverage</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">7</div>
+              <div class="ir-stat-label">MEGA Kernels</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">~5</div>
+              <div class="ir-stat-label">Tech Debt Items</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">1</div>
+              <div class="ir-stat-label">IR→C Pass</div>
+            </div>
+          </div>
+          <div class="ir-example">
+            // v6.6 style: IR-driven with minor hardcoded config
+            ir = ir_from_model(model)           // Build IR from model
+            fused = fuse_patterns(ir)           // Detect fusion patterns
+            code = generate_c(fused, registry)  // Generate C
+            // Core flow IR-driven; some config values Qwen2-specific
+          </div>
+        </div>
       </div>
-      <div class="roadmap-date">~2 weeks</div>
-    </div>
-    <div class="roadmap-row">
-      <div class="roadmap-version">v6.6</div>
-      <div class="roadmap-bar-container">
-        <div class="roadmap-bar current" style="width: 95%;">Fusion Kernels</div>
-      </div>
-      <div class="roadmap-date">Current</div>
     </div>
   </div>
+
+  <script>
+    function toggleIrAccordion(header) {
+      const item = header.parentElement;
+      const wasOpen = item.classList.contains('open');
+
+      // Close all
+      document.querySelectorAll('.ir-accordion-item').forEach(i => {
+        i.classList.remove('open');
+      });
+
+      // Open clicked if it wasn't open
+      if (!wasOpen) {
+        item.classList.add('open');
+      }
+    }
+  </script>
+
+  <!-- Detailed Roadmap Table -->
+  <h2>Detailed Roadmap</h2>
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>Version</th>
+        <th>Focus</th>
+        <th>Key Features</th>
+        <th>Depends On</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>v6.6</strong></td>
+        <td>IR Fusion + Parallel</td>
+        <td>IR-driven fusion kernels, OpenMP parallelization, MEGA kernels</td>
+        <td>Base</td>
+        <td><span class="version-status status-current">Current</span></td>
+      </tr>
+      <tr>
+        <td><strong>v7.0</strong></td>
+        <td>Training Forward</td>
+        <td>IR extend to backward, all kernels get grad() support</td>
+        <td>v6.6</td>
+        <td><span class="version-status status-building">Building</span></td>
+      </tr>
+      <tr>
+        <td><strong>v7.x</strong></td>
+        <td>Training Loop</td>
+        <td>Optimizer kernels (AdamW, SGD), LR schedulers, gradient accumulation</td>
+        <td>v7.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v8.0</strong></td>
+        <td>MoE - Mixture of Experts</td>
+        <td>Expert selection kernels, router computation, load balancing loss</td>
+        <td>v7.x training</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v9.0</strong></td>
+        <td>MoE Backward</td>
+        <td>Backward pass through MoE gates and experts</td>
+        <td>v8.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v10.0</strong></td>
+        <td>LoRA / QLoRA</td>
+        <td>Adapter injection, low-rank decomposition, 4-bit LoRA support</td>
+        <td>v7.x training</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v11.0</strong></td>
+        <td>Vision Encoder</td>
+        <td>Patch embedding, image positional encoding, ViT support</td>
+        <td>v7.x training</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v12.0</strong></td>
+        <td>Vision Training</td>
+        <td>Backward through vision encoder, image classification fine-tuning</td>
+        <td>v11.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v13.0</strong></td>
+        <td>Audio Encoder</td>
+        <td>Conformer/Whisper-style encoder, spectrogram preprocessing</td>
+        <td>v7.x training</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v14.0</strong></td>
+        <td>Audio Training</td>
+        <td>Backward through audio encoder, speech recognition training</td>
+        <td>v13.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+    </tbody>
+  </table>
 
   <!-- Version Timeline -->
   <h2>Version Timeline</h2>
 
-  <!-- v7.0 (Next Major) -->
+  <!-- v7.0 (Next) -->
   <div class="version-timeline">
     <div class="version-row">
       <div class="version-badge v7">v7.0</div>
       <div class="version-content">
         <div class="version-header">
-          <span class="version-status status-planned">Planned</span>
+          <span class="version-status status-building">Building</span>
           <span class="version-date">Target: ~2 months</span>
         </div>
+        <p class="version-tagline">"Training Forward" - Extend IR to support backward pass</p>
         <ul class="milestone-list">
           <li class="milestone current">
-            <span class="milestone-icon current">▶</span>
-            <span class="milestone-text">Complete backward pass for all kernels</span>
+            <span class="milestone-icon building">▶</span>
+            <span class="milestone-text">IR v3: Add gradient tensor semantics to IR</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">Full training loop (forward + backward)</span>
+            <span class="milestone-text">All kernels get backward() implementation</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon planned">○</span>
+            <span class="milestone-text">Autodiff engine for IR graph traversal</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
             <span class="milestone-text">make test-training target</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">SmolLM2-360M training parity</span>
           </li>
         </ul>
       </div>
@@ -1171,25 +1630,26 @@
       <div class="version-badge v6">v6.6</div>
       <div class="version-content">
         <div class="version-header">
-          <span class="version-status status-current">Current</span>
+          <span class="version-status status-released">Released</span>
           <span class="version-date">2026-01-15</span>
         </div>
+        <p class="version-tagline">"IR Fusion" - IR-driven kernel fusion and parallelization</p>
         <ul class="milestone-list">
-          <li class="milestone current">
-            <span class="milestone-icon current">▶</span>
-            <span class="milestone-text">Fusion Kernels (RMSNorm + QKV + RoPE)</span>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done">Fusion patterns in IR (RMSNorm+QKV+RoPE fuse)</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done">MEGA kernels: mega_fused_attention_prefill</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done">OpenMP parallelization in generated code</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
             <span class="milestone-text done">make llamacpp-parity-full (all kernels)</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">Q6_K quantization support</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">IR v2 format (symbolic dimensions)</span>
           </li>
         </ul>
       </div>
@@ -1205,148 +1665,133 @@
           <span class="version-status status-released">Released</span>
           <span class="version-date">2026-01-01</span>
         </div>
+        <p class="version-tagline">"IR Foundation" - Complete IR-based code generation</p>
         <ul class="milestone-list">
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done">IR v1 → IR v2 → IR v3 lowering pipeline</span>
+          </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
             <span class="milestone-text done">Full FP32 inference engine</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">Q4_K + Q5 quantization</span>
+            <span class="milestone-text done">Q4_K + Q5 + Q6_K quantization support</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">Codegen pipeline (IR → C)</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">AVX2/AVX-512 kernel assembly</span>
+            <span class="milestone-text done">GGUF → BUMP weight format</span>
           </li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- Future Plans -->
-  <h2>Future Milestones</h2>
+  <!-- Design Philosophy -->
+  <h2>Design Philosophy</h2>
   <div class="roadmap-chart">
-    <h3>Phase 2: Local Training (v7.0-v7.5)</h3>
+    <h3>Why This Roadmap?</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+      Every version builds on the <strong>IR graph + kernel foundation</strong>. This means:
+    </p>
     <ul class="milestone-list">
       <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v7.1: Optimizers (AdamW, SGD) + LR schedulers</span>
+        <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Backwards compatibility: v7 training uses same IR as v6 inference</span>
       </li>
       <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v7.2: BF16 mixed precision training</span>
+        <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Fusion works for both forward and backward (doubles speed)</span>
       </li>
       <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v7.3: Gradient checkpointing</span>
+        <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Multi-modal is just adding new kernel types to IR</span>
       </li>
       <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v7.4: NUMA-aware + cache optimizations</span>
-      </li>
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v7.5: Fused training kernels (2x PyTorch)</span>
+        <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Graph-based = easy optimization passes, validation, debugging</span>
       </li>
     </ul>
 
-    <h3>Phase 3: Multi-Modal (v8.0-v8.5)</h3>
+    <h3>Key Principles</h3>
     <ul class="milestone-list">
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v8.0: Audio transformer support (Whisper-style)</span>
+        <span class="milestone-text"><strong>IR First:</strong> All capabilities expressed in IR, generated to C</span>
       </li>
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v8.1: Vision transformer support (ViT)</span>
+        <span class="milestone-text"><strong>Kernel Fusion:</strong> Every version expands fusion patterns</span>
       </li>
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v8.2: Unified text/audio/vision API</span>
-      </li>
-    </ul>
-
-    <h3>Phase 4: Distributed CPU (v9.0-v12.0)</h3>
-    <ul class="milestone-list">
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v9.0: Multi-node communication layer (CCL/libuv)</span>
+        <span class="milestone-text"><strong>No GPU Dependency:</strong> Pure CPU execution, any x86_64 machine</span>
       </li>
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v9.1: Data Parallel on CPU cluster</span>
-      </li>
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v10.0: Tensor Parallelism (CPU)</span>
-      </li>
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v12.0: 100B+ model training on CPU cluster</span>
-      </li>
-    </ul>
-
-    <h3>Phase 5: Enterprise (v12.0-v16.0)</h3>
-    <ul class="milestone-list">
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v15.0: Sovereign AI deployment ready</span>
-      </li>
-      <li class="milestone">
-        <span class="milestone-icon planned">○</span>
-        <span class="milestone-text">v16.0: Enterprise contracts + HF integration</span>
+        <span class="milestone-text"><strong>Transparency:</strong> See every operation via ir_visualizer.html</span>
       </li>
     </ul>
   </div>
 
-  <hr>
-
-  <h2>About Version Tracking</h2>
-  <p>
-    This page tracks C-Kernel-Engine development milestones. Versions follow semantic versioning:
+  <!-- Version Naming -->
+  <h2>Version Numbering</h2>
+  <p style="color: var(--text-secondary);">
+    Version numbers follow this convention:
   </p>
-  <ul>
-    <li><strong>Major (v7.0)</strong>: New capabilities (training, distributed, multi-modal)</li>
-    <li><strong>Minor (v6.7)</strong>: Significant features (Flash Attention, fusion)</li>
-    <li><strong>Patch (v6.6.1)</strong>: Bug fixes and optimizations</li>
+  <ul style="color: var(--text-secondary);">
+    <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
+    <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
+    <li><strong>v8.x:</strong> MoE architecture (efficient large models)</li>
+    <li><strong>v10.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
+    <li><strong>v11.x:</strong> Vision encoding (ViT)</li>
+    <li><strong>v13.x:</strong> Audio encoding (Whisper/Conformer)</li>
   </ul>
 
   <div class="alert alert-info" style="margin-top: 1rem;">
     <span class="alert-icon">💡</span>
     <div>
-      <strong>Contribute:</strong> View progress on <a href="https://github.com/antshiv/C-Kernel-Engine/issues">GitHub Issues</a>
-      or run <code>make test</code> to verify current build status.
+      <strong>Track Progress:</strong> See <a href="test-report.html">Test Report</a> for nightly results
+      or <a href="https://github.com/antshiv/C-Kernel-Engine/issues">GitHub Issues</a> for tasks.
     </div>
   </div>
-
-  <p>
-    See also: <a href="test-report.html">Test Report</a> for nightly test results.
-  </p>
 </div>
 
 <script>
-// Version tracking data (could be loaded from JSON in future)
+// Version tracking data
 const versionData = {
   current: {
     major: 6,
     minor: 6,
     date: "2026-01-15",
+    phase: "inference",
     milestones_completed: 4,
-    milestones_total: 5
+    milestones_total: 4
   },
   next: {
     major: 7,
     minor: 0,
+    phase: "training_forward",
     target: "2026-03-15",
     milestones_planned: 4
-  }
+  },
+  roadmap: [
+    { major: 6, minor: 6, phase: "IR Fusion + Parallel", done: true },
+    { major: 7, minor: 0, phase: "Training Forward", building: true },
+    { major: 7, minor: 5, phase: "Training Complete", planned: true },
+    { major: 8, minor: 0, phase: "MoE Architecture", planned: true },
+    { major: 9, minor: 0, phase: "MoE Backward", planned: true },
+    { major: 10, minor: 0, phase: "LoRA / QLoRA", planned: true },
+    { major: 11, minor: 0, phase: "Vision Encoder", planned: true },
+    { major: 12, minor: 0, phase: "Vision Training", planned: true },
+    { major: 13, minor: 0, phase: "Audio Encoder", planned: true },
+    { major: 14, minor: 0, phase: "Audio Training", planned: true }
+  ]
 };
 
 console.log('Version History loaded. Current: v' + versionData.current.major + '.' + versionData.current.minor);
+console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' → '));
 </script>
     </main>
 
@@ -1557,7 +2002,7 @@ console.log('Version History loaded. Current: v' + versionData.current.major + '
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-27</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-28</p>
             </div>
         </div>
     </footer>

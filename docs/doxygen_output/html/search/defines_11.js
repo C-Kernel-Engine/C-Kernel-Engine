@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['white_4646',['WHITE',['../show__config_8c.html#a87b537f5fa5c109d3c05c13d6b18f382',1,'show_config.c']]]
+  ['sample_5fnext_5ftoken_4675',['SAMPLE_NEXT_TOKEN',['../ck__cli__v6_86_8c.html#ae495880372db70e28128c93942bb488f',1,'ck_cli_v6.6.c']]]
 ];

@@ -5,13 +5,14 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 41,
+      "total": 43,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
         "bias_add": 1,
         "embedding": 2,
         "fused_attention_block": 2,
+        "fused_linear_bias": 2,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
         "gemm": 9,
@@ -2271,6 +2272,154 @@
       "notes": "General matrix multiplication with Q8_0 weights and Q8_0 activations. Used for Wv projection in prefill.",
       "name": "gemm_nt_q8_0_q8_0",
       "_source_file": "gemm_nt_q8_0_q8_0.json"
+    },
+    {
+      "id": "gemv_fused_q5_0_bias",
+      "op": "fused_linear_bias",
+      "variant": "q5_0_w_fp32_a_bias",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32, quantized internally)"
+        },
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [M, K] in Q5_0 format"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "optional": true,
+          "desc": "Bias vector [M] (FP32), can be NULL"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] (FP32)"
+        }
+      ],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "fuses": [
+        "quantize_row_q8_0",
+        "gemv_q5_0_q8_0",
+        "bias_add"
+      ],
+      "impl": {
+        "function": "gemv_fused_q5_0_bias_dispatch",
+        "header": "gemv_fused_quant_bias.h",
+        "sources": [
+          "src/kernels/fused/gemv_fused_quant_bias.c"
+        ],
+        "variants": [
+          {
+            "name": "scalar",
+            "requires": [],
+            "function": "gemv_fused_q5_0_bias"
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2"
+            ],
+            "function": "gemv_fused_q5_0_bias_avx2"
+          }
+        ]
+      },
+      "notes": "Fused quantize + GEMV + bias. Eliminates memory traffic for quantized activations.",
+      "name": "gemv_fused_q5_0_bias",
+      "_source_file": "gemv_fused_q5_0_bias.json"
+    },
+    {
+      "id": "gemv_fused_q8_0_bias",
+      "op": "fused_linear_bias",
+      "variant": "q8_0_w_fp32_a_bias",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32, quantized internally)"
+        },
+        {
+          "name": "W",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [M, K] in Q8_0 format"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "optional": true,
+          "desc": "Bias vector [M] (FP32), can be NULL"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] (FP32)"
+        }
+      ],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "fuses": [
+        "quantize_row_q8_0",
+        "gemv_q8_0_q8_0",
+        "bias_add"
+      ],
+      "impl": {
+        "function": "gemv_fused_q8_0_bias_dispatch",
+        "header": "gemv_fused_quant_bias.h",
+        "sources": [
+          "src/kernels/fused/gemv_fused_quant_bias.c"
+        ]
+      },
+      "notes": "Fused quantize + GEMV (Q8_0 weights) + bias.",
+      "name": "gemv_fused_q8_0_bias",
+      "_source_file": "gemv_fused_q8_0_bias.json"
     },
     {
       "id": "gemv_q4_k",

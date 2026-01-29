@@ -1,5 +1,17 @@
 var NAVTREEINDEX11 =
 {
+"structCKMemSpan.html#a818835e50806e8d1fd141cf97b4ea806":[1,0,39,0],
+"structCKMemSpan.html#af281883bfadbea82697819bbf12aa759":[1,0,39,2],
+"structCKMergeRule.html":[1,0,40],
+"structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,40,0],
+"structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,40,3],
+"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,40,1],
+"structCKMergeRule.html#af89e288682de3079e22683c57b629d4c":[1,0,40,2],
+"structCKMetric.html":[1,0,41],
+"structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56":[1,0,41,3],
+"structCKMetric.html#a113674774faddfa6441f1da3a19ffe92":[1,0,41,2],
+"structCKMetric.html#a303423e9bf3c73c0111cfc897e515f40":[1,0,41,0],
+"structCKMetric.html#a66cf826792831f5ee95765f637ca795c":[1,0,41,1],
 "structCKMetric.html#ac7fc629fa6869ee876ee3cdb097ebd38":[1,0,41,4],
 "structCKMetric.html#ad0ca8343bf6c7d34f380835d0d7ec484":[1,0,41,5],
 "structCKMetricsContext.html":[1,0,42],
@@ -237,17 +249,5 @@ var NAVTREEINDEX11 =
 "structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,9,1],
 "structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,9,5],
 "structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,9,2],
-"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3],
-"structCacheTopology.html":[1,0,10],
-"structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,10,1],
-"structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,10,2],
-"structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,10,0],
-"structGEMMParams.html":[1,0,61],
-"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,61,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,61,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,61,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,61,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,61,4],
-"structMemoryInfo.html":[1,0,62],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,62,10]
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3]
 };

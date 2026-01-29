@@ -47,10 +47,6 @@ jobs:
           pip install -r requirements.txt
           pip install huggingface_hub torch
 
-      - name: Download SmolLM-135M model
-        run: |
-          python3 -c "from huggingface_hub import snapshot_download; import os; target = os.path.expanduser('~/.cache/huggingface/hub/SmolLM-135M'); print(f'Downloading SmolLM-135M to {target}...'); snapshot_download('HuggingFaceTB/SmolLM-135M', local_dir=target); print('Done!')"
-
       - name: Build CK-Engine
         run: |
           make clean || true

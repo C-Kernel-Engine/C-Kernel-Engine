@@ -1,6 +1,7 @@
 var true__bpe_8c =
 [
     [ "INITIAL_TOKEN_CAPACITY", "true__bpe_8c.html#aeee34d11578416e6e7ba54873260f34d", null ],
+    [ "MAX_SPECIAL_TOKENS", "true__bpe_8c.html#a524e748db6389290da3a8fd267964ec4", null ],
     [ "MAX_TOKEN_LEN", "true__bpe_8c.html#a3f6d16dfdf7920e1e5f1dad5db5347f2", null ],
     [ "MERGE_HASH_SIZE", "true__bpe_8c.html#aa4cd3b9c68870f9874e953080d27b0a7", null ],
     [ "ChunkType", "true__bpe_8c.html#a6742d03aa1e93ba39b234d0ea402ee6d", [
@@ -13,6 +14,7 @@ var true__bpe_8c =
     [ "byte_to_gpt2", "true__bpe_8c.html#ae3fa01999c02fdd82a6745e66e5bc74e", null ],
     [ "ck_true_bpe_add_merge", "true__bpe_8c.html#a727da777d7f46240f3836da6055b6759", null ],
     [ "ck_true_bpe_add_merge_by_tokens", "true__bpe_8c.html#ae818deba4ff4981c20c903bfffb2fdb6", null ],
+    [ "ck_true_bpe_add_special_token", "true__bpe_8c.html#a9b0c686592d0ec09b01d151eb0177eb6", null ],
     [ "ck_true_bpe_add_token", "true__bpe_8c.html#ac1960ecac16a47716d98aee961070323", null ],
     [ "ck_true_bpe_create", "true__bpe_8c.html#a5a78bb4542b285c7f2f1fb0187444544", null ],
     [ "ck_true_bpe_decode", "true__bpe_8c.html#a11af45a409593cf28602d2cbfb3df00e", null ],
@@ -27,7 +29,9 @@ var true__bpe_8c =
     [ "ck_true_bpe_set_special_ids", "true__bpe_8c.html#a5abdd31dde87c8f630e7a394c2cc7764", null ],
     [ "ck_true_bpe_vocab_size", "true__bpe_8c.html#abcefe990fad8049af6c05fa756c518b5", null ],
     [ "encode_chunk", "true__bpe_8c.html#a745ee862b3e4ffa89ecc661e34abbaf2", null ],
+    [ "encode_text_segment", "true__bpe_8c.html#a30574b55ec72a727488295e15314071a", null ],
     [ "find_best_merge", "true__bpe_8c.html#ab3bb7d16e6375ff25bae21d80f35a1a7", null ],
+    [ "gpt2_decode_byte", "true__bpe_8c.html#a711ac97ec60e5b0e1daed4478a97c054", null ],
     [ "gpt2_pretokenize", "true__bpe_8c.html#a75677b0ab168d7bf958f8d1b258f016a", null ],
     [ "init_tokens_from_text", "true__bpe_8c.html#a658fd44fe4b1abd5a95855fdb35775bf", null ],
     [ "is_bpe_digit", "true__bpe_8c.html#a6f0f624284b853f714b83338e9b07b74", null ],
@@ -39,6 +43,7 @@ var true__bpe_8c =
     [ "is_letter", "true__bpe_8c.html#a2661d3a5aec088c75126c08a32e355d1", null ],
     [ "is_whitespace", "true__bpe_8c.html#a8f8799a3df3ab598e163ab91b50423c6", null ],
     [ "is_word_prefix_char", "true__bpe_8c.html#ab5b6476ecc972bb40a826d6066a98817", null ],
+    [ "match_special_token", "true__bpe_8c.html#aa55a40014a7c834ab58b172d1a1b62f2", null ],
     [ "merge_hash", "true__bpe_8c.html#aaaa185f311d9d89550cb0b8223c5dcc3", null ],
     [ "merge_key", "true__bpe_8c.html#ad85c42e889510c385f21508b66d103b5", null ],
     [ "merge_table_create", "true__bpe_8c.html#acca11f8747f0bdef7f6cd3456497752b", null ],

@@ -1205,7 +1205,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-27 07:13</span>
+        <span class="folder-updated">Updated: 2026-01-28 19:03</span>
     </div>
     <pre class="tree-output">
 .
@@ -1535,6 +1535,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- decoder_layer_plan.json
 |   |-- global_buffers.json
 |   `-- README.md
+|-- layer_dumps
 |-- llama.cpp
 |   |-- benches
 |   |   `-- dgx-spark
@@ -1951,6 +1952,9 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- convert_hf_to_gguf_update.py
 |   |-- convert_llama_ggml_to_gguf.py
 |   |-- convert_lora_to_gguf.py
+|   |-- debug_kv.py
+|   |-- dump_llama_prompt.cpp
+|   |-- dump_llama_tokens.cpp
 |   |-- flake.lock
 |   |-- flake.nix
 |   |-- LICENSE
@@ -1961,7 +1965,9 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- pyrightconfig.json
 |   |-- README.md
 |   |-- requirements.txt
-|   `-- SECURITY.md
+|   |-- SECURITY.md
+|   `-- verify_decode_only.py
+|-- llama_dump
 |-- logs
 |   |-- 2025-12-26-training-fix
 |   |   |-- CHANGES.md
@@ -2002,7 +2008,10 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- Screenshot 2026-01-17 at 04-54-27 TestReport C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-22 at 05-15-39 C-Kernel-Engine_site_nightly-results at gh-pages · antshiv_C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-22 at 05-20-39 antshiv_C-Kernel-Engine at gh-pages.png
-|   `-- Screenshot 2026-01-27 at 06-57-43 IR Visualizer C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-27 at 06-57-43 IR Visualizer C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-28 at 09-35-57 TestReport C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-28 at 18-53-50 VersionHistory C-Kernel-Engine.png
+|   `-- Screenshot 2026-01-28 at 18-59-19 VersionHistory C-Kernel-Engine.png
 |-- scripts
 |   |-- test
 |   |   |-- compare_perf_results.py
@@ -2419,6 +2428,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   `-- system_topology.c
 |-- test_results
 |   `-- mega_fused_test_report.json
+|-- tests
+|   `-- test_v66_decode_regression.py
 |-- tools
 |   |-- cache_analysis.py
 |   |-- ck.c
@@ -2443,6 +2454,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   `-- mini_v4.config.json
 |   |-- fusion
 |   |   |-- test_gemm_vs_gemv.c
+|   |   |-- test_gemv_fused_quant_bias.py
 |   |   |-- test_mega_fused_attention_prefill.py
 |   |   |-- test_mega_fused_attention_prefill_q8_0.py
 |   |   |-- test_mega_fused_attention.py
@@ -2541,6 +2553,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_tokenizer_unified.py
 |   |-- test_topk.py
 |   |-- test_true_bpe_parity.py
+|   |-- test_true_bpe_special_tokens.py
 |   |-- test_utils.py
 |   |-- test_v4_conversion.py
 |   |-- test_vision.py
@@ -2569,17 +2582,16 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |       `-- V6_6_UPGRADE_PLAN.md
 |-- add_int8_kernel.sh
 |-- benchmark_gemm_vs_fp32.py
+|-- check_mlp_down_buffers.sh
 |-- c-kernel-engine-power-infographic.svg
 |-- ck-kernel-inference-int8.c
-|-- compare_vs_llamacpp.py
-|-- compare_with_llamacpp.py
 |-- config.json
 |-- CONTRIBUTING.md
 |-- debug_code.c
-|-- debug_v6_compare.py
-|-- debug_v6_output.py
 |-- default.config.json
 |-- default.json
+|-- dump_llama
+|-- dump_llama_layer.cpp
 |-- interactive-infographic.html
 |-- llama.cpp_comparison_test.cpp
 |-- Makefile
@@ -2590,22 +2602,20 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- run_flamegraph_v6.sh
 |-- test_kernel_compare
 |-- test_kernel_compare.c
-|-- test_layer_by_layer.py
 |-- test_out.log
-|-- test_q4k_packing.py
-|-- test_qproj_compare.py
 |-- test_v65_detailed
 |-- test_v65_detailed.c
 |-- test_v66_detailed
 |-- test_v66_detailed.c
-|-- test_v66_inference.py
 |-- test_v66_runtime_load
 |-- test_v66_runtime_load.c
 |-- test_vs_llamacpp.cpp
 |-- v6.5-profile.svg
-`-- verify_numerical_parity.py
+|-- v6.6_prompt.txt
+|-- valdiate_buffer.txt
+`-- valdiate_data_flow.txt
 
-198 directories, 1197 files
+201 directories, 1204 files
 </pre>
 </div>
 
@@ -2857,7 +2867,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-27</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-28</p>
             </div>
         </div>
     </footer>

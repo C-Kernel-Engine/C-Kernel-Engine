@@ -219,6 +219,7 @@ SRCS    := src/backend_native.c \
             src/kernels/fused/mega_fused_attention_prefill.c \
             src/kernels/fused/mega_fused_attention_prefill_q8_0.c \
             src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+            src/kernels/fused/gemv_fused_quant_bias.c \
             src/kernels/gemm_head_major_output.c \
             src/kernels/gemm_microkernel.c \
 	           src/kernels/layernorm_kernels.c \
@@ -712,6 +713,19 @@ test-mega-fused-block-7b: $(LIB)
 		$(PYTHON) $(PYTHONFLAGS) unittest/test_fused_attention_mlp.py \
 		--embed 4096 --intermediate 11008 --heads 32 --kv-heads 32 --head-dim 128 --seq-len 512
 
+# Test fused GEMV kernels (quantize + gemv + bias)
+test-fusion-gemv: $(LIB)
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║  FUSED GEMV TEST: quantize_row_q8_0 + gemv + bias_add                ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_gemv_fused_quant_bias.py
+
+test-fusion-gemv-quick: $(LIB)
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) $(PYTHONFLAGS) unittest/fusion/test_gemv_fused_quant_bias.py --quick
+
 # All fusion tests combined
 test-fusion-all: $(LIB)
 	@echo ""
@@ -720,16 +734,19 @@ test-fusion-all: $(LIB)
 	@echo "╠══════════════════════════════════════════════════════════════════════╣"
 	@echo "║  1. RMSNorm + QKV fusion                                             ║"
 	@echo "║  2. Mega-fused Attention + MLP block                                 ║"
+	@echo "║  3. Fused GEMV (quantize + gemv + bias)                              ║"
 	@echo "╚══════════════════════════════════════════════════════════════════════╝"
 	@$(MAKE) --no-print-directory test-fused
 	@echo ""
 	@$(MAKE) --no-print-directory test-mega-fused-block
 	@echo ""
+	@$(MAKE) --no-print-directory test-fusion-gemv
+	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════════════╗"
 	@echo "║                    ALL FUSION TESTS COMPLETE                         ║"
 	@echo "╚══════════════════════════════════════════════════════════════════════╝"
 
-.PHONY: test-mega-fused-block test-mega-fused-block-7b test-fusion-all
+.PHONY: test-mega-fused-block test-mega-fused-block-7b test-fusion-all test-fusion-gemv test-fusion-gemv-quick
 
 ir-v2-meta: $(IR_V2_DEMO)
 	@echo "Generating IR v2 from $(CONFIG) + $(IR_V2_META)..."
@@ -2053,6 +2070,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/attention_flash_true.c \
                src/kernels/fused/prefill_fused_gemm.c \
                src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+               src/kernels/fused/gemv_fused_quant_bias.c \
                src/kernels/add_kernels_bf16.c
 
 LIB_PARITY := $(BUILD_DIR)/libck_parity.so
@@ -2131,6 +2149,7 @@ TEST_HARNESS_SRCS := src/backend_native.c \
 	src/kernels/fused/mega_fused_attention_prefill.c \
 	src/kernels/fused/mega_fused_attention_prefill_q8_0.c \
 	src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
+	src/kernels/fused/gemv_fused_quant_bias.c \
 	src/kernels/gemm_head_major_output.c \
 	src/kernels/gemm_microkernel.c \
 	src/kernels/layernorm_kernels.c \

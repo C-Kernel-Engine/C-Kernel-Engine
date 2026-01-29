@@ -9,6 +9,7 @@ var ck__cli__v6_86_8c =
     [ "CK_CLI_VERSION", "ck__cli__v6_86_8c.html#af40b97e43c83401d927b8c8d34546ef3", null ],
     [ "EOS_PATTERN_BUF_SIZE", "ck__cli__v6_86_8c.html#aa0c85f374e34dcd53f4d9d7a7f32d13f", null ],
     [ "EOS_PENDING_MAX", "ck__cli__v6_86_8c.html#a79afc0e25978b6cfaafdaa876d2b59a9", null ],
+    [ "SAMPLE_NEXT_TOKEN", "ck__cli__v6_86_8c.html#ae495880372db70e28128c93942bb488f", null ],
     [ "decode_t", "ck__cli__v6_86_8c.html#a97d23c9b1367e79d27112bf0efe43afa", null ],
     [ "embed_t", "ck__cli__v6_86_8c.html#a268b869c9b68d62c6605f97ae19e63a1", null ],
     [ "forward_t", "ck__cli__v6_86_8c.html#a787e30713d4547eef024a2da0c9f26a7", null ],

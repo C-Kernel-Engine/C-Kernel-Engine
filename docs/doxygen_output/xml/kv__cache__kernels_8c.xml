@@ -239,6 +239,72 @@
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a40fd2085b4a6972bdd956e1080459611" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5741" endline="5873">qwen2_0_5b_decode_layer_8_decode</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a9cdc13ab71c3c11ffd53fbb205b1c423" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="5878" endline="6010">qwen2_0_5b_decode_layer_9_decode</referencedby>
       </memberdef>
+      <memberdef kind="function" id="kv__cache__kernels_8c_1aea95247a7e5d56f78b56f3d48bac580a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void logits_copy_to_position</definition>
+        <argsstring>(const float *__restrict src, float *__restrict dst, int position, int vocab_size)</argsstring>
+        <name>logits_copy_to_position</name>
+        <param>
+          <type>const float *__restrict</type>
+          <declname>src</declname>
+        </param>
+        <param>
+          <type>float *__restrict</type>
+          <declname>dst</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>position</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>vocab_size</declname>
+        </param>
+        <briefdescription>
+<para>Copy logits to position-indexed location in output buffer. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Used in decode mode to copy single-token logits from position 0 to the correct sequence position. This moves buffer management logic from codegen to the IR layer, making codegen &quot;dumb&quot; - just emit kernel calls, no runtime if-statements.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>src</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Source logits buffer (single token) [vocab_size] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>dst</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Destination logits buffer [max_seq_len, vocab_size] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>position</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Token position index (0-based) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>vocab_size</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of logits per token </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/kv_cache_kernels.c" line="134" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/kv_cache_kernels.c" bodystart="134" bodyend="147"/>
+        <references refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" compoundref="true__bpe_8h" startline="185">vocab_size</references>
+      </memberdef>
       </sectiondef>
     <briefdescription>
 <para>KV-cache helper kernels (head-major layout) </para>
@@ -378,6 +444,34 @@
 <codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>head_dim,</highlight></codeline>
 <codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>head_dim);</highlight></codeline>
 <codeline lineno="119"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="121"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="122"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Copy<sp/>logits<sp/>to<sp/>position-indexed<sp/>location<sp/>in<sp/>output<sp/>buffer.</highlight></codeline>
+<codeline lineno="123"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="124"><highlight class="comment"><sp/>*<sp/>Used<sp/>in<sp/>decode<sp/>mode<sp/>to<sp/>copy<sp/>single-token<sp/>logits<sp/>from<sp/>position<sp/>0<sp/>to</highlight></codeline>
+<codeline lineno="125"><highlight class="comment"><sp/>*<sp/>the<sp/>correct<sp/>sequence<sp/>position.<sp/>This<sp/>moves<sp/>buffer<sp/>management<sp/>logic</highlight></codeline>
+<codeline lineno="126"><highlight class="comment"><sp/>*<sp/>from<sp/>codegen<sp/>to<sp/>the<sp/>IR<sp/>layer,<sp/>making<sp/>codegen<sp/>&quot;dumb&quot;<sp/>-<sp/>just<sp/>emit</highlight></codeline>
+<codeline lineno="127"><highlight class="comment"><sp/>*<sp/>kernel<sp/>calls,<sp/>no<sp/>runtime<sp/>if-statements.</highlight></codeline>
+<codeline lineno="128"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="129"><highlight class="comment"><sp/>*<sp/>@param<sp/>src<sp/><sp/><sp/><sp/><sp/><sp/><sp/>Source<sp/>logits<sp/>buffer<sp/>(single<sp/>token)<sp/>[vocab_size]</highlight></codeline>
+<codeline lineno="130"><highlight class="comment"><sp/>*<sp/>@param<sp/>dst<sp/><sp/><sp/><sp/><sp/><sp/><sp/>Destination<sp/>logits<sp/>buffer<sp/>[max_seq_len,<sp/>vocab_size]</highlight></codeline>
+<codeline lineno="131"><highlight class="comment"><sp/>*<sp/>@param<sp/>position<sp/><sp/>Token<sp/>position<sp/>index<sp/>(0-based)</highlight></codeline>
+<codeline lineno="132"><highlight class="comment"><sp/>*<sp/>@param<sp/>vocab_size<sp/>Number<sp/>of<sp/>logits<sp/>per<sp/>token</highlight></codeline>
+<codeline lineno="133"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="134" refid="kv__cache__kernels_8c_1aea95247a7e5d56f78b56f3d48bac580a" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="kv__cache__kernels_8c_1aea95247a7e5d56f78b56f3d48bac580a" kindref="member">logits_copy_to_position</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*__restrict<sp/>src,</highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*__restrict<sp/>dst,</highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>position,</highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>)</highlight></codeline>
+<codeline lineno="138"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!src<sp/>||<sp/>!dst<sp/>||<sp/>position<sp/>&lt;<sp/>0<sp/>||<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref><sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"></highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Copy<sp/>logits<sp/>to<sp/>dst[position<sp/>*<sp/>vocab_size<sp/>:<sp/>(position+1)<sp/>*<sp/>vocab_size]</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Use<sp/>memmove<sp/>for<sp/>safety<sp/>in<sp/>case<sp/>src<sp/>and<sp/>dst<sp/>overlap<sp/>(e.g.,<sp/>src<sp/>==<sp/>dst)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*dst_pos<sp/>=<sp/>dst<sp/>+<sp/>(size_t)position<sp/>*<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)<ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>;</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"><sp/><sp/><sp/><sp/>memmove(dst_pos,<sp/>src,<sp/>(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal">)<ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref><sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal">));</highlight></codeline>
+<codeline lineno="147"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/kv_cache_kernels.c"/>
   </compounddef>

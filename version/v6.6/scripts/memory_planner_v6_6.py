@@ -199,8 +199,9 @@ class MemoryPlanner:
         current_layer = -1
 
         for op in ir1_ops:
-            # Handle both IR1 (op_id) and IR Lower 1 (idx) formats
-            op_id = op.get("op_id", op.get("idx", -1))
+            # Prefer idx (unique sequential index from IR Lower 1) over op_id
+            # (which comes from IR1 and can collide after fusion/insertion)
+            op_id = op.get("idx", op.get("op_id", -1))
             op_type = op.get("op", "")
             layer = op.get("layer", -1)
             dataflow = op.get("dataflow", {})
@@ -212,6 +213,7 @@ class MemoryPlanner:
             # Plan this op's buffer assignment
             assignment = self._plan_op(op_id, op_type, layer, dataflow)
             self.assignments[op_id] = assignment
+
 
         return self.assignments
 
@@ -230,6 +232,15 @@ class MemoryPlanner:
         for output_name, output_info in dataflow.get("outputs", {}).items():
             buffer, dtype = self._get_output_buffer(op_id, op_type, output_name, output_info)
             outputs_assignment[output_name] = {"buffer": buffer, "dtype": dtype}
+
+        # For known op types without dataflow outputs (e.g., fused ops),
+        # generate default output assignment so state tracking stays correct
+        if not outputs_assignment and op_type in (
+            "out_proj", "mlp_gate_up", "mlp_down", "residual_add",
+            "rmsnorm", "dense_embedding_lookup", "residual_save",
+        ):
+            buffer, dtype = self._get_output_buffer(op_id, op_type, "y", {"dtype": "fp32"})
+            outputs_assignment["y"] = {"buffer": buffer, "dtype": dtype}
 
         # Handle ping-pong for specific ops
         self._handle_pingpong(op_type)
@@ -261,11 +272,17 @@ class MemoryPlanner:
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "out_proj":
-            # out_proj reads quantized attention output
+            if dtype == "fp32":
+                # Fused op: quantize absorbed, reads FP32 from attention scratch
+                return "A_ATTN_SCRATCH", "fp32"
+            # Unfused: reads quantized attention output
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "mlp_gate_up":
-            # mlp_gate_up reads quantized input after second rmsnorm
+            if dtype == "fp32":
+                # Fused op: quantize absorbed, reads FP32 from main stream
+                return self.state.main_stream_buffer, "fp32"
+            # Unfused: reads quantized input after second rmsnorm
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "mlp_down":

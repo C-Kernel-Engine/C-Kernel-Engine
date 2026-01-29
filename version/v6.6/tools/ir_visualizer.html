@@ -316,6 +316,26 @@
         .dtype-q4_k { background: rgba(243, 156, 18, 0.2); color: #f39c12; }
         .dtype-q6_k { background: rgba(52, 152, 219, 0.2); color: #3498db; }
 
+        /* Folder button */
+        .controls label[title*="folder"] {
+            background: var(--dark-card);
+        }
+
+        /* Interpretability panel */
+        .parity-section {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: var(--dark-card);
+            border-radius: 8px;
+            border: 1px solid var(--grey);
+        }
+        .parity-section h3 {
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         /* Kernel Flow */
         .layer-container {
             margin: 1rem 0;
@@ -666,10 +686,15 @@
     </header>
 
     <div class="controls">
-        <label><input type="file" id="ir1File" accept=".json" onchange="loadIR1(event)">Load IR1 (Dataflow)</label>
-        <label><input type="file" id="layoutFile" accept=".json" onchange="loadLayout(event)">Load Layout JSON</label>
+        <label title="Select a folder containing model files">
+            <input type="file" id="folderInput" webkitdirectory directory multiple onchange="loadFolder(event)">
+            📁 Load Folder
+        </label>
+        <label><input type="file" id="ir1File" accept=".json" onchange="loadIR1(event)">Load IR1</label>
+        <label><input type="file" id="layoutFile" accept=".json" onchange="loadLayout(event)">Load Layout</label>
         <label><input type="file" id="loweredFile" accept=".json" onchange="loadLowered(event)">Load Lowered IR</label>
-        <label><input type="file" id="callFile" accept=".json" onchange="loadCallIR(event)">Load Call IR</label>
+        <label><input type="file" id="manifestFile" accept=".json" onchange="loadManifest(event)">Load Manifest</label>
+        <label><input type="file" id="bumpFile" accept=".bump,.bin" onchange="loadBUMP(event)">Load BUMP</label>
         <button onclick="loadFromCache()">Load from Cache</button>
         <select id="modeSelect" onchange="switchMode()">
             <option value="decode">Decode Mode</option>
@@ -688,6 +713,7 @@
     <div class="tabs">
         <div class="tab active" onclick="showTab('memory')">Memory Layout</div>
         <div class="tab" onclick="showTab('kernels')">Kernel Flow</div>
+        <div class="tab" onclick="showTab('interpretability')">Interpretability</div>
         <div class="tab" onclick="showTab('quantization')">Quantization Audit</div>
         <div class="tab" onclick="showTab('parity')">Parity Debug</div>
         <div class="tab" onclick="showTab('dataflow')">Dataflow Graph</div>
@@ -750,6 +776,67 @@
 
             <div id="graphContainer" style="width: 100%; height: 600px; border: 1px solid var(--grey); border-radius: 8px; background: var(--dark); overflow: hidden;"></div>
             <div id="kernelFlow"></div>
+        </div>
+
+        <!-- Interpretability Panel -->
+        <div id="interpretability" class="panel">
+            <h2 style="margin-bottom: 1rem;">Mechanistic Interpretability</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Analyze BUMP weights, neuron activations, and attention patterns to understand model internals.
+            </p>
+
+            <div id="bumpSection">
+                <div class="stats-grid" id="bumpStats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="bumpSize">--</div>
+                        <div class="stat-label">File Size</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="bumpLayers">--</div>
+                        <div class="stat-label">Layers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="bumpDtypes">--</div>
+                        <div class="stat-label">Dtypes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="bumpWeights">--</div>
+                        <div class="stat-label">Weight Tensors</div>
+                    </div>
+                </div>
+
+                <div class="parity-section">
+                    <h3><span class="badge badge-orange">Weights</span> Weight Distribution</h3>
+                    <div id="weightDistribution" style="background: var(--dark); border-radius: 8px; padding: 1rem; margin-top: 1rem; min-height: 200px;">
+                        <p style="color: var(--text-muted); text-align: center; padding: 2rem;">
+                            Load a BUMP file to see weight distributions
+                        </p>
+                    </div>
+                </div>
+
+                <div class="parity-section">
+                    <h3><span class="badge badge-green">Tensors</span> Tensor Metadata</h3>
+                    <div id="tensorList" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                        <p style="color: var(--text-muted);">Load manifest.json to see tensor list...</p>
+                    </div>
+                </div>
+
+                <div class="parity-section">
+                    <h3><span class="badge badge-red">Analysis</span> Activation Analysis</h3>
+                    <div id="activationAnalysis" style="margin-top: 1rem;">
+                        <p style="color: var(--text-muted);">
+                            Load IR + BUMP to analyze neuron activations and attention patterns.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="folderFiles" style="margin-top: 1.5rem; padding: 1rem; background: var(--dark-card); border-radius: 8px;">
+                <h4 style="margin-bottom: 0.75rem;">Loaded Files</h4>
+                <div id="fileList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem;">
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">No files loaded yet. Select a folder or individual files.</p>
+                </div>
+            </div>
         </div>
 
         <div id="quantization" class="panel">
@@ -1146,6 +1233,7 @@ python test_gemv_q8_0_q8_0.py</pre>
         let layoutData = null;
         let loweredData = null;
         let callData = null;
+        let manifestData = null;
 
         function formatBytes(bytes) {
             if (bytes >= 1024*1024*1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
@@ -1157,7 +1245,7 @@ python test_gemv_q8_0_q8_0.py</pre>
         function showTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            const tabOrder = ['memory','kernels','quantization','parity','dataflow','tests','stats'];
+            const tabOrder = ['memory','kernels','interpretability','quantization','parity','dataflow','tests','stats'];
             document.querySelector(`.tab:nth-child(${tabOrder.indexOf(tabId)+1})`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
 
@@ -1207,6 +1295,20 @@ python test_gemv_q8_0_q8_0.py</pre>
                 loweredData = JSON.parse(e.target.result);
                 renderKernelFlow();
                 renderStats();
+            };
+            reader.readAsText(file);
+        }
+
+        function loadManifest(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                manifestData = JSON.parse(e.target.result);
+                renderTensorList();
+                // Update bump stats if loaded
+                document.getElementById('bumpLayers').textContent = manifestData?.config?.n_layers || '--';
+                document.getElementById('bumpDtypes').textContent = '--';
+                document.getElementById('bumpWeights').textContent = manifestData?.weights?.length || '--';
             };
             reader.readAsText(file);
         }
@@ -1356,16 +1458,117 @@ python test_gemv_q8_0_q8_0.py</pre>
             const weightsBody = document.querySelector('#weightsTable tbody');
             weightsBody.innerHTML = '';
 
+            // Get config for shape inference
+            const config = layoutData.config || {};
+            const embedDim = config.embed_dim || 896;
+            const numLayers = config.num_layers || 24;
+            const numHeads = config.num_heads || 14;
+            const numKVHeads = config.num_kv_heads || 2;
+            const headDim = config.head_dim || 64;
+            const intermediateSize = config.intermediate_size || 4864;
+            const vocabSize = config.vocab_size || 151936;
+
+            // Shape inference map
+            function inferShape(name, dtype, size) {
+                const n = name.toLowerCase();
+
+                // Handle quantized sizes to infer shape
+                const bytesPerElement = getDtypeBytes(dtype);
+                const elements = Math.round(size / bytesPerElement);
+
+                if (n.includes('token_embedding') || n.includes('tok_emb')) {
+                    return [vocabSize, embedDim];
+                }
+                if (n.includes('wq') || n.includes('w_q')) {
+                    return [embedDim, embedDim]; // actually [num_heads * head_dim, embed_dim]
+                }
+                if (n.includes('wk') || n.includes('w_k')) {
+                    return [numKVHeads * headDim, embedDim];
+                }
+                if (n.includes('wv') || n.includes('w_v')) {
+                    return [numKVHeads * headDim, embedDim];
+                }
+                if (n.includes('wo') || n.includes('w_o')) {
+                    return [embedDim, embedDim];
+                }
+                if (n.includes('w1') || n.includes('gate')) {
+                    return [intermediateSize, embedDim];
+                }
+                if (n.includes('w2') || n.includes('down')) {
+                    return [embedDim, intermediateSize];
+                }
+                if (n.includes('w3') || n.includes('up')) {
+                    return [intermediateSize, embedDim];
+                }
+                if (n.includes('ln_weight') || n.includes('gamma')) {
+                    return [embedDim];
+                }
+                if (n.includes('ln_bias') || n.includes('beta')) {
+                    return [embedDim];
+                }
+                if (n.includes('final_ln')) {
+                    return [embedDim];
+                }
+                if (n.includes('head')) {
+                    return [vocabSize, embedDim];
+                }
+                if (n.includes('b') && n.match(/\d/)) {
+                    // Bias vectors
+                    if (n.includes('q') || n.includes('k') || n.includes('v')) {
+                        return [numHeads * headDim];
+                    }
+                    if (n.includes('o')) {
+                        return [embedDim];
+                    }
+                    if (n.includes('1') || n.includes('gate')) {
+                        return [intermediateSize];
+                    }
+                    if (n.includes('2') || n.includes('down')) {
+                        return [embedDim];
+                    }
+                }
+                return null; // Can't infer
+            }
+
+            function getDtypeBytes(dtype) {
+                const d = dtype.toLowerCase();
+                if (d.includes('q4') || d.includes('q5') || d.includes('q6')) {
+                    // Quantized - estimate 0.5-0.75 bytes per element
+                    return 0.625; // Average for Q4_K
+                }
+                if (d.includes('q8')) return 1.0;
+                if (d.includes('f16') || d.includes('bf16')) return 2;
+                if (d.includes('f32')) return 4;
+                return 4;
+            }
+
+            function formatShape(shape) {
+                if (!shape || shape.length === 0) return '-';
+                if (shape.length === 1) return `[${shape[0]}]`;
+                return shape.join(' × ');
+            }
+
             weightsEntries.forEach(w => {
                 const size = parseInt(w.size) || 0;
                 totalWeightSize += size;
+                let shape = w.shape || [];
+                let shapeStr = shape.length > 0 ? formatShape(shape) : '-';
+
+                // Try to infer shape if not present
+                if (shape.length === 0 && w.name && w.dtype) {
+                    const inferred = inferShape(w.name, w.dtype, size);
+                    if (inferred) {
+                        shapeStr = formatShape(inferred);
+                    }
+                }
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${w.name || w.key || '-'}</td>
                     <td class="offset">0x${(parseInt(w.offset) || 0).toString(16)}</td>
                     <td class="size">${formatBytes(size)}</td>
                     <td><span class="dtype dtype-${(w.dtype || 'unknown').replace('_', '_')}">${w.dtype || '-'}</span></td>
-                    <td>${JSON.stringify(w.shape || [])}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${shapeStr}</td>
                 `;
                 weightsBody.appendChild(row);
             });
@@ -1377,12 +1580,20 @@ python test_gemv_q8_0_q8_0.py</pre>
             activationBuffers.forEach(a => {
                 const size = parseInt(a.size) || 0;
                 totalActivationSize += size;
+
+                // Try to infer shape if not present
+                let shapeStr = (a.shape || []).join(' × ') || '-';
+                if ((a.shape || []).length === 0 && a.name) {
+                    const inferred = inferActivationShape(a.name, size);
+                    if (inferred) shapeStr = inferred;
+                }
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${a.name || '-'}</td>
                     <td class="offset">0x${(parseInt(a.offset) || 0).toString(16)}</td>
                     <td class="size">${formatBytes(size)}</td>
-                    <td>${JSON.stringify(a.shape || [])}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${shapeStr}</td>
                     <td>${a.usage || '-'}</td>
                 `;
                 activationsBody.appendChild(row);
@@ -1419,10 +1630,21 @@ python test_gemv_q8_0_q8_0.py</pre>
                 if (entry.name === 'kv_cache') block.className += ' kv-cache';
                 if (entry.name && entry.name.includes('scratch')) block.className += ' scratch';
 
+                // Get or infer shape
+                let shapeStr = '';
+                if (entry.shape && entry.shape.length > 0) {
+                    shapeStr = entry.shape.join('×');
+                } else {
+                    // Try to get from config or infer
+                    shapeStr = inferActivationShape(entry.name, size);
+                }
+
+                const label = width > 10 ? `${entry.name || entry.key || ''}\n[${shapeStr}]` : '';
+
                 block.style.left = `${(currentOffset / totalSize) * 100}%`;
                 block.style.width = `${width}%`;
-                block.textContent = width > 5 ? (entry.name || entry.key || '').substring(0, 12) : '';
-                block.title = `${entry.name || entry.key}\nOffset: 0x${(entry.offset || 0).toString(16)}\nSize: ${formatBytes(size)}`;
+                block.textContent = label;
+                block.title = `${entry.name || entry.key}\nShape: [${shapeStr}]\nOffset: 0x${(entry.offset || 0).toString(16)}\nSize: ${formatBytes(size)}`;
 
                 block.onmouseenter = (e) => showTooltip(e, entry);
                 block.onmouseleave = hideTooltip;
@@ -1430,6 +1652,33 @@ python test_gemv_q8_0_q8_0.py</pre>
                 bar.appendChild(block);
                 currentOffset += size;
             });
+        }
+
+        function inferActivationShape(name, size) {
+            const n = name.toLowerCase();
+            const bytesPerElement = 4; // activations usually FP32
+            const elements = Math.round(size / bytesPerElement);
+
+            if (n.includes('hidden') || n.includes('activations')) {
+                // Try to infer from config
+                const config = layoutData?.config || {};
+                const seqLen = config.context_length || 1024;
+                const embedDim = config.embed_dim || 896;
+
+                // Check if it's closer to [1, seq_len, embed_dim] or [seq_len, embed_dim]
+                if (elements === seqLen * embedDim) return `${seqLen}×${embedDim}`;
+                if (elements === embedDim) return String(embedDim);
+            }
+            if (n.includes('logits')) return '151936';
+            if (n.includes('kvcache') || n.includes('kv_cache')) {
+                const config = layoutData?.config || {};
+                const layers = config.num_layers || 24;
+                const heads = config.num_kv_heads || 2;
+                const headDim = config.head_dim || 64;
+                const seqLen = config.context_length || 1024;
+                return `${layers}×${heads}×${headDim}×${seqLen}`;
+            }
+            return ''; // Can't infer
         }
 
         function renderKernelFlow() {
@@ -2309,6 +2558,261 @@ python test_gemv_q8_0_q8_0.py</pre>
 
         let ir1Data = null;
         let currentDfLayer = -1;
+        let loadedFiles = {}; // Track all loaded files from folder
+
+        // Load folder - webkitdirectory allows folder selection
+        function loadFolder(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            console.log(`Loading ${files.length} files from folder...`);
+            loadedFiles = {};
+
+            let loaded = 0;
+            const fileListDiv = document.getElementById('fileList');
+
+            // Process each file
+            Array.from(files).forEach(file => {
+                const path = file.webkitRelativePath || file.name;
+                const name = path.split('/').pop().toLowerCase();
+
+                loadedFiles[path] = {
+                    name: name,
+                    path: path,
+                    size: file.size,
+                    type: getFileType(name)
+                };
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const content = e.target.result;
+
+                        // Auto-detect file type and load
+                        if (name.endsWith('.json')) {
+                            const json = JSON.parse(content);
+                            loadedFiles[path].data = json;
+                            console.log(`Loaded JSON: ${name}`);
+                        } else if (name.endsWith('.bump') || name.endsWith('.bin')) {
+                            // Binary file - just store metadata for now
+                            loadedFiles[path].isBinary = true;
+                            loadedFiles[path].size = file.size;
+                            console.log(`Indexed binary: ${name}`);
+                        }
+
+                        loaded++;
+                        if (loaded === files.length) {
+                            updateFileList();
+                            autoLoadFromFolder();
+                        }
+                    } catch (err) {
+                        console.warn(`Error loading ${name}:`, err);
+                        loaded++;
+                    }
+                };
+
+                if (name.endsWith('.json')) {
+                    reader.readAsText(file);
+                } else {
+                    // Just index binary files
+                    loaded++;
+                    if (loaded === files.length) {
+                        updateFileList();
+                        autoLoadFromFolder();
+                    }
+                }
+            });
+        }
+
+        function getFileType(filename) {
+            const name = filename.toLowerCase();
+            if (name.includes('layout')) return 'layout';
+            if (name.includes('lowered')) return 'lowered';
+            if (name.includes('ir1') || name.includes('dataflow')) return 'ir1';
+            if (name.includes('call')) return 'call';
+            if (name.includes('manifest')) return 'manifest';
+            if (name.includes('weights') && name.includes('.bump')) return 'bump';
+            if (name.endsWith('.bump') || name.endsWith('.bin')) return 'binary';
+            if (name.endsWith('.json')) return 'json';
+            return 'unknown';
+        }
+
+        function updateFileList() {
+            const fileListDiv = document.getElementById('fileList');
+            const entries = Object.entries(loadedFiles);
+
+            if (entries.length === 0) {
+                fileListDiv.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No files loaded.</p>';
+                return;
+            }
+
+            fileListDiv.innerHTML = entries.map(([path, info]) => `
+                <div style="padding: 0.5rem; background: var(--dark); border-radius: 4px; font-size: 0.8rem;">
+                    <div style="color: var(--orange);">${info.name}</div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem;">${info.type} | ${formatBytes(info.size)}</div>
+                </div>
+            `).join('');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function autoLoadFromFolder() {
+            // Auto-load known file types
+            const entries = Object.entries(loadedFiles);
+
+            entries.forEach(([path, info]) => {
+                if (info.data) {
+                    const name = info.name.toLowerCase();
+
+                    if (name.includes('layout') && name.includes('decode')) {
+                        layoutData = info.data;
+                        renderMemoryLayout();
+                        console.log('Auto-loaded: layout_decode.json');
+                    } else if (name.includes('layout') && name.includes('prefill')) {
+                        layoutDataPrefill = info.data;
+                        console.log('Auto-loaded: layout_prefill.json');
+                    } else if (name.includes('lowered') && name.includes('decode')) {
+                        loweredData = info.data;
+                        renderKernelFlow();
+                        renderQuantAudit();
+                        console.log('Auto-loaded: lowered_decode.json');
+                    } else if (name.includes('lowered') && name.includes('prefill')) {
+                        loweredDataPrefill = info.data;
+                        console.log('Auto-loaded: lowered_prefill.json');
+                    } else if (name.includes('manifest')) {
+                        manifestData = info.data;
+                        renderTensorList();
+                        console.log('Auto-loaded: manifest');
+                    } else if (name.includes('ir1') || name.includes('dataflow')) {
+                        ir1Data = info.data;
+                        renderDataflow();
+                        console.log('Auto-loaded: ir1 dataflow');
+                    }
+                }
+            });
+
+            // Update bump stats if BUMP file found
+            const bumpFile = entries.find(([p, i]) => i.type === 'bump' || i.type === 'binary');
+            if (bumpFile) {
+                updateBumpStats(bumpFile[1]);
+            }
+        }
+
+        function updateBumpStats(bumpInfo) {
+            document.getElementById('bumpSize').textContent = formatBytes(bumpInfo.size);
+            document.getElementById('bumpLayers').textContent = manifestData?.config?.n_layers || '--';
+            document.getElementById('bumpDtypes').textContent = '--';
+            document.getElementById('bumpWeights').textContent = manifestData?.weights?.length || '--';
+        }
+
+        // Load BUMP file directly
+        function loadBUMP(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('bumpSize').textContent = formatBytes(file.size);
+
+            // For binary BUMP files, we can only show metadata
+            // Full parsing would require WASM or server-side processing
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const buffer = e.target.result;
+                const view = new DataView(buffer);
+
+                // Try to read BUMP header
+                try {
+                    const magic = view.getUint32(0, true);
+                    const version = view.getUint32(4, true);
+                    const numTensors = view.getUint32(8, true);
+
+                    document.getElementById('bumpLayers').textContent = version || '--';
+                    document.getElementById('bumpWeights').textContent = numTensors || '--';
+
+                    // Show header info
+                    showWeightDistribution(buffer, numTensors);
+                } catch (err) {
+                    console.warn('Could not parse BUMP header:', err);
+                    document.getElementById('bumpWeights').textContent = '?';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showWeightDistribution(buffer, numTensors) {
+            const container = document.getElementById('weightDistribution');
+
+            // Simple histogram visualization
+            const histogram = document.createElement('div');
+            histogram.style.display = 'flex';
+            histogram.style.alignItems = 'flex-end';
+            histogram.style.height = '150px';
+            histogram.style.gap = '2px';
+            histogram.style.padding = '1rem';
+            histogram.style.background = 'var(--dark-card)';
+            histogram.style.borderRadius = '4px';
+
+            // Sample data from buffer for visualization
+            const sampleSize = Math.min(1000, buffer.byteLength);
+            const bins = new Array(20).fill(0);
+
+            for (let i = 0; i < sampleSize; i += 4) {
+                const val = new Float32Array(buffer.slice(i, i + 4))[0] || 0;
+                const bin = Math.min(19, Math.max(0, Math.floor((val + 2) / 4 * 20)));
+                bins[bin]++;
+            }
+
+            const maxBin = Math.max(...bins);
+            bins.forEach((count, i) => {
+                const bar = document.createElement('div');
+                bar.style.flex = '1';
+                bar.style.height = `${(count / maxBin) * 100}%`;
+                bar.style.background = `hsl(${i * 18}, 70%, 50%)`;
+                bar.style.borderRadius = '2px 2px 0 0';
+                bar.title = `Bin ${i}: ${count} samples`;
+                histogram.appendChild(bar);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(histogram);
+
+            // Add legend
+            const legend = document.createElement('div');
+            legend.style.display = 'flex';
+            legend.style.justifyContent = 'space-between';
+            legend.style.fontSize = '0.75rem';
+            legend.style.color = 'var(--text-muted)';
+            legend.style.marginTop = '0.5rem';
+            legend.innerHTML = '<span>-2.0</span><span>0</span><span>+2.0</span>';
+            container.appendChild(legend);
+        }
+
+        function renderTensorList() {
+            const container = document.getElementById('tensorList');
+            if (!manifestData || !manifestData.weights) {
+                container.innerHTML = '<p style="color: var(--text-muted);">Load manifest.json to see tensors.</p>';
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Name</th><th>Shape</th><th>Dtype</th><th>Offset</th><th>Size</th></tr></thead><tbody>';
+
+            manifestData.weights.forEach(w => {
+                const shape = w.shape ? w.shape.join('×') : '?';
+                html += `<tr>
+                    <td>${w.name || '?'}</td>
+                    <td>${shape}</td>
+                    <td><span class="dtype dtype-${w.quantization || 'fp32'}">${w.quantization || 'fp32'}</span></td>
+                    <td class="offset">${w.offset || 0}</td>
+                    <td class="size">${w.size ? formatBytes(w.size) : '?'}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
 
         function loadIR1(event) {
             const file = event.target.files[0];

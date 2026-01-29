@@ -326,6 +326,28 @@
         {"name": "K", "source": "dim:_input_dim"}
       ]
     },
+    "gemv_fused_q5_0_bias_dispatch": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Fused quantize + GEMV (Q5_0 weights) + bias add. FP32 input, quantized internally."
+    },
+    "gemv_fused_q8_0_bias_dispatch": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Fused quantize + GEMV (Q8_0 weights) + bias add. FP32 input, quantized internally."
+    },
     "gemm_nt_q5_0": {
       "params": [
         {"name": "A", "source": "activation:a", "cast": "const float*"},

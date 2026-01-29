@@ -1652,18 +1652,42 @@ def apply_fusion_pass(ir1_ops: List[Dict], registry: Dict, mode: str, no_fusion:
             # Scan for matching sequences
             i = 0
             while i <= len(fused_ops) - seq_len:
-                # Check if sequence matches (compare kernel IDs)
+                # Check if sequence matches (compare kernel/function IDs)
                 match = True
                 for j in range(seq_len):
-                    if fused_ops[i + j]["kernel"] != sequence[j]:
+                    # Use "function" field if "kernel" not present
+                    op_kernel = fused_ops[i + j].get("kernel") or fused_ops[i + j].get("function", "")
+                    if op_kernel != sequence[j]:
                         match = False
                         break
 
                 if match:
+                    # Safety: if the first op is a quantize op, check it has
+                    # exactly 1 consumer. Shared quantize ops (e.g. quantize_input_0
+                    # feeding q/k/v projections) must NOT be fused.
+                    first_op = fused_ops[i]
+                    first_kernel = first_op.get("kernel", "")
+                    if first_kernel.startswith("quantize_row_"):
+                        first_op_id = first_op.get("op_id")
+                        if first_op_id is not None:
+                            consumer_count = sum(
+                                1 for op in fused_ops
+                                if any(
+                                    inp.get("from_op") == first_op_id
+                                    for inp in op.get("dataflow", {}).get("inputs", {}).values()
+                                )
+                            )
+                            if consumer_count > 1:
+                                print(f"\n  Skipping fusion at position {i}: "
+                                      f"{first_kernel} (op_id={first_op_id}) has "
+                                      f"{consumer_count} consumers")
+                                i += 1
+                                continue
+
                     # Found a match - replace with fused kernel
                     fused_id = pattern["fused_kernel"]
                     removed_ops = fused_ops[i:i+seq_len]
-                    removed_kernels = [op["kernel"] for op in removed_ops]
+                    removed_kernels = [op.get("kernel") or op.get("function", "?") for op in removed_ops]
 
                     print(f"\n  Fusion opportunity at position {i}:")
                     print(f"    Replacing: {' + '.join(removed_kernels)}")
@@ -1674,15 +1698,39 @@ def apply_fusion_pass(ir1_ops: List[Dict], registry: Dict, mode: str, no_fusion:
                     for op in removed_ops:
                         merged_weights.update(op.get("weights", {}))
 
-                    # Create fused op
+                    # Build correct dataflow for fused op:
+                    # - Input: first op's input (FP32 from rmsnorm, renamed to "x")
+                    # - Output: last op's output
+                    first_dataflow = removed_ops[0].get("dataflow", {})
+                    last_dataflow = removed_ops[-1].get("dataflow", {})
+                    # Find the "primary" op (gemv) for op name and instance
+                    middle_op = removed_ops[1] if seq_len >= 3 else removed_ops[0]
+
+                    fused_dataflow = {}
+                    if first_dataflow.get("inputs"):
+                        # Rename first op's input key to "x" for fused kernel
+                        first_inputs = first_dataflow["inputs"]
+                        # Get the first (and typically only) input
+                        first_input_key = next(iter(first_inputs))
+                        first_input_val = first_inputs[first_input_key]
+                        fused_dataflow["inputs"] = {
+                            "x": {**first_input_val, "dtype": "fp32"}
+                        }
+                    if last_dataflow.get("outputs"):
+                        fused_dataflow["outputs"] = last_dataflow["outputs"]
+
+                    # Create fused op preserving the primary op's identity
                     fused_op = {
                         "kernel": fused_id,
-                        "op": "fused",
+                        "op": middle_op.get("op", "fused"),
                         "section": removed_ops[0]["section"],
                         "layer": removed_ops[0]["layer"],
+                        "instance": middle_op.get("instance", 0),
                         "weights": merged_weights,
                         "fused_from": removed_kernels,
                     }
+                    if fused_dataflow:
+                        fused_op["dataflow"] = fused_dataflow
 
                     # Replace sequence with fused op
                     fused_ops[i:i+seq_len] = [fused_op]
@@ -3241,7 +3289,7 @@ def generate_ir_lower_2(
             # USE MEMORY PLANNER for QKV input buffer assignment
             # The memory planner knows the correct buffer (main_stream_q8)
             # ═══════════════════════════════════════════════════════════════
-            op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+            op_id = ir_op.get("idx", ir_op.get("op_id", -1))
 
             for input_name, input_info in ir_op.get("inputs", {}).items():
                 # Skip weight inputs
@@ -3333,7 +3381,7 @@ def generate_ir_lower_2(
                 # ═══════════════════════════════════════════════════════════════
                 # USE MEMORY PLANNER for buffer assignment
                 # ═══════════════════════════════════════════════════════════════
-                op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+                op_id = ir_op.get("idx", ir_op.get("op_id", -1))
 
                 # Map from kernel input names to dataflow names
                 # Kernel maps use: A (input), B (weight), C (output)
@@ -3384,7 +3432,7 @@ def generate_ir_lower_2(
                 # ═══════════════════════════════════════════════════════════════
                 # USE MEMORY PLANNER for output buffer assignment
                 # ═══════════════════════════════════════════════════════════════
-                op_id = ir_op.get("op_id", ir_op.get("idx", -1))
+                op_id = ir_op.get("idx", ir_op.get("op_id", -1))
 
                 # Map from kernel output names to dataflow names
                 kernel_to_dataflow_output = {
@@ -4161,9 +4209,12 @@ def main(args: List[str]) -> int:
     registry = load_kernel_registry()
     ir1 = build_ir1_direct(manifest, manifest_path, mode=parsed_args.mode)
 
-    # Fusion pass: combine kernels (fused attention, fused MLP)
-    fused_ops, fusion_stats = apply_fusion_pass(ir1, registry, parsed_args.mode, no_fusion=parsed_args.no_fusion)
-    fused_ops = insert_bias_add_ops(fused_ops, registry, manifest, parsed_args.mode)
+    # Insert bias_add ops BEFORE fusion pass so fused kernels can match
+    # [quantize + gemv + bias_add] sequences
+    ir1_with_bias = insert_bias_add_ops(ir1, registry, manifest, parsed_args.mode)
+
+    # Fusion pass: combine kernels (fused attention, fused MLP, fused GEMV+bias)
+    fused_ops, fusion_stats = apply_fusion_pass(ir1_with_bias, registry, parsed_args.mode, no_fusion=parsed_args.no_fusion)
 
     # IR Lower 1: Stitch kernel maps with fused ops
     # This creates buffer requirements (inputs/outputs/scratch) for each kernel
