@@ -1,5 +1,13 @@
 var NAVTREEINDEX11 =
 {
+"structCKMemSpan.html#a818835e50806e8d1fd141cf97b4ea806":[1,0,39,0],
+"structCKMemSpan.html#af281883bfadbea82697819bbf12aa759":[1,0,39,2],
+"structCKMergeRule.html":[1,0,40],
+"structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,40,0],
+"structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,40,3],
+"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,40,1],
+"structCKMergeRule.html#af89e288682de3079e22683c57b629d4c":[1,0,40,2],
+"structCKMetric.html":[1,0,41],
 "structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56":[1,0,41,3],
 "structCKMetric.html#a113674774faddfa6441f1da3a19ffe92":[1,0,41,2],
 "structCKMetric.html#a303423e9bf3c73c0111cfc897e515f40":[1,0,41,0],
@@ -133,8 +141,8 @@ var NAVTREEINDEX11 =
 "structCKTokenizer.html#a1ef21faeef58ae6154e1f03fe76e3377":[1,0,51,13],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,51,26],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,51,27],
-"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,20],
 "structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,19],
+"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,51,20],
 "structCKTokenizer.html#a35f73551a504361ab117452f40fe81bf":[1,0,51,21],
 "structCKTokenizer.html#a52c39349a30ea0dfb6ab48fa975e6fed":[1,0,51,24],
 "structCKTokenizer.html#a64d0be7dac3d476548e873e3f2d05d50":[1,0,51,16],
@@ -241,13 +249,5 @@ var NAVTREEINDEX11 =
 "structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,9,1],
 "structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,9,5],
 "structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,9,2],
-"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3],
-"structCacheTopology.html":[1,0,10],
-"structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,10,1],
-"structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,10,2],
-"structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,10,0],
-"structGEMMParams.html":[1,0,61],
-"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,61,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,61,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,61,2]
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3]
 };
