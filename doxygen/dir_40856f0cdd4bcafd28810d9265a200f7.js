@@ -36,6 +36,8 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "gemm_kernels_q6k_sse.c", "gemm__kernels__q6k__sse_8c.html", "gemm__kernels__q6k__sse_8c" ],
     [ "gemm_kernels_q8_0.c", "gemm__kernels__q8__0_8c.html", "gemm__kernels__q8__0_8c" ],
     [ "gemm_microkernel.c", "gemm__microkernel_8c.html", "gemm__microkernel_8c" ],
+    [ "gemv_omp.c", "gemv__omp_8c.html", "gemv__omp_8c" ],
+    [ "gemv_omp.h", "gemv__omp_8h.html", "gemv__omp_8h" ],
     [ "kv_cache_kernels.c", "kv__cache__kernels_8c.html", "kv__cache__kernels_8c" ],
     [ "layernorm_kernels.c", "layernorm__kernels_8c.html", "layernorm__kernels_8c" ],
     [ "layernorm_kernels_bf16.c", "layernorm__kernels__bf16_8c.html", "layernorm__kernels__bf16_8c" ],
