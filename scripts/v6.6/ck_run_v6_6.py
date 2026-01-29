@@ -457,7 +457,8 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                   weight_dtype: str = None, modes: list = None, force: bool = False,
                   debug: bool = False, parity: bool = False,
                   codegen_version: str = "v6",
-                  int8_activations: bool = False) -> Path:
+                  int8_activations: bool = False,
+                  profile: bool = False) -> Path:
     """Build IR and generate layout JSON.
 
     Args:
@@ -465,6 +466,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         parity: If True, save intermediate buffers for parity comparison with PyTorch.
         codegen_version: "v6" for explicit unrolled (default), "v4" for loop-based (legacy).
         int8_activations: If True, use INT8 activation path (Q5_0×Q8_0 kernels).
+        profile: If True, emit CK_PROFILE timing wrappers for per-op profiling.
     """
     log_step(3, f"Building IR v6 and layout (codegen={codegen_version})")
 
@@ -506,6 +508,9 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     if parity:
         cmd.append("--parity")
+
+    if profile:
+        cmd.append("--profile")
 
     # INT8 activations are enabled by default in v6.6
     # The --int8-activations flag is now a no-op (always on in v6.6)
@@ -825,6 +830,8 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     extra_cflags = os.environ.get("CK_V6_EXTRA_CFLAGS", "").strip()
     if extra_cflags:
         cflags += extra_cflags.split()
+    if os.environ.get("CK_PROFILE") == "1":
+        cflags.append("-DCK_PROFILE")
 
     cmd = [
         "gcc", *cflags, "-fPIC", "-fopenmp", "-shared",
@@ -1109,6 +1116,66 @@ def step_run_c_cli_smoke(lib_path: Path, weights_path: Path, prompt: str, max_to
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Profile Summary Generation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _generate_profile_summary(work_dir: Path):
+    """Parse profile CSV and generate summary JSON for ir_visualizer."""
+    import csv as csv_mod
+    csv_path = work_dir / "profile_decode.csv"
+    if not csv_path.exists():
+        return
+
+    entries = []
+    with open(csv_path) as f:
+        reader = csv_mod.DictReader(f)
+        for row in reader:
+            entries.append(row)
+
+    if not entries:
+        return
+
+    # Aggregate by op (across all layers, first decode token only)
+    by_op = {}
+    by_layer = {}
+    total_us = 0
+    for e in entries:
+        if e.get('token_id', '0') != '0':  # Only first token for summary
+            continue
+        op = e.get('op', 'unknown')
+        layer = int(e.get('layer', -1))
+        us = float(e.get('time_us', 0))
+        total_us += us
+        by_op[op] = by_op.get(op, 0) + us
+        if layer >= 0:
+            if layer not in by_layer:
+                by_layer[layer] = {}
+            by_layer[layer][op] = by_layer[layer].get(op, 0) + us
+
+    summary = {
+        "total_us": total_us,
+        "total_ms": total_us / 1000,
+        "by_op": by_op,
+        "by_layer": {str(k): v for k, v in sorted(by_layer.items())},
+        "entries": entries,
+    }
+
+    summary_path = work_dir / "profile_summary.json"
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2)
+    log(f"  Profile summary: {summary_path}", C_GREEN)
+    log(f"  Total decode time (first token): {total_us / 1000:.2f} ms", C_DIM)
+
+    # Top 3 hotspots
+    sorted_ops = sorted(by_op.items(), key=lambda x: -x[1])
+    if sorted_ops:
+        log("  Top hotspots:", C_DIM)
+        for op, us in sorted_ops[:5]:
+            pct = us / total_us * 100 if total_us > 0 else 0
+            log(f"    {op}: {us / 1000:.2f} ms ({pct:.1f}%)", C_DIM)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1269,8 +1336,8 @@ def run_pipeline(args: argparse.Namespace):
         sys.exit(1)
 
     # Build IR
-    # If debug or parity is enabled, force recompile to ensure special code is generated
-    force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
+    # If debug, parity, or profile is enabled, force recompile to ensure special code is generated
+    force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False) or getattr(args, 'profile', False)
     manifest_for_dtype = None
     
     # Vocabulary metadata (prefer non-zero values from config/manifest)
@@ -1323,6 +1390,14 @@ def run_pipeline(args: argparse.Namespace):
         except Exception:
             pass
 
+    # Profile: set environment variables for profile output
+    if getattr(args, 'profile', False):
+        os.environ["CK_PROFILE"] = "1"
+        os.environ["CK_PROFILE_CSV"] = str(work_dir / "profile_decode.csv")
+        os.environ["CK_PROFILE_JSON"] = str(work_dir / "profile_decode.json")
+        log(f"  Profile: CSV -> {work_dir / 'profile_decode.csv'}", C_DIM)
+        log(f"  Profile: JSON -> {work_dir / 'profile_decode.json'}", C_DIM)
+
     weight_dtype = normalize_weight_dtype(args.weight_dtype, manifest_for_dtype)
     layout_path = step_build_ir(
         config_path, work_dir,
@@ -1333,6 +1408,7 @@ def run_pipeline(args: argparse.Namespace):
         parity=getattr(args, 'parity', False),
         codegen_version=getattr(args, 'codegen', 'v6'),
         int8_activations=getattr(args, 'int8_activations', False),
+        profile=getattr(args, 'profile', False),
     )
 
     # Generate C code
@@ -1398,6 +1474,10 @@ def run_pipeline(args: argparse.Namespace):
             max_tokens = int(getattr(args, "c_cli_max_tokens", 16) or 16)
             step_run_c_cli_smoke(lib_path, weights_bump, prompt, max_tokens)
         step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
+
+    # Generate profile summary if profiling was enabled
+    if getattr(args, 'profile', False):
+        _generate_profile_summary(work_dir)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1621,6 +1701,8 @@ Examples:
                            help='Emit debug prints in generated C code to trace NaN/zero issues')
     run_parser.add_argument('--parity', action='store_true',
                            help='Save intermediate buffers for parity comparison with PyTorch')
+    run_parser.add_argument('--profile', action='store_true',
+                           help='Enable per-kernel timing profiling (CK_PROFILE)')
     run_parser.add_argument('--codegen', choices=['v4', 'v6'], default='v6',
                            help='Codegen version: v6=explicit unrolled (default), v4=loop-based (legacy)')
     run_parser.add_argument('--int8-activations', action='store_true',

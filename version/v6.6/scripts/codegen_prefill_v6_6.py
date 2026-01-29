@@ -63,7 +63,7 @@ def get_parallel_pragma(op: Dict) -> str:
     return ""
 
 
-def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
+def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False) -> str:
     """Emit a single op call for prefill mode.
 
     The IR already provides:
@@ -71,6 +71,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
       - args[]: each with name, source, expr
 
     We just substitute num_tokens for const:1 and fix memcpy size.
+    If profile=True, emit CK_PROFILE_BEGIN/END timing wrappers.
     """
     func = op.get("function", "unknown")
     op_type = op.get("op", "unknown")
@@ -220,6 +221,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
 
     lines = []
     lines.append(f"    /* Op {seq_idx}: {func} ({op_type}) layer={layer} */")
+    if profile:
+        lines.append(f"    CK_PROFILE_BEGIN();")
 
     # Build argument list with substitutions
     args = []
@@ -266,11 +269,13 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict) -> str:
             comma = "," if i < len(args) - 1 else ""
             lines.append(f"        {arg}{comma}")
         lines.append(f"    );")
+    if profile:
+        lines.append(f'    CK_PROFILE_END("prefill", "{func}", "{op_type}", {layer});')
 
     return "\n".join(lines)
 
 
-def emit_prefill_function(ops: List[Dict], config: Dict) -> str:
+def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False) -> str:
     """Emit the prefill function with all ops unrolled."""
     lines = []
     lines.append("""
@@ -290,6 +295,10 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
     memcpy((void*)(model->bump + A_TOKEN_IDS), tokens, (size_t)num_tokens * sizeof(int32_t));
 """)
 
+    if profile:
+        lines.append("    CK_PROFILE_VARS();")
+        lines.append("")
+
     # Preprocess ops to determine K vs V for transpose_kv_to_head_major
     # Within each layer, the first transpose_kv is K, the second is V
     layer_kv_count: Dict[int, int] = {}
@@ -301,7 +310,7 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
             layer_kv_count[layer] = count + 1
 
     for seq_idx, op in enumerate(ops):
-        lines.append(emit_prefill_op(op, seq_idx, config))
+        lines.append(emit_prefill_op(op, seq_idx, config, profile=profile))
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
         lines.append("")
 
@@ -310,10 +319,11 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
     return "\n".join(lines)
 
 
-def generate_prefill(ir_path: Path, layout_path: Path = None) -> str:
+def generate_prefill(ir_path: Path, layout_path: Path = None, profile: bool = False) -> str:
     """Generate prefill C code from IR.
 
     The IR already contains everything we need - just read and emit.
+    If profile=True, emit CK_PROFILE timing wrappers around each kernel call.
     """
     ir = json.load(open(ir_path))
 
@@ -323,16 +333,17 @@ def generate_prefill(ir_path: Path, layout_path: Path = None) -> str:
     parts = []
 
     # Header comment
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     parts.append(f'''/*
  * Auto-generated PREFILL code by codegen_prefill_v6_6.py
- * Generated: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")}
+ * Generated: {now}
  * Model: {config.get("model", "unknown")}
  * Mode: prefill
  * Ops: {len(ops)}
  */
 ''')
 
-    parts.append(emit_prefill_function(ops, config))
+    parts.append(emit_prefill_function(ops, config, profile=profile))
 
     return "\n".join(parts)
 

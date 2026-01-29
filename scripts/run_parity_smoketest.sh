@@ -607,6 +607,50 @@ if [ "$PERF_MODE" = true ]; then
     fi
 fi
 
+# Step 3e: OpenMP GEMV parity tests (serial vs parallel kernels)
+log_step "[3e/5] Running OpenMP GEMV parity tests..."
+GEMV_OMP_BIN="$BUILD_DIR/test_gemv_omp_parity"
+GEMV_OMP_SRC="$ROOT_DIR/tests/test_gemv_omp_parity.c"
+
+if [ -f "$GEMV_OMP_SRC" ]; then
+    # Build the OMP parity test binary if needed
+    if [ ! -f "$GEMV_OMP_BIN" ] || [ "$GEMV_OMP_SRC" -nt "$GEMV_OMP_BIN" ]; then
+        log_step "Building OpenMP GEMV parity test..."
+        CC="${CC:-gcc}"
+        $CC -O3 -march=native -fopenmp -I"$ROOT_DIR/include" \
+            "$GEMV_OMP_SRC" \
+            -L"$BUILD_DIR" -lckernel_engine -lm \
+            -Wl,-rpath,"$BUILD_DIR" \
+            -o "$GEMV_OMP_BIN" 2>&1 || {
+                log_warn "Failed to build OMP parity test"
+                incr_skipped
+            }
+    fi
+
+    if [ -f "$GEMV_OMP_BIN" ]; then
+        set +e
+        if [ "$QUICK_MODE" = true ]; then
+            LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH" "$GEMV_OMP_BIN" --quick
+            RET=$?
+        else
+            LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH" "$GEMV_OMP_BIN"
+            RET=$?
+        fi
+        set -e
+
+        if [ $RET -eq 0 ]; then
+            log_success "OpenMP GEMV parity tests passed"
+            incr_passed
+        else
+            log_error "OpenMP GEMV parity tests failed"
+            incr_failed
+        fi
+    fi
+else
+    log_warn "OpenMP GEMV parity test source not found: $GEMV_OMP_SRC"
+    incr_skipped
+fi
+
 # Step 4: PyTorch FP32 reference tests
 if [ "$KERNELS_ONLY" = false ]; then
     log_step "[4/5] Running PyTorch reference tests..."

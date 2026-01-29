@@ -121,6 +121,12 @@ void gemv_fused_q5_0_bias_dispatch(float *y, const void *W, const float *x,
 void gemv_fused_q8_0_bias_dispatch(float *y, const void *W, const float *x,
                                     const float *bias, int M, int K);
 
+/* OpenMP-parallel GEMV variants (for single-stream decode throughput) */
+void gemv_q8_0_q8_0_parallel_omp(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q5_0_q8_0_parallel_omp(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_fused_q5_0_bias_parallel_omp(float *y, const void *W, const float *x,
+                                const float *bias, int M, int K);
+
 /* ============================================================================
  * GEMM KERNELS (prefill mode - multiple tokens)
  * ============================================================================ */

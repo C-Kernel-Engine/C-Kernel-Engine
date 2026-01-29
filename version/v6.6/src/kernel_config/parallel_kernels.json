@@ -72,7 +72,53 @@
     }
   },
 
-  "selection_priority": ["parallel_simd", "parallel_ref", "simd", "ref"],
+    "gemv_q8_0_q8_0": {
+      "parallel_omp": {
+        "function": "gemv_q8_0_q8_0_parallel_omp",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": [],
+        "speedup": "1.8-2.6x",
+        "notes": "Same signature as serial — OpenMP handled internally, no wrapper needed"
+      },
+      "simd": {
+        "function": "gemv_q8_0_q8_0",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": ["avx"]
+      }
+    },
+
+    "gemv_q5_0_q8_0": {
+      "parallel_omp": {
+        "function": "gemv_q5_0_q8_0_parallel_omp",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": [],
+        "speedup": "1.6-2.6x",
+        "notes": "Same signature as serial — OpenMP handled internally, no wrapper needed"
+      },
+      "simd": {
+        "function": "gemv_q5_0_q8_0",
+        "params": ["y", "W", "x_q8", "M", "K"],
+        "requires": ["avx"]
+      }
+    },
+
+    "gemv_fused_q5_0_bias": {
+      "parallel_omp": {
+        "function": "gemv_fused_q5_0_bias_parallel_omp",
+        "params": ["y", "W", "x", "bias", "M", "K"],
+        "requires": [],
+        "speedup": "1.4-2.1x",
+        "notes": "Same signature as serial — OpenMP handled internally, no wrapper needed"
+      },
+      "simd": {
+        "function": "gemv_fused_q5_0_bias_dispatch",
+        "params": ["y", "W", "x", "bias", "M", "K"],
+        "requires": ["avx"]
+      }
+    }
+  },
+
+  "selection_priority": ["parallel_omp", "parallel_simd", "parallel_ref", "simd", "ref"],
 
   "parallelization_modes": {
     "decode": {

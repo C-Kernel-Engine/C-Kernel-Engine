@@ -530,7 +530,9 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                   context_len: int = None,
                   no_fusion: bool = False,
                   layout_mode: str = "region",
-                  layer_limit: int = None) -> Path:
+                  layer_limit: int = None,
+                  profile: bool = False,
+                  parallel_decode: bool = False) -> Path:
     """Build IR1: Direct template + quant → kernel IDs (v6.6 new pipeline).
 
     Args:
@@ -665,8 +667,14 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         if no_fusion:
             cmd.append("--no-fusion")
 
-        # Enable OpenMP parallelization annotations for prefill mode
+        if profile:
+            cmd.append("--profile")
+
+        # Enable OpenMP parallelization annotations for prefill mode,
+        # and parallel GEMV kernels for decode mode (--parallel-decode)
         if mode == "prefill":
+            cmd.append("--parallel")
+        if mode == "decode" and parallel_decode:
             cmd.append("--parallel")
 
         log(f"  Generating IR1 + {'NO fusion' if no_fusion else 'fusion'} + layout + lowered + call IR for mode: {mode}", C_DIM)
@@ -695,7 +703,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
     return ir1_paths.get("decode", ir1_paths[target_modes[0]])
 
 
-def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False) -> Path:
+def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False, profile: bool = False) -> Path:
     """Generate v6.6 C code from lowered IR.
 
     The lowered IR contains everything needed for codegen:
@@ -738,6 +746,8 @@ def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False) -> Path:
         f"--prefill={lowered_prefill}" if lowered_prefill.exists() else "",
         f"--output={model_c_path}"
     ]
+    if profile:
+        cmd.append("--profile")
     # Filter empty args
     cmd = [c for c in cmd if c]
 
@@ -810,10 +820,13 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         f"-Wl,-rpath,{BUILD_DIR}",
     ]
 
+    # Add profiling define if requested
+    if os.environ.get("CK_PROFILE") == "1":
+        cmd.append("-DCK_PROFILE")
+
     log(f"  Compiling...", C_DIM)
     try:
         import subprocess
-        import os
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             log(f"  Compiled: {lib_path}", C_GREEN)
@@ -1163,8 +1176,15 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
     if getattr(args, 'parity', False):
         cmd.append("--parity")
 
-    # Replace current process with chat
-    os.execvp(sys.executable, cmd)
+    # If profiling, run as subprocess so post-run summary can execute
+    # Otherwise, replace current process (original behavior)
+    if os.environ.get("CK_PROFILE") == "1":
+        try:
+            subprocess.run(cmd)
+        except KeyboardInterrupt:
+            pass
+    else:
+        os.execvp(sys.executable, cmd)
 
 
 def step_run_c_cli_smoke(lib_path: Path, weights_path: Path, prompt: str, max_tokens: int):
@@ -1215,6 +1235,71 @@ def step_run_c_cli_smoke(lib_path: Path, weights_path: Path, prompt: str, max_to
         sys.exit(1)
 
     log(f"  {C_GREEN}Native v6 CLI smoke test: OK{C_RESET}", C_DIM)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Profiling Summary
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _generate_profile_summary(work_dir: Path):
+    """Parse profile CSV and generate summary JSON for ir_visualizer."""
+    import csv as csv_mod
+    csv_path = work_dir / "profile_decode.csv"
+    if not csv_path.exists():
+        log(f"  No profile CSV found at {csv_path}", C_DIM)
+        return
+
+    entries = []
+    with open(csv_path) as f:
+        reader = csv_mod.DictReader(f)
+        for row in reader:
+            entries.append(row)
+
+    if not entries:
+        log(f"  Profile CSV is empty", C_DIM)
+        return
+
+    # Aggregate by op (across all layers, first decode token only)
+    by_op = {}
+    by_layer = {}
+    total_us = 0
+    for e in entries:
+        if e.get('token_id', '0') != '0':  # Only first token
+            continue
+        op = e.get('op', 'unknown')
+        layer = int(e.get('layer', -1))
+        us = float(e.get('time_us', 0))
+        total_us += us
+        by_op[op] = by_op.get(op, 0) + us
+        if layer >= 0:
+            if layer not in by_layer:
+                by_layer[layer] = {}
+            by_layer[layer][op] = by_layer[layer].get(op, 0) + us
+
+    summary = {
+        "total_us": total_us,
+        "total_ms": total_us / 1000,
+        "by_op": by_op,
+        "by_layer": {str(k): v for k, v in sorted(by_layer.items())},
+        "entries": entries,
+    }
+
+    summary_path = work_dir / "profile_summary.json"
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    log(f"\n{C_GREEN}Profile summary:{C_RESET}")
+    log(f"  Total: {total_us / 1000:.2f} ms")
+    log(f"  CSV:   {csv_path}")
+    log(f"  JSON:  {summary_path}")
+
+    # Show top 5 hotspots
+    sorted_ops = sorted(by_op.items(), key=lambda x: x[1], reverse=True)
+    if sorted_ops:
+        log(f"  Top hotspots:")
+        for op, us in sorted_ops[:5]:
+            pct = us / total_us * 100 if total_us > 0 else 0
+            log(f"    {op:20s} {us/1000:8.2f} ms ({pct:5.1f}%)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1378,7 +1463,7 @@ def run_pipeline(args: argparse.Namespace):
 
     # Build IR
     # If debug or parity is enabled, force recompile to ensure special code is generated
-    force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False)
+    force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False) or getattr(args, 'profile', False)
     manifest_for_dtype = None
     
     # Vocabulary metadata (prefer non-zero values from config/manifest)
@@ -1447,10 +1532,12 @@ def run_pipeline(args: argparse.Namespace):
         no_fusion=getattr(args, 'no_fusion', False),
         layout_mode=getattr(args, 'layout_mode', 'region'),
         layer_limit=getattr(args, 'layer_limit', None),
+        profile=getattr(args, 'profile', False),
+        parallel_decode=getattr(args, 'parallel_decode', False),
     )
 
     # Generate C code
-    model_c_path = step_codegen(layout_path, work_dir, force=force_for_debug)
+    model_c_path = step_codegen(layout_path, work_dir, force=force_for_debug, profile=getattr(args, 'profile', False))
 
     # Run reverse validation if requested (validates IR Lower 3 before compile)
     if getattr(args, 'reverse_test', False):
@@ -1462,6 +1549,13 @@ def run_pipeline(args: argparse.Namespace):
                 sys.exit(1)
             else:
                 log(f"  {C_ORANGE}Continuing due to --force-compile{C_RESET}")
+
+    # Set up profiling environment before compile
+    if getattr(args, 'profile', False):
+        os.environ["CK_PROFILE"] = "1"
+        os.environ["CK_PROFILE_CSV"] = str(work_dir / "profile_decode.csv")
+        os.environ["CK_PROFILE_JSON"] = str(work_dir / "profile_decode.json")
+        log(f"  Profiling enabled: CSV → {work_dir / 'profile_decode.csv'}", C_DIM)
 
     # Compile
     lib_path = step_compile(model_c_path, work_dir, force=force_for_debug)
@@ -1523,6 +1617,10 @@ def run_pipeline(args: argparse.Namespace):
             max_tokens = int(getattr(args, "c_cli_max_tokens", 16) or 16)
             step_run_c_cli_smoke(lib_path, weights_bump, prompt, max_tokens)
         step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
+
+    # Generate profile summary if profiling was enabled
+    if getattr(args, 'profile', False):
+        _generate_profile_summary(work_dir)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1765,6 +1863,10 @@ Examples:
                            help='Prompt for native v6 CLI smoke test (default: Hello)')
     run_parser.add_argument('--c-cli-max-tokens', type=int, default=16,
                            help='Max tokens for native v6 CLI smoke test (default: 16)')
+    run_parser.add_argument('--profile', action='store_true',
+                           help='Enable per-kernel timing profiling (CK_PROFILE)')
+    run_parser.add_argument('--parallel-decode', action='store_true',
+                           help='Use OpenMP-parallel GEMV kernels for decode mode (_parallel_omp variants)')
     run_parser.add_argument('--reverse-test', action='store_true',
                            help='Run IR reverse validation after codegen (validates IR Lower 3 consistency)')
     run_parser.add_argument('--reverse-test-verbose', action='store_true',

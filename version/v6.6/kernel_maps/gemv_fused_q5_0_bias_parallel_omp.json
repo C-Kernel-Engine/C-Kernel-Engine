@@ -1,0 +1,43 @@
+{
+  "id": "gemv_fused_q5_0_bias_parallel_omp",
+  "op": "fused_linear_bias",
+  "variant": "q5_0_w_fp32_a_bias_parallel_omp",
+  "parallel": true,
+  "mode": "decode",
+  "quant": {
+    "weight": "q5_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32, quantized internally)"},
+    {"name": "W", "dtype": "q5_0", "shape": ["M", "K"], "desc": "Weight matrix [M, K] in Q5_0 format"},
+    {"name": "bias", "dtype": "fp32", "shape": ["M"], "optional": true, "desc": "Bias vector [M] (FP32), can be NULL"}
+  ],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] (FP32)"}
+  ],
+  "dims": ["M", "K"],
+  "fuses": [
+    "quantize_row_q8_0",
+    "gemv_q5_0_q8_0_parallel_omp",
+    "bias_add"
+  ],
+  "parallelization": {
+    "supported": ["output"],
+    "strategies": [
+      {
+        "name": "openmp_rows",
+        "partition_dim": "M",
+        "notes": "Quantizes input once serially, then uses #pragma omp parallel for over output rows"
+      }
+    ]
+  },
+  "impl": {
+    "function": "gemv_fused_q5_0_bias_parallel_omp",
+    "c_declaration": "void gemv_fused_q5_0_bias_parallel_omp(float *y, const void *W, const float *x, const float *bias, int M, int K);",
+    "sources": ["src/kernels/gemv_omp.c"],
+    "requires_flags": ["-fopenmp"]
+  },
+  "notes": "OpenMP-parallel version of gemv_fused_q5_0_bias_dispatch for single-stream decode throughput. Quantizes input once, then parallelizes GEMV + bias over output rows."
+}

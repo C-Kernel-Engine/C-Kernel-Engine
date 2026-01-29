@@ -37,6 +37,10 @@
 #include "tokenizer/true_bpe.h"
 #include "ck_features.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #define CK_CLI_VERSION         "6.6.0"
 #define CK_CLI_DEFAULT_MAX_TOKENS  256
 #define CK_CLI_EOS_MAX             8
@@ -72,6 +76,7 @@ typedef int (*forward_t)(float *logits_out);
 typedef int (*kv_enable_t)(int capacity);
 typedef void (*kv_reset_t)(void);
 typedef int (*decode_t)(int32_t token, float *logits_out);
+typedef void (*prefill_t)(const int32_t *tokens, int num_tokens);
 typedef float *(*get_logits_t)(void);
 typedef int (*get_int_t)(void);
 typedef void (*free_t)(void);
@@ -92,6 +97,7 @@ typedef struct {
     kv_enable_t kv_enable;
     kv_reset_t kv_reset;
     decode_t decode;
+    prefill_t prefill;  /* ck_prefill for batched prefill (optional) */
     get_logits_t get_logits;
     get_int_t get_context;
     get_int_t get_vocab_size;
@@ -553,6 +559,8 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     if (!resolve_symbol(api->handle, "ck_model_embed_tokens", (void **)&api->embed, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, true)) return false;
     if (!resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, true)) return false;
+    /* ck_prefill - optional, only present when prefill IR was generated */
+    resolve_symbol(api->handle, "ck_prefill", (void **)&api->prefill, false);
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
@@ -828,7 +836,14 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
         return -1;
     }
 
-    int n = ck_true_bpe_encode(tokenizer, formatted, -1, ids, ctx);
+    /* Use model's built-in tokenizer (v6.6 pattern) */
+    int n = -1;
+    if (api->encode_text) {
+        n = api->encode_text(formatted, -1);
+        if (n > 0 && n <= ctx) {
+            api->get_token_buffer(ids);  /* Copy tokens to caller's buffer */
+        }
+    }
     free(formatted);
 
     if (n <= 0) {
@@ -908,9 +923,20 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
     for (int generated = 0; generated < max_tokens && !g_exit_requested && g_generation_active; generated++) {
         if (next_token < 0) break;
 
+        /* Convert token ID to string using model's tokenizer */
+        char token_str[256];
+        const char *word = NULL;
+        if (api->decode_tokens) {
+            int32_t single_id = next_token;
+            int len = api->decode_tokens(&single_id, 1, token_str, sizeof(token_str) - 1);
+            if (len > 0) {
+                token_str[len] = '\0';
+                word = token_str;
+            }
+        }
+
         if (opt->verbose) {
-            const char *tok_str = ck_true_bpe_id_to_token(tokenizer, next_token);
-            fprintf(stderr, "[DEBUG] Token %d: %d (%s)\n", generated, next_token, tok_str ? tok_str : "NULL");
+            fprintf(stderr, "[DEBUG] Token %d: %d (%s)\n", generated, next_token, word ? word : "NULL");
         }
 
         if (is_eos_token(opt, next_token)) {
@@ -919,8 +945,6 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
             }
             break;
         }
-
-        const char *word = ck_true_bpe_id_to_token(tokenizer, next_token);
 
         /* Process token through EOS pattern detection (buffers potential EOS tokens) */
         if (!opt->ignore_eos &&
@@ -1275,12 +1299,25 @@ int main(int argc, char **argv) {
            cap.name, cap.width, cap.has_fma ? "Yes" : "No",
            cap.has_ai_accel ? "Yes" : "No", cap.best_kernel);
 
+#ifdef _OPENMP
+    {
+        int max_threads = omp_get_max_threads();
+        const char *omp_env = getenv("OMP_NUM_THREADS");
+        printf("[OpenMP]   Threads: %d (OMP_NUM_THREADS=%s) | Cores: %d\n",
+               max_threads,
+               omp_env ? omp_env : "auto",
+               (int)sysconf(_SC_NPROCESSORS_ONLN));
+    }
+#else
+    printf("[OpenMP]   Disabled (compiled without -fopenmp)\n");
+#endif
+
     printf("Type /help for commands, Ctrl+C to stop generation\n\n");
 
     setvbuf(stdout, NULL, _IOFBF, 1 << 20);
 
     if (opt.prompt_once) {
-        run_prompt(&api, tokenizer, &opt, opt.prompt_once);
+        run_prompt(&api, &opt, opt.prompt_once);
     } else {
         /* REPL */
 #ifdef HAVE_READLINE
@@ -1329,7 +1366,7 @@ int main(int argc, char **argv) {
 
             printf("\033[1;34mAssistant:\033[0m ");
             fflush(stdout);
-            run_prompt(&api, tokenizer, &opt, line);
+            run_prompt(&api, &opt, line);
 
 #ifdef HAVE_READLINE
             free(line);
@@ -1343,7 +1380,7 @@ int main(int argc, char **argv) {
 #endif
     }
 
-    ck_true_bpe_free(tokenizer);
+    /* Model handles its own cleanup via ck_model_free */
     if (api.free_fn) api.free_fn();
     if (api.handle) dlclose(api.handle);
 

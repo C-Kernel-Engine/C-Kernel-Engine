@@ -2365,6 +2365,7 @@ def parse_args(argv: List[str]) -> Dict:
         # Debug options
         "debug": False,  # Emit debug prints in generated C code
         "parity": False,  # Emit buffer saves for parity comparison with PyTorch
+        "profile": False,  # Emit CK_PROFILE timing wrappers for per-op profiling
         "int8": True,  # Use INT8 activations for faster decode (5-15x speedup)
         "codegen": "v6",  # Codegen version: v6 (explicit unrolled, default) or v4 (loop-based)
         "decode_layout": "prefill",  # Use prefill or decode layout for decode codegen
@@ -2448,6 +2449,8 @@ def parse_args(argv: List[str]) -> Dict:
             args["debug"] = True
         elif arg == "--parity":
             args["parity"] = True
+        elif arg == "--profile":
+            args["profile"] = True
         elif arg == "--int8":
             args["int8"] = True
         elif arg == "--no-int8":
@@ -2541,6 +2544,7 @@ def print_usage():
     print("  --decode-layout=prefill|decode  Layout to use for decode codegen (default: prefill)")
     print("  --debug                 Emit debug prints in generated C code")
     print("  --parity                Emit buffer saves for PyTorch comparison")
+    print("  --profile               Emit CK_PROFILE timing wrappers (compile with -DCK_PROFILE)")
     print()
     print("Training Options (for --modes=training):")
     print("  --memory=GB             Available memory in GB (auto-detect if not set)")
@@ -3009,6 +3013,7 @@ def main(argv: List[str]) -> int:
                         emit_parity=args.get("parity", False),
                         weights_manifest=weights_manifest if not args.get("skip_manifest_validation") else None,
                         int8_activations=int8_activations,
+                        emit_profile=args.get("profile", False),
                     )
                 else:
                     codegen_v4.emit_c_source_v4(

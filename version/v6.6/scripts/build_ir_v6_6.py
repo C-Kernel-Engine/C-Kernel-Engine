@@ -846,7 +846,8 @@ def find_kernel(
     op: str,
     quant: Dict[str, str],
     mode: str = "decode",
-    prefer_q8_activation: bool = True  # V6.5 parity: use Q8_0 activation kernels
+    prefer_q8_activation: bool = True,  # V6.5 parity: use Q8_0 activation kernels
+    prefer_parallel: bool = False  # Use OpenMP-parallel kernels for decode throughput
 ) -> Optional[str]:
     """
     Find kernel ID from registry.
@@ -858,6 +859,9 @@ def find_kernel(
         mode: Execution mode ("decode" or "prefill")
         prefer_q8_activation: If True, prefer Q8_0 activation kernels (V6.5 parity).
                               If False, prefer FP32 activation kernels.
+        prefer_parallel: If True, prefer _parallel_omp kernel variants for decode mode.
+                         These have the same signature as serial kernels but use OpenMP
+                         internally — no wrapper code or IR changes needed.
 
     Returns:
         Kernel ID (C function name) or None if not found
@@ -926,6 +930,17 @@ def find_kernel(
             return 1  # Quantized last
 
     matches.sort(key=activation_priority)
+
+    # When prefer_parallel=True in decode mode, look for _parallel_omp variant
+    # among the top-priority activation matches. These have the same signature
+    # as serial kernels — the IR just swaps the function name, no wrapper needed.
+    if prefer_parallel and mode == "decode":
+        top_act = matches[0].get("quant", {}).get("activation", "fp32")
+        same_act = [m for m in matches if m.get("quant", {}).get("activation", "fp32") == top_act]
+        for m in same_act:
+            if m.get("parallel", False):
+                return m["id"]
+
     return matches[0]["id"]
 
 
@@ -964,7 +979,8 @@ def get_quantize_kernel_for_activation(activation_dtype: str) -> Optional[str]:
     return None
 
 
-def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") -> List[str]:
+def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
+                     prefer_parallel: bool = False) -> List[str]:
     """
     Direct mapping: Template + Quant Summary → Kernel IDs.
 
@@ -979,6 +995,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
     Args:
         manifest: Weights manifest with template and quant_summary
         mode: Execution mode ("decode" or "prefill")
+        prefer_parallel: If True, select _parallel_omp kernel variants for decode.
+                         These have the same signature as serial kernels but use
+                         OpenMP internally — the IR just swaps the function name.
 
     Returns:
         List of kernel IDs (C function names) in execution order
@@ -1180,7 +1199,20 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
             1. If metadata op → return []
             2. If has weight keys → lookup quant → find gemv/gemm kernel
             3. If fp32-only → find fp32 kernel
+
+        Note: prefer_parallel is currently DISABLED (always False).
+              OpenMP fork/join overhead makes per-kernel parallelism slower than
+              serial for inference workloads (tested: 3.1 tok/s parallel vs 5.9
+              tok/s serial on Qwen 0.5B). Needs a persistent thread pool instead
+              of OpenMP #pragma omp parallel for. See gemv_omp.c for the kernel
+              implementations — they are numerically correct but need a different
+              threading model.
         """
+        # DISABLED: OpenMP fork/join overhead (~50-200us per call) makes parallel
+        # kernels slower for inference. Each decode token calls kernels 500+ times,
+        # so thread management overhead dominates. Needs persistent thread pool.
+        use_parallel = False  # Was: prefer_parallel and op in PARALLEL_OPS
+
         kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
         if not kernel_op:
             return []
@@ -1205,7 +1237,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
 
             # Try fused kernel first (e.g., qkv_projection)
             weight_dtype = layer_quant.get(weight_info[0], "fp32")
-            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode)
+            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
+                                    prefer_parallel=use_parallel)
             if kernel_id:
                 return [kernel_id]
 
@@ -1219,7 +1252,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
             }
             for w_key in weight_info:
                 w_dtype = layer_quant.get(w_key, "fp32")
-                k = find_kernel(registry, op="matmul", quant={"weight": w_dtype}, mode=mode)
+                k = find_kernel(registry, op="matmul", quant={"weight": w_dtype}, mode=mode,
+                                prefer_parallel=use_parallel)
                 if k:
                     split_op = weight_to_split_op.get(w_key, op)
                     kernels.append((k, split_op))
@@ -1228,16 +1262,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode") 
         # Header/footer ops with weights (embedding, logits)
         if isinstance(weight_info, list) and not weight_info:
             # These use fixed quant (typically q8_0)
-            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "q8_0"}, mode=mode)
+            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "q8_0"}, mode=mode,
+                                    prefer_parallel=use_parallel)
             return [kernel_id] if kernel_id else []
 
         # Ops with fp32 weights or no weights
-        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "fp32"}, mode=mode)
+        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "fp32"}, mode=mode,
+                                prefer_parallel=use_parallel)
         if kernel_id:
             return [kernel_id]
 
         # Try without weight quant requirement
-        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "none"}, mode=mode)
+        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "none"}, mode=mode,
+                                prefer_parallel=use_parallel)
         return [kernel_id] if kernel_id else []
 
     # ═══════════════════════════════════════════════════════════
@@ -4187,6 +4224,11 @@ def main(args: List[str]) -> int:
         action="store_true",
         help="Enable OpenMP parallelization annotations in lowered IR"
     )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable per-kernel profiling instrumentation in generated code"
+    )
 
     parsed_args = parser.parse_args(args)
 
@@ -4207,7 +4249,8 @@ def main(args: List[str]) -> int:
 
     # Build IR1
     registry = load_kernel_registry()
-    ir1 = build_ir1_direct(manifest, manifest_path, mode=parsed_args.mode)
+    ir1 = build_ir1_direct(manifest, manifest_path, mode=parsed_args.mode,
+                           prefer_parallel=parsed_args.parallel)
 
     # Insert bias_add ops BEFORE fusion pass so fused kernels can match
     # [quantize + gemv + bias_add] sequences

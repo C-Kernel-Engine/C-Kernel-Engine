@@ -260,9 +260,12 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
     # Header offsets struct
     header_entries = [e for e in weights.get("entries", []) if "layer" not in e.get("name", "")]
     vocab_merges_size = 0
+    vocab_strings_size = 0
     for e in header_entries:
         if e.get("name") == "vocab_merges":
             vocab_merges_size = int(e.get("size", 0))
+        elif e.get("name") == "vocab_strings":
+            vocab_strings_size = int(e.get("size", 0))
             break
     lines.append("/* Header weight offsets */")
     lines.append("typedef struct {")
@@ -279,6 +282,10 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
         lines.append(f"#define VOCAB_MERGES_COUNT {vocab_merges_size // 4}")
     else:
         lines.append("#define VOCAB_MERGES_COUNT 0")
+    if vocab_strings_size:
+        lines.append(f"#define VOCAB_STRINGS_SIZE {vocab_strings_size}")
+    else:
+        lines.append("#define VOCAB_STRINGS_SIZE 0")
     lines.append("")
 
     # Layer offsets struct - get fields from layer 0
@@ -407,13 +414,14 @@ def _guard_bump_offsets(layout: Dict, ir_list: List[Dict]) -> None:
     if unknown:
         print(f"Warning: Unresolved bump macros in IR: {sorted(unknown)[:5]}")
 
-def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False) -> str:
+def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: bool = False) -> str:
     """Emit a single function call from an IR operation.
 
     Just read the op and emit the call. No special cases.
     IR Lower 3 provides call-ready args with exact expressions.
 
     If debug=True, emit printf statements to dump output buffer values.
+    If profile=True, emit CK_PROFILE_BEGIN/END timing wrappers.
     """
     function = op.get("function", op.get("kernel", "unknown"))
     idx = op.get("idx", 0)
@@ -424,8 +432,12 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False) -> str:
 
     lines = []
     lines.append(f"    /* Op {idx}: {function} ({op_name}) layer={layer} section={section} */")
+    if profile:
+        lines.append(f"    CK_PROFILE_BEGIN();")
     if not args:
         lines.append(f"    {function}();")
+        if profile:
+            lines.append(f'    CK_PROFILE_END("decode", "{function}", "{op_name}", {layer});')
         return "\n".join(lines)
 
     lines.append(f"    {function}(")
@@ -434,6 +446,8 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False) -> str:
         comma = "," if i < len(args) - 1 else ""
         lines.append(f"        {expr}{comma}")
     lines.append("    );")
+    if profile:
+        lines.append(f'    CK_PROFILE_END("decode", "{function}", "{op_name}", {layer});')
 
     if seq_idx is not None:
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
@@ -464,7 +478,7 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False) -> str:
     return "\n".join(lines)
 
 
-def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False) -> str:
+def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False, profile: bool = False) -> str:
     """Emit the decode function with all ops unrolled."""
     lines = []
     lines.append("""
@@ -478,12 +492,14 @@ static void ck_decode(CKModel *model, int32_t token) {
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
 """)
+    if profile:
+        lines.append("    CK_PROFILE_VARS();")
     lines.append(f"    /* Store token at offset {token_offset} (from layout) */")
     lines.append(f"    *(int32_t*)({token_base} + {token_offset}) = token;")
     lines.append("")
 
     for seq_idx, op in enumerate(ops):
-        lines.append(emit_op(op, seq_idx, debug=debug))
+        lines.append(emit_op(op, seq_idx, debug=debug, profile=profile))
         lines.append("")
 
     lines.append("    model->pos++;")
@@ -533,7 +549,7 @@ def get_init_free_code(init_call: Dict) -> str:
     return "\n".join(free_lines)
 
 
-def emit_model_and_api(init_call: Dict = None) -> str:
+def emit_model_and_api(init_call: Dict = None, profile: bool = False) -> str:
     """Emit model struct and clean API functions.
 
     Args:
@@ -663,6 +679,28 @@ CK_EXPORT int32_t ck_model_get_bos_token_id(void) {{
     if tokenizer_include:
         tokenizer_include_line = tokenizer_include
 
+    # Profile dump calls (guarded by #ifdef CK_PROFILE)
+    profile_dump_after_decode = ""
+    profile_dump_after_prefill = ""
+    profile_dump_api = ""
+    if profile:
+        profile_dump_after_decode = """
+#ifdef CK_PROFILE
+    _ck_profile_dump();
+#endif"""
+        profile_dump_after_prefill = """
+#ifdef CK_PROFILE
+    _ck_profile_dump();
+#endif"""
+        profile_dump_api = """
+/* Profile dump API */
+CK_EXPORT void ck_model_profile_dump(void) {
+#ifdef CK_PROFILE
+    _ck_profile_dump();
+#endif
+}
+"""
+
     return f'''
 /* ============================================================================
  * MODEL STRUCT
@@ -762,6 +800,18 @@ static void do_post_weights_init(void) {{
 {post_weights_init_code}
 }}
 
+static void print_omp_info(void) {{
+#ifdef _OPENMP
+    int max_threads = omp_get_max_threads();
+    const char *env = getenv("OMP_NUM_THREADS");
+    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    fprintf(stderr, "[OpenMP]   Threads: %d (OMP_NUM_THREADS=%s) | CPU cores: %ld\\n",
+            max_threads, env ? env : "auto", ncpu);
+#else
+    fprintf(stderr, "[OpenMP]   Disabled (compiled without -fopenmp)\\n");
+#endif
+}}
+
 /* Combined init + load (ck_chat.py expects this signature) */
 CK_EXPORT int ck_model_init(const char *weights_path) {{
     char manifest_path[4096];
@@ -769,6 +819,7 @@ CK_EXPORT int ck_model_init(const char *weights_path) {{
     if (build_manifest_path(weights_path, manifest_path, sizeof(manifest_path)) != 0) return -1;
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
+    print_omp_info();
     return 0;
 }}
 
@@ -777,6 +828,7 @@ CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *
     if (do_init() != 0) return -1;
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
+    print_omp_info();
     return 0;
 }}
 
@@ -815,7 +867,7 @@ CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {{
 #ifdef CK_HAS_PREFILL
     /* Use batched prefill for multiple tokens */
     if (count > 1) {{
-        ck_prefill(g_model, tokens, count);
+        ck_prefill(g_model, tokens, count);{profile_dump_after_prefill}
         return 0;
     }}
 #endif
@@ -823,7 +875,7 @@ CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {{
     /* Single token or no prefill: process one by one via decode */
     for (int i = 0; i < count; i++) {{
         ck_decode(g_model, tokens[i]);
-    }}
+    }}{profile_dump_after_decode}
     return 0;
 }}
 
@@ -840,7 +892,7 @@ CK_EXPORT int ck_model_decode(int32_t token, float *output) {{
     if (!g_model) return -1;
     /* Capture position before decode (ck_decode increments pos at end) */
     int token_pos = g_model->pos;
-    ck_decode(g_model, token);
+    ck_decode(g_model, token);{profile_dump_after_decode}
     /* Copy logits from position 0 to position token_pos in the logits buffer.
      * This makes the logits buffer match what ck_chat.py expects:
      * logits[token_pos * VOCAB_SIZE .. (token_pos+1) * VOCAB_SIZE] */
@@ -857,6 +909,7 @@ CK_EXPORT int ck_model_decode(int32_t token, float *output) {{
 
 /* Getters */
 CK_EXPORT int ck_model_get_vocab_size(void) {{ return VOCAB_SIZE; }}
+CK_EXPORT int ck_model_get_vocab_strings_size(void) {{ return VOCAB_STRINGS_SIZE; }}
 CK_EXPORT const int32_t* ck_model_get_vocab_offsets(void) {{
     return g_model ? (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS) : NULL;
 }}
@@ -871,6 +924,7 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? 
 
 {tokenizer_api_functions}
 {stop_tokens_api}
+{profile_dump_api}
 '''
 
 
@@ -878,7 +932,7 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? 
 # MAIN
 # =============================================================================
 
-def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None) -> str:
+def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None, profile: bool = False) -> str:
     """Generate complete C code.
 
     Args:
@@ -886,6 +940,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
         layout_path: Path to layout JSON
         debug: If True, emit printf statements to dump tensor values after each op
         init_call: Lowered init IR dict (from init_call.json) with call-ready ops
+        profile: If True, emit CK_PROFILE timing wrappers around each kernel call
 
     If debug=True, emit printf statements to dump tensor values after each op.
     """
@@ -964,6 +1019,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <unistd.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -972,9 +1028,102 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 {tokenizer_include}
 ''')
 
+    # Emit profiling infrastructure (all #ifdef CK_PROFILE guarded)
+    if profile:
+        parts.append('''
+/* ============================================================================
+ * PROFILING INFRASTRUCTURE (CK_PROFILE)
+ * ============================================================================ */
+#ifdef CK_PROFILE
+#include <time.h>
+
+typedef struct {
+    const char *mode;       /* "prefill" or "decode" */
+    const char *kernel;     /* e.g. "gemv_q5_0_q8_0" */
+    const char *op;         /* e.g. "q_proj", "mlp_gate_up" */
+    int layer;
+    double time_us;
+} CKProfileEntry;
+
+#define CK_PROFILE_MAX_ENTRIES 16384
+static CKProfileEntry _ck_profile_entries[CK_PROFILE_MAX_ENTRIES];
+static int _ck_profile_count = 0;
+static int _ck_profile_token_id = 0;
+
+static inline void _ck_profile_log(const char *mode, const char *kernel,
+                                    const char *op, int layer,
+                                    struct timespec t0, struct timespec t1) {
+    if (_ck_profile_count >= CK_PROFILE_MAX_ENTRIES) return;
+    double us = (t1.tv_sec - t0.tv_sec) * 1e6 + (t1.tv_nsec - t0.tv_nsec) / 1e3;
+    _ck_profile_entries[_ck_profile_count++] = (CKProfileEntry){
+        mode, kernel, op, layer, us
+    };
+}
+
+static void _ck_profile_dump_json(FILE *f) {
+    fprintf(f, "{\\n  \\"entries\\": [\\n");
+    for (int i = 0; i < _ck_profile_count; i++) {
+        CKProfileEntry *e = &_ck_profile_entries[i];
+        fprintf(f, "    {\\"mode\\":\\"%s\\",\\"kernel\\":\\"%s\\",\\"op\\":\\"%s\\","
+                "\\"layer\\":%d,\\"time_us\\":%.1f,\\"token_id\\":%d}%s\\n",
+                e->mode, e->kernel, e->op, e->layer, e->time_us,
+                _ck_profile_token_id,
+                i < _ck_profile_count - 1 ? "," : "");
+    }
+    fprintf(f, "  ],\\n  \\"total_entries\\": %d,\\n  \\"token_id\\": %d\\n}\\n",
+            _ck_profile_count, _ck_profile_token_id);
+}
+
+static void _ck_profile_dump(void) {
+    const char *csv_path = getenv("CK_PROFILE_CSV");
+    const char *json_path = getenv("CK_PROFILE_JSON");
+    if (csv_path) {
+        FILE *f = fopen(csv_path, _ck_profile_token_id == 0 ? "w" : "a");
+        if (f) {
+            if (_ck_profile_token_id == 0) {
+                fprintf(f, "mode,kernel,op,layer,time_us,token_id\\n");
+            }
+            for (int i = 0; i < _ck_profile_count; i++) {
+                CKProfileEntry *e = &_ck_profile_entries[i];
+                fprintf(f, "%s,%s,%s,%d,%.1f,%d\\n",
+                        e->mode, e->kernel, e->op, e->layer, e->time_us,
+                        _ck_profile_token_id);
+            }
+            fclose(f);
+        }
+    }
+    if (json_path) {
+        FILE *f = fopen(json_path, "w");
+        if (f) { _ck_profile_dump_json(f); fclose(f); }
+    }
+    if (!csv_path && !json_path) {
+        fprintf(stderr, "mode,kernel,op,layer,time_us,token_id\\n");
+        for (int i = 0; i < _ck_profile_count; i++) {
+            CKProfileEntry *e = &_ck_profile_entries[i];
+            fprintf(stderr, "%s,%s,%s,%d,%.1f,%d\\n",
+                    e->mode, e->kernel, e->op, e->layer, e->time_us,
+                    _ck_profile_token_id);
+        }
+    }
+    _ck_profile_count = 0;
+    _ck_profile_token_id++;
+}
+
+#define CK_PROFILE_VARS() struct timespec _pt0, _pt1;
+#define CK_PROFILE_BEGIN() clock_gettime(CLOCK_MONOTONIC, &_pt0);
+#define CK_PROFILE_END(mode, kernel, op, layer) \\
+    clock_gettime(CLOCK_MONOTONIC, &_pt1); \\
+    _ck_profile_log(mode, kernel, op, layer, _pt0, _pt1);
+#else
+#define CK_PROFILE_VARS()
+#define CK_PROFILE_BEGIN()
+#define CK_PROFILE_END(mode, kernel, op, layer)
+#endif
+''')
+
     parts.append(emit_memory_layout(layout, config))
-    parts.append(emit_model_and_api(init_call=init_call))  # Pass lowered init IR for init ops
-    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug))
+    parts.append(emit_model_and_api(init_call=init_call, profile=profile))  # Pass lowered init IR for init ops
+    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug, profile=profile))
 
     return "\n".join(parts)
 
@@ -993,6 +1142,8 @@ def main():
     parser.add_argument("-o", "--output", required=True, help="Output C file")
     # Debug
     parser.add_argument("--debug", action="store_true", help="Emit debug printf for tensor values")
+    # Profile
+    parser.add_argument("--profile", action="store_true", help="Emit CK_PROFILE timing wrappers")
     args = parser.parse_args()
 
     # Handle legacy API (--decode/--prefill)
@@ -1038,7 +1189,7 @@ def main():
         _guard_bump_offsets(layout_obj, ir_list)
 
         # Generate decode code
-        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj)
+        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj, profile=args.profile)
 
         # Generate prefill code if provided
         prefill_code = ""
@@ -1047,7 +1198,7 @@ def main():
             if prefill_ir.exists():
                 try:
                     from codegen_prefill_v6_6 import generate_prefill
-                    prefill_code = generate_prefill(prefill_ir)
+                    prefill_code = generate_prefill(prefill_ir, profile=args.profile)
                     print(f"  + Prefill code generated")
                 except ImportError as e:
                     print(f"Warning: Could not import prefill codegen: {e}")
@@ -1087,7 +1238,7 @@ def main():
             with open(init_call_path) as f:
                 init_call_obj = json.load(f)
 
-        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj)
+        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj, profile=args.profile)
         with open(args.output, 'w') as f:
             f.write(code)
         print(f"Generated: {args.output}")

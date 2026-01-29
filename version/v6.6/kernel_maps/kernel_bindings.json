@@ -326,6 +326,38 @@
         {"name": "K", "source": "dim:_input_dim"}
       ]
     },
+    "gemv_q8_0_q8_0_parallel_omp": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x_q8", "source": "activation:x", "cast": "void*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "OpenMP-parallel variant — same signature as gemv_q8_0_q8_0"
+    },
+    "gemv_q5_0_q8_0_parallel_omp": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x_q8", "source": "activation:x", "cast": "void*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "requires_quantized_activation": "q8_0",
+      "notes": "OpenMP-parallel variant — same signature as gemv_q5_0_q8_0"
+    },
+    "gemv_fused_q5_0_bias_parallel_omp": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "OpenMP-parallel variant — same signature as gemv_fused_q5_0_bias_dispatch"
+    },
     "gemv_fused_q5_0_bias_dispatch": {
       "params": [
         {"name": "y", "source": "output:y", "cast": "float*"},

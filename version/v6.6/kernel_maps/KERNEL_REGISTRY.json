@@ -5,18 +5,18 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 43,
+      "total": 46,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
         "bias_add": 1,
         "embedding": 2,
         "fused_attention_block": 2,
-        "fused_linear_bias": 2,
+        "fused_linear_bias": 3,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
         "gemm": 9,
-        "gemv": 8,
+        "gemv": 10,
         "kv_cache_store": 1,
         "logits_store_indexed": 1,
         "qkv_projection": 1,
@@ -2355,6 +2355,90 @@
       "_source_file": "gemv_fused_q5_0_bias.json"
     },
     {
+      "id": "gemv_fused_q5_0_bias_parallel_omp",
+      "op": "fused_linear_bias",
+      "variant": "q5_0_w_fp32_a_bias_parallel_omp",
+      "parallel": true,
+      "mode": "decode",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (FP32, quantized internally)"
+        },
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [M, K] in Q5_0 format"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "optional": true,
+          "desc": "Bias vector [M] (FP32), can be NULL"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] (FP32)"
+        }
+      ],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "fuses": [
+        "quantize_row_q8_0",
+        "gemv_q5_0_q8_0_parallel_omp",
+        "bias_add"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "strategies": [
+          {
+            "name": "openmp_rows",
+            "partition_dim": "M",
+            "notes": "Quantizes input once serially, then uses #pragma omp parallel for over output rows"
+          }
+        ]
+      },
+      "impl": {
+        "function": "gemv_fused_q5_0_bias_parallel_omp",
+        "c_declaration": "void gemv_fused_q5_0_bias_parallel_omp(float *y, const void *W, const float *x, const float *bias, int M, int K);",
+        "sources": [
+          "src/kernels/gemv_omp.c"
+        ],
+        "requires_flags": [
+          "-fopenmp"
+        ]
+      },
+      "notes": "OpenMP-parallel version of gemv_fused_q5_0_bias_dispatch for single-stream decode throughput. Quantizes input once, then parallelizes GEMV + bias over output rows.",
+      "name": "gemv_fused_q5_0_bias_parallel_omp",
+      "_source_file": "gemv_fused_q5_0_bias_parallel_omp.json"
+    },
+    {
       "id": "gemv_fused_q8_0_bias",
       "op": "fused_linear_bias",
       "variant": "q8_0_w_fp32_a_bias",
@@ -2894,6 +2978,86 @@
       "_source_file": "gemv_q5_0_q8_0.json"
     },
     {
+      "id": "gemv_q5_0_q8_0_parallel_omp",
+      "op": "gemv",
+      "variant": "q5_0_w_q8_0_a_fp32_out_parallel_omp",
+      "parallel": true,
+      "mode": "decode",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "q8_0",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_0)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q5_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [M, K] row-major"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "strategies": [
+          {
+            "name": "openmp_rows",
+            "partition_dim": "M",
+            "notes": "Uses #pragma omp parallel for over output rows"
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q5_0 uses 32-value blocks; K should be a multiple of 32."
+      },
+      "impl": {
+        "function": "gemv_q5_0_q8_0_parallel_omp",
+        "c_declaration": "void gemv_q5_0_q8_0_parallel_omp(float *y, const void *W, const void *x_q8, int M, int K);",
+        "sources": [
+          "src/kernels/gemv_omp.c"
+        ],
+        "requires_flags": [
+          "-fopenmp"
+        ]
+      },
+      "notes": "OpenMP-parallel version of gemv_q5_0_q8_0 for single-stream decode throughput.",
+      "name": "gemv_q5_0_q8_0_parallel_omp",
+      "_source_file": "gemv_q5_0_q8_0_parallel_omp.json"
+    },
+    {
       "id": "gemv_q6_k",
       "op": "gemv",
       "variant": "q6_k_w_fp32_a_fp32_out",
@@ -3283,6 +3447,86 @@
       "notes": "Generalized matrix-vector multiplication for Q8_0 weights with Q8_0 activation input. Q8_0 has looser alignment requirements (32) than Q4_K/Q5_0 (256).",
       "name": "gemv_q8_0_q8_0",
       "_source_file": "gemv_q8_0_q8_0.json"
+    },
+    {
+      "id": "gemv_q8_0_q8_0_parallel_omp",
+      "op": "gemv",
+      "variant": "q8_0_w_q8_0_a_fp32_out_parallel_omp",
+      "parallel": true,
+      "mode": "decode",
+      "quant": {
+        "weight": "q8_0",
+        "activation": "q8_0",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "q8_0",
+          "shape": [
+            "K"
+          ],
+          "desc": "Input vector [K] (quantized q8_0)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "W",
+          "dtype": "q8_0",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "desc": "Weight matrix [M, K] row-major"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "y",
+          "dtype": "fp32",
+          "shape": [
+            "M"
+          ],
+          "desc": "Output vector [M] = W @ x"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "parallelization": {
+        "supported": [
+          "output"
+        ],
+        "strategies": [
+          {
+            "name": "openmp_rows",
+            "partition_dim": "M",
+            "notes": "Uses #pragma omp parallel for over output rows"
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "K": 32
+        },
+        "notes": "Q8_0 requires K multiple of 32 for SIMD alignment."
+      },
+      "impl": {
+        "function": "gemv_q8_0_q8_0_parallel_omp",
+        "c_declaration": "void gemv_q8_0_q8_0_parallel_omp(float *y, const void *W, const void *x_q8, int M, int K);",
+        "sources": [
+          "src/kernels/gemv_omp.c"
+        ],
+        "requires_flags": [
+          "-fopenmp"
+        ]
+      },
+      "notes": "OpenMP-parallel version of gemv_q8_0_q8_0 for single-stream decode throughput.",
+      "name": "gemv_q8_0_q8_0_parallel_omp",
+      "_source_file": "gemv_q8_0_q8_0_parallel_omp.json"
     },
     {
       "id": "kv_cache_store",

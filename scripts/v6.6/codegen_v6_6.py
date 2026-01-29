@@ -525,7 +525,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                      emit_parity: bool = False,
                      weights_manifest: Optional[Dict] = None,
                      decode_scratch_offsets: Optional[Dict[int, Dict[str, int]]] = None,
-                     int8_activations: bool = False) -> None:
+                     int8_activations: bool = False,
+                     emit_profile: bool = False) -> None:
     """Emit generated_model.c with explicit per-layer unrolled kernel calls.
 
     Args:
@@ -538,6 +539,9 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                                 This enables zero-copy operation and training support.
         int8_activations: If True, use INT8 activation path (quantize + gemv) for decode mode.
                          This is 5-15x faster but requires matching INT8 kernels.
+        emit_profile: If True, insert CK_PROFILE_BEGIN/END timing wrappers around each kernel call
+                      for per-op profiling. Data is emitted as CSV/JSON via CK_PROFILE_CSV/CK_PROFILE_JSON
+                      environment variables. Compile with -DCK_PROFILE to enable at runtime.
     """
     if mode not in ("prefill", "decode"):
         raise ValueError(f"v6 codegen only supports prefill/decode (got: {mode})")
@@ -721,6 +725,96 @@ def emit_c_source_v6(layout: v3.ModelLayout,
     add(f'#error "{layout.name}: v6 codegen currently supports fp32 only. Use --dtype=fp32."')
     add("#endif")
     add()
+
+    # Profiling infrastructure
+    if emit_profile:
+        add("/* ============================================================================")
+        add(" * PROFILING INFRASTRUCTURE (CK_PROFILE)")
+        add(" * ============================================================================ */")
+        add("#ifdef CK_PROFILE")
+        add("#include <time.h>")
+        add()
+        add("typedef struct {")
+        add('    const char *mode;       /* "prefill" or "decode" */')
+        add('    const char *kernel;     /* e.g. "gemv_q5_0_q8_0" */')
+        add('    const char *op;         /* e.g. "q_proj", "mlp_gate_up" */')
+        add("    int layer;")
+        add("    double time_us;")
+        add("} CKProfileEntry;")
+        add()
+        add("#define CK_PROFILE_MAX_ENTRIES 16384")
+        add("static CKProfileEntry _ck_profile_entries[CK_PROFILE_MAX_ENTRIES];")
+        add("static int _ck_profile_count = 0;")
+        add("static int _ck_profile_token_id = 0;")
+        add()
+        add("static inline void _ck_profile_log(const char *mode, const char *kernel,")
+        add("                                    const char *op, int layer,")
+        add("                                    struct timespec t0, struct timespec t1) {")
+        add("    if (_ck_profile_count >= CK_PROFILE_MAX_ENTRIES) return;")
+        add("    double us = (t1.tv_sec - t0.tv_sec) * 1e6 + (t1.tv_nsec - t0.tv_nsec) / 1e3;")
+        add("    _ck_profile_entries[_ck_profile_count++] = (CKProfileEntry){")
+        add("        mode, kernel, op, layer, us")
+        add("    };")
+        add("}")
+        add()
+        add("static void _ck_profile_dump_json(FILE *f) {")
+        add('    fprintf(f, "{\\n  \\"entries\\": [\\n");')
+        add("    for (int i = 0; i < _ck_profile_count; i++) {")
+        add("        CKProfileEntry *e = &_ck_profile_entries[i];")
+        add('        fprintf(f, "    {\\"mode\\":\\"%s\\",\\"kernel\\":\\"%s\\",\\"op\\":\\"%s\\","')
+        add('                "\\"layer\\":%d,\\"time_us\\":%.1f,\\"token_id\\":%d}%s\\n",')
+        add("                e->mode, e->kernel, e->op, e->layer, e->time_us,")
+        add('                _ck_profile_token_id,')
+        add('                i < _ck_profile_count - 1 ? "," : "");')
+        add("    }")
+        add('    fprintf(f, "  ],\\n  \\"total_entries\\": %d,\\n  \\"token_id\\": %d\\n}\\n",')
+        add("            _ck_profile_count, _ck_profile_token_id);")
+        add("}")
+        add()
+        add("static void _ck_profile_dump(void) {")
+        add('    const char *csv_path = getenv("CK_PROFILE_CSV");')
+        add('    const char *json_path = getenv("CK_PROFILE_JSON");')
+        add("    if (csv_path) {")
+        add('        FILE *f = fopen(csv_path, _ck_profile_token_id == 0 ? "w" : "a");')
+        add("        if (f) {")
+        add("            if (_ck_profile_token_id == 0) {")
+        add('                fprintf(f, "mode,kernel,op,layer,time_us,token_id\\n");')
+        add("            }")
+        add("            for (int i = 0; i < _ck_profile_count; i++) {")
+        add("                CKProfileEntry *e = &_ck_profile_entries[i];")
+        add('                fprintf(f, "%s,%s,%s,%d,%.1f,%d\\n",')
+        add("                        e->mode, e->kernel, e->op, e->layer, e->time_us,")
+        add("                        _ck_profile_token_id);")
+        add("            }")
+        add("            fclose(f);")
+        add("        }")
+        add("    }")
+        add("    if (json_path) {")
+        add('        FILE *f = fopen(json_path, "w");')
+        add("        if (f) { _ck_profile_dump_json(f); fclose(f); }")
+        add("    }")
+        add("    if (!csv_path && !json_path) {")
+        add('        fprintf(stderr, "mode,kernel,op,layer,time_us,token_id\\n");')
+        add("        for (int i = 0; i < _ck_profile_count; i++) {")
+        add("            CKProfileEntry *e = &_ck_profile_entries[i];")
+        add('            fprintf(stderr, "%s,%s,%s,%d,%.1f,%d\\n",')
+        add("                    e->mode, e->kernel, e->op, e->layer, e->time_us,")
+        add("                    _ck_profile_token_id);")
+        add("        }")
+        add("    }")
+        add("    _ck_profile_count = 0;")
+        add("    _ck_profile_token_id++;")
+        add("}")
+        add()
+        add("#define CK_PROFILE_BEGIN() struct timespec _pt0, _pt1; clock_gettime(CLOCK_MONOTONIC, &_pt0);")
+        add("#define CK_PROFILE_END(mode, kernel, op, layer) \\")
+        add("    clock_gettime(CLOCK_MONOTONIC, &_pt1); \\")
+        add("    _ck_profile_log(mode, kernel, op, layer, _pt0, _pt1);")
+        add("#else")
+        add("#define CK_PROFILE_BEGIN()")
+        add("#define CK_PROFILE_END(mode, kernel, op, layer)")
+        add("#endif")
+        add()
 
     add("/* ============================================================================")
     add(" * LOCAL HELPERS (no orchestration dependency)")
@@ -1161,6 +1255,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add()
 
             add("    /* RMSNorm before attention */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    rmsnorm_forward(input,")
             add("                    ln1_gamma,")
             add("                    ln1_out,")
@@ -1169,19 +1265,27 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"                    {safe_name}_EMBED_DIM,")
             add("                    aligned_embed_dim,")
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "rmsnorm_forward", "rmsnorm_attn", {layer_id});')
             add()
 
             # Quantize ln1_out to Q8_0 once for all QKV projections
             if use_int8_batch:
                 add("    /* Quantize ln1_out to Q8_0 for INT8 batch kernels */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add("    for (int t = 0; t < num_tokens; ++t) {")
                 add("        quantize_row_q8_0(ln1_out + (size_t)t * (size_t)aligned_embed_dim,")
                 add("                          ln1_q8 + (size_t)t * q8_row_bytes,")
                 add("                          aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "quantize_row_q8_0", "quantize_qkv", {layer_id});')
                 add()
 
             add("    /* Q projection (head-major) */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wq_dt == "fp32":
                 add("    const float *WQ_f = (const float *)WQ;")
                 add("    for (int h = 0; h < H; ++h) {")
@@ -1190,8 +1294,9 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *q_h = q + (size_t)h * q_head_stride;")
                 add(f"        {wq_kernel}(ln1_out, wq_h, bq_h, q_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wq_kernel}", "q_proj", {layer_id});')
             elif wq_int8_batch:
-                # INT8 batch path: use pre-quantized Q8_0 input
                 gemm_kernel, _, _ = wq_int8_batch
                 add(f"    /* Q projection: {wq_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
                 add(f"    const size_t wq_head_bytes = ck_dtype_row_bytes({dtype_const(wq_dt)}, head_w_elems);")
@@ -1202,6 +1307,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *q_h = q + (size_t)h * q_head_stride;")
                 add(f"        {gemm_kernel}(ln1_q8, wq_h, bq_h, q_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{gemm_kernel}", "q_proj", {layer_id});')
             else:
                 add(f"    const size_t wq_head_bytes = ck_dtype_row_bytes({dtype_const(wq_dt)}, head_w_elems);")
                 add("    const uint8_t *WQ_bytes = (const uint8_t *)WQ;")
@@ -1211,9 +1318,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *q_h = q + (size_t)h * q_head_stride;")
                 add(f"        {wq_kernel}(ln1_out, wq_h, bq_h, q_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wq_kernel}", "q_proj", {layer_id});')
             add()
 
             add("    /* K projection (head-major) */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wk_dt == "fp32":
                 add("    const float *WK_f = (const float *)WK;")
                 add("    for (int h = 0; h < H_kv; ++h) {")
@@ -1222,8 +1333,9 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *k_h = k + (size_t)h * kv_head_stride;")
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wk_kernel}", "k_proj", {layer_id});')
             elif wk_int8_batch:
-                # INT8 batch path: use pre-quantized Q8_0 input
                 gemm_kernel, _, _ = wk_int8_batch
                 add(f"    /* K projection: {wk_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
                 add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, head_w_elems);")
@@ -1234,6 +1346,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *k_h = k + (size_t)h * kv_head_stride;")
                 add(f"        {gemm_kernel}(ln1_q8, wk_h, bk_h, k_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{gemm_kernel}", "k_proj", {layer_id});')
             else:
                 add(f"    const size_t wk_head_bytes = ck_dtype_row_bytes({dtype_const(wk_dt)}, head_w_elems);")
                 add("    const uint8_t *WK_bytes = (const uint8_t *)WK;")
@@ -1243,9 +1357,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *k_h = k + (size_t)h * kv_head_stride;")
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wk_kernel}", "k_proj", {layer_id});')
             add()
 
             add("    /* V projection (head-major) */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wv_dt == "fp32":
                 add("    const float *WV_f = (const float *)WV;")
                 add("    for (int h = 0; h < H_kv; ++h) {")
@@ -1254,8 +1372,9 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *v_h = v + (size_t)h * kv_head_stride;")
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wv_kernel}", "v_proj", {layer_id});')
             elif wv_int8_batch:
-                # INT8 batch path: use pre-quantized Q8_0 input
                 gemm_kernel, _, _ = wv_int8_batch
                 add(f"    /* V projection: {wv_dt.upper()} x Q8_0 -> {gemm_kernel} (INT8 batch) */")
                 add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, head_w_elems);")
@@ -1266,6 +1385,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *v_h = v + (size_t)h * kv_head_stride;")
                 add(f"        {gemm_kernel}(ln1_q8, wv_h, bv_h, v_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{gemm_kernel}", "v_proj", {layer_id});')
             else:
                 add(f"    const size_t wv_head_bytes = ck_dtype_row_bytes({dtype_const(wv_dt)}, head_w_elems);")
                 add("    const uint8_t *WV_bytes = (const uint8_t *)WV;")
@@ -1275,10 +1396,14 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("        float *v_h = v + (size_t)h * kv_head_stride;")
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_h, num_tokens, aligned_head_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wv_kernel}", "v_proj", {layer_id});')
             add()
 
             if has_rope:
                 add("    /* RoPE */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add("    rope_forward_qk_strided(q,")
                 add("                            k,")
                 add("                            rope_cos,")
@@ -1291,9 +1416,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("                            0,")
                 add("                            num_tokens,")
                 add("                            aligned_context_window);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "rope_forward_qk_strided", "rope", {layer_id});')
                 add()
 
             add("    /* Attention (prefill, causal) */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    attention_forward_causal_head_major_gqa_flash_strided(q,")
             add("                                                           k,")
             add("                                                           v,")
@@ -1304,6 +1433,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("                                                           head_dim,")
             add("                                                           aligned_head_dim,")
             add("                                                           aligned_context_window);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "attention_forward_causal_head_major_gqa_flash_strided", "attention", {layer_id});')
             add()
 
             add("    /* Output projection (flatten head-major to token-major) */")
@@ -1329,6 +1460,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("    }")
 
             # Output projection: WO - use INT8 if available
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wo_int8_batch:
                 wo_gemm, wo_act_dt, wo_quant_fn = wo_int8_batch
                 add(f"    /* Output projection: {wo_dt.upper()} x {wo_act_dt.upper()} -> {wo_gemm} (INT8 batch) */")
@@ -1337,23 +1470,32 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("        const size_t wo_q8_row_bytes = (K / 32) * sizeof(block_q8_0);")
                 else:  # q8_k
                     add("        const size_t wo_q8_row_bytes = (K / 256) * sizeof(block_q8_K);")
-                # Use fc1_out as scratch - it's not used until after WO completes
                 add("        uint8_t *proj_q8 = (uint8_t *)fc1_out;")
                 add("        for (int t = 0; t < num_tokens; ++t) {")
                 add(f"            {wo_quant_fn}(proj_in + (size_t)t * (size_t)K, proj_q8 + (size_t)t * wo_q8_row_bytes, K);")
                 add("        }")
                 add(f"        {wo_gemm}(proj_q8, WO, BO, proj_tmp, num_tokens, aligned_embed_dim, K);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wo_gemm}", "out_proj", {layer_id});')
             else:
                 add(f"    /* Output projection: {wo_dt.upper()} (FP32) */")
                 add(f"    {wo_kernel}(proj_in, WO, BO, proj_tmp, num_tokens, aligned_embed_dim, K);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{wo_kernel}", "out_proj", {layer_id});')
             add()
 
             add("    /* Residual add */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add(f"    {safe_name_lower}_residual_add_token_major(input, proj_tmp, residual1, num_tokens, aligned_embed_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "residual_add_token_major", "residual1", {layer_id});')
             add()
 
             add("    /* RMSNorm before MLP */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    rmsnorm_forward(residual1,")
             add("                    ln2_gamma,")
             add("                    ln2_out,")
@@ -1362,11 +1504,15 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"                    {safe_name}_EMBED_DIM,")
             add("                    aligned_embed_dim,")
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "rmsnorm_forward", "rmsnorm_mlp", {layer_id});')
             add()
 
             add("    /* MLP (SwiGLU) */")
 
             # W1 (gate+up) projection: use INT8 batch if available
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if w1_int8_batch:
                 w1_gemm, w1_act_dt, w1_quant_fn = w1_int8_batch
                 add(f"    /* W1 (gate+up): {w1_dt.upper()} x {w1_act_dt.upper()} -> {w1_gemm} (INT8 batch) */")
@@ -1375,20 +1521,29 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("        const size_t w1_q8_row_bytes = (aligned_embed_dim / 32) * sizeof(block_q8_0);")
                 else:  # q8_k
                     add("        const size_t w1_q8_row_bytes = (aligned_embed_dim / 256) * sizeof(block_q8_K);")
-                # Use proj_scratch as scratch - not used during MLP
                 add("        uint8_t *ln2_q8 = (uint8_t *)proj_scratch;")
                 add("        for (int t = 0; t < num_tokens; ++t) {")
                 add(f"            {w1_quant_fn}(ln2_out + (size_t)t * (size_t)aligned_embed_dim, ln2_q8 + (size_t)t * w1_q8_row_bytes, aligned_embed_dim);")
                 add("        }")
                 add(f"        {w1_gemm}(ln2_q8, W1, B1, fc1_out, num_tokens, 2 * aligned_intermediate_dim, aligned_embed_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{w1_gemm}", "mlp_gate_up", {layer_id});')
             else:
                 add(f"    /* W1 (gate+up): {w1_dt.upper()} (FP32) */")
                 add(f"    {w1_kernel}(ln2_out, W1, B1, fc1_out, num_tokens, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{w1_kernel}", "mlp_gate_up", {layer_id});')
 
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    swiglu_forward(fc1_out, swiglu_out, num_tokens, aligned_intermediate_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "swiglu_forward", "swiglu", {layer_id});')
 
             # W2 (down) projection: use INT8 batch if available
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if w2_int8_batch:
                 w2_gemm, w2_act_dt, w2_quant_fn = w2_int8_batch
                 add(f"    /* W2 (down): {w2_dt.upper()} x {w2_act_dt.upper()} -> {w2_gemm} (INT8 batch) */")
@@ -1397,20 +1552,27 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("        const size_t w2_q8_row_bytes = (aligned_intermediate_dim / 32) * sizeof(block_q8_0);")
                 else:  # q8_k
                     add("        const size_t w2_q8_row_bytes = (aligned_intermediate_dim / 256) * sizeof(block_q8_K);")
-                # Reuse proj_scratch for swiglu quantization
                 add("        uint8_t *swiglu_q8 = (uint8_t *)proj_scratch;")
                 add("        for (int t = 0; t < num_tokens; ++t) {")
                 add(f"            {w2_quant_fn}(swiglu_out + (size_t)t * (size_t)aligned_intermediate_dim, swiglu_q8 + (size_t)t * w2_q8_row_bytes, aligned_intermediate_dim);")
                 add("        }")
                 add(f"        {w2_gemm}(swiglu_q8, W2, B2, mlp_out, num_tokens, aligned_embed_dim, aligned_intermediate_dim);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{w2_gemm}", "mlp_down", {layer_id});')
             else:
                 add(f"    /* W2 (down): {w2_dt.upper()} (FP32) */")
                 add(f"    {w2_kernel}(swiglu_out, W2, B2, mlp_out, num_tokens, aligned_embed_dim, aligned_intermediate_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("prefill", "{w2_kernel}", "mlp_down", {layer_id});')
             add()
 
             add("    /* Final residual add */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add(f"    {safe_name_lower}_residual_add_token_major(residual1, mlp_out, output, num_tokens, aligned_embed_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("prefill", "residual_add_token_major", "residual2", {layer_id});')
 
             # No free needed - using pre-allocated proj_scratch buffer
 
@@ -1438,6 +1600,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add()
         add(f"    float *embed_out = {safe_name}_PTR(model, {safe_name}_HEADER.embedded_input);")
         embed_kernel = DTYPE_TO_EMBEDDING_KERNEL.get(embed_quant_type, "embedding_forward")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         if embed_quant_type != "fp32":
             add(f"    const void *embed_weight = (const void *){safe_name}_PTR(model, {safe_name}_HEADER.token_emb);")
             add(f"    {embed_kernel}((const int32_t *)tokens,")
@@ -1462,6 +1626,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("                      aligned_embed_dim,")
             add("                      num_tokens,")
             add("                      0);")
+        if emit_profile:
+            add(f'    CK_PROFILE_END("prefill", "{embed_kernel}", "embedding", -1);')
         add()
 
         for layer_id in range(num_layers):
@@ -1477,6 +1643,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(f"    float *last_hidden = {safe_name}_PTR(model, {safe_name}_LAYERS[{safe_name}_NUM_LAYERS - 1].output);")
         add(f"    float *final_ln_weight = {safe_name}_PTR(model, {safe_name}_FOOTER.final_ln_weight);")
         add(f"    float *final_out = {safe_name}_PTR(model, {safe_name}_FOOTER.final_output);")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         add("    rmsnorm_forward(last_hidden,")
         add("                   final_ln_weight,")
         add("                   final_out,")
@@ -1485,9 +1653,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(f"                   {safe_name}_EMBED_DIM,")
         add("                   aligned_embed_dim,")
         add(f"                   {config.get('rms_norm_eps', 1e-6)}f);")
+        if emit_profile:
+            add('    CK_PROFILE_END("prefill", "rmsnorm_forward", "final_rmsnorm", -1);')
         add()
         add(f"    float *logits = {safe_name}_PTR(model, {safe_name}_FOOTER.logits);")
         lm_head_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(lm_head_quant_type, "gemm_blocked_serial")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         if lm_head_quant_type != "fp32":
             add(f"    const void *lm_head = (const void *){safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
             if lm_head_use_q4_k:
@@ -1526,6 +1698,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("                        num_tokens,")
             add(f"                        {safe_name}_VOCAB_SIZE,")
             add("                        aligned_embed_dim);")
+        if emit_profile:
+            add(f'    CK_PROFILE_END("prefill", "{lm_head_kernel}", "lm_head", -1);')
         add("}")
         add()
     emit_prefill_impl()
@@ -1655,6 +1829,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             # Step 1: RMSNorm
             add("    /* Step 1: RMSNorm before attention */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    rmsnorm_forward(input,")
             add("                    ln1_gamma,")
             add("                    ln1_out,")
@@ -1663,6 +1839,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"                    {safe_name}_EMBED_DIM,")
             add("                    aligned_embed_dim,")
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "rmsnorm_forward", "rmsnorm_attn", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_ln1_out", ln1_out, aligned_embed_dim);')
             if emit_parity:
@@ -1691,10 +1869,16 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             # INT8 path: quantize input once, use for all QKV projections
             if int8_activations and (wq_int8 or wk_int8 or wv_int8):
                 add("    /* INT8 activation: quantize ln1_out once for QKV */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add("    quantize_row_q8_0(ln1_out, ln1_q8, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "quantize_row_q8_0", "quantize_qkv", {layer_id});')
                 add()
 
             # Q projection
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wq_int8:
                 gemv_kernel, _, _ = wq_int8
                 add(f"    /* Q projection: {wq_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
@@ -1704,9 +1888,13 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("    if (BQ) {")
                     add("        for (int i = 0; i < H * head_dim; ++i) q_token[i] += BQ[i];")
                     add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "q_proj", {layer_id});')
             else:
                 add(f"    /* Q projection: {wq_dt.upper()} -> {wq_kernel} (FP32) */")
                 add(f"    {wq_kernel}(ln1_out, WQ, {bq_arg}, q_token, 1, H * head_dim, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wq_kernel}", "q_proj", {layer_id});')
             add("    if (aligned_head_dim > head_dim) {")
             add("        for (int h = 0; h < H; ++h) {")
             add("            float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;")
@@ -1717,6 +1905,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("    }")
             add()
             # K projection with INT8 support
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wk_int8:
                 gemv_kernel, _, _ = wk_int8
                 add(f"    /* K projection: {wk_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8, direct-to-cache) */")
@@ -1732,6 +1922,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("        if (bk_h) { for (int d = 0; d < head_dim; ++d) k_head[d] += bk_h[d]; }")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "k_proj", {layer_id});')
             elif wk_dt == "fp32":
                 add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (FP32, direct-to-cache) */")
                 add("    const float *WK_f = (const float *)WK;")
@@ -1743,6 +1935,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wk_kernel}", "k_proj", {layer_id});')
             else:
                 add(f"    /* K projection: {wk_dt.upper()} -> {wk_kernel} (FP32 fallback, direct-to-cache) */")
                 add(f"    const size_t wk_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
@@ -1755,8 +1949,12 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add(f"        {wk_kernel}(ln1_out, wk_h, bk_h, k_head, 1, head_dim, aligned_embed_dim);")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) k_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wk_kernel}", "k_proj", {layer_id});')
             add()
             # V projection with INT8 support
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             if wv_int8:
                 gemv_kernel, _, _ = wv_int8
                 add(f"    /* V projection: {wv_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8, direct-to-cache) */")
@@ -1772,6 +1970,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                     add("        if (bv_h) { for (int d = 0; d < head_dim; ++d) v_head[d] += bv_h[d]; }")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "v_proj", {layer_id});')
             elif wv_dt == "fp32":
                 add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (FP32, direct-to-cache) */")
                 add("    const float *WV_f = (const float *)WV;")
@@ -1783,6 +1983,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wv_kernel}", "v_proj", {layer_id});')
             else:
                 add(f"    /* V projection: {wv_dt.upper()} -> {wv_kernel} (FP32 fallback, direct-to-cache) */")
                 add(f"    const size_t wv_head_elems = (size_t)aligned_head_dim * (size_t)aligned_embed_dim;")
@@ -1795,6 +1997,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add(f"        {wv_kernel}(ln1_out, wv_h, bv_h, v_head, 1, head_dim, aligned_embed_dim);")
                 add("        for (int d = head_dim; d < aligned_head_dim; ++d) v_head[d] = 0.0f;")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wv_kernel}", "v_proj", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_q_token", q_token, H * aligned_head_dim);')
             if emit_parity:
@@ -1804,6 +2008,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             # Step 3: RoPE
             if has_rope:
                 add("    /* Step 3: RoPE */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add("    rope_forward(q_token,")
                 add("                 rope_cos,")
                 add("                 rope_sin,")
@@ -1823,6 +2029,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 add("                     aligned_head_dim,")
                 add("                     token_index);")
                 add("    }")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "rope_forward", "rope", {layer_id});')
                 if emit_parity:
                     add(f'    parity_save_buffer("layer_{layer_id}_q_rope", q_token, H * aligned_head_dim);')
                 add()
@@ -1833,6 +2041,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             # Step 5: Attention
             add("    /* Step 5: Attention (decode, flash) */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    attention_forward_decode_head_major_gqa_flash(q_token,")
             add("                                                   k_cache,")
             add("                                                   v_cache,")
@@ -1843,6 +2053,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("                                                   aligned_context_window,")
             add("                                                   head_dim,")
             add("                                                   aligned_head_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "attention_forward_decode_head_major_gqa_flash", "attention", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_attn_token", attn_token, H * aligned_head_dim);')
             if emit_parity:
@@ -1857,11 +2069,22 @@ def emit_c_source_v6(layout: v3.ModelLayout,
                 gemv_kernel, _, quantize_fn = wo_int8
                 add(f"    /* WO projection: {wo_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
                 add("    uint8_t attn_q8[(H * aligned_head_dim / 32 + 1) * 34];")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {quantize_fn}(attn_token, attn_q8, H * head_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{quantize_fn}", "quantize_attn", {layer_id});')
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {gemv_kernel}(proj_tmp, WO, attn_q8, aligned_embed_dim, H * head_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "out_proj", {layer_id});')
             else:
                 add(f"    /* WO projection: {wo_dt.upper()} -> {wo_kernel} (FP32) */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {wo_kernel}(attn_token, WO, NULL, proj_tmp, 1, aligned_embed_dim, H * head_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{wo_kernel}", "out_proj", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_proj_tmp", proj_tmp, aligned_embed_dim);')
             if emit_parity:
@@ -1870,7 +2093,11 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             # Step 7: Residual add
             add("    /* Step 7: Residual add */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add(f"    {safe_name_lower}_residual_add_token_major(input, proj_tmp, residual1, 1, aligned_embed_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "residual_add_token_major", "residual1", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_residual1", residual1, aligned_embed_dim);')
             if emit_parity:
@@ -1879,6 +2106,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             # Step 8: RMSNorm before MLP
             add("    /* Step 8: RMSNorm before MLP */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add("    rmsnorm_forward(residual1,")
             add("                    ln2_gamma,")
             add("                    ln2_out,")
@@ -1887,6 +2116,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add(f"                    {safe_name}_EMBED_DIM,")
             add("                    aligned_embed_dim,")
             add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "rmsnorm_forward", "rmsnorm_mlp", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_ln2_out", ln2_out, aligned_embed_dim);')
             if emit_parity:
@@ -1904,18 +2135,33 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             if w1_int8:
                 gemv_kernel, _, quantize_fn = w1_int8
                 add(f"    /* Gate+Up projection: {w1_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {quantize_fn}(ln2_out, ln2_q8, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{quantize_fn}", "quantize_mlp", {layer_id});')
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {gemv_kernel}(fc1_out, W1, ln2_q8, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "mlp_gate_up", {layer_id});')
             else:
                 add(f"    /* Gate+Up projection: {w1_dt.upper()} -> {w1_kernel} (FP32) */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {w1_kernel}(ln2_out, W1, NULL, fc1_out, 1, 2 * aligned_intermediate_dim, aligned_embed_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{w1_kernel}", "mlp_gate_up", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_fc1_out", fc1_out, 2 * aligned_intermediate_dim);')
             if emit_parity:
                 add(f'    parity_save_buffer("layer_{layer_id}_fc1", fc1_out, 2 * aligned_intermediate_dim);')
             add()
             add("    /* SwiGLU activation */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add(f"    swiglu_forward(fc1_out, swiglu_out, 1, aligned_intermediate_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "swiglu_forward", "swiglu", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_swiglu_out", swiglu_out, aligned_intermediate_dim);')
             if emit_parity:
@@ -1925,11 +2171,22 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             if w2_int8:
                 gemv_kernel, _, quantize_fn = w2_int8
                 add(f"    /* Down projection: {w2_dt.upper()} x Q8_0 -> {gemv_kernel} (INT8) */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {quantize_fn}(swiglu_out, swiglu_q8, aligned_intermediate_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{quantize_fn}", "quantize_down", {layer_id});')
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {gemv_kernel}(mlp_out, W2, swiglu_q8, aligned_embed_dim, aligned_intermediate_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{gemv_kernel}", "mlp_down", {layer_id});')
             else:
                 add(f"    /* Down projection: {w2_dt.upper()} -> {w2_kernel} (FP32) */")
+                if emit_profile:
+                    add("    CK_PROFILE_BEGIN();")
                 add(f"    {w2_kernel}(swiglu_out, W2, NULL, mlp_out, 1, aligned_embed_dim, aligned_intermediate_dim);")
+                if emit_profile:
+                    add(f'    CK_PROFILE_END("decode", "{w2_kernel}", "mlp_down", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_mlp_out", mlp_out, aligned_embed_dim);')
             if emit_parity:
@@ -1938,7 +2195,11 @@ def emit_c_source_v6(layout: v3.ModelLayout,
 
             # Step 10: Final residual add
             add("    /* Step 10: Final residual add */")
+            if emit_profile:
+                add("    CK_PROFILE_BEGIN();")
             add(f"    {safe_name_lower}_residual_add_token_major(residual1, mlp_out, output, 1, aligned_embed_dim);")
+            if emit_profile:
+                add(f'    CK_PROFILE_END("decode", "residual_add_token_major", "residual2", {layer_id});')
             if emit_debug:
                 add(f'    debug_check_buffer("layer{layer_id}_output", output, aligned_embed_dim);')
             if emit_parity:
@@ -1970,6 +2231,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add("    /* Embedding lookup */")
         add(f"    float *embed_out = {safe_name}_PTR(model, {safe_name}_HEADER.embedded_input);")
         embed_kernel = DTYPE_TO_EMBEDDING_KERNEL.get(embed_quant_type, "embedding_forward")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         if embed_quant_type != "fp32":
             add(f"    const void *embed_weight = (const void *){safe_name}_PTR(model, {safe_name}_HEADER.token_emb);")
             add(f"    /* Embedding: {embed_quant_type.upper()} -> {embed_kernel} */")
@@ -1995,6 +2258,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
             add("                      aligned_embed_dim,")
             add("                      1,")
             add("                      0);")
+        if emit_profile:
+            add(f'    CK_PROFILE_END("decode", "{embed_kernel}", "embedding", -1);')
         if emit_debug:
             add('    debug_check_buffer("embed_out", embed_out, aligned_embed_dim);')
         if emit_parity:
@@ -2012,6 +2277,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(f"    float *last_hidden = {safe_name}_PTR(model, {safe_name}_LAYERS[{num_layers - 1}].output);")
         add(f"    float *final_ln_weight = {safe_name}_PTR(model, {safe_name}_FOOTER.final_ln_weight);")
         add(f"    float *final_out = {safe_name}_PTR(model, {safe_name}_FOOTER.final_output);")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         add("    rmsnorm_forward(last_hidden,")
         add("                    final_ln_weight,")
         add("                    final_out,")
@@ -2020,6 +2287,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(f"                    {safe_name}_EMBED_DIM,")
         add("                    aligned_embed_dim,")
         add(f"                    {config.get('rms_norm_eps', 1e-6)}f);")
+        if emit_profile:
+            add('    CK_PROFILE_END("decode", "rmsnorm_forward", "final_rmsnorm", -1);')
         if emit_debug:
             add('    debug_check_buffer("final_out", final_out, aligned_embed_dim);')
         if emit_parity:
@@ -2030,6 +2299,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add("    /* LM head projection */")
         add(f"    float *logits = {safe_name}_PTR(model, {safe_name}_FOOTER.logits);")
         lm_head_kernel = DTYPE_TO_GEMM_NT_KERNEL.get(lm_head_quant_type, "gemm_blocked_serial")
+        if emit_profile:
+            add("    CK_PROFILE_BEGIN();")
         if lm_head_quant_type != "fp32":
             add(f"    const void *lm_head = (const void *){safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
             add(f"    /* LM head: {lm_head_quant_type.upper()} -> {lm_head_kernel} */")
@@ -2037,6 +2308,8 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         else:
             add(f"    float *lm_head = {safe_name}_PTR(model, {safe_name}_FOOTER.lm_head_weight);")
             add(f"    gemm_blocked_serial(final_out, lm_head, NULL, logits, 1, {safe_name}_VOCAB_SIZE, aligned_embed_dim);")
+        if emit_profile:
+            add(f'    CK_PROFILE_END("decode", "{lm_head_kernel}", "lm_head", -1);')
         if emit_debug:
             add(f'    debug_check_buffer("logits", logits, {safe_name}_VOCAB_SIZE);')
         if emit_parity:
@@ -2056,12 +2329,29 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(") {")
         add("    if (!model || !tokens || num_tokens <= 0) return;")
         add(f"    {safe_name_lower}_forward_prefill_impl(model, tokens, num_tokens);")
+        if emit_profile:
+            add("#ifdef CK_PROFILE")
+            add("    _ck_profile_dump();")
+            add("#endif")
         add("}")
         add()
         add(f"void {safe_name_lower}_decode({safe_name}Model *model, const int *token, int token_index) {{")
         add(f"    {safe_name_lower}_decode_token(model, token, token_index);")
+        if emit_profile:
+            add("#ifdef CK_PROFILE")
+            add("    _ck_profile_dump();")
+            add("#endif")
         add("}")
         add()
+
+        # Profile dump public API
+        if emit_profile:
+            add("void ck_model_profile_dump(void) {")
+            add("#ifdef CK_PROFILE")
+            add("    _ck_profile_dump();")
+            add("#endif")
+            add("}")
+            add()
 
     else:  # prefill mode
         add("/* ============================================================================")
@@ -2075,8 +2365,21 @@ def emit_c_source_v6(layout: v3.ModelLayout,
         add(") {")
         add("    if (!model || !tokens || num_tokens <= 0) return;")
         add(f"    {safe_name_lower}_forward_prefill_impl(model, tokens, num_tokens);")
+        if emit_profile:
+            add("#ifdef CK_PROFILE")
+            add("    _ck_profile_dump();")
+            add("#endif")
         add("}")
         add()
+
+        # Profile dump public API
+        if emit_profile:
+            add("void ck_model_profile_dump(void) {")
+            add("#ifdef CK_PROFILE")
+            add("    _ck_profile_dump();")
+            add("#endif")
+            add("}")
+            add()
 
     # Write output
     with open(output_path, "w") as f:

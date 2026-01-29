@@ -272,6 +272,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_batch_int8.c \
 	           src/kernels/fused/fused_rmsnorm_linear.c \
 	           src/kernels/gemm_kernels_q8_0.c \
+	           src/kernels/gemv_omp.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/fused/rmsnorm_q8_k_fused.c \
 	           src/kernels/gemm_kernels_f16.c \
@@ -1337,6 +1338,9 @@ test: $(LIB) test-libs
 	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
+	@echo ""
+	@echo "Running OpenMP GEMV parity tests..."
+	@$(MAKE) --no-print-directory test-gemv-omp-quick
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -1616,10 +1620,13 @@ llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
 	@./scripts/run_parity_smoketest.sh --quick
 
-# Full parity test (assumes already built)
+# Full parity test (assumes already built) — includes OMP kernel parity
 llamacpp-parity-full:
 	@echo "Running full llama.cpp parity test..."
 	@./scripts/run_parity_smoketest.sh --skip-build
+	@echo ""
+	@echo "Running OpenMP GEMV parity tests (serial vs parallel)..."
+	@$(MAKE) --no-print-directory test-gemv-omp
 
 # Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
@@ -1770,6 +1777,82 @@ test-gemv-comprehensive-quick: $(LIB_PARITY)
 test-gemv-comprehensive-large: $(LIB_PARITY)
 	@echo "Running comprehensive GEMV kernel tests with 7B dimensions..."
 	@$(PYTHON) unittest/test_gemv_kernels_comprehensive.py --large
+
+# =============================================================================
+# OpenMP GEMV Parity & Speed Tests
+# =============================================================================
+# Compare serial GEMV kernels vs OpenMP-parallel variants:
+#   - Numerical parity (max abs diff < 1e-3)
+#   - Speed comparison (serial vs OMP, thread scaling)
+#
+# Targets:
+#   make test-gemv-omp          Full parity + speed test (all model dimensions)
+#   make test-gemv-omp-quick    Quick parity test (small dimensions)
+#   make test-gemv-omp-verbose  Full test with detailed diff output
+
+GEMV_OMP_BIN := $(BUILD_DIR)/test_gemv_omp_parity
+
+$(GEMV_OMP_BIN): $(LIB) tests/test_gemv_omp_parity.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -march=native -fopenmp -Iinclude \
+		tests/test_gemv_omp_parity.c \
+		-L$(BUILD_DIR) -lckernel_engine -lm \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o $(GEMV_OMP_BIN)
+
+test-gemv-omp: $(GEMV_OMP_BIN)
+	@echo "Running OpenMP GEMV parity + speed test (full)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMV_OMP_BIN)
+
+test-gemv-omp-quick: $(GEMV_OMP_BIN)
+	@echo "Running OpenMP GEMV parity test (quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMV_OMP_BIN) --quick
+
+test-gemv-omp-verbose: $(GEMV_OMP_BIN)
+	@echo "Running OpenMP GEMV parity + speed test (verbose)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMV_OMP_BIN) --verbose
+
+.PHONY: test-gemv-omp test-gemv-omp-quick test-gemv-omp-verbose
+
+# =============================================================================
+# OpenMP GEMV Profiling (serial vs parallel)
+# =============================================================================
+# Full profiling suite: perf stat, flamegraph, cachegrind, VTune, massif
+#
+# Targets:
+#   make test-profile-full              All profiling tools
+#   make test-profile-perf              perf stat only (HW counters)
+#   make test-profile-flamegraph        Flamegraph comparison
+#   make test-profile-cachegrind        Cache behavior analysis
+#   make test-profile-vtune             Intel VTune analysis
+#   make test-profile-massif            Heap memory profiling
+
+test-profile-full: $(GEMV_OMP_BIN)
+	@echo "Running full profiling suite (serial vs OpenMP GEMV)..."
+	@./scripts/profile_gemv_omp.sh all
+
+test-profile-perf: $(GEMV_OMP_BIN)
+	@echo "Running perf stat comparison..."
+	@./scripts/profile_gemv_omp.sh perf
+
+test-profile-flamegraph: $(GEMV_OMP_BIN)
+	@echo "Generating serial vs OpenMP flamegraphs..."
+	@./scripts/profile_gemv_omp.sh flamegraph
+
+test-profile-cachegrind: $(GEMV_OMP_BIN)
+	@echo "Running cachegrind comparison..."
+	@./scripts/profile_gemv_omp.sh cachegrind
+
+test-profile-vtune: $(GEMV_OMP_BIN)
+	@echo "Running VTune analysis..."
+	@./scripts/profile_gemv_omp.sh vtune
+
+test-profile-massif: $(GEMV_OMP_BIN)
+	@echo "Running heap profiling comparison..."
+	@./scripts/profile_gemv_omp.sh massif
+
+.PHONY: test-profile-full test-profile-perf test-profile-flamegraph
+.PHONY: test-profile-cachegrind test-profile-vtune test-profile-massif
 
 all-tests: $(LIB)
 	$(MAKE) test
@@ -2697,7 +2780,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-cachegrind profile-v6-full
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
@@ -2757,4 +2840,61 @@ v6.6-ir-visualizer:
 		open http://localhost:8080/ir_visualizer.html 2>/dev/null || \
 		echo "Open http://localhost:8080/ir_visualizer.html in your browser"; \
 	fi
+
+# =============================================================================
+# V6.6 Comprehensive Profiling
+# =============================================================================
+
+PROFILE_V6_SCRIPT := version/v6.6/scripts/ck_run_v6_6.py
+
+profile-v6-decode:
+	CK_PROFILE=1 \
+	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+		--profile --force-compile \
+		--prompt "The quick brown fox" --max-tokens 32
+	@echo "Profile data saved in model cache directory"
+
+profile-v6-prefill:
+	CK_PROFILE=1 \
+	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+		--profile --force-compile \
+		--prompt "Explain the theory of relativity in simple terms" \
+		--max-tokens 1
+	@echo "Profile data saved in model cache directory"
+
+profile-v6-flamegraph:
+	CK_V6_EXTRA_CFLAGS="-fno-omit-frame-pointer -g" \
+	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+		--force-compile \
+		--prompt "The quick brown fox" --max-tokens 32
+	perf script -i /tmp/ck_v6_perf.data | \
+		./FlameGraph/stackcollapse-perf.pl | \
+		./FlameGraph/flamegraph.pl --title="CK v6.6 Decode" > build/flamegraph_v6.svg
+
+profile-v6-perf-stat:
+	perf stat -e cycles,instructions,cache-references,cache-misses,\
+LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
+branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+		--context-len 1024 --prompt "The quick brown fox" --max-tokens 32 \
+		2> /tmp/ck_v6_perf_stat.txt
+	@cat /tmp/ck_v6_perf_stat.txt
+
+profile-v6-cachegrind:
+	valgrind --tool=cachegrind --cachegrind-out-file=build/cachegrind_v6.out \
+	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+		--context-len 1024 --prompt "Hello" --max-tokens 4
+	cg_annotate build/cachegrind_v6.out > build/cachegrind_v6_annotated.txt
+
+profile-v6-full:
+	$(MAKE) profile-v6-decode
+	$(MAKE) profile-v6-prefill
+	$(MAKE) profile-v6-perf-stat
+	@echo "=== Open visualizer: version/v6.6/tools/ir_visualizer.html ==="
+	@echo "=== Load folder from model cache to see Profile tab ==="
 

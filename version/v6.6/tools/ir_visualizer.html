@@ -719,6 +719,7 @@
         <div class="tab" onclick="showTab('dataflow')">Dataflow Graph</div>
         <div class="tab" onclick="showTab('tests')">Tests</div>
         <div class="tab" onclick="showTab('stats')">Statistics</div>
+        <div class="tab" onclick="showTab('profile')">Profile</div>
     </div>
 
     <main>
@@ -1201,6 +1202,42 @@ python test_gemv_q8_0_q8_0.py</pre>
                 <tbody></tbody>
             </table>
         </div>
+
+        <div id="profile" class="panel">
+            <h2 style="margin-bottom: 1rem;">Performance Profile</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                Per-kernel timing breakdown for prefill and decode paths.
+                Load a model folder or upload profile_summary.json.
+            </p>
+
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
+                <label style="padding: 0.5rem 1rem; background: var(--orange); color: var(--dark); border: none; border-radius: 4px; cursor: pointer;">
+                    Load Profile
+                    <input type="file" id="profileFile" accept=".json,.csv" onchange="loadProfileData(event)" style="display:none;">
+                </label>
+                <select id="profileMode" onchange="renderProfile()" style="padding: 0.5rem; background: var(--dark-card); color: var(--text-primary); border: 1px solid var(--grey); border-radius: 4px;">
+                    <option value="decode">Decode</option>
+                    <option value="prefill">Prefill</option>
+                </select>
+                <select id="profileView" onchange="renderProfile()" style="padding: 0.5rem; background: var(--dark-card); color: var(--text-primary); border: 1px solid var(--grey); border-radius: 4px;">
+                    <option value="op_breakdown">By Operation</option>
+                    <option value="layer_heatmap">Layer Heatmap</option>
+                    <option value="raw_table">Raw Data</option>
+                </select>
+            </div>
+
+            <!-- Summary stats -->
+            <div class="stats-grid" id="profileStats"></div>
+
+            <!-- Bar chart: per-op breakdown -->
+            <div id="profileOpChart" style="margin: 1.5rem 0;"></div>
+
+            <!-- Heatmap: layers x ops -->
+            <div id="profileHeatmap" style="margin: 1.5rem 0;"></div>
+
+            <!-- Raw data table -->
+            <div id="profileRawTable" style="margin: 1.5rem 0;"></div>
+        </div>
     </main>
 
     <div class="tooltip" id="tooltip"></div>
@@ -1234,6 +1271,7 @@ python test_gemv_q8_0_q8_0.py</pre>
         let loweredData = null;
         let callData = null;
         let manifestData = null;
+        let profileData = null;
 
         function formatBytes(bytes) {
             if (bytes >= 1024*1024*1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
@@ -1245,7 +1283,7 @@ python test_gemv_q8_0_q8_0.py</pre>
         function showTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            const tabOrder = ['memory','kernels','interpretability','quantization','parity','dataflow','tests','stats'];
+            const tabOrder = ['memory','kernels','interpretability','quantization','parity','dataflow','tests','stats','profile'];
             document.querySelector(`.tab:nth-child(${tabOrder.indexOf(tabId)+1})`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
 
@@ -1255,6 +1293,9 @@ python test_gemv_q8_0_q8_0.py</pre>
             }
             if (tabId === 'dataflow') {
                 renderDataflow();
+            }
+            if (tabId === 'profile') {
+                renderProfile();
             }
         }
 
@@ -2626,6 +2667,7 @@ python test_gemv_q8_0_q8_0.py</pre>
 
         function getFileType(filename) {
             const name = filename.toLowerCase();
+            if (name.includes('profile')) return 'profile';
             if (name.includes('layout')) return 'layout';
             if (name.includes('lowered')) return 'lowered';
             if (name.includes('ir1') || name.includes('dataflow')) return 'ir1';
@@ -2691,6 +2733,10 @@ python test_gemv_q8_0_q8_0.py</pre>
                         ir1Data = info.data;
                         renderDataflow();
                         console.log('Auto-loaded: ir1 dataflow');
+                    } else if (name.includes('profile_summary') || name.includes('profile_decode')) {
+                        profileData = info.data;
+                        renderProfile();
+                        console.log('Auto-loaded: profile data');
                     }
                 }
             });
@@ -3347,6 +3393,249 @@ python test_gemv_q8_0_q8_0.py</pre>
                     break;
             }
         });
+
+        /* ================================================================
+         * PROFILE TAB - Per-kernel timing visualization
+         * ================================================================ */
+
+        function loadProfileData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    if (file.name.endsWith('.json')) {
+                        profileData = JSON.parse(e.target.result);
+                    } else if (file.name.endsWith('.csv')) {
+                        profileData = parseProfileCSV(e.target.result);
+                    }
+                    renderProfile();
+                    console.log('Loaded profile data:', file.name);
+                } catch (err) {
+                    console.error('Error loading profile:', err);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseProfileCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) return null;
+            const headers = lines[0].split(',');
+            const entries = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = lines[i].split(',');
+                const entry = {};
+                headers.forEach((h, j) => entry[h.trim()] = vals[j]?.trim() || '');
+                entries.push(entry);
+            }
+            // Build summary
+            const byOp = {};
+            const byLayer = {};
+            let totalUs = 0;
+            entries.forEach(e => {
+                if (e.token_id !== '0') return;
+                const op = e.op || 'unknown';
+                const layer = parseInt(e.layer || '-1');
+                const us = parseFloat(e.time_us || '0');
+                totalUs += us;
+                byOp[op] = (byOp[op] || 0) + us;
+                if (layer >= 0) {
+                    if (!byLayer[layer]) byLayer[layer] = {};
+                    byLayer[layer][op] = (byLayer[layer][op] || 0) + us;
+                }
+            });
+            return { total_us: totalUs, total_ms: totalUs / 1000, by_op: byOp, by_layer: byLayer, entries };
+        }
+
+        function renderProfile() {
+            if (!profileData) {
+                document.getElementById('profileStats').innerHTML = '<p style="color:var(--text-muted);">No profile data loaded. Use the Load Profile button or load a model folder.</p>';
+                document.getElementById('profileOpChart').innerHTML = '';
+                document.getElementById('profileHeatmap').innerHTML = '';
+                document.getElementById('profileRawTable').innerHTML = '';
+                return;
+            }
+
+            const data = profileData;
+            const mode = document.getElementById('profileMode').value;
+            const view = document.getElementById('profileView').value;
+
+            // Filter entries by mode if we have raw entries
+            let filteredData = data;
+            if (data.entries && data.entries.length > 0 && data.entries[0].mode) {
+                const filtered = data.entries.filter(e => e.mode === mode && (e.token_id === '0' || e.token_id === 0));
+                if (filtered.length > 0) {
+                    const byOp = {};
+                    const byLayer = {};
+                    let totalUs = 0;
+                    filtered.forEach(e => {
+                        const op = e.op || 'unknown';
+                        const layer = parseInt(e.layer || '-1');
+                        const us = parseFloat(e.time_us || '0');
+                        totalUs += us;
+                        byOp[op] = (byOp[op] || 0) + us;
+                        if (layer >= 0) {
+                            if (!byLayer[layer]) byLayer[layer] = {};
+                            byLayer[layer][op] = (byLayer[layer][op] || 0) + us;
+                        }
+                    });
+                    filteredData = { total_us: totalUs, total_ms: totalUs / 1000, by_op: byOp, by_layer: byLayer, entries: filtered };
+                }
+            }
+
+            renderProfileStats(filteredData);
+
+            document.getElementById('profileOpChart').style.display = view === 'op_breakdown' ? '' : 'none';
+            document.getElementById('profileHeatmap').style.display = view === 'layer_heatmap' ? '' : 'none';
+            document.getElementById('profileRawTable').style.display = view === 'raw_table' ? '' : 'none';
+
+            if (view === 'op_breakdown') renderProfileOpChart(filteredData);
+            if (view === 'layer_heatmap') renderProfileHeatmap(filteredData);
+            if (view === 'raw_table') renderProfileRawTable(filteredData);
+        }
+
+        function renderProfileStats(data) {
+            const container = document.getElementById('profileStats');
+            const totalMs = data.total_ms || 0;
+            const toksPerSec = totalMs > 0 ? (1000 / totalMs).toFixed(1) : '-';
+
+            const sorted = Object.entries(data.by_op || {}).sort((a, b) => b[1] - a[1]);
+            const top3 = sorted.slice(0, 3).map(([op, us]) =>
+                `${op}: ${(us/1000).toFixed(2)}ms`
+            ).join(', ');
+
+            container.innerHTML = `
+                <div class="stat-card"><div class="stat-value">${totalMs.toFixed(2)} ms</div><div class="stat-label">Total Time (first token)</div></div>
+                <div class="stat-card"><div class="stat-value">${toksPerSec}</div><div class="stat-label">Tokens/sec (estimated)</div></div>
+                <div class="stat-card"><div class="stat-value">${sorted.length}</div><div class="stat-label">Unique Operations</div></div>
+                <div class="stat-card"><div class="stat-value" style="font-size:0.9rem;">${top3 || '-'}</div><div class="stat-label">Top Hotspots</div></div>
+            `;
+        }
+
+        function renderProfileOpChart(data) {
+            const container = document.getElementById('profileOpChart');
+            const byOp = data.by_op || {};
+            const totalUs = data.total_us || 1;
+
+            const sorted = Object.entries(byOp).sort((a, b) => b[1] - a[1]);
+            const maxUs = sorted[0]?.[1] || 1;
+
+            const opColors = {
+                'q_proj': '#47b475', 'k_proj': '#47b475', 'v_proj': '#47b475',
+                'out_proj': '#47b475', 'mlp_gate_up': '#47b475', 'mlp_down': '#47b475',
+                'attention': '#f39c12',
+                'rmsnorm_attn': '#9b59b6', 'rmsnorm_mlp': '#9b59b6', 'final_rmsnorm': '#9b59b6',
+                'quantize_qkv': '#e74c3c', 'quantize_attn': '#e74c3c',
+                'quantize_mlp': '#e74c3c', 'quantize_down': '#e74c3c',
+                'swiglu': '#3498db', 'rope': '#3498db',
+                'embedding': '#3498db', 'lm_head': '#47b475',
+                'residual1': '#555', 'residual2': '#555',
+            };
+
+            container.innerHTML = '<h3 style="margin-bottom:0.75rem;">Per-Operation Breakdown</h3>' +
+                '<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;font-size:0.75rem;">' +
+                '<span><span style="display:inline-block;width:10px;height:10px;background:#47b475;border-radius:2px;"></span> GEMV/GEMM</span>' +
+                '<span><span style="display:inline-block;width:10px;height:10px;background:#f39c12;border-radius:2px;"></span> Attention</span>' +
+                '<span><span style="display:inline-block;width:10px;height:10px;background:#9b59b6;border-radius:2px;"></span> Norm</span>' +
+                '<span><span style="display:inline-block;width:10px;height:10px;background:#e74c3c;border-radius:2px;"></span> Quantize</span>' +
+                '<span><span style="display:inline-block;width:10px;height:10px;background:#3498db;border-radius:2px;"></span> Other</span>' +
+                '</div>' +
+                sorted.map(([op, us]) => {
+                    const pct = (us / totalUs * 100).toFixed(1);
+                    const ms = (us / 1000).toFixed(2);
+                    const barWidth = (us / maxUs * 100).toFixed(1);
+                    const color = opColors[op] || '#07adf8';
+                    return `<div style="display:flex;align-items:center;margin:4px 0;gap:8px;">
+                        <span style="width:140px;text-align:right;font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;">${op}</span>
+                        <div style="flex:1;height:24px;background:var(--dark);border-radius:4px;overflow:hidden;">
+                            <div style="width:${barWidth}%;height:100%;background:${color};display:flex;align-items:center;padding-left:8px;font-size:0.75rem;color:#fff;font-weight:600;min-width:40px;">
+                                ${pct}%
+                            </div>
+                        </div>
+                        <span style="width:80px;font-size:0.8rem;color:var(--text-muted);">${ms} ms</span>
+                    </div>`;
+                }).join('');
+        }
+
+        function renderProfileHeatmap(data) {
+            const container = document.getElementById('profileHeatmap');
+            const byLayer = data.by_layer;
+            if (!byLayer || Object.keys(byLayer).length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted);">No per-layer data available.</p>';
+                return;
+            }
+
+            const allOps = new Set();
+            Object.values(byLayer).forEach(layerOps => {
+                Object.keys(layerOps).forEach(op => allOps.add(op));
+            });
+            const ops = [...allOps].sort();
+
+            let maxUs = 0;
+            Object.values(byLayer).forEach(layerOps => {
+                Object.values(layerOps).forEach(us => { if (us > maxUs) maxUs = us; });
+            });
+
+            let html = '<h3 style="margin-bottom:0.75rem;">Layer x Operation Heatmap</h3>';
+            html += '<div style="overflow-x:auto;"><table style="font-size:0.75rem;border-collapse:collapse;">';
+            html += '<thead><tr><th style="padding:4px 8px;">Layer</th>' + ops.map(op =>
+                `<th style="writing-mode:vertical-rl;text-orientation:mixed;max-width:30px;padding:4px 2px;">${op}</th>`
+            ).join('') + '<th style="padding:4px 8px;">Total</th></tr></thead><tbody>';
+
+            const sortedLayers = Object.entries(byLayer).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
+            sortedLayers.forEach(([layer, layerOps]) => {
+                let layerTotal = 0;
+                html += `<tr><td style="padding:2px 8px;font-weight:bold;">${layer}</td>`;
+                ops.forEach(op => {
+                    const us = layerOps[op] || 0;
+                    layerTotal += us;
+                    const intensity = maxUs > 0 ? us / maxUs : 0;
+                    const bg = `rgba(255,180,0,${intensity.toFixed(2)})`;
+                    const text = us > 0 ? (us/1000).toFixed(1) : '';
+                    html += `<td style="background:${bg};text-align:center;color:${intensity>0.5?'#000':'#888'};padding:2px 4px;border:1px solid var(--grey);" title="${op} L${layer}: ${(us/1000).toFixed(2)}ms">${text}</td>`;
+                });
+                html += `<td style="padding:2px 8px;font-weight:bold;color:var(--orange);">${(layerTotal/1000).toFixed(1)}</td>`;
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function renderProfileRawTable(data) {
+            const container = document.getElementById('profileRawTable');
+            const entries = data.entries || [];
+            if (entries.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted);">No raw entries available.</p>';
+                return;
+            }
+
+            const totalUs = data.total_us || 1;
+            const sortedEntries = [...entries].sort((a, b) => parseFloat(b.time_us || 0) - parseFloat(a.time_us || 0));
+
+            let html = '<h3 style="margin-bottom:0.75rem;">Raw Profile Data</h3>';
+            html += '<table style="font-size:0.8rem;width:100%;"><thead><tr>';
+            html += '<th>Mode</th><th>Kernel</th><th>Op</th><th>Layer</th><th>Time (us)</th><th>% Total</th>';
+            html += '</tr></thead><tbody>';
+
+            sortedEntries.slice(0, 500).forEach(e => {
+                const us = parseFloat(e.time_us || 0);
+                const pct = (us / totalUs * 100).toFixed(1);
+                html += `<tr>
+                    <td>${e.mode || ''}</td>
+                    <td style="color:var(--orange);">${e.kernel || ''}</td>
+                    <td>${e.op || ''}</td>
+                    <td>${e.layer || ''}</td>
+                    <td style="text-align:right;">${us.toFixed(1)}</td>
+                    <td style="text-align:right;">${pct}%</td>
+                </tr>`;
+            });
+            if (sortedEntries.length > 500) {
+                html += `<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">... ${sortedEntries.length - 500} more entries</td></tr>`;
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
     </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </body>
