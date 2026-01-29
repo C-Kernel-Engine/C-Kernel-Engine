@@ -1,10 +1,5 @@
 var NAVTREEINDEX11 =
 {
-"structCKMemPool.html#ac7919cceb17dccce7584f443a2f9eb4e":[1,0,38,1],
-"structCKMemPool.html#ac7e607885b7d68b849240ab7cd91ddac":[1,0,38,2],
-"structCKMemSpan.html":[1,0,39],
-"structCKMemSpan.html#a0d967f0eca56cf7113b4552d67b208e5":[1,0,39,1],
-"structCKMemSpan.html#a1a8d564452e900aa6e0978ac20b63c5e":[1,0,39,3],
 "structCKMemSpan.html#a818835e50806e8d1fd141cf97b4ea806":[1,0,39,0],
 "structCKMemSpan.html#af281883bfadbea82697819bbf12aa759":[1,0,39,2],
 "structCKMergeRule.html":[1,0,40],
@@ -249,5 +244,10 @@ var NAVTREEINDEX11 =
 "structCPUInfo.html#aec1d73dace532ccaa255243ad9222d44":[1,0,60,19],
 "structCPUInfo.html#aef5b41cc946c52f34e354c69a66bcde3":[1,0,60,31],
 "structCacheInfo.html":[1,0,9],
-"structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,9,0]
+"structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,9,0],
+"structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770":[1,0,9,4],
+"structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,9,1],
+"structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,9,5],
+"structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,9,2],
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3]
 };
