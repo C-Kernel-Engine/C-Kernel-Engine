@@ -1,5 +1,15 @@
 var NAVTREEINDEX11 =
 {
+"structCKLayerOffsets.html#ae06fcbd942baee6eb8503aae98d1ce9a":[1,0,34,38],
+"structCKLayerOffsets.html#ae669bb44d0a9022b6748f450b56f78b2":[1,0,34,42],
+"structCKLayerOffsets.html#aed3dcb5b839829cb5f8f9dd2e7128bb8":[1,0,34,7],
+"structCKLayerOffsets.html#af0086d39bd3384211d2c8c9815ffbe0e":[1,0,34,14],
+"structCKLayerOffsets.html#af31ef2ca40d94908315c2313a00f7280":[1,0,34,1],
+"structCKLayerOffsets.html#af6000f2aff58810114cbd110c77402e5":[1,0,34,20],
+"structCKLayerOptimizerOffsets.html":[1,0,35],
+"structCKLayerOptimizerOffsets.html#a081f58fcc2e8245a0383d42e7d521177":[1,0,35,2],
+"structCKLayerOptimizerOffsets.html#a142f3597b192e27b22152d7e5e1cca73":[1,0,35,36],
+"structCKLayerOptimizerOffsets.html#a14824d8d69c159d9f82752211c99df8f":[1,0,35,15],
 "structCKLayerOptimizerOffsets.html#a1bea81a97d9e230388a11aa88fcfaab8":[1,0,35,20],
 "structCKLayerOptimizerOffsets.html#a1ff16b8b06509ebee3c34fbe6602a12f":[1,0,35,3],
 "structCKLayerOptimizerOffsets.html#a205ea40a57d44759dce23b92ce8a853f":[1,0,35,26],
@@ -239,15 +249,5 @@ var NAVTREEINDEX11 =
 "structCKTokenizerMemPool.html#a8a2ca8e09bc485f1600935ec73697294":[1,0,55,1],
 "structCKTokenizerMemPool.html#a8fbf4d3abd94543c4609336fc9762239":[1,0,55,2],
 "structCKTokenizerToken.html":[1,0,56],
-"structCKTokenizerToken.html#a5bf0bdab214c61d97fd591ee62d3e682":[1,0,56,1],
-"structCKTokenizerToken.html#a61f5a516313b0da2c937842311e30701":[1,0,56,0],
-"structCKTokenizerToken.html#aae2b4c7e571d73b96714ef0dc715ee84":[1,0,56,2],
-"structCKTrie.html":[1,0,57],
-"structCKTrie.html#a82ef124b5228ed534e3b9d861c12ad21":[1,0,57,0],
-"structCKTrie.html#a83868dcb850147794f7cb150568cece0":[1,0,57,1],
-"structCKTrie.html#a8684910b0e136ebc6be4bd48d57f3ce1":[1,0,57,2],
-"structCKTrieNode.html":[1,0,58],
-"structCKTrieNode.html#a316472d591daedc90299616e28bda4da":[1,0,58,1],
-"structCKTrieNode.html#a80ca1a9924999b6499c6770c014e7fce":[1,0,58,0],
-"structCKTrieNode.html#aa55f70549c1823d3325218b0b71a42b8":[1,0,58,3]
+"structCKTokenizerToken.html#a5bf0bdab214c61d97fd591ee62d3e682":[1,0,56,1]
 };
