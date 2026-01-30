@@ -823,6 +823,9 @@ CK_EXPORT int ck_model_init(const char *weights_path) {{
 #ifdef CK_PARALLEL_DECODE
     ck_parallel_decode_init();
 #endif
+#ifdef CK_PARALLEL_PREFILL
+    ck_parallel_prefill_init();
+#endif
     return 0;
 }}
 
@@ -835,6 +838,9 @@ CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *
 #ifdef CK_PARALLEL_DECODE
     ck_parallel_decode_init();
 #endif
+#ifdef CK_PARALLEL_PREFILL
+    ck_parallel_prefill_init();
+#endif
     return 0;
 }}
 
@@ -842,6 +848,9 @@ CK_EXPORT void ck_model_free(void) {{
     if (!g_model) return;
 #ifdef CK_PARALLEL_DECODE
     ck_parallel_decode_shutdown();
+#endif
+#ifdef CK_PARALLEL_PREFILL
+    ck_parallel_prefill_shutdown();
 #endif
 {free_ops_code}
     if (g_manifest) {{
@@ -1039,6 +1048,10 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 /* Thread-pool parallel GEMV dispatch (persistent pthread workers) */
 #define CK_PARALLEL_DECODE 1
 #include "ck_parallel_decode.h"
+
+/* Thread-pool parallel GEMM dispatch for prefill (row-splitting) */
+#define CK_PARALLEL_PREFILL 1
+#include "ck_parallel_prefill.h"
 ''')
 
     # Emit profiling infrastructure (all #ifdef CK_PROFILE guarded)

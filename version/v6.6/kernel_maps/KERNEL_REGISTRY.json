@@ -5,13 +5,13 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 46,
+      "total": 47,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
         "bias_add": 1,
         "embedding": 2,
-        "fused_attention_block": 2,
+        "fused_attention_block": 3,
         "fused_linear_bias": 3,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
@@ -3904,6 +3904,326 @@
       "notes": "Mega-fused attention block for decode (single token). Fuses RMSNorm + QKV + RoPE + Attention + OutProj.",
       "name": "mega_fused_attention_decode",
       "_source_file": "mega_fused_attention_decode.json"
+    },
+    {
+      "id": "mega_fused_attention_decode_q5_0",
+      "op": "fused_attention_block",
+      "variant": "q5_0_decode",
+      "quant": {
+        "weight": "q5_0",
+        "activation": "fp32",
+        "output": "fp32",
+        "note": "wq, wk, wo are Q5_0; wv is Q8_0 (mixed quantization)"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Input activation [1, aligned_embed_dim]"
+        },
+        {
+          "name": "residual",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Residual input for final add [1, aligned_embed_dim]"
+        }
+      ],
+      "weights": [
+        {
+          "name": "wq",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AD",
+            "AE"
+          ],
+          "desc": "Q projection weights [num_heads, head_dim, embed_dim]"
+        },
+        {
+          "name": "wk",
+          "dtype": "q5_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "K projection weights [num_kv_heads, head_dim, embed_dim]"
+        },
+        {
+          "name": "wv",
+          "dtype": "q8_0",
+          "shape": [
+            "KV",
+            "AD",
+            "AE"
+          ],
+          "desc": "V projection weights [num_kv_heads, head_dim, embed_dim]"
+        },
+        {
+          "name": "wo",
+          "dtype": "q5_0",
+          "shape": [
+            "H",
+            "AE",
+            "AD"
+          ],
+          "desc": "Output projection weights [num_heads, embed_dim, head_dim]"
+        },
+        {
+          "name": "ln_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "RMSNorm gamma weight [embed_dim]"
+        }
+      ],
+      "biases": [
+        {
+          "name": "bq",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "Q bias [num_heads, head_dim] or NULL"
+        },
+        {
+          "name": "bk",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "K bias [num_kv_heads, head_dim] or NULL"
+        },
+        {
+          "name": "bv",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "AD"
+          ],
+          "optional": true,
+          "desc": "V bias [num_kv_heads, head_dim] or NULL"
+        },
+        {
+          "name": "bo",
+          "dtype": "fp32",
+          "shape": [
+            "AE"
+          ],
+          "optional": true,
+          "desc": "Output bias [aligned_embed_dim] or NULL"
+        }
+      ],
+      "runtime_buffers": [
+        {
+          "name": "kv_cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "K cache [num_kv_heads, max_tokens, head_dim]"
+        },
+        {
+          "name": "kv_cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "max_T",
+            "AD"
+          ],
+          "desc": "V cache [num_kv_heads, max_tokens, head_dim]"
+        },
+        {
+          "name": "rope_cos",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            "2"
+          ],
+          "optional": true,
+          "desc": "RoPE cos, or NULL if not needed"
+        },
+        {
+          "name": "rope_sin",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D",
+            "2"
+          ],
+          "optional": true,
+          "desc": "RoPE sin, or NULL if not needed"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "1",
+            "AE"
+          ],
+          "desc": "Output [1, aligned_embed_dim] (before residual add)"
+        }
+      ],
+      "dims": [
+        "E",
+        "AE",
+        "H",
+        "KV",
+        "D",
+        "AD",
+        "AAD",
+        "max_T"
+      ],
+      "params": [
+        {
+          "name": "pos",
+          "dtype": "int32",
+          "desc": "Current position in sequence (0-indexed)"
+        },
+        {
+          "name": "embed_dim",
+          "dtype": "int32",
+          "desc": "Original embedding dimension E"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "dtype": "int32",
+          "desc": "Aligned embedding dimension AE (multiple of 64)"
+        },
+        {
+          "name": "num_heads",
+          "dtype": "int32",
+          "desc": "Number of query heads H"
+        },
+        {
+          "name": "num_kv_heads",
+          "dtype": "int32",
+          "desc": "Number of key/value heads KV"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32",
+          "desc": "Head dimension AD"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension AAD (multiple of 64)"
+        },
+        {
+          "name": "cache_capacity",
+          "dtype": "int32",
+          "desc": "Maximum cache capacity max_T"
+        },
+        {
+          "name": "eps",
+          "dtype": "float32",
+          "desc": "RMSNorm epsilon (e.g., 1e-5)"
+        }
+      ],
+      "fuses": [
+        "rmsnorm_forward",
+        "gemv_q5_0_q8_0",
+        "add_inplace_f32",
+        "gemv_q5_0_q8_0",
+        "add_inplace_f32",
+        "gemv_q8_0_q8_0",
+        "add_inplace_f32",
+        "rope_forward_qk",
+        "kv_cache_store",
+        "attention_forward_decode_head_major_gqa_flash",
+        "gemv_fused_q5_0_bias_dispatch",
+        "ck_residual_add_token_major"
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "none",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "description": "Parallelize across attention heads",
+            "notes": "Each thread handles subset of H heads. K, V projections and KV cache store done by thread 0."
+          }
+        ]
+      },
+      "impl": {
+        "function": "mega_fused_attention_decode_q5_0_parallel_simd",
+        "header": "mega_fused_attention_decode_q5_0.h",
+        "sources": [
+          "src/kernels/fused/mega_fused_attention_decode_q5_0.c"
+        ],
+        "variants": [
+          {
+            "name": "serial",
+            "function": "mega_fused_attention_decode_q5_0",
+            "description": "Serial version, no threading"
+          },
+          {
+            "name": "parallel_simd",
+            "function": "mega_fused_attention_decode_q5_0_parallel_simd",
+            "requires": [
+              "avx2"
+            ],
+            "description": "Threadpool-parallel version with SIMD inner loops"
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "AE": 64,
+          "AD": 64
+        },
+        "head_dim_divisible": 64,
+        "max_embed_dim": 2048,
+        "max_tokens": 32768
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_mega_fused_attention_decode_q5_0.py"
+        ],
+        "bench": [
+          "scripts/bench_mega_fused_attention_decode_q5_0.py"
+        ],
+        "parity": [
+          {
+            "target": "llama.cpp",
+            "kernel": "llama_decode",
+            "tolerance": 0.0001
+          },
+          {
+            "target": "pytorch",
+            "kernel": "nn.functional.scaled_dot_product_attention",
+            "tolerance": 0.0001
+          }
+        ]
+      },
+      "notes": "DRAFT - Work in progress. Mega-fused attention decode kernel supporting Q5_0 weights. Replaces ~12 separate kernel calls with single fused kernel call. Thread-parallel across heads.",
+      "name": "mega_fused_attention_decode_q5_0",
+      "_source_file": "mega_fused_attention_decode_q5_0.json"
     },
     {
       "id": "mega_fused_attention_prefill",

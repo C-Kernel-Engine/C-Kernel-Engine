@@ -833,6 +833,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         str(model_c_path),
         str(loader_src),
         str(v66_src / "ck_parallel_decode.c"),  # Thread-pool parallel GEMV dispatch
+        str(v66_src / "ck_parallel_prefill.c"),  # Thread-pool parallel GEMM dispatch (prefill)
         f"-L{BUILD_DIR}",
         f"-L{output_dir}",  # Also look in output_dir for libckernel_engine.so
         "-lckernel_engine",

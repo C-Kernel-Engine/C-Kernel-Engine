@@ -1822,20 +1822,23 @@ test-gemv-omp-verbose: $(GEMV_OMP_BIN)
 .PHONY: test-gemv-omp test-gemv-omp-quick test-gemv-omp-verbose
 
 # =============================================================================
-# Thread Pool GEMV Parity & Speed Tests
+# Thread Pool GEMV/GEMM Parity & Speed Tests
 # =============================================================================
-# Compare serial GEMV kernels vs persistent pthread thread pool dispatch
-# (ck_parallel_decode.h). This is the PRODUCTION parallelization path —
-# thread pool replaced OpenMP due to:
+# Compare serial GEMV/GEMM kernels vs persistent pthread thread pool dispatch
+# (ck_parallel_decode.h, ck_parallel_prefill.h). This is the PRODUCTION
+# parallelization path — thread pool replaced OpenMP due to:
 #   - Zero fork/join overhead (threads spin-wait on atomics, ~0.1us wake)
 #   - No core oversubscription (one pool, known thread count)
 #   - Consistent (ith, nth) work splitting to kernels
 #
-# Tests 4 dispatch wrappers against serial baselines:
-#   1. gemv_q8_0_q8_0_parallel_dispatch
-#   2. gemv_q5_0_q8_0_parallel_dispatch
-#   3. gemv_fused_q5_0_bias_parallel_dispatch (fused: quantize+gemv+bias)
-#   4. Dispatch latency measurement (overhead on small M)
+# Tests dispatch wrappers against serial baselines:
+#   1. gemv_q8_0_q8_0_parallel_dispatch       (decode)
+#   2. gemv_q5_0_q8_0_parallel_dispatch       (decode)
+#   3. gemv_fused_q5_0_bias_parallel_dispatch  (decode, fused: quantize+gemv+bias)
+#   4. Dispatch latency measurement            (overhead on small M)
+#   5. gemm_nt_q5_0_q8_0_parallel_dispatch    (prefill, Q8_0 x Q5_0)
+#   6. gemm_nt_q8_0_q8_0_parallel_dispatch    (prefill, Q8_0 x Q8_0)
+#   7. gemm_nt_q6_k_q8_k_parallel_dispatch    (prefill, Q8_K x Q6_K)
 #
 # Targets:
 #   make test-threadpool-parity          Full parity + speed test
@@ -1845,11 +1848,12 @@ test-gemv-omp-verbose: $(GEMV_OMP_BIN)
 THREADPOOL_BIN := $(BUILD_DIR)/test_threadpool_parity
 V66_SRC_DIR    := version/v6.6/src
 
-$(THREADPOOL_BIN): $(LIB) tests/test_threadpool_parity.c $(V66_SRC_DIR)/ck_parallel_decode.c
+$(THREADPOOL_BIN): $(LIB) tests/test_threadpool_parity.c $(V66_SRC_DIR)/ck_parallel_decode.c $(V66_SRC_DIR)/ck_parallel_prefill.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 -march=native -Iinclude -I$(V66_SRC_DIR) \
 		tests/test_threadpool_parity.c \
 		$(V66_SRC_DIR)/ck_parallel_decode.c \
+		$(V66_SRC_DIR)/ck_parallel_prefill.c \
 		-L$(BUILD_DIR) -lckernel_engine -lm -lpthread \
 		-Wl,-rpath,$(BUILD_DIR) \
 		-o $(THREADPOOL_BIN)
