@@ -4322,23 +4322,32 @@ def main(args: List[str]) -> int:
     if parsed_args.call_output:
         lowered_call = generate_ir_lower_3(lowered_ir, parsed_args.mode)
 
-        # Apply OpenMP parallelization pass if enabled
-        # This is a SEPARATE PASS that analyzes the full graph and makes
-        # centralized decisions about what to parallelize.
-        # See parallel_pass.py for why this is centralized (false sharing, etc.)
-        if getattr(parsed_args, 'parallel', False) and lowered_call:
-            try:
-                from parallel_pass import run_parallel_pass
-                lowered_call, parallel_stats = run_parallel_pass(
-                    lowered_call, parsed_args.mode
-                )
-                print(f"  [PARALLEL PASS] {parallel_stats['parallelized_ops']}/{parallel_stats['total_ops']} ops annotated")
-                for strat, count in parallel_stats.get('strategies', {}).items():
-                    print(f"    - {strat}: {count} ops")
-            except ImportError as e:
-                print(f"  [PARALLEL PASS] Warning: parallel_pass.py not found ({e})")
-            except Exception as e:
-                print(f"  [PARALLEL PASS] Warning: parallelization failed: {e}")
+        # NOTE: OpenMP parallel pass is SUPERSEDED by thread pool dispatch.
+        #
+        # parallel_pass.py annotates ops with #pragma omp parallel for, but
+        # codegen_v6_6.py never reads these annotations. Actual parallelization
+        # is handled by ck_parallel_decode.h / ck_parallel_prefill.h which use
+        # persistent pthread thread pools via macro redirects:
+        #   - Decode: gemv_q5_0_q8_0() → gemv_q5_0_q8_0_parallel_dispatch()
+        #   - Prefill: gemm_nt_q5_0_q8_0() → gemm_nt_q5_0_q8_0_parallel_dispatch()
+        #
+        # Kept commented out for reference. The false-sharing and memory-bandwidth
+        # analysis in parallel_pass.py remains useful for planning thread pool work
+        # splitting strategies.
+        #
+        # if getattr(parsed_args, 'parallel', False) and lowered_call:
+        #     try:
+        #         from parallel_pass import run_parallel_pass
+        #         lowered_call, parallel_stats = run_parallel_pass(
+        #             lowered_call, parsed_args.mode
+        #         )
+        #         print(f"  [PARALLEL PASS] {parallel_stats['parallelized_ops']}/{parallel_stats['total_ops']} ops annotated")
+        #         for strat, count in parallel_stats.get('strategies', {}).items():
+        #             print(f"    - {strat}: {count} ops")
+        #     except ImportError as e:
+        #         print(f"  [PARALLEL PASS] Warning: parallel_pass.py not found ({e})")
+        #     except Exception as e:
+        #         print(f"  [PARALLEL PASS] Warning: parallelization failed: {e}")
 
     # Once we have the right memory and lowered graph then we can do codegen
     # codegen will read the lowered IR and memory layout to emit C code

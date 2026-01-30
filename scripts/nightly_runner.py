@@ -306,6 +306,12 @@ MAKE_TARGETS = {
         "target": "test-flash-attention",
         "timeout_sec": 1800,
     },
+    "threadpool_parity": {
+        "name": "Thread Pool GEMV Parity (serial vs dispatch)",
+        "category": "parity",
+        "target": "test-threadpool-parity",
+        "timeout_sec": 300,
+    },
 }
 
 # Benchmark targets with perf extraction

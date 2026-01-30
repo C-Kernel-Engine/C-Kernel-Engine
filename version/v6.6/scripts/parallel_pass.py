@@ -3,7 +3,29 @@
 parallel_pass.py - Centralized OpenMP parallelization pass for IR v6.6
 
 =============================================================================
-ARCHITECTURE: WHY THIS EXISTS
+STATUS: SUPERSEDED BY THREAD POOL DISPATCH
+=============================================================================
+
+This pass annotates IR ops with #pragma omp parallel for, but codegen
+(codegen_v6_6.py) never reads these annotations. They are written into the
+lowered IR JSON and then ignored.
+
+Actual parallelization uses persistent pthread thread pools instead of OpenMP:
+  - Decode: ck_parallel_decode.h — macro-redirects serial GEMV calls to
+    thread pool dispatch wrappers (ck_parallel_decode.c)
+  - Prefill: ck_parallel_prefill.h — same pattern for GEMM kernels (TODO)
+
+Why thread pool over OpenMP:
+  - Zero fork/join overhead (threads are already running, spin-wait on atomics)
+  - No thread oversubscription (one pool, known thread count)
+  - No conflict between OpenMP thread team and pthread pool competing for cores
+  - Consistent with kernel architecture: kernels accept (ith, nth) args
+
+This file is kept for reference and for the false-sharing / memory-bandwidth
+analysis logic, which remains relevant for any parallelization strategy.
+
+=============================================================================
+ORIGINAL ARCHITECTURE: WHY THIS EXISTS
 =============================================================================
 
 When looking at codegen output, you'll see many `for` loops that LOOK like

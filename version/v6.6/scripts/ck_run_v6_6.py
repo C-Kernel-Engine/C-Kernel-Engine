@@ -670,12 +670,25 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         if profile:
             cmd.append("--profile")
 
-        # Enable OpenMP parallelization annotations for prefill mode,
-        # and parallel GEMV kernels for decode mode (--parallel-decode)
-        if mode == "prefill":
-            cmd.append("--parallel")
-        if mode == "decode" and parallel_decode:
-            cmd.append("--parallel")
+        # ADR: OpenMP parallel pass is SUPERSEDED by persistent pthread thread pool.
+        #
+        # Previously, --parallel passed OpenMP pragma annotations into the IR via
+        # parallel_pass.py. However, codegen_v6_6.py never consumed these annotations.
+        # Actual decode parallelization uses ck_parallel_decode.h which macro-redirects
+        # serial GEMV calls to thread pool dispatch wrappers — always enabled, no flag needed.
+        #
+        # Why thread pool over OpenMP:
+        #   - OpenMP fork/join creates N threads per #pragma region (~15-50us overhead each)
+        #   - Thread pool keeps N-1 pthreads alive, spin-waiting on atomics (~0.1us wake)
+        #   - OpenMP + thread pool together causes 2N threads competing for N cores
+        #   - Thread pool gives deterministic (ith, nth) work splitting to kernels
+        #
+        # The --parallel / --parallel-decode flags fed the OpenMP pass which is now
+        # commented out in build_ir_v6_6.py. Flags accepted but no longer have effect.
+        if parallel_decode:
+            log("  [WARNING] --parallel-decode is deprecated. Thread pool dispatch "
+                "(ck_parallel_decode.h) is always enabled. OpenMP parallel pass removed "
+                "due to fork/join overhead and core oversubscription. Flag ignored.", C_YELLOW)
 
         log(f"  Generating IR1 + {'NO fusion' if no_fusion else 'fusion'} + layout + lowered + call IR for mode: {mode}", C_DIM)
         run_cmd(cmd)
@@ -1875,7 +1888,11 @@ Examples:
     run_parser.add_argument('--profile', action='store_true',
                            help='Enable per-kernel timing profiling (CK_PROFILE)')
     run_parser.add_argument('--parallel-decode', action='store_true',
-                           help='Use OpenMP-parallel GEMV kernels for decode mode (_parallel_omp variants)')
+                           help='[DEPRECATED] Was: OpenMP parallel GEMV for decode. '
+                                'Superseded by persistent pthread thread pool '
+                                '(ck_parallel_decode.h) which is always enabled. '
+                                'Thread pool avoids OpenMP fork/join overhead and '
+                                'core oversubscription. Flag accepted but ignored.')
     run_parser.add_argument('--reverse-test', action='store_true',
                            help='Run IR reverse validation after codegen (validates IR Lower 3 consistency)')
     run_parser.add_argument('--reverse-test-verbose', action='store_true',

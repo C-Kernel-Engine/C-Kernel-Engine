@@ -1342,6 +1342,9 @@ test: $(LIB) test-libs
 	@echo ""
 	@echo "Running OpenMP GEMV parity tests..."
 	@$(MAKE) --no-print-directory test-gemv-omp-quick
+	@echo ""
+	@echo "Running Thread Pool GEMV parity tests..."
+	@$(MAKE) --no-print-directory test-threadpool-parity-quick
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -1628,6 +1631,9 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running OpenMP GEMV parity tests (serial vs parallel)..."
 	@$(MAKE) --no-print-directory test-gemv-omp
+	@echo ""
+	@echo "Running Thread Pool GEMV parity tests (serial vs dispatch)..."
+	@$(MAKE) --no-print-directory test-threadpool-parity
 
 # Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
@@ -1814,6 +1820,53 @@ test-gemv-omp-verbose: $(GEMV_OMP_BIN)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMV_OMP_BIN) --verbose
 
 .PHONY: test-gemv-omp test-gemv-omp-quick test-gemv-omp-verbose
+
+# =============================================================================
+# Thread Pool GEMV Parity & Speed Tests
+# =============================================================================
+# Compare serial GEMV kernels vs persistent pthread thread pool dispatch
+# (ck_parallel_decode.h). This is the PRODUCTION parallelization path —
+# thread pool replaced OpenMP due to:
+#   - Zero fork/join overhead (threads spin-wait on atomics, ~0.1us wake)
+#   - No core oversubscription (one pool, known thread count)
+#   - Consistent (ith, nth) work splitting to kernels
+#
+# Tests 4 dispatch wrappers against serial baselines:
+#   1. gemv_q8_0_q8_0_parallel_dispatch
+#   2. gemv_q5_0_q8_0_parallel_dispatch
+#   3. gemv_fused_q5_0_bias_parallel_dispatch (fused: quantize+gemv+bias)
+#   4. Dispatch latency measurement (overhead on small M)
+#
+# Targets:
+#   make test-threadpool-parity          Full parity + speed test
+#   make test-threadpool-parity-quick    Quick parity test
+#   make test-threadpool-parity-verbose  Full test with detailed diff output
+
+THREADPOOL_BIN := $(BUILD_DIR)/test_threadpool_parity
+V66_SRC_DIR    := version/v6.6/src
+
+$(THREADPOOL_BIN): $(LIB) tests/test_threadpool_parity.c $(V66_SRC_DIR)/ck_parallel_decode.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -march=native -Iinclude -I$(V66_SRC_DIR) \
+		tests/test_threadpool_parity.c \
+		$(V66_SRC_DIR)/ck_parallel_decode.c \
+		-L$(BUILD_DIR) -lckernel_engine -lm -lpthread \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o $(THREADPOOL_BIN)
+
+test-threadpool-parity: $(THREADPOOL_BIN)
+	@echo "Running Thread Pool GEMV parity + speed test (full)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(THREADPOOL_BIN)
+
+test-threadpool-parity-quick: $(THREADPOOL_BIN)
+	@echo "Running Thread Pool GEMV parity test (quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(THREADPOOL_BIN) --quick
+
+test-threadpool-parity-verbose: $(THREADPOOL_BIN)
+	@echo "Running Thread Pool GEMV parity + speed test (verbose)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(THREADPOOL_BIN) --verbose
+
+.PHONY: test-threadpool-parity test-threadpool-parity-quick test-threadpool-parity-verbose
 
 # =============================================================================
 # OpenMP GEMV Profiling (serial vs parallel)
