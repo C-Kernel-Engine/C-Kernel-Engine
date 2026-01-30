@@ -953,6 +953,8 @@
         <li><a href="#vs-mempool">Thread Pool vs. Memory Pool &mdash; Same Idea, Different Resource</a></li>
         <li><a href="#why-faster">Why Is It Faster?</a></li>
         <li><a href="#real-numbers">Real Numbers: Before &amp; After</a></li>
+        <li><a href="#how-parallel">How Parallelization Actually Works</a></li>
+        <li><a href="#per-kernel">Per-Kernel Parallelization Analysis</a></li>
     </ol>
 </div>
 
@@ -1727,6 +1729,635 @@ about <em>what</em> they pool and <em>what synchronization</em> they need.</p>
     = total:                        <span class="grn">~70 ms</span>
 
   Dispatch overhead: <span class="err">100 ms</span> (OpenMP) vs <span class="grn">0.1 ms</span> (pool) = <span class="hl">1000x less overhead</span></div>
+
+<h2 id="how-parallel"><span class="section-num">&sect;14</span> How Parallelization Actually Works</h2>
+
+<p>Forget the abstractions for a moment. Here is exactly what happens, from physical hardware up.</p>
+
+<h3>Step 1: Pin Threads to Physical Cores</h3>
+
+<p>At startup, the thread pool creates N&minus;1 persistent pthreads. Ideally, each thread is
+<strong>pinned (affined) to a distinct physical CPU core</strong> using <code>sched_setaffinity()</code>
+or <code>pthread_setaffinity_np()</code>. This means the OS scheduler will not migrate a thread to a
+different core &mdash; it stays put.</p>
+
+<div class="diagram"><span class="dim">4-core CPU with hyperthreading (8 logical CPUs):</span>
+
+  Physical Core 0        Physical Core 1        Physical Core 2        Physical Core 3
+  +-------+-------+     +-------+-------+     +-------+-------+     +-------+-------+
+  | <span class="hl">CPU 0</span> | CPU 4 |     | <span class="hl">CPU 1</span> | CPU 5 |     | <span class="hl">CPU 2</span> | CPU 6 |     | <span class="hl">CPU 3</span> | CPU 7 |
+  +-------+-------+     +-------+-------+     +-------+-------+     +-------+-------+
+      ^                      ^                      ^                      ^
+   <span class="grn">Thread 0</span>              <span class="grn">Thread 1</span>              <span class="grn">Thread 2</span>              <span class="grn">Thread 3</span>
+   (main)                (worker)              (worker)              (worker)
+
+  <span class="dim">Each thread pinned to one physical core.</span>
+  <span class="dim">We avoid hyperthreads (CPU 4-7) because they share execution units</span>
+  <span class="dim">with the primary logical CPU on the same core &mdash; using both gives</span>
+  <span class="dim">diminishing returns for compute-bound work.</span></div>
+
+<p>Why pin? Three reasons:</p>
+<ul>
+    <li><strong>Cache locality:</strong> A pinned thread keeps its L1/L2 caches warm. If the OS migrates
+    a thread to a different core, the old core's cache is useless and the new core starts cold.</li>
+    <li><strong>No scheduler jitter:</strong> The OS scheduler makes decisions every ~1&ndash;4ms.
+    Thread migration adds 5&ndash;20&micro;s of latency. For sub-millisecond kernels, that's significant.</li>
+    <li><strong>NUMA awareness:</strong> On multi-socket systems, accessing memory attached to a remote
+    socket costs 2&ndash;3x more than local memory. Pinning keeps threads close to their data.</li>
+</ul>
+
+<h4>CK-Engine's Current State</h4>
+
+<p>The system topology module (<code>src/system_topology.c</code>) can discover the CPU layout:</p>
+
+<pre><code>// topology_discover_affinity() reads the process CPU mask
+cpu_set_t mask;
+if (sched_getaffinity(0, sizeof(mask), &amp;mask) == 0) {
+    for (int i = 0; i &lt; MAX_CPUS; i++) {
+        if (CPU_ISSET(i, &amp;mask)) {
+            aff-&gt;affinity_cpus[aff-&gt;num_affinity_cpus++] = i;
+        }
+    }
+}</code></pre>
+
+<p>The GGML layer has full NUMA-aware pinning with three strategies:
+<code>DISTRIBUTE</code> (round-robin across NUMA nodes),
+<code>ISOLATE</code> (all threads on same node), and
+<code>NUMACTL</code> (respect external numactl settings).
+Intel hybrid CPU detection (P-core vs E-core via CPUID) is also available to skip
+efficiency cores for compute-heavy work.</p>
+
+<h3>Step 2: Identify Embarrassingly Parallel Loops</h3>
+
+<p>An <strong>embarrassingly parallel</strong> loop is one where every iteration is completely
+independent &mdash; no iteration reads what another writes. These loops can be split across
+cores with zero synchronization.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The key question for every loop:</strong> Can two iterations step on each other?<br><br>
+        If iteration <em>i</em> only <strong>writes</strong> to <code>output[i]</code> and only <strong>reads</strong> from
+        shared inputs, then <em>yes</em>, it's embarrassingly parallel. Every neural network kernel
+        in CK-Engine has this property along at least one dimension.
+    </div>
+</div>
+
+<p>Here's what the thread pool does to every such loop:</p>
+
+<pre><code>// BEFORE: Serial loop over M rows
+for (int row = 0; row &lt; M; row++) {
+    compute_row(row, ...);
+}
+
+// AFTER: Thread pool splits the loop across N threads
+void work_fn(int ith, int nth, void *args) {
+    int rows_per_thread = M / nth;
+    int start = ith * rows_per_thread;
+    int end   = (ith == nth - 1) ? M : start + rows_per_thread;
+
+    for (int row = start; row &lt; end; row++) {
+        compute_row(row, ...);   // exact same computation, just a slice
+    }
+}
+ck_threadpool_dispatch(pool, work_fn, &amp;args);</code></pre>
+
+<p>Each thread computes a <strong>contiguous slice</strong> of the output. Thread 0 does rows 0..249,
+thread 1 does rows 250..499, etc. The total work is the same; it's just divided.</p>
+
+<h3>Step 3: Ensure No Two Threads Write to the Same Cache Line</h3>
+
+<p>This is the critical constraint. The rule is:</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>The Write-Exclusivity Rule:</strong><br>
+        <strong>Reading</strong> from the same cache line across threads is <span class="good">FREE</span> &mdash;
+        all cores get their own read-only copy (MESI "Shared" state).<br><br>
+        <strong>Writing</strong> to the same cache line from two threads is <span class="bad">EXPENSIVE</span> &mdash;
+        every write invalidates all other cores' copies (MESI "Invalid" state),
+        forcing a 40&ndash;100ns stall on every access.
+    </div>
+</div>
+
+<p>In practice, this means the output array partition must be <strong>cache-line aligned</strong>
+at the boundaries between threads. Since a cache line is 64 bytes = 16 floats:</p>
+
+<div class="diagram"><span class="dim">Output array: 1000 floats, 4 threads</span>
+
+  Thread 0 writes                Thread 1 writes                Thread 2 writes                Thread 3 writes
+  <span class="grn">output[0..249]</span>               <span class="purple">output[250..499]</span>             <span class="hl">output[500..749]</span>             <span class="wrn">output[750..999]</span>
+
+  Cache lines (16 floats each):
+  |<span class="grn">0..15</span>|<span class="grn">16..31</span>|...|<span class="grn">240..255</span>|<span class="purple">256..271</span>|...|<span class="purple">496..511</span>|<span class="hl">512..527</span>|...|<span class="hl">752..767</span>|<span class="wrn">768..783</span>|...|<span class="wrn">992..1007</span>|
+                         ^                                                ^
+                     <span class="grn">Thread boundaries fall on cache line boundaries</span>
+                     <span class="grn">250 floats = 15.625 cache lines &rarr; round up to 256 (16 lines)</span>
+
+  <span class="dim">Shared INPUT (all threads read, no one writes):</span>
+  <span class="dim">  Weight matrix W[M&times;K]: all threads read overlapping rows &rarr; FREE (Shared state)</span>
+  <span class="dim">  Input vector x[K]: all threads read the same vector &rarr; FREE (Shared state)</span></div>
+
+<p>For transformer kernels, this alignment happens <strong>naturally</strong> because:</p>
+<ul>
+    <li>Each output row is typically 512&ndash;4096 floats (2KB&ndash;16KB) &mdash; many cache lines per row.</li>
+    <li>We split on <em>row</em> boundaries, so each thread owns complete rows.</li>
+    <li>Row addresses are aligned to <code>CK_CACHE_LINE</code> (64 bytes) in the memory allocator.</li>
+    <li>The only "dangerous" case is the last few elements at a boundary, but with row-level
+    splitting this never happens.</li>
+</ul>
+
+<h3>Step 4: What About Reads?</h3>
+
+<p>Reads are shared freely. This is what makes matrix operations so parallelizable:</p>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3>GEMV: y = W &middot; x</h3>
+        <p><strong>Shared read:</strong> Input vector <code>x[K]</code> &mdash; all threads read the same vector.<br>
+        <strong>Shared read:</strong> Weight matrix <code>W[M&times;K]</code> &mdash; each thread reads its own rows, but the data is read-only.<br>
+        <strong>Exclusive write:</strong> Output <code>y[M]</code> &mdash; each thread writes its own slice of y.</p>
+    </div>
+    <div class="card card-green">
+        <h3>RMSNorm: y = x &middot; &gamma; / RMS(x)</h3>
+        <p><strong>Shared read:</strong> Gamma weights <code>&gamma;[D]</code> &mdash; all threads read the same normalization weights.<br>
+        <strong>Per-token read:</strong> Each thread reads its own token's input <code>x[t]</code>.<br>
+        <strong>Exclusive write:</strong> Output <code>y[t]</code> &mdash; each thread writes its own token.</p>
+    </div>
+</div>
+
+<p>The MESI cache coherency protocol makes shared reads essentially free. When multiple cores
+read the same cache line, each core gets its own copy in "Shared" (S) state. No invalidation
+occurs. The cache line stays resident in every core's L1/L2 simultaneously.</p>
+
+<h3>Step 5: Handle Reductions Carefully</h3>
+
+<p>Some kernels have <strong>reduction</strong> operations &mdash; where all threads must contribute to a single
+result (e.g., sum, max). These break the "no shared writes" rule and need special handling.</p>
+
+<div class="diagram"><span class="dim">Reduction example: RMSNorm needs sum of squares across D elements</span>
+
+  <span class="err">BAD: Multiple threads write to the same accumulator</span>
+  Thread 0: sum += x[0]&sup2; + x[1]&sup2; + ...     &darr;
+  Thread 1: sum += x[256]&sup2; + x[257]&sup2; + ...  &darr;  <span class="err">RACE CONDITION on sum!</span>
+  Thread 2: sum += x[512]&sup2; + x[513]&sup2; + ...  &darr;
+
+  <span class="grn">GOOD: Each thread has a private partial sum, then combine</span>
+  Thread 0: partial[0] = x[0]&sup2; + x[1]&sup2; + ...       <span class="grn">(private write)</span>
+  Thread 1: partial[1] = x[256]&sup2; + x[257]&sup2; + ...    <span class="grn">(private write)</span>
+  Thread 2: partial[2] = x[512]&sup2; + x[513]&sup2; + ...    <span class="grn">(private write)</span>
+  &mdash;&mdash;&mdash;&mdash; barrier &mdash;&mdash;&mdash;&mdash;
+  Thread 0: total = partial[0] + partial[1] + partial[2]  <span class="grn">(single-thread reduce)</span></div>
+
+<p>In CK-Engine's kernels, reductions are <strong>intra-token</strong> (within a single token's D-dimensional
+vector), not inter-token. Since we parallelize across tokens (not within a single token's dimension),
+<strong>each thread's reduction is completely private</strong> &mdash; no cross-thread communication needed.</p>
+
+<h3>The Complete Picture</h3>
+
+<div class="diagram"><span class="hl">One kernel dispatch, from hardware up:</span>
+
+  1. <span class="grn">POOL CREATED</span> (once at startup)
+     &bull; N-1 pthreads created, each pinned to a physical core
+     &bull; Workers enter spin-wait loop
+
+  2. <span class="grn">DISPATCH</span> (per kernel call, ~500x per token)
+     &bull; Main sets work_fn = gemv_parallel, work_args = {W, x, y, M, K}
+     &bull; Main bumps n_dispatch (atomic, ~0.1&micro;s)
+     &bull; Workers see counter change, read work_fn + args
+
+  3. <span class="grn">PARTITION</span> (each thread independently)
+     &bull; Thread <em>i</em> computes: start_row = i * (M/N), end_row = (i+1) * (M/N)
+     &bull; <span class="hl">Write region:</span> y[start_row .. end_row-1]  &larr;  <span class="grn">no overlap, cache-line aligned</span>
+     &bull; <span class="dim">Read region:</span>  W[start_row*K .. end_row*K-1] + x[0..K-1]  &larr;  <span class="dim">shared, read-only</span>
+
+  4. <span class="grn">COMPUTE</span> (all threads in parallel)
+     &bull; Each thread runs SIMD-vectorized inner loop over its rows
+     &bull; L1/L2 caches stay warm (thread pinned to same core)
+     &bull; No locks, no atomics, no barriers needed &mdash; pure data parallelism
+
+  5. <span class="grn">COMPLETE</span>
+     &bull; Each worker atomically increments n_complete
+     &bull; Main spin-waits until n_complete == N-1
+     &bull; Cost: ~0.1&micro;s to synchronize
+     &bull; Workers go back to spin-wait for next dispatch</div>
+
+<h2 id="per-kernel"><span class="section-num">&sect;15</span> Per-Kernel Parallelization Analysis</h2>
+
+<p>Every kernel in the transformer decode loop has a natural parallelization dimension.
+Here's exactly how each one splits across threads, what data is shared, what is exclusive,
+and where reductions happen.</p>
+
+<h3 id="kernel-gemv">GEMV &mdash; Matrix-Vector Multiply</h3>
+
+<p><strong>File:</strong> <code>src/kernels/gemv_omp.c</code><br>
+<strong>Operation:</strong> <code>y[M] = W[M&times;K] &middot; x[K]</code><br>
+<strong>Call frequency:</strong> ~37% of decode time (logits projection is the largest single GEMV)</p>
+
+<div class="diagram"><span class="dim">GEMV parallelization: split rows of W across threads</span>
+
+  Weight matrix W [M rows &times; K cols]        Input x [K]        Output y [M]
+  +---------------------------+                              +-------+
+  | <span class="grn">Thread 0: rows 0..249</span>     |  &middot;  [shared by all]  &rarr;  | <span class="grn">y[0..249]</span>   |
+  +---------------------------+                              +-------+
+  | <span class="purple">Thread 1: rows 250..499</span>  |  &middot;  [shared by all]  &rarr;  | <span class="purple">y[250..499]</span> |
+  +---------------------------+                              +-------+
+  | <span class="hl">Thread 2: rows 500..749</span>  |  &middot;  [shared by all]  &rarr;  | <span class="hl">y[500..749]</span> |
+  +---------------------------+                              +-------+
+  | <span class="wrn">Thread 3: rows 750..999</span>  |  &middot;  [shared by all]  &rarr;  | <span class="wrn">y[750..999]</span> |
+  +---------------------------+                              +-------+
+
+  <span class="grn">READ (shared):</span>  x[K] &mdash; all threads read the entire input vector
+  <span class="grn">READ (private):</span> W rows &mdash; each thread reads only its rows (no overlap)
+  <span class="hl">WRITE:</span>         y elements &mdash; each thread writes its own slice (no overlap)
+  <span class="dim">REDUCTION:</span>     NONE &mdash; each y[i] = dot(W[i], x) is independent</div>
+
+<pre><code>void gemv_q8_parallel(int ith, int nth, void *args) {
+    gemv_args_t *a = args;
+    int rows_per_thread = a-&gt;M / nth;
+    int start = ith * rows_per_thread;
+    int end   = (ith == nth - 1) ? a-&gt;M : start + rows_per_thread;
+
+    for (int row = start; row &lt; end; row++) {
+        // Each thread: dot product of one W row with shared x
+        vec_dot_q8_0_q8_0(a-&gt;K, &amp;a-&gt;y[row],
+                          &amp;a-&gt;W_blocks[row * blocks_per_row],
+                          a-&gt;x_blocks);
+    }
+}</code></pre>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Rows (M) &mdash; embarrassingly parallel</td></tr>
+    <tr><td>Shared reads</td><td>Input vector x[K], quantization lookup tables</td></tr>
+    <tr><td>Exclusive writes</td><td>Output y[start..end] &mdash; contiguous, cache-aligned</td></tr>
+    <tr><td>Reduction</td><td class="good">None</td></tr>
+    <tr><td>Cache behavior</td><td>x stays in L1 across all rows (K &asymp; 896 = 3.5KB). W streams through L2.</td></tr>
+    <tr><td>Speedup potential</td><td>Near-linear: 4 threads &asymp; 3.5&ndash;3.8x (limited by memory bandwidth)</td></tr>
+</table>
+
+<h3 id="kernel-gemm">GEMM &mdash; Matrix-Matrix Multiply</h3>
+
+<p><strong>File:</strong> <code>src/kernels/gemm_kernels.c</code><br>
+<strong>Operation:</strong> <code>C[M&times;N] = A[M&times;K] &middot; B[K&times;N] + bias[N]</code><br>
+<strong>Used for:</strong> Prefill (processing entire prompt at once &mdash; M &gt; 1)</p>
+
+<div class="diagram"><span class="dim">GEMM parallelization: split output rows across threads</span>
+
+  A [M&times;K]     &times;     B [K&times;N]     =     C [M&times;N]
+  +--------+          +--------+          +--------+
+  |<span class="grn"> T0 rows</span>|          |        |          |<span class="grn"> T0 rows</span>|
+  +--------+   &times;     | shared |     =    +--------+
+  |<span class="purple"> T1 rows</span>|          |   by   |          |<span class="purple"> T1 rows</span>|
+  +--------+          |  all   |          +--------+
+  |<span class="hl"> T2 rows</span>|          |threads |          |<span class="hl"> T2 rows</span>|
+  +--------+          +--------+          +--------+
+  |<span class="wrn"> T3 rows</span>|                                |<span class="wrn"> T3 rows</span>|
+  +--------+                                +--------+
+
+  Each thread computes complete rows of C independently.
+  B matrix is shared read-only across all threads.</div>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Output rows (M) &mdash; embarrassingly parallel</td></tr>
+    <tr><td>Shared reads</td><td>B[K&times;N] (entire matrix), bias[N]</td></tr>
+    <tr><td>Exclusive writes</td><td>C[start_row..end_row, 0..N-1] &mdash; complete rows per thread</td></tr>
+    <tr><td>Reduction</td><td class="good">None &mdash; each C[i,j] = dot(A[i], B[:,j]) is independent</td></tr>
+    <tr><td>SIMD</td><td>AVX-512 processes 16 floats per cycle, AVX2 does 8</td></tr>
+    <tr><td>Special case</td><td>When M=1 (decode mode), falls back to GEMV &mdash; parallelizes over N instead</td></tr>
+</table>
+
+<h3 id="kernel-rmsnorm">RMSNorm &mdash; Root Mean Square Normalization</h3>
+
+<p><strong>File:</strong> <code>src/kernels/rmsnorm_kernels.c</code><br>
+<strong>Operation:</strong> <code>y[t,d] = x[t,d] &middot; &gamma;[d] / sqrt(mean(x[t]&sup2;) + &epsilon;)</code><br>
+<strong>Called:</strong> Before every attention and FFN block (2x per layer &asymp; 48 calls for 24 layers)</p>
+
+<div class="diagram"><span class="dim">RMSNorm parallelization: split tokens across threads</span>
+
+  Input [T tokens &times; D dims]             Output [T tokens &times; D dims]
+  +---------------------------+          +---------------------------+
+  | <span class="grn">Token 0: [d0, d1, .., dD]</span> |  &rarr;  | <span class="grn">Token 0: normalized</span>       |  Thread 0
+  | <span class="grn">Token 1: [d0, d1, .., dD]</span> |  &rarr;  | <span class="grn">Token 1: normalized</span>       |
+  +---------------------------+          +---------------------------+
+  | <span class="purple">Token 2: [d0, d1, .., dD]</span> |  &rarr;  | <span class="purple">Token 2: normalized</span>       |  Thread 1
+  | <span class="purple">Token 3: [d0, d1, .., dD]</span> |  &rarr;  | <span class="purple">Token 3: normalized</span>       |
+  +---------------------------+          +---------------------------+
+  ...
+  Shared read: &gamma;[D] (normalization weights, same for all tokens)
+
+  <span class="wrn">Each token has an INTERNAL reduction (sum of squares across D),</span>
+  <span class="wrn">but since we parallelize across TOKENS, each thread's reduction is private.</span></div>
+
+<p>The reduction (sum of x&sup2; across the D dimension) happens <strong>within</strong> a single token.
+Since we split across <em>tokens</em>, not across <em>dimensions within a token</em>, each thread
+does its own reduction with zero cross-thread communication.</p>
+
+<pre><code>void rmsnorm_parallel(int ith, int nth, void *args) {
+    rmsnorm_args_t *a = args;
+    int tokens_per_thread = a-&gt;T / nth;
+    int t_start = ith * tokens_per_thread;
+    int t_end   = (ith == nth - 1) ? a-&gt;T : t_start + tokens_per_thread;
+
+    for (int t = t_start; t &lt; t_end; t++) {
+        float *x = a-&gt;input + t * a-&gt;aligned_D;
+        float *y = a-&gt;output + t * a-&gt;aligned_D;
+
+        // Phase 1: sum of squares (PRIVATE reduction &mdash; within this token only)
+        __m512 sum_sq = _mm512_setzero_ps();
+        for (int d = 0; d &lt; a-&gt;D; d += 16)
+            sum_sq = _mm512_fmadd_ps(_mm512_loadu_ps(&amp;x[d]),
+                                      _mm512_loadu_ps(&amp;x[d]), sum_sq);
+        float rms = sqrtf(_mm512_reduce_add_ps(sum_sq) / a-&gt;D + 1e-6f);
+
+        // Phase 2: normalize (element-wise, reads shared gamma)
+        __m512 rstd = _mm512_set1_ps(1.0f / rms);
+        for (int d = 0; d &lt; a-&gt;D; d += 16)
+            _mm512_storeu_ps(&amp;y[d],
+                _mm512_mul_ps(_mm512_mul_ps(_mm512_loadu_ps(&amp;x[d]), rstd),
+                              _mm512_loadu_ps(&amp;a-&gt;gamma[d])));
+    }
+}</code></pre>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Tokens (T) &mdash; embarrassingly parallel</td></tr>
+    <tr><td>Shared reads</td><td>&gamma;[D] normalization weights</td></tr>
+    <tr><td>Exclusive writes</td><td>output[t_start..t_end, 0..D-1] &mdash; complete token vectors</td></tr>
+    <tr><td>Reduction</td><td class="good">Intra-token only (private to each thread, no cross-thread sync)</td></tr>
+    <tr><td>Decode mode</td><td class="meh">T=1 in decode &rarr; no token-level parallelism. Could split D dimension with barrier.</td></tr>
+</table>
+
+<h3 id="kernel-attention">Attention &mdash; Q&middot;K<sup>T</sup>/&radic;d &rarr; Softmax &rarr; Attn&middot;V</h3>
+
+<p><strong>File:</strong> <code>src/kernels/attention_kernels.c</code><br>
+<strong>Operation:</strong> Multi-head scaled dot-product attention with causal mask<br>
+<strong>Three phases:</strong> Score computation, softmax, weighted value summation</p>
+
+<div class="diagram"><span class="dim">Attention parallelization: split heads across threads</span>
+
+  Q [H heads &times; T &times; d]     K [H &times; T &times; d]     V [H &times; T &times; d]
+  +-------------------+    +-------------------+    +-------------------+
+  | <span class="grn">Head 0 (Thread 0)</span> |    | <span class="grn">Head 0</span>            |    | <span class="grn">Head 0</span>            |
+  | <span class="grn">Head 1 (Thread 0)</span> |    | <span class="grn">Head 1</span>            |    | <span class="grn">Head 1</span>            |
+  +-------------------+    +-------------------+    +-------------------+
+  | <span class="purple">Head 2 (Thread 1)</span> |    | <span class="purple">Head 2</span>            |    | <span class="purple">Head 2</span>            |
+  | <span class="purple">Head 3 (Thread 1)</span> |    | <span class="purple">Head 3</span>            |    | <span class="purple">Head 3</span>            |
+  +-------------------+    +-------------------+    +-------------------+
+  | <span class="hl">Head 4 (Thread 2)</span> |    | <span class="hl">Head 4</span>            |    | <span class="hl">Head 4</span>            |
+  | <span class="hl">Head 5 (Thread 2)</span> |    | <span class="hl">Head 5</span>            |    | <span class="hl">Head 5</span>            |
+  +-------------------+    +-------------------+    +-------------------+
+  | <span class="wrn">Head 6 (Thread 3)</span> |    | <span class="wrn">Head 6</span>            |    | <span class="wrn">Head 6</span>            |
+  | <span class="wrn">Head 7 (Thread 3)</span> |    | <span class="wrn">Head 7</span>            |    | <span class="wrn">Head 7</span>            |
+  +-------------------+    +-------------------+    +-------------------+
+
+  Each head is <span class="grn">completely independent</span>. All three phases (score, softmax, value)
+  for a given head can be computed by one thread with zero cross-thread communication.
+
+  Scores [H &times; T &times; T] &mdash; intermediate, private per head
+  Output [H &times; T &times; d] &mdash; exclusive write per thread</div>
+
+<p>Attention is the most complex kernel but also the most naturally parallel.
+Each attention head is a self-contained computation:</p>
+
+<ol>
+    <li><strong>Phase 1 (Score):</strong> For each query position <em>i</em>, compute
+    <code>score[h,i,j] = Q[h,i] &middot; K[h,j] / &radic;d</code> for all <code>j &le; i</code> (causal mask).
+    Triangle of dot products per head.</li>
+    <li><strong>Phase 2 (Softmax):</strong> Per row: find max, subtract, exp, sum, normalize.
+    The reduction (max, sum) is <em>within a single row</em> &mdash; private to the thread owning that head.</li>
+    <li><strong>Phase 3 (Value):</strong> <code>output[h,i] = &sum;<sub>j</sub> score[h,i,j] &middot; V[h,j]</code>.
+    Accumulates over j &mdash; but within a single head, so private to the owning thread.</li>
+</ol>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Heads (H) &mdash; completely independent</td></tr>
+    <tr><td>Shared reads</td><td>None &mdash; each head has its own Q, K, V slices in head-major layout</td></tr>
+    <tr><td>Exclusive writes</td><td>scores[h, *, *] and output[h, *, *] &mdash; entire head is private</td></tr>
+    <tr><td>Reduction</td><td class="good">Softmax max/sum is intra-row, within a single head (private)</td></tr>
+    <tr><td>Compute cost</td><td>O(T&sup2; &middot; d) per head &mdash; quadratic in sequence length</td></tr>
+    <tr><td>Ideal threads</td><td>num_heads (typically 8&ndash;32, more than enough to saturate cores)</td></tr>
+</table>
+
+<h3 id="kernel-softmax">Softmax &mdash; With Causal Masking</h3>
+
+<p><strong>File:</strong> <code>src/kernels/softmax_kernels.c</code><br>
+<strong>Operation:</strong> <code>softmax(row) = exp(row - max) / sum(exp(row - max))</code>, applied to each row of the attention score matrix<br>
+<strong>Called:</strong> Once per attention layer, integrated into the attention computation</p>
+
+<div class="diagram"><span class="dim">Softmax parallelization: split heads (or rows) across threads</span>
+
+  Score matrix per head [T &times; T], lower-triangular (causal):
+
+  Row 0: [s<sub>00</sub>]                                               &larr; len=1
+  Row 1: [s<sub>10</sub>, s<sub>11</sub>]                                         &larr; len=2
+  Row 2: [s<sub>20</sub>, s<sub>21</sub>, s<sub>22</sub>]                                   &larr; len=3
+  Row 3: [s<sub>30</sub>, s<sub>31</sub>, s<sub>32</sub>, s<sub>33</sub>]                             &larr; len=4
+  ...
+  Row T: [s<sub>T0</sub>, s<sub>T1</sub>, ..., s<sub>TT</sub>]                            &larr; len=T
+
+  Each row: find max &rarr; subtract max &rarr; exp &rarr; sum &rarr; divide by sum
+  <span class="grn">Rows are independent!</span> Each row's max/sum is a private reduction.</div>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Heads (H) or rows (T) within a head &mdash; both embarrassingly parallel</td></tr>
+    <tr><td>Shared reads</td><td>None (in-place operation)</td></tr>
+    <tr><td>Exclusive writes</td><td>score[h, i, *] &mdash; each row written independently</td></tr>
+    <tr><td>Reduction</td><td class="good">Row-internal max and sum &mdash; private per row, no cross-thread sync</td></tr>
+    <tr><td>Causal optimization</td><td>Row <em>i</em> only processes <em>i+1</em> elements (lower triangle) + zeroes rest</td></tr>
+</table>
+
+<h3 id="kernel-swiglu">SwiGLU &mdash; Gated Linear Unit Activation</h3>
+
+<p><strong>File:</strong> <code>src/kernels/swiglu_kernels.c</code><br>
+<strong>Operation:</strong> <code>output[t,d] = SiLU(gate[t,d]) &times; value[t,d]</code> where input is split into gate and value halves<br>
+<strong>Called:</strong> Once per FFN block (1x per layer)</p>
+
+<div class="diagram"><span class="dim">SwiGLU parallelization: split tokens across threads</span>
+
+  Input [T &times; 2D]                                Output [T &times; D]
+  +-------------------+-------------------+          +-------------------+
+  | <span class="grn">Token 0: gate[D]</span>  | <span class="grn">Token 0: value[D]</span> |  &rarr;  | <span class="grn">Token 0: SiLU&times;val</span> |  Thread 0
+  | <span class="grn">Token 1: gate[D]</span>  | <span class="grn">Token 1: value[D]</span> |  &rarr;  | <span class="grn">Token 1: SiLU&times;val</span> |
+  +-------------------+-------------------+          +-------------------+
+  | <span class="purple">Token 2: gate[D]</span>  | <span class="purple">Token 2: value[D]</span> |  &rarr;  | <span class="purple">Token 2: SiLU&times;val</span> |  Thread 1
+  | <span class="purple">Token 3: gate[D]</span>  | <span class="purple">Token 3: value[D]</span> |  &rarr;  | <span class="purple">Token 3: SiLU&times;val</span> |
+  +-------------------+-------------------+          +-------------------+
+
+  Pure element-wise: sigmoid(gate) * gate * value
+  <span class="grn">No reduction. No shared writes. Perfect parallelism.</span></div>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Tokens (T) &mdash; embarrassingly parallel, zero dependencies</td></tr>
+    <tr><td>Shared reads</td><td>None</td></tr>
+    <tr><td>Exclusive writes</td><td>output[t_start..t_end, 0..D-1]</td></tr>
+    <tr><td>Reduction</td><td class="good">None &mdash; pure element-wise operation</td></tr>
+    <tr><td>SIMD efficiency</td><td>Excellent &mdash; straight FMA + sigmoid approximation over contiguous memory</td></tr>
+</table>
+
+<h3 id="kernel-rope">RoPE &mdash; Rotary Position Embedding</h3>
+
+<p><strong>File:</strong> <code>src/kernels/rope_kernels.c</code><br>
+<strong>Operation:</strong> Rotate Q and K vectors using precomputed sin/cos tables based on token position<br>
+<strong>Called:</strong> Once per attention block (1x per layer, applied to Q and K separately)</p>
+
+<div class="diagram"><span class="dim">RoPE parallelization: split heads &times; tokens across threads</span>
+
+  Q or K [H heads &times; T tokens &times; head_dim]
+  +-----------------------------------------------+
+  | <span class="grn">Head 0, Token 0: rotate(q, cos[0], sin[0])</span>    |  Thread 0
+  | <span class="grn">Head 0, Token 1: rotate(q, cos[1], sin[1])</span>    |
+  | <span class="grn">Head 1, Token 0: rotate(q, cos[0], sin[0])</span>    |
+  +-----------------------------------------------+
+  | <span class="purple">Head 1, Token 1: rotate(q, cos[1], sin[1])</span>    |  Thread 1
+  | <span class="purple">Head 2, Token 0: rotate(q, cos[0], sin[0])</span>    |
+  | <span class="purple">Head 2, Token 1: rotate(q, cos[1], sin[1])</span>    |
+  +-----------------------------------------------+
+  ...
+
+  Rotation: x'[i] = x[i]*cos[pos,i] - x[i+half]*sin[pos,i]
+            x'[i+half] = x[i]*sin[pos,i] + x[i+half]*cos[pos,i]
+
+  <span class="grn">Shared reads:</span>  cos_cache[pos, half_dim], sin_cache[pos, half_dim]
+  <span class="hl">In-place write:</span> x[h, t, 0..head_dim-1] &mdash; each (h,t) is independent</div>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Heads &times; Tokens (H&middot;T) &mdash; all (h,t) pairs independent</td></tr>
+    <tr><td>Shared reads</td><td>cos_cache[T &times; half_dim], sin_cache[T &times; half_dim]</td></tr>
+    <tr><td>Exclusive writes</td><td>x[h, t, *] &mdash; in-place rotation, one head-vector per (h,t)</td></tr>
+    <tr><td>Reduction</td><td class="good">None &mdash; pure element-wise rotation</td></tr>
+    <tr><td>Best split</td><td>Flatten H&times;T loop, divide evenly across threads</td></tr>
+</table>
+
+<h3 id="kernel-embedding">Embedding Lookup</h3>
+
+<p><strong>File:</strong> <code>src/kernels/embedding_kernels.c</code><br>
+<strong>Operation:</strong> <code>output[t] = token_embeddings[token_id[t]] + pos_embeddings[t]</code><br>
+<strong>Called:</strong> Once per forward pass (first operation)</p>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">Tokens (T) &mdash; each token lookup is independent</td></tr>
+    <tr><td>Shared reads</td><td>token_embeddings[vocab_size &times; D] (table), pos_embeddings[T &times; D]</td></tr>
+    <tr><td>Exclusive writes</td><td>output[t, 0..D-1] &mdash; one embedding vector per token</td></tr>
+    <tr><td>Reduction</td><td class="good">None</td></tr>
+    <tr><td>Special pattern</td><td class="meh">Irregular memory access (gather) &mdash; token_ids determine which rows to fetch</td></tr>
+    <tr><td>Decode mode</td><td class="meh">T=1 &rarr; no parallelism possible. Prefill (T=512+) benefits greatly.</td></tr>
+</table>
+
+<h3 id="kernel-kvcache">KV Cache Write</h3>
+
+<p><strong>File:</strong> <code>src/kernels/kv_cache_kernels.c</code><br>
+<strong>Operation:</strong> Copy new K and V vectors for current token into the cache at position <code>token_index</code><br>
+<strong>Called:</strong> Once per layer (append new token's K,V to cache)</p>
+
+<table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Parallel dimension</td><td class="good">KV heads (num_kv_heads) &mdash; each head is independent</td></tr>
+    <tr><td>Shared reads</td><td>k_token[num_kv_heads &times; head_dim], v_token[num_kv_heads &times; head_dim]</td></tr>
+    <tr><td>Exclusive writes</td><td>k_cache[h, token_index, *], v_cache[h, token_index, *]</td></tr>
+    <tr><td>Reduction</td><td class="good">None &mdash; pure memcpy per head</td></tr>
+    <tr><td>Worth parallelizing?</td><td class="meh">Small &mdash; only head_dim floats per head. May not justify dispatch overhead.</td></tr>
+</table>
+
+<h3 id="kernel-summary">Summary: Parallelization Map</h3>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Split Dimension</th>
+        <th>Shared Reads</th>
+        <th>Reduction</th>
+        <th>Priority</th>
+    </tr>
+    <tr>
+        <td><strong>GEMV</strong></td>
+        <td class="good">Rows (M)</td>
+        <td>x[K]</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-green">HIGH</span> &mdash; dominates decode time</td>
+    </tr>
+    <tr>
+        <td><strong>GEMM</strong></td>
+        <td class="good">Rows (M)</td>
+        <td>B[K&times;N]</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-green">HIGH</span> &mdash; dominates prefill time</td>
+    </tr>
+    <tr>
+        <td><strong>Attention</strong></td>
+        <td class="good">Heads (H)</td>
+        <td>None</td>
+        <td class="good">Private per head</td>
+        <td><span class="badge badge-green">HIGH</span> &mdash; O(T&sup2;) cost</td>
+    </tr>
+    <tr>
+        <td><strong>RMSNorm</strong></td>
+        <td class="good">Tokens (T)</td>
+        <td>&gamma;[D]</td>
+        <td class="good">Private per token</td>
+        <td><span class="badge badge-orange">MEDIUM</span> &mdash; called 48x/fwd</td>
+    </tr>
+    <tr>
+        <td><strong>SwiGLU</strong></td>
+        <td class="good">Tokens (T)</td>
+        <td>None</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-orange">MEDIUM</span> &mdash; element-wise</td>
+    </tr>
+    <tr>
+        <td><strong>Softmax</strong></td>
+        <td class="good">Heads (H) or Rows (T)</td>
+        <td>None</td>
+        <td class="good">Private per row</td>
+        <td><span class="badge badge-orange">MEDIUM</span></td>
+    </tr>
+    <tr>
+        <td><strong>RoPE</strong></td>
+        <td class="good">H &times; T</td>
+        <td>cos/sin tables</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-grey">LOW</span> &mdash; cheap per call</td>
+    </tr>
+    <tr>
+        <td><strong>Embedding</strong></td>
+        <td class="good">Tokens (T)</td>
+        <td>Embedding table</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-grey">LOW</span> &mdash; prefill only</td>
+    </tr>
+    <tr>
+        <td><strong>KV Cache</strong></td>
+        <td class="good">KV Heads</td>
+        <td>Token vectors</td>
+        <td class="good">None</td>
+        <td><span class="badge badge-grey">LOW</span> &mdash; small memcpy</td>
+    </tr>
+</table>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+        <strong>Every single kernel</strong> in the transformer has embarrassingly parallel structure.
+        The only reductions (RMSNorm sum-of-squares, Softmax max/sum) are <em>intra-token</em> or
+        <em>intra-row</em> &mdash; private to whichever thread owns that token or head.
+        No kernel requires cross-thread communication for its core computation.
+        This is why a persistent thread pool with simple <code>(ith, nth)</code> partitioning
+        is the perfect parallelization strategy for LLM inference.
+    </div>
+</div>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1936,7 +2567,7 @@ about <em>what</em> they pool and <em>what synchronization</em> they need.</p>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-29</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
             </div>
         </div>
     </footer>
