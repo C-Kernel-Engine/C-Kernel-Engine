@@ -109,6 +109,7 @@ for page in "$PAGES_DIR"/*.html; do
         header="${header//\{\{NAV_DECISIONS\}\}/}"
         header="${header//\{\{NAV_API\}\}/}"
         header="${header//\{\{NAV_CONTRIBUTING\}\}/}"
+        header="${header//\{\{NAV_THREADPOOL\}\}/}"
 
         if [ -n "$nav_active" ]; then
             header="${header//\{\{NAV_${nav_active^^}\}\}/active}"

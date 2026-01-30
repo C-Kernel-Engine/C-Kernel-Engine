@@ -3,11 +3,15 @@
   <compounddef id="ckernel__strict_8c" kind="file" language="C++">
     <compoundname>ckernel_strict.c</compoundname>
     <includes refid="ckernel__engine_8h" local="yes">ckernel_engine.h</includes>
+    <includes refid="ck__threadpool_8h" local="yes">ck_threadpool.h</includes>
     <includes local="no">stdio.h</includes>
     <includes local="no">stdlib.h</includes>
     <includes local="no">unistd.h</includes>
     <includes local="no">errno.h</includes>
     <incdepgraph>
+      <node id="10">
+        <label>stdatomic.h</label>
+      </node>
       <node id="6">
         <label>ckernel_quant.h</label>
         <link refid="ckernel__quant_8h"/>
@@ -16,6 +20,16 @@
         <childnode refid="3" relation="include">
         </childnode>
         <childnode refid="7" relation="include">
+        </childnode>
+      </node>
+      <node id="9">
+        <label>ck_threadpool.h</label>
+        <link refid="ck__threadpool_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="10" relation="include">
+        </childnode>
+        <childnode refid="11" relation="include">
         </childnode>
       </node>
       <node id="7">
@@ -37,10 +51,10 @@
       <node id="4">
         <label>stdint.h</label>
       </node>
-      <node id="10">
+      <node id="13">
         <label>stdlib.h</label>
       </node>
-      <node id="12">
+      <node id="15">
         <label>errno.h</label>
       </node>
       <node id="1">
@@ -50,11 +64,13 @@
         </childnode>
         <childnode refid="9" relation="include">
         </childnode>
-        <childnode refid="10" relation="include">
-        </childnode>
-        <childnode refid="11" relation="include">
-        </childnode>
         <childnode refid="12" relation="include">
+        </childnode>
+        <childnode refid="13" relation="include">
+        </childnode>
+        <childnode refid="14" relation="include">
+        </childnode>
+        <childnode refid="15" relation="include">
         </childnode>
       </node>
       <node id="2">
@@ -75,9 +91,12 @@
         <label>stddef.h</label>
       </node>
       <node id="11">
+        <label>pthread.h</label>
+      </node>
+      <node id="14">
         <label>unistd.h</label>
       </node>
-      <node id="9">
+      <node id="12">
         <label>stdio.h</label>
       </node>
       <node id="5">
@@ -117,7 +136,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="85" column="17"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="86" column="17"/>
       </memberdef>
       </sectiondef>
       <sectiondef kind="var">
@@ -133,9 +152,9 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="19" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="19" bodyend="-1"/>
-        <referencedby refid="ckernel__engine_8h_1a8bcb6fa03c4861c8f45d59fa424d1146" compoundref="ckernel__strict_8c" startline="21" endline="30">ck_set_strict_parity</referencedby>
-        <referencedby refid="ckernel__engine_8h_1aef8c9a331116ff9c2d77b03152aa8004" compoundref="ckernel__strict_8c" startline="32" endline="35">ck_strict_parity_enabled</referencedby>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="20" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="20" bodyend="-1"/>
+        <referencedby refid="ckernel__engine_8h_1a8bcb6fa03c4861c8f45d59fa424d1146" compoundref="ckernel__strict_8c" startline="22" endline="31">ck_set_strict_parity</referencedby>
+        <referencedby refid="ckernel__engine_8h_1aef8c9a331116ff9c2d77b03152aa8004" compoundref="ckernel__strict_8c" startline="33" endline="36">ck_strict_parity_enabled</referencedby>
       </memberdef>
       <memberdef kind="variable" id="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" prot="public" static="yes" mutable="no">
         <type>int</type>
@@ -149,9 +168,9 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="41" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="41" bodyend="-1"/>
-        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="177" endline="184">ck_get_num_threads</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="147" endline="175">ck_set_num_threads</referencedby>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="42" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="42" bodyend="-1"/>
+        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="178" endline="185">ck_get_num_threads</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="148" endline="176">ck_set_num_threads</referencedby>
       </memberdef>
       <memberdef kind="variable" id="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" prot="public" static="yes" mutable="no">
         <type>int</type>
@@ -165,9 +184,9 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="42" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="42" bodyend="-1"/>
-        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="177" endline="184">ck_get_num_threads</referencedby>
-        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="147" endline="175">ck_set_num_threads</referencedby>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="43" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="43" bodyend="-1"/>
+        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="178" endline="185">ck_get_num_threads</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="148" endline="176">ck_set_num_threads</referencedby>
       </memberdef>
       </sectiondef>
       <sectiondef kind="func">
@@ -185,11 +204,12 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="177" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="177" bodyend="184"/>
-        <references refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="147" endline="175">ck_set_num_threads</references>
-        <references refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" compoundref="ckernel__strict_8c" startline="41">g_num_threads</references>
-        <references refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" compoundref="ckernel__strict_8c" startline="42">g_threads_initialized</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="178" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="178" bodyend="185"/>
+        <references refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="148" endline="176">ck_set_num_threads</references>
+        <references refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" compoundref="ckernel__strict_8c" startline="42">g_num_threads</references>
+        <references refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" compoundref="ckernel__strict_8c" startline="43">g_threads_initialized</references>
         <referencedby refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" compoundref="gemm__kernels_8c" startline="661" endline="752">gemm_blocked_serial</referencedby>
+        <referencedby refid="ck__threadpool_8c_1a5787f410f04801389446b1cf43c79e15" compoundref="ck__threadpool_8c" startline="377" endline="381">global_pool_init</referencedby>
       </memberdef>
       <memberdef kind="function" id="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -205,9 +225,28 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="61" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="61" bodyend="145"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="62" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="62" bodyend="146"/>
         <references refid="ckernel__strict_8c_1ad94b76f11ab5b09db24682947452e946">CK_ADD_PAIR</references>
-        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="147" endline="175">ck_set_num_threads</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="148" endline="176">ck_set_num_threads</referencedby>
+        <referencedby refid="ck__threadpool_8h_1a5cf6b941c6e0f27bb568cfc67ca0ddff" compoundref="ck__threadpool_8c" startline="183" endline="241">ck_threadpool_create</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__strict_8c_1ac0b7956a32f188dc930dfafd8ca281f3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>ck_threadpool_t *</type>
+        <definition>ck_threadpool_t* ck_get_threadpool</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_get_threadpool</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get the global thread pool handle for dispatch. Convenience wrapper — initializes on first call. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="218" column="17" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="218" bodyend="221"/>
+        <references refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" compoundref="ck__threadpool_8c" startline="383" endline="387">ck_threadpool_global</references>
       </memberdef>
       <memberdef kind="function" id="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -224,9 +263,9 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="44" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="44" bodyend="58"/>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="45" column="12" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="45" bodyend="59"/>
         <references refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" compoundref="utf8_8c" startline="215">end</references>
-        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="147" endline="175">ck_set_num_threads</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" compoundref="ckernel__strict_8c" startline="148" endline="176">ck_set_num_threads</referencedby>
       </memberdef>
       <memberdef kind="function" id="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -243,12 +282,12 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="147" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="147" bodyend="175"/>
-        <references refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" compoundref="ckernel__strict_8c" startline="61" endline="145">ck_get_physical_cores</references>
-        <references refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" compoundref="ckernel__strict_8c" startline="44" endline="58">ck_parse_env_int</references>
-        <references refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" compoundref="ckernel__strict_8c" startline="41">g_num_threads</references>
-        <references refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" compoundref="ckernel__strict_8c" startline="42">g_threads_initialized</references>
-        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="177" endline="184">ck_get_num_threads</referencedby>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="148" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="148" bodyend="176"/>
+        <references refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" compoundref="ckernel__strict_8c" startline="62" endline="146">ck_get_physical_cores</references>
+        <references refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" compoundref="ckernel__strict_8c" startline="45" endline="59">ck_parse_env_int</references>
+        <references refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" compoundref="ckernel__strict_8c" startline="42">g_num_threads</references>
+        <references refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" compoundref="ckernel__strict_8c" startline="43">g_threads_initialized</references>
+        <referencedby refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" compoundref="ckernel__strict_8c" startline="178" endline="185">ck_get_num_threads</referencedby>
       </memberdef>
       <memberdef kind="function" id="ckernel__strict_8c_1a8bcb6fa03c4861c8f45d59fa424d1146" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -265,8 +304,8 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="21" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="21" bodyend="30"/>
-        <references refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" compoundref="ckernel__strict_8c" startline="19">ck_strict_parity</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="22" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="22" bodyend="31"/>
+        <references refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" compoundref="ckernel__strict_8c" startline="20">ck_strict_parity</references>
       </memberdef>
       <memberdef kind="function" id="ckernel__strict_8c_1aef8c9a331116ff9c2d77b03152aa8004" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>int</type>
@@ -282,8 +321,8 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="32" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="32" bodyend="35"/>
-        <references refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" compoundref="ckernel__strict_8c" startline="19">ck_strict_parity</references>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="33" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="33" bodyend="36"/>
+        <references refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" compoundref="ckernel__strict_8c" startline="20">ck_strict_parity</references>
         <referencedby refid="ckernel__orchestration_8c_1a45ad329928b675ddc00ad3d5059335b3" compoundref="ckernel__orchestration_8c" startline="282" endline="301">ck_q8k_activations_enabled</referencedby>
         <referencedby refid="ckernel__engine_8h_1a9af477f77eb64b2cdd2ccddae9c84e72" compoundref="gemm__kernels_8c" startline="149" endline="202">gemm_avx512_parallel</referencedby>
         <referencedby refid="ckernel__engine_8h_1af4f0e756d3ac00b45ce2c7a296b61ae3" compoundref="gemm__kernels_8c" startline="661" endline="752">gemm_blocked_serial</referencedby>
@@ -296,6 +335,43 @@
         <referencedby refid="ckernel__engine_8h_1ae3bc36ea7b8562f9121e527f0f408b43" compoundref="gemm__kernels_8c" startline="581" endline="652">gemm_tn_blocked</referencedby>
         <referencedby refid="ckernel__engine_8h_1a84ce00fad7103b550ea75b52a21a98f7" compoundref="gemm__kernels_8c" startline="499" endline="519">gemm_tn_parallel</referencedby>
       </memberdef>
+      <memberdef kind="function" id="ckernel__strict_8c_1a0cdb2989b11a190fcacfad0dee729bc3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_init</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_threadpool_init</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Initialize the global thread pool. Called once during engine startup (e.g., from ck_model_init). Uses <ref refid="ckernel__strict_8c_1aedf852ec498fe7db175f59f810886b9f" kindref="member">ck_get_num_threads()</ref> for thread count (respects CK_NUM_THREADS env).</para>
+<para>Safe to call multiple times — subsequent calls are no-ops. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="198" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="198" bodyend="203"/>
+        <references refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" compoundref="ck__threadpool_8c" startline="383" endline="387">ck_threadpool_global</references>
+      </memberdef>
+      <memberdef kind="function" id="ckernel__strict_8c_1a0f8bb8ea3b2036ee4fc08582774c0b5e" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_shutdown</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_threadpool_shutdown</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Shut down the global thread pool. Called during engine teardown. Workers are joined and freed. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" line="209" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c" bodystart="209" bodyend="212"/>
+        <references refid="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" compoundref="ck__threadpool_8c" startline="389" endline="397">ck_threadpool_global_destroy</references>
+      </memberdef>
       </sectiondef>
     <briefdescription>
     </briefdescription>
@@ -303,189 +379,226 @@
     </detaileddescription>
     <programlisting>
 <codeline lineno="1"><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__engine_8h" kindref="compound">ckernel_engine.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;unistd.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;errno.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="6"><highlight class="normal"></highlight></codeline>
-<codeline lineno="7"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;omp.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="10"><highlight class="normal"></highlight></codeline>
-<codeline lineno="11"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(USE_MKL)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="12"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;mkl.h&gt;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="14"><highlight class="normal"></highlight></codeline>
-<codeline lineno="15"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="16"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Strict<sp/>parity<sp/>mode<sp/>(for<sp/>numerical<sp/>reproducibility)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="17"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="18"><highlight class="normal"></highlight></codeline>
-<codeline lineno="19" refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref><sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="20"><highlight class="normal"></highlight></codeline>
-<codeline lineno="21" refid="ckernel__engine_8h_1a8bcb6fa03c4861c8f45d59fa424d1146" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a8bcb6fa03c4861c8f45d59fa424d1146" kindref="member">ck_set_strict_parity</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>enabled)</highlight></codeline>
-<codeline lineno="22"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="23"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref><sp/>=<sp/>enabled<sp/>?<sp/>1<sp/>:<sp/>0;</highlight></codeline>
-<codeline lineno="24"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="25"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref>)<sp/>{</highlight></codeline>
-<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>omp_set_dynamic(0);</highlight></codeline>
-<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>omp_set_num_threads(1);</highlight></codeline>
-<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="29"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="30"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="31"><highlight class="normal"></highlight></codeline>
-<codeline lineno="32" refid="ckernel__engine_8h_1aef8c9a331116ff9c2d77b03152aa8004" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1aef8c9a331116ff9c2d77b03152aa8004" kindref="member">ck_strict_parity_enabled</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
-<codeline lineno="33"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref>;</highlight></codeline>
-<codeline lineno="35"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="36"><highlight class="normal"></highlight></codeline>
-<codeline lineno="37"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="38"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Thread<sp/>configuration</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="39"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="40"><highlight class="normal"></highlight></codeline>
-<codeline lineno="41" refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref><sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="42" refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref><sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="43"><highlight class="normal"></highlight></codeline>
-<codeline lineno="44" refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*name)</highlight></codeline>
-<codeline lineno="45"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*val<sp/>=<sp/>getenv(name);</highlight></codeline>
-<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!val<sp/>||<sp/>!val[0])<sp/>{</highlight></codeline>
-<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
-<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="50"><highlight class="normal"></highlight></codeline>
-<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/>errno<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref><sp/>=<sp/>NULL;</highlight></codeline>
-<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">long</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>strtol(val,<sp/>&amp;<ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref>,<sp/>10);</highlight></codeline>
-<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(errno<sp/>!=<sp/>0<sp/>||<sp/><ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref><sp/>==<sp/>val<sp/>||<sp/>n<sp/>&lt;=<sp/>0<sp/>||<sp/>n<sp/>&gt;<sp/>(1L<sp/>&lt;&lt;<sp/>20))<sp/>{</highlight></codeline>
-<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
-<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal">)n;</highlight></codeline>
-<codeline lineno="58"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="59"><highlight class="normal"></highlight></codeline>
-<codeline lineno="60"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Detect<sp/>physical<sp/>CPU<sp/>cores<sp/>(not<sp/>hyperthreads)<sp/>when<sp/>possible.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="61" refid="ckernel__engine_8h_1a7ff78bf68a9657c2d6858b64df79f7ae" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
-<codeline lineno="62"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_cores<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>logical_cores<sp/>=<sp/>(int)sysconf(_SC_NPROCESSORS_ONLN);</highlight></codeline>
-<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(logical_cores<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>logical_cores<sp/>=<sp/>1;</highlight></codeline>
-<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="68"><highlight class="normal"></highlight></codeline>
-<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Read<sp/>from<sp/>/proc/cpuinfo<sp/>(Linux)<sp/>and<sp/>count<sp/>unique<sp/>(physical<sp/>id,<sp/>core<sp/>id)<sp/>pairs.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE<sp/>*f<sp/>=<sp/>fopen(</highlight><highlight class="stringliteral">&quot;/proc/cpuinfo&quot;</highlight><highlight class="normal">,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(f)<sp/>{</highlight></codeline>
-<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>line[256];</highlight></codeline>
-<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_id<sp/>=<sp/>-1;</highlight></codeline>
-<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>core_id<sp/>=<sp/>-1;</highlight></codeline>
-<codeline lineno="75"><highlight class="normal"></highlight></codeline>
-<codeline lineno="76"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
-<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_id;</highlight></codeline>
-<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>core_id;</highlight></codeline>
-<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/>seen[8192];</highlight></codeline>
-<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>seen_count<sp/>=<sp/>0;</highlight></codeline>
-<codeline lineno="81"><highlight class="normal"></highlight></codeline>
-<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>seen_cap<sp/>=<sp/>(int)(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(seen)<sp/>/<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(seen[0]));</highlight></codeline>
-<codeline lineno="83"><highlight class="normal"></highlight></codeline>
-<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Helper:<sp/>add<sp/>(pid,cid)<sp/>to<sp/>set<sp/>if<sp/>not<sp/>present.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="85"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>#define<sp/>CK_ADD_PAIR(pid,<sp/>cid)<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="86"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>do<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="87"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>((pid)<sp/>&gt;=<sp/>0<sp/>&amp;&amp;<sp/>(cid)<sp/>&gt;=<sp/>0)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="88"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int<sp/>exists<sp/>=<sp/>0;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="89"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>for<sp/>(int<sp/>ii<sp/>=<sp/>0;<sp/>ii<sp/>&lt;<sp/>seen_count;<sp/>++ii)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="90"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>(seen[ii].physical_id<sp/>==<sp/>(pid)<sp/>&amp;&amp;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="91"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[ii].core_id<sp/>==<sp/>(cid))<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="92"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>exists<sp/>=<sp/>1;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="93"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>break;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="94"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="95"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="96"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>(!exists<sp/>&amp;&amp;<sp/>seen_count<sp/>&lt;<sp/>seen_cap)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="97"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[seen_count].physical_id<sp/>=<sp/>(pid);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="98"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[seen_count].core_id<sp/>=<sp/>(cid);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="99"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>++seen_count;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="100"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="101"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
-<codeline lineno="102"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/>while<sp/>(0)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="103"><highlight class="normal"></highlight></codeline>
-<codeline lineno="104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(fgets(line,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(line),<sp/>f))<sp/>{</highlight></codeline>
-<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>val;</highlight></codeline>
-<codeline lineno="106"><highlight class="normal"></highlight></codeline>
-<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Blank<sp/>line<sp/>separates<sp/>processor<sp/>blocks.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(line[0]<sp/>==<sp/></highlight><highlight class="charliteral">&apos;\n&apos;</highlight><highlight class="normal"><sp/>||<sp/>line[0]<sp/>==<sp/></highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
-<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1ad94b76f11ab5b09db24682947452e946" kindref="member">CK_ADD_PAIR</ref>(physical_id,<sp/>core_id);</highlight></codeline>
-<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_id<sp/>=<sp/>-1;</highlight></codeline>
-<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>core_id<sp/>=<sp/>-1;</highlight></codeline>
-<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="114"><highlight class="normal"></highlight></codeline>
-<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;physical<sp/>id<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;val)<sp/>==<sp/>1)<sp/>{</highlight></codeline>
-<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_id<sp/>=<sp/>val;</highlight></codeline>
-<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;core<sp/>id<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;val)<sp/>==<sp/>1)<sp/>{</highlight></codeline>
-<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>core_id<sp/>=<sp/>val;</highlight></codeline>
-<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
-<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
-<codeline lineno="125"><highlight class="normal"></highlight></codeline>
-<codeline lineno="126"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Handle<sp/>file<sp/>without<sp/>trailing<sp/>blank<sp/>line.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1ad94b76f11ab5b09db24682947452e946" kindref="member">CK_ADD_PAIR</ref>(physical_id,<sp/>core_id);</highlight></codeline>
-<codeline lineno="128"><highlight class="normal"></highlight></codeline>
-<codeline lineno="129"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>#undef<sp/>CK_ADD_PAIR</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="130"><highlight class="normal"></highlight></codeline>
-<codeline lineno="131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_cores<sp/>=<sp/>seen_count;</highlight></codeline>
-<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="133"><highlight class="normal"></highlight></codeline>
-<codeline lineno="134"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>If<sp/>we<sp/>couldn&apos;t<sp/>reliably<sp/>detect<sp/>physical<sp/>cores<sp/>(common<sp/>in<sp/>containers),</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>fall<sp/>back<sp/>to<sp/>logical<sp/>CPUs<sp/>instead<sp/>of<sp/>incorrectly<sp/>forcing<sp/>single-thread<sp/>execution.</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(physical_cores<sp/>&lt;=<sp/>1<sp/>&amp;&amp;<sp/>logical_cores<sp/>&gt;<sp/>1)<sp/>{</highlight></codeline>
-<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>logical_cores;</highlight></codeline>
-<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="139"><highlight class="normal"></highlight></codeline>
-<codeline lineno="140"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(physical_cores<sp/>&gt;<sp/>1)<sp/>{</highlight></codeline>
-<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>physical_cores;</highlight></codeline>
-<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="143"><highlight class="normal"></highlight></codeline>
-<codeline lineno="144"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>logical_cores;</highlight></codeline>
-<codeline lineno="145"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="146"><highlight class="normal"></highlight></codeline>
-<codeline lineno="147" refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" kindref="member">ck_set_num_threads</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_threads)</highlight></codeline>
-<codeline lineno="148"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="149"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>0<sp/>=<sp/>auto-detect</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(num_threads<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Prefer<sp/>explicit<sp/>env<sp/>controls<sp/>when<sp/>present:</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>-<sp/>CK_NUM_THREADS:<sp/>engine-level<sp/>override</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>-<sp/>OMP_NUM_THREADS:<sp/>standard<sp/>OpenMP<sp/>control<sp/>(set<sp/>by<sp/>`ck<sp/>run<sp/>--threads`)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>env_threads<sp/>=<sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="stringliteral">&quot;CK_NUM_THREADS&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(env_threads<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
-<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>env_threads<sp/>=<sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="stringliteral">&quot;OMP_NUM_THREADS&quot;</highlight><highlight class="normal">);</highlight></codeline>
-<codeline lineno="157"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_threads<sp/>=<sp/>env_threads<sp/>&gt;<sp/>0<sp/>?<sp/>env_threads<sp/>:<sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>();</highlight></codeline>
-<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="160"><highlight class="normal"></highlight></codeline>
-<codeline lineno="161"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref><sp/>=<sp/>num_threads;</highlight></codeline>
-<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref><sp/>=<sp/>1;</highlight></codeline>
-<codeline lineno="163"><highlight class="normal"></highlight></codeline>
-<codeline lineno="164"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="165"><highlight class="normal"><sp/><sp/><sp/><sp/>omp_set_dynamic(0);<sp/><sp/></highlight><highlight class="comment">//<sp/>Disable<sp/>dynamic<sp/>adjustment</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/>omp_set_num_threads(num_threads);</highlight></codeline>
-<codeline lineno="167"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="168"><highlight class="normal"></highlight></codeline>
-<codeline lineno="169"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(USE_MKL)</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="170"><highlight class="normal"><sp/><sp/><sp/><sp/>mkl_set_num_threads(num_threads);</highlight></codeline>
-<codeline lineno="171"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="172"><highlight class="normal"></highlight></codeline>
-<codeline lineno="173"><highlight class="normal"><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;[CK]<sp/>Set<sp/>%d<sp/>threads<sp/>(auto=%d)\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
-<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_threads,<sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>());</highlight></codeline>
-<codeline lineno="175"><highlight class="normal">}</highlight></codeline>
-<codeline lineno="176"><highlight class="normal"></highlight></codeline>
-<codeline lineno="177" refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1aedf852ec498fe7db175f59f810886b9f" kindref="member">ck_get_num_threads</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
-<codeline lineno="178"><highlight class="normal">{</highlight></codeline>
-<codeline lineno="179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Auto-initialize<sp/>if<sp/>not<sp/>set</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!<ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref>)<sp/>{</highlight></codeline>
-<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" kindref="member">ck_set_num_threads</ref>(0);<sp/><sp/></highlight><highlight class="comment">//<sp/>Auto-detect</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
-<codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref>;</highlight></codeline>
-<codeline lineno="184"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="2"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ck__threadpool_8h" kindref="compound">ck_threadpool.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="3"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdio.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="4"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdlib.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="5"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;unistd.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="6"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;errno.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="7"><highlight class="normal"></highlight></codeline>
+<codeline lineno="8"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="9"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;omp.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="10"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="11"><highlight class="normal"></highlight></codeline>
+<codeline lineno="12"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(USE_MKL)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="13"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;mkl.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="14"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="15"><highlight class="normal"></highlight></codeline>
+<codeline lineno="16"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="17"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Strict<sp/>parity<sp/>mode<sp/>(for<sp/>numerical<sp/>reproducibility)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="18"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="19"><highlight class="normal"></highlight></codeline>
+<codeline lineno="20" refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="21"><highlight class="normal"></highlight></codeline>
+<codeline lineno="22" refid="ckernel__engine_8h_1a8bcb6fa03c4861c8f45d59fa424d1146" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a8bcb6fa03c4861c8f45d59fa424d1146" kindref="member">ck_set_strict_parity</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>enabled)</highlight></codeline>
+<codeline lineno="23"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref><sp/>=<sp/>enabled<sp/>?<sp/>1<sp/>:<sp/>0;</highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>omp_set_dynamic(0);</highlight></codeline>
+<codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>omp_set_num_threads(1);</highlight></codeline>
+<codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="30"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight></codeline>
+<codeline lineno="33" refid="ckernel__engine_8h_1aef8c9a331116ff9c2d77b03152aa8004" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1aef8c9a331116ff9c2d77b03152aa8004" kindref="member">ck_strict_parity_enabled</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="34"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a6dbb8ec1125b21473b47d31ae92427c3" kindref="member">ck_strict_parity</ref>;</highlight></codeline>
+<codeline lineno="36"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Thread<sp/>configuration</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight></codeline>
+<codeline lineno="42" refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="43" refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"></highlight></codeline>
+<codeline lineno="45" refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*name)</highlight></codeline>
+<codeline lineno="46"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="47"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*val<sp/>=<sp/>getenv(name);</highlight></codeline>
+<codeline lineno="48"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!val<sp/>||<sp/>!val[0])<sp/>{</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/>errno<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref><sp/>=<sp/>NULL;</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">long</highlight><highlight class="normal"><sp/>n<sp/>=<sp/>strtol(val,<sp/>&amp;<ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref>,<sp/>10);</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(errno<sp/>!=<sp/>0<sp/>||<sp/><ref refid="utf8_8c_1a204a3f4fa39b9c007f9784d3e4af4667" kindref="member">end</ref><sp/>==<sp/>val<sp/>||<sp/>n<sp/>&lt;=<sp/>0<sp/>||<sp/>n<sp/>&gt;<sp/>(1L<sp/>&lt;&lt;<sp/>20))<sp/>{</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>0;</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal">)n;</highlight></codeline>
+<codeline lineno="59"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="60"><highlight class="normal"></highlight></codeline>
+<codeline lineno="61"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Detect<sp/>physical<sp/>CPU<sp/>cores<sp/>(not<sp/>hyperthreads)<sp/>when<sp/>possible.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="62" refid="ckernel__engine_8h_1a7ff78bf68a9657c2d6858b64df79f7ae" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="63"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_cores<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>logical_cores<sp/>=<sp/>(int)sysconf(_SC_NPROCESSORS_ONLN);</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(logical_cores<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="67"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>logical_cores<sp/>=<sp/>1;</highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight></codeline>
+<codeline lineno="70"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Read<sp/>from<sp/>/proc/cpuinfo<sp/>(Linux)<sp/>and<sp/>count<sp/>unique<sp/>(physical<sp/>id,<sp/>core<sp/>id)<sp/>pairs.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/>FILE<sp/>*f<sp/>=<sp/>fopen(</highlight><highlight class="stringliteral">&quot;/proc/cpuinfo&quot;</highlight><highlight class="normal">,<sp/></highlight><highlight class="stringliteral">&quot;r&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(f)<sp/>{</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>line[256];</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_id<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>core_id<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">{</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>physical_id;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>core_id;</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/>seen[8192];</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>seen_count<sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="82"><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>seen_cap<sp/>=<sp/>(int)(</highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(seen)<sp/>/<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(seen[0]));</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Helper:<sp/>add<sp/>(pid,cid)<sp/>to<sp/>set<sp/>if<sp/>not<sp/>present.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>#define<sp/>CK_ADD_PAIR(pid,<sp/>cid)<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="87"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>do<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="88"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>((pid)<sp/>&gt;=<sp/>0<sp/>&amp;&amp;<sp/>(cid)<sp/>&gt;=<sp/>0)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="89"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>int<sp/>exists<sp/>=<sp/>0;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="90"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>for<sp/>(int<sp/>ii<sp/>=<sp/>0;<sp/>ii<sp/>&lt;<sp/>seen_count;<sp/>++ii)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="91"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>(seen[ii].physical_id<sp/>==<sp/>(pid)<sp/>&amp;&amp;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="92"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[ii].core_id<sp/>==<sp/>(cid))<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="93"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>exists<sp/>=<sp/>1;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="94"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>break;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="95"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="96"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="97"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>if<sp/>(!exists<sp/>&amp;&amp;<sp/>seen_count<sp/>&lt;<sp/>seen_cap)<sp/>{<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="98"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[seen_count].physical_id<sp/>=<sp/>(pid);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="99"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>seen[seen_count].core_id<sp/>=<sp/>(cid);<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="100"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>++seen_count;<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="101"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="102"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>\</highlight></codeline>
+<codeline lineno="103"><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}<sp/>while<sp/>(0)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="104"><highlight class="normal"></highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">while</highlight><highlight class="normal"><sp/>(fgets(line,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(line),<sp/>f))<sp/>{</highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>val;</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"></highlight></codeline>
+<codeline lineno="108"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Blank<sp/>line<sp/>separates<sp/>processor<sp/>blocks.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(line[0]<sp/>==<sp/></highlight><highlight class="charliteral">&apos;\n&apos;</highlight><highlight class="normal"><sp/>||<sp/>line[0]<sp/>==<sp/></highlight><highlight class="charliteral">&apos;\0&apos;</highlight><highlight class="normal">)<sp/>{</highlight></codeline>
+<codeline lineno="110"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1ad94b76f11ab5b09db24682947452e946" kindref="member">CK_ADD_PAIR</ref>(physical_id,<sp/>core_id);</highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_id<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>core_id<sp/>=<sp/>-1;</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;physical<sp/>id<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;val)<sp/>==<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_id<sp/>=<sp/>val;</highlight></codeline>
+<codeline lineno="118"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="119"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="120"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(sscanf(line,<sp/></highlight><highlight class="stringliteral">&quot;core<sp/>id<sp/>:<sp/>%d&quot;</highlight><highlight class="normal">,<sp/>&amp;val)<sp/>==<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="121"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>core_id<sp/>=<sp/>val;</highlight></codeline>
+<codeline lineno="122"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">continue</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>fclose(f);</highlight></codeline>
+<codeline lineno="126"><highlight class="normal"></highlight></codeline>
+<codeline lineno="127"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Handle<sp/>file<sp/>without<sp/>trailing<sp/>blank<sp/>line.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1ad94b76f11ab5b09db24682947452e946" kindref="member">CK_ADD_PAIR</ref>(physical_id,<sp/>core_id);</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"></highlight></codeline>
+<codeline lineno="130"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>#undef<sp/>CK_ADD_PAIR</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="131"><highlight class="normal"></highlight></codeline>
+<codeline lineno="132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>physical_cores<sp/>=<sp/>seen_count;</highlight></codeline>
+<codeline lineno="133"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="134"><highlight class="normal"></highlight></codeline>
+<codeline lineno="135"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>If<sp/>we<sp/>couldn&apos;t<sp/>reliably<sp/>detect<sp/>physical<sp/>cores<sp/>(common<sp/>in<sp/>containers),</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="136"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>fall<sp/>back<sp/>to<sp/>logical<sp/>CPUs<sp/>instead<sp/>of<sp/>incorrectly<sp/>forcing<sp/>single-thread<sp/>execution.</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="137"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(physical_cores<sp/>&lt;=<sp/>1<sp/>&amp;&amp;<sp/>logical_cores<sp/>&gt;<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>logical_cores;</highlight></codeline>
+<codeline lineno="139"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"></highlight></codeline>
+<codeline lineno="141"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(physical_cores<sp/>&gt;<sp/>1)<sp/>{</highlight></codeline>
+<codeline lineno="142"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>physical_cores;</highlight></codeline>
+<codeline lineno="143"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="144"><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>logical_cores;</highlight></codeline>
+<codeline lineno="146"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="147"><highlight class="normal"></highlight></codeline>
+<codeline lineno="148" refid="ckernel__engine_8h_1a2b48c2a890de67e5830bc4239e01bd13" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" kindref="member">ck_set_num_threads</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_threads)</highlight></codeline>
+<codeline lineno="149"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="150"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>0<sp/>=<sp/>auto-detect</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="151"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(num_threads<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="152"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Prefer<sp/>explicit<sp/>env<sp/>controls<sp/>when<sp/>present:</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="153"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>-<sp/>CK_NUM_THREADS:<sp/>engine-level<sp/>override</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>-<sp/>OMP_NUM_THREADS:<sp/>standard<sp/>OpenMP<sp/>control<sp/>(set<sp/>by<sp/>`ck<sp/>run<sp/>--threads`)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>env_threads<sp/>=<sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="stringliteral">&quot;CK_NUM_THREADS&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(env_threads<sp/>&lt;=<sp/>0)<sp/>{</highlight></codeline>
+<codeline lineno="157"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>env_threads<sp/>=<sp/><ref refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kindref="member">ck_parse_env_int</ref>(</highlight><highlight class="stringliteral">&quot;OMP_NUM_THREADS&quot;</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="158"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="159"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_threads<sp/>=<sp/>env_threads<sp/>&gt;<sp/>0<sp/>?<sp/>env_threads<sp/>:<sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>();</highlight></codeline>
+<codeline lineno="160"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="161"><highlight class="normal"></highlight></codeline>
+<codeline lineno="162"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref><sp/>=<sp/>num_threads;</highlight></codeline>
+<codeline lineno="163"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref><sp/>=<sp/>1;</highlight></codeline>
+<codeline lineno="164"><highlight class="normal"></highlight></codeline>
+<codeline lineno="165"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>_OPENMP</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="166"><highlight class="normal"><sp/><sp/><sp/><sp/>omp_set_dynamic(0);<sp/><sp/></highlight><highlight class="comment">//<sp/>Disable<sp/>dynamic<sp/>adjustment</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="167"><highlight class="normal"><sp/><sp/><sp/><sp/>omp_set_num_threads(num_threads);</highlight></codeline>
+<codeline lineno="168"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="169"><highlight class="normal"></highlight></codeline>
+<codeline lineno="170"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(USE_MKL)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="171"><highlight class="normal"><sp/><sp/><sp/><sp/>mkl_set_num_threads(num_threads);</highlight></codeline>
+<codeline lineno="172"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="173"><highlight class="normal"></highlight></codeline>
+<codeline lineno="174"><highlight class="normal"><sp/><sp/><sp/><sp/>fprintf(stderr,<sp/></highlight><highlight class="stringliteral">&quot;[CK]<sp/>Set<sp/>%d<sp/>threads<sp/>(auto=%d)\n&quot;</highlight><highlight class="normal">,</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_threads,<sp/><ref refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kindref="member">ck_get_physical_cores</ref>());</highlight></codeline>
+<codeline lineno="176"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="177"><highlight class="normal"></highlight></codeline>
+<codeline lineno="178" refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1aedf852ec498fe7db175f59f810886b9f" kindref="member">ck_get_num_threads</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="179"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="180"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>Auto-initialize<sp/>if<sp/>not<sp/>set</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="181"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!<ref refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kindref="member">g_threads_initialized</ref>)<sp/>{</highlight></codeline>
+<codeline lineno="182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" kindref="member">ck_set_num_threads</ref>(0);<sp/><sp/></highlight><highlight class="comment">//<sp/>Auto-detect</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="183"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="184"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a3bf77bbe5d25ed7435e759b80410546f" kindref="member">g_num_threads</ref>;</highlight></codeline>
+<codeline lineno="185"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="186"><highlight class="normal"></highlight></codeline>
+<codeline lineno="187"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="188"><highlight class="normal"></highlight><highlight class="comment">//<sp/>Thread<sp/>pool<sp/>lifecycle</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="189"><highlight class="normal"></highlight><highlight class="comment">//<sp/>=============================================================================</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="190"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="191"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="192"><highlight class="comment"><sp/>*<sp/>Initialize<sp/>the<sp/>global<sp/>thread<sp/>pool.</highlight></codeline>
+<codeline lineno="193"><highlight class="comment"><sp/>*<sp/>Called<sp/>once<sp/>during<sp/>engine<sp/>startup<sp/>(e.g.,<sp/>from<sp/>ck_model_init).</highlight></codeline>
+<codeline lineno="194"><highlight class="comment"><sp/>*<sp/>Uses<sp/>ck_get_num_threads()<sp/>for<sp/>thread<sp/>count<sp/>(respects<sp/>CK_NUM_THREADS<sp/>env).</highlight></codeline>
+<codeline lineno="195"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="196"><highlight class="comment"><sp/>*<sp/>Safe<sp/>to<sp/>call<sp/>multiple<sp/>times<sp/>—<sp/>subsequent<sp/>calls<sp/>are<sp/>no-ops.</highlight></codeline>
+<codeline lineno="197"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="198" refid="ckernel__strict_8c_1a0cdb2989b11a190fcacfad0dee729bc3" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a0cdb2989b11a190fcacfad0dee729bc3" kindref="member">ck_threadpool_init</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="199"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="200"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>ck_threadpool_global()<sp/>uses<sp/>pthread_once<sp/>internally<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="201"><highlight class="normal"><sp/><sp/><sp/><sp/>ck_threadpool_t<sp/>*pool<sp/>=<sp/><ref refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" kindref="member">ck_threadpool_global</ref>();</highlight></codeline>
+<codeline lineno="202"><highlight class="normal"><sp/><sp/><sp/><sp/>(void)pool;</highlight></codeline>
+<codeline lineno="203"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="204"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="205"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="206"><highlight class="comment"><sp/>*<sp/>Shut<sp/>down<sp/>the<sp/>global<sp/>thread<sp/>pool.</highlight></codeline>
+<codeline lineno="207"><highlight class="comment"><sp/>*<sp/>Called<sp/>during<sp/>engine<sp/>teardown.<sp/>Workers<sp/>are<sp/>joined<sp/>and<sp/>freed.</highlight></codeline>
+<codeline lineno="208"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="209" refid="ckernel__strict_8c_1a0f8bb8ea3b2036ee4fc08582774c0b5e" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ckernel__strict_8c_1a0f8bb8ea3b2036ee4fc08582774c0b5e" kindref="member">ck_threadpool_shutdown</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="210"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="211"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" kindref="member">ck_threadpool_global_destroy</ref>();</highlight></codeline>
+<codeline lineno="212"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="213"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="214"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="215"><highlight class="comment"><sp/>*<sp/>Get<sp/>the<sp/>global<sp/>thread<sp/>pool<sp/>handle<sp/>for<sp/>dispatch.</highlight></codeline>
+<codeline lineno="216"><highlight class="comment"><sp/>*<sp/>Convenience<sp/>wrapper<sp/>—<sp/>initializes<sp/>on<sp/>first<sp/>call.</highlight></codeline>
+<codeline lineno="217"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="218" refid="ckernel__strict_8c_1ac0b7956a32f188dc930dfafd8ca281f3" refkind="member"><highlight class="normal">ck_threadpool_t<sp/>*<ref refid="ckernel__strict_8c_1ac0b7956a32f188dc930dfafd8ca281f3" kindref="member">ck_get_threadpool</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">)</highlight></codeline>
+<codeline lineno="219"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="220"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" kindref="member">ck_threadpool_global</ref>();</highlight></codeline>
+<codeline lineno="221"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/ckernel_strict.c"/>
   </compounddef>

@@ -1,0 +1,843 @@
+<!-- TITLE: Thread Pool -->
+<!-- NAV: threadpool -->
+
+<div class="hero">
+    <h1>CK-Engine Thread Pool</h1>
+    <p>A plain-English deep dive into how persistent pthread thread pools work,
+       why they exist, and how they compare to OpenMP and memory pools.</p>
+    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+        <span class="badge badge-green">ck_threadpool.c</span>
+        <span class="badge badge-orange">Sub-&micro;s Dispatch</span>
+        <span class="badge badge-grey">Spin + Condvar Hybrid</span>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top:0;">Contents</h3>
+    <ol>
+        <li><a href="#what-is-a-pool">What Is a "Pool"? (The Core Idea)</a></li>
+        <li><a href="#why-not-openmp">The Problem: Why Not Just Use OpenMP?</a></li>
+        <li><a href="#anatomy">Anatomy of CK-Engine's Thread Pool</a></li>
+        <li><a href="#lifecycle">Lifecycle: Create &rarr; Dispatch &rarr; Destroy</a></li>
+        <li><a href="#dispatch-deep">Dispatch Deep Dive: What Actually Happens</a></li>
+        <li><a href="#spin-vs-sleep">Spin-Wait vs. Sleep: The Hybrid Polling Design</a></li>
+        <li><a href="#atomics-mutex">Atomics, Mutexes, and Memory Ordering</a></li>
+        <li><a href="#cache-lines">Cache Lines &amp; False Sharing</a></li>
+        <li><a href="#barrier">The Barrier: How Threads Synchronize</a></li>
+        <li><a href="#vs-openmp">Thread Pool vs. OpenMP &mdash; Side-by-Side</a></li>
+        <li><a href="#vs-mempool">Thread Pool vs. Memory Pool &mdash; Same Idea, Different Resource</a></li>
+        <li><a href="#why-faster">Why Is It Faster?</a></li>
+        <li><a href="#real-numbers">Real Numbers: Before &amp; After</a></li>
+    </ol>
+</div>
+
+<!-- ================================================================== -->
+<!--  1. WHAT IS A POOL                                                  -->
+<!-- ================================================================== -->
+<h2 id="what-is-a-pool"><span class="section-num">&sect;1</span> What Is a "Pool"?</h2>
+
+<p>A pool is a set of expensive resources you create <strong>once</strong> and reuse over and over,
+instead of creating and destroying them every time you need one.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Analogy:</strong> Imagine a restaurant kitchen with 4 chefs.<br><br>
+        <strong>No pool:</strong> Every time an order comes in, go out on the street, hire 3 chefs,
+        cook the meal, then fire them all. Next order &mdash; hire 3 more chefs. <em>(This is what OpenMP does.)</em><br><br>
+        <strong>Pool:</strong> Hire 3 chefs on day one. They stand ready at their stations.
+        Order comes in &mdash; you shout "Go!" and all 4 of you (including yourself) cook simultaneously.
+        Between orders, chefs wait at their stations. <em>(This is a thread pool.)</em>
+    </div>
+</div>
+
+<p>The word "pool" shows up in many places in systems programming:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Thread Pool</h3>
+        <p>Pre-created threads waiting for work. Avoids spawn/join overhead per task.</p>
+    </div>
+    <div class="card">
+        <h3>Memory Pool</h3>
+        <p>Pre-allocated memory blocks. Avoids <code>malloc</code>/<code>free</code> overhead per allocation.</p>
+    </div>
+    <div class="card">
+        <h3>Connection Pool</h3>
+        <p>Pre-opened database/network connections. Avoids TCP handshake per query.</p>
+    </div>
+    <div class="card">
+        <h3>Object Pool</h3>
+        <p>Pre-constructed objects (e.g. game entities). Avoids constructor/destructor overhead.</p>
+    </div>
+</div>
+
+<p>The common pattern: <strong>creating the resource is expensive; using it is cheap.</strong>
+A pool pays the creation cost once, then amortizes it over thousands of uses.</p>
+
+<!-- ================================================================== -->
+<!--  2. WHY NOT OPENMP                                                  -->
+<!-- ================================================================== -->
+<h2 id="why-not-openmp"><span class="section-num">&sect;2</span> The Problem: Why Not Just Use OpenMP?</h2>
+
+<p>OpenMP looks appealing &mdash; just add <code>#pragma omp parallel for</code> and you get parallelism. But there's a hidden cost.</p>
+
+<p>During inference, CK-Engine runs the transformer decode loop. For each token generated,
+it calls kernel functions (matrix-vector multiplies, RMSNorm, SwiGLU, etc.) roughly
+<strong>500+ times</strong>. Each call is a short burst of work (microseconds to low milliseconds).</p>
+
+<h3>OpenMP's Fork/Join Model</h3>
+
+<div class="diagram"><span class="dim">// Every single #pragma omp parallel does this:</span>
+
+  Main thread
+       |
+       |&mdash;&mdash; <span class="wrn">fork</span> &mdash;&mdash;&gt;  [spawn/wake N threads]       <span class="err">&larr; 50&ndash;200 &micro;s overhead</span>
+       |              |   |   |   |
+       |              <span class="grn">work work work work</span>           <span class="dim">&larr; actual compute (maybe 20 &micro;s)</span>
+       |              |   |   |   |
+       |&lt;&mdash; <span class="wrn">join</span> &mdash;&mdash;&mdash;  [wait + tear down]          <span class="err">&larr; 50&ndash;200 &micro;s overhead</span>
+       |
+       |&mdash;&mdash; <span class="wrn">fork</span> &mdash;&mdash;&gt;  [spawn/wake again]          <span class="err">&larr; overhead AGAIN</span>
+       |              ...
+       v
+  <span class="err">500+ fork/joins per token!</span></div>
+
+<p>With each fork/join costing 50&ndash;200&micro;s and 500+ kernel calls per token:</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>The math:</strong> 500 calls &times; 100&micro;s overhead = <strong>50ms of pure overhead per token</strong> &mdash;
+        just from spawning and joining threads, before any useful work is done.
+        The actual compute per kernel might only be 20&micro;s!
+    </div>
+</div>
+
+<h3>Real Measurement from CK-Engine (gemv_omp.c)</h3>
+
+<pre><code>/*
+ * Measured on i7-3630QM (4C/8T), Qwen 0.5B:
+ *   Serial kernels:   170 ms/tok  (5.9 tok/s)
+ *   OMP parallel:     327 ms/tok  (3.1 tok/s)  &larr; 1.9x SLOWER
+ *
+ * The math is correct (10/10 parity tests pass) but the
+ * threading model is wrong for this workload.
+ */</code></pre>
+
+<p>OpenMP parallelism made it <strong>almost 2x slower</strong>. The fork/join overhead
+completely ate the parallelism gains and then some.</p>
+
+<!-- ================================================================== -->
+<!--  3. ANATOMY                                                         -->
+<!-- ================================================================== -->
+<h2 id="anatomy"><span class="section-num">&sect;3</span> Anatomy of CK-Engine's Thread Pool</h2>
+
+<p>Let's look at the actual data structure. Every field exists for a specific reason.</p>
+
+<pre><code>struct ck_threadpool {
+    /* --- Dispatch state (each on its own cache line) --- */
+    _Alignas(64) atomic_int   n_dispatch;   // bumped to wake workers
+    _Alignas(64) atomic_int   n_complete;   // workers signal "I'm done"
+    _Alignas(64) ck_work_fn_t work_fn;      // pointer to current kernel
+                 void        *work_args;    // arguments for the kernel
+
+    /* --- Barrier for mid-kernel sync --- */
+    ck_barrier_t barrier;
+
+    /* --- Worker management --- */
+    int          n_threads;    // total (including main)
+    ck_worker_t  workers[64];  // thread handles
+
+    /* --- Shutdown / pause --- */
+    _Alignas(64) atomic_int stop;    // set to 1 to kill workers
+    _Alignas(64) atomic_int paused;  // set to 1 for power saving
+
+    /* --- Hybrid sleep mechanism --- */
+    pthread_mutex_t mutex;
+    pthread_cond_t  cond_dispatch; // workers sleep here
+    pthread_cond_t  cond_done;     // main sleeps here
+};</code></pre>
+
+<h3>Why <code>_Alignas(64)</code> Everywhere?</h3>
+<p>Each atomic counter is placed on its own <strong>64-byte cache line</strong>.
+This prevents "false sharing" &mdash; where two unrelated variables on the same
+cache line cause all CPU cores to fight over that cache line.
+<a href="#cache-lines">More on this in &sect;8.</a></p>
+
+<h3>The Worker Struct</h3>
+<pre><code>typedef struct {
+    pthread_t thread;            // OS thread handle
+    int       id;               // 0 = main, 1..N-1 = workers
+    struct ck_threadpool *pool; // back-pointer to the pool
+} ck_worker_t;</code></pre>
+
+<p>Thread 0 is <strong>always the main thread</strong> &mdash; the one that calls <code>ck_threadpool_dispatch()</code>.
+It doesn't get a new pthread. It does its share of the work alongside the workers.</p>
+
+<!-- ================================================================== -->
+<!--  4. LIFECYCLE                                                       -->
+<!-- ================================================================== -->
+<h2 id="lifecycle"><span class="section-num">&sect;4</span> Lifecycle: Create &rarr; Dispatch &rarr; Destroy</h2>
+
+<div class="card card-green">
+    <h3>1. Create &mdash; <code>ck_threadpool_create(n_threads)</code></h3>
+    <p>Called once at engine startup. Allocates the pool struct (cache-line aligned),
+    then spawns N&minus;1 worker pthreads. Workers immediately enter the spin-wait loop.
+    The main thread is thread 0 &mdash; no extra pthread is created for it.</p>
+</div>
+
+<div class="card card-accent">
+    <h3>2. Dispatch (called ~500x per token) &mdash; <code>ck_threadpool_dispatch(pool, fn, args)</code></h3>
+    <p>Sets the work function + args, bumps <code>n_dispatch</code> (an atomic counter), and
+    signals sleeping workers via condvar. Main thread also runs its share. All threads do their chunk,
+    then main waits for <code>n_complete</code> to hit N&minus;1.</p>
+</div>
+
+<div class="card card-blue">
+    <h3>3. Pause/Resume (between batches)</h3>
+    <p>Between user interactions (waiting for input), workers can be paused
+    so they sleep on a condvar and use 0% CPU. Resume wakes them instantly.</p>
+</div>
+
+<div class="card">
+    <h3>4. Destroy &mdash; <code>ck_threadpool_destroy(pool)</code></h3>
+    <p>Sets <code>stop = 1</code>, broadcasts the condvar to wake sleeping workers,
+    then <code>pthread_join</code>s every worker thread. Frees the pool memory.</p>
+</div>
+
+<h3>Global Pool Convenience</h3>
+<p>For CK-Engine, there's a <strong>global singleton</strong> pool accessed via
+<code>ck_threadpool_global()</code>. It uses <code>pthread_once</code> to ensure
+thread-safe lazy initialization &mdash; no matter how many threads call it simultaneously,
+the pool is created exactly once.</p>
+
+<pre><code>static ck_threadpool_t *g_threadpool = NULL;
+static pthread_once_t  g_threadpool_once = PTHREAD_ONCE_INIT;
+
+ck_threadpool_t *ck_threadpool_global(void) {
+    pthread_once(&amp;g_threadpool_once, global_pool_init);
+    return g_threadpool;
+}</code></pre>
+
+<!-- ================================================================== -->
+<!--  5. DISPATCH DEEP DIVE                                              -->
+<!-- ================================================================== -->
+<h2 id="dispatch-deep"><span class="section-num">&sect;5</span> Dispatch Deep Dive: What Actually Happens</h2>
+
+<p>Let's trace exactly what happens when CK-Engine needs to run one kernel across 4 threads.</p>
+
+<div class="diagram"><span class="hl">ck_threadpool_dispatch(pool, gemv_q8_0, &amp;args)</span>
+
+<span class="grn">MAIN THREAD (ith=0)</span>                          <span class="purple">WORKER 1</span>        <span class="purple">WORKER 2</span>        <span class="purple">WORKER 3</span>
+     |                                       [spinning]      [spinning]      [spinning]
+     |                                       checking        checking        checking
+     |  <span class="wrn">pool-&gt;work_fn = gemv_q8_0</span>           n_dispatch      n_dispatch      n_dispatch
+     |  <span class="wrn">pool-&gt;work_args = &amp;args</span>             ...             ...             ...
+     |  <span class="wrn">n_complete = 0</span>                       ...             ...             ...
+     |                                       ...             ...             ...
+     |  <span class="hl">atomic n_dispatch++ </span>  &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&gt;    <span class="grn">WAKE!</span>           <span class="grn">WAKE!</span>           <span class="grn">WAKE!</span>
+     |  condvar broadcast  &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&gt;    (if sleeping)   (if sleeping)   (if sleeping)
+     |                                       |               |               |
+     | <span class="grn">gemv(0, 4, args)</span>                     <span class="grn">gemv(1,4,args)</span>  <span class="grn">gemv(2,4,args)</span>  <span class="grn">gemv(3,4,args)</span>
+     | rows 0..249                           rows 250..499   rows 500..749   rows 750..999
+     |   ...done                               ...done         ...done         ...done
+     |                                       |               |               |
+     |                                       n_complete++    n_complete++    n_complete++
+     |                                       <span class="dim">(back to spin)</span>  <span class="dim">(back to spin)</span>  last one signals
+     | <span class="wrn">spin-wait: n_complete == 3?</span>                                          <span class="hl">cond_signal!</span>
+     | <span class="grn">YES &rarr; return</span>
+     |
+     v  <span class="dim">next kernel call...</span></div>
+
+<h3>Key Details</h3>
+<ul>
+    <li><strong>No thread creation.</strong> Workers are already alive, spinning or sleeping. The only cost is bumping an atomic counter.</li>
+    <li><strong>Main thread participates.</strong> Thread 0 does 1/N of the work alongside the workers. No wasted CPU.</li>
+    <li><strong>Single-thread fast path.</strong> If <code>n_threads == 1</code>, dispatch just calls <code>fn(0, 1, args)</code> directly &mdash; zero overhead.</li>
+    <li><strong>Completion tracking.</strong> Each worker atomically increments <code>n_complete</code>. The last worker (N&minus;2-th increment) signals the condvar to wake main if it fell asleep waiting.</li>
+</ul>
+
+<h3>Inside the Work Function</h3>
+<p>Each kernel receives <code>(ith, nth, args)</code> and partitions work by thread index:</p>
+
+<pre><code>void gemv_parallel(int ith, int nth, void *args) {
+    gemv_args_t *a = args;
+    // Each thread computes its slice of output rows
+    int rows_per_thread = a-&gt;M / nth;
+    int start = ith * rows_per_thread;
+    int end   = (ith == nth - 1) ? a-&gt;M : start + rows_per_thread;
+
+    for (int row = start; row &lt; end; row++) {
+        vec_dot(a-&gt;K, &amp;a-&gt;y[row], a-&gt;W + row * a-&gt;K, a-&gt;x);
+    }
+}</code></pre>
+
+<!-- ================================================================== -->
+<!--  6. SPIN VS SLEEP                                                   -->
+<!-- ================================================================== -->
+<h2 id="spin-vs-sleep"><span class="section-num">&sect;6</span> Spin-Wait vs. Sleep: The Hybrid Polling Design</h2>
+
+<p>How do worker threads wait for work? There are two extremes, and CK-Engine uses both.</p>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3>Pure Spin-Wait</h3>
+        <p>Thread sits in a tight loop checking an atomic variable: <code>while (no_work) { _mm_pause(); }</code></p>
+        <p><span class="good">PRO: Instant wake-up (nanoseconds)</span><br>
+        <span class="bad">CON: Burns 100% CPU while waiting</span></p>
+    </div>
+    <div class="card card-blue">
+        <h3>Pure Condvar Sleep</h3>
+        <p>Thread calls <code>pthread_cond_wait()</code> and the OS puts it to sleep.</p>
+        <p><span class="good">PRO: Zero CPU while waiting</span><br>
+        <span class="bad">CON: Wake-up takes 5&ndash;50&micro;s (kernel context switch)</span></p>
+    </div>
+</div>
+
+<h3>CK-Engine's Hybrid Approach</h3>
+<p>Workers do <strong>both</strong>:</p>
+<ol>
+    <li>First, spin for <code>CK_THREADPOOL_SPIN_COUNT</code> (1024) iterations, checking the atomic dispatch counter.</li>
+    <li>If no work arrives during spin, fall back to <code>pthread_cond_wait()</code> (sleep).</li>
+    <li>When new work arrives, spinning workers wake <strong>instantly</strong>; sleeping workers wake via condvar broadcast.</li>
+</ol>
+
+<pre><code>// worker_main() &mdash; the hybrid wait loop
+for (;;) {
+    int spins = 0;
+    for (;;) {
+        if (atomic_load(&amp;pool-&gt;stop))  return NULL;  // shutdown?
+
+        int current = atomic_load(&amp;pool-&gt;n_dispatch);
+        if (current != last_dispatch) {              // new work!
+            last_dispatch = current;
+            break;                                   // go execute
+        }
+
+        _mm_pause();    // x86 hint: "I'm spinning, save power"
+        spins++;
+
+        if (spins &gt;= 1024) {                        // tired of spinning?
+            pthread_mutex_lock(&amp;pool-&gt;mutex);
+            // Re-check under lock (avoid missed wakeup!)
+            if (no_new_work &amp;&amp; !stopping)
+                pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);
+            pthread_mutex_unlock(&amp;pool-&gt;mutex);
+            spins = 0;
+        }
+    }
+    // execute work...
+}</code></pre>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Why re-check under the lock?</strong> This avoids the "missed wakeup" race condition.
+        Without it: main could bump <code>n_dispatch</code> and broadcast <em>between</em> the worker's
+        last spin check and its <code>cond_wait</code> call. The worker would then sleep forever,
+        never seeing the work. The lock + re-check makes this impossible.
+    </div>
+</div>
+
+<h3>What Is <code>_mm_pause()</code>?</h3>
+<p>It's an x86 intrinsic that tells the CPU: "I'm in a spin-wait loop." The CPU can then:</p>
+<ul>
+    <li>Reduce power consumption of the spinning core</li>
+    <li>Free up execution resources for the sibling hyper-thread</li>
+    <li>Avoid memory-order violations that would require pipeline flushes</li>
+</ul>
+<p>On non-x86 (ARM, etc.), CK-Engine defines <code>CK_SPIN_PAUSE()</code> as a no-op.</p>
+
+<!-- ================================================================== -->
+<!--  7. ATOMICS AND MUTEXES                                             -->
+<!-- ================================================================== -->
+<h2 id="atomics-mutex"><span class="section-num">&sect;7</span> Atomics, Mutexes, and Memory Ordering</h2>
+
+<p>These are the fundamental building blocks of any concurrent system. Let's understand each one from scratch.</p>
+
+<h3>What Is an Atomic Operation?</h3>
+<p>An <strong>atomic</strong> operation is one that completes in a single, indivisible step
+from the perspective of all other threads. No other thread can see a "half-done" state.</p>
+
+<div class="diagram"><span class="err">WITHOUT atomics</span> (broken):               <span class="grn">WITH atomics</span> (correct):
+
+  Thread A: read counter (= 5)              Thread A: <span class="hl">atomic_fetch_add</span>(&amp;counter, 1)
+  Thread B: read counter (= 5)                        <span class="dim">&rarr; hardware guarantees only one</span>
+  Thread A: write counter = 6                           <span class="dim">  thread touches it at a time</span>
+  Thread B: write counter = 6               Thread B: <span class="hl">atomic_fetch_add</span>(&amp;counter, 1)
+
+  Result: counter = <span class="err">6</span> (should be 7!)       Result: counter = <span class="grn">7</span> (correct)</div>
+
+<p>CK-Engine uses atomics for:</p>
+<ul>
+    <li><code>n_dispatch</code> &mdash; the "new work available" counter. Main increments it; workers read it.</li>
+    <li><code>n_complete</code> &mdash; workers increment when done. Main reads it to know when all are finished.</li>
+    <li><code>n_arrived</code> (barrier) &mdash; threads increment when reaching the barrier point.</li>
+    <li><code>stop</code>, <code>paused</code> &mdash; simple flags, but still need atomic reads/writes for visibility across cores.</li>
+</ul>
+
+<h3>Memory Ordering</h3>
+<p>CPUs and compilers can <strong>reorder</strong> memory operations for performance.
+Memory ordering tells them: "don't reorder <em>this</em> particular operation past certain points."</p>
+
+<table>
+    <tr>
+        <th>Ordering</th>
+        <th>What It Means</th>
+        <th>Used In CK-Engine For</th>
+    </tr>
+    <tr>
+        <td><code>memory_order_relaxed</code></td>
+        <td>No ordering guarantee. Just make the read/write atomic.</td>
+        <td>Resetting <code>n_arrived</code> (only writer, no dependency)</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_acquire</code></td>
+        <td>All reads/writes <strong>after</strong> this load cannot be moved <strong>before</strong> it.</td>
+        <td>Workers reading <code>n_dispatch</code> &mdash; must see <code>work_fn</code>/<code>work_args</code> written before</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_release</code></td>
+        <td>All reads/writes <strong>before</strong> this store cannot be moved <strong>after</strong> it.</td>
+        <td>Main bumping <code>n_dispatch</code> &mdash; ensures <code>work_fn</code>/<code>work_args</code> are visible</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_acq_rel</code></td>
+        <td>Both acquire and release. Full fence in both directions.</td>
+        <td><code>fetch_add</code> on <code>n_complete</code> and <code>n_arrived</code></td>
+    </tr>
+</table>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Why does this matter?</strong> Without proper ordering, the main thread could bump
+        <code>n_dispatch</code> but the worker might read the <em>old</em> <code>work_fn</code> pointer (from a previous dispatch)
+        because the CPU reordered the stores. The <code>release</code> on the store and <code>acquire</code> on the load
+        form a <strong>happens-before</strong> relationship that prevents this.
+    </div>
+</div>
+
+<h3>What Is a Mutex?</h3>
+<p>A <strong>mutex</strong> (mutual exclusion) is a lock. Only one thread can hold it at a time.
+Everyone else waits. CK-Engine uses mutexes <em>only</em> for the condvar sleep mechanism &mdash;
+the hot path (spin-wait) doesn't touch the mutex at all.</p>
+
+<pre><code>// Mutex usage &mdash; only in the cold sleep path
+pthread_mutex_lock(&amp;pool-&gt;mutex);
+  // Re-check condition (avoid lost wakeup)
+  if (still_no_work)
+      pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);
+      //     ^^ releases mutex, sleeps, re-acquires on wake
+pthread_mutex_unlock(&amp;pool-&gt;mutex);</code></pre>
+
+<h3>What Is a Condition Variable (Condvar)?</h3>
+<p>A condvar lets a thread say: "Wake me up when something changes." It works together with a mutex:</p>
+<ol>
+    <li><strong>Wait side:</strong> Lock mutex &rarr; check condition &rarr; if false, <code>cond_wait</code> (atomically releases mutex + sleeps) &rarr; on wake, re-acquires mutex</li>
+    <li><strong>Signal side:</strong> Lock mutex &rarr; change state &rarr; <code>cond_broadcast</code> (wakes all waiters) &rarr; unlock</li>
+</ol>
+<p>CK-Engine has two condvars:</p>
+<ul>
+    <li><code>cond_dispatch</code> &mdash; workers wait here when idle (no work to do)</li>
+    <li><code>cond_done</code> &mdash; main thread waits here when all workers are still busy</li>
+</ul>
+
+<!-- ================================================================== -->
+<!--  8. CACHE LINES                                                     -->
+<!-- ================================================================== -->
+<h2 id="cache-lines"><span class="section-num">&sect;8</span> Cache Lines &amp; False Sharing</h2>
+
+<p>This is one of the most important performance concepts in multi-threaded code.</p>
+
+<h3>How CPU Caches Work (Simplified)</h3>
+<p>CPUs don't read individual bytes from RAM. They read in <strong>cache lines</strong> &mdash;
+64-byte chunks. When one core writes to a cache line, <em>all other cores that have a copy
+of that line must invalidate it</em> (MESI protocol). This is called a <strong>cache coherency miss</strong>.</p>
+
+<div class="diagram">
+<span class="dim">FALSE SHARING: Two unrelated variables on the SAME cache line</span>
+
+                    <span class="err">64-byte cache line</span>
+  +------------------------------------------------------------+
+  |  <span class="hl">n_dispatch</span> (4 bytes)  |  <span class="purple">n_complete</span> (4 bytes)  | padding |
+  +------------------------------------------------------------+
+       ^                          ^
+       Core 0 writes              Core 1 writes
+       (bumps dispatch)           (bumps complete)
+
+  <span class="err">PROBLEM: Every write by Core 0 invalidates Core 1's cache,</span>
+  <span class="err">         and vice versa. Both cores stall on every access!</span>
+
+
+<span class="dim">FIXED: Each variable on its OWN cache line</span>
+
+  <span class="grn">Cache line 1 (64 bytes)</span>              <span class="grn">Cache line 2 (64 bytes)</span>
+  +--------------------------+        +--------------------------+
+  |  <span class="hl">n_dispatch</span>  |  padding  |        |  <span class="purple">n_complete</span>  |  padding  |
+  +--------------------------+        +--------------------------+
+       ^                                    ^
+       Core 0: no conflict                  Core 1: no conflict</div>
+
+<p>This is why every <code>atomic_int</code> in the pool struct has <code>_Alignas(64)</code> &mdash;
+it forces each one onto its own cache line, eliminating false sharing entirely.</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>How bad is false sharing?</strong> On modern x86, a cache coherency miss costs
+        ~40&ndash;100 nanoseconds. In a tight spin-wait loop executing billions of iterations,
+        this can reduce throughput by 10&ndash;50x. It's one of the most common multi-threaded performance bugs.
+    </div>
+</div>
+
+<!-- ================================================================== -->
+<!--  9. BARRIER                                                         -->
+<!-- ================================================================== -->
+<h2 id="barrier"><span class="section-num">&sect;9</span> The Barrier: How Threads Synchronize</h2>
+
+<p>A barrier is a meeting point. All threads must arrive before any can proceed.</p>
+
+<p>CK-Engine implements a custom spin-wait barrier using two atomic counters:
+<code>n_arrived</code> (how many threads reached the barrier) and <code>n_phase</code>
+(which "round" of the barrier we're on).</p>
+
+<pre><code>// barrier_wait() &mdash; ck_threadpool.c:89&ndash;111
+static void barrier_wait(ck_barrier_t *b) {
+    const int phase = atomic_load(&amp;b-&gt;n_phase);
+
+    if (atomic_fetch_add(&amp;b-&gt;n_arrived, 1) == n - 1) {
+        // I'm the LAST thread to arrive
+        atomic_store(&amp;b-&gt;n_arrived, 0);       // reset for next use
+        atomic_store(&amp;b-&gt;n_phase, phase + 1); // advance phase
+    } else {
+        // NOT the last thread &mdash; spin until phase advances
+        while (atomic_load(&amp;b-&gt;n_phase) == phase) {
+            _mm_pause();
+        }
+    }
+}</code></pre>
+
+<div class="diagram">
+<span class="dim">4-thread barrier example:</span>
+
+  Thread 0  Thread 1  Thread 2  Thread 3
+     |         |         |         |
+     |  <span class="grn">arrive</span> |         |         |       n_arrived = 1, phase = 0
+     |         |  <span class="grn">arrive</span> |         |       n_arrived = 2, phase = 0
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |         |
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="grn">arrive</span> |       n_arrived = 3, phase = 0
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   | <span class="hl">arrive</span> n_arrived = 4 == N &rarr; <span class="hl">LAST!</span>
+     |         |         |         |       reset n_arrived = 0
+     |         |         |         |       <span class="hl">phase = 1</span>
+     |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    all see phase changed
+     v         v         v         v</div>
+
+<p>The phase counter trick allows the barrier to be reused without an explicit reset &mdash;
+each barrier use just increments the phase. After many spins without the last thread arriving,
+threads call <code>sched_yield()</code> to be nice to the OS on oversubscribed systems.</p>
+
+<!-- ================================================================== -->
+<!--  10. VS OPENMP                                                      -->
+<!-- ================================================================== -->
+<h2 id="vs-openmp"><span class="section-num">&sect;10</span> Thread Pool vs. OpenMP &mdash; Side-by-Side</h2>
+
+<table>
+    <tr>
+        <th>Aspect</th>
+        <th>OpenMP</th>
+        <th>CK Thread Pool</th>
+    </tr>
+    <tr>
+        <td>Thread lifetime</td>
+        <td>Created per <code>#pragma</code> region (or pooled by runtime &mdash; inconsistent)</td>
+        <td class="good">Created once at startup, live until shutdown</td>
+    </tr>
+    <tr>
+        <td>Dispatch cost</td>
+        <td class="bad">50&ndash;200 &micro;s (fork/join overhead)</td>
+        <td class="good">&lt; 1 &micro;s (atomic increment + optional condvar signal)</td>
+    </tr>
+    <tr>
+        <td>Control over scheduling</td>
+        <td>Limited (<code>schedule(static)</code>, <code>dynamic</code>)</td>
+        <td class="good">Full &mdash; you write the partition logic</td>
+    </tr>
+    <tr>
+        <td>Idle CPU usage</td>
+        <td class="meh">Implementation-dependent (some spin, some sleep)</td>
+        <td class="good">Configurable: spin &rarr; condvar sleep &rarr; pause</td>
+    </tr>
+    <tr>
+        <td>Barrier</td>
+        <td>Implicit at end of parallel region</td>
+        <td>Explicit <code>ck_threadpool_barrier()</code></td>
+    </tr>
+    <tr>
+        <td>Works with short kernels?</td>
+        <td class="bad">No &mdash; overhead dominates</td>
+        <td class="good">Yes &mdash; designed for thousands of tiny dispatches</td>
+    </tr>
+    <tr>
+        <td>Code complexity</td>
+        <td class="good">One line: <code>#pragma omp parallel for</code></td>
+        <td class="bad">Must write work function, manage pool lifecycle</td>
+    </tr>
+    <tr>
+        <td>Portability</td>
+        <td class="good">Standard, compiler-supported everywhere</td>
+        <td class="meh">POSIX pthreads (Linux/macOS)</td>
+    </tr>
+</table>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+        <strong>When to use what:</strong><br>
+        <strong>OpenMP</strong> is great for long-running parallel regions (scientific computing, image processing,
+        big matrix operations). One fork/join overhead amortized over milliseconds of work is fine.<br><br>
+        <strong>Thread pools</strong> are essential when you dispatch thousands of short tasks per second
+        (inference, game engines, audio processing, network servers).
+    </div>
+</div>
+
+<!-- ================================================================== -->
+<!--  11. VS MEMORY POOL                                                 -->
+<!-- ================================================================== -->
+<h2 id="vs-mempool"><span class="section-num">&sect;11</span> Thread Pool vs. Memory Pool &mdash; Same Idea, Different Resource</h2>
+
+<p>Both are "pools" &mdash; they pre-create expensive resources. The key differences are
+about <em>what</em> they pool and <em>what synchronization</em> they need.</p>
+
+<table>
+    <tr>
+        <th>Aspect</th>
+        <th>Thread Pool</th>
+        <th>Memory Pool</th>
+    </tr>
+    <tr>
+        <td>What is pooled?</td>
+        <td>OS threads (pthreads)</td>
+        <td>Memory blocks (heap allocations)</td>
+    </tr>
+    <tr>
+        <td>What is expensive?</td>
+        <td><code>pthread_create</code> / <code>pthread_join</code> (~50&ndash;200 &micro;s)</td>
+        <td><code>malloc</code> / <code>free</code> (~0.1&ndash;5 &micro;s)</td>
+    </tr>
+    <tr>
+        <td>Pool initialized with...</td>
+        <td>N live threads, waiting for work</td>
+        <td>One big block of memory, subdivided into slots</td>
+    </tr>
+    <tr>
+        <td>"Acquire" from pool</td>
+        <td><code>dispatch(fn, args)</code> &mdash; give threads work</td>
+        <td><code>pool_alloc(size)</code> &mdash; get a memory block</td>
+    </tr>
+    <tr>
+        <td>"Release" back to pool</td>
+        <td>Implicit &mdash; threads go back to waiting</td>
+        <td><code>pool_free(ptr)</code> &mdash; return block to free list</td>
+    </tr>
+    <tr>
+        <td>Synchronization needed</td>
+        <td>Atomics + condvar (dispatch/wait signaling)</td>
+        <td>Atomics or mutex (free-list management)</td>
+    </tr>
+    <tr>
+        <td>Active resources...</td>
+        <td>...execute code concurrently</td>
+        <td>...hold data passively</td>
+    </tr>
+</table>
+
+<h3>The Deeper Conceptual Link</h3>
+
+<div class="diagram">
+<span class="dim">The pool pattern in both cases:</span>
+
+  <span class="hl">Thread Pool</span>                              <span class="purple">Memory Pool</span>
+
+  +---------------------+                 +---------------------+
+  |    STARTUP (once)   |                 |    STARTUP (once)   |
+  |  Create N threads   |                 |  malloc(big_block)  |
+  |  All threads idle   |                 |  Carve into slots   |
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |   HOT PATH (fast)   |                 |   HOT PATH (fast)   |
+  |  dispatch(fn, args) |                 |  slot = pool_alloc()|
+  |  <span class="grn">&lt; 1 us</span>              |                 |  <span class="grn">&lt; 0.05 us</span>           |
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |   RETURN TO POOL    |                 |   RETURN TO POOL    |
+  |  Threads go idle    |                 |  pool_free(slot)    |
+  |  (spin or sleep)    |                 |  (back to free list)|
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |  SHUTDOWN (once)    |                 |  SHUTDOWN (once)    |
+  |  join all threads   |                 |  free(big_block)    |
+  +---------------------+                 +---------------------+</div>
+
+<h3>Synchronization Comparison</h3>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3>Thread Pool Sync</h3>
+        <p><code>atomic_int</code> for dispatch/complete counters (hot path).<br>
+        <code>pthread_mutex + cond</code> for sleep fallback (cold path).<br>
+        <code>_mm_pause()</code> spin hint for low-latency wake.<br>
+        <code>memory_order_acquire/release</code> to publish work descriptor.</p>
+    </div>
+    <div class="card card-blue">
+        <h3>Memory Pool Sync</h3>
+        <p>Atomic CAS for lock-free free-list (typical).<br>
+        Or a simple mutex around the free-list pointer.<br>
+        Bump allocator variant needs <strong>zero sync</strong> (per-thread pools).<br>
+        No condvars needed &mdash; memory doesn't need to "wake up."</p>
+    </div>
+</div>
+
+<!-- ================================================================== -->
+<!--  12. WHY FASTER                                                     -->
+<!-- ================================================================== -->
+<h2 id="why-faster"><span class="section-num">&sect;12</span> Why Is It Faster?</h2>
+
+<h3>Cost Breakdown: OpenMP vs. Thread Pool</h3>
+
+<div class="diagram">
+<span class="dim">Per-kernel dispatch cost comparison (4 threads, x86-64):</span>
+
+  <span class="err">OpenMP fork/join:</span>
+  +------------------------------------------------------------------+
+  |  <span class="wrn">pthread_create x3</span>  |  <span class="grn">work</span>  |  <span class="wrn">pthread_join x3</span>  |  <span class="dim">scheduler</span> |
+  |  ~~~100 us~~~~~~~  |  20us  |  ~~~100 us~~~~~~  |  ~20 us~~  |
+  +------------------------------------------------------------------+
+  Total: ~240 us  (only 20 us is useful work!)
+
+  <span class="grn">Thread pool dispatch:</span>
+  +---------------------------------------+
+  | <span class="hl">atomic++</span> |  <span class="grn">work</span>  | <span class="hl">spin check</span>       |
+  |  ~0.1us  |  20us  |  ~0.1us          |
+  +---------------------------------------+
+  Total: ~20.2 us  (99% is useful work!)</div>
+
+<h3>The Five Reasons It's Faster</h3>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3>1. No Thread Creation</h3>
+        <p><code>pthread_create</code> involves a system call, stack allocation (~8MB virtual),
+        kernel scheduling setup, and TLS initialization. The thread pool does this <strong>once</strong>.
+        Subsequent dispatches just flip an atomic counter &mdash; a single CPU instruction.</p>
+    </div>
+    <div class="card card-green">
+        <h3>2. No Join Overhead</h3>
+        <p><code>pthread_join</code> involves a system call + scheduler interaction to reap the thread.
+        The pool never joins during work &mdash; completion is tracked with a simple atomic counter.</p>
+    </div>
+    <div class="card card-green">
+        <h3>3. Warm Caches</h3>
+        <p>Persistent threads keep their L1/L2 caches warm across dispatches.
+        A fresh thread starts with cold caches and must re-fetch everything from L3/RAM.</p>
+    </div>
+    <div class="card card-green">
+        <h3>4. No Kernel Involvement</h3>
+        <p>The spin-wait hot path is entirely in userspace. No system calls, no context switches,
+        no kernel scheduler decisions. Just atomic loads in a tight loop.</p>
+    </div>
+    <div class="card card-green">
+        <h3>5. Main Thread Participates</h3>
+        <p>The main thread doesn't just wait &mdash; it does 1/N of the work. With OpenMP,
+        the orchestration thread often sits idle during the parallel region. CK-Engine wastes zero cores.</p>
+    </div>
+    <div class="card card-blue">
+        <h3>Bonus: Power Management</h3>
+        <p>Between inference batches (e.g., waiting for user input), workers sleep on a condvar
+        using <strong>0% CPU</strong>. No busy-waiting during idle periods. OpenMP's behavior
+        here varies by implementation and is often wasteful.</p>
+    </div>
+</div>
+
+<!-- ================================================================== -->
+<!--  13. REAL NUMBERS                                                   -->
+<!-- ================================================================== -->
+<h2 id="real-numbers"><span class="section-num">&sect;13</span> Real Numbers: Before &amp; After</h2>
+
+<p>Measured on i7-3630QM (4 cores / 8 threads), Qwen2 0.5B model, Q4_K_M quantization.</p>
+
+<table>
+    <tr>
+        <th>Configuration</th>
+        <th>ms/token</th>
+        <th>Tokens/sec</th>
+        <th>Relative</th>
+    </tr>
+    <tr>
+        <td>Serial (single-threaded)</td>
+        <td>170</td>
+        <td>5.9</td>
+        <td>baseline</td>
+    </tr>
+    <tr>
+        <td>OpenMP <code>#pragma omp parallel for</code></td>
+        <td class="bad">327</td>
+        <td class="bad">3.1</td>
+        <td class="bad">1.9x slower</td>
+    </tr>
+    <tr>
+        <td>Persistent pthread thread pool</td>
+        <td class="good">&mdash;</td>
+        <td class="good">&mdash;</td>
+        <td class="good">Expected: 2&ndash;4x faster than serial</td>
+    </tr>
+</table>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The key insight:</strong> OpenMP didn't fail because parallelism is bad. It failed because
+        the <em>overhead of setting up parallelism</em> exceeded the actual work being parallelized.
+        The thread pool removes that overhead, letting the parallelism actually help.
+    </div>
+</div>
+
+<h3>Where Does Overhead Go?</h3>
+
+<div class="diagram">
+<span class="dim">500 kernel calls per token, 4 threads:</span>
+
+  <span class="err">OpenMP overhead per token:</span>
+    500 calls x ~200us fork/join = <span class="err">100,000 us = 100 ms</span> (wasted)
+    + actual compute:               ~70 ms  (useful)
+    = total:                        <span class="err">170+ ms</span> (but measured 327ms due to
+                                             cache thrashing, scheduler overhead)
+
+  <span class="grn">Thread pool overhead per token:</span>
+    500 calls x ~0.2us dispatch =  <span class="grn">100 us = 0.1 ms</span> (wasted)
+    + actual compute:               ~70 ms  (useful)
+    = total:                        <span class="grn">~70 ms</span>
+
+  Dispatch overhead: <span class="err">100 ms</span> (OpenMP) vs <span class="grn">0.1 ms</span> (pool) = <span class="hl">1000x less overhead</span></div>

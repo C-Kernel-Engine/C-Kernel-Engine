@@ -1,0 +1,600 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="ck__threadpool_8h" kind="file" language="C++">
+    <compoundname>ck_threadpool.h</compoundname>
+    <includes local="no">stdint.h</includes>
+    <includes local="no">stdatomic.h</includes>
+    <includes local="no">pthread.h</includes>
+    <includedby refid="ck__threadpool_8c" local="yes">ck_threadpool.c</includedby>
+    <includedby refid="ckernel__strict_8c" local="yes">ckernel_strict.c</includedby>
+    <incdepgraph>
+      <node id="3">
+        <label>stdatomic.h</label>
+      </node>
+      <node id="1">
+        <label>ck_threadpool.h</label>
+        <link refid="ck__threadpool_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stdint.h</label>
+      </node>
+      <node id="4">
+        <label>pthread.h</label>
+      </node>
+    </incdepgraph>
+    <invincdepgraph>
+      <node id="1">
+        <label>ck_threadpool.h</label>
+        <link refid="ck__threadpool_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>ckernel_strict.c</label>
+        <link refid="ckernel__strict_8c"/>
+      </node>
+      <node id="2">
+        <label>ck_threadpool.c</label>
+        <link refid="ck__threadpool_8c"/>
+      </node>
+    </invincdepgraph>
+      <sectiondef kind="define">
+      <memberdef kind="define" id="ck__threadpool_8h_1a452e44b0d33892f36e77c590eba38daf" prot="public" static="no">
+        <name>CK_CACHE_LINE</name>
+        <initializer>64</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Cache line size for alignment (x86-64) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="54" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" bodystart="54" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ck__threadpool_8h_1a38f1782864a6bd5318d8cc54d00be0e5" prot="public" static="no">
+        <name>CK_THREADPOOL_MAX_THREADS</name>
+        <initializer>64</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum threads supported (main + workers) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="48" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" bodystart="48" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="define" id="ck__threadpool_8h_1a4644600fdce88046ccbdf5089793819a" prot="public" static="no">
+        <name>CK_THREADPOOL_SPIN_COUNT</name>
+        <initializer>1024</initializer>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Number of spin iterations before falling back to condvar wait </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="51" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" bodystart="51" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="typedef">
+      <memberdef kind="typedef" id="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" prot="public" static="no">
+        <type>void(*</type>
+        <definition>typedef void(* ck_work_fn_t) (int ith, int nth, void *args)</definition>
+        <argsstring>)(int ith, int nth, void *args)</argsstring>
+        <name>ck_work_fn_t</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Work function signature. Called on ALL threads (including main thread 0).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>ith</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Thread index (0 = main thread) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>nth</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Total number of threads </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>args</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Opaque argument pointer (set via dispatch) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="68" column="9" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" bodystart="68" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="ck__threadpool_8h_1a6c8e0af8fa97116468ed08769a0a5ea6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_barrier</definition>
+        <argsstring>(ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_barrier</name>
+        <param>
+          <type>ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Barrier synchronization within a dispatched work function.</para>
+<para>ALL threads must call this at the same point. Threads spin-wait until all have arrived, then proceed.</para>
+<para>Must only be called from within a work function (during dispatch).</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Thread pool </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="128" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="320" bodyend="324" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="128" declcolumn="6"/>
+        <references refid="ck__threadpool_8c_1a1dcf1b7c2fd4bc9276f0aa642333db2a" compoundref="ck__threadpool_8c" startline="89" endline="111">barrier_wait</references>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1a5cf6b941c6e0f27bb568cfc67ca0ddff" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>ck_threadpool_t *</type>
+        <definition>ck_threadpool_t* ck_threadpool_create</definition>
+        <argsstring>(int n_threads)</argsstring>
+        <name>ck_threadpool_create</name>
+        <param>
+          <type>int</type>
+          <declname>n_threads</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Create a thread pool with <computeroutput>n_threads</computeroutput> total threads. Thread 0 is the calling (main) thread; n_threads-1 workers are spawned.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>n_threads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Total thread count (including main). Must be &gt;= 1. Pass 0 for auto-detect (physical cores). </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<simplesect kind="return"><para>Pool handle, or NULL on failure. </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="90" column="17" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="183" bodyend="241" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="90" declcolumn="17"/>
+        <references refid="ck__threadpool_8c_1a19111881b2bff4a1ddd3bfb5f8074686" compoundref="ck__threadpool_8c" startline="78" endline="83">barrier_init</references>
+        <references refid="ck__threadpool_8h_1a452e44b0d33892f36e77c590eba38daf" compoundref="ck__threadpool_8h" startline="54">CK_CACHE_LINE</references>
+        <references refid="ck__threadpool_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" compoundref="ckernel__strict_8c" startline="62" endline="146">ck_get_physical_cores</references>
+        <references refid="ck__threadpool_8h_1a38f1782864a6bd5318d8cc54d00be0e5" compoundref="ck__threadpool_8h" startline="48">CK_THREADPOOL_MAX_THREADS</references>
+        <references refid="ck__threadpool_8c_1a65ba0b7b023b2064be03f050ff7601e6" compoundref="ck__threadpool_8c" startline="117" endline="175">worker_main</references>
+        <referencedby refid="ck__threadpool_8c_1a5787f410f04801389446b1cf43c79e15" compoundref="ck__threadpool_8c" startline="377" endline="381">global_pool_init</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1a6026581009cf6a835026bba70ce9bcd4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_destroy</definition>
+        <argsstring>(ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_destroy</name>
+        <param>
+          <type>ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Destroy the thread pool. Signals all workers to exit and joins them. Safe to call with NULL. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="96" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="243" bodyend="265" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="96" declcolumn="6"/>
+        <referencedby refid="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" compoundref="ck__threadpool_8c" startline="389" endline="397">ck_threadpool_global_destroy</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1abf4adc5451a56f39e5630dc42c07e330" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_dispatch</definition>
+        <argsstring>(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)</argsstring>
+        <name>ck_threadpool_dispatch</name>
+        <param>
+          <type>ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <param>
+          <type><ref refid="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" kindref="member">ck_work_fn_t</ref></type>
+          <declname>fn</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>args</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Dispatch work to all threads and wait for completion.</para>
+<para><orderedlist>
+<listitem><para>Sets the work function and args</para>
+</listitem><listitem><para>Bumps the dispatch counter (wakes workers)</para>
+</listitem><listitem><para>Main thread (ith=0) executes its share</para>
+</listitem><listitem><para>Waits for all threads to complete via barrier</para>
+</listitem></orderedlist>
+</para>
+<para>This is a blocking call — returns when ALL threads have finished.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>pool</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Thread pool </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>fn</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Work function (called on each thread) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>args</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Argument passed to fn </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="116" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="271" bodyend="318" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="116" declcolumn="6"/>
+        <references refid="ck__threadpool_8c_1a19111881b2bff4a1ddd3bfb5f8074686" compoundref="ck__threadpool_8c" startline="78" endline="83">barrier_init</references>
+        <references refid="ck__threadpool_8c_1ae0445e61c7b90259729ee63b95ee3257" compoundref="ck__threadpool_8c" startline="27">CK_SPIN_PAUSE</references>
+        <references refid="ck__threadpool_8h_1a4644600fdce88046ccbdf5089793819a" compoundref="ck__threadpool_8h" startline="51">CK_THREADPOOL_SPIN_COUNT</references>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>ck_threadpool_t *</type>
+        <definition>ck_threadpool_t* ck_threadpool_global</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_threadpool_global</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get or create the global thread pool. Thread-safe (uses pthread_once internally). Uses <ref refid="ckernel__engine_8h_1aedf852ec498fe7db175f59f810886b9f" kindref="member">ck_get_num_threads()</ref> for auto-detection.</para>
+<para><simplesect kind="return"><para>Global pool, never NULL after successful first call. </para>
+</simplesect>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="168" column="17" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="383" bodyend="387" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="168" declcolumn="17"/>
+        <references refid="ck__threadpool_8c_1a8d24c2ed3aa5c438f5d2e8c7782f32b5" compoundref="ck__threadpool_8c" startline="372">g_threadpool</references>
+        <references refid="ck__threadpool_8c_1a3dcd3040ab40fc1c79a7ea042b87b24f" compoundref="ck__threadpool_8c" startline="373">g_threadpool_once</references>
+        <references refid="ck__threadpool_8c_1a5787f410f04801389446b1cf43c79e15" compoundref="ck__threadpool_8c" startline="377" endline="381">global_pool_init</references>
+        <referencedby refid="ckernel__strict_8c_1ac0b7956a32f188dc930dfafd8ca281f3" compoundref="ckernel__strict_8c" startline="218" endline="221">ck_get_threadpool</referencedby>
+        <referencedby refid="ckernel__strict_8c_1a0cdb2989b11a190fcacfad0dee729bc3" compoundref="ckernel__strict_8c" startline="198" endline="203">ck_threadpool_init</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_global_destroy</definition>
+        <argsstring>(void)</argsstring>
+        <name>ck_threadpool_global_destroy</name>
+        <param>
+          <type>void</type>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Destroy the global thread pool. Called during engine shutdown. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="174" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="389" bodyend="397" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="174" declcolumn="6"/>
+        <references refid="ck__threadpool_8c_1a6026581009cf6a835026bba70ce9bcd4" compoundref="ck__threadpool_8c" startline="243" endline="265">ck_threadpool_destroy</references>
+        <references refid="ck__threadpool_8c_1a8d24c2ed3aa5c438f5d2e8c7782f32b5" compoundref="ck__threadpool_8c" startline="372">g_threadpool</references>
+        <references refid="ck__threadpool_8c_1a3dcd3040ab40fc1c79a7ea042b87b24f" compoundref="ck__threadpool_8c" startline="373">g_threadpool_once</references>
+        <referencedby refid="ckernel__strict_8c_1a0f8bb8ea3b2036ee4fc08582774c0b5e" compoundref="ckernel__strict_8c" startline="209" endline="212">ck_threadpool_shutdown</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1aef9103ab0a271feb7fdc74c915a78d10" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_threadpool_n_threads</definition>
+        <argsstring>(const ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_n_threads</name>
+        <param>
+          <type>const ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get total thread count (including main thread) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="152" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="351" bodyend="354" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="152" declcolumn="5"/>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1a001490b08bc5ba893488e49d4b10d3bf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_pause</definition>
+        <argsstring>(ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_pause</name>
+        <param>
+          <type>ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Pause workers — they sleep on condvar (0% CPU). Call between batches or during interactive waiting. Workers wake on next dispatch or resume. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="139" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="330" bodyend="334" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="139" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1a2c5c8ea3eb8087186ea7e8be2617c4f4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ck_threadpool_resume</definition>
+        <argsstring>(ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_resume</name>
+        <param>
+          <type>ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Resume workers — transition from sleep to spin-wait. Call before starting a new batch of work. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="145" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="336" bodyend="345" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="145" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="ck__threadpool_8h_1ada9a2b22c2eb79fe8834b026a3c7d8b4" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>int</type>
+        <definition>int ck_threadpool_thread_id</definition>
+        <argsstring>(const ck_threadpool_t *pool)</argsstring>
+        <name>ck_threadpool_thread_id</name>
+        <param>
+          <type>const ck_threadpool_t *</type>
+          <declname>pool</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Get thread index for current thread (0 = main, -1 if not in pool) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" line="155" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/ck_threadpool.c" bodystart="356" bodyend="366" declfile="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h" declline="155" declcolumn="5"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Persistent pthread thread pool for CK-Engine inference. </para>
+    </briefdescription>
+    <detaileddescription>
+<para>Design goals:<itemizedlist>
+<listitem><para>Sub-microsecond dispatch latency (spin-wait barriers)</para>
+</listitem><listitem><para>Zero allocation after init (all memory pre-allocated)</para>
+</listitem><listitem><para>Cache-line aligned atomics to avoid false sharing</para>
+</listitem><listitem><para>Hybrid polling: spin N rounds, then fall back to condvar</para>
+</listitem><listitem><para>Thread 0 = main thread (does serial ops + its share of parallel work)</para>
+</listitem></itemizedlist>
+</para>
+<para>Usage: ck_threadpool_t *pool = ck_threadpool_create(4); // 4 threads total</para>
+<para>// In decode loop: ck_threadpool_dispatch(pool, my_work_fn, args); // my_work_fn called on all threads with (ith, nth, args)</para>
+<para>// Between batches: ck_threadpool_pause(pool); // workers sleep (0% CPU) ck_threadpool_resume(pool); // wake workers</para>
+<para>ck_threadpool_destroy(pool);</para>
+<para>Architecture: STARTUP: Main creates N-1 worker pthreads, all spin on atomic counter DISPATCH: Main writes work desc, bumps counter, all threads execute BARRIER: Atomic counter + spin-wait with _mm_pause() PAUSE: Workers sleep on pthread_cond_t (0% CPU between batches) </para>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>ck_threadpool.h</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Persistent<sp/>pthread<sp/>thread<sp/>pool<sp/>for<sp/>CK-Engine<sp/>inference</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>Design<sp/>goals:</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>-<sp/>Sub-microsecond<sp/>dispatch<sp/>latency<sp/>(spin-wait<sp/>barriers)</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>-<sp/>Zero<sp/>allocation<sp/>after<sp/>init<sp/>(all<sp/>memory<sp/>pre-allocated)</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>-<sp/>Cache-line<sp/>aligned<sp/>atomics<sp/>to<sp/>avoid<sp/>false<sp/>sharing</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>-<sp/>Hybrid<sp/>polling:<sp/>spin<sp/>N<sp/>rounds,<sp/>then<sp/>fall<sp/>back<sp/>to<sp/>condvar</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>-<sp/>Thread<sp/>0<sp/>=<sp/>main<sp/>thread<sp/>(does<sp/>serial<sp/>ops<sp/>+<sp/>its<sp/>share<sp/>of<sp/>parallel<sp/>work)</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>Usage:</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_threadpool_t<sp/>*pool<sp/>=<sp/>ck_threadpool_create(4);<sp/><sp/>//<sp/>4<sp/>threads<sp/>total</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>In<sp/>decode<sp/>loop:</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_threadpool_dispatch(pool,<sp/>my_work_fn,<sp/>args);</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>my_work_fn<sp/>called<sp/>on<sp/>all<sp/>threads<sp/>with<sp/>(ith,<sp/>nth,<sp/>args)</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*<sp/><sp/><sp/>//<sp/>Between<sp/>batches:</highlight></codeline>
+<codeline lineno="20"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_threadpool_pause(pool);<sp/><sp/><sp/>//<sp/>workers<sp/>sleep<sp/>(0%<sp/>CPU)</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_threadpool_resume(pool);<sp/><sp/>//<sp/>wake<sp/>workers</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="23"><highlight class="comment"><sp/>*<sp/><sp/><sp/>ck_threadpool_destroy(pool);</highlight></codeline>
+<codeline lineno="24"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/>Architecture:</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/><sp/><sp/>STARTUP:<sp/><sp/>Main<sp/>creates<sp/>N-1<sp/>worker<sp/>pthreads,<sp/>all<sp/>spin<sp/>on<sp/>atomic<sp/>counter</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/><sp/><sp/>DISPATCH:<sp/>Main<sp/>writes<sp/>work<sp/>desc,<sp/>bumps<sp/>counter,<sp/>all<sp/>threads<sp/>execute</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*<sp/><sp/><sp/>BARRIER:<sp/><sp/>Atomic<sp/>counter<sp/>+<sp/>spin-wait<sp/>with<sp/>_mm_pause()</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*<sp/><sp/><sp/>PAUSE:<sp/><sp/><sp/><sp/>Workers<sp/>sleep<sp/>on<sp/>pthread_cond_t<sp/>(0%<sp/>CPU<sp/>between<sp/>batches)</highlight></codeline>
+<codeline lineno="30"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="31"><highlight class="normal"></highlight></codeline>
+<codeline lineno="32"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>CK_THREADPOOL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_THREADPOOL_H</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdatomic.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;pthread.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight></codeline>
+<codeline lineno="43"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="44"><highlight class="comment"><sp/>*<sp/>Configuration</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="46"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="47"><highlight class="comment">/**<sp/>Maximum<sp/>threads<sp/>supported<sp/>(main<sp/>+<sp/>workers)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="48" refid="ck__threadpool_8h_1a38f1782864a6bd5318d8cc54d00be0e5" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_THREADPOOL_MAX_THREADS<sp/>64</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="49"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="50"><highlight class="comment">/**<sp/>Number<sp/>of<sp/>spin<sp/>iterations<sp/>before<sp/>falling<sp/>back<sp/>to<sp/>condvar<sp/>wait<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="51" refid="ck__threadpool_8h_1a4644600fdce88046ccbdf5089793819a" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_THREADPOOL_SPIN_COUNT<sp/>1024</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="52"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="53"><highlight class="comment">/**<sp/>Cache<sp/>line<sp/>size<sp/>for<sp/>alignment<sp/>(x86-64)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="54" refid="ck__threadpool_8h_1a452e44b0d33892f36e77c590eba38daf" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>CK_CACHE_LINE<sp/>64</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="55"><highlight class="normal"></highlight></codeline>
+<codeline lineno="56"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="57"><highlight class="comment"><sp/>*<sp/>Types</highlight></codeline>
+<codeline lineno="58"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="60"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="61"><highlight class="comment"><sp/>*<sp/>Work<sp/>function<sp/>signature.</highlight></codeline>
+<codeline lineno="62"><highlight class="comment"><sp/>*<sp/>Called<sp/>on<sp/>ALL<sp/>threads<sp/>(including<sp/>main<sp/>thread<sp/>0).</highlight></codeline>
+<codeline lineno="63"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="64"><highlight class="comment"><sp/>*<sp/>@param<sp/>ith<sp/><sp/><sp/>Thread<sp/>index<sp/>(0<sp/>=<sp/>main<sp/>thread)</highlight></codeline>
+<codeline lineno="65"><highlight class="comment"><sp/>*<sp/>@param<sp/>nth<sp/><sp/><sp/>Total<sp/>number<sp/>of<sp/>threads</highlight></codeline>
+<codeline lineno="66"><highlight class="comment"><sp/>*<sp/>@param<sp/>args<sp/><sp/>Opaque<sp/>argument<sp/>pointer<sp/>(set<sp/>via<sp/>dispatch)</highlight></codeline>
+<codeline lineno="67"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="68" refid="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/>void<sp/>(*<ref refid="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" kindref="member">ck_work_fn_t</ref>)(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ith,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nth,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*args);</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="70"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*<sp/>Thread<sp/>pool<sp/>state<sp/>(opaque).</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="73"><highlight class="comment"><sp/>*<sp/>All<sp/>atomics<sp/>are<sp/>cache-line<sp/>aligned<sp/>to<sp/>prevent<sp/>false<sp/>sharing.</highlight></codeline>
+<codeline lineno="74"><highlight class="comment"><sp/>*<sp/>Workers<sp/>spin<sp/>on<sp/>n_dispatch,<sp/>checking<sp/>for<sp/>new<sp/>work<sp/>or<sp/>shutdown.</highlight></codeline>
+<codeline lineno="75"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="76"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal">ck_threadpool<sp/>ck_threadpool_t;</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight></codeline>
+<codeline lineno="78"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="79"><highlight class="comment"><sp/>*<sp/>Lifecycle</highlight></codeline>
+<codeline lineno="80"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="82"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="83"><highlight class="comment"><sp/>*<sp/>Create<sp/>a<sp/>thread<sp/>pool<sp/>with<sp/>`n_threads`<sp/>total<sp/>threads.</highlight></codeline>
+<codeline lineno="84"><highlight class="comment"><sp/>*<sp/>Thread<sp/>0<sp/>is<sp/>the<sp/>calling<sp/>(main)<sp/>thread;<sp/>n_threads-1<sp/>workers<sp/>are<sp/>spawned.</highlight></codeline>
+<codeline lineno="85"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="86"><highlight class="comment"><sp/>*<sp/>@param<sp/>n_threads<sp/><sp/>Total<sp/>thread<sp/>count<sp/>(including<sp/>main).<sp/>Must<sp/>be<sp/>&gt;=<sp/>1.</highlight></codeline>
+<codeline lineno="87"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Pass<sp/>0<sp/>for<sp/>auto-detect<sp/>(physical<sp/>cores).</highlight></codeline>
+<codeline lineno="88"><highlight class="comment"><sp/>*<sp/>@return<sp/>Pool<sp/>handle,<sp/>or<sp/>NULL<sp/>on<sp/>failure.</highlight></codeline>
+<codeline lineno="89"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="90"><highlight class="normal">ck_threadpool_t<sp/>*<ref refid="ck__threadpool_8h_1a5cf6b941c6e0f27bb568cfc67ca0ddff" kindref="member">ck_threadpool_create</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n_threads);</highlight></codeline>
+<codeline lineno="91"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="92"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="93"><highlight class="comment"><sp/>*<sp/>Destroy<sp/>the<sp/>thread<sp/>pool.<sp/>Signals<sp/>all<sp/>workers<sp/>to<sp/>exit<sp/>and<sp/>joins<sp/>them.</highlight></codeline>
+<codeline lineno="94"><highlight class="comment"><sp/>*<sp/>Safe<sp/>to<sp/>call<sp/>with<sp/>NULL.</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="96"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1a6026581009cf6a835026bba70ce9bcd4" kindref="member">ck_threadpool_destroy</ref>(ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"></highlight></codeline>
+<codeline lineno="98"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="99"><highlight class="comment"><sp/>*<sp/>Dispatch<sp/>&amp;<sp/>Synchronization</highlight></codeline>
+<codeline lineno="100"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="102"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="103"><highlight class="comment"><sp/>*<sp/>Dispatch<sp/>work<sp/>to<sp/>all<sp/>threads<sp/>and<sp/>wait<sp/>for<sp/>completion.</highlight></codeline>
+<codeline lineno="104"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="105"><highlight class="comment"><sp/>*<sp/>1.<sp/>Sets<sp/>the<sp/>work<sp/>function<sp/>and<sp/>args</highlight></codeline>
+<codeline lineno="106"><highlight class="comment"><sp/>*<sp/>2.<sp/>Bumps<sp/>the<sp/>dispatch<sp/>counter<sp/>(wakes<sp/>workers)</highlight></codeline>
+<codeline lineno="107"><highlight class="comment"><sp/>*<sp/>3.<sp/>Main<sp/>thread<sp/>(ith=0)<sp/>executes<sp/>its<sp/>share</highlight></codeline>
+<codeline lineno="108"><highlight class="comment"><sp/>*<sp/>4.<sp/>Waits<sp/>for<sp/>all<sp/>threads<sp/>to<sp/>complete<sp/>via<sp/>barrier</highlight></codeline>
+<codeline lineno="109"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="110"><highlight class="comment"><sp/>*<sp/>This<sp/>is<sp/>a<sp/>blocking<sp/>call<sp/>—<sp/>returns<sp/>when<sp/>ALL<sp/>threads<sp/>have<sp/>finished.</highlight></codeline>
+<codeline lineno="111"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="112"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/>Thread<sp/>pool</highlight></codeline>
+<codeline lineno="113"><highlight class="comment"><sp/>*<sp/>@param<sp/>fn<sp/><sp/><sp/><sp/>Work<sp/>function<sp/>(called<sp/>on<sp/>each<sp/>thread)</highlight></codeline>
+<codeline lineno="114"><highlight class="comment"><sp/>*<sp/>@param<sp/>args<sp/><sp/>Argument<sp/>passed<sp/>to<sp/>fn</highlight></codeline>
+<codeline lineno="115"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="116"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1abf4adc5451a56f39e5630dc42c07e330" kindref="member">ck_threadpool_dispatch</ref>(ck_threadpool_t<sp/>*pool,<sp/><ref refid="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" kindref="member">ck_work_fn_t</ref><sp/>fn,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*args);</highlight></codeline>
+<codeline lineno="117"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="118"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="119"><highlight class="comment"><sp/>*<sp/>Barrier<sp/>synchronization<sp/>within<sp/>a<sp/>dispatched<sp/>work<sp/>function.</highlight></codeline>
+<codeline lineno="120"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="121"><highlight class="comment"><sp/>*<sp/>ALL<sp/>threads<sp/>must<sp/>call<sp/>this<sp/>at<sp/>the<sp/>same<sp/>point.<sp/>Threads<sp/>spin-wait</highlight></codeline>
+<codeline lineno="122"><highlight class="comment"><sp/>*<sp/>until<sp/>all<sp/>have<sp/>arrived,<sp/>then<sp/>proceed.</highlight></codeline>
+<codeline lineno="123"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="124"><highlight class="comment"><sp/>*<sp/>Must<sp/>only<sp/>be<sp/>called<sp/>from<sp/>within<sp/>a<sp/>work<sp/>function<sp/>(during<sp/>dispatch).</highlight></codeline>
+<codeline lineno="125"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="126"><highlight class="comment"><sp/>*<sp/>@param<sp/>pool<sp/><sp/>Thread<sp/>pool</highlight></codeline>
+<codeline lineno="127"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="128"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1a6c8e0af8fa97116468ed08769a0a5ea6" kindref="member">ck_threadpool_barrier</ref>(ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="129"><highlight class="normal"></highlight></codeline>
+<codeline lineno="130"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="131"><highlight class="comment"><sp/>*<sp/>Power<sp/>Management</highlight></codeline>
+<codeline lineno="132"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="133"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="134"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="135"><highlight class="comment"><sp/>*<sp/>Pause<sp/>workers<sp/>—<sp/>they<sp/>sleep<sp/>on<sp/>condvar<sp/>(0%<sp/>CPU).</highlight></codeline>
+<codeline lineno="136"><highlight class="comment"><sp/>*<sp/>Call<sp/>between<sp/>batches<sp/>or<sp/>during<sp/>interactive<sp/>waiting.</highlight></codeline>
+<codeline lineno="137"><highlight class="comment"><sp/>*<sp/>Workers<sp/>wake<sp/>on<sp/>next<sp/>dispatch<sp/>or<sp/>resume.</highlight></codeline>
+<codeline lineno="138"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="139"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1a001490b08bc5ba893488e49d4b10d3bf" kindref="member">ck_threadpool_pause</ref>(ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="140"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="141"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="142"><highlight class="comment"><sp/>*<sp/>Resume<sp/>workers<sp/>—<sp/>transition<sp/>from<sp/>sleep<sp/>to<sp/>spin-wait.</highlight></codeline>
+<codeline lineno="143"><highlight class="comment"><sp/>*<sp/>Call<sp/>before<sp/>starting<sp/>a<sp/>new<sp/>batch<sp/>of<sp/>work.</highlight></codeline>
+<codeline lineno="144"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="145"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1a2c5c8ea3eb8087186ea7e8be2617c4f4" kindref="member">ck_threadpool_resume</ref>(ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="146"><highlight class="normal"></highlight></codeline>
+<codeline lineno="147"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="148"><highlight class="comment"><sp/>*<sp/>Queries</highlight></codeline>
+<codeline lineno="149"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="150"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="151"><highlight class="comment">/**<sp/>Get<sp/>total<sp/>thread<sp/>count<sp/>(including<sp/>main<sp/>thread)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="152"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1aef9103ab0a271feb7fdc74c915a78d10" kindref="member">ck_threadpool_n_threads</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="153"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="154"><highlight class="comment">/**<sp/>Get<sp/>thread<sp/>index<sp/>for<sp/>current<sp/>thread<sp/>(0<sp/>=<sp/>main,<sp/>-1<sp/>if<sp/>not<sp/>in<sp/>pool)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="155"><highlight class="normal"></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1ada9a2b22c2eb79fe8834b026a3c7d8b4" kindref="member">ck_threadpool_thread_id</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/>ck_threadpool_t<sp/>*pool);</highlight></codeline>
+<codeline lineno="156"><highlight class="normal"></highlight></codeline>
+<codeline lineno="157"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="158"><highlight class="comment"><sp/>*<sp/>Global<sp/>Thread<sp/>Pool<sp/>(convenience)</highlight></codeline>
+<codeline lineno="159"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="160"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="161"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="162"><highlight class="comment"><sp/>*<sp/>Get<sp/>or<sp/>create<sp/>the<sp/>global<sp/>thread<sp/>pool.</highlight></codeline>
+<codeline lineno="163"><highlight class="comment"><sp/>*<sp/>Thread-safe<sp/>(uses<sp/>pthread_once<sp/>internally).</highlight></codeline>
+<codeline lineno="164"><highlight class="comment"><sp/>*<sp/>Uses<sp/>ck_get_num_threads()<sp/>for<sp/>auto-detection.</highlight></codeline>
+<codeline lineno="165"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="166"><highlight class="comment"><sp/>*<sp/>@return<sp/>Global<sp/>pool,<sp/>never<sp/>NULL<sp/>after<sp/>successful<sp/>first<sp/>call.</highlight></codeline>
+<codeline lineno="167"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="168"><highlight class="normal">ck_threadpool_t<sp/>*<ref refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" kindref="member">ck_threadpool_global</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="169"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="170"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="171"><highlight class="comment"><sp/>*<sp/>Destroy<sp/>the<sp/>global<sp/>thread<sp/>pool.</highlight></codeline>
+<codeline lineno="172"><highlight class="comment"><sp/>*<sp/>Called<sp/>during<sp/>engine<sp/>shutdown.</highlight></codeline>
+<codeline lineno="173"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="174"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" kindref="member">ck_threadpool_global_destroy</ref>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal">);</highlight></codeline>
+<codeline lineno="175"><highlight class="normal"></highlight></codeline>
+<codeline lineno="176"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="177"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="178"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="179"><highlight class="normal"></highlight></codeline>
+<codeline lineno="180"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>CK_THREADPOOL_H<sp/>*/</highlight><highlight class="preprocessor"></highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/include/ck_threadpool.h"/>
+  </compounddef>
+</doxygen>

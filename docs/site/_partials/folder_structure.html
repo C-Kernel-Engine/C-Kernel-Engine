@@ -1,7 +1,7 @@
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-01-28 19:03</span>
+        <span class="folder-updated">Updated: 2026-01-29 18:23</span>
     </div>
     <pre class="tree-output">
 .
@@ -13,7 +13,13 @@
 |   |-- flash_attention_implementation_plan.md
 |   |-- fused_kernels_comparison.md
 |   |-- implementation_status.md
-|   `-- performance_analysis_detailed.md
+|   |-- performance_analysis_detailed.md
+|   |-- report_01_ck_engine_profile.md
+|   |-- report_02_ck_vtune.md
+|   |-- report_03_llamacpp_profile.md
+|   |-- report_04_llamacpp_vtune.md
+|   |-- report_05_comparison.md
+|   `-- report_06_threadpool_design.md
 |-- assets
 |   `-- cover_image.png
 |-- benchmarks
@@ -110,8 +116,11 @@
 |   |   |-- testing.html
 |   |   |-- test-report.html
 |   |   |-- test-viewer.html
+|   |   |-- threadpool.html
 |   |   |-- tokenizer.html
 |   |   `-- version-history.html
+|   |-- sites
+|   |   `-- _pages.html
 |   |-- study-materials
 |   |   |-- profiling
 |   |   |-- references
@@ -274,6 +283,125 @@
 |   |-- stackcollapse-wcp.pl
 |   |-- stackcollapse-xdebug.php
 |   `-- test.sh
+|-- ggml
+|   |-- ci
+|   |   `-- run.sh
+|   |-- cmake
+|   |   |-- BuildTypes.cmake
+|   |   |-- common.cmake
+|   |   |-- ggml-config.cmake.in
+|   |   `-- GitVars.cmake
+|   |-- docs
+|   |   `-- gguf.md
+|   |-- examples
+|   |   |-- gpt-2
+|   |   |-- gpt-j
+|   |   |-- magika
+|   |   |-- mnist
+|   |   |-- perf-metal
+|   |   |-- prompts
+|   |   |-- python
+|   |   |-- sam
+|   |   |-- simple
+|   |   |-- test-cmake
+|   |   |-- yolo
+|   |   |-- CMakeLists.txt
+|   |   |-- common.cpp
+|   |   |-- common-ggml.cpp
+|   |   |-- common-ggml.h
+|   |   |-- common.h
+|   |   |-- stb_image.h
+|   |   `-- stb_image_write.h
+|   |-- include
+|   |   |-- ggml-alloc.h
+|   |   |-- ggml-backend.h
+|   |   |-- ggml-blas.h
+|   |   |-- ggml-cann.h
+|   |   |-- ggml-cpp.h
+|   |   |-- ggml-cpu.h
+|   |   |-- ggml-cuda.h
+|   |   |-- ggml.h
+|   |   |-- ggml-hexagon.h
+|   |   |-- ggml-metal.h
+|   |   |-- ggml-opencl.h
+|   |   |-- ggml-opt.h
+|   |   |-- ggml-rpc.h
+|   |   |-- ggml-sycl.h
+|   |   |-- ggml-vulkan.h
+|   |   |-- ggml-webgpu.h
+|   |   |-- ggml-zdnn.h
+|   |   |-- ggml-zendnn.h
+|   |   `-- gguf.h
+|   |-- scripts
+|   |   |-- gen-authors.sh
+|   |   |-- release.sh
+|   |   |-- sync-llama-am.sh
+|   |   |-- sync-llama.last
+|   |   |-- sync-llama.sh
+|   |   |-- sync-whisper-am.sh
+|   |   |-- sync-whisper.last
+|   |   `-- sync-whisper.sh
+|   |-- src
+|   |   |-- ggml-blas
+|   |   |-- ggml-cann
+|   |   |-- ggml-cpu
+|   |   |-- ggml-cuda
+|   |   |-- ggml-hexagon
+|   |   |-- ggml-hip
+|   |   |-- ggml-metal
+|   |   |-- ggml-musa
+|   |   |-- ggml-opencl
+|   |   |-- ggml-rpc
+|   |   |-- ggml-sycl
+|   |   |-- ggml-vulkan
+|   |   |-- ggml-webgpu
+|   |   |-- ggml-zdnn
+|   |   |-- ggml-zendnn
+|   |   |-- CMakeLists.txt
+|   |   |-- ggml-alloc.c
+|   |   |-- ggml-backend.cpp
+|   |   |-- ggml-backend-impl.h
+|   |   |-- ggml-backend-reg.cpp
+|   |   |-- ggml.c
+|   |   |-- ggml-common.h
+|   |   |-- ggml.cpp
+|   |   |-- ggml-impl.h
+|   |   |-- ggml-opt.cpp
+|   |   |-- ggml-quants.c
+|   |   |-- ggml-quants.h
+|   |   |-- ggml-threading.cpp
+|   |   |-- ggml-threading.h
+|   |   `-- gguf.cpp
+|   |-- tests
+|   |   |-- CMakeLists.txt
+|   |   |-- test-arange.cpp
+|   |   |-- test-backend-ops.cpp
+|   |   |-- test-cont.c
+|   |   |-- test-conv1d.cpp
+|   |   |-- test-conv1d-dw-c1.cpp
+|   |   |-- test-conv1d-dw-c2.cpp
+|   |   |-- test-conv2d.cpp
+|   |   |-- test-conv2d-dw.cpp
+|   |   |-- test-conv-transpose-1d.cpp
+|   |   |-- test-conv-transpose.c
+|   |   |-- test-customop.c
+|   |   |-- test-dup.c
+|   |   |-- test-interpolate.cpp
+|   |   |-- test-opt.cpp
+|   |   |-- test-pad-reflect-1d.cpp
+|   |   |-- test-pool.c
+|   |   |-- test-quantize-fns.cpp
+|   |   |-- test-quantize-perf.cpp
+|   |   |-- test-rel-pos.c
+|   |   |-- test-roll.cpp
+|   |   `-- test-timestep_embedding.cpp
+|   |-- AUTHORS
+|   |-- CMakeLists.txt
+|   |-- CONTRIBUTING.md
+|   |-- ggml.pc.in
+|   |-- LICENSE
+|   |-- README.md
+|   `-- requirements.txt
 |-- HPCEmbedding -&gt; /home/antshiv/Workspace/BCGov/citz-imb-ai/HPC/HPC_Embeddings/
 |-- include
 |   |-- data_structures
@@ -308,6 +436,7 @@
 |   |-- ck_metrics.h
 |   |-- ck_model_api.h
 |   |-- ck_parity_api.h
+|   |-- ck_threadpool.h
 |   |-- ck_tokenizer.h
 |   |-- cpu_features.h
 |   |-- fused_kernels.h
@@ -782,6 +911,10 @@
 |   |-- README.md
 |   |-- single_layer_dump.cpp
 |   `-- test-kernel-parity.cpp
+|-- profile_results
+|   `-- gemv_omp
+|       |-- 20260129-125914
+|       `-- 20260129-130015
 |-- research
 |   `-- AI -&gt; /home/antshiv/Documents/AI/
 |-- Screenshots
@@ -807,7 +940,8 @@
 |   |-- Screenshot 2026-01-27 at 06-57-43 IR Visualizer C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-28 at 09-35-57 TestReport C-Kernel-Engine.png
 |   |-- Screenshot 2026-01-28 at 18-53-50 VersionHistory C-Kernel-Engine.png
-|   `-- Screenshot 2026-01-28 at 18-59-19 VersionHistory C-Kernel-Engine.png
+|   |-- Screenshot 2026-01-28 at 18-59-19 VersionHistory C-Kernel-Engine.png
+|   `-- Screenshot 2026-01-28 at 19-18-26 IR Visualizer C-Kernel-Engine.png
 |-- scripts
 |   |-- test
 |   |   |-- compare_perf_results.py
@@ -971,6 +1105,7 @@
 |   |-- pre-merge-check.sh
 |   |-- profile_comparison.sh
 |   |-- profile_decode.py
+|   |-- profile_gemv_omp.sh
 |   |-- profile_kernel.sh
 |   |-- profile_perf.py
 |   |-- q4_k_quantize.py
@@ -1061,6 +1196,8 @@
 |   |   |-- gemm_kernels_q6k_sse.c
 |   |   |-- gemm_kernels_q8_0.c
 |   |   |-- gemm_microkernel.c
+|   |   |-- gemv_omp.c
+|   |   |-- gemv_omp.h
 |   |   |-- KERNEL_STATUS.md
 |   |   |-- kv_cache_kernels.c
 |   |   |-- layernorm_kernels_bf16.c
@@ -1217,6 +1354,7 @@
 |   |-- ckernel_registry.c
 |   |-- ckernel_strict.c
 |   |-- ck_parity_api.c
+|   |-- ck_threadpool.c
 |   |-- ck_tokenizer.c
 |   |-- ck_tokenizer_v2.c
 |   |-- cpu_features.c
@@ -1225,6 +1363,8 @@
 |-- test_results
 |   `-- mega_fused_test_report.json
 |-- tests
+|   |-- test_gemv_omp_parity.c
+|   |-- test_threadpool.c
 |   `-- test_v66_decode_regression.py
 |-- tools
 |   |-- cache_analysis.py
@@ -1411,7 +1551,7 @@
 |-- valdiate_buffer.txt
 `-- valdiate_data_flow.txt
 
-201 directories, 1204 files
+241 directories, 1304 files
 </pre>
 </div>
 

@@ -95,6 +95,8 @@
     <member refid="structChatTemplate_1ac174a796ca2eb5f4b4f4178dab27fff8" kind="variable"><name>user_prefix</name></member>
     <member refid="structChatTemplate_1a540d7fed39461ba830cc303fc23b7cc5" kind="variable"><name>user_suffix</name></member>
   </compound>
+  <compound refid="structck__barrier__t" kind="struct"><name>ck_barrier_t</name>
+  </compound>
   <compound refid="structck__capability__t" kind="struct"><name>ck_capability_t</name>
     <member refid="structck__capability__t_1a191ce26013f94ccb8f51a5fa5dd8c04b" kind="variable"><name>best_kernel</name></member>
     <member refid="structck__capability__t_1a9f5f0f74c73143705dc702efbee3a8d3" kind="variable"><name>has_ai_accel</name></member>
@@ -107,6 +109,13 @@
     <member refid="structck__huge__alloc__entry__t_1a35b6434b21a4dca6199fcdafc8c89a27" kind="variable"><name>next</name></member>
     <member refid="structck__huge__alloc__entry__t_1aa688f3ad84fb1b5a177012507c5932bb" kind="variable"><name>ptr</name></member>
     <member refid="structck__huge__alloc__entry__t_1a6b3feb34af8cb376ae922b914c5503ff" kind="variable"><name>was_mmap</name></member>
+  </compound>
+  <compound refid="structck__threadpool" kind="struct"><name>ck_threadpool</name>
+  </compound>
+  <compound refid="structck__worker__t" kind="struct"><name>ck_worker_t</name>
+    <member refid="structck__worker__t_1ac43b85a5a81faf4ef761b51783739309" kind="variable"><name>id</name></member>
+    <member refid="structck__worker__t_1aff3f7f88bbdc2f28f2f263babc4b041e" kind="variable"><name>pool</name></member>
+    <member refid="structck__worker__t_1ad7a9cbdd4246c305f111a121ddce4a81" kind="variable"><name>thread</name></member>
   </compound>
   <compound refid="structCKBPEConfig" kind="struct"><name>CKBPEConfig</name>
     <member refid="structCKBPEConfig_1abfb01eec95857319bd1dafbaf6336238" kind="variable"><name>add_bos</name></member>
@@ -1886,6 +1895,43 @@
     <member refid="ck__parity__api_8h_1a74e6f14b267d70440de389eae4620bae" kind="function"><name>ck_test_vec_dot_q5_0_q8_0</name></member>
     <member refid="ck__parity__api_8h_1a6dd447ca849e7c7924ee76fa71144fcb" kind="function"><name>ck_test_vec_dot_q8_0_q8_0</name></member>
   </compound>
+  <compound refid="ck__threadpool_8c" kind="file"><name>ck_threadpool.c</name>
+    <member refid="ck__threadpool_8c_1ae0445e61c7b90259729ee63b95ee3257" kind="define"><name>CK_SPIN_PAUSE</name></member>
+    <member refid="ck__threadpool_8c_1a8d24c2ed3aa5c438f5d2e8c7782f32b5" kind="variable"><name>g_threadpool</name></member>
+    <member refid="ck__threadpool_8c_1a3dcd3040ab40fc1c79a7ea042b87b24f" kind="variable"><name>g_threadpool_once</name></member>
+    <member refid="ck__threadpool_8c_1a19111881b2bff4a1ddd3bfb5f8074686" kind="function"><name>barrier_init</name></member>
+    <member refid="ck__threadpool_8c_1a1dcf1b7c2fd4bc9276f0aa642333db2a" kind="function"><name>barrier_wait</name></member>
+    <member refid="ck__threadpool_8c_1aedf852ec498fe7db175f59f810886b9f" kind="function"><name>ck_get_num_threads</name></member>
+    <member refid="ck__threadpool_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kind="function"><name>ck_get_physical_cores</name></member>
+    <member refid="ck__threadpool_8c_1a6c8e0af8fa97116468ed08769a0a5ea6" kind="function"><name>ck_threadpool_barrier</name></member>
+    <member refid="ck__threadpool_8c_1a5cf6b941c6e0f27bb568cfc67ca0ddff" kind="function"><name>ck_threadpool_create</name></member>
+    <member refid="ck__threadpool_8c_1a6026581009cf6a835026bba70ce9bcd4" kind="function"><name>ck_threadpool_destroy</name></member>
+    <member refid="ck__threadpool_8c_1abf4adc5451a56f39e5630dc42c07e330" kind="function"><name>ck_threadpool_dispatch</name></member>
+    <member refid="ck__threadpool_8c_1af2f48cd631ad075b62d135d7b7c607dd" kind="function"><name>ck_threadpool_global</name></member>
+    <member refid="ck__threadpool_8c_1a4cb5ec1ec3544e52288a3ed3c17671fe" kind="function"><name>ck_threadpool_global_destroy</name></member>
+    <member refid="ck__threadpool_8c_1aef9103ab0a271feb7fdc74c915a78d10" kind="function"><name>ck_threadpool_n_threads</name></member>
+    <member refid="ck__threadpool_8c_1a001490b08bc5ba893488e49d4b10d3bf" kind="function"><name>ck_threadpool_pause</name></member>
+    <member refid="ck__threadpool_8c_1a2c5c8ea3eb8087186ea7e8be2617c4f4" kind="function"><name>ck_threadpool_resume</name></member>
+    <member refid="ck__threadpool_8c_1ada9a2b22c2eb79fe8834b026a3c7d8b4" kind="function"><name>ck_threadpool_thread_id</name></member>
+    <member refid="ck__threadpool_8c_1a5787f410f04801389446b1cf43c79e15" kind="function"><name>global_pool_init</name></member>
+    <member refid="ck__threadpool_8c_1a65ba0b7b023b2064be03f050ff7601e6" kind="function"><name>worker_main</name></member>
+  </compound>
+  <compound refid="ck__threadpool_8h" kind="file"><name>ck_threadpool.h</name>
+    <member refid="ck__threadpool_8h_1a452e44b0d33892f36e77c590eba38daf" kind="define"><name>CK_CACHE_LINE</name></member>
+    <member refid="ck__threadpool_8h_1a38f1782864a6bd5318d8cc54d00be0e5" kind="define"><name>CK_THREADPOOL_MAX_THREADS</name></member>
+    <member refid="ck__threadpool_8h_1a4644600fdce88046ccbdf5089793819a" kind="define"><name>CK_THREADPOOL_SPIN_COUNT</name></member>
+    <member refid="ck__threadpool_8h_1ab62fc130ff232f63cffe53fd072d0179" kind="typedef"><name>ck_work_fn_t</name></member>
+    <member refid="ck__threadpool_8h_1a6c8e0af8fa97116468ed08769a0a5ea6" kind="function"><name>ck_threadpool_barrier</name></member>
+    <member refid="ck__threadpool_8h_1a5cf6b941c6e0f27bb568cfc67ca0ddff" kind="function"><name>ck_threadpool_create</name></member>
+    <member refid="ck__threadpool_8h_1a6026581009cf6a835026bba70ce9bcd4" kind="function"><name>ck_threadpool_destroy</name></member>
+    <member refid="ck__threadpool_8h_1abf4adc5451a56f39e5630dc42c07e330" kind="function"><name>ck_threadpool_dispatch</name></member>
+    <member refid="ck__threadpool_8h_1af2f48cd631ad075b62d135d7b7c607dd" kind="function"><name>ck_threadpool_global</name></member>
+    <member refid="ck__threadpool_8h_1a4cb5ec1ec3544e52288a3ed3c17671fe" kind="function"><name>ck_threadpool_global_destroy</name></member>
+    <member refid="ck__threadpool_8h_1aef9103ab0a271feb7fdc74c915a78d10" kind="function"><name>ck_threadpool_n_threads</name></member>
+    <member refid="ck__threadpool_8h_1a001490b08bc5ba893488e49d4b10d3bf" kind="function"><name>ck_threadpool_pause</name></member>
+    <member refid="ck__threadpool_8h_1a2c5c8ea3eb8087186ea7e8be2617c4f4" kind="function"><name>ck_threadpool_resume</name></member>
+    <member refid="ck__threadpool_8h_1ada9a2b22c2eb79fe8834b026a3c7d8b4" kind="function"><name>ck_threadpool_thread_id</name></member>
+  </compound>
   <compound refid="ck__tokenizer_8c" kind="file"><name>ck_tokenizer.c</name>
     <member refid="ck__tokenizer_8c_1aa03130843a2ba7714a87b1bf8ac7e10c" kind="function"><name>ck_pool_alloc</name></member>
     <member refid="ck__tokenizer_8c_1aba3724127379a06a8baf1c63d478aa3a" kind="function"><name>ck_pool_free</name></member>
@@ -2320,6 +2366,8 @@
     <member refid="ckernel__engine_8h_1afe5bf17f909def227c3e25b0c4338f93" kind="function"><name>gemm_tn_avx512</name></member>
     <member refid="ckernel__engine_8h_1ae3bc36ea7b8562f9121e527f0f408b43" kind="function"><name>gemm_tn_blocked</name></member>
     <member refid="ckernel__engine_8h_1a84ce00fad7103b550ea75b52a21a98f7" kind="function"><name>gemm_tn_parallel</name></member>
+    <member refid="ckernel__engine_8h_1acd01fa09d31ed6d6dd83a603b364fbd9" kind="function"><name>gemv_fused_q5_0_bias_dispatch</name></member>
+    <member refid="ckernel__engine_8h_1a24b834f134e781725daeea8231fb9100" kind="function"><name>gemv_fused_q8_0_bias_dispatch</name></member>
     <member refid="ckernel__engine_8h_1afabf6422c50382a3bcc897b43c18f0ac" kind="function"><name>gemv_q4_0</name></member>
     <member refid="ckernel__engine_8h_1a9beb124343d26ac4870d92b2f047d643" kind="function"><name>gemv_q4_k</name></member>
     <member refid="ckernel__engine_8h_1abd2ce09c06d448b502b30fac01bc1d30" kind="function"><name>gemv_q4_k_q8_k</name></member>
@@ -2917,10 +2965,13 @@
     <member refid="ckernel__strict_8c_1adcc8293c7a06a4f12c2acfccb8d3cac0" kind="variable"><name>g_threads_initialized</name></member>
     <member refid="ckernel__strict_8c_1aedf852ec498fe7db175f59f810886b9f" kind="function"><name>ck_get_num_threads</name></member>
     <member refid="ckernel__strict_8c_1a7ff78bf68a9657c2d6858b64df79f7ae" kind="function"><name>ck_get_physical_cores</name></member>
+    <member refid="ckernel__strict_8c_1ac0b7956a32f188dc930dfafd8ca281f3" kind="function"><name>ck_get_threadpool</name></member>
     <member refid="ckernel__strict_8c_1a0878a8fbdd6fbda1d6e6efcd6682b8ae" kind="function"><name>ck_parse_env_int</name></member>
     <member refid="ckernel__strict_8c_1a2b48c2a890de67e5830bc4239e01bd13" kind="function"><name>ck_set_num_threads</name></member>
     <member refid="ckernel__strict_8c_1a8bcb6fa03c4861c8f45d59fa424d1146" kind="function"><name>ck_set_strict_parity</name></member>
     <member refid="ckernel__strict_8c_1aef8c9a331116ff9c2d77b03152aa8004" kind="function"><name>ck_strict_parity_enabled</name></member>
+    <member refid="ckernel__strict_8c_1a0cdb2989b11a190fcacfad0dee729bc3" kind="function"><name>ck_threadpool_init</name></member>
+    <member refid="ckernel__strict_8c_1a0f8bb8ea3b2036ee4fc08582774c0b5e" kind="function"><name>ck_threadpool_shutdown</name></member>
   </compound>
   <compound refid="cpu__features_8c" kind="file"><name>cpu_features.c</name>
     <member refid="cpu__features_8c_1a87e02c44ce8117ceb227f928980a175a" kind="variable"><name>g_cpu_info</name></member>
@@ -3170,6 +3221,7 @@
     <member refid="gemm__kernels__q5__0_8c_1abda2acfb31d844af99447ee60dbe5c2a" kind="function"><name>gemv_q5_0_parallel</name></member>
     <member refid="gemm__kernels__q5__0_8c_1ae8f7ef45b1d165688f611a3d5549c61d" kind="function"><name>gemv_q5_0_parallel_simd</name></member>
     <member refid="gemm__kernels__q5__0_8c_1a4fb9cf343ac07a0868c55f25bd201ca3" kind="function"><name>gemv_q5_0_q8_0</name></member>
+    <member refid="gemm__kernels__q5__0_8c_1ad110eca9145b24f8d6936a3d17d7d42e" kind="function"><name>gemv_q5_0_q8_0_parallel_simd</name></member>
     <member refid="gemm__kernels__q5__0_8c_1a4c1add4b1c01915769b02ded8605c55c" kind="function"><name>gemv_q5_0_ref</name></member>
     <member refid="gemm__kernels__q5__0_8c_1a8744a3b1e4d1dc928fce050f111414a6" kind="function"><name>vec_dot_q5_0_q8_0</name></member>
     <member refid="gemm__kernels__q5__0_8c_1a5703f283c14a34f7546cd236acd4ef80" kind="function"><name>vec_dot_q5_0_q8_0_ref</name></member>
@@ -3228,7 +3280,10 @@
     <member refid="gemm__kernels__q8__0_8c_1a3e0166eab910ca7f003602c29f428cb1" kind="function"><name>gemv_q8_0</name></member>
     <member refid="gemm__kernels__q8__0_8c_1afe30f2146f25d6c0fbfe932d6d68ba46" kind="function"><name>gemv_q8_0_backward</name></member>
     <member refid="gemm__kernels__q8__0_8c_1af81f5e920a8025d1f3034b56b43f42dc" kind="function"><name>gemv_q8_0_backward_ref</name></member>
+    <member refid="gemm__kernels__q8__0_8c_1a1b368197b63d3c036bde5ce658ba7bef" kind="function"><name>gemv_q8_0_parallel_simd</name></member>
     <member refid="gemm__kernels__q8__0_8c_1ab56038b4e1cf73692b6be9c28ada9023" kind="function"><name>gemv_q8_0_q8_0</name></member>
+    <member refid="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" kind="function"><name>gemv_q8_0_q8_0_parallel</name></member>
+    <member refid="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" kind="function"><name>gemv_q8_0_q8_0_parallel_simd</name></member>
     <member refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" kind="function"><name>gemv_q8_0_ref</name></member>
     <member refid="gemm__kernels__q8__0_8c_1a454391a623a91879cf0a9b4e457e5cf7" kind="function"><name>quantize_batch_q8_0</name></member>
     <member refid="gemm__kernels__q8__0_8c_1a6319eb9192df15549a476f85f52cd806" kind="function"><name>quantize_batch_q8_k</name></member>
@@ -3267,6 +3322,19 @@
     <member refid="gemv__fused__quant__bias_8c_1acd01fa09d31ed6d6dd83a603b364fbd9" kind="function"><name>gemv_fused_q5_0_bias_dispatch</name></member>
     <member refid="gemv__fused__quant__bias_8c_1a0f475672fcbd66bfdbff4cdef0986478" kind="function"><name>gemv_fused_q8_0_bias</name></member>
     <member refid="gemv__fused__quant__bias_8c_1a24b834f134e781725daeea8231fb9100" kind="function"><name>gemv_fused_q8_0_bias_dispatch</name></member>
+  </compound>
+  <compound refid="gemv__omp_8c" kind="file"><name>gemv_omp.c</name>
+    <member refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" kind="function"><name>gemv_fused_q5_0_bias_parallel_omp</name></member>
+    <member refid="gemv__omp_8c_1a94b6079b432e628c11aeba41566465f3" kind="function"><name>gemv_q5_0_q8_0_parallel_omp</name></member>
+    <member refid="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" kind="function"><name>gemv_q8_0_q8_0_parallel_omp</name></member>
+    <member refid="gemv__omp_8c_1aaed08819c4a21e49ca43bc3094022eaa" kind="function"><name>quantize_row_q8_0</name></member>
+    <member refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" kind="function"><name>vec_dot_q5_0_q8_0</name></member>
+    <member refid="gemv__omp_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kind="function"><name>vec_dot_q8_0_q8_0</name></member>
+  </compound>
+  <compound refid="gemv__omp_8h" kind="file"><name>gemv_omp.h</name>
+    <member refid="gemv__omp_8h_1a38918b47e39c93d7fc058a0f0d439ebf" kind="function"><name>gemv_fused_q5_0_bias_parallel_omp</name></member>
+    <member refid="gemv__omp_8h_1a94b6079b432e628c11aeba41566465f3" kind="function"><name>gemv_q5_0_q8_0_parallel_omp</name></member>
+    <member refid="gemv__omp_8h_1a96750f2ef3af257cb96144deac95ba27" kind="function"><name>gemv_q8_0_q8_0_parallel_omp</name></member>
   </compound>
   <compound refid="v6_85_2test__generated_2generic__api__test_8c" kind="file"><name>v6.5/test_generated/generic_api_test.c</name>
     <member refid="v6_85_2test__generated_2generic__api__test_8c_1a369266c24eacffb87046522897a570d5" kind="define"><name>_GNU_SOURCE</name></member>

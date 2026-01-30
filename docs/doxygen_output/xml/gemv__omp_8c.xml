@@ -1,0 +1,413 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="gemv__omp_8c" kind="file" language="C++">
+    <compoundname>gemv_omp.c</compoundname>
+    <includes local="no">omp.h</includes>
+    <includes refid="ckernel__quant_8h" local="yes">ckernel_quant.h</includes>
+    <incdepgraph>
+      <node id="3">
+        <label>ckernel_quant.h</label>
+        <link refid="ckernel__quant_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+        <childnode refid="6" relation="include">
+        </childnode>
+      </node>
+      <node id="6">
+        <label>ckernel_dtype.h</label>
+        <link refid="ckernel__dtype_8h"/>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="4">
+        <label>stdint.h</label>
+      </node>
+      <node id="2">
+        <label>omp.h</label>
+      </node>
+      <node id="5">
+        <label>stddef.h</label>
+      </node>
+      <node id="1">
+        <label>gemv_omp.c</label>
+        <link refid="gemv__omp_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="3" relation="include">
+        </childnode>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_fused_q5_0_bias_parallel_omp</definition>
+        <argsstring>(float *y, const void *W, const float *x, const float *bias, int M, int K)</argsstring>
+        <name>gemv_fused_q5_0_bias_parallel_omp</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>bias</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="96" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" bodystart="96" bodyend="117"/>
+        <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
+        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
+        <references refid="gemv__omp_8c_1aaed08819c4a21e49ca43bc3094022eaa" compoundref="gemm__kernels__q8__0_8c" startline="59" endline="173">quantize_row_q8_0</references>
+        <references refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="1350" endline="1363">vec_dot_q5_0_q8_0</references>
+      </memberdef>
+      <memberdef kind="function" id="gemv__omp_8c_1a94b6079b432e628c11aeba41566465f3" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q5_0_q8_0_parallel_omp</definition>
+        <argsstring>(float *y, const void *W, const void *x_q8, int M, int K)</argsstring>
+        <name>gemv_q5_0_q8_0_parallel_omp</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>x_q8</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="72" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" bodystart="72" bodyend="87"/>
+        <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
+        <references refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" compoundref="gemm__kernels__q5__0_8c" startline="1350" endline="1363">vec_dot_q5_0_q8_0</references>
+      </memberdef>
+      <memberdef kind="function" id="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q8_0_q8_0_parallel_omp</definition>
+        <argsstring>(float *y, const void *W, const void *x_q8, int M, int K)</argsstring>
+        <name>gemv_q8_0_q8_0_parallel_omp</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>x_q8</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="50" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" bodystart="50" bodyend="65"/>
+        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
+        <references refid="gemv__omp_8c_1aea5f7a52ed3f21e0c6795766cfb28751" compoundref="gemm__kernels__q8__0_8c" startline="1013" endline="1024">vec_dot_q8_0_q8_0</references>
+      </memberdef>
+      <memberdef kind="function" id="gemv__omp_8c_1aaed08819c4a21e49ca43bc3094022eaa" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void quantize_row_q8_0</definition>
+        <argsstring>(const float *x, void *y, int k)</argsstring>
+        <name>quantize_row_q8_0</name>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>void *</type>
+          <declname>y</declname>
+          <defname>vy</defname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>k</declname>
+        </param>
+        <briefdescription>
+<para>Quantize FP32 to Q8_0 format (scalar reference) </para>
+        </briefdescription>
+        <detaileddescription>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>x</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Input FP32 values </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>vy</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Output Q8_0 blocks </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>k</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of elements (must be multiple of 32) </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="40" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="59" bodyend="173" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" declline="40" declcolumn="13"/>
+        <referencedby refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" compoundref="gemv__omp_8c" startline="96" endline="117">gemv_fused_q5_0_bias_parallel_omp</referencedby>
+        <referencedby refid="ckernel__engine_8h_1af9d9ddf0d4084d8eaa67118ffefc60bb" compoundref="gemm__kernels__q8__0_8c" startline="192" endline="207">quantize_batch_q8_0</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void vec_dot_q5_0_q8_0</definition>
+        <argsstring>(int n, float *s, const void *vx, const void *vy)</argsstring>
+        <name>vec_dot_q5_0_q8_0</name>
+        <param>
+          <type>int</type>
+          <declname>n</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vx</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vy</declname>
+        </param>
+        <briefdescription>
+<para>Auto-dispatch quantized dot product Q5_0 x Q8_0. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Dispatch priority:<orderedlist>
+<listitem><para>AVX512 (best performance on modern Intel/AMD)</para>
+</listitem><listitem><para>AVX (256-bit float ops, works on Sandy/Ivy Bridge and newer)</para>
+</listitem><listitem><para>SSSE3 (128-bit fallback)</para>
+</listitem><listitem><para>Reference scalar (last resort) </para>
+</listitem></orderedlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="39" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q5_0.c" bodystart="1350" bodyend="1363" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" declline="39" declcolumn="13"/>
+        <referencedby refid="ckernel__quant_8h_1ab58c945a0911101ac318f093dfce1770" compoundref="gemm__kernels__q5__0_8c" startline="1469" endline="1497">gemm_nt_q5_0_q8_0</referencedby>
+        <referencedby refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" compoundref="gemv__omp_8c" startline="96" endline="117">gemv_fused_q5_0_bias_parallel_omp</referencedby>
+        <referencedby refid="ckernel__engine_8h_1a4fb9cf343ac07a0868c55f25bd201ca3" compoundref="gemm__kernels__q5__0_8c" startline="1381" endline="1395">gemv_q5_0_q8_0</referencedby>
+        <referencedby refid="gemv__omp_8c_1a94b6079b432e628c11aeba41566465f3" compoundref="gemv__omp_8c" startline="72" endline="87">gemv_q5_0_q8_0_parallel_omp</referencedby>
+        <referencedby refid="gemm__kernels__q5__0_8c_1ad110eca9145b24f8d6936a3d17d7d42e" compoundref="gemm__kernels__q5__0_8c" startline="1403" endline="1448">gemv_q5_0_q8_0_parallel_simd</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemv__omp_8c_1aea5f7a52ed3f21e0c6795766cfb28751" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void vec_dot_q8_0_q8_0</definition>
+        <argsstring>(int n, float *s, const void *vx, const void *vy)</argsstring>
+        <name>vec_dot_q8_0_q8_0</name>
+        <param>
+          <type>int</type>
+          <declname>n</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vx</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>vy</declname>
+        </param>
+        <briefdescription>
+<para>Auto-dispatch quantized dot product Q8_0 x Q8_0. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" line="38" column="13" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="1013" bodyend="1024" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c" declline="38" declcolumn="13"/>
+        <referencedby refid="ckernel__engine_8h_1ab56038b4e1cf73692b6be9c28ada9023" compoundref="gemm__kernels__q8__0_8c" startline="1042" endline="1056">gemv_q8_0_q8_0</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" compoundref="gemm__kernels__q8__0_8c" startline="1068" endline="1092">gemv_q8_0_q8_0_parallel</referencedby>
+        <referencedby refid="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" compoundref="gemv__omp_8c" startline="50" endline="65">gemv_q8_0_q8_0_parallel_omp</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" compoundref="gemm__kernels__q8__0_8c" startline="1100" endline="1148">gemv_q8_0_q8_0_parallel_simd</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/*</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>gemv_omp.c<sp/>-<sp/>OpenMP-parallel<sp/>GEMV<sp/>kernels<sp/>for<sp/>decode<sp/>mode</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*<sp/>WARNING:<sp/>These<sp/>kernels<sp/>use<sp/>#pragma<sp/>omp<sp/>parallel<sp/>for,<sp/>which<sp/>creates<sp/>and</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>joins<sp/>threads<sp/>on<sp/>EVERY<sp/>call.<sp/>During<sp/>inference,<sp/>each<sp/>decode<sp/>token<sp/>invokes</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>kernels<sp/>500+<sp/>times.<sp/>OpenMP<sp/>fork/join<sp/>overhead<sp/>(~50-200us<sp/>per<sp/>call)<sp/>makes</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>these<sp/>SLOWER<sp/>than<sp/>serial<sp/>for<sp/>real<sp/>inference<sp/>workloads:</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Measured<sp/>on<sp/>i7-3630QM<sp/>(4C/8T),<sp/>Qwen<sp/>0.5B:</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/>Serial<sp/>kernels:<sp/><sp/><sp/>170<sp/>ms/tok<sp/><sp/>(5.9<sp/>tok/s)</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/>OMP<sp/>parallel:<sp/><sp/><sp/><sp/><sp/>327<sp/>ms/tok<sp/><sp/>(3.1<sp/>tok/s)<sp/><sp/>←<sp/>1.9x<sp/>SLOWER</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*<sp/>The<sp/>math<sp/>is<sp/>correct<sp/>(10/10<sp/>parity<sp/>tests<sp/>pass)<sp/>but<sp/>the<sp/>threading<sp/>model<sp/>is</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/>wrong<sp/>for<sp/>this<sp/>workload.<sp/>OpenMP<sp/>is<sp/>designed<sp/>for<sp/>long-running<sp/>parallel</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/>regions,<sp/>not<sp/>thousands<sp/>of<sp/>short<sp/>kernel<sp/>calls<sp/>per<sp/>token.</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*<sp/>TODO:<sp/>Replace<sp/>with<sp/>a<sp/>persistent<sp/>pthread<sp/>thread<sp/>pool:</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Create<sp/>N<sp/>worker<sp/>pthreads<sp/>once<sp/>at<sp/>startup</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Workers<sp/>spin/wait<sp/>on<sp/>a<sp/>barrier<sp/>or<sp/>futex</highlight></codeline>
+<codeline lineno="20"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Kernel<sp/>dispatch:<sp/>write<sp/>work<sp/>descriptor,<sp/>signal<sp/>barrier<sp/>(~2-5us)</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>Workers<sp/>execute<sp/>rows,<sp/>signal<sp/>completion</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*<sp/><sp/><sp/>-<sp/>This<sp/>is<sp/>what<sp/>llama.cpp<sp/>does<sp/>(ggml_threadpool)<sp/>to<sp/>get<sp/>30<sp/>tok/s</highlight></codeline>
+<codeline lineno="23"><highlight class="comment"><sp/>*<sp/><sp/><sp/><sp/><sp/>on<sp/>the<sp/>same<sp/>hardware<sp/>where<sp/>these<sp/>OMP<sp/>kernels<sp/>get<sp/>3.1<sp/>tok/s</highlight></codeline>
+<codeline lineno="24"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/>These<sp/>are<sp/>parallel<sp/>variants<sp/>of<sp/>the<sp/>serial<sp/>GEMV<sp/>kernels<sp/>in</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/>gemm_kernels_q8_0.c<sp/>and<sp/>gemm_kernels_q5_0.c.<sp/>The<sp/>serial<sp/>kernels</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/>remain<sp/>untouched<sp/>for<sp/>multi-stream<sp/>/<sp/>multi-model<sp/>serving<sp/>where</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*<sp/>per-kernel<sp/>parallelism<sp/>is<sp/>not<sp/>wanted.</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="30"><highlight class="comment"><sp/>*<sp/>All<sp/>three<sp/>kernels<sp/>are<sp/>row-parallel:<sp/>each<sp/>output<sp/>y[row]<sp/>is<sp/>an</highlight></codeline>
+<codeline lineno="31"><highlight class="comment"><sp/>*<sp/>independent<sp/>dot<sp/>product,<sp/>so<sp/>we<sp/>partition<sp/>rows<sp/>across<sp/>threads.</highlight></codeline>
+<codeline lineno="32"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;omp.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="ckernel__quant_8h" kindref="compound">ckernel_quant.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>Existing<sp/>vec_dot<sp/>dispatch<sp/>functions<sp/>(in<sp/>gemm_kernels_q8_0.c<sp/>/<sp/>gemm_kernels_q5_0.c)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kindref="member">vec_dot_q8_0_q8_0</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*s,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vx,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy);</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" kindref="member">vec_dot_q5_0_q8_0</ref>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>n,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*s,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vx,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*vy);</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1aaed08819c4a21e49ca43bc3094022eaa" kindref="member">quantize_row_q8_0</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,<sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*y,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>k);</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"></highlight></codeline>
+<codeline lineno="42"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>---------------------------------------------------------------------------</highlight></codeline>
+<codeline lineno="43"><highlight class="comment"><sp/>*<sp/>gemv_q8_0_q8_0_parallel_omp<sp/><sp/>(logits<sp/>—<sp/>37%<sp/>of<sp/>decode<sp/>time)</highlight></codeline>
+<codeline lineno="44"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="45"><highlight class="comment"><sp/>*<sp/>Same<sp/>5-param<sp/>signature<sp/>as<sp/>gemv_q8_0_q8_0<sp/>—<sp/>drop-in<sp/>swap.</highlight></codeline>
+<codeline lineno="46"><highlight class="comment"><sp/>*<sp/>schedule(static)<sp/>ensures<sp/>contiguous<sp/>row<sp/>blocks<sp/>per<sp/>thread<sp/>→<sp/>no<sp/>false<sp/>sharing.</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*<sp/>x_blocks<sp/>is<sp/>read-only<sp/>shared<sp/>(~1<sp/>KB<sp/>for<sp/>K=896)<sp/>→<sp/>stays<sp/>in<sp/>L1.</highlight></codeline>
+<codeline lineno="48"><highlight class="comment"><sp/>*<sp/>Each<sp/>thread<sp/>reads<sp/>disjoint<sp/>weight<sp/>rows<sp/>→<sp/>no<sp/>contention.</highlight></codeline>
+<codeline lineno="49"><highlight class="comment"><sp/>*<sp/>---------------------------------------------------------------------------<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="50" refid="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" kindref="member">gemv_q8_0_q8_0_parallel_omp</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*x_q8,</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="54"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*w_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="56"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*x_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)x_q8;</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" kindref="member">QK8_0</ref>;</highlight></codeline>
+<codeline lineno="58"><highlight class="normal"></highlight></codeline>
+<codeline lineno="59"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="60"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>0;<sp/>row<sp/>&lt;<sp/>M;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="61"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemv__omp_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kindref="member">vec_dot_q8_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="65"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"></highlight></codeline>
+<codeline lineno="67"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>---------------------------------------------------------------------------</highlight></codeline>
+<codeline lineno="68"><highlight class="comment"><sp/>*<sp/>gemv_q5_0_q8_0_parallel_omp<sp/><sp/>(mlp_down<sp/>—<sp/>10%<sp/>of<sp/>decode<sp/>time)</highlight></codeline>
+<codeline lineno="69"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="70"><highlight class="comment"><sp/>*<sp/>Same<sp/>5-param<sp/>signature<sp/>as<sp/>gemv_q5_0_q8_0<sp/>—<sp/>drop-in<sp/>swap.</highlight></codeline>
+<codeline lineno="71"><highlight class="comment"><sp/>*<sp/>---------------------------------------------------------------------------<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="72" refid="gemv__omp_8c_1a94b6079b432e628c11aeba41566465f3" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1a94b6079b432e628c11aeba41566465f3" kindref="member">gemv_q5_0_q8_0_parallel_omp</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*x_q8,</highlight></codeline>
+<codeline lineno="75"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="76"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="77"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q5__0" kindref="compound">block_q5_0</ref><sp/>*w_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q5__0" kindref="compound">block_q5_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*x_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)x_q8;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" kindref="member">QK5_0</ref>;</highlight></codeline>
+<codeline lineno="80"><highlight class="normal"></highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="82"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>0;<sp/>row<sp/>&lt;<sp/>M;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="83"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" kindref="member">vec_dot_q5_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="85"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
+<codeline lineno="86"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="87"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="88"><highlight class="normal"></highlight></codeline>
+<codeline lineno="89"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>---------------------------------------------------------------------------</highlight></codeline>
+<codeline lineno="90"><highlight class="comment"><sp/>*<sp/>gemv_fused_q5_0_bias_parallel_omp<sp/><sp/>(mlp_gate_up<sp/>—<sp/>44%<sp/>of<sp/>decode<sp/>time)</highlight></codeline>
+<codeline lineno="91"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="92"><highlight class="comment"><sp/>*<sp/>Same<sp/>6-param<sp/>signature<sp/>as<sp/>gemv_fused_q5_0_bias_dispatch<sp/>—<sp/>drop-in<sp/>swap.</highlight></codeline>
+<codeline lineno="93"><highlight class="comment"><sp/>*<sp/>Quantizes<sp/>x<sp/>(FP32→Q8_0)<sp/>once<sp/>serially,<sp/>then<sp/>runs<sp/>the<sp/>parallel<sp/>GEMV.</highlight></codeline>
+<codeline lineno="94"><highlight class="comment"><sp/>*<sp/>Quantization<sp/>is<sp/>O(K)<sp/>=<sp/>896<sp/>elements<sp/>≈<sp/>negligible<sp/>vs.<sp/>O(M*K)<sp/>GEMV.</highlight></codeline>
+<codeline lineno="95"><highlight class="comment"><sp/>*<sp/>---------------------------------------------------------------------------<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="96" refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" kindref="member">gemv_fused_q5_0_bias_parallel_omp</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="97"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="98"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
+<codeline lineno="99"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*bias,</highlight></codeline>
+<codeline lineno="100"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K)</highlight></codeline>
+<codeline lineno="101"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="102"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q5__0" kindref="compound">block_q5_0</ref><sp/>*w_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q5__0" kindref="compound">block_q5_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="103"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" kindref="member">QK5_0</ref>;</highlight></codeline>
+<codeline lineno="104"><highlight class="normal"></highlight></codeline>
+<codeline lineno="105"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Quantize<sp/>input<sp/>ONCE<sp/>(serial,<sp/>fast<sp/>—<sp/>K=896<sp/>→<sp/>28<sp/>blocks<sp/>=<sp/>952<sp/>bytes)<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="106"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>x_q8[K<sp/>/<sp/><ref refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" kindref="member">QK8_0</ref>];</highlight></codeline>
+<codeline lineno="107"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="gemv__omp_8c_1aaed08819c4a21e49ca43bc3094022eaa" kindref="member">quantize_row_q8_0</ref>(x,<sp/>(</highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*)x_q8,<sp/>K);</highlight></codeline>
+<codeline lineno="108"><highlight class="normal"></highlight></codeline>
+<codeline lineno="109"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Parallel<sp/>GEMV<sp/>over<sp/>output<sp/>rows<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="110"><highlight class="normal"></highlight><highlight class="preprocessor"><sp/><sp/><sp/><sp/>#pragma<sp/>omp<sp/>parallel<sp/>for<sp/>schedule(static)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="111"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>0;<sp/>row<sp/>&lt;<sp/>M;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="112"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemv__omp_8c_1a8744a3b1e4d1dc928fce050f111414a6" kindref="member">vec_dot_q5_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="113"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="114"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_q8);</highlight></codeline>
+<codeline lineno="115"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(bias)<sp/>y[row]<sp/>+=<sp/>bias[row];</highlight></codeline>
+<codeline lineno="116"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="117"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemv_omp.c"/>
+  </compounddef>
+</doxygen>

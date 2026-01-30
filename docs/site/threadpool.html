@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThreadPool | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<div class="hero">
+    <h1>CK-Engine Thread Pool</h1>
+    <p>A plain-English deep dive into how persistent pthread thread pools work,
+       why they exist, and how they compare to OpenMP and memory pools.</p>
+    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+        <span class="badge badge-green">ck_threadpool.c</span>
+        <span class="badge badge-orange">Sub-&micro;s Dispatch</span>
+        <span class="badge badge-grey">Spin + Condvar Hybrid</span>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top:0;">Contents</h3>
+    <ol>
+        <li><a href="#what-is-a-pool">What Is a "Pool"? (The Core Idea)</a></li>
+        <li><a href="#why-not-openmp">The Problem: Why Not Just Use OpenMP?</a></li>
+        <li><a href="#anatomy">Anatomy of CK-Engine's Thread Pool</a></li>
+        <li><a href="#lifecycle">Lifecycle: Create &rarr; Dispatch &rarr; Destroy</a></li>
+        <li><a href="#dispatch-deep">Dispatch Deep Dive: What Actually Happens</a></li>
+        <li><a href="#spin-vs-sleep">Spin-Wait vs. Sleep: The Hybrid Polling Design</a></li>
+        <li><a href="#atomics-mutex">Atomics, Mutexes, and Memory Ordering</a></li>
+        <li><a href="#cache-lines">Cache Lines &amp; False Sharing</a></li>
+        <li><a href="#barrier">The Barrier: How Threads Synchronize</a></li>
+        <li><a href="#vs-openmp">Thread Pool vs. OpenMP &mdash; Side-by-Side</a></li>
+        <li><a href="#vs-mempool">Thread Pool vs. Memory Pool &mdash; Same Idea, Different Resource</a></li>
+        <li><a href="#why-faster">Why Is It Faster?</a></li>
+        <li><a href="#real-numbers">Real Numbers: Before &amp; After</a></li>
+    </ol>
+</div>
+
+<h2 id="what-is-a-pool"><span class="section-num">&sect;1</span> What Is a "Pool"?</h2>
+
+<p>A pool is a set of expensive resources you create <strong>once</strong> and reuse over and over,
+instead of creating and destroying them every time you need one.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Analogy:</strong> Imagine a restaurant kitchen with 4 chefs.<br><br>
+        <strong>No pool:</strong> Every time an order comes in, go out on the street, hire 3 chefs,
+        cook the meal, then fire them all. Next order &mdash; hire 3 more chefs. <em>(This is what OpenMP does.)</em><br><br>
+        <strong>Pool:</strong> Hire 3 chefs on day one. They stand ready at their stations.
+        Order comes in &mdash; you shout "Go!" and all 4 of you (including yourself) cook simultaneously.
+        Between orders, chefs wait at their stations. <em>(This is a thread pool.)</em>
+    </div>
+</div>
+
+<p>The word "pool" shows up in many places in systems programming:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Thread Pool</h3>
+        <p>Pre-created threads waiting for work. Avoids spawn/join overhead per task.</p>
+    </div>
+    <div class="card">
+        <h3>Memory Pool</h3>
+        <p>Pre-allocated memory blocks. Avoids <code>malloc</code>/<code>free</code> overhead per allocation.</p>
+    </div>
+    <div class="card">
+        <h3>Connection Pool</h3>
+        <p>Pre-opened database/network connections. Avoids TCP handshake per query.</p>
+    </div>
+    <div class="card">
+        <h3>Object Pool</h3>
+        <p>Pre-constructed objects (e.g. game entities). Avoids constructor/destructor overhead.</p>
+    </div>
+</div>
+
+<p>The common pattern: <strong>creating the resource is expensive; using it is cheap.</strong>
+A pool pays the creation cost once, then amortizes it over thousands of uses.</p>
+
+<h2 id="why-not-openmp"><span class="section-num">&sect;2</span> The Problem: Why Not Just Use OpenMP?</h2>
+
+<p>OpenMP looks appealing &mdash; just add <code>#pragma omp parallel for</code> and you get parallelism. But there's a hidden cost.</p>
+
+<p>During inference, CK-Engine runs the transformer decode loop. For each token generated,
+it calls kernel functions (matrix-vector multiplies, RMSNorm, SwiGLU, etc.) roughly
+<strong>500+ times</strong>. Each call is a short burst of work (microseconds to low milliseconds).</p>
+
+<h3>OpenMP's Fork/Join Model</h3>
+
+<div class="diagram"><span class="dim">// Every single #pragma omp parallel does this:</span>
+
+  Main thread
+       |
+       |&mdash;&mdash; <span class="wrn">fork</span> &mdash;&mdash;&gt;  [spawn/wake N threads]       <span class="err">&larr; 50&ndash;200 &micro;s overhead</span>
+       |              |   |   |   |
+       |              <span class="grn">work work work work</span>           <span class="dim">&larr; actual compute (maybe 20 &micro;s)</span>
+       |              |   |   |   |
+       |&lt;&mdash; <span class="wrn">join</span> &mdash;&mdash;&mdash;  [wait + tear down]          <span class="err">&larr; 50&ndash;200 &micro;s overhead</span>
+       |
+       |&mdash;&mdash; <span class="wrn">fork</span> &mdash;&mdash;&gt;  [spawn/wake again]          <span class="err">&larr; overhead AGAIN</span>
+       |              ...
+       v
+  <span class="err">500+ fork/joins per token!</span></div>
+
+<p>With each fork/join costing 50&ndash;200&micro;s and 500+ kernel calls per token:</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>The math:</strong> 500 calls &times; 100&micro;s overhead = <strong>50ms of pure overhead per token</strong> &mdash;
+        just from spawning and joining threads, before any useful work is done.
+        The actual compute per kernel might only be 20&micro;s!
+    </div>
+</div>
+
+<h3>Real Measurement from CK-Engine (gemv_omp.c)</h3>
+
+<pre><code>/*
+ * Measured on i7-3630QM (4C/8T), Qwen 0.5B:
+ *   Serial kernels:   170 ms/tok  (5.9 tok/s)
+ *   OMP parallel:     327 ms/tok  (3.1 tok/s)  &larr; 1.9x SLOWER
+ *
+ * The math is correct (10/10 parity tests pass) but the
+ * threading model is wrong for this workload.
+ */</code></pre>
+
+<p>OpenMP parallelism made it <strong>almost 2x slower</strong>. The fork/join overhead
+completely ate the parallelism gains and then some.</p>
+
+<h2 id="anatomy"><span class="section-num">&sect;3</span> Anatomy of CK-Engine's Thread Pool</h2>
+
+<p>Let's look at the actual data structure. Every field exists for a specific reason.</p>
+
+<pre><code>struct ck_threadpool {
+    /* --- Dispatch state (each on its own cache line) --- */
+    _Alignas(64) atomic_int   n_dispatch;   // bumped to wake workers
+    _Alignas(64) atomic_int   n_complete;   // workers signal "I'm done"
+    _Alignas(64) ck_work_fn_t work_fn;      // pointer to current kernel
+                 void        *work_args;    // arguments for the kernel
+
+    /* --- Barrier for mid-kernel sync --- */
+    ck_barrier_t barrier;
+
+    /* --- Worker management --- */
+    int          n_threads;    // total (including main)
+    ck_worker_t  workers[64];  // thread handles
+
+    /* --- Shutdown / pause --- */
+    _Alignas(64) atomic_int stop;    // set to 1 to kill workers
+    _Alignas(64) atomic_int paused;  // set to 1 for power saving
+
+    /* --- Hybrid sleep mechanism --- */
+    pthread_mutex_t mutex;
+    pthread_cond_t  cond_dispatch; // workers sleep here
+    pthread_cond_t  cond_done;     // main sleeps here
+};</code></pre>
+
+<h3>Why <code>_Alignas(64)</code> Everywhere?</h3>
+<p>Each atomic counter is placed on its own <strong>64-byte cache line</strong>.
+This prevents "false sharing" &mdash; where two unrelated variables on the same
+cache line cause all CPU cores to fight over that cache line.
+<a href="#cache-lines">More on this in &sect;8.</a></p>
+
+<h3>The Worker Struct</h3>
+<pre><code>typedef struct {
+    pthread_t thread;            // OS thread handle
+    int       id;               // 0 = main, 1..N-1 = workers
+    struct ck_threadpool *pool; // back-pointer to the pool
+} ck_worker_t;</code></pre>
+
+<p>Thread 0 is <strong>always the main thread</strong> &mdash; the one that calls <code>ck_threadpool_dispatch()</code>.
+It doesn't get a new pthread. It does its share of the work alongside the workers.</p>
+
+<h2 id="lifecycle"><span class="section-num">&sect;4</span> Lifecycle: Create &rarr; Dispatch &rarr; Destroy</h2>
+
+<div class="card card-green">
+    <h3>1. Create &mdash; <code>ck_threadpool_create(n_threads)</code></h3>
+    <p>Called once at engine startup. Allocates the pool struct (cache-line aligned),
+    then spawns N&minus;1 worker pthreads. Workers immediately enter the spin-wait loop.
+    The main thread is thread 0 &mdash; no extra pthread is created for it.</p>
+</div>
+
+<div class="card card-accent">
+    <h3>2. Dispatch (called ~500x per token) &mdash; <code>ck_threadpool_dispatch(pool, fn, args)</code></h3>
+    <p>Sets the work function + args, bumps <code>n_dispatch</code> (an atomic counter), and
+    signals sleeping workers via condvar. Main thread also runs its share. All threads do their chunk,
+    then main waits for <code>n_complete</code> to hit N&minus;1.</p>
+</div>
+
+<div class="card card-blue">
+    <h3>3. Pause/Resume (between batches)</h3>
+    <p>Between user interactions (waiting for input), workers can be paused
+    so they sleep on a condvar and use 0% CPU. Resume wakes them instantly.</p>
+</div>
+
+<div class="card">
+    <h3>4. Destroy &mdash; <code>ck_threadpool_destroy(pool)</code></h3>
+    <p>Sets <code>stop = 1</code>, broadcasts the condvar to wake sleeping workers,
+    then <code>pthread_join</code>s every worker thread. Frees the pool memory.</p>
+</div>
+
+<h3>Global Pool Convenience</h3>
+<p>For CK-Engine, there's a <strong>global singleton</strong> pool accessed via
+<code>ck_threadpool_global()</code>. It uses <code>pthread_once</code> to ensure
+thread-safe lazy initialization &mdash; no matter how many threads call it simultaneously,
+the pool is created exactly once.</p>
+
+<pre><code>static ck_threadpool_t *g_threadpool = NULL;
+static pthread_once_t  g_threadpool_once = PTHREAD_ONCE_INIT;
+
+ck_threadpool_t *ck_threadpool_global(void) {
+    pthread_once(&amp;g_threadpool_once, global_pool_init);
+    return g_threadpool;
+}</code></pre>
+
+<h2 id="dispatch-deep"><span class="section-num">&sect;5</span> Dispatch Deep Dive: What Actually Happens</h2>
+
+<p>Let's trace exactly what happens when CK-Engine needs to run one kernel across 4 threads.</p>
+
+<div class="diagram"><span class="hl">ck_threadpool_dispatch(pool, gemv_q8_0, &amp;args)</span>
+
+<span class="grn">MAIN THREAD (ith=0)</span>                          <span class="purple">WORKER 1</span>        <span class="purple">WORKER 2</span>        <span class="purple">WORKER 3</span>
+     |                                       [spinning]      [spinning]      [spinning]
+     |                                       checking        checking        checking
+     |  <span class="wrn">pool-&gt;work_fn = gemv_q8_0</span>           n_dispatch      n_dispatch      n_dispatch
+     |  <span class="wrn">pool-&gt;work_args = &amp;args</span>             ...             ...             ...
+     |  <span class="wrn">n_complete = 0</span>                       ...             ...             ...
+     |                                       ...             ...             ...
+     |  <span class="hl">atomic n_dispatch++ </span>  &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&gt;    <span class="grn">WAKE!</span>           <span class="grn">WAKE!</span>           <span class="grn">WAKE!</span>
+     |  condvar broadcast  &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&gt;    (if sleeping)   (if sleeping)   (if sleeping)
+     |                                       |               |               |
+     | <span class="grn">gemv(0, 4, args)</span>                     <span class="grn">gemv(1,4,args)</span>  <span class="grn">gemv(2,4,args)</span>  <span class="grn">gemv(3,4,args)</span>
+     | rows 0..249                           rows 250..499   rows 500..749   rows 750..999
+     |   ...done                               ...done         ...done         ...done
+     |                                       |               |               |
+     |                                       n_complete++    n_complete++    n_complete++
+     |                                       <span class="dim">(back to spin)</span>  <span class="dim">(back to spin)</span>  last one signals
+     | <span class="wrn">spin-wait: n_complete == 3?</span>                                          <span class="hl">cond_signal!</span>
+     | <span class="grn">YES &rarr; return</span>
+     |
+     v  <span class="dim">next kernel call...</span></div>
+
+<h3>Key Details</h3>
+<ul>
+    <li><strong>No thread creation.</strong> Workers are already alive, spinning or sleeping. The only cost is bumping an atomic counter.</li>
+    <li><strong>Main thread participates.</strong> Thread 0 does 1/N of the work alongside the workers. No wasted CPU.</li>
+    <li><strong>Single-thread fast path.</strong> If <code>n_threads == 1</code>, dispatch just calls <code>fn(0, 1, args)</code> directly &mdash; zero overhead.</li>
+    <li><strong>Completion tracking.</strong> Each worker atomically increments <code>n_complete</code>. The last worker (N&minus;2-th increment) signals the condvar to wake main if it fell asleep waiting.</li>
+</ul>
+
+<h3>Inside the Work Function</h3>
+<p>Each kernel receives <code>(ith, nth, args)</code> and partitions work by thread index:</p>
+
+<pre><code>void gemv_parallel(int ith, int nth, void *args) {
+    gemv_args_t *a = args;
+    // Each thread computes its slice of output rows
+    int rows_per_thread = a-&gt;M / nth;
+    int start = ith * rows_per_thread;
+    int end   = (ith == nth - 1) ? a-&gt;M : start + rows_per_thread;
+
+    for (int row = start; row &lt; end; row++) {
+        vec_dot(a-&gt;K, &amp;a-&gt;y[row], a-&gt;W + row * a-&gt;K, a-&gt;x);
+    }
+}</code></pre>
+
+<h2 id="spin-vs-sleep"><span class="section-num">&sect;6</span> Spin-Wait vs. Sleep: The Hybrid Polling Design</h2>
+
+<p>How do worker threads wait for work? There are two extremes, and CK-Engine uses both.</p>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3>Pure Spin-Wait</h3>
+        <p>Thread sits in a tight loop checking an atomic variable: <code>while (no_work) { _mm_pause(); }</code></p>
+        <p><span class="good">PRO: Instant wake-up (nanoseconds)</span><br>
+        <span class="bad">CON: Burns 100% CPU while waiting</span></p>
+    </div>
+    <div class="card card-blue">
+        <h3>Pure Condvar Sleep</h3>
+        <p>Thread calls <code>pthread_cond_wait()</code> and the OS puts it to sleep.</p>
+        <p><span class="good">PRO: Zero CPU while waiting</span><br>
+        <span class="bad">CON: Wake-up takes 5&ndash;50&micro;s (kernel context switch)</span></p>
+    </div>
+</div>
+
+<h3>CK-Engine's Hybrid Approach</h3>
+<p>Workers do <strong>both</strong>:</p>
+<ol>
+    <li>First, spin for <code>CK_THREADPOOL_SPIN_COUNT</code> (1024) iterations, checking the atomic dispatch counter.</li>
+    <li>If no work arrives during spin, fall back to <code>pthread_cond_wait()</code> (sleep).</li>
+    <li>When new work arrives, spinning workers wake <strong>instantly</strong>; sleeping workers wake via condvar broadcast.</li>
+</ol>
+
+<pre><code>// worker_main() &mdash; the hybrid wait loop
+for (;;) {
+    int spins = 0;
+    for (;;) {
+        if (atomic_load(&amp;pool-&gt;stop))  return NULL;  // shutdown?
+
+        int current = atomic_load(&amp;pool-&gt;n_dispatch);
+        if (current != last_dispatch) {              // new work!
+            last_dispatch = current;
+            break;                                   // go execute
+        }
+
+        _mm_pause();    // x86 hint: "I'm spinning, save power"
+        spins++;
+
+        if (spins &gt;= 1024) {                        // tired of spinning?
+            pthread_mutex_lock(&amp;pool-&gt;mutex);
+            // Re-check under lock (avoid missed wakeup!)
+            if (no_new_work &amp;&amp; !stopping)
+                pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);
+            pthread_mutex_unlock(&amp;pool-&gt;mutex);
+            spins = 0;
+        }
+    }
+    // execute work...
+}</code></pre>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Why re-check under the lock?</strong> This avoids the "missed wakeup" race condition.
+        Without it: main could bump <code>n_dispatch</code> and broadcast <em>between</em> the worker's
+        last spin check and its <code>cond_wait</code> call. The worker would then sleep forever,
+        never seeing the work. The lock + re-check makes this impossible.
+    </div>
+</div>
+
+<h3>What Is <code>_mm_pause()</code>?</h3>
+<p>It's an x86 intrinsic that tells the CPU: "I'm in a spin-wait loop." The CPU can then:</p>
+<ul>
+    <li>Reduce power consumption of the spinning core</li>
+    <li>Free up execution resources for the sibling hyper-thread</li>
+    <li>Avoid memory-order violations that would require pipeline flushes</li>
+</ul>
+<p>On non-x86 (ARM, etc.), CK-Engine defines <code>CK_SPIN_PAUSE()</code> as a no-op.</p>
+
+<h2 id="atomics-mutex"><span class="section-num">&sect;7</span> Atomics, Mutexes, and Memory Ordering</h2>
+
+<p>These are the fundamental building blocks of any concurrent system. Let's understand each one from scratch.</p>
+
+<h3>What Is an Atomic Operation?</h3>
+<p>An <strong>atomic</strong> operation is one that completes in a single, indivisible step
+from the perspective of all other threads. No other thread can see a "half-done" state.</p>
+
+<div class="diagram"><span class="err">WITHOUT atomics</span> (broken):               <span class="grn">WITH atomics</span> (correct):
+
+  Thread A: read counter (= 5)              Thread A: <span class="hl">atomic_fetch_add</span>(&amp;counter, 1)
+  Thread B: read counter (= 5)                        <span class="dim">&rarr; hardware guarantees only one</span>
+  Thread A: write counter = 6                           <span class="dim">  thread touches it at a time</span>
+  Thread B: write counter = 6               Thread B: <span class="hl">atomic_fetch_add</span>(&amp;counter, 1)
+
+  Result: counter = <span class="err">6</span> (should be 7!)       Result: counter = <span class="grn">7</span> (correct)</div>
+
+<p>CK-Engine uses atomics for:</p>
+<ul>
+    <li><code>n_dispatch</code> &mdash; the "new work available" counter. Main increments it; workers read it.</li>
+    <li><code>n_complete</code> &mdash; workers increment when done. Main reads it to know when all are finished.</li>
+    <li><code>n_arrived</code> (barrier) &mdash; threads increment when reaching the barrier point.</li>
+    <li><code>stop</code>, <code>paused</code> &mdash; simple flags, but still need atomic reads/writes for visibility across cores.</li>
+</ul>
+
+<h3>Memory Ordering</h3>
+<p>CPUs and compilers can <strong>reorder</strong> memory operations for performance.
+Memory ordering tells them: "don't reorder <em>this</em> particular operation past certain points."</p>
+
+<table>
+    <tr>
+        <th>Ordering</th>
+        <th>What It Means</th>
+        <th>Used In CK-Engine For</th>
+    </tr>
+    <tr>
+        <td><code>memory_order_relaxed</code></td>
+        <td>No ordering guarantee. Just make the read/write atomic.</td>
+        <td>Resetting <code>n_arrived</code> (only writer, no dependency)</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_acquire</code></td>
+        <td>All reads/writes <strong>after</strong> this load cannot be moved <strong>before</strong> it.</td>
+        <td>Workers reading <code>n_dispatch</code> &mdash; must see <code>work_fn</code>/<code>work_args</code> written before</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_release</code></td>
+        <td>All reads/writes <strong>before</strong> this store cannot be moved <strong>after</strong> it.</td>
+        <td>Main bumping <code>n_dispatch</code> &mdash; ensures <code>work_fn</code>/<code>work_args</code> are visible</td>
+    </tr>
+    <tr>
+        <td><code>memory_order_acq_rel</code></td>
+        <td>Both acquire and release. Full fence in both directions.</td>
+        <td><code>fetch_add</code> on <code>n_complete</code> and <code>n_arrived</code></td>
+    </tr>
+</table>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Why does this matter?</strong> Without proper ordering, the main thread could bump
+        <code>n_dispatch</code> but the worker might read the <em>old</em> <code>work_fn</code> pointer (from a previous dispatch)
+        because the CPU reordered the stores. The <code>release</code> on the store and <code>acquire</code> on the load
+        form a <strong>happens-before</strong> relationship that prevents this.
+    </div>
+</div>
+
+<h3>What Is a Mutex?</h3>
+<p>A <strong>mutex</strong> (mutual exclusion) is a lock. Only one thread can hold it at a time.
+Everyone else waits. CK-Engine uses mutexes <em>only</em> for the condvar sleep mechanism &mdash;
+the hot path (spin-wait) doesn't touch the mutex at all.</p>
+
+<pre><code>// Mutex usage &mdash; only in the cold sleep path
+pthread_mutex_lock(&amp;pool-&gt;mutex);
+  // Re-check condition (avoid lost wakeup)
+  if (still_no_work)
+      pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);
+      //     ^^ releases mutex, sleeps, re-acquires on wake
+pthread_mutex_unlock(&amp;pool-&gt;mutex);</code></pre>
+
+<h3>What Is a Condition Variable (Condvar)?</h3>
+<p>A condvar lets a thread say: "Wake me up when something changes." It works together with a mutex:</p>
+<ol>
+    <li><strong>Wait side:</strong> Lock mutex &rarr; check condition &rarr; if false, <code>cond_wait</code> (atomically releases mutex + sleeps) &rarr; on wake, re-acquires mutex</li>
+    <li><strong>Signal side:</strong> Lock mutex &rarr; change state &rarr; <code>cond_broadcast</code> (wakes all waiters) &rarr; unlock</li>
+</ol>
+<p>CK-Engine has two condvars:</p>
+<ul>
+    <li><code>cond_dispatch</code> &mdash; workers wait here when idle (no work to do)</li>
+    <li><code>cond_done</code> &mdash; main thread waits here when all workers are still busy</li>
+</ul>
+
+<h2 id="cache-lines"><span class="section-num">&sect;8</span> Cache Lines &amp; False Sharing</h2>
+
+<p>This is one of the most important performance concepts in multi-threaded code.</p>
+
+<h3>How CPU Caches Work (Simplified)</h3>
+<p>CPUs don't read individual bytes from RAM. They read in <strong>cache lines</strong> &mdash;
+64-byte chunks. When one core writes to a cache line, <em>all other cores that have a copy
+of that line must invalidate it</em> (MESI protocol). This is called a <strong>cache coherency miss</strong>.</p>
+
+<div class="diagram">
+<span class="dim">FALSE SHARING: Two unrelated variables on the SAME cache line</span>
+
+                    <span class="err">64-byte cache line</span>
+  +------------------------------------------------------------+
+  |  <span class="hl">n_dispatch</span> (4 bytes)  |  <span class="purple">n_complete</span> (4 bytes)  | padding |
+  +------------------------------------------------------------+
+       ^                          ^
+       Core 0 writes              Core 1 writes
+       (bumps dispatch)           (bumps complete)
+
+  <span class="err">PROBLEM: Every write by Core 0 invalidates Core 1's cache,</span>
+  <span class="err">         and vice versa. Both cores stall on every access!</span>
+
+
+<span class="dim">FIXED: Each variable on its OWN cache line</span>
+
+  <span class="grn">Cache line 1 (64 bytes)</span>              <span class="grn">Cache line 2 (64 bytes)</span>
+  +--------------------------+        +--------------------------+
+  |  <span class="hl">n_dispatch</span>  |  padding  |        |  <span class="purple">n_complete</span>  |  padding  |
+  +--------------------------+        +--------------------------+
+       ^                                    ^
+       Core 0: no conflict                  Core 1: no conflict</div>
+
+<p>This is why every <code>atomic_int</code> in the pool struct has <code>_Alignas(64)</code> &mdash;
+it forces each one onto its own cache line, eliminating false sharing entirely.</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>How bad is false sharing?</strong> On modern x86, a cache coherency miss costs
+        ~40&ndash;100 nanoseconds. In a tight spin-wait loop executing billions of iterations,
+        this can reduce throughput by 10&ndash;50x. It's one of the most common multi-threaded performance bugs.
+    </div>
+</div>
+
+<h2 id="barrier"><span class="section-num">&sect;9</span> The Barrier: How Threads Synchronize</h2>
+
+<p>A barrier is a meeting point. All threads must arrive before any can proceed.</p>
+
+<p>CK-Engine implements a custom spin-wait barrier using two atomic counters:
+<code>n_arrived</code> (how many threads reached the barrier) and <code>n_phase</code>
+(which "round" of the barrier we're on).</p>
+
+<pre><code>// barrier_wait() &mdash; ck_threadpool.c:89&ndash;111
+static void barrier_wait(ck_barrier_t *b) {
+    const int phase = atomic_load(&amp;b-&gt;n_phase);
+
+    if (atomic_fetch_add(&amp;b-&gt;n_arrived, 1) == n - 1) {
+        // I'm the LAST thread to arrive
+        atomic_store(&amp;b-&gt;n_arrived, 0);       // reset for next use
+        atomic_store(&amp;b-&gt;n_phase, phase + 1); // advance phase
+    } else {
+        // NOT the last thread &mdash; spin until phase advances
+        while (atomic_load(&amp;b-&gt;n_phase) == phase) {
+            _mm_pause();
+        }
+    }
+}</code></pre>
+
+<div class="diagram">
+<span class="dim">4-thread barrier example:</span>
+
+  Thread 0  Thread 1  Thread 2  Thread 3
+     |         |         |         |
+     |  <span class="grn">arrive</span> |         |         |       n_arrived = 1, phase = 0
+     |         |  <span class="grn">arrive</span> |         |       n_arrived = 2, phase = 0
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |         |
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="grn">arrive</span> |       n_arrived = 3, phase = 0
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |
+     |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   |  <span class="dim">spin</span>   | <span class="hl">arrive</span> n_arrived = 4 == N &rarr; <span class="hl">LAST!</span>
+     |         |         |         |       reset n_arrived = 0
+     |         |         |         |       <span class="hl">phase = 1</span>
+     |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    |  <span class="grn">GO!</span>    all see phase changed
+     v         v         v         v</div>
+
+<p>The phase counter trick allows the barrier to be reused without an explicit reset &mdash;
+each barrier use just increments the phase. After many spins without the last thread arriving,
+threads call <code>sched_yield()</code> to be nice to the OS on oversubscribed systems.</p>
+
+<h2 id="vs-openmp"><span class="section-num">&sect;10</span> Thread Pool vs. OpenMP &mdash; Side-by-Side</h2>
+
+<table>
+    <tr>
+        <th>Aspect</th>
+        <th>OpenMP</th>
+        <th>CK Thread Pool</th>
+    </tr>
+    <tr>
+        <td>Thread lifetime</td>
+        <td>Created per <code>#pragma</code> region (or pooled by runtime &mdash; inconsistent)</td>
+        <td class="good">Created once at startup, live until shutdown</td>
+    </tr>
+    <tr>
+        <td>Dispatch cost</td>
+        <td class="bad">50&ndash;200 &micro;s (fork/join overhead)</td>
+        <td class="good">&lt; 1 &micro;s (atomic increment + optional condvar signal)</td>
+    </tr>
+    <tr>
+        <td>Control over scheduling</td>
+        <td>Limited (<code>schedule(static)</code>, <code>dynamic</code>)</td>
+        <td class="good">Full &mdash; you write the partition logic</td>
+    </tr>
+    <tr>
+        <td>Idle CPU usage</td>
+        <td class="meh">Implementation-dependent (some spin, some sleep)</td>
+        <td class="good">Configurable: spin &rarr; condvar sleep &rarr; pause</td>
+    </tr>
+    <tr>
+        <td>Barrier</td>
+        <td>Implicit at end of parallel region</td>
+        <td>Explicit <code>ck_threadpool_barrier()</code></td>
+    </tr>
+    <tr>
+        <td>Works with short kernels?</td>
+        <td class="bad">No &mdash; overhead dominates</td>
+        <td class="good">Yes &mdash; designed for thousands of tiny dispatches</td>
+    </tr>
+    <tr>
+        <td>Code complexity</td>
+        <td class="good">One line: <code>#pragma omp parallel for</code></td>
+        <td class="bad">Must write work function, manage pool lifecycle</td>
+    </tr>
+    <tr>
+        <td>Portability</td>
+        <td class="good">Standard, compiler-supported everywhere</td>
+        <td class="meh">POSIX pthreads (Linux/macOS)</td>
+    </tr>
+</table>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+        <strong>When to use what:</strong><br>
+        <strong>OpenMP</strong> is great for long-running parallel regions (scientific computing, image processing,
+        big matrix operations). One fork/join overhead amortized over milliseconds of work is fine.<br><br>
+        <strong>Thread pools</strong> are essential when you dispatch thousands of short tasks per second
+        (inference, game engines, audio processing, network servers).
+    </div>
+</div>
+
+<h2 id="vs-mempool"><span class="section-num">&sect;11</span> Thread Pool vs. Memory Pool &mdash; Same Idea, Different Resource</h2>
+
+<p>Both are "pools" &mdash; they pre-create expensive resources. The key differences are
+about <em>what</em> they pool and <em>what synchronization</em> they need.</p>
+
+<table>
+    <tr>
+        <th>Aspect</th>
+        <th>Thread Pool</th>
+        <th>Memory Pool</th>
+    </tr>
+    <tr>
+        <td>What is pooled?</td>
+        <td>OS threads (pthreads)</td>
+        <td>Memory blocks (heap allocations)</td>
+    </tr>
+    <tr>
+        <td>What is expensive?</td>
+        <td><code>pthread_create</code> / <code>pthread_join</code> (~50&ndash;200 &micro;s)</td>
+        <td><code>malloc</code> / <code>free</code> (~0.1&ndash;5 &micro;s)</td>
+    </tr>
+    <tr>
+        <td>Pool initialized with...</td>
+        <td>N live threads, waiting for work</td>
+        <td>One big block of memory, subdivided into slots</td>
+    </tr>
+    <tr>
+        <td>"Acquire" from pool</td>
+        <td><code>dispatch(fn, args)</code> &mdash; give threads work</td>
+        <td><code>pool_alloc(size)</code> &mdash; get a memory block</td>
+    </tr>
+    <tr>
+        <td>"Release" back to pool</td>
+        <td>Implicit &mdash; threads go back to waiting</td>
+        <td><code>pool_free(ptr)</code> &mdash; return block to free list</td>
+    </tr>
+    <tr>
+        <td>Synchronization needed</td>
+        <td>Atomics + condvar (dispatch/wait signaling)</td>
+        <td>Atomics or mutex (free-list management)</td>
+    </tr>
+    <tr>
+        <td>Active resources...</td>
+        <td>...execute code concurrently</td>
+        <td>...hold data passively</td>
+    </tr>
+</table>
+
+<h3>The Deeper Conceptual Link</h3>
+
+<div class="diagram">
+<span class="dim">The pool pattern in both cases:</span>
+
+  <span class="hl">Thread Pool</span>                              <span class="purple">Memory Pool</span>
+
+  +---------------------+                 +---------------------+
+  |    STARTUP (once)   |                 |    STARTUP (once)   |
+  |  Create N threads   |                 |  malloc(big_block)  |
+  |  All threads idle   |                 |  Carve into slots   |
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |   HOT PATH (fast)   |                 |   HOT PATH (fast)   |
+  |  dispatch(fn, args) |                 |  slot = pool_alloc()|
+  |  <span class="grn">&lt; 1 us</span>              |                 |  <span class="grn">&lt; 0.05 us</span>           |
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |   RETURN TO POOL    |                 |   RETURN TO POOL    |
+  |  Threads go idle    |                 |  pool_free(slot)    |
+  |  (spin or sleep)    |                 |  (back to free list)|
+  +---------+-----------+                 +---------+-----------+
+            |                                       |
+            v                                       v
+  +---------------------+                 +---------------------+
+  |  SHUTDOWN (once)    |                 |  SHUTDOWN (once)    |
+  |  join all threads   |                 |  free(big_block)    |
+  +---------------------+                 +---------------------+</div>
+
+<h3>Synchronization Comparison</h3>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3>Thread Pool Sync</h3>
+        <p><code>atomic_int</code> for dispatch/complete counters (hot path).<br>
+        <code>pthread_mutex + cond</code> for sleep fallback (cold path).<br>
+        <code>_mm_pause()</code> spin hint for low-latency wake.<br>
+        <code>memory_order_acquire/release</code> to publish work descriptor.</p>
+    </div>
+    <div class="card card-blue">
+        <h3>Memory Pool Sync</h3>
+        <p>Atomic CAS for lock-free free-list (typical).<br>
+        Or a simple mutex around the free-list pointer.<br>
+        Bump allocator variant needs <strong>zero sync</strong> (per-thread pools).<br>
+        No condvars needed &mdash; memory doesn't need to "wake up."</p>
+    </div>
+</div>
+
+<h2 id="why-faster"><span class="section-num">&sect;12</span> Why Is It Faster?</h2>
+
+<h3>Cost Breakdown: OpenMP vs. Thread Pool</h3>
+
+<div class="diagram">
+<span class="dim">Per-kernel dispatch cost comparison (4 threads, x86-64):</span>
+
+  <span class="err">OpenMP fork/join:</span>
+  +------------------------------------------------------------------+
+  |  <span class="wrn">pthread_create x3</span>  |  <span class="grn">work</span>  |  <span class="wrn">pthread_join x3</span>  |  <span class="dim">scheduler</span> |
+  |  ~~~100 us~~~~~~~  |  20us  |  ~~~100 us~~~~~~  |  ~20 us~~  |
+  +------------------------------------------------------------------+
+  Total: ~240 us  (only 20 us is useful work!)
+
+  <span class="grn">Thread pool dispatch:</span>
+  +---------------------------------------+
+  | <span class="hl">atomic++</span> |  <span class="grn">work</span>  | <span class="hl">spin check</span>       |
+  |  ~0.1us  |  20us  |  ~0.1us          |
+  +---------------------------------------+
+  Total: ~20.2 us  (99% is useful work!)</div>
+
+<h3>The Five Reasons It's Faster</h3>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3>1. No Thread Creation</h3>
+        <p><code>pthread_create</code> involves a system call, stack allocation (~8MB virtual),
+        kernel scheduling setup, and TLS initialization. The thread pool does this <strong>once</strong>.
+        Subsequent dispatches just flip an atomic counter &mdash; a single CPU instruction.</p>
+    </div>
+    <div class="card card-green">
+        <h3>2. No Join Overhead</h3>
+        <p><code>pthread_join</code> involves a system call + scheduler interaction to reap the thread.
+        The pool never joins during work &mdash; completion is tracked with a simple atomic counter.</p>
+    </div>
+    <div class="card card-green">
+        <h3>3. Warm Caches</h3>
+        <p>Persistent threads keep their L1/L2 caches warm across dispatches.
+        A fresh thread starts with cold caches and must re-fetch everything from L3/RAM.</p>
+    </div>
+    <div class="card card-green">
+        <h3>4. No Kernel Involvement</h3>
+        <p>The spin-wait hot path is entirely in userspace. No system calls, no context switches,
+        no kernel scheduler decisions. Just atomic loads in a tight loop.</p>
+    </div>
+    <div class="card card-green">
+        <h3>5. Main Thread Participates</h3>
+        <p>The main thread doesn't just wait &mdash; it does 1/N of the work. With OpenMP,
+        the orchestration thread often sits idle during the parallel region. CK-Engine wastes zero cores.</p>
+    </div>
+    <div class="card card-blue">
+        <h3>Bonus: Power Management</h3>
+        <p>Between inference batches (e.g., waiting for user input), workers sleep on a condvar
+        using <strong>0% CPU</strong>. No busy-waiting during idle periods. OpenMP's behavior
+        here varies by implementation and is often wasteful.</p>
+    </div>
+</div>
+
+<h2 id="real-numbers"><span class="section-num">&sect;13</span> Real Numbers: Before &amp; After</h2>
+
+<p>Measured on i7-3630QM (4 cores / 8 threads), Qwen2 0.5B model, Q4_K_M quantization.</p>
+
+<table>
+    <tr>
+        <th>Configuration</th>
+        <th>ms/token</th>
+        <th>Tokens/sec</th>
+        <th>Relative</th>
+    </tr>
+    <tr>
+        <td>Serial (single-threaded)</td>
+        <td>170</td>
+        <td>5.9</td>
+        <td>baseline</td>
+    </tr>
+    <tr>
+        <td>OpenMP <code>#pragma omp parallel for</code></td>
+        <td class="bad">327</td>
+        <td class="bad">3.1</td>
+        <td class="bad">1.9x slower</td>
+    </tr>
+    <tr>
+        <td>Persistent pthread thread pool</td>
+        <td class="good">&mdash;</td>
+        <td class="good">&mdash;</td>
+        <td class="good">Expected: 2&ndash;4x faster than serial</td>
+    </tr>
+</table>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The key insight:</strong> OpenMP didn't fail because parallelism is bad. It failed because
+        the <em>overhead of setting up parallelism</em> exceeded the actual work being parallelized.
+        The thread pool removes that overhead, letting the parallelism actually help.
+    </div>
+</div>
+
+<h3>Where Does Overhead Go?</h3>
+
+<div class="diagram">
+<span class="dim">500 kernel calls per token, 4 threads:</span>
+
+  <span class="err">OpenMP overhead per token:</span>
+    500 calls x ~200us fork/join = <span class="err">100,000 us = 100 ms</span> (wasted)
+    + actual compute:               ~70 ms  (useful)
+    = total:                        <span class="err">170+ ms</span> (but measured 327ms due to
+                                             cache thrashing, scheduler overhead)
+
+  <span class="grn">Thread pool overhead per token:</span>
+    500 calls x ~0.2us dispatch =  <span class="grn">100 us = 0.1 ms</span> (wasted)
+    + actual compute:               ~70 ms  (useful)
+    = total:                        <span class="grn">~70 ms</span>
+
+  Dispatch overhead: <span class="err">100 ms</span> (OpenMP) vs <span class="grn">0.1 ms</span> (pool) = <span class="hl">1000x less overhead</span></div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-29</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

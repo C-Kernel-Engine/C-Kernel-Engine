@@ -488,6 +488,50 @@
         <references refid="structblock__q8__0_1ac6f2ca6c9108456b6630b7f1bf874488" compoundref="ckernel__quant_8h" startline="105">block_q8_0::qs</references>
         <referencedby refid="gemm__kernels__q8__0_8c_1afe30f2146f25d6c0fbfe932d6d68ba46" compoundref="gemm__kernels__q8__0_8c" startline="805" endline="815">gemv_q8_0_backward</referencedby>
       </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q8__0_8c_1a1b368197b63d3c036bde5ce658ba7bef" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q8_0_parallel_simd</definition>
+        <argsstring>(float *y, const void *W, const float *x, int M, int K, int ith, int nth)</argsstring>
+        <name>gemv_q8_0_parallel_simd</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>x</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>ith</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>nth</declname>
+        </param>
+        <briefdescription>
+<para>Parallel SIMD GEMV for Q8_0 weights x FP32 input with prefetching. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" line="1153" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="1153" bodyend="1216"/>
+        <references refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" compoundref="gemm__kernels__q8__0_8c" startline="252" endline="275">gemv_q8_0_ref</references>
+        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
+      </memberdef>
       <memberdef kind="function" id="gemm__kernels__q8__0_8c_1ab56038b4e1cf73692b6be9c28ada9023" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
         <definition>void gemv_q8_0_q8_0</definition>
@@ -567,6 +611,95 @@
         <references refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" compoundref="gemm__kernels__q8__0_8c" startline="1013" endline="1024">vec_dot_q8_0_q8_0</references>
         <referencedby refid="ck__parity__api_8h_1ae6b6e7d7848157d54ba75f661fe9ca39" compoundref="ck__parity__api_8c" startline="186" endline="212">ck_test_gemv_q8_0</referencedby>
         <referencedby refid="ck__parity__api_8h_1a6c5534c711d8306cf8973670bc9d3cfc" compoundref="ck__parity__api_8c" startline="240" endline="264">ck_test_gemv_q8_0_q8_0</referencedby>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q8_0_q8_0_parallel</definition>
+        <argsstring>(float *y, const void *W, const void *x_q8, int M, int K, int ith, int nth)</argsstring>
+        <name>gemv_q8_0_q8_0_parallel</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>x_q8</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>ith</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>nth</declname>
+        </param>
+        <briefdescription>
+<para>Parallel reference GEMV for Q8_0 x Q8_0. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" line="1068" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="1068" bodyend="1092"/>
+        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
+        <references refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" compoundref="gemm__kernels__q8__0_8c" startline="1013" endline="1024">vec_dot_q8_0_q8_0</references>
+      </memberdef>
+      <memberdef kind="function" id="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void gemv_q8_0_q8_0_parallel_simd</definition>
+        <argsstring>(float *y, const void *W, const void *x_q8, int M, int K, int ith, int nth)</argsstring>
+        <name>gemv_q8_0_q8_0_parallel_simd</name>
+        <param>
+          <type>float *</type>
+          <declname>y</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>W</declname>
+        </param>
+        <param>
+          <type>const void *</type>
+          <declname>x_q8</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>M</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>K</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>ith</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>nth</declname>
+        </param>
+        <briefdescription>
+<para>Parallel SIMD GEMV for Q8_0 x Q8_0 with prefetching. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Each thread processes rows [r0, r1) where r0 = ith * ceil(M/nth). Prefetches upcoming weight rows to hide memory latency. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" line="1100" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c" bodystart="1100" bodyend="1148"/>
+        <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
+        <references refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" compoundref="gemm__kernels__q8__0_8c" startline="1013" endline="1024">vec_dot_q8_0_q8_0</references>
       </memberdef>
       <memberdef kind="function" id="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -648,6 +781,7 @@
         <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
         <references refid="structblock__q8__0_1ac6f2ca6c9108456b6630b7f1bf874488" compoundref="ckernel__quant_8h" startline="105">block_q8_0::qs</references>
         <referencedby refid="ckernel__engine_8h_1a3e0166eab910ca7f003602c29f428cb1" compoundref="gemm__kernels__q8__0_8c" startline="630" endline="647">gemv_q8_0</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a1b368197b63d3c036bde5ce658ba7bef" compoundref="gemm__kernels__q8__0_8c" startline="1153" endline="1216">gemv_q8_0_parallel_simd</referencedby>
       </memberdef>
       <memberdef kind="function" id="gemm__kernels__q8__0_8c_1a454391a623a91879cf0a9b4e457e5cf7" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -848,6 +982,7 @@
         <referencedby refid="ck__parity__api_8h_1a6c5534c711d8306cf8973670bc9d3cfc" compoundref="ck__parity__api_8c" startline="240" endline="264">ck_test_gemv_q8_0_q8_0</referencedby>
         <referencedby refid="ckernel__engine_8h_1ada60aced9f99494621f97100803ccde8" compoundref="prefill__fused__gemm_8c" startline="965" endline="1061">fused_mlp_swiglu_prefill_w1w2_quant</referencedby>
         <referencedby refid="ckernel__engine_8h_1afd9005557cdc687d7911f97f0bd01fbf" compoundref="prefill__fused__gemm_8c" startline="519" endline="649">fused_rmsnorm_qkv_prefill_head_major_quant</referencedby>
+        <referencedby refid="gemv__omp_8c_1a38918b47e39c93d7fc058a0f0d439ebf" compoundref="gemv__omp_8c" startline="96" endline="117">gemv_fused_q5_0_bias_parallel_omp</referencedby>
         <referencedby refid="mega__fused__attention__prefill_8c_1a883b9f36dd8db8e37e5df4037f25b86e" compoundref="mega__fused__attention__prefill_8c" startline="84" endline="102">quantize_attn_out_head_major_q8_0</referencedby>
         <referencedby refid="ckernel__engine_8h_1af9d9ddf0d4084d8eaa67118ffefc60bb" compoundref="gemm__kernels__q8__0_8c" startline="192" endline="207">quantize_batch_q8_0</referencedby>
       </memberdef>
@@ -909,6 +1044,9 @@
         <references refid="gemm__kernels__q8__0_8c_1a7522a539e09d34bc1298e9d5a3d09692" compoundref="gemm__kernels__q8__0_8c" startline="863" endline="884">vec_dot_q8_0_q8_0_ref</references>
         <referencedby refid="ck__parity__api_8h_1a6dd447ca849e7c7924ee76fa71144fcb" compoundref="ck__parity__api_8c" startline="297" endline="303">ck_test_vec_dot_q8_0_q8_0</referencedby>
         <referencedby refid="ckernel__engine_8h_1ab56038b4e1cf73692b6be9c28ada9023" compoundref="gemm__kernels__q8__0_8c" startline="1042" endline="1056">gemv_q8_0_q8_0</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" compoundref="gemm__kernels__q8__0_8c" startline="1068" endline="1092">gemv_q8_0_q8_0_parallel</referencedby>
+        <referencedby refid="gemv__omp_8c_1a96750f2ef3af257cb96144deac95ba27" compoundref="gemv__omp_8c" startline="50" endline="65">gemv_q8_0_q8_0_parallel_omp</referencedby>
+        <referencedby refid="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" compoundref="gemm__kernels__q8__0_8c" startline="1100" endline="1148">gemv_q8_0_q8_0_parallel_simd</referencedby>
         <referencedby refid="mega__fused__attention__prefill__q8__0_8c_1a0404c43ebf752ec2c2f54ead81036f30" compoundref="mega__fused__attention__prefill__q8__0_8c" startline="49" endline="82">out_proj_head_major_q8_0_q8_0</referencedby>
       </memberdef>
       <memberdef kind="function" id="gemm__kernels__q8__0_8c_1a7522a539e09d34bc1298e9d5a3d09692" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
@@ -2062,6 +2200,166 @@
 <codeline lineno="1054"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
 <codeline lineno="1055"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="1056"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="1057"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1058"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>============================================================================</highlight></codeline>
+<codeline lineno="1059"><highlight class="comment"><sp/>*<sp/>PARALLEL<sp/>VERSIONS<sp/>(for<sp/>thread<sp/>pool<sp/>orchestration)</highlight></codeline>
+<codeline lineno="1060"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="1061"><highlight class="comment"><sp/>*<sp/>These<sp/>receive<sp/>ith<sp/>(thread<sp/>index)<sp/>and<sp/>nth<sp/>(total<sp/>threads)<sp/>from<sp/>the</highlight></codeline>
+<codeline lineno="1062"><highlight class="comment"><sp/>*<sp/>thread<sp/>pool.<sp/>OpenMP<sp/>/<sp/>pthreads<sp/>live<sp/>in<sp/>the<sp/>orchestration<sp/>layer,<sp/>NOT<sp/>here.</highlight></codeline>
+<codeline lineno="1063"><highlight class="comment"><sp/>*<sp/>============================================================================<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1064"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="1065"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="1066"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Parallel<sp/>reference<sp/>GEMV<sp/>for<sp/>Q8_0<sp/>x<sp/>Q8_0</highlight></codeline>
+<codeline lineno="1067"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1068" refid="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q8__0_8c_1a79cb8f09192d8d62f7413e7f27fc6512" kindref="member">gemv_q8_0_q8_0_parallel</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="1069"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="1070"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*x_q8,</highlight></codeline>
+<codeline lineno="1071"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K,</highlight></codeline>
+<codeline lineno="1072"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ith,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nth)</highlight></codeline>
+<codeline lineno="1073"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="1074"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!y<sp/>||<sp/>!W<sp/>||<sp/>!x_q8<sp/>||<sp/>M<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1075"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(ith<sp/>&lt;<sp/>0<sp/>||<sp/>nth<sp/>&lt;=<sp/>0<sp/>||<sp/>ith<sp/>&gt;=<sp/>nth)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1076"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1077"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dr<sp/>=<sp/>(M<sp/>+<sp/>nth<sp/>-<sp/>1)<sp/>/<sp/>nth;</highlight></codeline>
+<codeline lineno="1078"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r0<sp/>=<sp/>dr<sp/>*<sp/>ith;</highlight></codeline>
+<codeline lineno="1079"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r1<sp/>=<sp/>(r0<sp/>+<sp/>dr<sp/>&lt;<sp/>M)<sp/>?<sp/>(r0<sp/>+<sp/>dr)<sp/>:<sp/>M;</highlight></codeline>
+<codeline lineno="1080"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1081"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(r0<sp/>&gt;=<sp/>M)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1082"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1083"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*w_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="1084"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*x_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)x_q8;</highlight></codeline>
+<codeline lineno="1085"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" kindref="member">QK8_0</ref>;</highlight></codeline>
+<codeline lineno="1086"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1087"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>r0;<sp/>row<sp/>&lt;<sp/>r1;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="1088"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kindref="member">vec_dot_q8_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="1089"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="1090"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
+<codeline lineno="1091"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1092"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="1093"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="1094"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="1095"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Parallel<sp/>SIMD<sp/>GEMV<sp/>for<sp/>Q8_0<sp/>x<sp/>Q8_0<sp/>with<sp/>prefetching</highlight></codeline>
+<codeline lineno="1096"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="1097"><highlight class="comment"><sp/>*<sp/>Each<sp/>thread<sp/>processes<sp/>rows<sp/>[r0,<sp/>r1)<sp/>where<sp/>r0<sp/>=<sp/>ith<sp/>*<sp/>ceil(M/nth).</highlight></codeline>
+<codeline lineno="1098"><highlight class="comment"><sp/>*<sp/>Prefetches<sp/>upcoming<sp/>weight<sp/>rows<sp/>to<sp/>hide<sp/>memory<sp/>latency.</highlight></codeline>
+<codeline lineno="1099"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1100" refid="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q8__0_8c_1a5b0dfb196cf30cb85db5c5a866142c03" kindref="member">gemv_q8_0_q8_0_parallel_simd</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="1101"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="1102"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*x_q8,</highlight></codeline>
+<codeline lineno="1103"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K,</highlight></codeline>
+<codeline lineno="1104"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ith,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nth)</highlight></codeline>
+<codeline lineno="1105"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="1106"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!y<sp/>||<sp/>!W<sp/>||<sp/>!x_q8<sp/>||<sp/>M<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1107"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(ith<sp/>&lt;<sp/>0<sp/>||<sp/>nth<sp/>&lt;=<sp/>0<sp/>||<sp/>ith<sp/>&gt;=<sp/>nth)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1108"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1109"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dr<sp/>=<sp/>(M<sp/>+<sp/>nth<sp/>-<sp/>1)<sp/>/<sp/>nth;</highlight></codeline>
+<codeline lineno="1110"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r0<sp/>=<sp/>dr<sp/>*<sp/>ith;</highlight></codeline>
+<codeline lineno="1111"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r1<sp/>=<sp/>(r0<sp/>+<sp/>dr<sp/>&lt;<sp/>M)<sp/>?<sp/>(r0<sp/>+<sp/>dr)<sp/>:<sp/>M;</highlight></codeline>
+<codeline lineno="1112"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1113"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(r0<sp/>&gt;=<sp/>M)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1114"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1115"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*w_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="1116"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*x_blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)x_q8;</highlight></codeline>
+<codeline lineno="1117"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" kindref="member">QK8_0</ref>;</highlight></codeline>
+<codeline lineno="1118"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1119"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>||<sp/>defined(__SSE4_1__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1120"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Prefetch<sp/>first<sp/>few<sp/>rows<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1121"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>PREFETCH_ROWS<sp/>=<sp/>4;</highlight></codeline>
+<codeline lineno="1122"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>p<sp/>=<sp/>0;<sp/>p<sp/>&lt;<sp/>PREFETCH_ROWS<sp/>&amp;&amp;<sp/>r0<sp/>+<sp/>p<sp/>&lt;<sp/>r1;<sp/>++p)<sp/>{</highlight></codeline>
+<codeline lineno="1123"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*row_ptr<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)(w_blocks<sp/>+<sp/>(r0<sp/>+<sp/>p)<sp/>*<sp/>blocks_per_row);</highlight></codeline>
+<codeline lineno="1124"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(row_ptr,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1125"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(row_ptr<sp/>+<sp/>64,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1126"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1127"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1128"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>r0;<sp/>row<sp/>&lt;<sp/>r1;<sp/>++row)<sp/>{</highlight></codeline>
+<codeline lineno="1129"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Prefetch<sp/>upcoming<sp/>rows<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1130"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(row<sp/>+<sp/>PREFETCH_ROWS<sp/>&lt;<sp/>r1)<sp/>{</highlight></codeline>
+<codeline lineno="1131"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*pf<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)(w_blocks<sp/>+<sp/>(row<sp/>+<sp/>PREFETCH_ROWS)<sp/>*<sp/>blocks_per_row);</highlight></codeline>
+<codeline lineno="1132"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(pf,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1133"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(pf<sp/>+<sp/>64,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1134"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1135"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1136"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kindref="member">vec_dot_q8_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="1137"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="1138"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
+<codeline lineno="1139"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1140"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1141"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Fallback:<sp/>no<sp/>prefetching<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1142"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>r0;<sp/>row<sp/>&lt;<sp/>r1;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="1143"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q8__0_8c_1aea5f7a52ed3f21e0c6795766cfb28751" kindref="member">vec_dot_q8_0_q8_0</ref>(K,<sp/>&amp;y[row],</highlight></codeline>
+<codeline lineno="1144"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>&amp;w_blocks[row<sp/>*<sp/>blocks_per_row],</highlight></codeline>
+<codeline lineno="1145"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x_blocks);</highlight></codeline>
+<codeline lineno="1146"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1147"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1148"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="1149"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="1150"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="1151"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Parallel<sp/>SIMD<sp/>GEMV<sp/>for<sp/>Q8_0<sp/>weights<sp/>x<sp/>FP32<sp/>input<sp/>with<sp/>prefetching</highlight></codeline>
+<codeline lineno="1152"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1153" refid="gemm__kernels__q8__0_8c_1a1b368197b63d3c036bde5ce658ba7bef" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="gemm__kernels__q8__0_8c_1a1b368197b63d3c036bde5ce658ba7bef" kindref="member">gemv_q8_0_parallel_simd</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*y,</highlight></codeline>
+<codeline lineno="1154"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/>*W,</highlight></codeline>
+<codeline lineno="1155"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*x,</highlight></codeline>
+<codeline lineno="1156"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>M,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>K,</highlight></codeline>
+<codeline lineno="1157"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>ith,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>nth)</highlight></codeline>
+<codeline lineno="1158"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="1159"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!y<sp/>||<sp/>!W<sp/>||<sp/>!x<sp/>||<sp/>M<sp/>&lt;=<sp/>0<sp/>||<sp/>K<sp/>&lt;=<sp/>0)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1160"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(ith<sp/>&lt;<sp/>0<sp/>||<sp/>nth<sp/>&lt;=<sp/>0<sp/>||<sp/>ith<sp/>&gt;=<sp/>nth)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1161"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1162"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>dr<sp/>=<sp/>(M<sp/>+<sp/>nth<sp/>-<sp/>1)<sp/>/<sp/>nth;</highlight></codeline>
+<codeline lineno="1163"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r0<sp/>=<sp/>dr<sp/>*<sp/>ith;</highlight></codeline>
+<codeline lineno="1164"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>r1<sp/>=<sp/>(r0<sp/>+<sp/>dr<sp/>&lt;<sp/>M)<sp/>?<sp/>(r0<sp/>+<sp/>dr)<sp/>:<sp/>M;</highlight></codeline>
+<codeline lineno="1165"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1166"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(r0<sp/>&gt;=<sp/>M)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal">;</highlight></codeline>
+<codeline lineno="1167"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1168"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*blocks<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref><sp/>*)W;</highlight></codeline>
+<codeline lineno="1169"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>blocks_per_row<sp/>=<sp/>K<sp/>/<sp/><ref refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" kindref="member">QK8_0</ref>;</highlight></codeline>
+<codeline lineno="1170"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1171"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX__)<sp/>||<sp/>defined(__SSE4_1__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1172"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>PREFETCH_ROWS<sp/>=<sp/>4;</highlight></codeline>
+<codeline lineno="1173"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>p<sp/>=<sp/>0;<sp/>p<sp/>&lt;<sp/>PREFETCH_ROWS<sp/>&amp;&amp;<sp/>r0<sp/>+<sp/>p<sp/>&lt;<sp/>r1;<sp/>++p)<sp/>{</highlight></codeline>
+<codeline lineno="1174"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*row_ptr<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)(blocks<sp/>+<sp/>(r0<sp/>+<sp/>p)<sp/>*<sp/>blocks_per_row);</highlight></codeline>
+<codeline lineno="1175"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(row_ptr,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1176"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(row_ptr<sp/>+<sp/>64,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1177"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1178"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1179"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>r0;<sp/>row<sp/>&lt;<sp/>r1;<sp/>++row)<sp/>{</highlight></codeline>
+<codeline lineno="1180"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(row<sp/>+<sp/>PREFETCH_ROWS<sp/>&lt;<sp/>r1)<sp/>{</highlight></codeline>
+<codeline lineno="1181"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*pf<sp/>=<sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)(blocks<sp/>+<sp/>(row<sp/>+<sp/>PREFETCH_ROWS)<sp/>*<sp/>blocks_per_row);</highlight></codeline>
+<codeline lineno="1182"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(pf,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1183"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>_mm_prefetch(pf<sp/>+<sp/>64,<sp/>_MM_HINT_T0);</highlight></codeline>
+<codeline lineno="1184"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1185"><highlight class="normal"></highlight></codeline>
+<codeline lineno="1186"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Dispatch<sp/>to<sp/>best<sp/>available<sp/>SIMD<sp/>for<sp/>single<sp/>row<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1187"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__AVX512F__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1188"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>gemv_q8_0_avx512(&amp;y[row],</highlight></codeline>
+<codeline lineno="1189"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1190"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1191"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX2__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1192"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>gemv_q8_0_avx2(&amp;y[row],</highlight></codeline>
+<codeline lineno="1193"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1194"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1195"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__AVX__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1196"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>gemv_q8_0_avx(&amp;y[row],</highlight></codeline>
+<codeline lineno="1197"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1198"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1199"><highlight class="normal"></highlight><highlight class="preprocessor">#elif<sp/>defined(__SSE4_1__)</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1200"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>gemv_q8_0_sse(&amp;y[row],</highlight></codeline>
+<codeline lineno="1201"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1202"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1203"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1204"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" kindref="member">gemv_q8_0_ref</ref>(&amp;y[row],</highlight></codeline>
+<codeline lineno="1205"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1206"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1207"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1208"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1209"><highlight class="normal"></highlight><highlight class="preprocessor">#else</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1210"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>row<sp/>=<sp/>r0;<sp/>row<sp/>&lt;<sp/>r1;<sp/>row++)<sp/>{</highlight></codeline>
+<codeline lineno="1211"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="gemm__kernels__q8__0_8c_1aff97d7ac8b3cd0813a79aad642bc1263" kindref="member">gemv_q8_0_ref</ref>(&amp;y[row],</highlight></codeline>
+<codeline lineno="1212"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)blocks<sp/>+<sp/>row<sp/>*<sp/>blocks_per_row<sp/>*<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structblock__q8__0" kindref="compound">block_q8_0</ref>),</highlight></codeline>
+<codeline lineno="1213"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>x,<sp/>1,<sp/>K);</highlight></codeline>
+<codeline lineno="1214"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
+<codeline lineno="1215"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="1216"><highlight class="normal">}</highlight></codeline>
     </programlisting>
     <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q8_0.c"/>
   </compounddef>
