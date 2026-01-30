@@ -7,6 +7,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ck_metrics.h", "ck__metrics_8h.html", "ck__metrics_8h" ],
     [ "ck_model_api.h", "ck__model__api_8h.html", "ck__model__api_8h" ],
     [ "ck_parity_api.h", "ck__parity__api_8h.html", "ck__parity__api_8h" ],
+    [ "ck_threadpool.h", "ck__threadpool_8h.html", "ck__threadpool_8h" ],
     [ "ck_tokenizer.h", "ck__tokenizer_8h.html", "ck__tokenizer_8h" ],
     [ "ckernel_alloc.h", "ckernel__alloc_8h.html", "ckernel__alloc_8h" ],
     [ "ckernel_bump_v5.h", "ckernel__bump__v5_8h.html", "ckernel__bump__v5_8h" ],
