@@ -1395,6 +1395,59 @@ void gemv_q5_0_q8_0(float *y,
 }
 
 /**
+ * @brief Parallel SIMD GEMV for Q5_0 x Q8_0 with prefetching
+ *
+ * Each thread processes rows [r0, r1) where r0 = ith * ceil(M/nth).
+ * Uses vec_dot_q5_0_q8_0 dispatch (auto-selects AVX512/AVX/SSE/scalar).
+ */
+void gemv_q5_0_q8_0_parallel_simd(float *y,
+                                   const void *W,
+                                   const void *x_q8,
+                                   int M, int K,
+                                   int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q5_0 *w_blocks = (const block_q5_0 *)W;
+    const block_q8_0 *x_blocks = (const block_q8_0 *)x_q8;
+    const int blocks_per_row = K / QK5_0;
+
+#if defined(__AVX__) || defined(__SSE4_1__)
+    const int PREFETCH_ROWS = 4;
+    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
+        const char *row_ptr = (const char *)(w_blocks + (r0 + p) * blocks_per_row);
+        _mm_prefetch(row_ptr, _MM_HINT_T0);
+        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
+    }
+
+    for (int row = r0; row < r1; ++row) {
+        if (row + PREFETCH_ROWS < r1) {
+            const char *pf = (const char *)(w_blocks + (row + PREFETCH_ROWS) * blocks_per_row);
+            _mm_prefetch(pf, _MM_HINT_T0);
+            _mm_prefetch(pf + 64, _MM_HINT_T0);
+        }
+
+        vec_dot_q5_0_q8_0(K, &y[row],
+                          &w_blocks[row * blocks_per_row],
+                          x_blocks);
+    }
+#else
+    for (int row = r0; row < r1; row++) {
+        vec_dot_q5_0_q8_0(K, &y[row],
+                          &w_blocks[row * blocks_per_row],
+                          x_blocks);
+    }
+#endif
+}
+
+/**
  * @brief Batch GEMM with Q5_0 weights and Q8_0 activations for prefill
  *
  * Computes C = A @ B^T + bias where:

@@ -22,6 +22,16 @@
 #include <sys/mman.h>
 
 /* ============================================================================
+ * PARALLEL DECODE (thread pool)
+ *
+ * When CK_PARALLEL_DECODE is defined, GEMV calls are redirected to
+ * parallel dispatch variants using the global thread pool.
+ * Set CK_NUM_THREADS=1 to disable (serial fallback).
+ * ============================================================================ */
+#define CK_PARALLEL_DECODE 1
+#include "ck_parallel_decode.h"
+
+/* ============================================================================
  * HUGE PAGE ALLOCATION (from v6.5/v6.6)
  * 1. First try explicit huge pages via mmap + MAP_HUGETLB
  * 2. Fallback to aligned_alloc with MADV_HUGEPAGE hint
@@ -840,12 +850,18 @@ CK_EXPORT int ck_model_init(const char* weights_path) {
         return -1;
     }
 
+    /* Initialize thread pool for parallel GEMV dispatch */
+    ck_parallel_decode_init();
+
     return 0;
 }
 
 /* Free model - SINGLE allocation to free! (ck_chat.py API) */
 CK_EXPORT void ck_model_free(void) {
     if (!g_model) return;
+
+    /* Shutdown thread pool */
+    ck_parallel_decode_shutdown();
 
     /* Free the SINGLE contiguous buffer using ck_huge_free */
     if (g_model->bump) {

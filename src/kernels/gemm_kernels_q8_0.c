@@ -1054,3 +1054,163 @@ void gemv_q8_0_q8_0(float *y,
                           x_blocks);
     }
 }
+
+/* ============================================================================
+ * PARALLEL VERSIONS (for thread pool orchestration)
+ *
+ * These receive ith (thread index) and nth (total threads) from the
+ * thread pool. OpenMP / pthreads live in the orchestration layer, NOT here.
+ * ============================================================================ */
+
+/**
+ * @brief Parallel reference GEMV for Q8_0 x Q8_0
+ */
+void gemv_q8_0_q8_0_parallel(float *y,
+                              const void *W,
+                              const void *x_q8,
+                              int M, int K,
+                              int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q8_0 *w_blocks = (const block_q8_0 *)W;
+    const block_q8_0 *x_blocks = (const block_q8_0 *)x_q8;
+    const int blocks_per_row = K / QK8_0;
+
+    for (int row = r0; row < r1; row++) {
+        vec_dot_q8_0_q8_0(K, &y[row],
+                          &w_blocks[row * blocks_per_row],
+                          x_blocks);
+    }
+}
+
+/**
+ * @brief Parallel SIMD GEMV for Q8_0 x Q8_0 with prefetching
+ *
+ * Each thread processes rows [r0, r1) where r0 = ith * ceil(M/nth).
+ * Prefetches upcoming weight rows to hide memory latency.
+ */
+void gemv_q8_0_q8_0_parallel_simd(float *y,
+                                   const void *W,
+                                   const void *x_q8,
+                                   int M, int K,
+                                   int ith, int nth)
+{
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q8_0 *w_blocks = (const block_q8_0 *)W;
+    const block_q8_0 *x_blocks = (const block_q8_0 *)x_q8;
+    const int blocks_per_row = K / QK8_0;
+
+#if defined(__AVX__) || defined(__SSE4_1__)
+    /* Prefetch first few rows */
+    const int PREFETCH_ROWS = 4;
+    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
+        const char *row_ptr = (const char *)(w_blocks + (r0 + p) * blocks_per_row);
+        _mm_prefetch(row_ptr, _MM_HINT_T0);
+        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
+    }
+
+    for (int row = r0; row < r1; ++row) {
+        /* Prefetch upcoming rows */
+        if (row + PREFETCH_ROWS < r1) {
+            const char *pf = (const char *)(w_blocks + (row + PREFETCH_ROWS) * blocks_per_row);
+            _mm_prefetch(pf, _MM_HINT_T0);
+            _mm_prefetch(pf + 64, _MM_HINT_T0);
+        }
+
+        vec_dot_q8_0_q8_0(K, &y[row],
+                          &w_blocks[row * blocks_per_row],
+                          x_blocks);
+    }
+#else
+    /* Fallback: no prefetching */
+    for (int row = r0; row < r1; row++) {
+        vec_dot_q8_0_q8_0(K, &y[row],
+                          &w_blocks[row * blocks_per_row],
+                          x_blocks);
+    }
+#endif
+}
+
+/**
+ * @brief Parallel SIMD GEMV for Q8_0 weights x FP32 input with prefetching
+ */
+void gemv_q8_0_parallel_simd(float *y,
+                              const void *W,
+                              const float *x,
+                              int M, int K,
+                              int ith, int nth)
+{
+    if (!y || !W || !x || M <= 0 || K <= 0) return;
+    if (ith < 0 || nth <= 0 || ith >= nth) return;
+
+    const int dr = (M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
+
+    if (r0 >= M) return;
+
+    const block_q8_0 *blocks = (const block_q8_0 *)W;
+    const int blocks_per_row = K / QK8_0;
+
+#if defined(__AVX__) || defined(__SSE4_1__)
+    const int PREFETCH_ROWS = 4;
+    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
+        const char *row_ptr = (const char *)(blocks + (r0 + p) * blocks_per_row);
+        _mm_prefetch(row_ptr, _MM_HINT_T0);
+        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
+    }
+
+    for (int row = r0; row < r1; ++row) {
+        if (row + PREFETCH_ROWS < r1) {
+            const char *pf = (const char *)(blocks + (row + PREFETCH_ROWS) * blocks_per_row);
+            _mm_prefetch(pf, _MM_HINT_T0);
+            _mm_prefetch(pf + 64, _MM_HINT_T0);
+        }
+
+        /* Dispatch to best available SIMD for single row */
+#if defined(__AVX512F__)
+        gemv_q8_0_avx512(&y[row],
+                          (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                          x, 1, K);
+#elif defined(__AVX2__)
+        gemv_q8_0_avx2(&y[row],
+                        (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                        x, 1, K);
+#elif defined(__AVX__)
+        gemv_q8_0_avx(&y[row],
+                       (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                       x, 1, K);
+#elif defined(__SSE4_1__)
+        gemv_q8_0_sse(&y[row],
+                       (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                       x, 1, K);
+#else
+        gemv_q8_0_ref(&y[row],
+                       (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                       x, 1, K);
+#endif
+    }
+#else
+    for (int row = r0; row < r1; row++) {
+        gemv_q8_0_ref(&y[row],
+                       (const char *)blocks + row * blocks_per_row * sizeof(block_q8_0),
+                       x, 1, K);
+    }
+#endif
+}

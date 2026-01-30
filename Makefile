@@ -282,7 +282,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/topk_kernels.c \
 	           src/kernels/axpy_kernels.c \
 	           src/kernels/fused/rmsnorm_qkv.c \
-	           src/kernels/fused/attention_mlp_fused.c
+	           src/kernels/fused/attention_mlp_fused.c \
+	           src/ck_threadpool.c
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so
@@ -475,7 +476,7 @@ $(BUILD_STAMP): | $(BUILD_DIR)
 
 $(LIB): $(BUILD_STAMP) $(SRCS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -shared -o $@ $(SRCS) $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) -shared -o $@ $(SRCS) $(LDFLAGS) -lm -lpthread
 
 $(IR_DEMO): $(BUILD_DIR) src/ckernel_ir.c src/ckernel_ir_demo.c src/ckernel_codegen.c src/ckernel_kernel_specs.c src/ckernel_registry.c include/ckernel_ir.h include/ckernel_codegen.h include/ckernel_registry.h include/ckernel_kernel_specs.h
 	$(CC) -O2 -Wall -Iinclude -o $@ src/ckernel_ir.c src/ckernel_codegen.c src/ckernel_kernel_specs.c src/ckernel_registry.c src/ckernel_ir_demo.c
@@ -2897,4 +2898,33 @@ profile-v6-full:
 	$(MAKE) profile-v6-perf-stat
 	@echo "=== Open visualizer: version/v6.6/tools/ir_visualizer.html ==="
 	@echo "=== Load folder from model cache to see Profile tab ==="
+
+# =============================================================================
+# Thread Pool Tests
+# =============================================================================
+
+TEST_THREADPOOL := $(BUILD_DIR)/test_threadpool
+
+THREADPOOL_CFLAGS := -O3 -fPIC -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
+
+$(TEST_THREADPOOL): tests/test_threadpool.c src/ck_threadpool.c src/ckernel_strict.c include/ck_threadpool.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(THREADPOOL_CFLAGS) -o $@ tests/test_threadpool.c src/ck_threadpool.c src/ckernel_strict.c \
+		-Iinclude -lpthread -lm
+
+test-threadpool: $(TEST_THREADPOOL)
+	@echo ""
+	@echo "========================================"
+	@echo "  Thread Pool Unit Tests"
+	@echo "========================================"
+	./$(TEST_THREADPOOL)
+
+bench-threadpool: $(TEST_THREADPOOL)
+	@echo ""
+	@echo "========================================"
+	@echo "  Thread Pool Benchmark"
+	@echo "========================================"
+	./$(TEST_THREADPOOL) --bench
+
+.PHONY: test-threadpool bench-threadpool
 

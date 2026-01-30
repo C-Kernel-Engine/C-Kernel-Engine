@@ -1,4 +1,5 @@
 #include "ckernel_engine.h"
+#include "ck_threadpool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -181,4 +182,40 @@ int ck_get_num_threads(void)
         ck_set_num_threads(0);  // Auto-detect
     }
     return g_num_threads;
+}
+
+// =============================================================================
+// Thread pool lifecycle
+// =============================================================================
+
+/**
+ * Initialize the global thread pool.
+ * Called once during engine startup (e.g., from ck_model_init).
+ * Uses ck_get_num_threads() for thread count (respects CK_NUM_THREADS env).
+ *
+ * Safe to call multiple times — subsequent calls are no-ops.
+ */
+void ck_threadpool_init(void)
+{
+    /* ck_threadpool_global() uses pthread_once internally */
+    ck_threadpool_t *pool = ck_threadpool_global();
+    (void)pool;
+}
+
+/**
+ * Shut down the global thread pool.
+ * Called during engine teardown. Workers are joined and freed.
+ */
+void ck_threadpool_shutdown(void)
+{
+    ck_threadpool_global_destroy();
+}
+
+/**
+ * Get the global thread pool handle for dispatch.
+ * Convenience wrapper — initializes on first call.
+ */
+ck_threadpool_t *ck_get_threadpool(void)
+{
+    return ck_threadpool_global();
 }

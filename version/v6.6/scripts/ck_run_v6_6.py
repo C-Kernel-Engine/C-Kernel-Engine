@@ -723,6 +723,14 @@ def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False, profile:
         log_error("Run step_build_ir first to generate call-ready lowered IR")
         sys.exit(1)
 
+    # Skip codegen if model_v6_6.c already exists and is newer than lowered IR
+    if not force and model_c_path.exists():
+        src_mtime = lowered_decode.stat().st_mtime
+        c_mtime = model_c_path.stat().st_mtime
+        if c_mtime > src_mtime:
+            log(f"  Using cached: {model_c_path}", C_GREEN)
+            return model_c_path
+
     # Show stats
     import json
     with open(lowered_decode, 'r') as f:
@@ -811,6 +819,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         "-o", str(lib_path),
         str(model_c_path),
         str(loader_src),
+        str(v66_src / "ck_parallel_decode.c"),  # Thread-pool parallel GEMV dispatch
         f"-L{BUILD_DIR}",
         f"-L{output_dir}",  # Also look in output_dir for libckernel_engine.so
         "-lckernel_engine",

@@ -1,14 +1,25 @@
 /**
  * @file parallel_orchestration.c
- * @brief Parallel decode orchestration for CK-Engine v6.6
+ * @brief [LEGACY] Parallel decode orchestration prototype — NOT USED by v6.6
  *
- * Demonstrates the llama.cpp-style parallelization pattern:
+ * This file was an early prototype demonstrating llama.cpp-style OpenMP
+ * parallelization patterns. It is NOT compiled into the v6.6 build and
+ * has no callers in the generated inference code path.
+ *
+ * v6.6 decode runs entirely through the generated code in:
+ *   version/v6.6/src/generated/ck-kernel-inference.c
+ *     → ck_model_decode_internal()
+ *
+ * Threading for v6.6 is handled by ck_threadpool (include/ck_threadpool.h),
+ * which replaces the OpenMP approach used here.
+ *
+ * Kept for reference only. See the original design notes below.
+ *
+ * Original design (OpenMP, superseded):
  * - OpenMP parallel region at orchestration level
  * - Each kernel receives (ith, nth) and processes its slice
  * - Barriers between dependent operations
- *
- * Key insight: OpenMP overhead is amortized over the entire decode,
- * not per-kernel. Thread pool stays active for entire forward pass.
+ * - Key insight: amortize thread pool overhead over entire forward pass
  */
 
 #include <omp.h>

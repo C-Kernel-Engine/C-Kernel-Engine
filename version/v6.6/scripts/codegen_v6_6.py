@@ -820,6 +820,9 @@ CK_EXPORT int ck_model_init(const char *weights_path) {{
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
     print_omp_info();
+#ifdef CK_PARALLEL_DECODE
+    ck_parallel_decode_init();
+#endif
     return 0;
 }}
 
@@ -829,11 +832,17 @@ CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
     print_omp_info();
+#ifdef CK_PARALLEL_DECODE
+    ck_parallel_decode_init();
+#endif
     return 0;
 }}
 
 CK_EXPORT void ck_model_free(void) {{
     if (!g_model) return;
+#ifdef CK_PARALLEL_DECODE
+    ck_parallel_decode_shutdown();
+#endif
 {free_ops_code}
     if (g_manifest) {{
         ck_unload_manifest_map(g_manifest);
@@ -1026,6 +1035,10 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 #include "ckernel_model_load_v6.6.h"
 #include "ckernel_engine.h"  /* Kernel declarations */
 {tokenizer_include}
+
+/* Thread-pool parallel GEMV dispatch (persistent pthread workers) */
+#define CK_PARALLEL_DECODE 1
+#include "ck_parallel_decode.h"
 ''')
 
     # Emit profiling infrastructure (all #ifdef CK_PROFILE guarded)
