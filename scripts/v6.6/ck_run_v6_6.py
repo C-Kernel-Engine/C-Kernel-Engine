@@ -815,6 +815,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         PROJECT_ROOT / "src" / "ckernel_orchestration.c",
         PROJECT_ROOT / "src" / "ckernel_strict.c",
         PROJECT_ROOT / "src" / "cpu_features.c",
+        PROJECT_ROOT / "src" / "ck_threadpool.c",
     ]
     existing = set(kernel_sources)
     for src in extra_sources:
