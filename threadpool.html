@@ -955,6 +955,7 @@
         <li><a href="#real-numbers">Real Numbers: Before &amp; After</a></li>
         <li><a href="#how-parallel">How Parallelization Actually Works</a></li>
         <li><a href="#per-kernel">Per-Kernel Parallelization Analysis</a></li>
+        <li><a href="#testing">Testing &amp; Validation</a></li>
     </ol>
 </div>
 
@@ -2358,6 +2359,229 @@ Each attention head is a self-contained computation:</p>
         is the perfect parallelization strategy for LLM inference.
     </div>
 </div>
+
+<h2 id="testing"><span class="section-num">&sect;16</span> Testing &amp; Validation</h2>
+
+<p>The thread pool dispatch layer is validated by a dedicated parity test suite that
+   compares every dispatch wrapper against its serial counterpart. The tests verify both
+   <strong>numerical correctness</strong> (bit-for-bit parity within tolerance) and
+   <strong>performance</strong> (speedup from parallelization).</p>
+
+<h3>Test Suite: <code>test_threadpool_parity.c</code></h3>
+
+<p>Location: <code>tests/test_threadpool_parity.c</code></p>
+
+<table>
+    <tr>
+        <th>Test</th>
+        <th>Serial Kernel</th>
+        <th>Thread Pool Dispatch</th>
+        <th>What It Validates</th>
+    </tr>
+    <tr>
+        <td><strong>Test 1</strong></td>
+        <td><code>gemv_q8_0_q8_0()</code></td>
+        <td><code>gemv_q8_0_q8_0_parallel_dispatch()</code></td>
+        <td>Q8_0 weights &times; Q8_0 input (logits, V proj)</td>
+    </tr>
+    <tr>
+        <td><strong>Test 2</strong></td>
+        <td><code>gemv_q5_0_q8_0()</code></td>
+        <td><code>gemv_q5_0_q8_0_parallel_dispatch()</code></td>
+        <td>Q5_0 weights &times; Q8_0 input (Q/K proj, MLP, out proj)</td>
+    </tr>
+    <tr>
+        <td><strong>Test 3</strong></td>
+        <td><code>gemv_fused_q5_0_bias_dispatch()</code></td>
+        <td><code>gemv_fused_q5_0_bias_parallel_dispatch()</code></td>
+        <td>Fused: quantize FP32 &rarr; GEMV &rarr; add bias (production path)</td>
+    </tr>
+    <tr>
+        <td><strong>Test 4</strong></td>
+        <td colspan="2">Fused dispatch with <code>NULL</code> bias</td>
+        <td>Edge case: bias pointer is NULL (no bias add)</td>
+    </tr>
+    <tr>
+        <td><strong>Test 5</strong></td>
+        <td colspan="2">Small M dispatch latency measurement</td>
+        <td>Overhead of packing args + waking threads on tiny workloads</td>
+    </tr>
+</table>
+
+<h3>Test Dimensions (Qwen2 0.5B shapes)</h3>
+
+<p>Tests run on real model dimensions to catch alignment and edge-case issues:</p>
+
+<table>
+    <tr>
+        <th>Config</th>
+        <th>M (output rows)</th>
+        <th>K (input dim)</th>
+        <th>Corresponds To</th>
+    </tr>
+    <tr>
+        <td><code>qkv_proj</code></td>
+        <td>896</td>
+        <td>896</td>
+        <td>Q/K/V projections (embed &rarr; embed)</td>
+    </tr>
+    <tr>
+        <td><code>mlp_gate_up</code></td>
+        <td>9,728</td>
+        <td>896</td>
+        <td>MLP gate+up projection (embed &rarr; 4&times; intermediate)</td>
+    </tr>
+    <tr>
+        <td><code>mlp_down</code></td>
+        <td>896</td>
+        <td>4,864</td>
+        <td>MLP down projection (intermediate &rarr; embed)</td>
+    </tr>
+    <tr>
+        <td><code>logits</code></td>
+        <td>151,936</td>
+        <td>896</td>
+        <td>LM head (embed &rarr; vocab, largest GEMV)</td>
+    </tr>
+</table>
+
+<h3>How to Run</h3>
+
+<pre style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; overflow-x: auto;">
+<strong># Quick parity check (~5 seconds)</strong>
+make test-threadpool-parity-quick
+
+<strong># Full parity + speed test (all model dimensions)</strong>
+make test-threadpool-parity
+
+<strong># Verbose output (shows max_abs_diff, max_rel_diff for every config)</strong>
+make test-threadpool-parity-verbose
+</pre>
+
+<h3>Correctness Criteria</h3>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Tolerance: 1e-3 absolute.</strong> Thread pool dispatch splits rows across threads.
+        Each thread calls the same <code>_parallel_simd</code> kernel on its row subset.
+        Since each output row is computed from independent dot products, the thread pool
+        result should be <strong>bit-identical</strong> to serial &mdash; the tolerance exists only
+        to guard against floating-point non-determinism from different SIMD accumulation orders.
+    </div>
+</div>
+
+<h3>CI Integration</h3>
+
+<p>The thread pool parity test runs automatically in three places:</p>
+
+<table>
+    <tr>
+        <th>Trigger</th>
+        <th>What Runs</th>
+        <th>Where Configured</th>
+    </tr>
+    <tr>
+        <td><code>make test</code></td>
+        <td><code>test-threadpool-parity-quick</code></td>
+        <td><code>Makefile</code> (test target)</td>
+    </tr>
+    <tr>
+        <td><code>make llamacpp-parity-full</code></td>
+        <td><code>test-threadpool-parity</code> (full)</td>
+        <td><code>Makefile</code> (llamacpp-parity-full target)</td>
+    </tr>
+    <tr>
+        <td>Nightly / Push to main / PR</td>
+        <td><code>test-threadpool-parity</code> (full)</td>
+        <td><code>scripts/nightly_runner.py</code> &rarr; <code>MAKE_TARGETS["threadpool_parity"]</code></td>
+    </tr>
+</table>
+
+<p>The nightly workflow (<code>.github/workflows/nightly.yml</code>) runs on every push to
+   <code>main</code>, every pull request, and nightly at 2am UTC. If the thread pool
+   dispatch diverges from serial output, the test exits with code 1 and the nightly
+   report marks it as failed.</p>
+
+<h3>ADR: Thread Pool Replaced OpenMP for Parallelization</h3>
+
+<p>The codebase previously had an OpenMP parallelization pass (<code>parallel_pass.py</code>)
+   that annotated IR operations with <code>#pragma omp parallel for</code>. This was
+   <strong>superseded</strong> by the persistent pthread thread pool for the following reasons:</p>
+
+<table>
+    <tr>
+        <th>Concern</th>
+        <th>OpenMP</th>
+        <th>Thread Pool</th>
+    </tr>
+    <tr>
+        <td>Thread creation</td>
+        <td class="danger">Fork/join per <code>#pragma</code> region (~15-50&micro;s)</td>
+        <td class="good">Created once at init, spin-wait between dispatches (~0.1&micro;s wake)</td>
+    </tr>
+    <tr>
+        <td>Core oversubscription</td>
+        <td class="danger">OpenMP team + thread pool = 2N threads on N cores</td>
+        <td class="good">One pool, known thread count, no conflict</td>
+    </tr>
+    <tr>
+        <td>Codegen integration</td>
+        <td class="danger"><code>parallel_pass.py</code> emits pragmas, but <code>codegen_v6_6.py</code> never reads them</td>
+        <td class="good">Macro redirects in <code>ck_parallel_decode.h</code> &mdash; zero codegen changes</td>
+    </tr>
+    <tr>
+        <td>Kernel interface</td>
+        <td class="danger">Implicit OpenMP runtime</td>
+        <td class="good">Explicit <code>(ith, nth)</code> args to <code>_parallel_simd</code> kernels</td>
+    </tr>
+</table>
+
+<p>Files affected by this decision:</p>
+<ul>
+    <li><code>version/v6.6/scripts/parallel_pass.py</code> &mdash; header documents "SUPERSEDED BY THREAD POOL DISPATCH"</li>
+    <li><code>version/v6.6/scripts/build_ir_v6_6.py</code> &mdash; <code>run_parallel_pass()</code> commented out with ADR</li>
+    <li><code>version/v6.6/scripts/ck_run_v6_6.py</code> &mdash; <code>--parallel-decode</code> flag deprecated (warns and continues)</li>
+</ul>
+
+<h3>Related Test Suites</h3>
+
+<p>The thread pool parity test complements existing tests that cover other aspects of the parallelization stack:</p>
+
+<table>
+    <tr>
+        <th>Make Target</th>
+        <th>Test File</th>
+        <th>What It Tests</th>
+    </tr>
+    <tr>
+        <td><code>test-threadpool-parity</code></td>
+        <td><code>tests/test_threadpool_parity.c</code></td>
+        <td>Serial vs thread pool dispatch (this page)</td>
+    </tr>
+    <tr>
+        <td><code>test-gemv-omp</code></td>
+        <td><code>tests/test_gemv_omp_parity.c</code></td>
+        <td>Serial vs OpenMP parallel (legacy comparison)</td>
+    </tr>
+    <tr>
+        <td><code>test-fusion-gemv</code></td>
+        <td><code>unittest/fusion/test_gemv_fused_quant_bias.py</code></td>
+        <td>Fused vs unfused GEMV correctness + speedup</td>
+    </tr>
+    <tr>
+        <td><code>llamacpp-parity-full</code></td>
+        <td><code>scripts/run_parity_smoketest.sh</code></td>
+        <td>CK-Engine kernels vs llama.cpp reference (includes thread pool + OMP)</td>
+    </tr>
+    <tr>
+        <td><code>e2e-v66</code></td>
+        <td><code>version/v6.6/test/Makefile</code></td>
+        <td>Full v6.6 pipeline: IR &rarr; codegen &rarr; compile &rarr; run (thread pool always enabled)</td>
+    </tr>
+</table>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -2567,7 +2791,7 @@ Each attention head is a self-contained computation:</p>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-29</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
             </div>
         </div>
     </footer>
