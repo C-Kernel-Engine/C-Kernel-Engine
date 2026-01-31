@@ -192,6 +192,63 @@ void gemm_nt_q8_0_q8_0_avx2(
 }
 #endif /* __AVX2__ */
 
+#if defined(__AVX__) && !defined(__AVX2__)
+/**
+ * @brief AVX (SSE4.1) implementation: gemm_nt_q8_0_q8_0
+ *
+ * Uses 128-bit SSE4.1 intrinsics to process 32 int8 values per block
+ * in 4 chunks of 8. Available on all AVX-capable CPUs (Sandy Bridge+).
+ * Fills the gap between AVX2 and scalar fallback.
+ */
+void gemm_nt_q8_0_q8_0_avx(
+    const void *A,
+    const void *B,
+    float *C,
+    int M, int N, int K)
+{
+    const int nb = K / QK8_0;
+    const block_q8_0 *a_blocks = (const block_q8_0 *)A;
+    const block_q8_0 *b_blocks = (const block_q8_0 *)B;
+
+    for (int m = 0; m < M; m++) {
+        const block_q8_0 *a_row = a_blocks + (size_t)m * nb;
+        for (int n = 0; n < N; n++) {
+            const block_q8_0 *b_row = b_blocks + (size_t)n * nb;
+            float sum = 0.0f;
+
+            for (int ib = 0; ib < nb; ib++) {
+                const float d = CK_FP16_TO_FP32(a_row[ib].d)
+                              * CK_FP16_TO_FP32(b_row[ib].d);
+                const int8_t *a_qs = a_row[ib].qs;
+                const int8_t *b_qs = b_row[ib].qs;
+
+                /* 4 chunks of 8 int8 values: load, sign-extend to int16, madd to int32 */
+                __m128i d0 = _mm_madd_epi16(
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(a_qs +  0))),
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(b_qs +  0))));
+                __m128i d1 = _mm_madd_epi16(
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(a_qs +  8))),
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(b_qs +  8))));
+                __m128i d2 = _mm_madd_epi16(
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(a_qs + 16))),
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(b_qs + 16))));
+                __m128i d3 = _mm_madd_epi16(
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(a_qs + 24))),
+                    _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)(b_qs + 24))));
+
+                /* Reduce 4x4 int32 lanes to single int32 */
+                __m128i s4 = _mm_add_epi32(_mm_add_epi32(d0, d1),
+                                           _mm_add_epi32(d2, d3));
+                s4 = _mm_add_epi32(s4, _mm_srli_si128(s4, 8));
+                s4 = _mm_add_epi32(s4, _mm_srli_si128(s4, 4));
+                sum += d * (float)_mm_cvtsi128_si32(s4);
+            }
+            C[(size_t)m * N + n] = sum;
+        }
+    }
+}
+#endif /* __AVX__ && !__AVX2__ */
+
 #if defined(__AVX512F__)
 /**
  * @brief AVX-512 implementation: gemm_nt_q8_0_q8_0
@@ -536,6 +593,8 @@ void gemm_nt_q8_0_q8_0(
     gemm_nt_q8_0_q8_0_avx512(A, B, C, M, N, K);
 #elif defined(__AVX2__)
     gemm_nt_q8_0_q8_0_avx2(A, B, C, M, N, K);
+#elif defined(__AVX__)
+    gemm_nt_q8_0_q8_0_avx(A, B, C, M, N, K);
 #else
     gemm_nt_q8_0_q8_0_ref(A, B, C, M, N, K);
 #endif

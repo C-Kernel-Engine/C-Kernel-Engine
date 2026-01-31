@@ -4172,10 +4172,11 @@
       },
       "impl": {
         "function": "mega_fused_attention_decode_q5_0_parallel_simd",
-        "header": "mega_fused_attention_decode_q5_0.h",
+        "header": "src/kernels/fused/mega_fused_attention_decode_q5_0.h",
         "sources": [
           "src/kernels/fused/mega_fused_attention_decode_q5_0.c"
         ],
+        "scratch_size_fn": "mega_fused_attention_decode_scratch_size(AE, H, KV, AD)",
         "variants": [
           {
             "name": "serial",
@@ -4186,9 +4187,9 @@
             "name": "parallel_simd",
             "function": "mega_fused_attention_decode_q5_0_parallel_simd",
             "requires": [
-              "avx2"
+              "sse"
             ],
-            "description": "Threadpool-parallel version with SIMD inner loops"
+            "description": "Threadpool-parallel version (barriers managed by caller)"
           }
         ]
       },

@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <math.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -56,6 +57,7 @@ static double g_prefill_time_ms = 0.0;
 static double g_decode_time_ms = 0.0;
 static int g_decode_count = 0;
 static int g_prompt_tokens = 0;
+static int g_user_tokens = 0;
 
 static void handle_sigint(int sig) {
     (void)sig;
@@ -216,6 +218,19 @@ static const char *get_cache_dir(void) {
     return cache_path;
 }
 
+/* Case-insensitive substring search */
+static const char *strcasestr_local(const char *haystack, const char *needle) {
+    if (!needle[0]) return haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack, *n = needle;
+        while (*h && *n && (tolower((unsigned char)*h) == tolower((unsigned char)*n))) {
+            h++; n++;
+        }
+        if (!*n) return haystack;
+    }
+    return NULL;
+}
+
 static bool find_model_in_cache(const char *model_name, char *lib_out, char *weights_out, size_t out_size) {
     const char *cache_dir = get_cache_dir();
     DIR *dir = opendir(cache_dir);
@@ -225,8 +240,8 @@ static bool find_model_in_cache(const char *model_name, char *lib_out, char *wei
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_name[0] == '.') continue;
 
-        /* Check if directory name contains model_name */
-        if (strstr(entry->d_name, model_name) != NULL) {
+        /* Case-insensitive check if directory name contains model_name */
+        if (strcasestr_local(entry->d_name, model_name) != NULL) {
             char model_dir[4096];
             snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
 
@@ -316,7 +331,7 @@ static void list_available_models(void) {
         return;
     }
 
-    printf("Available models in %s:\n", cache_dir);
+    fprintf(stderr, "Available models in %s:\n", cache_dir);
     struct dirent *entry;
     int count = 0;
     while ((entry = readdir(dir)) != NULL) {
@@ -330,15 +345,148 @@ static void list_available_models(void) {
 
         struct stat st;
         if (stat(so_path, &st) == 0) {
-            printf("  - %s\n", entry->d_name);
+            fprintf(stderr, "  - %s\n", entry->d_name);
             count++;
         }
     }
     closedir(dir);
 
     if (count == 0) {
-        printf("  (none found)\n");
+        fprintf(stderr, "  (none found)\n");
     }
+}
+
+#define MAX_CACHED_MODELS 64
+
+static const char *format_size(double bytes, char *buf, size_t buf_size) {
+    if (bytes >= 1e9)       snprintf(buf, buf_size, "%.1f GB", bytes / 1e9);
+    else if (bytes >= 1e6)  snprintf(buf, buf_size, "%.1f MB", bytes / 1e6);
+    else if (bytes >= 1e3)  snprintf(buf, buf_size, "%.1f KB", bytes / 1e3);
+    else                    snprintf(buf, buf_size, "%.0f B", bytes);
+    return buf;
+}
+
+/**
+ * @brief Scan cache directory and auto-select a model.
+ *
+ * If exactly one compiled model is found, auto-selects it.
+ * If multiple are found, presents a numbered list for user selection.
+ * Returns true if a model was selected (lib_out and weights_out filled).
+ */
+static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_size) {
+    const char *cache_dir = get_cache_dir();
+    DIR *dir = opendir(cache_dir);
+    if (!dir) {
+        fprintf(stderr, "\n  No model cache found.\n");
+        fprintf(stderr, "  Looked in: %s\n\n", cache_dir);
+        fprintf(stderr, "  To get started, compile a model first:\n");
+        fprintf(stderr, "    python version/v6.6/scripts/ck_run_v6_6.py run <model-name>\n\n");
+        fprintf(stderr, "  Example:\n");
+        fprintf(stderr, "    python version/v6.6/scripts/ck_run_v6_6.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+        return false;
+    }
+
+    /* Collect compiled models */
+    char model_names[MAX_CACHED_MODELS][256];
+    char so_paths[MAX_CACHED_MODELS][4096];
+    char bump_paths[MAX_CACHED_MODELS][4096];
+    double weights_sizes[MAX_CACHED_MODELS];
+    int count = 0;
+
+    /* Also count directories that exist but aren't compiled yet */
+    int uncompiled = 0;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char model_dir[4096];
+        snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
+
+        char so_path[4096], bump_path[4096];
+        snprintf(so_path, sizeof(so_path), "%s/ck-kernel-inference.so", model_dir);
+        snprintf(bump_path, sizeof(bump_path), "%s/weights.bump", model_dir);
+
+        struct stat st_so, st_bump;
+        bool has_so = (stat(so_path, &st_so) == 0);
+        bool has_bump = (stat(bump_path, &st_bump) == 0);
+
+        if (has_so && has_bump && count < MAX_CACHED_MODELS) {
+            strncpy(model_names[count], entry->d_name, 255);
+            model_names[count][255] = '\0';
+            strncpy(so_paths[count], so_path, 4095);
+            so_paths[count][4095] = '\0';
+            strncpy(bump_paths[count], bump_path, 4095);
+            bump_paths[count][4095] = '\0';
+            weights_sizes[count] = (double)st_bump.st_size;
+            count++;
+        } else {
+            uncompiled++;
+        }
+    }
+    closedir(dir);
+
+    if (count == 0) {
+        fprintf(stderr, "\n  Scanned: %s\n", cache_dir);
+        if (uncompiled > 0) {
+            fprintf(stderr, "  Found %d model folder%s, but none are compiled yet.\n\n",
+                   uncompiled, uncompiled > 1 ? "s" : "");
+            fprintf(stderr, "  To compile, run:\n");
+            fprintf(stderr, "    python version/v6.6/scripts/ck_run_v6_6.py run <model-name> --force-compile\n\n");
+        } else {
+            fprintf(stderr, "  No models found.\n\n");
+            fprintf(stderr, "  To get started, download and compile a model:\n");
+            fprintf(stderr, "    python version/v6.6/scripts/ck_run_v6_6.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+        }
+        return false;
+    }
+
+    int selected = 0;
+    char size_buf[32];
+
+    if (count == 1) {
+        fprintf(stderr, "  Found 1 compiled model in cache:\n");
+        fprintf(stderr, "    %s  (%s)\n\n",
+                model_names[0], format_size(weights_sizes[0], size_buf, sizeof(size_buf)));
+        fprintf(stderr, "  Loading automatically...\n\n");
+        selected = 0;
+    } else {
+        fprintf(stderr, "  Found %d compiled models in cache:\n", count);
+        fprintf(stderr, "  %s\n\n", cache_dir);
+        for (int i = 0; i < count; i++) {
+            fprintf(stderr, "    [%d]  %s  (%s)\n",
+                   i + 1, model_names[i],
+                   format_size(weights_sizes[i], size_buf, sizeof(size_buf)));
+        }
+        if (uncompiled > 0) {
+            fprintf(stderr, "\n  (%d other folder%s not yet compiled — run ck_run_v6_6.py to compile)\n",
+                   uncompiled, uncompiled > 1 ? "s" : "");
+        }
+        fprintf(stderr, "\n  Which model would you like to use? [1-%d]: ", count);
+
+        char input_buf[32];
+        if (!fgets(input_buf, sizeof(input_buf), stdin)) {
+            return false;
+        }
+
+        /* Default to 1 if user just presses Enter */
+        int choice = atoi(input_buf);
+        if (input_buf[0] == '\n' || input_buf[0] == '\r') {
+            choice = 1;
+        }
+        if (choice < 1 || choice > count) {
+            fprintf(stderr, "  Invalid selection. Expected 1-%d.\n", count);
+            return false;
+        }
+        selected = choice - 1;
+        fprintf(stderr, "\n  Selected: %s\n\n", model_names[selected]);
+    }
+
+    strncpy(lib_out, so_paths[selected], out_size - 1);
+    lib_out[out_size - 1] = '\0';
+    strncpy(weights_out, bump_paths[selected], out_size - 1);
+    weights_out[out_size - 1] = '\0';
+    return true;
 }
 
 /* ============================================================================
@@ -817,6 +965,13 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
 
     int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
 
+    /* Tokenize raw user input to get user-only token count */
+    int user_tokens = 0;
+    if (api->encode_text) {
+        int raw_n = api->encode_text(input, -1);
+        if (raw_n > 0) user_tokens = raw_n;
+    }
+
     /* Apply chat template if enabled */
     const ChatTemplate *tmpl = &g_templates[opt->no_chat_template ? CHAT_TEMPLATE_NONE : opt->chat_template];
     char *formatted = apply_chat_template(tmpl, opt->system_prompt, input);
@@ -841,7 +996,8 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
     if (api->encode_text) {
         n = api->encode_text(formatted, -1);
         if (n > 0 && n <= ctx) {
-            api->get_token_buffer(ids);  /* Copy tokens to caller's buffer */
+            const int32_t *buf = api->get_token_buffer();
+            if (buf) memcpy(ids, buf, (size_t)n * sizeof(int32_t));
         }
     }
     free(formatted);
@@ -862,8 +1018,12 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
     g_decode_time_ms = 0.0;
     g_decode_count = 0;
     g_prompt_tokens = n;
+    g_user_tokens = user_tokens;
 
     if (api->kv_reset) api->kv_reset();
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
 
     if (api->embed(ids, n) != 0) {
         fprintf(stderr, "[Model] embed failed\n");
@@ -871,13 +1031,12 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
         return -1;
     }
 
-    struct timespec t0, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
     if (api->forward(NULL) != 0) {
         fprintf(stderr, "[Model] forward failed\n");
         free(ids);
         return -1;
     }
+
     clock_gettime(CLOCK_MONOTONIC, &t1);
     g_prefill_time_ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
                         (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
@@ -896,13 +1055,9 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
                 memcpy(logits_copy, last_logits, vocab_size * sizeof(float)); \
                 next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p); \
                 free(logits_copy); \
-            } else if (api->sample) { \
-                next_token = api->sample(); \
             } else { \
                 next_token = -1; \
             } \
-        } else if (api->sample) { \
-            next_token = api->sample(); \
         } else { \
             next_token = -1; \
         } \
@@ -986,14 +1141,46 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
 
     if (opt->timing) {
         double total_ms = g_prefill_time_ms + g_decode_time_ms;
-        double prefill_rate = g_prompt_tokens / (g_prefill_time_ms / 1000.0);
         double decode_rate = g_decode_count > 0 ? g_decode_count / (g_decode_time_ms / 1000.0) : 0.0;
         double avg_decode = g_decode_count > 0 ? g_decode_time_ms / g_decode_count : 0.0;
 
-        printf("\033[90m");  /* Gray text */
-        printf("prompt: %3d tok / %7.1f ms (%5.1f tok/s) | ", g_prompt_tokens, g_prefill_time_ms, prefill_rate);
-        printf("decode: %3d tok / %7.1f ms (%5.1f tok/s, %5.1f ms/tok)\033[0m\n",
-               g_decode_count, g_decode_time_ms, decode_rate, avg_decode);
+        /* Labels in dim cyan, numbers in bold white for readability */
+        #define C_DIM   "\033[36m"    /* cyan for labels */
+        #define C_NUM   "\033[1;37m"  /* bold white for numbers */
+        #define C_RST   "\033[0m"
+
+        /* Prefill stats — show user + template token breakdown */
+        int tmpl_tokens = g_prompt_tokens - g_user_tokens;
+        if (g_prefill_time_ms >= 0.1) {
+            double prefill_rate = g_prompt_tokens / (g_prefill_time_ms / 1000.0);
+            printf(C_DIM "prefill " C_NUM "%d" C_DIM " tok "
+                   "(%d user + %d tmpl)  "
+                   C_NUM "%.1f" C_DIM " ms  "
+                   C_NUM "%.1f" C_DIM " tok/s" C_RST,
+                   g_prompt_tokens, g_user_tokens, tmpl_tokens,
+                   g_prefill_time_ms, prefill_rate);
+        } else {
+            printf(C_DIM "prefill " C_NUM "%d" C_DIM " tok "
+                   "(%d user + %d tmpl)  "
+                   C_NUM "<0.1" C_DIM " ms" C_RST,
+                   g_prompt_tokens, g_user_tokens, tmpl_tokens);
+        }
+
+        /* Decode stats */
+        if (g_decode_count > 0) {
+            printf(C_DIM " | decode " C_NUM "%d" C_DIM " tok  "
+                   C_NUM "%.1f" C_DIM " ms  "
+                   C_NUM "%.1f" C_DIM " tok/s  "
+                   C_NUM "%.1f" C_DIM " ms/tok" C_RST,
+                   g_decode_count, g_decode_time_ms, decode_rate, avg_decode);
+        }
+
+        /* Total */
+        printf(C_DIM " | total " C_NUM "%.1f" C_DIM " ms" C_RST "\n", total_ms);
+
+        #undef C_DIM
+        #undef C_NUM
+        #undef C_RST
     }
     fflush(stdout);
 
@@ -1006,16 +1193,19 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
  * ============================================================================ */
 
 static void print_banner(void) {
-    printf("\n");
-    printf("  \033[1;36mC-Kernel-Engine v%s\033[0m\n", CK_CLI_VERSION);
-    printf("  Native inference CLI with true-BPE tokenization\n");
-    printf("\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  \033[1;36mC-Kernel-Engine v%s\033[0m\n", CK_CLI_VERSION);
+    fprintf(stderr, "  Native inference CLI with true-BPE tokenization\n");
+    fprintf(stderr, "\n");
 }
 
 static void print_help(const char *prog) {
     print_banner();
-    fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "  %s --model <name>                       Auto-discover model from cache\n", prog);
+    fprintf(stderr, "Quick start:\n");
+    fprintf(stderr, "  %s                                      Scan cache and pick a model\n", prog);
+    fprintf(stderr, "  %s --model qwen                         Load by name from cache\n", prog);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Advanced:\n");
     fprintf(stderr, "  %s <libmodel.so> <weights.bump>         Direct paths\n", prog);
     fprintf(stderr, "  %s --lib <.so> --weights <.bump>        Named arguments\n", prog);
     fprintf(stderr, "\nOptions:\n");
@@ -1033,7 +1223,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  --no-chat-template      Disable chat template formatting\n");
     fprintf(stderr, "  --eos IDS               Comma-separated EOS token IDs\n");
     fprintf(stderr, "  --ignore-eos            Do not stop on EOS tokens\n");
-    fprintf(stderr, "  --list                  List available models\n");
+    fprintf(stderr, "  --list                  List available models in cache\n");
     fprintf(stderr, "  --verbose, -v           Verbose output\n");
     fprintf(stderr, "  --help, -h              Show this help\n");
     fprintf(stderr, "\nREPL Commands:\n");
@@ -1043,6 +1233,13 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  /temp <value>           Set temperature\n");
     fprintf(stderr, "  /system <text>          Set system prompt\n");
     fprintf(stderr, "  /help                   Show help\n");
+    fprintf(stderr, "\nWorkflow:\n");
+    fprintf(stderr, "  This CLI runs pre-compiled models. To compile a new model:\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  Step 1: Compile (once)    python version/v6.6/scripts/ck_run_v6_6.py run <model>\n");
+    fprintf(stderr, "  Step 2: Run (fast)        %s\n", prog);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  Models are cached in: ~/.cache/ck-engine-v6.6/models/\n");
 }
 
 static bool parse_args(int argc, char **argv, CLIOptions *opt) {
@@ -1103,11 +1300,25 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
         } else if (!strcmp(arg, "--verbose") || !strcmp(arg, "-v")) {
             opt->verbose = true;
         } else if (arg[0] != '-') {
-            if (!opt->lib_path) opt->lib_path = arg;
-            else if (!opt->weights_path) opt->weights_path = arg;
-            else {
-                fprintf(stderr, "Unknown argument: %s\n", arg);
-                return false;
+            /* Positional argument: if it looks like a file path (.so or .bump), use as direct path.
+               Otherwise treat as model name for cache lookup. */
+            const char *ext = strrchr(arg, '.');
+            bool is_file = (ext && (!strcmp(ext, ".so") || !strcmp(ext, ".bump")));
+            if (is_file) {
+                if (!opt->lib_path) opt->lib_path = arg;
+                else if (!opt->weights_path) opt->weights_path = arg;
+                else {
+                    fprintf(stderr, "Unknown argument: %s\n", arg);
+                    return false;
+                }
+            } else {
+                /* Treat as model name */
+                if (!opt->model_name) {
+                    opt->model_name = arg;
+                } else {
+                    fprintf(stderr, "Unknown argument: %s (model already set to '%s')\n", arg, opt->model_name);
+                    return false;
+                }
             }
         } else {
             fprintf(stderr, "Unknown option: %s\n", arg);
@@ -1115,22 +1326,34 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
         }
     }
 
-    /* Auto-discover model if --model specified */
+    /* Auto-discover model if --model specified or model name given as positional arg */
     if (opt->model_name && (!opt->lib_path || !opt->weights_path)) {
         static char lib_buf[4096], weights_buf[4096];
         if (find_model_in_cache(opt->model_name, lib_buf, weights_buf, sizeof(lib_buf))) {
             opt->lib_path = lib_buf;
             opt->weights_path = weights_buf;
         } else {
-            fprintf(stderr, "Error: model '%s' not found in cache\n", opt->model_name);
-            fprintf(stderr, "Run with --list to see available models\n");
+            fprintf(stderr, "Model '%s' not found in cache.\n\n", opt->model_name);
+            list_available_models();
+            fprintf(stderr, "\nTo use an existing model:  %s --model <name>\n", argv[0]);
+            fprintf(stderr, "To compile '%s':           python version/v6.6/scripts/ck_run_v6_6.py run %s\n",
+                    opt->model_name, opt->model_name);
             return false;
         }
     }
 
     if (!opt->lib_path || !opt->weights_path) {
-        print_help(argv[0]);
-        return false;
+        /* No model specified — auto-scan cache directory */
+        static char scan_lib[4096], scan_weights[4096];
+        print_banner();
+        if (scan_and_select_model(scan_lib, scan_weights, sizeof(scan_lib))) {
+            opt->lib_path = scan_lib;
+            opt->weights_path = scan_weights;
+        } else {
+            fprintf(stderr, "\n");
+            print_help(argv[0]);
+            return false;
+        }
     }
 
     /* Auto-detect chat template from model name/path */

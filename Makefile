@@ -1345,6 +1345,9 @@ test: $(LIB) test-libs
 	@echo ""
 	@echo "Running Thread Pool GEMV parity tests..."
 	@$(MAKE) --no-print-directory test-threadpool-parity-quick
+	@echo ""
+	@echo "Running GEMM AVX vs scalar benchmark (quick)..."
+	@$(MAKE) --no-print-directory test-gemm-avx-bench-quick
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -1634,6 +1637,9 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running Thread Pool GEMV parity tests (serial vs dispatch)..."
 	@$(MAKE) --no-print-directory test-threadpool-parity
+	@echo ""
+	@echo "Running GEMM AVX vs scalar benchmark..."
+	@$(MAKE) --no-print-directory test-gemm-avx-bench
 
 # Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
@@ -1871,6 +1877,36 @@ test-threadpool-parity-verbose: $(THREADPOOL_BIN)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(THREADPOOL_BIN) --verbose
 
 .PHONY: test-threadpool-parity test-threadpool-parity-quick test-threadpool-parity-verbose
+
+# =============================================================================
+# GEMM AVX Benchmark: _avx (SSE4.1) vs _ref (scalar)
+# =============================================================================
+# Measures speedup of the SSE4.1-based gemm_nt_q8_0_q8_0_avx kernel over the
+# scalar _ref fallback. Verifies parity and confirms dispatch routing.
+#
+# Targets:
+#   make test-gemm-avx-bench       Full benchmark (5 configs, 5 iters each)
+#   make test-gemm-avx-bench-quick Quick parity + benchmark (3 configs, 3 iters)
+
+GEMM_AVX_BENCH_BIN := $(BUILD_DIR)/test_gemm_avx_bench
+
+$(GEMM_AVX_BENCH_BIN): $(LIB) tests/test_gemm_avx_bench.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -march=native -Iinclude \
+		tests/test_gemm_avx_bench.c \
+		-L$(BUILD_DIR) -lckernel_engine -lm \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o $(GEMM_AVX_BENCH_BIN)
+
+test-gemm-avx-bench: $(GEMM_AVX_BENCH_BIN)
+	@echo "Running GEMM Q8_0 AVX vs scalar benchmark (full)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMM_AVX_BENCH_BIN)
+
+test-gemm-avx-bench-quick: $(GEMM_AVX_BENCH_BIN)
+	@echo "Running GEMM Q8_0 AVX vs scalar benchmark (quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMM_AVX_BENCH_BIN) --quick
+
+.PHONY: test-gemm-avx-bench test-gemm-avx-bench-quick
 
 # =============================================================================
 # OpenMP GEMV Profiling (serial vs parallel)
@@ -2328,7 +2364,7 @@ CK_CLI := tools/ck.c
 CK_CLI_V4 := tools/ck_v4.c
 CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
-CK_CLI_V66 := src/v6.6/ck_cli_v6.6.c
+CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
