@@ -999,7 +999,7 @@
 
 
 <details open>
-    <summary>GEMM (Matrix Multiplication) (88)</summary>
+    <summary>GEMM (Matrix Multiplication) (87)</summary>
     <div class="accordion-content">
 
 
@@ -1470,16 +1470,6 @@
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_q5_0_q8_0_ref(const void * A, const void * B, float * C, int M, int N, int K)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Dispatcher for gemm_nt_q8_0_q8_0.</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_q5_0_q8_0_unroll_avx</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_q5_0_q8_0_unroll_avx(const void * A_q8, const void * B_q5, const float * bias, float * C, int M, int N, int K)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -2165,7 +2155,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void fused_rmsnorm_qkv_prefill(const float * x, const float * gamma, const float * Wq, const float * Wk, const float * Wv, float * Q, float * K, float * V, int seq_len, int hidden, int q_dim, int kv_dim, float eps, float * scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused RMSNorm + QKV projection for prefill (v3 optimized)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused RMSNorm + QKV projection for prefill.</p>
         </div>
 
 
@@ -2205,7 +2195,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t fused_rmsnorm_qkv_scratch_size(int hidden)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch size for fused prefill.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch buffer size for fused_rmsnorm_qkv_prefill.</p>
         </div>
 
 
@@ -2421,7 +2411,7 @@ test_parity.py::test_rmsnorm_parity</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void unfused_rmsnorm_qkv_prefill(const float * x, const float * gamma, const float * Wq, const float * Wk, const float * Wv, float * x_norm, float * Q, float * K, float * V, int seq_len, int hidden, int q_dim, int kv_dim, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Unfused version for comparison.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Unfused version for benchmarking comparison.</p>
         </div>
 
     </div>
@@ -2660,7 +2650,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (43)</summary>
+    <summary>Attention (40)</summary>
     <div class="accordion-content">
 
 
@@ -3037,36 +3027,6 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_decode_q5_0</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode_q5_0(float * output, const float * input, const float * residual, const void * wq_q5_0, const void * wk_q5_0, const void * wv_q8_0, const void * wo_q5_0, const float * ln_gamma, const float * bq, const float * bk, const float * bv, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps, void * scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Serial mega-fused attention decode kernel.</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_decode_q5_0_parallel_simd</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode_q5_0_parallel_simd(float * output, const float * input, const float * residual, const void * wq_q5_0, const void * wk_q5_0, const void * wv_q8_0, const void * wo_q5_0, const float * ln_gamma, const float * bq, const float * bk, const float * bv, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps, void * scratch, int ith, int nth)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Parallel SIMD mega-fused attention decode kernel (threadpool-aware)</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_decode_scratch_size</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int mega_fused_attention_decode_scratch_size(int AE, int H, int KV, int AD)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Calculate scratch buffer size needed for the kernel.</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_prefill</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -3259,7 +3219,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void fused_mlp_swiglu_prefill_bias(const float * x, const float * W_gate, const float * W_up, const float * W_down, const float * B_gate, const float * B_up, const float * B_down, float * output, int seq_len, int hidden, int intermediate, float * scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused MLP for prefill with proper tiling.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused MLP (Gate + Up + SwiGLU + Down) for prefill with biases.</p>
         </div>
 
 
@@ -3289,7 +3249,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t fused_mlp_swiglu_scratch_size(int intermediate)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch size for fused MLP.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch buffer size for fused_mlp_swiglu_prefill.</p>
         </div>
 
 
@@ -3571,7 +3531,7 @@ test_swiglu.py::TestSwiGLUForward::test_exact_single</p>
 
 
 <details open>
-    <summary>RoPE (Rotary Position Embedding) (22)</summary>
+    <summary>RoPE (Rotary Position Embedding) (21)</summary>
     <div class="accordion-content">
 
 
@@ -3581,16 +3541,6 @@ test_swiglu.py::TestSwiGLUForward::test_exact_single</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void apply_rope(float * x, int seq_len, int head_dim)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">apply_rope_inline</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void apply_rope_inline(float * q, float * k, const float * rope_cos, const float * rope_sin, int pos, int H, int KV, int AD)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -3835,7 +3785,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (842)</summary>
+    <summary>Other Functions (837)</summary>
     <div class="accordion-content">
 
 
@@ -4527,7 +4477,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float ck_fp16_to_fp32(ck_half h)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Convert FP16 (ck_half) to FP32.</p>
         </div>
 
 
@@ -4563,21 +4513,11 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_fp16_to_fp32_soft</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float ck_fp16_to_fp32_soft(ck_half h)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Convert FP16 (ck_half) to FP32 — software implementation.</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_fp32_to_fp16</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_half ck_fp32_to_fp16(float f)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Convert FP32 to FP16 (ck_half)</p>
         </div>
 
 
@@ -4618,16 +4558,6 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">uint16_t ck_fp32_to_fp16_scalar(float f)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_fp32_to_fp16_soft</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_half ck_fp32_to_fp16_soft(float f)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Convert FP32 to FP16 (ck_half) — software implementation.</p>
         </div>
 
 
@@ -5316,7 +5246,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_ir_v2_serialize_json_with_plan</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const struct CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -8812,16 +8742,6 @@ hugepage_mode
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemv_q5_0_from_fp32</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemv_q5_0_from_fp32(float * out, const void * W_q5_0, const float * x_fp32, const float * bias, int M, int K, block_q8_0 * x_q8_scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemv_q5_0_parallel</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -9047,16 +8967,6 @@ hugepage_mode
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemv_q8_0_backward_ref(float * dX, const void * W, const float * dY, int M, int K)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass: compute input gradient (scalar reference)</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemv_q8_0_from_fp32</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemv_q8_0_from_fp32(float * out, const void * W_q8_0, const float * x_fp32, const float * bias, int M, int K, block_q8_0 * x_q8_scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -10744,16 +10654,6 @@ The IR graph structure (number of layers, op types)</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">qk_norm_forward</code>
-                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
-            </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void qk_norm_forward(float * q, float * k, const float * q_gamma, const float * k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Per-head RMSNorm on Q and K.</p>
-        </div>
-
-
-        <div class="card" style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">qkv_index</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -10807,7 +10707,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">quantize_batch_q8_0</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void quantize_batch_q8_0(const float * x, void * vy, int num_rows, int k)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void quantize_batch_q8_0(const float * x, void * y, int num_rows, int k)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Batch quantize FP32 to Q8_0 format (row-major output)</p>
         </div>
 
@@ -10817,7 +10717,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">quantize_batch_q8_k</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void quantize_batch_q8_k(const float * x, void * vy, int num_rows, int k)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void quantize_batch_q8_k(const float * x, void * y, int num_rows, int k)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Batch quantize FP32 to Q8_K format (row-major output)</p>
         </div>
 
@@ -12497,7 +12397,7 @@ rmsnorm_backward(d_norm_out, input, gamma, rstd_cache, d_input, d_gamma, tokens,
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-01</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
             </div>
         </div>
     </footer>

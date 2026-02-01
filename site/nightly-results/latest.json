@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-02-01T04:35:23.660528",
-  "duration_sec": 386.26233100891113,
+  "timestamp": "2026-02-01T23:13:54.926568",
+  "duration_sec": 271.60244631767273,
   "summary": {
     "total": 45,
     "passed": 41,
@@ -8,15 +8,15 @@
     "skipped": 0,
     "timeout": 0,
     "sub_tests_total": 182,
-    "sub_tests_passed": 182,
-    "sub_tests_failed": 0
+    "sub_tests_passed": 181,
+    "sub_tests_failed": 1
   },
   "results": [
     {
       "name": "GEMM",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 15.564837217330933,
+      "duration_sec": 25.745296716690063,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -26,40 +26,40 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Blocked (serial)",
-          "status": "pass",
-          "max_diff": 4.58e-05,
-          "tolerance": 0.0001,
-          "c_time_us": 4038.9,
-          "pytorch_time_us": 256.5,
-          "speedup": 0.06
-        },
-        {
-          "name": "AVX-512 (parallel)",
-          "status": "pass",
-          "max_diff": 4.96e-05,
-          "tolerance": 0.0001,
-          "c_time_us": 2052.1,
-          "pytorch_time_us": 256.5,
-          "speedup": 0.13
-        },
-        {
           "name": "Naive (parallel)",
           "status": "pass",
-          "max_diff": 2.1e-05,
+          "max_diff": 4.2e-05,
           "tolerance": 0.0001,
-          "c_time_us": 15197.7,
-          "pytorch_time_us": 256.5,
-          "speedup": 0.02
+          "c_time_us": 12550.3,
+          "pytorch_time_us": 479.2,
+          "speedup": 0.04
         },
         {
           "name": "Fine-grained",
           "status": "pass",
-          "max_diff": 4.96e-05,
+          "max_diff": 3.43e-05,
           "tolerance": 0.0001,
-          "c_time_us": 2731.7,
-          "pytorch_time_us": 256.5,
-          "speedup": 0.09
+          "c_time_us": 2888.1,
+          "pytorch_time_us": 479.2,
+          "speedup": 0.17
+        },
+        {
+          "name": "AVX-512 (parallel)",
+          "status": "pass",
+          "max_diff": 3.43e-05,
+          "tolerance": 0.0001,
+          "c_time_us": 1362.8,
+          "pytorch_time_us": 479.2,
+          "speedup": 0.35
+        },
+        {
+          "name": "Blocked (serial)",
+          "status": "pass",
+          "max_diff": 4.2e-05,
+          "tolerance": 0.0001,
+          "c_time_us": 24973.7,
+          "pytorch_time_us": 479.2,
+          "speedup": 0.02
         }
       ]
     },
@@ -67,7 +67,7 @@
       "name": "GEMM Variants",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.2432913780212402,
+      "duration_sec": 1.5430669784545898,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -81,7 +81,7 @@
       "name": "GEMM Microkernel",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 10.090917348861694,
+      "duration_sec": 10.727449178695679,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -95,7 +95,7 @@
       "name": "GEMM Fused",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.7316477298736572,
+      "duration_sec": 2.007735013961792,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -104,6 +104,24 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "GEMM+Bias+SiLU",
+          "status": "pass",
+          "max_diff": 1.91e-05,
+          "tolerance": 0.001,
+          "c_time_us": 130.5,
+          "pytorch_time_us": 53.1,
+          "speedup": 0.41
+        },
+        {
+          "name": "GEMM+SwiGLU",
+          "status": "pass",
+          "max_diff": 0.000732,
+          "tolerance": 0.002,
+          "c_time_us": 176.2,
+          "pytorch_time_us": 93.4,
+          "speedup": 0.53
+        },
         {
           "name": "Tiny (M=8,N=16,K=32)",
           "status": "pass",
@@ -114,22 +132,31 @@
           "speedup": null
         },
         {
-          "name": "GEMM+Bias+SiLU",
-          "status": "pass",
-          "max_diff": 2.67e-05,
-          "tolerance": 0.001,
-          "c_time_us": 141.8,
-          "pytorch_time_us": 39.1,
-          "speedup": 0.28
-        },
-        {
           "name": "GEMM+Bias+ReLU",
           "status": "pass",
-          "max_diff": 3.05e-05,
+          "max_diff": 2.29e-05,
           "tolerance": 0.0001,
-          "c_time_us": 100.7,
-          "pytorch_time_us": 36.1,
-          "speedup": 0.36
+          "c_time_us": 86.3,
+          "pytorch_time_us": 45.7,
+          "speedup": 0.53
+        },
+        {
+          "name": "GEMM+Bias+GELU",
+          "status": "pass",
+          "max_diff": 0.0207,
+          "tolerance": 0.05,
+          "c_time_us": 130.7,
+          "pytorch_time_us": 93.7,
+          "speedup": 0.72
+        },
+        {
+          "name": "Medium (M=64,N=128,K=256)",
+          "status": "pass",
+          "max_diff": 1.91e-05,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "Small (M=32,N=64,K=128)",
@@ -143,34 +170,7 @@
         {
           "name": "Large (M=128,N=256,K=512)",
           "status": "pass",
-          "max_diff": 4.58e-05,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "GEMM+SwiGLU",
-          "status": "pass",
-          "max_diff": 0.00116,
-          "tolerance": 0.002,
-          "c_time_us": 162.4,
-          "pytorch_time_us": 74.8,
-          "speedup": 0.46
-        },
-        {
-          "name": "GEMM+Bias+GELU",
-          "status": "pass",
-          "max_diff": 0.0207,
-          "tolerance": 0.05,
-          "c_time_us": 145.7,
-          "pytorch_time_us": 129.3,
-          "speedup": 0.89
-        },
-        {
-          "name": "Medium (M=64,N=128,K=256)",
-          "status": "pass",
-          "max_diff": 3.05e-05,
+          "max_diff": 3.81e-05,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -182,7 +182,7 @@
       "name": "ReLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.5594234466552734,
+      "duration_sec": 2.045718193054199,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -192,40 +192,40 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 3.0,
-          "pytorch_time_us": 33.9,
-          "speedup": 11.43
-        },
-        {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 3.0,
-          "pytorch_time_us": 30.6,
-          "speedup": 10.33
+          "c_time_us": 2.8,
+          "pytorch_time_us": 44.9,
+          "speedup": 16.3
+        },
+        {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 2.8,
+          "pytorch_time_us": 47.8,
+          "speedup": 17.35
         },
         {
           "name": "ReLU (out-of-place)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 2.8,
-          "pytorch_time_us": 3.2,
-          "speedup": 1.16
+          "c_time_us": 2.3,
+          "pytorch_time_us": 2.9,
+          "speedup": 1.29
         },
         {
           "name": "ReLU (inplace)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 3.3,
-          "pytorch_time_us": 3.2,
-          "speedup": 0.98
+          "c_time_us": 8.1,
+          "pytorch_time_us": 2.9,
+          "speedup": 0.36
         }
       ]
     },
@@ -233,7 +233,7 @@
       "name": "GELU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.7554726600646973,
+      "duration_sec": 2.186190605163574,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -243,13 +243,22 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "Fast (sigmoid)",
+          "status": "pass",
+          "max_diff": 0.115,
+          "tolerance": 0.1,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "Fast (SIMD approx)",
           "status": "pass",
           "max_diff": 0.0146,
           "tolerance": 0.02,
-          "c_time_us": 5.1,
-          "pytorch_time_us": 13.5,
-          "speedup": 2.64
+          "c_time_us": 5.2,
+          "pytorch_time_us": 16.5,
+          "speedup": 3.16
         },
         {
           "name": "Exact (scalar)",
@@ -261,22 +270,13 @@
           "speedup": null
         },
         {
-          "name": "Fast (sigmoid)",
-          "status": "pass",
-          "max_diff": 0.115,
-          "tolerance": 0.1,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "SIMD (tanh approx)",
           "status": "pass",
           "max_diff": 0.0586,
           "tolerance": 0.1,
-          "c_time_us": 5.1,
-          "pytorch_time_us": 58.5,
-          "speedup": 11.44
+          "c_time_us": 5.5,
+          "pytorch_time_us": 73.9,
+          "speedup": 13.42
         }
       ]
     },
@@ -284,7 +284,7 @@
       "name": "Sigmoid",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.580019474029541,
+      "duration_sec": 1.9980039596557617,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -294,31 +294,31 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_input",
+          "name": "Sigmoid",
           "status": "pass",
-          "max_diff": 1.01e-05,
+          "max_diff": 1.19e-07,
           "tolerance": 2e-05,
-          "c_time_us": 3.7,
-          "pytorch_time_us": 35.8,
-          "speedup": 9.77
+          "c_time_us": 19.9,
+          "pytorch_time_us": 6.1,
+          "speedup": 0.31
         },
         {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 3.7,
-          "pytorch_time_us": 31.4,
-          "speedup": 8.59
+          "c_time_us": 21.3,
+          "pytorch_time_us": 42.6,
+          "speedup": 2.0
         },
         {
-          "name": "Sigmoid",
+          "name": "d_input",
           "status": "pass",
-          "max_diff": 1.35e-05,
+          "max_diff": 5.96e-08,
           "tolerance": 2e-05,
-          "c_time_us": 3.5,
-          "pytorch_time_us": 4.6,
-          "speedup": 1.33
+          "c_time_us": 21.3,
+          "pytorch_time_us": 48.7,
+          "speedup": 2.28
         }
       ]
     },
@@ -326,7 +326,7 @@
       "name": "Softmax",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.2006216049194336,
+      "duration_sec": 2.658989906311035,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -338,11 +338,11 @@
         {
           "name": "Fast (SIMD approx)",
           "status": "pass",
-          "max_diff": 0.0182,
+          "max_diff": 0.025,
           "tolerance": 0.03,
-          "c_time_us": 43.0,
-          "pytorch_time_us": 72.9,
-          "speedup": 1.7
+          "c_time_us": 27.7,
+          "pytorch_time_us": 92.8,
+          "speedup": 3.36
         },
         {
           "name": "Exact (scalar)",
@@ -356,7 +356,7 @@
         {
           "name": "Exact (scalar fwd+bwd)",
           "status": "pass",
-          "max_diff": 1.19e-07,
+          "max_diff": 7.45e-08,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -365,11 +365,11 @@
         {
           "name": "Fast (SIMD fwd+bwd)",
           "status": "pass",
-          "max_diff": 0.0217,
+          "max_diff": 0.0348,
           "tolerance": 0.05,
-          "c_time_us": 61.0,
-          "pytorch_time_us": 188.5,
-          "speedup": 3.09
+          "c_time_us": 43.8,
+          "pytorch_time_us": 224.1,
+          "speedup": 5.11
         }
       ]
     },
@@ -377,7 +377,7 @@
       "name": "SwiGLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.753075122833252,
+      "duration_sec": 2.1611127853393555,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -387,6 +387,15 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "Fast (SIMD approx)",
+          "status": "pass",
+          "max_diff": 2.86e-05,
+          "tolerance": 5e-05,
+          "c_time_us": 5.1,
+          "pytorch_time_us": 19.6,
+          "speedup": 3.84
+        },
+        {
           "name": "Exact (scalar)",
           "status": "pass",
           "max_diff": 4.77e-07,
@@ -394,15 +403,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Fast (SIMD approx)",
-          "status": "pass",
-          "max_diff": 2.86e-05,
-          "tolerance": 5e-05,
-          "c_time_us": 5.6,
-          "pytorch_time_us": 16.4,
-          "speedup": 2.92
         }
       ]
     },
@@ -410,7 +410,7 @@
       "name": "LayerNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.6496992111206055,
+      "duration_sec": 2.065535068511963,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -429,49 +429,13 @@
           "speedup": null
         },
         {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Rolled (SIMD)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 4.5,
-          "pytorch_time_us": 6.7,
-          "speedup": 1.48
-        },
-        {
-          "name": "Forward",
+          "name": "Forward+Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 11.8,
-          "pytorch_time_us": 6.9,
-          "speedup": 0.58
-        },
-        {
-          "name": "Naive (scalar)",
-          "status": "pass",
-          "max_diff": 9.54e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 11.8,
-          "pytorch_time_us": 6.7,
-          "speedup": 0.57
-        },
-        {
-          "name": "Unrolled (SIMD)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 4.0,
-          "pytorch_time_us": 6.7,
-          "speedup": 1.68
+          "c_time_us": 20.9,
+          "pytorch_time_us": 76.9,
+          "speedup": 3.69
         },
         {
           "name": "d_beta",
@@ -483,22 +447,58 @@
           "speedup": null
         },
         {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Forward",
+          "status": "pass",
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 11.0,
+          "pytorch_time_us": 6.1,
+          "speedup": 0.55
+        },
+        {
+          "name": "Naive (scalar)",
+          "status": "pass",
+          "max_diff": 1.43e-06,
+          "tolerance": 1e-05,
+          "c_time_us": 11.1,
+          "pytorch_time_us": 6.4,
+          "speedup": 0.58
+        },
+        {
+          "name": "Unrolled (SIMD)",
+          "status": "pass",
+          "max_diff": 9.54e-07,
+          "tolerance": 1e-05,
+          "c_time_us": 4.4,
+          "pytorch_time_us": 6.4,
+          "speedup": 1.46
+        },
+        {
           "name": "Backward (est)",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 12.2,
-          "pytorch_time_us": 55.2,
-          "speedup": 4.53
+          "c_time_us": 11.0,
+          "pytorch_time_us": 70.8,
+          "speedup": 6.45
         },
         {
-          "name": "Forward+Backward",
+          "name": "Rolled (SIMD)",
           "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 22.9,
-          "pytorch_time_us": 62.1,
-          "speedup": 2.71
+          "max_diff": 7.15e-07,
+          "tolerance": 1e-05,
+          "c_time_us": 5.2,
+          "pytorch_time_us": 6.4,
+          "speedup": 1.22
         }
       ]
     },
@@ -506,7 +506,7 @@
       "name": "RMSNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8157017230987549,
+      "duration_sec": 2.1299922466278076,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -525,22 +525,40 @@
           "speedup": null
         },
         {
-          "name": "d_input",
+          "name": "Forward+Backward",
           "status": "pass",
-          "max_diff": 1.43e-06,
-          "tolerance": 1e-05,
-          "c_time_us": 17.1,
-          "pytorch_time_us": 216.9,
-          "speedup": 12.65
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 14.4,
+          "pytorch_time_us": 204.7,
+          "speedup": 14.2
         },
         {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 13.0,
-          "pytorch_time_us": 186.0,
-          "speedup": 14.31
+          "c_time_us": 8.4,
+          "pytorch_time_us": 177.8,
+          "speedup": 21.06
+        },
+        {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 1.43e-06,
+          "tolerance": 1e-05,
+          "c_time_us": 14.4,
+          "pytorch_time_us": 204.7,
+          "speedup": 14.2
+        },
+        {
+          "name": "RMSNorm",
+          "status": "pass",
+          "max_diff": 9.54e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 6.7,
+          "pytorch_time_us": 28.8,
+          "speedup": 4.28
         },
         {
           "name": "RMSNorm (no rstd cache)",
@@ -550,24 +568,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "RMSNorm",
-          "status": "pass",
-          "max_diff": 9.54e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 6.2,
-          "pytorch_time_us": 31.5,
-          "speedup": 5.05
-        },
-        {
-          "name": "Forward+Backward",
-          "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 17.1,
-          "pytorch_time_us": 216.9,
-          "speedup": 12.65
         }
       ]
     },
@@ -575,7 +575,7 @@
       "name": "RoPE",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 3.023353338241577,
+      "duration_sec": 3.126664400100708,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -585,9 +585,9 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_input",
+          "name": "pos=10",
           "status": "pass",
-          "max_diff": 4.77e-07,
+          "max_diff": 2.38e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -603,16 +603,34 @@
           "speedup": null
         },
         {
-          "name": "pos=500",
+          "name": "cos_cache",
           "status": "pass",
-          "max_diff": 2.38e-07,
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Llama3 (\u03b8=500000, d=64)",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Tiny (H=2,T=8,D=16)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Small (H=4,T=16,D=32)",
+          "name": "Medium (H=8,T=32,D=64)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -630,7 +648,7 @@
           "speedup": null
         },
         {
-          "name": "Large (H=8,T=64,D=128)",
+          "name": "Qwen2-1.5B (\u03b8=1000000)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -639,10 +657,37 @@
           "speedup": null
         },
         {
-          "name": "Llama3 (\u03b8=500000, d=64)",
+          "name": "Qwen2 (\u03b8=1000000, d=64)",
           "status": "pass",
-          "max_diff": 1.53e-05,
+          "max_diff": 1.91e-06,
           "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "sin_cache",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=100",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -657,7 +702,43 @@
           "speedup": null
         },
         {
-          "name": "Qwen2-1.5B (\u03b8=1000000)",
+          "name": "Qwen2 (\u03b8=1000000)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=2000",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Large (H=8,T=64,D=128)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Llama3 (\u03b8=500000)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=500",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -684,88 +765,7 @@
           "speedup": null
         },
         {
-          "name": "sin_cache",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Llama3 (\u03b8=500000)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "cos_cache",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2 (\u03b8=1000000)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2 (\u03b8=1000000, d=64)",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Tiny (H=2,T=8,D=16)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Medium (H=8,T=32,D=64)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=2000",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=10",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=100",
+          "name": "Small (H=4,T=16,D=32)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -779,7 +779,7 @@
       "name": "Embedding",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9767577648162842,
+      "duration_sec": 2.18349027633667,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -789,22 +789,22 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_token_emb",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 56.4,
-          "pytorch_time_us": 318.0,
-          "speedup": 5.64
-        },
-        {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 56.4,
-          "pytorch_time_us": 291.1,
-          "speedup": 5.16
+          "c_time_us": 45.6,
+          "pytorch_time_us": 178.4,
+          "speedup": 3.91
+        },
+        {
+          "name": "d_token_emb",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 45.6,
+          "pytorch_time_us": 208.6,
+          "speedup": 4.58
         },
         {
           "name": "d_pos_emb",
@@ -821,7 +821,7 @@
       "name": "Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.3066399097442627,
+      "duration_sec": 2.5004451274871826,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -831,10 +831,10 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Exact (scalar)",
+          "name": "Score-matrix (exp approx)",
           "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
+          "max_diff": 0.0732,
+          "tolerance": 0.1,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -844,15 +844,15 @@
           "status": "pass",
           "max_diff": 7.75e-07,
           "tolerance": 0.0001,
-          "c_time_us": 385.4,
-          "pytorch_time_us": 157.6,
-          "speedup": 0.41
+          "c_time_us": 333.5,
+          "pytorch_time_us": 173.2,
+          "speedup": 0.52
         },
         {
-          "name": "Score-matrix (exp approx)",
+          "name": "Exact (scalar)",
           "status": "pass",
-          "max_diff": 0.0703,
-          "tolerance": 0.1,
+          "max_diff": 4.17e-07,
+          "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -863,7 +863,7 @@
       "name": "KV Cache Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.4042563438415527,
+      "duration_sec": 1.6697208881378174,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -873,18 +873,9 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "decode_vs_full",
-          "status": "pass",
-          "max_diff": 7.15e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "flash_strided_vs_ref",
           "status": "pass",
-          "max_diff": 7.15e-07,
+          "max_diff": 9.54e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -892,6 +883,15 @@
         },
         {
           "name": "flash_vs_ref",
+          "status": "pass",
+          "max_diff": 6.56e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_vs_full",
           "status": "pass",
           "max_diff": 5.96e-07,
           "tolerance": 1e-05,
@@ -905,7 +905,7 @@
       "name": "KV Cache Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.1968779563903809,
+      "duration_sec": 1.5094308853149414,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -929,7 +929,7 @@
       "name": "Fused Attention Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.202977180480957,
+      "duration_sec": 1.51961088180542,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -939,18 +939,18 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "fused_attention_decode",
+          "name": "fused_attention_decode_mlp",
           "status": "pass",
-          "max_diff": 0.00394,
+          "max_diff": 0.00195,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fused_attention_decode_mlp",
+          "name": "fused_attention_decode",
           "status": "pass",
-          "max_diff": 0.00394,
+          "max_diff": 0.00211,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -962,7 +962,7 @@
       "name": "Fused SwiGLU Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.991072177886963,
+      "duration_sec": 3.0283334255218506,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -974,7 +974,7 @@
         {
           "name": "mlp_unfused",
           "status": "pass",
-          "max_diff": 3.58e-07,
+          "max_diff": 8.34e-07,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -983,7 +983,7 @@
         {
           "name": "mlp_fused_v2",
           "status": "pass",
-          "max_diff": 2.98e-07,
+          "max_diff": 3.4e-06,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -995,7 +995,7 @@
       "name": "MLP",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 4.8562517166137695,
+      "duration_sec": 11.207271099090576,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1005,22 +1005,22 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Fast (SIMD GELU)",
-          "status": "pass",
-          "max_diff": 0.00598,
-          "tolerance": 0.01,
-          "c_time_us": 1514.2,
-          "pytorch_time_us": 136.6,
-          "speedup": 0.09
-        },
-        {
           "name": "Exact (scalar GELU)",
           "status": "pass",
-          "max_diff": 1.56e-07,
+          "max_diff": 1.64e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "Fast (SIMD GELU)",
+          "status": "pass",
+          "max_diff": 0.00598,
+          "tolerance": 0.01,
+          "c_time_us": 5576.9,
+          "pytorch_time_us": 207.3,
+          "speedup": 0.04
         }
       ]
     },
@@ -1028,7 +1028,7 @@
       "name": "Cross Entropy",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.139134645462036,
+      "duration_sec": 2.3676421642303467,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1052,7 +1052,7 @@
       "name": "Optimizer (AdamW/SGD)",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.9540157318115234,
+      "duration_sec": 2.0312247276306152,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1062,22 +1062,13 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "fp32 (step=1)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 16.5,
-          "pytorch_time_us": 75.7,
-          "speedup": 4.59
-        },
-        {
-          "name": "accumulate (+=)",
+          "name": "scale (*=)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 8.3,
-          "pytorch_time_us": 2.5,
-          "speedup": 0.31
+          "c_time_us": 4.5,
+          "pytorch_time_us": 2.9,
+          "speedup": 0.64
         },
         {
           "name": "fp32 (10 steps)",
@@ -1089,13 +1080,22 @@
           "speedup": null
         },
         {
-          "name": "scale (*=)",
+          "name": "accumulate (+=)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 6.0,
-          "pytorch_time_us": 6.9,
-          "speedup": 1.14
+          "c_time_us": 7.8,
+          "pytorch_time_us": 2.7,
+          "speedup": 0.35
+        },
+        {
+          "name": "fp32 (step=1)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 15.7,
+          "pytorch_time_us": 71.7,
+          "speedup": 4.57
         }
       ]
     },
@@ -1103,7 +1103,7 @@
       "name": "LM Head Litmus",
       "category": "kernels",
       "status": "fail",
-      "duration_sec": 12.536302328109741,
+      "duration_sec": 17.734533309936523,
       "stdout": "",
       "stderr": "",
       "error_msg": "        fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\ncollect2: error: ld returned 1 exit status\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c']' returned non-zero exit status 1.",
@@ -1117,7 +1117,7 @@
       "name": "Vision",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.179732322692871,
+      "duration_sec": 1.5200047492980957,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1131,7 +1131,7 @@
       "name": "ReLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.172729730606079,
+      "duration_sec": 1.506540298461914,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1145,7 +1145,7 @@
       "name": "GELU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1743416786193848,
+      "duration_sec": 1.4592583179473877,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1159,7 +1159,7 @@
       "name": "Sigmoid BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.183546543121338,
+      "duration_sec": 1.4538276195526123,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1173,7 +1173,7 @@
       "name": "SwiGLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1957504749298096,
+      "duration_sec": 1.493384599685669,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1187,7 +1187,7 @@
       "name": "LayerNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1788890361785889,
+      "duration_sec": 1.4830355644226074,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1201,7 +1201,7 @@
       "name": "RMSNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1792137622833252,
+      "duration_sec": 1.5164580345153809,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1215,7 +1215,7 @@
       "name": "RoPE BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1726288795471191,
+      "duration_sec": 1.517329216003418,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1229,7 +1229,7 @@
       "name": "Embedding BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1714527606964111,
+      "duration_sec": 1.4488270282745361,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1243,7 +1243,7 @@
       "name": "Attention BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1703486442565918,
+      "duration_sec": 1.4874968528747559,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1257,7 +1257,7 @@
       "name": "MLP BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.1777281761169434,
+      "duration_sec": 1.4605743885040283,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1271,7 +1271,7 @@
       "name": "Cross Entropy BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.174971342086792,
+      "duration_sec": 1.4895107746124268,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1285,7 +1285,7 @@
       "name": "Q4_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.1890299320220947,
+      "duration_sec": 1.5816869735717773,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1297,7 +1297,7 @@
         {
           "name": "Q4_K GEMV",
           "status": "pass",
-          "max_diff": 0.000732,
+          "max_diff": 0.00061,
           "tolerance": null,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1318,7 +1318,7 @@
       "name": "Q6_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.1834251880645752,
+      "duration_sec": 1.5797865390777588,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1327,6 +1327,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "gemv_q6_k (M=32,K=256)",
+          "status": "pass",
+          "max_diff": 7.63e-05,
+          "tolerance": 0.0005,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "dequant_q6_k_row",
           "status": "pass",
@@ -1337,18 +1346,9 @@
           "speedup": null
         },
         {
-          "name": "gemv_q6_k (M=32,K=256)",
-          "status": "pass",
-          "max_diff": 0.000122,
-          "tolerance": 0.0005,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "gemm_nt_q6_k (M=1,N=32,K=256)",
           "status": "pass",
-          "max_diff": 0.000305,
+          "max_diff": 3.05e-05,
           "tolerance": 0.0005,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1360,7 +1360,7 @@
       "name": "Q4_K x Q8_K MatVec",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.2893900871276855,
+      "duration_sec": 1.7081282138824463,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1374,9 +1374,18 @@
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
-          "c_time_us": 30.3,
-          "pytorch_time_us": 9.8,
-          "speedup": 0.32
+          "c_time_us": 33.2,
+          "pytorch_time_us": 20.4,
+          "speedup": 0.61
+        },
+        {
+          "name": "End-to-end (M=16,K=1024)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0,
+          "c_time_us": 7.1,
+          "pytorch_time_us": 3.7,
+          "speedup": 0.52
         },
         {
           "name": "End-to-end (M=16,K=512)",
@@ -1384,17 +1393,8 @@
           "max_diff": 0.0,
           "tolerance": 0.0,
           "c_time_us": 4.9,
-          "pytorch_time_us": 4.0,
-          "speedup": 0.83
-        },
-        {
-          "name": "End-to-end (M=16,K=1024)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0,
-          "c_time_us": 6.7,
-          "pytorch_time_us": 4.5,
-          "speedup": 0.68
+          "pytorch_time_us": 3.5,
+          "speedup": 0.71
         }
       ]
     },
@@ -1402,7 +1402,7 @@
       "name": "Softmax Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.2253592014312744,
+      "duration_sec": 1.5459449291229248,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1453,7 +1453,7 @@
       "name": "Attention Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 14.026547193527222,
+      "duration_sec": 17.32709789276123,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1465,7 +1465,16 @@
         {
           "name": "d_v (GQA)",
           "status": "pass",
-          "max_diff": 3.34e-06,
+          "max_diff": 2.86e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_v",
+          "status": "pass",
+          "max_diff": 9.54e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1483,43 +1492,7 @@
         {
           "name": "Medium (H=8,T=32,D=64)",
           "status": "pass",
-          "max_diff": 9.54e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_q (GQA)",
-          "status": "pass",
-          "max_diff": 5.96e-07,
-          "tolerance": 0.0001,
-          "c_time_us": 248.1,
-          "pytorch_time_us": 39358.1,
-          "speedup": 158.66
-        },
-        {
-          "name": "Small (H=4,T=16,D=32)",
-          "status": "pass",
-          "max_diff": 7.15e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_q",
-          "status": "pass",
-          "max_diff": 2.98e-07,
-          "tolerance": 0.0001,
-          "c_time_us": 139.9,
-          "pytorch_time_us": 19294.9,
-          "speedup": 137.94
-        },
-        {
-          "name": "d_v",
-          "status": "pass",
-          "max_diff": 9.54e-07,
+          "max_diff": 1.19e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1528,16 +1501,43 @@
         {
           "name": "d_k (GQA)",
           "status": "pass",
-          "max_diff": 1.43e-06,
+          "max_diff": 1.19e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "d_k",
+          "name": "d_q",
           "status": "pass",
           "max_diff": 4.77e-07,
+          "tolerance": 0.0001,
+          "c_time_us": 141.6,
+          "pytorch_time_us": 23639.9,
+          "speedup": 166.94
+        },
+        {
+          "name": "d_q (GQA)",
+          "status": "pass",
+          "max_diff": 7.15e-07,
+          "tolerance": 0.0001,
+          "c_time_us": 238.4,
+          "pytorch_time_us": 48863.0,
+          "speedup": 205.01
+        },
+        {
+          "name": "d_k",
+          "status": "pass",
+          "max_diff": 5.96e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Small (H=4,T=16,D=32)",
+          "status": "pass",
+          "max_diff": 9.54e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1549,7 +1549,7 @@
       "name": "PyTorch Parity",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 1.5284698009490967,
+      "duration_sec": 1.9708914756774902,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1561,11 +1561,20 @@
         {
           "name": "d_gamma",
           "status": "pass",
-          "max_diff": 4.77e-06,
+          "max_diff": 3.81e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "Loss",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": 147.7,
+          "pytorch_time_us": 27.2,
+          "speedup": 0.18
         },
         {
           "name": "d_input",
@@ -1577,13 +1586,105 @@
           "speedup": null
         },
         {
-          "name": "Loss",
+          "name": "Forward",
+          "status": "pass",
+          "max_diff": 2.87e-05,
+          "tolerance": 5e-05,
+          "c_time_us": 11.3,
+          "pytorch_time_us": 24.2,
+          "speedup": 2.14
+        },
+        {
+          "name": "d_logits",
+          "status": "pass",
+          "max_diff": 9.31e-10,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        }
+      ]
+    },
+    {
+      "name": "Litmus Test",
+      "category": "parity",
+      "status": "fail",
+      "duration_sec": 17.576730251312256,
+      "stdout": "",
+      "stderr": "",
+      "error_msg": "fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\ncollect2: error: ld returned 1 exit status\nraise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c']' returned non-zero exit status 1.\nmake: *** [Makefile:1515: litmus] Error 1",
+      "perf_metric": null,
+      "perf_unit": "",
+      "baseline_perf": null,
+      "perf_delta_pct": null,
+      "sub_tests": []
+    },
+    {
+      "name": "llama.cpp Parity (Full)",
+      "category": "parity",
+      "status": "fail",
+      "duration_sec": 34.18830347061157,
+      "stdout": "",
+      "stderr": "",
+      "error_msg": "Failed:  1\nSome tests failed!\n[ERROR] Comprehensive GEMV tests failed\nFailed: 0\n[ERROR] Some tests failed!\nmake: *** [Makefile:1634: llamacpp-parity-full] Error 1",
+      "perf_metric": null,
+      "perf_unit": "",
+      "baseline_perf": null,
+      "perf_delta_pct": null,
+      "sub_tests": [
+        {
+          "name": "Q8_0_qwen_qkv",
+          "status": "pass",
+          "max_diff": 0.0181,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_tiny",
+          "status": "pass",
+          "max_diff": 0.000859,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_tiny",
           "status": "pass",
           "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": 161.0,
-          "pytorch_time_us": 23.2,
-          "speedup": 0.14
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_medium",
+          "status": "pass",
+          "max_diff": 0.0372,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_qwen_qkv",
+          "status": "pass",
+          "max_diff": 6.1e-05,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_large",
+          "status": "pass",
+          "max_diff": 0.0137,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "d_logits",
@@ -1595,102 +1696,28 @@
           "speedup": null
         },
         {
-          "name": "Forward",
+          "name": "Q5_0_Q8_0_small",
           "status": "pass",
-          "max_diff": 2.87e-05,
-          "tolerance": 5e-05,
-          "c_time_us": 12.0,
-          "pytorch_time_us": 20.7,
-          "speedup": 1.73
-        }
-      ]
-    },
-    {
-      "name": "Litmus Test",
-      "category": "parity",
-      "status": "fail",
-      "duration_sec": 12.51949691772461,
-      "stdout": "",
-      "stderr": "",
-      "error_msg": "fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\ncollect2: error: ld returned 1 exit status\nraise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c']' returned non-zero exit status 1.\nmake: *** [Makefile:1514: litmus] Error 1",
-      "perf_metric": null,
-      "perf_unit": "",
-      "baseline_perf": null,
-      "perf_delta_pct": null,
-      "sub_tests": []
-    },
-    {
-      "name": "llama.cpp Parity (Full)",
-      "category": "parity",
-      "status": "fail",
-      "duration_sec": 149.7772855758667,
-      "stdout": "",
-      "stderr": "",
-      "error_msg": "Failed:  0\nFailed: 0\nFailed:        0\ncollect2: error: ld returned 1 exit status\nmake[1]: *** [Makefile:1895: build/test_gemm_avx_bench] Error 1\nmake: *** [Makefile:1642: llamacpp-parity-full] Error 2",
-      "perf_metric": null,
-      "perf_unit": "",
-      "baseline_perf": null,
-      "perf_delta_pct": null,
-      "sub_tests": [
-        {
-          "name": "Q5_0_qwen_mlp",
-          "status": "pass",
-          "max_diff": 0.01,
-          "tolerance": 0.03,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_qwen_mlp_down",
-          "status": "pass",
-          "max_diff": 8.39e-05,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Forward",
-          "status": "pass",
-          "max_diff": 2.87e-05,
-          "tolerance": 5e-05,
-          "c_time_us": 11.6,
-          "pytorch_time_us": 20.4,
-          "speedup": 1.76
-        },
-        {
-          "name": "Q4_K_medium_wide",
-          "status": "pass",
-          "max_diff": 6.1e-05,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_medium",
-          "status": "pass",
-          "max_diff": 0.00157,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_qwen_mlp_up",
-          "status": "pass",
-          "max_diff": 0.000122,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_small",
-          "status": "pass",
-          "max_diff": 3.05e-05,
+          "max_diff": 0.0,
           "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_medium",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_small_sq",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.02,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1707,167 +1734,41 @@
         {
           "name": "Q4_K_small_sq",
           "status": "pass",
-          "max_diff": 1.53e-05,
+          "max_diff": 4.58e-05,
           "tolerance": 0.001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "d_logits",
+          "name": "Q5_0_Q8_0_large",
           "status": "pass",
-          "max_diff": 9.31e-10,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_small",
-          "status": "pass",
-          "max_diff": 0.0042,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_Q8_0_qwen",
-          "status": "pass",
-          "max_diff": 0.0,
+          "max_diff": 1.91e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_tiny",
+          "name": "Q8_0_small_sq",
           "status": "pass",
           "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_small",
-          "status": "pass",
-          "max_diff": 0.0171,
           "tolerance": 0.2,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_medium",
+          "name": "Q4_K_medium_tall",
           "status": "pass",
-          "max_diff": 2.86e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_medium",
-          "status": "pass",
-          "max_diff": 0.00582,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_tiny",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_qwen_qkv",
-          "status": "pass",
-          "max_diff": 0.00117,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_qwen",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_large",
-          "status": "pass",
-          "max_diff": 0.0479,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_medium",
-          "status": "pass",
-          "max_diff": 2.93e-05,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_large",
-          "status": "pass",
-          "max_diff": 0.0112,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_small_sq",
-          "status": "pass",
-          "max_diff": 0.000861,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_medium_sq",
-          "status": "pass",
-          "max_diff": 2.67e-05,
+          "max_diff": 4.58e-05,
           "tolerance": 0.001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 3.79e-05,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Loss",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": 162.5,
-          "pytorch_time_us": 22.2,
-          "speedup": 0.14
-        },
-        {
-          "name": "Q4_K_qwen_qkv",
+          "name": "Q4_K_small_wide",
           "status": "pass",
           "max_diff": 3.05e-05,
           "tolerance": 0.001,
@@ -1876,19 +1777,37 @@
           "speedup": null
         },
         {
-          "name": "Q4_K_small_tall",
+          "name": "Q8_0_tiny",
           "status": "pass",
-          "max_diff": 1.53e-05,
+          "max_diff": 0.0,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_qwen_mlp_down",
+          "status": "pass",
+          "max_diff": 0.000244,
           "tolerance": 0.001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q8_0_Q8_0_tiny",
+          "name": "Forward",
           "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
+          "max_diff": 2.87e-05,
+          "tolerance": 5e-05,
+          "c_time_us": 10.9,
+          "pytorch_time_us": 24.5,
+          "speedup": 2.24
+        },
+        {
+          "name": "Q8_0_small",
+          "status": "pass",
+          "max_diff": 0.0461,
+          "tolerance": 0.2,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1903,25 +1822,7 @@
           "speedup": null
         },
         {
-          "name": "d_gamma",
-          "status": "pass",
-          "max_diff": 4.77e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_Q8_0_small",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_small_wide",
+          "name": "Q4_K_qwen_mlp_up",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.001,
@@ -1930,7 +1831,34 @@
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_large",
+          "name": "Q4_K_small_tall",
+          "status": "pass",
+          "max_diff": 3.05e-05,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_qwen_qkv",
+          "status": "pass",
+          "max_diff": 0.02,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_qwen",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_gamma",
           "status": "pass",
           "max_diff": 3.81e-06,
           "tolerance": 0.0001,
@@ -1939,37 +1867,109 @@
           "speedup": null
         },
         {
-          "name": "Q4_K_medium_tall",
+          "name": "Q4_K_medium_sq",
           "status": "pass",
-          "max_diff": 6.1e-05,
+          "max_diff": 0.000122,
           "tolerance": 0.001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q8_0_small_sq",
+          "name": "Loss",
           "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 0.2,
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": 148.8,
+          "pytorch_time_us": 27.1,
+          "speedup": 0.18
+        },
+        {
+          "name": "Q5_0_Q8_0_qwen",
+          "status": "pass",
+          "max_diff": 5.72e-06,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q8_0_qwen_qkv",
+          "name": "d_input",
           "status": "pass",
-          "max_diff": 0.0209,
-          "tolerance": 0.2,
+          "max_diff": 3.79e-05,
+          "tolerance": 5e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q8_0_tiny",
+          "name": "Q5_0_medium",
           "status": "pass",
-          "max_diff": 0.023,
-          "tolerance": 0.2,
+          "max_diff": 0.000744,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_small",
+          "status": "pass",
+          "max_diff": 7.63e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_medium_wide",
+          "status": "pass",
+          "max_diff": 0.000305,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_large",
+          "status": "pass",
+          "max_diff": 0.0184,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_tiny",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_qwen_mlp",
+          "status": "pass",
+          "max_diff": 0.00661,
+          "tolerance": 0.03,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_small",
+          "status": "pass",
+          "max_diff": 0.00397,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_medium",
+          "status": "fail",
+          "max_diff": 0.000122,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1980,7 +1980,7 @@
       "name": "Flash Attention (50K+)",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 17.714135885238647,
+      "duration_sec": 18.01681113243103,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1990,46 +1990,73 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 1.94e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_1k (Tq=1,Tk=1024,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 2.05e-06,
-          "tolerance": 0.001,
-          "c_time_us": 36.1,
-          "pytorch_time_us": 134.9,
-          "speedup": 3.73
-        },
-        {
-          "name": "fastexp_decode_small (Tq=1,Tk=16,H=2,D=32)",
-          "status": "pass",
-          "max_diff": 1.94e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "decode_4h_hd128 (Tq=1,Tk=256,H=4,D=128)",
           "status": "pass",
-          "max_diff": 3.9e-06,
+          "max_diff": 3.93e-06,
           "tolerance": 0.001,
-          "c_time_us": 27.8,
-          "pytorch_time_us": 77.3,
-          "speedup": 2.78
+          "c_time_us": 23.4,
+          "pytorch_time_us": 104.2,
+          "speedup": 4.45
+        },
+        {
+          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 5.9e-07,
+          "tolerance": 0.001,
+          "c_time_us": 1169.7,
+          "pytorch_time_us": 3356.6,
+          "speedup": 2.87
+        },
+        {
+          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.3e-07,
+          "tolerance": 0.001,
+          "c_time_us": 2845.7,
+          "pytorch_time_us": 6943.4,
+          "speedup": 2.44
         },
         {
           "name": "fastexp_decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
           "status": "pass",
-          "max_diff": 5.33e-06,
+          "max_diff": 5.48e-06,
           "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
+          "status": "pass",
+          "max_diff": 3.55e-06,
+          "tolerance": 0.001,
+          "c_time_us": 106.9,
+          "pytorch_time_us": 383.9,
+          "speedup": 3.59
+        },
+        {
+          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 7.89e-07,
+          "tolerance": 0.001,
+          "c_time_us": 424.5,
+          "pytorch_time_us": 577.2,
+          "speedup": 1.36
+        },
+        {
+          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0003,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
+          "status": "pass",
+          "max_diff": 2.98e-07,
+          "tolerance": 0.0002,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2037,11 +2064,11 @@
         {
           "name": "decode_32h_51200 (Tq=1,Tk=51200,H=32,D=64)",
           "status": "pass",
-          "max_diff": 6.03e-07,
+          "max_diff": 6.14e-07,
           "tolerance": 0.001,
-          "c_time_us": 27108.6,
-          "pytorch_time_us": 57441.0,
-          "speedup": 2.12
+          "c_time_us": 15962.3,
+          "pytorch_time_us": 76165.5,
+          "speedup": 4.77
         },
         {
           "name": "decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
@@ -2053,118 +2080,73 @@
           "speedup": null
         },
         {
-          "name": "prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
           "status": "pass",
-          "max_diff": 4.17e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 7.82e-07,
+          "max_diff": 3.28e-06,
           "tolerance": 0.001,
-          "c_time_us": 397.3,
-          "pytorch_time_us": 548.3,
-          "speedup": 1.38
+          "c_time_us": 103.4,
+          "pytorch_time_us": 315.7,
+          "speedup": 3.05
         },
         {
-          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
+          "name": "fastexp_decode_tail (Tq=1,Tk=63,H=4,D=40)",
           "status": "pass",
-          "max_diff": 3.5e-06,
-          "tolerance": 0.001,
-          "c_time_us": 155.8,
-          "pytorch_time_us": 367.6,
-          "speedup": 2.36
-        },
-        {
-          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 3.6e-06,
-          "tolerance": 0.001,
-          "c_time_us": 42.5,
-          "pytorch_time_us": 135.8,
-          "speedup": 3.19
-        },
-        {
-          "name": "fastexp_prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 3.5e-05,
+          "max_diff": 7.79e-06,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fastexp_decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
+          "name": "decode_4h_1k (Tq=1,Tk=1024,H=4,D=64)",
           "status": "pass",
-          "max_diff": 1.04e-05,
-          "tolerance": 0.01,
+          "max_diff": 2.09e-06,
+          "tolerance": 0.001,
+          "c_time_us": 32.2,
+          "pytorch_time_us": 115.7,
+          "speedup": 3.6
+        },
+        {
+          "name": "fast_exp_vec=avx",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_gqa_8h_2kv (Tq=1,Tk=64,H=8,D=64,kv=2)",
-          "status": "pass",
-          "max_diff": 2.09e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
           "status": "pass",
           "max_diff": 2.38e-07,
-          "tolerance": 0.0003,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fastexp_prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "name": "fastexp_decode_small (Tq=1,Tk=16,H=2,D=32)",
           "status": "pass",
-          "max_diff": 1.7e-05,
+          "max_diff": 1.93e-05,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
           "status": "pass",
-          "max_diff": 1.79e-07,
+          "max_diff": 2.68e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
+          "name": "llama.cpp (decode_small)",
           "status": "pass",
-          "max_diff": 2.09e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.42e-07,
+          "max_diff": 3.58e-07,
           "tolerance": 0.001,
-          "c_time_us": 3867.7,
-          "pytorch_time_us": 5716.1,
-          "speedup": 1.48
-        },
-        {
-          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
-          "status": "pass",
-          "max_diff": 1.79e-07,
-          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2174,51 +2156,60 @@
           "status": "pass",
           "max_diff": 3.29e-06,
           "tolerance": 0.001,
-          "c_time_us": 20.4,
-          "pytorch_time_us": 86.1,
-          "speedup": 4.22
+          "c_time_us": 21.0,
+          "pytorch_time_us": 100.8,
+          "speedup": 4.81
         },
         {
-          "name": "llama.cpp (decode_small)",
+          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
           "status": "pass",
-          "max_diff": 1.79e-07,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "fastexp_decode_tail (Tq=1,Tk=63,H=4,D=40)",
-          "status": "pass",
-          "max_diff": 7.73e-06,
+          "max_diff": 1.9e-05,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
+          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
           "status": "pass",
-          "max_diff": 3.2e-07,
+          "max_diff": 3.6e-06,
+          "tolerance": 0.001,
+          "c_time_us": 35.1,
+          "pytorch_time_us": 126.6,
+          "speedup": 3.6
+        },
+        {
+          "name": "prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
+          "status": "pass",
+          "max_diff": 4.02e-07,
           "tolerance": 0.0002,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "name": "fastexp_prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
           "status": "pass",
-          "max_diff": 6.4e-07,
-          "tolerance": 0.001,
-          "c_time_us": 1625.7,
-          "pytorch_time_us": 2170.0,
-          "speedup": 1.33
+          "max_diff": 3.49e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
-          "name": "fastexp_offset (Tq=3,Tk=9,H=3,D=24)",
+          "name": "decode_gqa_8h_2kv (Tq=1,Tk=64,H=8,D=64,kv=2)",
           "status": "pass",
-          "max_diff": 1.01e-05,
-          "tolerance": 0.01,
+          "max_diff": 2.38e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "status": "pass",
+          "max_diff": 2.09e-07,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2226,35 +2217,35 @@
         {
           "name": "prefill (Tq=8,Tk=8,H=4,D=64)",
           "status": "pass",
-          "max_diff": 4.77e-07,
+          "max_diff": 3.58e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
+          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
           "status": "pass",
-          "max_diff": 3.27e-06,
-          "tolerance": 0.001,
-          "c_time_us": 153.7,
-          "pytorch_time_us": 378.8,
-          "speedup": 2.46
-        },
-        {
-          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
-          "status": "pass",
-          "max_diff": 1.79e-07,
+          "max_diff": 2.38e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fast_exp_vec=avx512",
+          "name": "fastexp_prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
           "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0,
+          "max_diff": 1.65e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
+          "status": "pass",
+          "max_diff": 1.07e-05,
+          "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2262,16 +2253,25 @@
         {
           "name": "decode_32h_512 (Tq=1,Tk=512,H=32,D=64)",
           "status": "pass",
-          "max_diff": 4.68e-06,
+          "max_diff": 4.7e-06,
           "tolerance": 0.001,
-          "c_time_us": 166.5,
-          "pytorch_time_us": 317.4,
-          "speedup": 1.91
+          "c_time_us": 117.0,
+          "pytorch_time_us": 332.1,
+          "speedup": 2.84
         },
         {
-          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
+          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
           "status": "pass",
-          "max_diff": 1.89e-05,
+          "max_diff": 2.68e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_offset (Tq=3,Tk=9,H=3,D=24)",
+          "status": "pass",
+          "max_diff": 1.03e-05,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -2283,7 +2283,7 @@
       "name": "Thread Pool GEMV Parity (serial vs dispatch)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 69.37171339988708,
+      "duration_sec": 30.301331043243408,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2297,10 +2297,10 @@
       "name": "GEMM Benchmark",
       "category": "bench",
       "status": "fail",
-      "duration_sec": 26.77379846572876,
+      "duration_sec": 23.82202911376953,
       "stdout": "",
       "stderr": "",
-      "error_msg": "make: *** [Makefile:1404: bench_gemm] Error 2",
+      "error_msg": "make: *** [Makefile:1405: bench_gemm] Error 2",
       "perf_metric": null,
       "perf_unit": "",
       "baseline_perf": null,
