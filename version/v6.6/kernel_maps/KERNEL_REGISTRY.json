@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 47,
+      "total": 48,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
@@ -19,6 +19,7 @@
         "gemv": 10,
         "kv_cache_store": 1,
         "logits_store_indexed": 1,
+        "qk_norm": 1,
         "qkv_projection": 1,
         "quantize": 2,
         "quantize_batch": 2,
@@ -4781,6 +4782,153 @@
       "notes": "Memory copy for saving residual before RMSNorm for skip connections.",
       "name": "memcpy",
       "_source_file": "memcpy.json"
+    },
+    {
+      "id": "qk_norm_forward",
+      "op": "qk_norm",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [num_heads, num_tokens, head_dim] to be normalized in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor [num_kv_heads, num_tokens, head_dim] to be normalized in-place"
+        }
+      ],
+      "weights": [
+        {
+          "name": "q_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Q norm gamma weights [head_dim], shared across all heads"
+        },
+        {
+          "name": "k_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "K norm gamma weights [head_dim], shared across all heads"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor after per-head RMSNorm (in-place)"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor after per-head RMSNorm (in-place)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float",
+          "desc": "RMSNorm epsilon (e.g. 1e-6)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head",
+          "token"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Each head is independent. Parallelize across heads for Q, then across kv_heads for K."
+          },
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across tokens; each thread handles one or more tokens across all heads."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64
+        },
+        "notes": "D (head_dim) should be multiple of 64 for optimal SIMD in underlying rmsnorm_forward."
+      },
+      "impl": {
+        "function": "qk_norm_forward",
+        "c_declaration": "void qk_norm_forward(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/qk_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_qk_norm.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": "python unittest/test_qk_norm.py",
+            "tolerance": "1e-6",
+            "notes": "Verify per-head RMSNorm matches PyTorch torch.nn.RMSNorm applied per-head"
+          }
+        ]
+      },
+      "notes": "Per-head RMSNorm on Q and K (Qwen3-style). Wraps rmsnorm_forward twice: once for Q with num_heads*num_tokens rows, once for K with num_kv_heads*num_tokens rows. Each row is [head_dim] elements. Gamma is shared across all heads (one gamma vector per Q, one per K). Placed between QKV projection and RoPE to stabilize attention scores.",
+      "name": "qk_norm_forward",
+      "_source_file": "qk_norm_forward.json"
     },
     {
       "id": "quantize_batch_q8_0",

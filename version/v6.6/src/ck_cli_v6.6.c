@@ -101,6 +101,7 @@ typedef struct {
     decode_t decode;
     prefill_t prefill;  /* ck_prefill for batched prefill (optional) */
     get_logits_t get_logits;
+    get_int_t get_logits_stride;
     get_int_t get_context;
     get_int_t get_vocab_size;
     get_int_t get_active_tokens;
@@ -710,6 +711,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     /* ck_prefill - optional, only present when prefill IR was generated */
     resolve_symbol(api->handle, "ck_prefill", (void **)&api->prefill, false);
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
+    resolve_symbol(api->handle, "ck_model_get_logits_stride", (void **)&api->get_logits_stride, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
     resolve_symbol(api->handle, "ck_model_get_context_window", (void **)&api->get_context, false);
@@ -1049,8 +1051,13 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
         if (api->get_logits && vocab_size > 0) { \
             float *logits = api->get_logits(); \
             if (logits) { \
+                int stride = api->get_logits_stride ? api->get_logits_stride() : vocab_size; \
                 int active = api->get_active_tokens ? api->get_active_tokens() : 1; \
-                float *last_logits = logits + (size_t)(active - 1) * vocab_size; \
+                float *last_logits = logits; \
+                if (stride > 0) { \
+                    if (active < 1) active = 1; \
+                    last_logits = logits + (size_t)(active - 1) * (size_t)stride; \
+                } \
                 float *logits_copy = (float *)malloc(vocab_size * sizeof(float)); \
                 memcpy(logits_copy, last_logits, vocab_size * sizeof(float)); \
                 next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p); \

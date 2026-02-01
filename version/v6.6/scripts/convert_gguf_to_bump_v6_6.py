@@ -73,6 +73,9 @@ Notes:
     canonical on-disk representation (same block layout as llama.cpp).
   - The bump file encodes a per-tensor dtype table. The runtime reads
     it automatically to select the right kernel path.
+  - Config includes attn_out_dim derived from GGUF weight shapes. Some models
+    (e.g. Qwen3) use attention output dim != embed_dim, so IR must use this
+    to size out_proj and related ops correctly.
   - BUMPWGT5: Metadata placed at EOF preserves all v4 offsets
 """
 
@@ -1371,6 +1374,8 @@ def main() -> None:
     wanted_meta = {
         "general.architecture",
         "general.alignment",
+        "general.name",
+        "general.finetune",
         # Llama-style keys
         "llama.block_count",
         "llama.context_length",
@@ -1416,6 +1421,17 @@ def main() -> None:
         "deepseek2.attention.head_count_kv",
         "deepseek2.rope.freq_base",
         "deepseek2.attention.layer_norm_rms_epsilon",
+        # Qwen3-style keys
+        "qwen3.block_count",
+        "qwen3.context_length",
+        "qwen3.embedding_length",
+        "qwen3.feed_forward_length",
+        "qwen3.attention.head_count",
+        "qwen3.attention.head_count_kv",
+        "qwen3.rope.freq_base",
+        "qwen3.attention.layer_norm_rms_epsilon",
+        "qwen3.attention.key_length",
+        "qwen3.attention.value_length",
         # Tokenizer keys (for automatic extraction from GGUF)
         "tokenizer.ggml.tokens",
         "tokenizer.ggml.merges",
@@ -1428,6 +1444,7 @@ def main() -> None:
         "tokenizer.ggml.padding_token_id",
         "tokenizer.ggml.add_bos_token",
         "tokenizer.ggml.add_eos_token",
+        "tokenizer.chat_template",
     }
 
     if args.extract_vocab:
@@ -1679,7 +1696,7 @@ def main() -> None:
         tok = tensors[tok_name]
         if len(tok.dims) != 2:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
-        embed_dim = meta_int("deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length", "llama.embedding_length", "qwen2.embedding_length") or tok.ne0
+        embed_dim = meta_int("deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length", "llama.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length") or tok.ne0
         vocab_size = tok.ne1
 
         vocab_offsets = None
@@ -1703,7 +1720,7 @@ def main() -> None:
                 total_vocab_bytes = len(vocab_strings)
                 print(f"[tokenizer] extracted {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from GGUF metadata")
 
-        num_layers = meta_int("deepseek2.block_count", "mistral3.block_count", "mistral.block_count", "llama.block_count", "qwen2.block_count")
+        num_layers = meta_int("deepseek2.block_count", "mistral3.block_count", "mistral.block_count", "llama.block_count", "qwen3.block_count", "qwen2.block_count")
         if num_layers is None:
             # Infer from present blocks.
             layer_ids = []
@@ -1717,7 +1734,7 @@ def main() -> None:
                 raise GGUFError("Could not infer num_layers (missing block_count and no blk.* tensors found)")
             num_layers = max(layer_ids) + 1
 
-        intermediate = meta_int("deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length", "llama.feed_forward_length", "qwen2.feed_forward_length")
+        intermediate = meta_int("deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length", "llama.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length")
         if intermediate is None:
             gate0 = tensors.get("blk.0.ffn_gate.weight")
             if gate0 and len(gate0.dims) == 2:
@@ -1725,19 +1742,19 @@ def main() -> None:
         if intermediate is None:
             raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
-        num_heads = meta_int("deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count", "llama.attention.head_count", "qwen2.attention.head_count")
+        num_heads = meta_int("deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count", "llama.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count")
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
-        num_kv_heads = meta_int("deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv", "llama.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
+        num_kv_heads = meta_int("deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv", "llama.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
 
-        context_len = meta_int("deepseek2.context_length", "mistral3.context_length", "mistral.context_length", "llama.context_length", "qwen2.context_length") or 0
+        context_len = meta_int("deepseek2.context_length", "mistral3.context_length", "mistral.context_length", "llama.context_length", "qwen3.context_length", "qwen2.context_length") or 0
         if args.context is not None:
             context_len = int(args.context)
         if context_len <= 0:
             raise GGUFError("Could not determine context length (use --context to override)")
 
-        rope_theta = meta_float("deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base", "llama.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
-        rms_eps = meta_float("deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon", "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
+        rope_theta = meta_float("deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base", "llama.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
+        rms_eps = meta_float("deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon", "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps", "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
 
         if embed_dim != tok.ne0:
             raise GGUFError(f"{tok_name}: embedding_length mismatch (meta={embed_dim}, tensor.ne0={tok.ne0})")
@@ -1748,7 +1765,7 @@ def main() -> None:
         embed_kv = num_kv_heads * head_dim
 
         # Infer correct dimensions from actual tensors if metadata doesn't match
-        # This handles non-standard architectures like Devstral
+        # This handles non-standard architectures like Qwen3/Devstral
         wq0 = tensors.get("blk.0.attn_q.weight")
         wk0 = tensors.get("blk.0.attn_k.weight")
         wo0 = tensors.get("blk.0.attn_output.weight")
@@ -1765,6 +1782,14 @@ def main() -> None:
                 # Update for consistency with actual tensors
                 embed_kv = k_dim1
                 head_dim = inferred_q_head_dim
+
+        # Attention output dim (attn_out). For most models this == embed_dim,
+        # but some (e.g., Qwen3) use num_heads * head_dim.
+        attn_out_dim = num_heads * head_dim
+        if wq0 and len(wq0.dims) == 2:
+            attn_out_dim = wq0.ne1
+        elif wo0 and len(wo0.dims) == 2:
+            attn_out_dim = wo0.ne0
 
 
         aligned_embed_dim = embed_dim
@@ -1797,10 +1822,13 @@ def main() -> None:
             gate = tensors.get(f"blk.{layer}.ffn_gate.weight")
             up = tensors.get(f"blk.{layer}.ffn_up.weight")
             down = tensors.get(f"blk.{layer}.ffn_down.weight")
-            # Attention biases (optional - Qwen2 has them, LLaMA doesn't)
+            # Attention biases (optional - Qwen2 has them, LLaMA/Qwen3 don't)
             bq = tensors.get(f"blk.{layer}.attn_q.bias")
             bk = tensors.get(f"blk.{layer}.attn_k.bias")
             bv = tensors.get(f"blk.{layer}.attn_v.bias")
+            # QK norm weights (optional - Qwen3 has them, Qwen2/LLaMA don't)
+            q_norm = tensors.get(f"blk.{layer}.attn_q_norm.weight")
+            k_norm = tensors.get(f"blk.{layer}.attn_k_norm.weight")
             if not wq or not wk or not wv or not wo:
                 raise GGUFError(f"Layer {layer}: missing attention projection tensors (q/k/v/o)")
             if not gate or not up or not down:
@@ -1882,6 +1910,8 @@ def main() -> None:
                 "bq": bq,  # Optional bias tensors (None if not present)
                 "bk": bk,
                 "bv": bv,
+                "q_norm": q_norm,  # Optional QK norm (None if not present)
+                "k_norm": k_norm,
                 "wq_dt": wq_dt,
                 "wk_dt": wk_dt,
                 "wv_dt": wv_dt,
@@ -1892,6 +1922,7 @@ def main() -> None:
             })
 
         layers_with_bias = sum(1 for info in layer_infos if info["bq"] is not None)
+        layers_with_qk_norm = sum(1 for info in layer_infos if info["q_norm"] is not None)
 
         dtype_table.extend([CK_DT_FP32, CK_DT_FP32])
         dtype_table_bytes = bytes(dtype_table)
@@ -1986,7 +2017,7 @@ def main() -> None:
                 write_f32_padded(w, ln2, aligned_embed_dim)
 
                 # WQ
-                wq_size = ggml_row_bytes(info["wq"].ggml_type, aligned_embed_dim) * embed_dim
+                wq_size = ggml_row_bytes(info["wq"].ggml_type, aligned_embed_dim) * (num_heads * aligned_head_dim)
                 record_entry(f"layer.{layer}.wq", get_quant_type_name(info["wq"].ggml_type), wq_size)
                 copy_qk_head_packed(
                     f, data_start, info["wq"], w,
@@ -2005,8 +2036,15 @@ def main() -> None:
                 else:
                     write_f32_zeros(w, num_heads * aligned_head_dim)
 
+                # q_norm - per-head RMSNorm on Q (Qwen3-style)
+                if info["q_norm"] is not None:
+                    q_norm_vec = read_vector_f32(f, data_start, info["q_norm"])
+                    q_norm_size = aligned_head_dim * 4
+                    record_entry(f"layer.{layer}.q_norm", "fp32", q_norm_size)
+                    write_f32_padded(w, q_norm_vec, aligned_head_dim)
+
                 # WK
-                wk_size = ggml_row_bytes(info["wk"].ggml_type, aligned_embed_dim) * embed_kv
+                wk_size = ggml_row_bytes(info["wk"].ggml_type, aligned_embed_dim) * (num_kv_heads * aligned_head_dim)
                 record_entry(f"layer.{layer}.wk", get_quant_type_name(info["wk"].ggml_type), wk_size)
                 copy_qk_head_packed(
                     f, data_start, info["wk"], w,
@@ -2025,8 +2063,15 @@ def main() -> None:
                 else:
                     write_f32_zeros(w, num_kv_heads * aligned_head_dim)
 
+                # k_norm - per-head RMSNorm on K (Qwen3-style)
+                if info["k_norm"] is not None:
+                    k_norm_vec = read_vector_f32(f, data_start, info["k_norm"])
+                    k_norm_size = aligned_head_dim * 4
+                    record_entry(f"layer.{layer}.k_norm", "fp32", k_norm_size)
+                    write_f32_padded(w, k_norm_vec, aligned_head_dim)
+
                 # WV
-                wv_size = ggml_row_bytes(info["wv"].ggml_type, aligned_embed_dim) * embed_kv
+                wv_size = ggml_row_bytes(info["wv"].ggml_type, aligned_embed_dim) * (num_kv_heads * aligned_head_dim)
                 record_entry(f"layer.{layer}.wv", get_quant_type_name(info["wv"].ggml_type), wv_size)
                 copy_qk_head_packed(
                     f, data_start, info["wv"], w,
@@ -2092,6 +2137,7 @@ def main() -> None:
                 config = {
                     "model": arch,
                     "embed_dim": int(embed_dim),
+                    "attn_out_dim": int(attn_out_dim),
                     "num_layers": int(num_layers),
                     "num_heads": int(num_heads),
                     "num_kv_heads": int(num_kv_heads),
@@ -2102,6 +2148,15 @@ def main() -> None:
                     "vocab_size": int(vocab_size),
                     "rms_eps": float(rms_eps) if rms_eps else 1e-5,
                 }
+                chat_template = meta.get("tokenizer.chat_template")
+                if isinstance(chat_template, str) and chat_template.strip():
+                    config["chat_template"] = chat_template
+                finetune = meta.get("general.finetune")
+                if isinstance(finetune, str) and finetune.strip():
+                    config["finetune"] = finetune
+                model_name = meta.get("general.name")
+                if isinstance(model_name, str) and model_name.strip():
+                    config["model_name"] = model_name
 
                 # Build quantization summary from layer_infos
                 quant_summary = {}
@@ -2166,6 +2221,7 @@ def main() -> None:
                         "vocab_size": vocab_size,
                         "context_length": context_len,
                         "has_attention_biases": layers_with_bias > 0,
+                        "has_qk_norm": layers_with_qk_norm > 0,
                         "num_merges": num_merges,
                         "total_vocab_bytes": total_vocab_bytes,
                         "entries": manifest_entries,
@@ -2255,8 +2311,18 @@ def main() -> None:
             rope_theta=rope_theta,
             rms_norm_eps=rms_eps,
         )
+        cfg["attn_out_dim"] = int(attn_out_dim)
         cfg["num_merges"] = num_merges
         cfg["total_vocab_bytes"] = total_vocab_bytes
+        chat_template = meta.get("tokenizer.chat_template")
+        if isinstance(chat_template, str) and chat_template.strip():
+            cfg["chat_template"] = chat_template
+        finetune = meta.get("general.finetune")
+        if isinstance(finetune, str) and finetune.strip():
+            cfg["finetune"] = finetune
+        model_name = meta.get("general.name")
+        if isinstance(model_name, str) and model_name.strip():
+            cfg["model_name"] = model_name
         with open(args.config_out, "w", encoding="utf-8") as cf:
             json.dump(cfg, cf, indent=2)
             cf.write("\n")
@@ -2334,6 +2400,7 @@ def main() -> None:
             "vocab_size": vocab_size,
             "context_length": context_len,
             "has_attention_biases": layers_with_bias > 0,
+                        "has_qk_norm": layers_with_qk_norm > 0,
             "num_merges": num_merges,
             "total_vocab_bytes": total_vocab_bytes,
             "entries": manifest_entries,

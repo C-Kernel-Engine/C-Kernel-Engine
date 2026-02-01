@@ -414,7 +414,21 @@ def _guard_bump_offsets(layout: Dict, ir_list: List[Dict]) -> None:
     if unknown:
         print(f"Warning: Unresolved bump macros in IR: {sorted(unknown)[:5]}")
 
-def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: bool = False) -> str:
+
+def _infer_logits_layout(config: Dict, layout: Dict) -> str:
+    """Infer logits layout ('last' or 'full') from config/layout."""
+    layout_cfg = str(config.get("logits_layout", "auto")).lower()
+    if layout_cfg in {"last", "full"}:
+        return layout_cfg
+    vocab = int(config.get("vocab_size", 0))
+    if vocab > 0:
+        for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
+            if buf.get("name") == "logits":
+                size = int(buf.get("size", 0))
+                return "full" if size > vocab * 4 else "last"
+    return "last"
+
+def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: bool = False, dump: bool = False) -> str:
     """Emit a single function call from an IR operation.
 
     Just read the op and emit the call. No special cases.
@@ -475,10 +489,64 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: 
                         f'printf("[Op {idx} {op_name} L{layer}] out[0..4]: %f %f %f %f %f\\n", '
                         f'_dbg[0], _dbg[1], _dbg[2], _dbg[3], _dbg[4]); }}')
 
+    # Add parity dump if enabled
+    if dump:
+        # Map ops to dump names
+        dump_op_map = {
+            "dense_embedding_lookup": "embed_out",
+            "rmsnorm": "attn_norm" if "attn" in op_name else "ffn_norm",
+            "q_proj": "q_proj",
+            "k_proj": "k_proj",
+            "v_proj": "v_proj",
+            "qk_norm": "qk_norm",
+            "rope_qk": "rope_qk",
+            "attn": "attn_out",
+            "out_proj": "attn_proj",
+            "residual_add": "ffn_inp" if "mlp" in op_name else "layer_out",
+            "mlp_gate_up": "mlp_gate",
+            "silu_mul": "mlp_silu",
+            "mlp_down": "mlp_down",
+            "quantize_final_output": "final_norm",
+            "lm_head": "logits",
+        }
+        dump_name = dump_op_map.get(op_name, op_name)
+
+        # Find output buffer for dumping
+        output_expr = None
+        output_size = None
+        for arg in args:
+            source = arg.get("source", "")
+            expr = arg.get("expr", "")
+            if "(float*)" in expr and "const" not in expr:
+                output_expr = expr
+                # Try to determine size from source
+                if "main_stream" in source:
+                    output_size = "EMBED_DIM"
+                elif "q_scratch" in source:
+                    output_size = "NUM_HEADS * HEAD_DIM"
+                elif "k_scratch" in source:
+                    output_size = "NUM_KV_HEADS * HEAD_DIM"
+                elif "v_scratch" in source:
+                    output_size = "NUM_KV_HEADS * HEAD_DIM"
+                elif "attn_scratch" in source:
+                    output_size = "EMBED_DIM"
+                elif "mlp_scratch" in source:
+                    output_size = "EMBED_DIM"
+                elif "logits" in source:
+                    output_size = "VOCAB_SIZE"
+                break
+
+        if output_expr and dump_name:
+            raw_expr = output_expr.replace("(float*)", "").strip()
+            size_expr = output_size if output_size else "0"
+            lines.append(f'    #ifdef CK_PARITY_DUMP')
+            lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "{dump_name}", {size_expr});')
+            lines.append(f'    #endif')
+
     return "\n".join(lines)
 
 
-def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False, profile: bool = False) -> str:
+def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False, profile: bool = False, dump: bool = False) -> str:
     """Emit the decode function with all ops unrolled."""
     lines = []
     lines.append("""
@@ -499,7 +567,7 @@ static void ck_decode(CKModel *model, int32_t token) {
     lines.append("")
 
     for seq_idx, op in enumerate(ops):
-        lines.append(emit_op(op, seq_idx, debug=debug, profile=profile))
+        lines.append(emit_op(op, seq_idx, debug=debug, profile=profile, dump=dump))
         lines.append("")
 
     lines.append("    model->pos++;")
@@ -549,7 +617,7 @@ def get_init_free_code(init_call: Dict) -> str:
     return "\n".join(free_lines)
 
 
-def emit_model_and_api(init_call: Dict = None, profile: bool = False) -> str:
+def emit_model_and_api(init_call: Dict = None, profile: bool = False, logits_stride: int = 0, dump: bool = False) -> str:
     """Emit model struct and clean API functions.
 
     Args:
@@ -569,6 +637,25 @@ def emit_model_and_api(init_call: Dict = None, profile: bool = False) -> str:
     - Post-weights init (tokenizer_init): Runs AFTER do_load_manifest().
       These ops have c_code that reads from bump memory (needs loaded weights).
     """
+    logits_stride = int(logits_stride)
+    if logits_stride > 0:
+        decode_logits_copy = f"""
+    /* Copy logits from position 0 to position token_pos in the logits buffer.
+     * This makes the logits buffer match what ck_chat.py expects:
+     * logits[token_pos * LOGITS_STRIDE .. (token_pos+1) * LOGITS_STRIDE] */
+    if (token_pos > 0) {{
+        memmove(
+            g_model->logits + (size_t)token_pos * {logits_stride},
+            g_model->logits,
+            VOCAB_SIZE * sizeof(float)
+        );
+    }}
+    if (output) memcpy(output, g_model->logits + (size_t)token_pos * {logits_stride}, VOCAB_SIZE * sizeof(float));"""
+    else:
+        decode_logits_copy = """
+    /* Last-only logits layout */
+    if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));"""
+
     # Generate init ops code from lowered IR
     # Separate into pre-weights (rope, etc.) and post-weights (tokenizer, etc.)
     pre_weights_init_code = ""
@@ -826,6 +913,9 @@ CK_EXPORT int ck_model_init(const char *weights_path) {{
 #ifdef CK_PARALLEL_PREFILL
     ck_parallel_prefill_init();
 #endif
+#ifdef CK_PARITY_DUMP
+    ck_dump_init(NULL);  /* Initialize parity dumping to ck_parity_dumps/dump.bin */
+#endif
     return 0;
 }}
 
@@ -841,6 +931,9 @@ CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *
 #ifdef CK_PARALLEL_PREFILL
     ck_parallel_prefill_init();
 #endif
+#ifdef CK_PARITY_DUMP
+    ck_dump_init(NULL);
+#endif
     return 0;
 }}
 
@@ -851,6 +944,9 @@ CK_EXPORT void ck_model_free(void) {{
 #endif
 #ifdef CK_PARALLEL_PREFILL
     ck_parallel_prefill_shutdown();
+#endif
+#ifdef CK_PARITY_DUMP
+    ck_dump_close();  /* Close parity dump file */
 #endif
 {free_ops_code}
     if (g_manifest) {{
@@ -910,18 +1006,7 @@ CK_EXPORT int ck_model_decode(int32_t token, float *output) {{
     if (!g_model) return -1;
     /* Capture position before decode (ck_decode increments pos at end) */
     int token_pos = g_model->pos;
-    ck_decode(g_model, token);{profile_dump_after_decode}
-    /* Copy logits from position 0 to position token_pos in the logits buffer.
-     * This makes the logits buffer match what ck_chat.py expects:
-     * logits[token_pos * VOCAB_SIZE .. (token_pos+1) * VOCAB_SIZE] */
-    if (token_pos > 0) {{
-        memmove(
-            g_model->logits + (size_t)token_pos * VOCAB_SIZE,
-            g_model->logits,
-            VOCAB_SIZE * sizeof(float)
-        );
-    }}
-    if (output) memcpy(output, g_model->logits + (size_t)token_pos * VOCAB_SIZE, VOCAB_SIZE * sizeof(float));
+    ck_decode(g_model, token);{profile_dump_after_decode}{decode_logits_copy}
     return 0;
 }}
 
@@ -937,6 +1022,7 @@ CK_EXPORT const uint8_t* ck_model_get_vocab_strings(void) {{
 CK_EXPORT int ck_model_get_num_merges(void) {{ return VOCAB_MERGES_COUNT; }}
 CK_EXPORT int ck_model_get_context_window(void) {{ return MAX_SEQ_LEN; }}
 CK_EXPORT int ck_model_get_active_tokens(void) {{ return g_model ? g_model->pos : 0; }}
+CK_EXPORT int ck_model_get_logits_stride(void) {{ return {logits_stride}; }}
 CK_EXPORT float* ck_model_get_logits(void) {{ return g_model ? g_model->logits : NULL; }}
 CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? g_model->bump : NULL); }}
 
@@ -950,7 +1036,7 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? 
 # MAIN
 # =============================================================================
 
-def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None, profile: bool = False) -> str:
+def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None, profile: bool = False, dump: bool = False) -> str:
     """Generate complete C code.
 
     Args:
@@ -959,6 +1045,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
         debug: If True, emit printf statements to dump tensor values after each op
         init_call: Lowered init IR dict (from init_call.json) with call-ready ops
         profile: If True, emit CK_PROFILE timing wrappers around each kernel call
+        dump: If True, emit parity dump calls for llama.cpp comparison
 
     If debug=True, emit printf statements to dump tensor values after each op.
     """
@@ -974,6 +1061,9 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
         merged = dict(config)
         merged.update(layout_config)
         config = merged
+    logits_layout = _infer_logits_layout(config, layout)
+    vocab_size = int(config.get("vocab_size", 0))
+    logits_stride = vocab_size if logits_layout == "full" else 0
     ops = ir.get("ops", ir.get("operations", []))  # Support both "ops" and "operations"
     memory = layout.get("memory", ir.get("memory", {}))  # Use layout memory for offsets
 
@@ -1044,6 +1134,12 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
 #include "ckernel_model_load_v6.6.h"
 #include "ckernel_engine.h"  /* Kernel declarations */
 {tokenizer_include}
+
+/* Parity dump instrumentation for llama.cpp comparison */
+{"#define CK_PARITY_DUMP 1" if dump else "/* undef CK_PARITY_DUMP */"}
+#ifdef CK_PARITY_DUMP
+#include "ck_parity_dump.h"
+#endif
 
 /* Thread-pool parallel GEMV dispatch (persistent pthread workers) */
 #define CK_PARALLEL_DECODE 1
@@ -1148,8 +1244,8 @@ static void _ck_profile_dump(void) {
 ''')
 
     parts.append(emit_memory_layout(layout, config))
-    parts.append(emit_model_and_api(init_call=init_call, profile=profile))  # Pass lowered init IR for init ops
-    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug, profile=profile))
+    parts.append(emit_model_and_api(init_call=init_call, profile=profile, logits_stride=logits_stride, dump=dump))  # Pass lowered init IR for init ops
+    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug, profile=profile, dump=dump))
 
     return "\n".join(parts)
 
@@ -1170,6 +1266,9 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Emit debug printf for tensor values")
     # Profile
     parser.add_argument("--profile", action="store_true", help="Emit CK_PROFILE timing wrappers")
+    # Parity Dump
+    parser.add_argument("--parity-dump", action="store_true",
+                       help="Emit parity dump calls for llama.cpp comparison")
     args = parser.parse_args()
 
     # Handle legacy API (--decode/--prefill)
@@ -1215,7 +1314,7 @@ def main():
         _guard_bump_offsets(layout_obj, ir_list)
 
         # Generate decode code
-        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj, profile=args.profile)
+        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj, profile=args.profile, dump=args.parity_dump)
 
         # Generate prefill code if provided
         prefill_code = ""
@@ -1264,7 +1363,7 @@ def main():
             with open(init_call_path) as f:
                 init_call_obj = json.load(f)
 
-        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj, profile=args.profile)
+        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj, profile=args.profile, dump=args.parity_dump)
         with open(args.output, 'w') as f:
             f.write(code)
         print(f"Generated: {args.output}")

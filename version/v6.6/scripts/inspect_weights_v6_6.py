@@ -172,14 +172,20 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         n_kv = r.u64()
 
         meta: Dict[str, object] = {}
-        arch_prefixes = ("general.", "llama.", "qwen2.", "qwen.")
+        # Skip only the large tokenizer arrays; read all other metadata
+        # so that any architecture (qwen2, qwen3, llama, mistral, etc.) works.
+        _skip_keys = {
+            "tokenizer.ggml.tokens", "tokenizer.ggml.merges",
+            "tokenizer.ggml.scores", "tokenizer.ggml.token_type",
+            "tokenizer.chat_template",
+        }
         for _ in range(n_kv):
             key = r.key_str()
             vtype = r.u32()
-            if key.startswith(arch_prefixes):
-                meta[key] = gguf._gguf_read_value(r, vtype)
-            else:
+            if key in _skip_keys:
                 gguf._gguf_skip_value(r, vtype)
+            else:
+                meta[key] = gguf._gguf_read_value(r, vtype)
 
         tensors: Dict[str, gguf.TensorInfo] = {}
         for _ in range(n_tensors):
@@ -273,21 +279,51 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         if num_heads is None:
             raise gguf.GGUFError("Missing attention.head_count (num_heads)")
         num_kv_heads = meta_int_arch("attention.head_count_kv") or num_heads
-        head_dim = embed_dim // num_heads
+        head_dim = meta_int_arch("attention.key_length") or meta_int_arch("attention.value_length")
+        if head_dim is None:
+            head_dim = embed_dim // num_heads
+
+        embed_kv = num_kv_heads * head_dim
+
+        # Infer correct dimensions from actual tensors if metadata doesn't match
+        wq0 = tensors.get("blk.0.attn_q.weight")
+        wk0 = tensors.get("blk.0.attn_k.weight")
+        wo0 = tensors.get("blk.0.attn_output.weight")
+        if wq0 and wk0 and wo0:
+            q_dim1 = wq0.ne1
+            k_dim1 = wk0.ne1
+            if q_dim1 != embed_dim or k_dim1 != embed_kv:
+                inferred_q_head_dim = q_dim1 // num_heads if q_dim1 % num_heads == 0 else q_dim1
+                embed_kv = k_dim1
+                head_dim = inferred_q_head_dim
+
+        attn_out_dim = num_heads * head_dim
+        if wq0 and len(wq0.dims) == 2:
+            attn_out_dim = wq0.ne1
+        elif wo0 and len(wo0.dims) == 2:
+            attn_out_dim = wo0.ne0
 
         context_len = meta_int_arch("context_length") or 0
         if context_len <= 0:
             raise gguf.GGUFError("Could not determine context length")
 
         rope_theta = meta_float_arch("rope.freq_base") or 10000.0
-        rms_eps = meta_float_arch("norm_rms_eps") or 1e-5
+        rms_eps = meta_float_arch("attention.layer_norm_rms_epsilon")
+        if rms_eps is None:
+            rms_eps = meta_float_arch("norm_rms_eps")  # llama-style key
+        if rms_eps is None:
+            rms_eps = 1e-5
 
         if max_layers:
             num_layers = min(int(max_layers), int(num_layers))
 
+        has_qk_norm = "blk.0.attn_q_norm.weight" in tensors
+        has_attn_bias = "blk.0.attn_q.bias" in tensors
+
         config = {
             "model_type": arch,
             "embed_dim": embed_dim,
+            "attn_out_dim": attn_out_dim,
             "num_heads": num_heads,
             "num_kv_heads": num_kv_heads,
             "head_dim": head_dim,
@@ -298,6 +334,8 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             "rope_theta": rope_theta,
             "rms_norm_eps": rms_eps,
             "tie_word_embeddings": "output.weight" not in tensors,
+            "has_qk_norm": has_qk_norm,
+            "has_attention_biases": has_attn_bias,
             "dtype": "fp32",
         }
 
@@ -336,7 +374,7 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
                     f"Layer {layer}: ffn_gate and ffn_up dtype mismatch"
                 )
 
-            manifest_entries.extend([
+            layer_entries = [
                 {"name": f"layer.{layer}.ln1_gamma", "dtype": "fp32", "shape": [embed_dim]},
                 {"name": f"layer.{layer}.wq", "dtype": dtype_name(weight_dtype(wq, "attn_q")),
                  "shape": [wq.ne1, wq.ne0], "source_dtype": gguf.ggml_type_name(wq.ggml_type)},
@@ -346,12 +384,27 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
                  "shape": [wv.ne1, wv.ne0], "source_dtype": gguf.ggml_type_name(wv.ggml_type)},
                 {"name": f"layer.{layer}.wo", "dtype": dtype_name(weight_dtype(wo, "attn_output")),
                  "shape": [wo.ne1, wo.ne0], "source_dtype": gguf.ggml_type_name(wo.ggml_type)},
+            ]
+
+            # QK norm weights (Qwen3-style: per-head RMSNorm on Q and K)
+            q_norm = tensors.get(f"blk.{layer}.attn_q_norm.weight")
+            k_norm = tensors.get(f"blk.{layer}.attn_k_norm.weight")
+            if q_norm:
+                layer_entries.append({"name": f"layer.{layer}.q_norm", "dtype": "fp32",
+                                      "shape": [q_norm.ne0]})
+            if k_norm:
+                layer_entries.append({"name": f"layer.{layer}.k_norm", "dtype": "fp32",
+                                      "shape": [k_norm.ne0]})
+
+            layer_entries.extend([
                 {"name": f"layer.{layer}.ln2_gamma", "dtype": "fp32", "shape": [embed_dim]},
                 {"name": f"layer.{layer}.w1", "dtype": dtype_name(gate_dt),
                  "shape": [2 * intermediate, embed_dim], "source_dtype": gguf.ggml_type_name(gate.ggml_type)},
                 {"name": f"layer.{layer}.w2", "dtype": dtype_name(weight_dtype(down, "ffn_down")),
                  "shape": [embed_dim, intermediate], "source_dtype": gguf.ggml_type_name(down.ggml_type)},
             ])
+
+            manifest_entries.extend(layer_entries)
 
         manifest_entries.append({"name": "final_ln_weight", "dtype": "fp32", "shape": [embed_dim]})
         out_weight = tensors.get("output.weight")
@@ -389,6 +442,23 @@ def main() -> None:
         with config_path.open("r", encoding="utf-8") as f:
             config = json.load(f)
         st_entries = load_safetensors_entries(model_dir)
+        # Infer attn_out_dim from q_proj weight shape when possible.
+        if "attn_out_dim" not in config:
+            attn_out_dim = None
+            for mapping in v4.WEIGHT_MAP_V4:
+                if mapping.get("ck") == "layer.{L}.wq":
+                    hf_name = mapping["hf"].replace("{layer}", "0").replace("{L}", "0")
+                    entry = st_entries.get(hf_name)
+                    shape = entry.get("shape") if entry else None
+                    if shape and len(shape) == 2:
+                        attn_out_dim = int(shape[0])
+                        break
+            if attn_out_dim is not None:
+                config["attn_out_dim"] = attn_out_dim
+                num_heads = pick(config, ["num_heads", "num_attention_heads"])
+                if num_heads and "head_dim" not in config:
+                    if attn_out_dim % int(num_heads) == 0:
+                        config["head_dim"] = attn_out_dim // int(num_heads)
         entries = build_hf_manifest(config, st_entries, args.max_layers)
 
     manifest = {

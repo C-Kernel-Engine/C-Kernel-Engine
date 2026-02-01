@@ -63,6 +63,12 @@ def get_parallel_pragma(op: Dict) -> str:
     return ""
 
 
+def _q8_0_row_bytes(embed_dim: int) -> Optional[int]:
+    if embed_dim % 32 != 0:
+        return None
+    return (embed_dim // 32) * 34
+
+
 def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False) -> str:
     """Emit a single op call for prefill mode.
 
@@ -90,6 +96,26 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
             {vocab_size} * sizeof(float)
         );
     }}"""
+
+    # If logits layout is last-only, emit a GEMV on the last token only.
+    if op_type == "logits" and str(config.get("logits_layout", "auto")).lower() == "last":
+        vocab_size = int(config.get("vocab_size", 151936))
+        embed_dim = int(config.get("embed_dim", 0))
+        row_bytes = _q8_0_row_bytes(embed_dim)
+        if row_bytes is not None:
+            gemv_func = func
+            if gemv_func.startswith("gemm_nt_"):
+                gemv_func = "gemv_" + gemv_func[len("gemm_nt_"):]
+            elif gemv_func.startswith("gemm_"):
+                gemv_func = "gemv_" + gemv_func[len("gemm_"):]
+            return f"""    /* Op {seq_idx}: logits (last-only) */
+    {gemv_func}(
+        (float*)(model->bump + A_LOGITS),
+        (const void*)(model->bump + W_TOKEN_EMB),
+        (void*)(model->bump + A_LAYER_INPUT + (size_t)(num_tokens - 1) * {row_bytes}),
+        {vocab_size},
+        {embed_dim}
+    );"""
 
     if op_type == "kv_cache_batch_copy":
         # Copy K/V from scratch (head-major after transpose) to KV cache

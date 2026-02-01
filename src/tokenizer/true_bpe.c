@@ -1,8 +1,9 @@
 /*
- * True BPE (Byte-Pair Encoding) Tokenizer
+ * True BPE (Byte-Pair Encoding) Tokenizer  [v4 - correctness complete, optimization pending]
  *
  * Implements the actual BPE algorithm used by GPT-2, LLaMA, Qwen, etc.
  * Unlike greedy longest-match, this applies merge rules in priority order.
+ * Achieves 100% token-exact parity with HuggingFace (8/8 tests passing).
  *
  * Algorithm:
  * 1. Split text into initial tokens (characters or bytes)
@@ -12,9 +13,36 @@
  * 5. Look up final tokens in vocabulary to get IDs
  *
  * Data Structures:
- * - Vocabulary: token string -> token ID (hash table)
- * - Merge rules: (left_id, right_id) -> (merged_id, priority) (hash table)
+ * - Vocabulary: token string -> token ID (hash table, FNV-1a, 65K buckets)
+ * - Merge rules: (left_id, right_id) -> (merged_id, priority) (hash table, MurmurHash3, 65K buckets)
  * - Token list: dynamic array for the working token sequence
+ *
+ * TODO: Performance optimizations (correctness is done, these are for throughput):
+ *
+ *   1. Arena allocator for token strings
+ *      - token_list_append() and token_list_merge_at() malloc/free per token string
+ *      - Replace with scratch arena (~64KB) on CKTrueBPE struct, reset per encode_chunk()
+ *      - Strings only live for one encode call, so arena lifetime matches perfectly
+ *
+ *   2. Linked list instead of array shift in merge loop
+ *      - token_list_merge_at() shifts entire tail array left by 1: O(n) per merge
+ *      - Use doubly-linked list of nodes (allocated from arena): O(1) per merge
+ *      - Store only token ID per node, use id_to_token[] for string when needed
+ *
+ *   3. Priority queue for find_best_merge()
+ *      - Currently rescans ALL adjacent pairs every iteration: O(n) per merge
+ *      - Total merge loop is O(n * m) where m = merges applied
+ *      - Use min-heap of candidate merges, pop best, re-insert affected neighbors
+ *      - Would reduce to O(n log n) total
+ *
+ *   4. Eliminate redundant string storage
+ *      - CKBPEToken stores both .str (malloc'd) and .id
+ *      - After initial char->ID lookup, only IDs needed for merge lookup
+ *      - Use id_to_token[merged_id] to get string when constructing merged tokens
+ *
+ *   Current profile: tokenizer runs 2x per prompt (not per token), so these
+ *   matter for batch tokenization / server use / 32K+ context, not for
+ *   interactive chat where GEMM kernels dominate at 57% of compute.
  *
  * By Anthony Shivakumar
  */

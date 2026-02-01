@@ -89,6 +89,15 @@ void rmsnorm_forward(const float *input,
                      int aligned_embed_dim,
                      float eps);
 
+/* Per-head RMSNorm on Q and K (Qwen3-style QK norm).
+ * Wraps rmsnorm_forward twice: once for Q [num_heads*num_tokens, head_dim],
+ * once for K [num_kv_heads*num_tokens, head_dim]. Operates in-place on
+ * scratch buffers between QKV projection and RoPE. */
+void qk_norm_forward(float *q, float *k,
+                     const float *q_gamma, const float *k_gamma,
+                     int num_heads, int num_kv_heads,
+                     int num_tokens, int head_dim, float eps);
+
 /* ============================================================================
  * QUANTIZATION KERNELS
  * ============================================================================ */

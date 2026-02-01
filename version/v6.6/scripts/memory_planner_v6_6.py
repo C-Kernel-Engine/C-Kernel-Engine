@@ -286,7 +286,9 @@ class MemoryPlanner:
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "mlp_down":
-            # mlp_down reads quantized MLP intermediate
+            # mlp_down reads quantized MLP intermediate unless fused (FP32 input)
+            if dtype == "fp32":
+                return "A_MLP_SCRATCH", "fp32"
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "silu_mul":

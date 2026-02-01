@@ -528,6 +528,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                   codegen_version: str = "v6",
                   int8_activations: bool = False,
                   context_len: int = None,
+                  logits_layout: str = None,
                   no_fusion: bool = False,
                   layout_mode: str = "region",
                   layer_limit: int = None,
@@ -614,7 +615,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                     layout_input_mtime > lowered_path.stat().st_mtime or
                     layout_input_mtime > lowered_call_path.stat().st_mtime
                 )
-                # Check if context_len or layout_mode matches cached layout
+                # Check if context_len or layout_mode/logits_layout matches cached layout
                 if layout_path.exists():
                     try:
                         import json
@@ -631,6 +632,14 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                         if cached_mode and cached_mode != layout_mode:
                             context_len_mismatch = True  # Reuse flag for any config change
                             log(f"  Layout mode changed: cached={cached_mode}, requested={layout_mode}", C_YELLOW)
+                        if logits_layout and logits_layout != "auto":
+                            cached_logits_layout = cached_layout.get("config", {}).get("logits_layout")
+                            if cached_logits_layout and cached_logits_layout != logits_layout:
+                                context_len_mismatch = True
+                                log(f"  Logits layout changed: cached={cached_logits_layout}, requested={logits_layout}", C_YELLOW)
+                            elif cached_logits_layout is None:
+                                context_len_mismatch = True
+                                log(f"  Logits layout set to {logits_layout}; cached layout has no setting", C_YELLOW)
                     except Exception:
                         pass
 
@@ -664,6 +673,8 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
             cmd.append(f"--layer-limit={layer_limit}")
         if context_len is not None:
             cmd.append(f"--context-len={context_len}")
+        if logits_layout:
+            cmd.append(f"--logits-layout={logits_layout}")
         if no_fusion:
             cmd.append("--no-fusion")
 
@@ -1552,6 +1563,7 @@ def run_pipeline(args: argparse.Namespace):
         codegen_version=getattr(args, 'codegen', 'v6'),
         int8_activations=getattr(args, 'int8_activations', False),
         context_len=getattr(args, 'context_len', None),
+        logits_layout=getattr(args, 'logits_layout', None),
         no_fusion=getattr(args, 'no_fusion', False),
         layout_mode=getattr(args, 'layout_mode', 'region'),
         layer_limit=getattr(args, 'layer_limit', None),
@@ -1845,6 +1857,8 @@ Examples:
     run_parser.add_argument('--context-len', type=int, default=None,
                            help='Context length for generation (default: from model config, max 32768). '
                                 'All buffers (KV cache, activations, RoPE) sized accordingly.')
+    run_parser.add_argument('--logits-layout', choices=['auto', 'last', 'full'], default='auto',
+                           help='Logits buffer layout (auto=decode last/prefill full)')
     run_parser.add_argument('--temperature', type=float, default=0.7,
                            help='Sampling temperature (default: 0.7)')
     run_parser.add_argument('--max-tokens', type=int, default=512,

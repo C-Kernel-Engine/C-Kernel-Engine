@@ -135,6 +135,20 @@
         {"name": "eps", "source": "dim:rms_eps"}
       ]
     },
+    "qk_norm_forward": {
+      "note": "Per-head RMSNorm on Q and K. Wraps rmsnorm_forward twice (Q then K). In-place on scratch buffers.",
+      "params": [
+        {"name": "q", "source": "scratch:q_scratch", "cast": "float*"},
+        {"name": "k", "source": "scratch:k_scratch", "cast": "float*"},
+        {"name": "q_gamma", "source": "weight_f:q_norm"},
+        {"name": "k_gamma", "source": "weight_f:k_norm"},
+        {"name": "num_heads", "source": "dim:num_heads"},
+        {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+        {"name": "num_tokens", "source": "dim:seq_len"},
+        {"name": "head_dim", "source": "dim:head_dim"},
+        {"name": "eps", "source": "dim:rms_eps"}
+      ]
+    },
     "rope_forward_qk": {
       "note": "RoPE is typically in-place: input q,k are modified and returned as output q,k",
       "params": [

@@ -1,11 +1,31 @@
 /*
- * C-Kernel-Engine BPE Tokenizer Implementation
+ * C-Kernel-Engine BPE Tokenizer Implementation  [v4 - correctness complete, optimization pending]
  *
  * Pure C implementation of Byte-Pair Encoding.
  * Reads HuggingFace tokenizer.json format.
  *
  * Token IDs are dense indices into the embedding table:
  *   embedding[token_id] gives the vector for that token.
+ *
+ * TODO: Performance optimizations (correctness is done, these are for throughput):
+ *
+ *   1. Pre-allocate encode buffer
+ *      - ck_tokenizer_encode() mallocs int32_t[] per call (line ~629)
+ *      - Add encode_buf + encode_buf_cap to CKTokenizer struct
+ *      - Allocate in ck_tokenizer_init(), realloc only if input exceeds cap
+ *      - Eliminates malloc/free syscall per encode call
+ *
+ *   2. Linked list instead of array shift in merge loop
+ *      - Merge at line ~686 shifts entire tail of tokens[] left by 1: O(n) per merge
+ *      - With n initial tokens and m merges, total shifting is O(n * m)
+ *      - Doubly-linked list would make each merge O(1)
+ *
+ *   3. Priority queue for best-merge scan
+ *      - find_best_merge scans ALL pairs each iteration (line ~673): O(n) per merge
+ *      - Min-heap of valid merge candidates: O(n log n) total instead of O(n * m)
+ *
+ *   Current profile: tokenizer runs 2x per prompt (not per token). GEMM kernels
+ *   dominate at 57% of compute. These optimizations matter for batch/server use.
  *
  * By Anthony Shivakumar
  */

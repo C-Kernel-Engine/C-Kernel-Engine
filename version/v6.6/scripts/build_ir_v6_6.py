@@ -125,6 +125,13 @@ OP_DATAFLOW = {
         "inputs": {"x": "v_scratch"},
         "outputs": {"x": {"slot": "v_scratch", "dtype": "fp32"}},
     },
+    "qk_norm": {
+        "inputs": {"q": "q_scratch", "k": "k_scratch"},
+        "outputs": {
+            "q": {"slot": "q_scratch", "dtype": "fp32"},
+            "k": {"slot": "k_scratch", "dtype": "fp32"},
+        },
+    },
     "rope_qk": {
         "inputs": {"q": "q_scratch", "k": "k_scratch"},
         "outputs": {
@@ -624,6 +631,25 @@ def _align_up(value: int, align: int) -> int:
     return (value + align - 1) // align * align
 
 
+def _resolve_logits_layout(config: Dict[str, Any], mode: str) -> str:
+    """Resolve logits layout policy for this mode: 'last' or 'full'."""
+    layout = str(config.get("logits_layout", "auto")).lower()
+    if layout not in {"auto", "last", "full"}:
+        layout = "auto"
+    if layout == "auto":
+        return "full" if mode == "prefill" else "last"
+    return layout
+
+
+def _logits_seq_for_layout(layout: str, mode: str, seq_len: int, context_len: int, config: Dict[str, Any]) -> int:
+    """Return logits token count for the requested layout."""
+    if layout == "full":
+        if mode == "decode":
+            return int(context_len or config.get("context_length", config.get("context_len", seq_len)))
+        return int(seq_len)
+    return 1
+
+
 def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, num_layers_override: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
     """Return activation buffer specs keyed by name."""
     embed_dim = int(config.get("embed_dim", 896))
@@ -694,7 +720,8 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     add("layer_output", layer_out_size, f"[{seq_len}, {embed_dim}]")
 
     # Logits
-    logits_seq = 1 if mode == "decode" else seq_len
+    logits_layout = _resolve_logits_layout(config, mode)
+    logits_seq = _logits_seq_for_layout(logits_layout, mode, seq_len, context_len, config)
     logits_size = logits_seq * vocab_size * 4
     add("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
 
@@ -735,9 +762,13 @@ TEMPLATE_TO_KERNEL_OP = {
     "silu_mul": "swiglu",
     "mlp_down": "matmul",  # gemv (decode) or gemm (prefill)
 
+    # QK norm (Qwen3-style: per-head RMSNorm on Q and K after projection)
+    "qk_norm": "qk_norm",  # Dedicated kernel wrapping rmsnorm_forward twice
+
     # Footer ops
     "final_rmsnorm": "rmsnorm",
     "weight_tying": None,  # Metadata op - no kernel
+    "lm_head": None,  # Metadata op - signals separate lm_head weight (not tied)
     "logits": "matmul",  # gemv (decode) or gemm (prefill)
 }
 
@@ -753,6 +784,8 @@ WEIGHT_TO_KERNEL_INPUT = {
     "b1": "bias", "b2": "bias",
     # Layer norms → gamma
     "ln1_gamma": "gamma", "ln2_gamma": "gamma",
+    # QK norm weights → q_gamma, k_gamma
+    "q_norm": "q_gamma", "k_norm": "k_gamma",
     # Embeddings
     "token_emb": "weight",
     # Footer
@@ -772,8 +805,9 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return heads * head_dim, embed
     if op_name in ("k_proj", "v_proj"):
         return kv_heads * head_dim, embed
+    attn_out = config.get("attn_out_dim", heads * head_dim)
     if op_name in ("out_proj", "attn_proj"):
-        return embed, embed
+        return embed, attn_out
     if op_name in ("mlp_gate_up", "mlp_up"):
         return inter * 2, embed
     if op_name in ("mlp_gate",):
@@ -787,8 +821,10 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
     # quantize_out_proj_input: quantize embed_dim (attention output)
     # quantize_mlp_down_input: quantize intermediate_size (swiglu output)
     # quantize_final_output: quantize embed_dim (footer rmsnorm output before logits)
-    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input", "quantize_final_output"):
+    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_final_output"):
         return embed, embed  # output_dim not used, but _input_dim = embed
+    if op_name in ("quantize_out_proj_input",):
+        return attn_out, attn_out  # output_dim not used, but _input_dim = attn_out_dim
     if op_name in ("quantize_mlp_down_input",):
         return inter, inter  # _input_dim = intermediate_size
     return None, None
@@ -1175,6 +1211,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
         # Ops with fp32 weights (no quant lookup needed)
         "rmsnorm": None,  # gamma is always fp32
+        "qk_norm": None,  # Per-head RMSNorm gamma is always fp32
 
         # Ops without weights (compute-only)
         "rope_qk": None,
@@ -1189,6 +1226,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "wordpiece_tokenizer": "metadata",  # WordPiece tokenizer init
         "patch_embeddings": "metadata",  # Vision model patches
         "weight_tying": "metadata",
+        "lm_head": "metadata",  # Signals separate lm_head weight (not tied)
     }
 
     def map_op_to_kernel(op: str, layer_quant: Dict, mode: str) -> List[str]:
@@ -1926,6 +1964,7 @@ def generate_ir_lower_1(
     print(f"{'='*60}")
 
     config = manifest.get("config", {})
+    logits_layout = _resolve_logits_layout(config, mode)
 
     # Build kernel map index by loading individual kernel map files
     # KERNEL_REGISTRY.json is only used for validation, not as source of truth
@@ -2211,7 +2250,7 @@ def generate_ir_lower_1(
     # But ck_model_forward() expects logits at position 0 (for the LAST token).
     # Insert a copy_last_logits op to copy logits[(n-1)*V : n*V] to logits[0:V].
     copy_last_logits_inserted = False
-    if mode == "prefill":
+    if mode == "prefill" and logits_layout != "last":
         # Insert copy_last_logits at the very end
         copy_last_logits_op = {
             "idx": len(final_ops),
@@ -2319,6 +2358,7 @@ TEMPLATE_OP_WEIGHTS = {
     "q_proj": ["wq", "bq"],  # Q projection only (when split)
     "k_proj": ["wk", "bk"],  # K projection only (when split)
     "v_proj": ["wv", "bv"],  # V projection only (when split)
+    "qk_norm": ["q_norm", "k_norm"],  # Per-head RMSNorm gamma weights for Q and K
     "rope_qk": [],  # No model weights (uses precomputed tables)
     "attn": [],  # No model weights
     "out_proj": ["wo", "bo"],  # Output projection + optional bias
@@ -2725,8 +2765,9 @@ def generate_memory_layout(
     # FOOTER buffers: final output
     # ─────────────────────────────────────────────────────────────
 
-    # Logits: [seq_len, vocab_size] - for decode just 1 token
-    logits_seq = 1 if mode == "decode" else seq_len
+    # Logits: [seq_len, vocab_size] - decode can be last-only or full
+    logits_layout = _resolve_logits_layout(config, mode)
+    logits_seq = _logits_seq_for_layout(logits_layout, mode, seq_len, context_len, config)
     logits_size = logits_seq * vocab_size * 4
     add_buffer("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
 
@@ -2765,6 +2806,8 @@ def generate_memory_layout(
         layout_config["context_len"] = context_len
     elif "context_length" not in layout_config:
         layout_config["context_length"] = layout_config.get("max_seq_len", 32768)
+    # Persist resolved logits layout in layout config
+    layout_config["logits_layout"] = logits_layout
 
     # Get bump_layout from manifest (written by converter)
     # This ensures codegen uses the same offsets as the converter
@@ -3529,6 +3572,20 @@ def generate_ir_lower_2(
                     "ptr_expr": f"activations + {scratch_offset}",
                 })
 
+        # Special handling for QK norm: add q_scratch and k_scratch buffers
+        # QK norm operates in-place on scratch buffers between QKV projection and RoPE
+        if ir_op.get("op", "") == "qk_norm":
+            for scratch_name in ["q_scratch", "k_scratch"]:
+                buf = activation_buffers.get(scratch_name)
+                if buf:
+                    lowered_op["scratch"].append({
+                        "name": scratch_name,
+                        "scratch_offset": buf["offset"],
+                        "size": buf["size"],
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    })
+
         # Special handling for RoPE: add q_scratch and k_scratch buffers
         # RoPE always uses the scratch buffers (where k_proj/v_proj just wrote)
         # in both decode and prefill modes
@@ -4198,6 +4255,12 @@ def main(args: List[str]) -> int:
         help="Context length for buffer allocation (default: from model config)"
     )
     parser.add_argument(
+        "--logits-layout",
+        choices=["auto", "last", "full"],
+        default="auto",
+        help="Logits buffer layout (auto=decode last/prefill full)"
+    )
+    parser.add_argument(
         "--no-fusion",
         action="store_true",
         help="Disable kernel fusion pass (use unfused ops)"
@@ -4246,6 +4309,8 @@ def main(args: List[str]) -> int:
 
     print(f"Loading manifest: {manifest_path}")
     manifest = load_manifest(manifest_path)
+    # Override logits layout if requested (propagates into layout + codegen config)
+    manifest.setdefault("config", {})["logits_layout"] = parsed_args.logits_layout
 
     # Build IR1
     registry = load_kernel_registry()

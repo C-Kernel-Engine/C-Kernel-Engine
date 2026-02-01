@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parity Report Viewer - C-Kernel-Engine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d3f 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: #2d2d3f;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            margin-bottom: 8px;
+        }
+
+        .card .value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .card .value.pass { color: #4ade80; }
+        .card .value.fail { color: #f87171; }
+        .card .value.error { color: #fbbf24; }
+        .card .value.warn { color: #fbbf24; }
+
+        .section {
+            background: #2d2d3f;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #404040;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            background: #404040;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #404040;
+        }
+
+        tr:hover {
+            background: #383848;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status.pass { background: #166534; color: #4ade80; }
+        .status.fail { background: #991b1b; color: #f87171; }
+        .status.error { background: #92400e; color: #fbbf24; }
+        .status.warn { background: #854d0e; color: #fbbf24; }
+        .status.missing { background: #404040; color: #9ca3af; }
+
+        .diff-bar {
+            width: 100px;
+            height: 8px;
+            background: #404040;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .diff-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .diff-fill.low { background: #4ade80; }
+        .diff-fill.medium { background: #fbbf24; }
+        .diff-fill.high { background: #f87171; }
+
+        .op-group {
+            margin-bottom: 24px;
+        }
+
+        .op-group-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #383848;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .op-group-header:hover {
+            background: #404050;
+        }
+
+        .layer-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .op-details {
+            display: none;
+            margin-left: 20px;
+        }
+
+        .op-details.show {
+            display: block;
+        }
+
+        .metric {
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .metric-value {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .timeline {
+            position: relative;
+            height: 40px;
+            background: #404040;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .timeline-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+        }
+
+        .timeline-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: 600;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: #404040;
+            border: 1px solid #505050;
+            border-radius: 8px;
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: #505050;
+            border-color: #667eea;
+        }
+
+        .filter-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        .drop-zone {
+            border: 2px dashed #505050;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            padding: 12px 24px;
+            background: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        .upload-btn:hover {
+            background: #764ba2;
+        }
+
+        .help-section {
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .help-section h3 {
+            color: #667eea;
+            margin-bottom: 16px;
+        }
+
+        .help-section code {
+            background: #1a1a1a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .help-section pre {
+            background: #1a1a1a;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .toggle-all {
+            margin-bottom: 16px;
+        }
+
+        .arrow {
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+
+        .arrow.expanded {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Parity Report Viewer</h1>
+            <div class="subtitle">Layer-by-layer comparison between llama.cpp and C-Kernel-Engine</div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="drop-zone" id="dropZone">
+            <svg style="width: 48px; height: 48px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5M12 3v9"/>
+            </svg>
+            <p style="margin: 16px 0;">Drop parity report JSON here</p>
+            <label class="upload-btn">
+                Choose File
+                <input type="file" class="file-input" id="fileInput" accept=".json">
+            </label>
+            <p style="margin-top: 12px; font-size: 12px; opacity: 0.6;">or run: <code>python scripts/parity_report.py --output report.json</code></p>
+        </div>
+
+        <!-- Content (hidden until loaded) -->
+        <div id="content" style="display: none;">
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>Total Operations</h3>
+                    <div class="value" id="totalOps">-</div>
+                </div>
+                <div class="card">
+                    <h3>Passed</h3>
+                    <div class="value pass" id="passedOps">-</div>
+                </div>
+                <div class="card">
+                    <h3>Failed</h3>
+                    <div class="value fail" id="failedOps">-</div>
+                </div>
+                <div class="card">
+                    <h3>Errors</h3>
+                    <div class="value error" id="errorOps">-</div>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="pass">Pass Only</button>
+                <button class="filter-btn" data-filter="fail">Fail Only</button>
+                <button class="filter-btn" data-filter="error">Errors</button>
+                <button class="filter-btn" data-filter="warning">Warnings</button>
+            </div>
+
+            <!-- Toggle All -->
+            <div class="toggle-all">
+                <button class="filter-btn" id="toggleAll">▼ Expand All Layers</button>
+            </div>
+
+            <!-- Operations List -->
+            <div id="opsList"></div>
+
+            <!-- Performance Section -->
+            <div class="section" id="performanceSection" style="display: none;">
+                <h2>⚡ Performance</h2>
+                <div id="performanceContent"></div>
+            </div>
+
+            <!-- Model Info -->
+            <div class="section" id="modelInfo" style="display: none;">
+                <h2>ℹ️ Model Information</h2>
+                <div id="modelInfoContent"></div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 17v-2m3 2v-2m0 2h-6m-6 4h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+            </svg>
+            <p>Load a parity report JSON to view detailed results</p>
+        </div>
+
+        <!-- Help Section -->
+        <div class="help-section">
+            <h3>📖 How to Generate Parity Report</h3>
+
+            <p><strong>Option 1: Check CKE Only (No llama.cpp Needed)</strong></p>
+            <pre><code># Enable parity dumping in generated code
+python version/v6.6/scripts/codegen_v6_6.py \
+    --decode lowered_decode_call.json \
+    --init init_call.json \
+    -o model_parity.c \
+    --parity-dump
+
+# Compile and run
+gcc -o model_parity model_parity.c -lckernel_engine -lm -DCK_PARITY_DUMP
+./model_parity model.gguf "Hello" 5
+
+# Generate report
+python version/v6.6/scripts/parity_report.py \
+    --ck-dump ck_parity_dumps/dump.bin \
+    --output report.json</code></pre>
+
+            <p><strong>Option 2: Full Comparison with llama.cpp</strong></p>
+            <pre><code># Run llama.cpp with dump (requires patch)
+./llama-cli -m model.gguf -p "Hello" -n 5 --parity-dump
+
+# Run CKE with dump
+./ck_model model.gguf "Hello" 5
+
+# Compare
+python version/v6.6/scripts/parity_report.py \
+    --ck-dump ck_parity_dumps/dump.bin \
+    --ref-dump llama_parity_dumps/dump.bin \
+    --manifest weights_manifest.json \
+    --output report.json</code></pre>
+
+            <p><strong>Option 3: Quick Check via ck-cli</strong></p>
+            <pre><code># ck-cli has built-in parity mode
+./build/ck-cli-v6.6 --model Qwen3-0.6B-GGUF --parity-dump --prompt "Hello"</code></pre>
+        </div>
+    </div>
+
+    <script>
+        // Parity report viewer
+        let reportData = null;
+        let expandedGroups = new Set();
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const content = document.getElementById('content');
+        const emptyState = document.getElementById('emptyState');
+        const opsList = document.getElementById('opsList');
+        const toggleAll = document.getElementById('toggleAll');
+
+        // Load report data
+        function loadReport(data) {
+            reportData = data;
+
+            // Hide empty state, show content
+            emptyState.style.display = 'none';
+            content.style.display = 'block';
+
+            // Update summary cards
+            document.getElementById('totalOps').textContent = data.summary.total;
+            document.getElementById('passedOps').textContent = data.summary.passed;
+            document.getElementById('failedOps').textContent = data.summary.failed;
+            document.getElementById('errorOps').textContent = data.summary.errors;
+
+            // Model info
+            if (data.model_info) {
+                document.getElementById('modelInfo').style.display = 'block';
+                let infoHtml = '<table style="width: 100%;">';
+                for (const [key, value] of Object.entries(data.model_info)) {
+                    infoHtml += `<tr><td style="opacity: 0.7;">${key}</td><td><code>${value}</code></td></tr>`;
+                }
+                infoHtml += '</table>';
+                document.getElementById('modelInfoContent').innerHTML = infoHtml;
+            }
+
+            // Performance
+            if (data.performance) {
+                document.getElementById('performanceSection').style.display = 'block';
+                let perfHtml = '<table style="width: 100%;">';
+                for (const [key, value] of Object.entries(data.performance)) {
+                    perfHtml += `<tr><td style="opacity: 0.7;">${key}</td><td><code>${value}</code></td></tr>`;
+                }
+                perfHtml += '</table>';
+                document.getElementById('performanceContent').innerHTML = perfHtml;
+            }
+
+            // Render operations by layer
+            renderOps(data.operations);
+        }
+
+        function renderOps(ops) {
+            // Group by layer
+            const layers = {};
+            for (const op of ops) {
+                if (!layers[op.layer]) {
+                    layers[op.layer] = [];
+                }
+                layers[op.layer].push(op);
+            }
+
+            let html = '';
+            for (const [layerId, layerOps] of Object.entries(layers)) {
+                const hasErrors = layerOps.some(o => o.status === 'error');
+                const hasFailures = layerOps.some(o => o.status === 'fail');
+
+                html += `
+                    <div class="op-group" data-status="${hasErrors ? 'error' : hasFailures ? 'fail' : 'pass'}">
+                        <div class="op-group-header" onclick="toggleGroup(${layerId})">
+                            <span class="arrow" id="arrow-${layerId}">▶</span>
+                            <span class="layer-badge">Layer ${layerId}</span>
+                            <span style="flex: 1;">${layerOps.length} operations</span>
+                            ${hasErrors ? '<span class="status error">⚠ Errors</span>' : ''}
+                            ${hasFailures ? '<span class="status fail">⚠ Failures</span>' : ''}
+                        </div>
+                        <div class="op-details" id="group-${layerId}">
+                            ${renderLayerOps(layerOps)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            opsList.innerHTML = html;
+        }
+
+        function renderLayerOps(ops) {
+            let html = '<table style="width: 100%;">';
+            html += '<thead><tr>';
+            html += '<th>Op</th><th>Status</th><th>Max Diff</th><th>Mean Diff</th><th>Max Rel Err</th><th>Ref Range</th><th>CKE Range</th><th>Notes</th>';
+            html += '</tr></thead><tbody>';
+
+            for (const op of ops) {
+                const statusClass = op.status.toLowerCase();
+                const diffPercent = Math.min(100, (op.max_abs_diff / (Math.max(Math.abs(op.ref_range[0]), Math.abs(op.ref_range[1])) + 1e-9)) * 100);
+
+                let diffClass = 'low';
+                if (diffPercent > 1) diffClass = 'medium';
+                if (diffPercent > 10) diffClass = 'high';
+
+                html += `
+                    <tr class="op-row" data-status="${statusClass}">
+                        <td><code>${op.op}</code></td>
+                        <td><span class="status ${statusClass}">${op.status}</span></td>
+                        <td><span class="metric-value">${op.max_abs_diff.toExponential(2)}</span></td>
+                        <td><span class="metric-value">${op.mean_abs_diff.toExponential(2)}</span></td>
+                        <td><span class="metric-value">${(op.max_rel_err * 100).toFixed(2)}%</span></td>
+                        <td><span class="metric-value">[${op.ref_range[0].toExponential(2)}, ${op.ref_range[1].toExponential(2)}]</span></td>
+                        <td><span class="metric-value">[${op.cke_range[0].toExponential(2)}, ${op.cke_range[1].toExponential(2)}]</span></td>
+                        <td style="font-size: 11px; opacity: 0.7;">${op.notes || '-'}</td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function toggleGroup(layerId) {
+            const details = document.getElementById(`group-${layerId}`);
+            const arrow = document.getElementById(`arrow-${layerId}`);
+
+            if (details.classList.contains('show')) {
+                details.classList.remove('show');
+                arrow.classList.remove('expanded');
+                arrow.textContent = '▶';
+                expandedGroups.delete(layerId);
+            } else {
+                details.classList.add('show');
+                arrow.classList.add('expanded');
+                arrow.textContent = '▼';
+                expandedGroups.add(layerId);
+            }
+        }
+
+        // Filter functionality
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const filter = btn.dataset.filter;
+
+                document.querySelectorAll('.op-group').forEach(group => {
+                    if (filter === 'all') {
+                        group.style.display = 'block';
+                    } else {
+                        const groupStatus = group.dataset.status;
+                        if (filter === 'warning' && groupStatus === 'pass') {
+                            group.style.display = 'none';
+                        } else if (filter !== 'warning' && groupStatus !== filter) {
+                            group.style.display = 'none';
+                        } else {
+                            group.style.display = 'block';
+                        }
+                    }
+                });
+            });
+        });
+
+        // Toggle all
+        toggleAll.addEventListener('click', () => {
+            const allExpanded = expandedGroups.size === Object.keys(document.querySelectorAll('.op-group')).length;
+
+            document.querySelectorAll('.op-details').forEach((details, idx) => {
+                const layerId = details.id.split('-')[1];
+                const arrow = document.getElementById(`arrow-${layerId}`);
+
+                if (allExpanded) {
+                    details.classList.remove('show');
+                    arrow.classList.remove('expanded');
+                    arrow.textContent = '▶';
+                    expandedGroups.clear();
+                } else {
+                    details.classList.add('show');
+                    arrow.classList.add('expanded');
+                    arrow.textContent = '▼';
+                    expandedGroups.add(parseInt(layerId));
+                }
+            });
+
+            toggleAll.textContent = allExpanded ? '▼ Expand All Layers' : '▲ Collapse All Layers';
+        });
+
+        // File input
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        loadReport(data);
+                    } catch (err) {
+                        alert('Invalid JSON file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        loadReport(data);
+                    } catch (err) {
+                        alert('Invalid JSON file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+    </script>
+</body>
+</html>

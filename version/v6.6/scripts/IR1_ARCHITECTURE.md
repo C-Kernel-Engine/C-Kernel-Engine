@@ -74,6 +74,11 @@ IR1 is a simple list of C function names (kernel IDs) in execution order.
 └─────────────────────────────────────────────────────────────┘
 ```
 
+Config contract (subset):
+- embed_dim, num_heads, num_kv_heads, head_dim, intermediate_size, context_length
+- attn_out_dim: attention output width used by out_proj and quantize_out_proj_input
+  (often == embed_dim, but may be num_heads * head_dim for some architectures)
+
 ## Two-Level Mapping System
 
 ### Level 1: Template Op → Kernel Op

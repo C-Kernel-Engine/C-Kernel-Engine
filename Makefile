@@ -241,6 +241,7 @@ SRCS    := src/backend_native.c \
 	            src/kernels/rmsnorm_kernels_bf16.c \
 	            src/kernels/rmsnorm_kernels_int8.c \
 	            src/kernels/rmsnorm_kernels_int4.c \
+	            src/kernels/qk_norm_kernels.c \
 	            src/kernels/swiglu_kernels.c \
 	           src/kernels/swiglu_kernels_bf16.c \
 	           src/kernels/sigmoid_kernels.c \

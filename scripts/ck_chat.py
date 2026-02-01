@@ -12,6 +12,7 @@ from __future__ import annotations  # Python 3.9 compatibility
 
 import argparse
 import ctypes
+import json
 import sys
 import time
 from pathlib import Path
@@ -68,8 +69,12 @@ class CKModel:
         self.has_kv_decode = False
         self.has_parity = False
         self.eos_tokens = set()  # Will be populated during load
+        self.logits_stride = None  # Optional: logits stride in floats (0 = last-only)
+        self.use_chat_template = True
+        self.chat_template_mode = "auto"
 
-    def load(self, gguf_path: str = None, force_python_tokenizer: bool = False) -> bool:
+    def load(self, gguf_path: str = None, force_python_tokenizer: bool = False,
+             chat_template: str = "auto") -> bool:
         """Load model library and tokenizer.
 
         Tokenizer priority (unless force_python_tokenizer=True):
@@ -80,6 +85,7 @@ class CKModel:
         Args:
             gguf_path: Path to GGUF file for tokenizer extraction
             force_python_tokenizer: If True, skip C tokenizer even if available
+            chat_template: "auto", "none", or a specific template name (e.g., "qwen")
         """
         # Load C library first (needed to check for C tokenizer)
         lib_path = self.model_dir / "ck-kernel-inference.so"
@@ -114,6 +120,13 @@ class CKModel:
 
         self.lib.ck_model_get_active_tokens.argtypes = []
         self.lib.ck_model_get_active_tokens.restype = ctypes.c_int
+        # Optional logits stride API (newer v6.6 models)
+        try:
+            self.lib.ck_model_get_logits_stride.argtypes = []
+            self.lib.ck_model_get_logits_stride.restype = ctypes.c_int
+            self._has_logits_stride = True
+        except AttributeError:
+            self._has_logits_stride = False
 
         self.lib.ck_model_free.argtypes = []
         self.lib.ck_model_free.restype = None
@@ -195,6 +208,13 @@ class CKModel:
             print(f"Error: Failed to initialize model (code {ret})")
             return False
 
+        # Read logits stride if available (0 = last-only, >0 = full history)
+        if self._has_logits_stride:
+            try:
+                self.logits_stride = int(self.lib.ck_model_get_logits_stride())
+            except Exception:
+                self.logits_stride = None
+
         self.vocab_size = self.lib.ck_model_get_vocab_size()
         self.context_window = self.lib.ck_model_get_context_window()
 
@@ -237,7 +257,61 @@ class CKModel:
         # Detect EOS tokens from tokenizer
         self._detect_eos_tokens()
 
+        # Configure chat template usage
+        self._configure_chat_template(chat_template)
+
         return True
+
+    def _load_model_meta(self) -> dict:
+        """Load chat-related metadata from config/manifest if present."""
+        meta = {}
+        config_path = self.model_dir / "config.json"
+        if config_path.exists():
+            try:
+                with open(config_path, "r") as f:
+                    cfg = json.load(f)
+                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name")})
+            except Exception:
+                pass
+        manifest_path = self.model_dir / "weights_manifest.json"
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+                cfg = manifest.get("config", {})
+                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name")})
+            except Exception:
+                pass
+        return meta
+
+    def _configure_chat_template(self, mode: str) -> None:
+        """Select chat template based on metadata or explicit override."""
+        mode = (mode or "auto").lower()
+        self.chat_template_mode = mode
+
+        if mode == "none":
+            self.use_chat_template = False
+            return
+        if mode == "qwen":
+            self.use_chat_template = True
+            return
+
+        # Auto mode: require chat_template metadata + instruct finetune
+        meta = self._load_model_meta()
+        chat_template = meta.get("chat_template") or ""
+        finetune = str(meta.get("finetune") or "").lower()
+        model_name = str(meta.get("model_name") or meta.get("name") or "").lower()
+
+        if chat_template and ("instruct" in finetune or "chat" in finetune or "instruct" in model_name):
+            # Only support ChatML-style templates here.
+            if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
+                self.use_chat_template = True
+                self.chat_template_mode = "qwen"
+                return
+
+        # Default: no chat template (base models or unknown templates)
+        self.use_chat_template = False
+        self.chat_template_mode = "none"
 
     def _detect_eos_tokens(self):
         """Detect EOS (End-Of-Sequence) token IDs from tokenizer vocabulary.
@@ -434,6 +508,9 @@ class CKModel:
         <|im_start|>assistant
         {model generates response here...}
         """
+        if not self.use_chat_template:
+            return user_message
+
         if system_prompt is None:
             system_prompt = "You are a helpful assistant."
 
@@ -453,13 +530,16 @@ class CKModel:
         # Get logits pointer
         logits_ptr = self.lib.ck_model_get_logits()
         active_tokens = self.lib.ck_model_get_active_tokens()
+        stride = self.logits_stride if self.logits_stride is not None else self.vocab_size
+        if stride <= 0:
+            logits_array = np.ctypeslib.as_array(logits_ptr, shape=(self.vocab_size,))
+            return logits_array.copy()
 
-        # Get last position logits
-        last_pos_offset = (active_tokens - 1) * self.vocab_size
-        logits_array = np.ctypeslib.as_array(logits_ptr, shape=(active_tokens * self.vocab_size,))
-        last_logits = logits_array[last_pos_offset:last_pos_offset + self.vocab_size].copy()
-
-        return last_logits
+        # Get last position logits (stride-aware)
+        active = max(int(active_tokens), 1)
+        last_pos_offset = (active - 1) * stride
+        logits_array = np.ctypeslib.as_array(logits_ptr, shape=(active * stride,))
+        return logits_array[last_pos_offset:last_pos_offset + self.vocab_size].copy()
 
     def prefill(self, token_ids: list) -> np.ndarray:
         """Prefill KV cache by running a full forward once (returns last logits)."""
@@ -473,8 +553,14 @@ class CKModel:
 
         logits_ptr = self.lib.ck_model_get_logits()
         active_tokens = self.lib.ck_model_get_active_tokens()
-        last_pos_offset = (active_tokens - 1) * self.vocab_size
-        logits_array = np.ctypeslib.as_array(logits_ptr, shape=(active_tokens * self.vocab_size,))
+        stride = self.logits_stride if self.logits_stride is not None else self.vocab_size
+        if stride <= 0:
+            logits_array = np.ctypeslib.as_array(logits_ptr, shape=(self.vocab_size,))
+            return logits_array.copy()
+
+        active = max(int(active_tokens), 1)
+        last_pos_offset = (active - 1) * stride
+        logits_array = np.ctypeslib.as_array(logits_ptr, shape=(active * stride,))
         return logits_array[last_pos_offset:last_pos_offset + self.vocab_size].copy()
 
     def free(self):
@@ -772,6 +858,10 @@ def main():
                        help="Disable prefill; feed prompt tokens via decode (slow)")
     parser.add_argument("--python-tokenizer", action="store_true",
                        help="Force Python tokenizer instead of C tokenizer")
+    parser.add_argument("--chat-template", choices=["auto", "none", "qwen"], default="auto",
+                       help="Chat template mode: auto (from GGUF), none, or qwen")
+    parser.add_argument("--no-chat-template", action="store_true",
+                       help="Disable chat template formatting (same as --chat-template=none)")
     args = parser.parse_args()
 
     # Determine parity directory
@@ -803,7 +893,9 @@ def main():
     print(f"Loading model from {args.model_dir}...")
     model = CKModel(args.model_dir, parity_dir=parity_dir)
 
-    if not model.load(gguf_path=args.gguf, force_python_tokenizer=args.python_tokenizer):
+    chat_template = "none" if args.no_chat_template else args.chat_template
+    if not model.load(gguf_path=args.gguf, force_python_tokenizer=args.python_tokenizer,
+                      chat_template=chat_template):
         sys.exit(1)
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")
