@@ -1336,6 +1336,154 @@ void vec_dot_q5_0_q8_0_avx(int n, float *s, const void *vx, const void *vy)
     acc0 = _mm256_add_ps(acc0, acc1);
     *s = hsum_float_8_avx(acc0);
 }
+
+/* ============================================================================
+ * Unrolled GEMM: C[M,N] = A_q8[M,K] @ B_q5[N,K]^T + bias
+ *
+ * Key optimizations over the naive vec_dot-per-element approach:
+ *   1. N-dimension 2x unroll: loads activation block ONCE, reuses for 2 weight rows
+ *   2. Inlined Q5_0 unpack: eliminates function call overhead per block
+ *   3. Block-level prefetching: hides DRAM latency for weight streaming
+ *   4. F16C scale conversion: uses hardware vcvtsh2ss via CK_FP16_TO_FP32 macro
+ *   5. Persistent __m256 accumulators: no per-block horizontal sum
+ *
+ * Expected speedup: 1.5-2x over naive dispatch loop on AVX (Ivy Bridge+)
+ * ============================================================================ */
+
+/**
+ * @brief Batch GEMM with Q5_0 weights x Q8_0 activations — AVX unrolled
+ *
+ * @param A_q8   Input activations in Q8_0 format [M rows of K/32 blocks each]
+ * @param B_q5   Weights in Q5_0 format [N rows of K/32 blocks each]
+ * @param bias   Optional bias vector [N], NULL if not used
+ * @param C      Output matrix [M x N], row-major FP32
+ * @param M      Batch size (number of tokens)
+ * @param N      Output dimension (number of output features)
+ * @param K      Input dimension (must be multiple of 32)
+ */
+void gemm_nt_q5_0_q8_0_unroll_avx(
+    const void *A_q8,
+    const void *B_q5,
+    const float *bias,
+    float *C,
+    int M, int N, int K)
+{
+    const int nb = K / QK5_0;
+    const block_q8_0 *a_blocks = (const block_q8_0 *)A_q8;
+    const block_q5_0 *b_blocks = (const block_q5_0 *)B_q5;
+    const __m128i mask = _mm_set1_epi8((char)0xF0);
+
+    for (int m = 0; m < M; m++) {
+        const block_q8_0 *a_row = a_blocks + (size_t)m * nb;
+
+        /* ---- 2x N-unrolled path: process 2 weight rows per iteration ---- */
+        int n = 0;
+        for (; n + 1 < N; n += 2) {
+            const block_q5_0 *w0 = b_blocks + (size_t)(n + 0) * nb;
+            const block_q5_0 *w1 = b_blocks + (size_t)(n + 1) * nb;
+
+            __m256 acc_n0 = _mm256_setzero_ps();
+            __m256 acc_n1 = _mm256_setzero_ps();
+
+            for (int ib = 0; ib < nb; ib++) {
+                /* Prefetch next weight blocks (1 cache line = ~2.9 Q5_0 blocks) */
+                if (ib + 2 < nb) {
+                    _mm_prefetch((const char *)&w0[ib + 2], _MM_HINT_T0);
+                    _mm_prefetch((const char *)&w1[ib + 2], _MM_HINT_T0);
+                }
+
+                /* Load activation Q8_0 block ONCE — reused for both weight rows */
+                const __m256i by = _mm256_loadu_si256((const __m256i *)a_row[ib].qs);
+                const float da = CK_FP16_TO_FP32(a_row[ib].d);
+
+                /* === Weight row 0: inline Q5_0 unpack + dot product === */
+                {
+                    const float d = da * CK_FP16_TO_FP32(w0[ib].d);
+
+                    /* Unpack low 4-bit nibbles → 32 bytes */
+                    __m256i bx = bytes_from_nibbles_32_avx(w0[ib].qs);
+
+                    /* Spread 32 high bits → 32 byte mask (0xFF or 0x00) */
+                    const __m256i bxhi = bytes_from_bits_32_avx(w0[ib].qh);
+                    __m128i bxhil = _mm256_castsi256_si128(bxhi);
+                    __m128i bxhih = _mm256_extractf128_si256(bxhi, 1);
+
+                    /* Combine: nibble |= (highbit ? 0x10 : 0x00) */
+                    bxhil = _mm_andnot_si128(bxhil, mask);
+                    bxhih = _mm_andnot_si128(bxhih, mask);
+                    __m128i bxl = _mm256_castsi256_si128(bx);
+                    __m128i bxh = _mm256_extractf128_si256(bx, 1);
+                    bxl = _mm_or_si128(bxl, bxhil);
+                    bxh = _mm_or_si128(bxh, bxhih);
+                    bx = MM256_SET_M128I(bxh, bxl);
+
+                    /* Signed int8 dot product → 8 float partial sums */
+                    const __m256 q = mul_sum_i8_pairs_float_avx(bx, by);
+                    acc_n0 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(d), q), acc_n0);
+                }
+
+                /* === Weight row 1: same activation data, different weights === */
+                {
+                    const float d = da * CK_FP16_TO_FP32(w1[ib].d);
+
+                    __m256i bx = bytes_from_nibbles_32_avx(w1[ib].qs);
+                    const __m256i bxhi = bytes_from_bits_32_avx(w1[ib].qh);
+                    __m128i bxhil = _mm256_castsi256_si128(bxhi);
+                    __m128i bxhih = _mm256_extractf128_si256(bxhi, 1);
+
+                    bxhil = _mm_andnot_si128(bxhil, mask);
+                    bxhih = _mm_andnot_si128(bxhih, mask);
+                    __m128i bxl = _mm256_castsi256_si128(bx);
+                    __m128i bxh = _mm256_extractf128_si256(bx, 1);
+                    bxl = _mm_or_si128(bxl, bxhil);
+                    bxh = _mm_or_si128(bxh, bxhih);
+                    bx = MM256_SET_M128I(bxh, bxl);
+
+                    const __m256 q = mul_sum_i8_pairs_float_avx(bx, by);
+                    acc_n1 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(d), q), acc_n1);
+                }
+            }
+
+            /* Horizontal reduce and store with optional bias */
+            float s0 = hsum_float_8_avx(acc_n0);
+            float s1 = hsum_float_8_avx(acc_n1);
+            if (bias) { s0 += bias[n]; s1 += bias[n + 1]; }
+            C[(size_t)m * N + n]     = s0;
+            C[(size_t)m * N + n + 1] = s1;
+        }
+
+        /* ---- Cleanup: remaining odd column ---- */
+        for (; n < N; n++) {
+            const block_q5_0 *w = b_blocks + (size_t)n * nb;
+            __m256 acc = _mm256_setzero_ps();
+
+            for (int ib = 0; ib < nb; ib++) {
+                const __m256i by = _mm256_loadu_si256((const __m256i *)a_row[ib].qs);
+                const float d = CK_FP16_TO_FP32(a_row[ib].d) * CK_FP16_TO_FP32(w[ib].d);
+
+                __m256i bx = bytes_from_nibbles_32_avx(w[ib].qs);
+                const __m256i bxhi = bytes_from_bits_32_avx(w[ib].qh);
+                __m128i bxhil = _mm256_castsi256_si128(bxhi);
+                __m128i bxhih = _mm256_extractf128_si256(bxhi, 1);
+                bxhil = _mm_andnot_si128(bxhil, mask);
+                bxhih = _mm_andnot_si128(bxhih, mask);
+                __m128i bxl = _mm256_castsi256_si128(bx);
+                __m128i bxh = _mm256_extractf128_si256(bx, 1);
+                bxl = _mm_or_si128(bxl, bxhil);
+                bxh = _mm_or_si128(bxh, bxhih);
+                bx = MM256_SET_M128I(bxh, bxl);
+
+                const __m256 q = mul_sum_i8_pairs_float_avx(bx, by);
+                acc = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(d), q), acc);
+            }
+
+            float s = hsum_float_8_avx(acc);
+            if (bias) s += bias[n];
+            C[(size_t)m * N + n] = s;
+        }
+    }
+}
+
 #endif
 
 /**
@@ -1477,7 +1625,7 @@ void gemm_nt_q5_0_q8_0(
 {
     const block_q5_0 *weights = (const block_q5_0 *)B_q5;
     const block_q8_0 *inputs = (const block_q8_0 *)A_q8;
-    const int blocks_per_row = K / QK5_0;  /* QK5_0 == QK8_0 == 32 */
+    const int blocks_per_row = K / QK5_0;
 
     for (int m = 0; m < M; m++) {
         const block_q8_0 *input_row = &inputs[m * blocks_per_row];
@@ -1486,7 +1634,7 @@ void gemm_nt_q5_0_q8_0(
             const block_q5_0 *weight_row = &weights[n * blocks_per_row];
             float *out = &C[m * N + n];
 
-            /* Use portable dispatch (selects AVX512/AVX/SSE/scalar) */
+            /* Dispatches to vec_dot_q5_0_q8_0_avx (2x block unrolled) on AVX */
             vec_dot_q5_0_q8_0(K, out, weight_row, input_row);
 
             if (bias) {

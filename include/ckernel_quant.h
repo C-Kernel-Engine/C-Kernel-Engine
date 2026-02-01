@@ -251,16 +251,17 @@ static inline void unpack_q4_k_scales(const uint8_t *scales,
 
 /* ============================================================================
  * FP16 Conversion Utilities
+ *
+ * Three variants:
+ *   _soft  - Pure C bit manipulation (always available, portable)
+ *   _simd  - F16C hardware instruction (vcvtph2ps/vcvtps2ph, Ivy Bridge+)
+ *   (default) - Auto-dispatches to best available at compile time
  * ============================================================================ */
 
 /**
- * @brief Convert FP16 (ck_half) to FP32
+ * @brief Convert FP16 (ck_half) to FP32 — software implementation
  */
-static inline float ck_fp16_to_fp32(ck_half h) {
-    /*
-     * FP16: 1 sign + 5 exponent + 10 mantissa
-     * FP32: 1 sign + 8 exponent + 23 mantissa
-     */
+static inline float ck_fp16_to_fp32_soft(ck_half h) {
     uint32_t sign = (h & 0x8000) << 16;
     uint32_t exp = (h >> 10) & 0x1F;
     uint32_t mant = h & 0x3FF;
@@ -269,7 +270,6 @@ static inline float ck_fp16_to_fp32(ck_half h) {
 
     if (exp == 0) {
         if (mant == 0) {
-            /* Zero */
             result = sign;
         } else {
             /* Denormalized - convert to normalized FP32 */
@@ -282,10 +282,8 @@ static inline float ck_fp16_to_fp32(ck_half h) {
             result = sign | ((exp + 127 - 15) << 23) | (mant << 13);
         }
     } else if (exp == 31) {
-        /* Inf or NaN */
         result = sign | 0x7F800000 | (mant << 13);
     } else {
-        /* Normalized */
         result = sign | ((exp + 127 - 15) << 23) | (mant << 13);
     }
 
@@ -295,9 +293,9 @@ static inline float ck_fp16_to_fp32(ck_half h) {
 }
 
 /**
- * @brief Convert FP32 to FP16 (ck_half)
+ * @brief Convert FP32 to FP16 (ck_half) — software implementation
  */
-static inline ck_half ck_fp32_to_fp16(float f) {
+static inline ck_half ck_fp32_to_fp16_soft(float f) {
     union { uint32_t u; float f; } u;
     u.f = f;
 
@@ -307,23 +305,65 @@ static inline ck_half ck_fp32_to_fp16(float f) {
 
     if (exp <= 0) {
         if (exp < -10) {
-            /* Underflow to zero */
             return sign;
         }
-        /* Denormalized */
         mant = (mant | 0x400) >> (1 - exp);
         return sign | mant;
     } else if (exp >= 31) {
-        /* Overflow to infinity */
         return sign | 0x7C00;
     }
 
     return sign | (exp << 10) | mant;
 }
 
+/* --------------------------------------------------------------------------
+ * F16C Hardware SIMD conversion (requires Intel Ivy Bridge+ or AMD Piledriver+)
+ * Uses vcvtsh2ss / vcvtss2sh single-element hardware instructions.
+ * -------------------------------------------------------------------------- */
+#if defined(__F16C__)
+#include <immintrin.h>
+
+/**
+ * @brief Convert FP16 to FP32 — F16C hardware (1 instruction: vcvtsh2ss)
+ */
+static inline float ck_fp16_to_fp32_simd(ck_half h) {
+    return _cvtsh_ss(h);
+}
+
+/**
+ * @brief Convert FP32 to FP16 — F16C hardware (1 instruction: vcvtss2sh)
+ */
+static inline ck_half ck_fp32_to_fp16_simd(float f) {
+    return (ck_half)_cvtss_sh(f, _MM_FROUND_TO_NEAREST_INT);
+}
+#endif /* __F16C__ */
+
+/* --------------------------------------------------------------------------
+ * Default dispatch: selects hardware SIMD when available, else software
+ * -------------------------------------------------------------------------- */
+static inline float ck_fp16_to_fp32(ck_half h) {
+#if defined(__F16C__)
+    return ck_fp16_to_fp32_simd(h);
+#else
+    return ck_fp16_to_fp32_soft(h);
+#endif
+}
+
+static inline ck_half ck_fp32_to_fp16(float f) {
+#if defined(__F16C__)
+    return ck_fp32_to_fp16_simd(f);
+#else
+    return ck_fp32_to_fp16_soft(f);
+#endif
+}
+
 /* Convenience macros */
 #define CK_FP16_TO_FP32(x) ck_fp16_to_fp32(x)
 #define CK_FP32_TO_FP16(x) ck_fp32_to_fp16(x)
+#define CK_FP16_TO_FP32_SIMD(x) ck_fp16_to_fp32_simd(x)
+#define CK_FP32_TO_FP16_SIMD(x) ck_fp32_to_fp16_simd(x)
+#define CK_FP16_TO_FP32_SOFT(x) ck_fp16_to_fp32_soft(x)
+#define CK_FP32_TO_FP16_SOFT(x) ck_fp32_to_fp16_soft(x)
 
 /* Legacy compatibility (for files that used the old names) */
 typedef ck_half ggml_half;
@@ -345,6 +385,7 @@ void rmsnorm_q8_k_fused(const float *input, const float *gamma, void *vy, int to
 
 /* INT8 activation batch GEMM kernels (Q5_0 weights x Q8_0 activations) */
 void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_0_q8_0_unroll_avx(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K);
 void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy);
 void vec_dot_q8_0_q8_0(int n, float *s, const void *vx, const void *vy);
 void quantize_row_q8_0(const float *x, void *vy, int k);
