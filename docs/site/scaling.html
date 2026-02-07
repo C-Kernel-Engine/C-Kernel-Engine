@@ -870,6 +870,7 @@
                         <div class="menu-heading">Core</div>
                         <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
                         <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
                         <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
                         <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
@@ -927,6 +928,44 @@
     <main>
 
 <h1>Scaling Philosophy</h1>
+
+<div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
+    <h2 style="margin-top: 0; color: #ffb400;">The Myth That Created This Project</h2>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        The GPU marketing machine has been so effective that the industry has internalized a belief that borders on religious doctrine:
+        <strong>"AI cannot run on CPUs."</strong> Not "AI is slower on CPUs" or "GPUs are better suited" &mdash; but that the laws of physics
+        somehow forbid a CPU from performing matrix multiplication and softmax. That running inference on a CPU would violate
+        some fundamental constraint of the universe.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        <strong>This is not a technical argument. It is marketing.</strong> And many smart people have been made to believe it.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        The reality: <strong>A quantized Qwen2 0.5B model running llama.cpp achieves ~30 tokens/sec on a
+        12-year-old Intel Core i7.</strong> No GPU. No CUDA. No special hardware. A consumer CPU from 2012 with only AVX and SSE2 &mdash;
+        not even AVX2. Instructions that have existed in x86 chips since 2011. The C-Kernel-Engine is still closing
+        the performance gap with llama.cpp, but the physics of the underlying hardware proves the capability is there.
+        The math works. The tokens come out.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        And 30 tokens/sec is <strong>human-readable speed</strong>. That's fast enough for real, practical work. Imagine a natural language
+        interface to your Linux command line &mdash; instead of memorizing <code>find / -name "*.log" -mtime +7 -exec rm {} \;</code>,
+        you describe what you want in plain English and the model translates it. At 30 tok/sec on a 12-year-old CPU,
+        that response arrives faster than you can read it. This isn't a research demo &mdash; it's an accessible utility that makes Linux navigable
+        for everyone, running on hardware that's already in every data center and most desktops.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        <strong>The C-Kernel-Engine exists to challenge and disprove the GPU-only narrative.</strong> Not just to show that AI <em>can</em>
+        run on CPUs, but that CPU-only inference and training can be practical, competitive, and at scale &mdash;
+        dramatically cheaper. Every section on this page is evidence against a myth that has cost the industry
+        billions in unnecessary GPU spending.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7; border-top: 1px solid #333; padding-top: 1.5rem; margin-bottom: 0;">
+        With hand-tuned SIMD kernels, a custom memory planner, and weight stitching built from scratch &mdash;
+        the math is settled. We know mathematically that GPUs are not required.
+        <strong>The rest is all hardcore engineering.</strong>
+    </p>
+</div>
 
 <div class="alert alert-warning">
     <div class="alert-icon">
@@ -1117,7 +1156,7 @@ CPU Path:
     <p>C-Kernel-Engine uses <code>ck_features.h</code> for feature detection. We target by SIMD capability, not CPU model:</p>
 </div>
 
-<div class="grid grid-2">
+<div class="grid grid-3">
     <div class="card">
         <h3 style="margin-top: 0;">Instruction Set Priority</h3>
         <ul>
@@ -1139,7 +1178,6 @@ CPU Path:
             <li><strong>Multiple sockets</strong> - NUMA-aware memory access</li>
         </ul>
     </div>
-</div>
     <div class="card">
         <h3 style="margin-top: 0;">Memory Requirements</h3>
         <ul>
@@ -1563,6 +1601,75 @@ Net difference: 4-5x less power = ~$1,000+/year savings
     </div>
 </div>
 
+<h3>The Hidden Cost: Power Delivery and Signal Integrity</h3>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Nobody Talks About This</strong><br>
+        GPU marketing quotes peak TFLOPS. What they don't mention is the electrical engineering nightmare required to actually deliver those peaks.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The GPU Power Profile: Burst-Idle-Burst</h3>
+    <p>GPUs don't draw steady power. They spike to peak compute (hundreds of watts), then drop when waiting for data transfer, then spike again. This <strong>burst-idle-burst</strong> pattern creates massive di/dt (rate of current change) that cascades into real electrical engineering problems:</p>
+    <ul>
+        <li><strong>di/dt spikes</strong> &mdash; Rapid current transitions from idle to peak compute stress every component in the power delivery path</li>
+        <li><strong>Signal reflections</strong> &mdash; High-speed switching creates signal integrity issues on PCB traces and interconnects</li>
+        <li><strong>Crosstalk</strong> &mdash; Adjacent high-speed signal lines interfere with each other at GPU clock speeds</li>
+        <li><strong>Ground bounce</strong> &mdash; Simultaneous switching of thousands of CUDA cores causes ground plane voltage fluctuation</li>
+        <li><strong>Power supply design</strong> &mdash; PSUs must handle massive transient spikes, requiring expensive voltage regulation and capacitor banks</li>
+    </ul>
+    <p><strong>Result:</strong> Data centers running GPU clusters need specialized power infrastructure &mdash; substations, high-capacity PDUs, and overprovisioned power delivery &mdash; to handle these peak bursts that occur for fractions of a second.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU: Spiky, Unpredictable Power</h3>
+        <pre>
+Power draw over time:
+  ████████░░░░████████░░████████░░░░
+  700W     150W  700W  150W 700W  150W
+  compute  wait  compute wait compute wait
+
+Peak-to-idle ratio: ~5:1
+di/dt: Extreme
+Infrastructure: Substation-grade power delivery
+        </pre>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU: Steady, Predictable Power</h3>
+        <pre>
+Power draw over time:
+  ████████████████████████████████
+  200-400W consistent draw
+
+Peak-to-idle ratio: ~2:1
+di/dt: Minimal (DVFS transitions are gradual)
+Infrastructure: Standard data center power
+        </pre>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Theory of Constraints Applied to Power</h3>
+    <p>The fastest moving part and the slowest moving part of a system should be as close together as possible. GPUs violate this principle at the electrical level:</p>
+    <ul>
+        <li><strong>Fastest part:</strong> GPU peak compute at 700W+ burst</li>
+        <li><strong>Slowest part:</strong> Data transfer at 150W idle</li>
+        <li><strong>Gap:</strong> 5:1 ratio &mdash; massive mismatch that the power infrastructure must absorb</li>
+    </ul>
+    <p>CPUs don't have GPU-level peak FLOPS, but they also <strong>don't need substation-grade power infrastructure</strong> to handle those peaks. The power draw is consistent and predictable. Standard, well-designed data center power delivery handles it without complication. No specialized substations. No overprovisioned PDUs. No capacitor banks for transient spikes.</p>
+    <p><strong>The peak FLOPS that GPUs advertise are real &mdash; but the cost of actually delivering that power is hidden from every benchmark and every marketing slide.</strong></p>
+</div>
+
+<div class="img-container svg-viewer" data-title="Power Delivery Reality: GPU Spikes vs CPU Steady State">
+    <img src="assets/power-delivery-infographic.svg" alt="Power Delivery Reality - GPU burst-idle-burst spikes vs CPU steady state power draw, showing signal integrity problems, Theory of Constraints applied to power, and hidden infrastructure costs">
+</div>
+
 <h2>Principle 2: The Ethernet Equalizer</h2>
 
 <div class="alert alert-info">
@@ -1824,6 +1931,278 @@ rdma link show
         <li><strong>Plus:</strong> Double the code complexity, double the cost</li>
     </ul>
     <p><strong>Conclusion:</strong> If the GPU is limited by the CPU anyway, just use CPUs! Simpler, faster, cheaper.</p>
+</div>
+
+<h2>The GPU Workaround Stack: "Innovations" That Are Actually Patches</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The Uncomfortable Truth</strong><br>
+        The entire field has been optimizing around a hardware constraint and mistaking the workarounds for progress. Every major "breakthrough" in LLM architecture is actually compensating for GPU memory limitations.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Every "Innovation" Maps to a GPU Constraint</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>"Innovation"</th><th>What It Actually Does</th><th>The GPU Constraint It Patches</th><th>Needed on CPU with 2-4TB RAM?</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>GQA (Grouped Query Attention)</strong></td>
+                    <td>Shares KV heads across query heads</td>
+                    <td>KV cache blows up GPU VRAM</td>
+                    <td style="color: #4ade80;">No &mdash; KV cache fits</td>
+                </tr>
+                <tr>
+                    <td><strong>MoE (Mixture of Experts)</strong></td>
+                    <td>Activates sparse subset of parameters</td>
+                    <td>Dense model won't fit on one GPU</td>
+                    <td style="color: #4ade80;">No &mdash; dense model fits</td>
+                </tr>
+                <tr>
+                    <td><strong>KV Caching</strong></td>
+                    <td>Stores past attention keys/values &mdash; literally a key-value database in every layer</td>
+                    <td>GPU VRAM limits cache size, forces eviction strategies</td>
+                    <td style="color: #4ade80;">CPU home turf &mdash; this is literally how databases work. CPUs have been running key-value stores for decades.</td>
+                </tr>
+                <tr>
+                    <td><strong>Gradient Checkpointing</strong></td>
+                    <td>Recomputes activations instead of storing them</td>
+                    <td>Training activations don't fit in GPU VRAM</td>
+                    <td style="color: #4ade80;">No &mdash; store everything</td>
+                </tr>
+                <tr>
+                    <td><strong>Tensor Parallelism</strong></td>
+                    <td>Shards weight matrices across GPUs</td>
+                    <td>Single GPU can't hold the full matrix</td>
+                    <td style="color: #4ade80;">No &mdash; full matrix fits in RAM</td>
+                </tr>
+                <tr>
+                    <td><strong>Pipeline Parallelism</strong></td>
+                    <td>Distributes layers across GPUs</td>
+                    <td>All layers don't fit on one GPU</td>
+                    <td style="color: #4ade80;">No &mdash; all layers fit</td>
+                </tr>
+                <tr>
+                    <td><strong>Flash Attention</strong></td>
+                    <td>Online softmax with tiled computation &mdash; streams through attention in blocks</td>
+                    <td>Full attention matrix doesn't fit in GPU SRAM/VRAM</td>
+                    <td style="color: #4ade80;">Brilliant for CPU &mdash; tiling maps naturally to CPU cache hierarchies. CPUs process data in cache-line-sized tiles inherently.</td>
+                </tr>
+                <tr>
+                    <td><strong>Quantization Research</strong></td>
+                    <td>Compresses model weights (Q4, Q8, etc.)</td>
+                    <td>Model doesn't fit in GPU VRAM at full precision</td>
+                    <td style="color: #fbbf24;">Optional &mdash; use for bandwidth, not capacity</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The Punchline</strong><br>
+        On a CPU with 2-4TB RAM, <strong>half of these become unnecessary, and the other half become simpler.</strong> The entire research direction has been shaped by GPU limitations, and people have confused "optimizations forced by GPU memory walls" with "fundamental advances in model architecture."
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="GPU Workaround Convergence: All Roads Lead Back to CPU">
+    <img src="assets/gpu-workaround-convergence.svg" alt="GPU Workaround Convergence - Every GPU innovation (GQA, MoE, KV Caching, Flash Attention, Gradient Checkpointing, Tensor/Pipeline Parallelism, Quantization) converges toward capabilities CPUs have had natively for decades">
+</div>
+
+<h3>The Sequential Reality: GPUs Were Never Designed for This</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Transformers Are Sequential. Period.</h3>
+    <p>A transformer forward pass is:</p>
+    <pre>Layer 1 &rarr; Layer 2 &rarr; Layer 3 &rarr; ... &rarr; Layer 80</pre>
+    <p>You <strong>cannot</strong> compute layer 10 without the output of layer 9. That is the <em>definition</em> of sequential dependency. There is no debate here &mdash; it's mathematical fact.</p>
+    <p>What people mean when they say "LLMs are parallel" is that <em>within</em> a single layer, the matrix multiplication can be parallelized across rows and columns. But that's not the model being parallel &mdash; that's a single operation within a sequential pipeline being decomposable. Every CPU has been decomposing matmuls across SIMD lanes and cores for decades.</p>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">What GPUs Were Designed For</h3>
+        <p><strong>Independent pixel computation.</strong></p>
+        <p>Millions of pixels with <em>zero</em> data dependency on each other. Pixel (0,0) doesn't need the result of pixel (1920,1080) to compute its color. That IS embarrassingly parallel.</p>
+        <pre>
+pixel(0,0)   &rarr; compute color &rarr; done
+pixel(0,1)   &rarr; compute color &rarr; done
+pixel(1,0)   &rarr; compute color &rarr; done
+...
+pixel(1920,1080) &rarr; compute color &rarr; done
+(all independent, all simultaneous)</pre>
+    </div>
+    <div class="card" style="border-left: 4px solid #fbbf24;">
+        <h3 style="margin-top: 0;">What LLM Inference Actually Is</h3>
+        <p><strong>Sequential token generation on a sequential layer stack.</strong></p>
+        <p>Token N+1 depends on the attention computation over ALL previous tokens. The autoregressive decode loop is the opposite of pixel independence.</p>
+        <pre>
+token 1 &rarr; 80 layers &rarr; token 2
+token 2 &rarr; 80 layers &rarr; token 3
+token 3 &rarr; 80 layers &rarr; token 4
+...
+(each waits for the previous)</pre>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Vocabulary of Mismatch</h3>
+    <p>The fact that the industry bolted LLM training onto hardware designed for independent pixel shading and then invented an entire vocabulary to work around the mismatch should tell you something is wrong with the foundational assumption:</p>
+    <ul>
+        <li><strong>Tensor parallelism</strong> &mdash; because one GPU can't hold the weights</li>
+        <li><strong>Pipeline parallelism</strong> &mdash; because one GPU can't hold the layers</li>
+        <li><strong>Model parallelism</strong> &mdash; because the model doesn't fit</li>
+        <li><strong>Gradient checkpointing</strong> &mdash; because activations don't fit</li>
+        <li><strong>Flash Attention</strong> &mdash; because attention intermediates don't fit</li>
+        <li><strong>Activation recomputation</strong> &mdash; because you ran out of memory</li>
+    </ul>
+    <p><strong>Every one of these is a workaround for the same problem:</strong> you're running a sequential, memory-hungry workload on hardware designed for embarrassingly parallel, compute-bound pixel shading.</p>
+</div>
+
+<h3>MoE Is Just Branch Prediction</h3>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">CPUs Have Done This Natively Since the 1960s</h3>
+    <p>Mixture of Experts says: "route this token to expert 3 instead of expert 7." That's a conditional branch. What MoE does in software with learned routing networks, CPUs do in hardware natively.</p>
+    <div class="grid grid-2">
+        <div>
+            <h4>MoE (Software Routing)</h4>
+            <pre>
+// Learned gating function
+scores = gate(token)
+expert = top_k(scores, k=2)
+output = experts[expert](token)
+            </pre>
+            <p style="color: #888;">Requires routing network, load balancing losses, expert dropout, capacity factors...</p>
+        </div>
+        <div>
+            <h4>CPU (Hardware Routing)</h4>
+            <pre>
+// Branch prediction + speculative execution
+if (condition) {
+    path_a(data);  // predicted path
+} else {
+    path_b(data);  // alternate path
+}
+            </pre>
+            <p style="color: #888;">Built into the instruction pipeline. No learned gating. No routing overhead. Just hardware.</p>
+        </div>
+    </div>
+    <p><strong>AVX-512 computes 16 FP32 multiply-accumulates per cycle per core.</strong> Across 128 cores that's 2048 parallel operations. That's not qualitatively different from what a GPU does &mdash; it's quantitatively different, and less so than people think when you account for GPU memory stalls.</p>
+</div>
+
+<h3>Training: Batch Size Is Not What You Think</h3>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>"But GPUs need large batches for efficiency!"</strong><br>
+        This is true &mdash; and that's a GPU problem, not a training requirement. Training does not <em>need</em> batch size greater than 1. There are many ways to simulate larger effective batch sizes without holding multiple sequences in memory simultaneously.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU: The Batch Balancing Act</h3>
+        <p>On a GPU, you must balance three competing constraints:</p>
+        <ul>
+            <li><strong>Model size</strong> &mdash; weights consume VRAM</li>
+            <li><strong>Context length</strong> &mdash; KV cache consumes VRAM</li>
+            <li><strong>Batch size</strong> &mdash; activations consume VRAM</li>
+        </ul>
+        <p>Increase any one, and you must decrease the others. Want longer context? Reduce batch size. Want larger batch? Reduce context. Want a bigger model? Reduce both.</p>
+        <pre>
+GPU VRAM budget (80GB):
+  Model weights:    40GB (fixed)
+  KV cache:         20GB (varies with context)
+  Activations:      20GB (varies with batch)
+
+  Longer context = less batch
+  Larger batch   = less context
+  ALWAYS a tradeoff.
+        </pre>
+    </div>
+    <div class="card" style="border-left: 4px solid #47b475;">
+        <h3 style="margin-top: 0;">CPU: No Tradeoff Required</h3>
+        <p>With 2-4TB of RAM, all three fit simultaneously:</p>
+        <ul>
+            <li><strong>Model size</strong> &mdash; even 405B fits (810GB in FP16)</li>
+            <li><strong>Context length</strong> &mdash; variable, up to 1M+ tokens</li>
+            <li><strong>Batch size</strong> &mdash; whatever you need</li>
+        </ul>
+        <p>You can have <strong>variable context length AND batch greater than one</strong> at the same time. No balancing act required.</p>
+        <pre>
+CPU RAM budget (4TB):
+  Model weights:    810GB (405B FP16)
+  KV cache:         500GB (long context)
+  Activations:      200GB (large batch)
+  Remaining:        2,538GB (room to spare)
+
+  Variable context + variable batch
+  NO tradeoffs.
+        </pre>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">You Don't Need Large Batches &mdash; You Can Simulate Them</h3>
+    <p>Training with batch=1 works. The gradient is noisier, but there are well-established techniques to get the benefits of large batches without the memory cost:</p>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Technique</th><th>How It Works</th><th>GPU Benefit</th><th>CPU Benefit</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Gradient Accumulation</strong></td>
+                    <td>Accumulate gradients over N forward passes, update once</td>
+                    <td>Simulates batch=N with batch=1 memory</td>
+                    <td>Same, but can also do actual batch=N</td>
+                </tr>
+                <tr>
+                    <td><strong>Micro-batching</strong></td>
+                    <td>Process small sub-batches, aggregate gradients</td>
+                    <td>Fits in VRAM per micro-batch</td>
+                    <td>Can use larger micro-batches</td>
+                </tr>
+                <tr>
+                    <td><strong>Online Learning</strong></td>
+                    <td>Update after every single example (batch=1)</td>
+                    <td>Works but GPU underutilized</td>
+                    <td>Natural fit for CPU sequential processing</td>
+                </tr>
+                <tr>
+                    <td><strong>Data Parallelism</strong></td>
+                    <td>Each node processes different batch, average gradients</td>
+                    <td>Requires NVLink/IB for gradient sync</td>
+                    <td>RDMA gradient sync, same principle</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>The C-Kernel-Engine is actively being developed to prove this.</strong><br>
+        Our kernel architecture supports variable context lengths and flexible batch sizes natively. The quantized GEMV/GEMM kernels (Q4_K, Q5_0, Q5_1, Q5_K, Q6_K, Q8_0) are designed from the ground up for CPU-native inference and training &mdash; not as ports of GPU code. We're building the evidence that CPU-only training and inference at scale isn't theoretical &mdash; it's practical, and the kernel-level work is happening now.
+    </div>
 </div>
 
 <h2>Why CPU-Only is the Future</h2>
@@ -2297,6 +2676,17 @@ CPU Kubernetes Deployment:
         </table>
     </div>
     <p style="color: #888; font-size: 0.9em;">This is memory bandwidth consumed per generated token. Reducing this is key for decode performance.</p>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Real-world profile (Qwen3-0.6B Q8_0, AVX-only CPU):</strong> decode time is dominated by memory-moving kernels --
+        ~48% MLP (gate/up + down), ~21% logits, ~29% attention projections (q/k/v + out), and ~2% attention core. This matches the
+        bandwidth thesis: most time is spent streaming weights/activations, not math.
+    </div>
 </div>
 
 <h3>Context Length: The Memory Multiplier</h3>
@@ -3028,7 +3418,7 @@ That's it. For any model size.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
             </div>
         </div>
     </footer>

@@ -154,7 +154,7 @@ Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Output projection from head-major attention (NO LAYOUT CONVERSION) </p>
-<h1><a class="anchor" id="autotoc_md35"></a>
+<h1><a class="anchor" id="autotoc_md41"></a>
 CK-ENGINE KERNEL RULES:</h1>
 <ol type="1">
 <li>NO malloc/free - memory via bump allocator, pointers passed in</li>
@@ -164,7 +164,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <li>Pure computation - deterministic, no side effects</li>
 </ol>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
-<h1><a class="anchor" id="autotoc_md36"></a>
+<h1><a class="anchor" id="autotoc_md42"></a>
 PROBLEM THIS SOLVES:</h1>
 <p>The standard mega_fused_attention_prefill has a bottleneck: attn_out [num_heads, tokens, head_dim] (head-major) → <a class="el" href="mega__fused__attention__prefill_8c.html#a3c0ac15e87fbf875bd91aad8288b7e7c">flatten_head_major()</a> - 448 memcpy calls for 32 tokens × 14 heads! → token-major buffer → GEMM output projection</p>
 <p>This kernel eliminates the flatten by reading head-major data directly with strided access. The output projection computes:</p>
@@ -369,13 +369,13 @@ PROBLEM THIS SOLVES:</h1>
 <div class="line"><a name="l00405"></a><span class="lineno">  405</span>&#160;        }</div>
 <div class="line"><a name="l00406"></a><span class="lineno">  406</span>&#160;    }</div>
 <div class="line"><a name="l00407"></a><span class="lineno">  407</span>&#160;}</div>
-<div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00325">ckernel_quant.h:325</a></div></div>
+<div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00400">ckernel_quant.h:400</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_af13e8b7fd92d0f48c1cfca7161552d4a"><div class="ttname"><a href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a></div><div class="ttdeci">#define QK8_0</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00101">ckernel_quant.h:101</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html"><div class="ttname"><a href="structblock__q8__0.html">block_q8_0</a></div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00103">ckernel_quant.h:103</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html_a0bc77a0a0101bc89b05749157bf1514e"><div class="ttname"><a href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">block_q8_0::d</a></div><div class="ttdeci">ck_half d</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00104">ckernel_quant.h:104</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html_ac6f2ca6c9108456b6630b7f1bf874488"><div class="ttname"><a href="structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488">block_q8_0::qs</a></div><div class="ttdeci">int8_t qs[32]</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00105">ckernel_quant.h:105</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00104">block_q8_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00101">QK8_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00105">block_q8_0::qs</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00400">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00104">block_q8_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00101">QK8_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00105">block_q8_0::qs</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="mega__fused__attention__prefill_8c_source.html#l00160">mega_fused_attention_prefill()</a>.</p>
 
@@ -577,7 +577,7 @@ PROBLEM THIS SOLVES:</h1>
 <div class="ttc" id="astructblock__q5__0_html_a823c98aafc2ecd999f30689d289fb963"><div class="ttname"><a href="structblock__q5__0.html#a823c98aafc2ecd999f30689d289fb963">block_q5_0::qh</a></div><div class="ttdeci">uint8_t qh[4]</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00071">ckernel_quant.h:71</a></div></div>
 <div class="ttc" id="astructblock__q5__0_html_aeb5285bb56ae2ed55bfb99a2bcb53282"><div class="ttname"><a href="structblock__q5__0.html#aeb5285bb56ae2ed55bfb99a2bcb53282">block_q5_0::qs</a></div><div class="ttdeci">uint8_t qs[32/2]</div><div class="ttdef"><b>Definition:</b> <a href="ckernel__quant_8h_source.html#l00072">ckernel_quant.h:72</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00325">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00070">block_q5_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00071">block_q5_0::qh</a>, <a class="el" href="ckernel__quant_8h_source.html#l00067">QK5_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00072">block_q5_0::qs</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00400">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00070">block_q5_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00071">block_q5_0::qh</a>, <a class="el" href="ckernel__quant_8h_source.html#l00067">QK5_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00072">block_q5_0::qs</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="gemm__head__major__output_8c_source.html#l00328">ck_gemm_nt_head_major_q5_0()</a>.</p>
 

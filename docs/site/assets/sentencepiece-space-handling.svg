@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">
+  <defs>
+    <linearGradient id="spmSpaceGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#69db7c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#40c057;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gptSpaceGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#74c0fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4dabf7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="600" fill="#0d1b2a"/>
+
+  <!-- Title -->
+  <text x="600" y="40" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#fff" text-anchor="middle">Space Encoding: SentencePiece ▁ vs GPT-2 Ġ</text>
+  <text x="600" y="65" font-family="Arial, sans-serif" font-size="14" fill="#888" text-anchor="middle">Two incompatible space encoding strategies that C-Kernel auto-detects from vocabulary</text>
+
+  <!-- Left: SentencePiece -->
+  <g transform="translate(30, 95)">
+    <rect width="560" height="470" rx="12" fill="url(#spmSpaceGrad)" opacity="0.08" stroke="#69db7c" stroke-width="2"/>
+
+    <rect x="10" y="10" width="540" height="40" rx="8" fill="#69db7c" opacity="0.2"/>
+    <text x="280" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#69db7c" text-anchor="middle">SentencePiece: ▁ (U+2581)</text>
+
+    <!-- Encoding -->
+    <text x="20" y="80" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#69db7c">UTF-8 Bytes: 0xE2 0x96 0x81 (3 bytes)</text>
+
+    <!-- Visual: lower-one-eighth block -->
+    <rect x="20" y="95" width="520" height="90" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="115" font-family="monospace" font-size="12" fill="#aaa">Input:     "Hello world"</text>
+    <text x="30" y="135" font-family="monospace" font-size="12" fill="#69db7c">Encoded:   "▁Hello▁world"</text>
+    <text x="30" y="158" font-family="monospace" font-size="11" fill="#666">             ↑              ↑</text>
+    <text x="30" y="175" font-family="monospace" font-size="11" fill="#666">        start prefix    space replaced</text>
+
+    <!-- Rules -->
+    <text x="20" y="215" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#69db7c">Rules:</text>
+    <rect x="20" y="225" width="520" height="100" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="248" font-family="Arial, sans-serif" font-size="12" fill="#fff">1. Add ▁ at the BEGINNING of the text</text>
+    <text x="30" y="270" font-family="Arial, sans-serif" font-size="12" fill="#fff">2. Replace ALL spaces with ▁</text>
+    <text x="30" y="292" font-family="Arial, sans-serif" font-size="12" fill="#69db7c">3. Reversible: just replace ▁ back to space, trim start</text>
+    <text x="30" y="312" font-family="Arial, sans-serif" font-size="10" fill="#666">Tokens in vocab: "▁Hello" "▁the" "▁world" (▁ is part of the token)</text>
+
+    <!-- Decode example -->
+    <text x="20" y="350" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#69db7c">Decoding (Lossless):</text>
+    <rect x="20" y="360" width="520" height="90" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="383" font-family="monospace" font-size="12" fill="#fff">Tokens:  ["▁Hello", "▁world"]</text>
+    <text x="30" y="405" font-family="monospace" font-size="12" fill="#fff">Join:    "▁Hello▁world"</text>
+    <text x="30" y="427" font-family="monospace" font-size="12" fill="#69db7c">Decode:  "Hello world"  (▁→space, trim start)</text>
+    <text x="30" y="443" font-family="monospace" font-size="10" fill="#666">No information lost — fully reversible!</text>
+  </g>
+
+  <!-- Right: GPT-2 -->
+  <g transform="translate(610, 95)">
+    <rect width="560" height="470" rx="12" fill="url(#gptSpaceGrad)" opacity="0.08" stroke="#74c0fc" stroke-width="2"/>
+
+    <rect x="10" y="10" width="540" height="40" rx="8" fill="#74c0fc" opacity="0.2"/>
+    <text x="280" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#74c0fc" text-anchor="middle">GPT-2 / BPE: Ġ (U+0120)</text>
+
+    <!-- Encoding -->
+    <text x="20" y="80" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#74c0fc">UTF-8 Bytes: 0xC4 0xA0 (2 bytes)</text>
+
+    <!-- Visual -->
+    <rect x="20" y="95" width="520" height="90" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="115" font-family="monospace" font-size="12" fill="#aaa">Input:     "Hello world"</text>
+    <text x="30" y="135" font-family="monospace" font-size="12" fill="#74c0fc">Encoded:   "Hello Ġworld"</text>
+    <text x="30" y="158" font-family="monospace" font-size="11" fill="#666">                  ↑</text>
+    <text x="30" y="175" font-family="monospace" font-size="11" fill="#666">           space becomes Ġ prefix</text>
+
+    <!-- Rules -->
+    <text x="20" y="215" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#74c0fc">Rules:</text>
+    <rect x="20" y="225" width="520" height="100" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="248" font-family="Arial, sans-serif" font-size="12" fill="#fff">1. NO prefix at text start</text>
+    <text x="30" y="270" font-family="Arial, sans-serif" font-size="12" fill="#fff">2. Replace spaces with Ġ (byte-level encoding)</text>
+    <text x="30" y="292" font-family="Arial, sans-serif" font-size="12" fill="#74c0fc">3. ALL bytes mapped to visible characters</text>
+    <text x="30" y="312" font-family="Arial, sans-serif" font-size="10" fill="#666">Tokens in vocab: "Hello" "Ġworld" "Ġthe" (Ġ is part of the token)</text>
+
+    <!-- Byte mapping -->
+    <text x="20" y="350" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#74c0fc">Byte-Level Character Map:</text>
+    <rect x="20" y="360" width="520" height="90" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="30" y="383" font-family="monospace" font-size="11" fill="#fff">0x20 (space)   → Ġ  (U+0120)</text>
+    <text x="30" y="403" font-family="monospace" font-size="11" fill="#fff">0x0A (newline) → Ċ  (U+010A)</text>
+    <text x="30" y="423" font-family="monospace" font-size="11" fill="#fff">0x09 (tab)     → ĉ  (U+0109)</text>
+    <text x="30" y="443" font-family="monospace" font-size="10" fill="#666">Control chars (0x00-0x20) → U+0100 + byte value</text>
+  </g>
+
+  <!-- Auto-detection callout -->
+  <g transform="translate(350, 575)">
+    <rect width="500" height="22" rx="4" fill="#ffb400" opacity="0.15" stroke="#ffb400" stroke-width="1"/>
+    <text x="250" y="16" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffb400" text-anchor="middle">CK auto-detects: scans first 10K vocab entries, counts ▁ vs Ġ occurrences</text>
+  </g>
+</svg>

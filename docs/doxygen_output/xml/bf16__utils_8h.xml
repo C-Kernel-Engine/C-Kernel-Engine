@@ -7,6 +7,7 @@
     <includedby refid="add__kernels__bf16_8c" local="yes">add_kernels_bf16.c</includedby>
     <includedby refid="attention__kernels_8c" local="yes">attention_kernels.c</includedby>
     <includedby refid="embedding__kernels__bf16_8c" local="yes">embedding_kernels_bf16.c</includedby>
+    <includedby refid="gelu__kernels_8c" local="yes">gelu_kernels.c</includedby>
     <includedby refid="gelu__kernels__bf16_8c" local="yes">gelu_kernels_bf16.c</includedby>
     <includedby refid="gemm__kernels__bf16_8c" local="yes">gemm_kernels_bf16.c</includedby>
     <includedby refid="layernorm__kernels__bf16_8c" local="yes">layernorm_kernels_bf16.c</includedby>
@@ -37,19 +38,19 @@
       </node>
     </incdepgraph>
     <invincdepgraph>
-      <node id="13">
+      <node id="14">
         <label>rope_kernels_bf16.c</label>
         <link refid="rope__kernels__bf16_8c"/>
       </node>
-      <node id="11">
+      <node id="12">
         <label>relu_kernels_bf16.c</label>
         <link refid="relu__kernels__bf16_8c"/>
       </node>
-      <node id="14">
+      <node id="15">
         <label>sigmoid_kernels_bf16.c</label>
         <link refid="sigmoid__kernels__bf16_8c"/>
       </node>
-      <node id="8">
+      <node id="9">
         <label>loss_kernels_bf16.c</label>
         <link refid="loss__kernels__bf16_8c"/>
       </node>
@@ -88,20 +89,26 @@
         </childnode>
         <childnode refid="17" relation="include">
         </childnode>
+        <childnode refid="18" relation="include">
+        </childnode>
       </node>
       <node id="3">
         <label>attention_kernels.c</label>
         <link refid="attention__kernels_8c"/>
       </node>
-      <node id="6">
+      <node id="7">
         <label>gemm_kernels_bf16.c</label>
         <link refid="gemm__kernels__bf16_8c"/>
       </node>
-      <node id="16">
+      <node id="17">
         <label>swiglu_kernels_bf16.c</label>
         <link refid="swiglu__kernels__bf16_8c"/>
       </node>
-      <node id="7">
+      <node id="5">
+        <label>gelu_kernels.c</label>
+        <link refid="gelu__kernels_8c"/>
+      </node>
+      <node id="8">
         <label>layernorm_kernels_bf16.c</label>
         <link refid="layernorm__kernels__bf16_8c"/>
       </node>
@@ -113,27 +120,27 @@
         <label>add_kernels_bf16.c</label>
         <link refid="add__kernels__bf16_8c"/>
       </node>
-      <node id="9">
+      <node id="10">
         <label>mlp_kernels_bf16.c</label>
         <link refid="mlp__kernels__bf16_8c"/>
       </node>
-      <node id="15">
+      <node id="16">
         <label>softmax_kernels_bf16.c</label>
         <link refid="softmax__kernels__bf16_8c"/>
       </node>
-      <node id="10">
+      <node id="11">
         <label>optimizer_kernels_bf16.c</label>
         <link refid="optimizer__kernels__bf16_8c"/>
       </node>
-      <node id="5">
+      <node id="6">
         <label>gelu_kernels_bf16.c</label>
         <link refid="gelu__kernels__bf16_8c"/>
       </node>
-      <node id="12">
+      <node id="13">
         <label>rmsnorm_kernels_bf16.c</label>
         <link refid="rmsnorm__kernels__bf16_8c"/>
       </node>
-      <node id="17">
+      <node id="18">
         <label>vision_kernels_bf16.c</label>
         <link refid="vision__kernels__bf16_8c"/>
       </node>
@@ -167,6 +174,7 @@
         <referencedby refid="ckernel__engine_8h_1a28366760be3525ac9d44e724da8c20a4" compoundref="softmax__kernels__bf16_8c" startline="53" endline="72">backward_causal_softmax_head_major_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1aedbd95c45598bf4ab2123914a183fbe7" compoundref="softmax__kernels__bf16_8c" startline="31" endline="47">causal_softmax_head_major_bf16</referencedby>
         <referencedby refid="attention__kernels_8c_1af50caaef2599654770e914a92ff21667" compoundref="attention__kernels_8c" startline="28" endline="32">convert_bf16_tensor_to_buf</referencedby>
+        <referencedby refid="ckernel__engine_8h_1ac2146f8009ce79891bd0b7d54e174992" compoundref="gelu__kernels_8c" startline="813" endline="830">geglu_forward_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a79b99577c3b4e080aa37e41ffa43c46f" compoundref="gelu__kernels__bf16_8c" startline="46" endline="64">gelu_backward_exact_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a6dc372b7ca52037556aaaa6c8aadf642" compoundref="gelu__kernels__bf16_8c" startline="69" endline="85">gelu_backward_fast_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a9f5d586b285fab4efe8b7223748f9d00" compoundref="gelu__kernels__bf16_8c" startline="31" endline="40">gelu_fast_inplace_bf16</referencedby>
@@ -250,6 +258,7 @@
         <references refid="bf16__utils_8h_1a174b16a92b3a5972230d7519fc0c5aa3" compoundref="bf16__utils_8h" startline="90" endline="103">float_to_bf16</references>
         <referencedby refid="ckernel__engine_8h_1a28366760be3525ac9d44e724da8c20a4" compoundref="softmax__kernels__bf16_8c" startline="53" endline="72">backward_causal_softmax_head_major_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1aedbd95c45598bf4ab2123914a183fbe7" compoundref="softmax__kernels__bf16_8c" startline="31" endline="47">causal_softmax_head_major_bf16</referencedby>
+        <referencedby refid="ckernel__engine_8h_1ac2146f8009ce79891bd0b7d54e174992" compoundref="gelu__kernels_8c" startline="813" endline="830">geglu_forward_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a79b99577c3b4e080aa37e41ffa43c46f" compoundref="gelu__kernels__bf16_8c" startline="46" endline="64">gelu_backward_exact_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a6dc372b7ca52037556aaaa6c8aadf642" compoundref="gelu__kernels__bf16_8c" startline="69" endline="85">gelu_backward_fast_bf16</referencedby>
         <referencedby refid="ckernel__engine_8h_1a9f5d586b285fab4efe8b7223748f9d00" compoundref="gelu__kernels__bf16_8c" startline="31" endline="40">gelu_fast_inplace_bf16</referencedby>

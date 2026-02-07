@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="920" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #ffb400; }
+      .subtitle { font-size: 14px; fill: #707070; }
+      .gpu-label { font-size: 13px; font-weight: 700; fill: #ff6b6b; }
+      .gpu-desc { font-size: 11px; fill: #c08080; }
+      .cpu-label { font-size: 13px; font-weight: 700; fill: #47b475; }
+      .cpu-desc { font-size: 11px; fill: #80c0a0; }
+      .arrow-label { font-size: 10px; fill: #888; font-style: italic; }
+      .center-title { font-size: 20px; font-weight: 700; fill: #47b475; }
+      .center-sub { font-size: 12px; fill: #80c0a0; }
+      .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+    </style>
+
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1b2a"/>
+      <stop offset="100%" style="stop-color:#0a1420"/>
+    </linearGradient>
+
+    <linearGradient id="gpuCardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1020"/>
+      <stop offset="100%" style="stop-color:#140c18"/>
+    </linearGradient>
+
+    <linearGradient id="cpuCenterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a2018"/>
+      <stop offset="100%" style="stop-color:#071510"/>
+    </linearGradient>
+
+    <radialGradient id="convergenceGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#47b475;stop-opacity:0.15"/>
+      <stop offset="70%" style="stop-color:#47b475;stop-opacity:0.03"/>
+      <stop offset="100%" style="stop-color:#47b475;stop-opacity:0"/>
+    </radialGradient>
+
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+
+    <filter id="glowGreen">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feFlood flood-color="#47b475" flood-opacity="0.2" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475" opacity="0.7"/>
+    </marker>
+
+    <marker id="arrowFade" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555" opacity="0.5"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="920" fill="url(#bgGrad)" rx="12"/>
+
+  <!-- Title -->
+  <text x="600" y="42" class="title" text-anchor="middle">Every GPU "Innovation" Converges Back to What CPUs Already Do</text>
+  <text x="600" y="65" class="subtitle" text-anchor="middle">The workarounds are rediscovering CPU-native capabilities</text>
+
+  <!-- Central convergence glow -->
+  <ellipse cx="600" cy="460" rx="280" ry="280" fill="url(#convergenceGlow)"/>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- CENTER: CPU Native Hub -->
+  <!-- ════════════════════════════════════ -->
+  <rect x="440" y="385" width="320" height="150" rx="16" fill="url(#cpuCenterGrad)" stroke="#47b475" stroke-width="2.5" filter="url(#glowGreen)"/>
+  <text x="600" y="418" class="center-title" text-anchor="middle">CPUs Do This Natively</text>
+  <line x1="480" y1="428" x2="720" y2="428" stroke="#47b475" stroke-width="0.5" opacity="0.4"/>
+  <text x="600" y="450" class="center-sub" text-anchor="middle">Key-value databases &#x2022; Cache hierarchies</text>
+  <text x="600" y="468" class="center-sub" text-anchor="middle">Branch prediction &#x2022; Tiled computation</text>
+  <text x="600" y="486" class="center-sub" text-anchor="middle">Terabytes of RAM &#x2022; Sequential pipelines</text>
+  <text x="600" y="504" class="center-sub" text-anchor="middle">DVFS power scaling &#x2022; SIMD parallelism</text>
+  <text x="600" y="525" font-size="11" fill="#47b475" font-weight="700" text-anchor="middle" class="mono">Since the 1960s.</text>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- GPU WORKAROUNDS (8 cards around center) -->
+  <!-- ════════════════════════════════════ -->
+
+  <!-- 1. GQA - Top Left -->
+  <g transform="translate(30, 88)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">GQA (Grouped Query Attention)</text>
+    <text x="15" y="46" class="gpu-desc">Shares KV heads to reduce cache size</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: KV cache exceeds VRAM</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: KV cache just fits in RAM</text>
+  </g>
+  <!-- Arrow from GQA to center -->
+  <line x1="280" y1="150" x2="455" y2="400" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 2. MoE - Top Center-Left -->
+  <g transform="translate(310, 88)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">MoE (Mixture of Experts)</text>
+    <text x="15" y="46" class="gpu-desc">Sparse routing to fit in GPU VRAM</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: dense model won't fit</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: branch prediction since 1960s</text>
+  </g>
+  <!-- Arrow from MoE to center -->
+  <line x1="435" y1="183" x2="520" y2="385" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 3. KV Caching - Top Center-Right -->
+  <g transform="translate(640, 88)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">KV Caching</text>
+    <text x="15" y="46" class="gpu-desc">Store past keys/values to avoid recompute</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: limited VRAM for cache</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: literally a database per layer</text>
+  </g>
+  <!-- Arrow from KV Cache to center -->
+  <line x1="700" y1="183" x2="650" y2="385" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 4. Flash Attention - Top Right -->
+  <g transform="translate(920, 88)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">Flash Attention</text>
+    <text x="15" y="46" class="gpu-desc">Online softmax, tiled computation</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: attention matrix too large</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: cache-line tiling is native</text>
+  </g>
+  <!-- Arrow from Flash Attention to center -->
+  <line x1="920" y1="150" x2="745" y2="400" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 5. Gradient Checkpointing - Bottom Left -->
+  <g transform="translate(30, 570)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="92" width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">Gradient Checkpointing</text>
+    <text x="15" y="46" class="gpu-desc">Recompute activations to save memory</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: activations exceed VRAM</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: just store everything in RAM</text>
+  </g>
+  <!-- Arrow from Grad Checkpoint to center -->
+  <line x1="280" y1="600" x2="455" y2="520" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 6. Tensor Parallelism - Bottom Center-Left -->
+  <g transform="translate(310, 570)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="92" width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">Tensor Parallelism</text>
+    <text x="15" y="46" class="gpu-desc">Shard matrices across multiple GPUs</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: matrix won't fit on one GPU</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: full matrix fits in RAM</text>
+  </g>
+  <!-- Arrow from Tensor Parallel to center -->
+  <line x1="435" y1="570" x2="520" y2="535" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 7. Pipeline Parallelism - Bottom Center-Right -->
+  <g transform="translate(640, 570)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="92" width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">Pipeline Parallelism</text>
+    <text x="15" y="46" class="gpu-desc">Distribute layers across GPUs</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: all layers won't fit</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: sequential pipeline is native</text>
+  </g>
+  <!-- Arrow from Pipeline Parallel to center -->
+  <line x1="700" y1="570" x2="650" y2="535" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- 8. Quantization - Bottom Right -->
+  <g transform="translate(920, 570)">
+    <rect width="250" height="95" rx="8" fill="url(#gpuCardGrad)" stroke="#ff6b6b" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="92" width="250" height="3" rx="2" fill="#ff6b6b" opacity="0.6"/>
+    <text x="15" y="28" class="gpu-label">Quantization (Q4/Q8)</text>
+    <text x="15" y="46" class="gpu-desc">Compress weights to fit GPU VRAM</text>
+    <text x="15" y="62" class="gpu-desc">GPU constraint: model too large for VRAM</text>
+    <line x1="15" y1="72" x2="235" y2="72" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="15" y="87" class="cpu-label">&#x2192; CPU: optional, for bandwidth not capacity</text>
+  </g>
+  <!-- Arrow from Quantization to center -->
+  <line x1="920" y1="600" x2="745" y2="520" stroke="#47b475" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" marker-end="url(#arrowGreen)"/>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- LEFT SIDE LABEL -->
+  <!-- ════════════════════════════════════ -->
+  <g transform="translate(15, 320)">
+    <text x="0" y="0" font-size="13" fill="#ff6b6b" font-weight="700" transform="rotate(-90, 0, 0)" text-anchor="middle">GPU WORKAROUNDS</text>
+  </g>
+
+  <!-- RIGHT SIDE LABEL -->
+  <g transform="translate(1188, 460)">
+    <text x="0" y="0" font-size="13" fill="#47b475" font-weight="700" transform="rotate(90, 0, 0)" text-anchor="middle">CPU NATIVE</text>
+  </g>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- SIDE ANNOTATIONS - Left (GPU story) -->
+  <!-- ════════════════════════════════════ -->
+  <g transform="translate(30, 240)">
+    <rect width="250" height="70" rx="6" fill="#111a28" stroke="#ff6b6b" stroke-width="0.5" opacity="0.8"/>
+    <text x="125" y="22" font-size="11" fill="#ff6b6b" font-weight="700" text-anchor="middle">The GPU Pattern</text>
+    <text x="125" y="40" font-size="10" fill="#c08080" text-anchor="middle">Hit memory wall &#x2192; Invent workaround</text>
+    <text x="125" y="55" font-size="10" fill="#c08080" text-anchor="middle">&#x2192; Workaround looks like what CPUs do</text>
+  </g>
+
+  <!-- SIDE ANNOTATIONS - Right (CPU story) -->
+  <g transform="translate(920, 240)">
+    <rect width="250" height="70" rx="6" fill="#111a28" stroke="#47b475" stroke-width="0.5" opacity="0.8"/>
+    <text x="125" y="22" font-size="11" fill="#47b475" font-weight="700" text-anchor="middle">The CPU Reality</text>
+    <text x="125" y="40" font-size="10" fill="#80c0a0" text-anchor="middle">No memory wall &#x2192; No workaround needed</text>
+    <text x="125" y="55" font-size="10" fill="#80c0a0" text-anchor="middle">These capabilities are built-in hardware</text>
+  </g>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- BOTTOM PUNCHLINE -->
+  <!-- ════════════════════════════════════ -->
+  <rect x="30" y="700" width="1140" height="95" rx="10" fill="#1a1510" stroke="#ffb400" stroke-width="1.5"/>
+  <g transform="translate(60, 728)">
+    <rect x="0" y="0" width="8" height="50" rx="2" fill="#ffb400"/>
+    <text x="22" y="16" fill="#ffb400" font-size="16" font-weight="700">All roads lead back to CPU.</text>
+    <text x="22" y="36" fill="#a0b0c0" font-size="13">Every GPU workaround reinvents something CPUs already do in hardware: key-value stores, cache-line tiling,</text>
+    <text x="22" y="52" fill="#a0b0c0" font-size="13">branch prediction, sequential pipelines, terabytes of flat memory. The industry is spending billions patching</text>
+    <text x="22" y="68" fill="#a0b0c0" font-size="13">around GPU limitations and converging toward the architecture CPUs have had for decades.</text>
+  </g>
+
+  <!-- Bottom stats -->
+  <g transform="translate(30, 820)">
+    <rect width="360" height="55" rx="8" fill="#111a28" stroke="#ff6b6b" stroke-width="0.5"/>
+    <text x="180" y="22" font-size="24" font-weight="700" fill="#ff6b6b" text-anchor="middle" class="mono">8</text>
+    <text x="180" y="42" font-size="11" fill="#c08080" text-anchor="middle">workarounds invented for GPU memory walls</text>
+  </g>
+  <g transform="translate(420, 820)">
+    <rect width="360" height="55" rx="8" fill="#111a28" stroke="#47b475" stroke-width="0.5"/>
+    <text x="180" y="22" font-size="24" font-weight="700" fill="#47b475" text-anchor="middle" class="mono">0</text>
+    <text x="180" y="42" font-size="11" fill="#80c0a0" text-anchor="middle">workarounds needed on CPU with 2-4TB RAM</text>
+  </g>
+  <g transform="translate(810, 820)">
+    <rect width="360" height="55" rx="8" fill="#111a28" stroke="#ffb400" stroke-width="0.5"/>
+    <text x="180" y="22" font-size="24" font-weight="700" fill="#ffb400" text-anchor="middle" class="mono">60+ years</text>
+    <text x="180" y="42" font-size="11" fill="#a0a070" text-anchor="middle">CPUs have had these capabilities natively</text>
+  </g>
+
+  <!-- Watermark -->
+  <text x="600" y="905" fill="#252535" font-size="11" text-anchor="middle" font-family="monospace">C-Kernel-Engine | GPU Workaround Convergence</text>
+</svg>

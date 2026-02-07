@@ -1,0 +1,298 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="qk__norm__kernels_8c" kind="file" language="C++">
+    <compoundname>qk_norm_kernels.c</compoundname>
+    <includes local="no">stddef.h</includes>
+    <incdepgraph>
+      <node id="1">
+        <label>qk_norm_kernels.c</label>
+        <link refid="qk__norm__kernels_8c"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>stddef.h</label>
+      </node>
+    </incdepgraph>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="qk__norm__kernels_8c_1a7520c628ab3cdfbb8b5d6303a2db125a" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void qk_norm_forward</definition>
+        <argsstring>(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</argsstring>
+        <name>qk_norm_forward</name>
+        <param>
+          <type>float *</type>
+          <declname>q</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>k</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>q_gamma</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>k_gamma</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_kv_heads</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>num_tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>head_dim</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Per-head RMSNorm on Q and K.</para>
+<para><parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>q</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Q scratch buffer [num_heads * num_tokens * head_dim], in-place </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>k</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>K scratch buffer [num_kv_heads * num_tokens * head_dim], in-place </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>q_gamma</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Q norm gamma weights [head_dim] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>k_gamma</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>K norm gamma weights [head_dim] </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of query heads (e.g. 32 for Qwen3-8B) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_kv_heads</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of KV heads (e.g. 8 for Qwen3-8B with GQA) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>num_tokens</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Number of tokens (1 for decode, T for prefill) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>head_dim</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Dimension per head (e.g. 128) </para>
+</parameterdescription>
+</parameteritem>
+<parameteritem>
+<parameternamelist>
+<parametername>eps</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>RMSNorm epsilon (e.g. 1e-6)</para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+<xrefsect id="test_1_test000021"><xreftitle>Test</xreftitle><xrefdescription><para>unittest/test_qk_norm.py </para>
+</xrefdescription></xrefsect></para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/qk_norm_kernels.c" line="61" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/qk_norm_kernels.c" bodystart="61" bodyend="75"/>
+        <references refid="qk__norm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" compoundref="rmsnorm__kernels_8c" startline="50" endline="170">rmsnorm_forward</references>
+      </memberdef>
+      <memberdef kind="function" id="qk__norm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void rmsnorm_forward</definition>
+        <argsstring>(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</argsstring>
+        <name>rmsnorm_forward</name>
+        <param>
+          <type>const float *</type>
+          <declname>input</declname>
+        </param>
+        <param>
+          <type>const float *</type>
+          <declname>gamma</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>output</declname>
+        </param>
+        <param>
+          <type>float *</type>
+          <declname>rstd_cache</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>tokens</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>d_model</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>aligned_embed_dim</declname>
+        </param>
+        <param>
+          <type>float</type>
+          <declname>eps</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>RMSNorm forward pass <xrefsect id="test_1_test000022"><xreftitle>Test</xreftitle><xrefdescription><para>test_rmsnorm.py::TestRMSNormForward::test_fp32_tokens </para>
+<para>test_rmsnorm.py::TestRMSNormForward::test_fp32_single </para>
+<para>test_rmsnorm.py::TestRMSNormForward::test_perf_rolled </para>
+<para>test_layernorm.py::TestLayerNormForward::test_rmsnorm_compat </para>
+<para>test_parity.py::test_rmsnorm_parity</para>
+</xrefdescription></xrefsect></para>
+<para>RMSNorm: y[i] = gamma[i] * x[i] / sqrt(mean(x^2) + eps)</para>
+<para>After changes: make test &amp;&amp; make llamacpp-parity-full </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/qk_norm_kernels.c" line="37" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rmsnorm_kernels.c" bodystart="50" bodyend="170" declfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/qk_norm_kernels.c" declline="37" declcolumn="6"/>
+        <referencedby refid="qk__norm__kernels_8c_1a7520c628ab3cdfbb8b5d6303a2db125a" compoundref="qk__norm__kernels_8c" startline="61" endline="75">qk_norm_forward</referencedby>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Per-head RMSNorm on Q and K (Qwen3-style QK norm) </para>
+    </briefdescription>
+    <detaileddescription>
+<sect1 id="qk__norm__kernels_8c_1autotoc_md75">
+<title>CK-ENGINE KERNEL RULES:</title>
+<para><orderedlist>
+<listitem><para>NO malloc/free - memory via bump allocator, pointers passed in</para>
+</listitem><listitem><para>NO OpenMP - parallelization at orchestrator/codegen layer</para>
+</listitem><listitem><para>API must define: inputs, outputs, workspace, and memory layouts</para>
+</listitem><listitem><para>Pure computation - deterministic, no side effects</para>
+</listitem></orderedlist>
+</para>
+<para>After changes: make test &amp;&amp; python unittest/test_qk_norm.py</para>
+<para>QK Norm normalizes each head&apos;s query/key vectors independently before RoPE. This stabilizes Q*K^T dot products before softmax, preventing attention collapse from large magnitude vectors.</para>
+<para>Why only Q and K, not V? V does not participate in the attention score computation (Q*K^T). The softmax saturation problem comes from large Q*K^T values, so only Q and K magnitudes matter. V is linearly combined after softmax weights are computed <ndash/> normalizing it would change output scale but not fix attention stability.</para>
+<para>Data layout after QKV projection (head-major): Q: [num_heads, num_tokens, head_dim] contiguous K: [num_kv_heads, num_tokens, head_dim] contiguous</para>
+<para>We treat Q as [num_heads * num_tokens] rows of [head_dim] elements. rmsnorm_forward normalizes each row independently. The gamma weight [head_dim] is shared across all heads (Qwen3 design: one gamma per Q, one per K). </para>
+</sect1>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="2"><highlight class="comment"><sp/>*<sp/>@file<sp/>qk_norm_kernels.c</highlight></codeline>
+<codeline lineno="3"><highlight class="comment"><sp/>*<sp/>@brief<sp/>Per-head<sp/>RMSNorm<sp/>on<sp/>Q<sp/>and<sp/>K<sp/>(Qwen3-style<sp/>QK<sp/>norm)</highlight></codeline>
+<codeline lineno="4"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="5"><highlight class="comment"><sp/>*<sp/>CK-ENGINE<sp/>KERNEL<sp/>RULES:</highlight></codeline>
+<codeline lineno="6"><highlight class="comment"><sp/>*<sp/>=======================</highlight></codeline>
+<codeline lineno="7"><highlight class="comment"><sp/>*<sp/>1.<sp/>NO<sp/>malloc/free<sp/>-<sp/>memory<sp/>via<sp/>bump<sp/>allocator,<sp/>pointers<sp/>passed<sp/>in</highlight></codeline>
+<codeline lineno="8"><highlight class="comment"><sp/>*<sp/>2.<sp/>NO<sp/>OpenMP<sp/>-<sp/>parallelization<sp/>at<sp/>orchestrator/codegen<sp/>layer</highlight></codeline>
+<codeline lineno="9"><highlight class="comment"><sp/>*<sp/>3.<sp/>API<sp/>must<sp/>define:<sp/>inputs,<sp/>outputs,<sp/>workspace,<sp/>and<sp/>memory<sp/>layouts</highlight></codeline>
+<codeline lineno="10"><highlight class="comment"><sp/>*<sp/>4.<sp/>Pure<sp/>computation<sp/>-<sp/>deterministic,<sp/>no<sp/>side<sp/>effects</highlight></codeline>
+<codeline lineno="11"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="12"><highlight class="comment"><sp/>*<sp/>After<sp/>changes:<sp/>make<sp/>test<sp/>&amp;&amp;<sp/>python<sp/>unittest/test_qk_norm.py</highlight></codeline>
+<codeline lineno="13"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="14"><highlight class="comment"><sp/>*<sp/>QK<sp/>Norm<sp/>normalizes<sp/>each<sp/>head&apos;s<sp/>query/key<sp/>vectors<sp/>independently<sp/>before<sp/>RoPE.</highlight></codeline>
+<codeline lineno="15"><highlight class="comment"><sp/>*<sp/>This<sp/>stabilizes<sp/>Q*K^T<sp/>dot<sp/>products<sp/>before<sp/>softmax,<sp/>preventing<sp/>attention</highlight></codeline>
+<codeline lineno="16"><highlight class="comment"><sp/>*<sp/>collapse<sp/>from<sp/>large<sp/>magnitude<sp/>vectors.</highlight></codeline>
+<codeline lineno="17"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="18"><highlight class="comment"><sp/>*<sp/>Why<sp/>only<sp/>Q<sp/>and<sp/>K,<sp/>not<sp/>V?</highlight></codeline>
+<codeline lineno="19"><highlight class="comment"><sp/>*<sp/><sp/><sp/>V<sp/>does<sp/>not<sp/>participate<sp/>in<sp/>the<sp/>attention<sp/>score<sp/>computation<sp/>(Q*K^T).</highlight></codeline>
+<codeline lineno="20"><highlight class="comment"><sp/>*<sp/><sp/><sp/>The<sp/>softmax<sp/>saturation<sp/>problem<sp/>comes<sp/>from<sp/>large<sp/>Q*K^T<sp/>values,<sp/>so<sp/>only</highlight></codeline>
+<codeline lineno="21"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Q<sp/>and<sp/>K<sp/>magnitudes<sp/>matter.<sp/>V<sp/>is<sp/>linearly<sp/>combined<sp/>after<sp/>softmax<sp/>weights</highlight></codeline>
+<codeline lineno="22"><highlight class="comment"><sp/>*<sp/><sp/><sp/>are<sp/>computed<sp/>--<sp/>normalizing<sp/>it<sp/>would<sp/>change<sp/>output<sp/>scale<sp/>but<sp/>not<sp/>fix</highlight></codeline>
+<codeline lineno="23"><highlight class="comment"><sp/>*<sp/><sp/><sp/>attention<sp/>stability.</highlight></codeline>
+<codeline lineno="24"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="25"><highlight class="comment"><sp/>*<sp/>Data<sp/>layout<sp/>after<sp/>QKV<sp/>projection<sp/>(head-major):</highlight></codeline>
+<codeline lineno="26"><highlight class="comment"><sp/>*<sp/><sp/><sp/>Q:<sp/>[num_heads,<sp/>num_tokens,<sp/>head_dim]<sp/><sp/><sp/><sp/><sp/><sp/><sp/>contiguous</highlight></codeline>
+<codeline lineno="27"><highlight class="comment"><sp/>*<sp/><sp/><sp/>K:<sp/>[num_kv_heads,<sp/>num_tokens,<sp/>head_dim]<sp/><sp/><sp/><sp/><sp/>contiguous</highlight></codeline>
+<codeline lineno="28"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="29"><highlight class="comment"><sp/>*<sp/>We<sp/>treat<sp/>Q<sp/>as<sp/>[num_heads<sp/>*<sp/>num_tokens]<sp/>rows<sp/>of<sp/>[head_dim]<sp/>elements.</highlight></codeline>
+<codeline lineno="30"><highlight class="comment"><sp/>*<sp/>rmsnorm_forward<sp/>normalizes<sp/>each<sp/>row<sp/>independently.<sp/>The<sp/>gamma<sp/>weight<sp/>[head_dim]</highlight></codeline>
+<codeline lineno="31"><highlight class="comment"><sp/>*<sp/>is<sp/>shared<sp/>across<sp/>all<sp/>heads<sp/>(Qwen3<sp/>design:<sp/>one<sp/>gamma<sp/>per<sp/>Q,<sp/>one<sp/>per<sp/>K).</highlight></codeline>
+<codeline lineno="32"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="33"><highlight class="normal"></highlight></codeline>
+<codeline lineno="34"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stddef.h&gt;</highlight><highlight class="normal"><sp/><sp/></highlight><highlight class="comment">/*<sp/>NULL<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="35"><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight><highlight class="comment">/*<sp/>rmsnorm_forward<sp/>is<sp/>declared<sp/>in<sp/>ckernel_engine.h<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="qk__norm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*input,</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*gamma,</highlight></codeline>
+<codeline lineno="39"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*output,</highlight></codeline>
+<codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*rstd_cache,</highlight></codeline>
+<codeline lineno="41"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>tokens,</highlight></codeline>
+<codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>d_model,</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>aligned_embed_dim,</highlight></codeline>
+<codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps);</highlight></codeline>
+<codeline lineno="45"><highlight class="normal"></highlight><highlight class="comment"></highlight></codeline>
+<codeline lineno="46"><highlight class="comment">/**</highlight></codeline>
+<codeline lineno="47"><highlight class="comment"><sp/>*<sp/>Per-head<sp/>RMSNorm<sp/>on<sp/>Q<sp/>and<sp/>K.</highlight></codeline>
+<codeline lineno="48"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="49"><highlight class="comment"><sp/>*<sp/>@param<sp/>q<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>Q<sp/>scratch<sp/>buffer<sp/>[num_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>head_dim],<sp/>in-place</highlight></codeline>
+<codeline lineno="50"><highlight class="comment"><sp/>*<sp/>@param<sp/>k<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>K<sp/>scratch<sp/>buffer<sp/>[num_kv_heads<sp/>*<sp/>num_tokens<sp/>*<sp/>head_dim],<sp/>in-place</highlight></codeline>
+<codeline lineno="51"><highlight class="comment"><sp/>*<sp/>@param<sp/>q_gamma<sp/><sp/><sp/><sp/><sp/><sp/><sp/>Q<sp/>norm<sp/>gamma<sp/>weights<sp/>[head_dim]</highlight></codeline>
+<codeline lineno="52"><highlight class="comment"><sp/>*<sp/>@param<sp/>k_gamma<sp/><sp/><sp/><sp/><sp/><sp/><sp/>K<sp/>norm<sp/>gamma<sp/>weights<sp/>[head_dim]</highlight></codeline>
+<codeline lineno="53"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_heads<sp/><sp/><sp/><sp/><sp/>Number<sp/>of<sp/>query<sp/>heads<sp/>(e.g.<sp/>32<sp/>for<sp/>Qwen3-8B)</highlight></codeline>
+<codeline lineno="54"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_kv_heads<sp/><sp/>Number<sp/>of<sp/>KV<sp/>heads<sp/>(e.g.<sp/>8<sp/>for<sp/>Qwen3-8B<sp/>with<sp/>GQA)</highlight></codeline>
+<codeline lineno="55"><highlight class="comment"><sp/>*<sp/>@param<sp/>num_tokens<sp/><sp/><sp/><sp/>Number<sp/>of<sp/>tokens<sp/>(1<sp/>for<sp/>decode,<sp/>T<sp/>for<sp/>prefill)</highlight></codeline>
+<codeline lineno="56"><highlight class="comment"><sp/>*<sp/>@param<sp/>head_dim<sp/><sp/><sp/><sp/><sp/><sp/>Dimension<sp/>per<sp/>head<sp/>(e.g.<sp/>128)</highlight></codeline>
+<codeline lineno="57"><highlight class="comment"><sp/>*<sp/>@param<sp/>eps<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>RMSNorm<sp/>epsilon<sp/>(e.g.<sp/>1e-6)</highlight></codeline>
+<codeline lineno="58"><highlight class="comment"><sp/>*</highlight></codeline>
+<codeline lineno="59"><highlight class="comment"><sp/>*<sp/>@test<sp/>unittest/test_qk_norm.py</highlight></codeline>
+<codeline lineno="60"><highlight class="comment"><sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="61" refid="qk__norm__kernels_8c_1a7520c628ab3cdfbb8b5d6303a2db125a" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="qk__norm__kernels_8c_1a7520c628ab3cdfbb8b5d6303a2db125a" kindref="member">qk_norm_forward</ref>(</highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*q,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k,</highlight></codeline>
+<codeline lineno="62"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*q_gamma,<sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>*k_gamma,</highlight></codeline>
+<codeline lineno="63"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_heads,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_kv_heads,</highlight></codeline>
+<codeline lineno="64"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>num_tokens,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>head_dim,<sp/></highlight><highlight class="keywordtype">float</highlight><highlight class="normal"><sp/>eps)</highlight></codeline>
+<codeline lineno="65"><highlight class="normal">{</highlight></codeline>
+<codeline lineno="66"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>Q<sp/>norm:<sp/>[num_heads<sp/>*<sp/>num_tokens]<sp/>rows<sp/>of<sp/>[head_dim]</highlight></codeline>
+<codeline lineno="67"><highlight class="comment"><sp/><sp/><sp/><sp/><sp/>*<sp/>Each<sp/>row<sp/>is<sp/>one<sp/>head&apos;s<sp/>vector<sp/>for<sp/>one<sp/>token.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="68"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="qk__norm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>(q,<sp/>q_gamma,<sp/>q,<sp/>NULL,</highlight></codeline>
+<codeline lineno="69"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_heads<sp/>*<sp/>num_tokens,<sp/>head_dim,<sp/>head_dim,<sp/>eps);</highlight></codeline>
+<codeline lineno="70"><highlight class="normal"></highlight></codeline>
+<codeline lineno="71"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">/*<sp/>K<sp/>norm:<sp/>[num_kv_heads<sp/>*<sp/>num_tokens]<sp/>rows<sp/>of<sp/>[head_dim]</highlight></codeline>
+<codeline lineno="72"><highlight class="comment"><sp/><sp/><sp/><sp/><sp/>*<sp/>Same<sp/>logic,<sp/>fewer<sp/>rows<sp/>when<sp/>using<sp/>GQA.<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="73"><highlight class="normal"><sp/><sp/><sp/><sp/><ref refid="qk__norm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>(k,<sp/>k_gamma,<sp/>k,<sp/>NULL,</highlight></codeline>
+<codeline lineno="74"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>num_kv_heads<sp/>*<sp/>num_tokens,<sp/>head_dim,<sp/>head_dim,<sp/>eps);</highlight></codeline>
+<codeline lineno="75"><highlight class="normal">}</highlight></codeline>
+    </programlisting>
+    <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/qk_norm_kernels.c"/>
+  </compounddef>
+</doxygen>

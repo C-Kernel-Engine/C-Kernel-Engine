@@ -145,7 +145,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_head_major_output.c" line="353" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_head_major_output.c" bodystart="353" bodyend="407"/>
-        <references refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" compoundref="ckernel__quant_8h" startline="325">CK_FP16_TO_FP32</references>
+        <references refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" compoundref="ckernel__quant_8h" startline="400">CK_FP16_TO_FP32</references>
         <references refid="structblock__q8__0_1a0bc77a0a0101bc89b05749157bf1514e" compoundref="ckernel__quant_8h" startline="104">block_q8_0::d</references>
         <references refid="ckernel__quant_8h_1af13e8b7fd92d0f48c1cfca7161552d4a" compoundref="ckernel__quant_8h" startline="101">QK8_0</references>
         <references refid="structblock__q8__0_1ac6f2ca6c9108456b6630b7f1bf874488" compoundref="ckernel__quant_8h" startline="105">block_q8_0::qs</references>
@@ -288,7 +288,7 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_head_major_output.c" line="62" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_head_major_output.c" bodystart="62" bodyend="134"/>
-        <references refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" compoundref="ckernel__quant_8h" startline="325">CK_FP16_TO_FP32</references>
+        <references refid="ckernel__quant_8h_1a7edd411b02255eed928c775b91396c2a" compoundref="ckernel__quant_8h" startline="400">CK_FP16_TO_FP32</references>
         <references refid="structblock__q5__0_1a4c5238d5b9b5e8406ca30b40302a15ce" compoundref="ckernel__quant_8h" startline="70">block_q5_0::d</references>
         <references refid="structblock__q5__0_1a823c98aafc2ecd999f30689d289fb963" compoundref="ckernel__quant_8h" startline="71">block_q5_0::qh</references>
         <references refid="ckernel__quant_8h_1a01fd96c19126075d365d10748fb254ac" compoundref="ckernel__quant_8h" startline="67">QK5_0</references>
@@ -300,7 +300,7 @@
 <para>Output projection from head-major attention (NO LAYOUT CONVERSION) </para>
     </briefdescription>
     <detaileddescription>
-<sect1 id="gemm__head__major__output_8c_1autotoc_md35">
+<sect1 id="gemm__head__major__output_8c_1autotoc_md41">
 <title>CK-ENGINE KERNEL RULES:</title>
 <para><orderedlist>
 <listitem><para>NO malloc/free - memory via bump allocator, pointers passed in</para>
@@ -312,7 +312,7 @@
 </para>
 <para>After changes: make test &amp;&amp; make llamacpp-parity-full</para>
 </sect1>
-<sect1 id="gemm__head__major__output_8c_1autotoc_md36">
+<sect1 id="gemm__head__major__output_8c_1autotoc_md42">
 <title>PROBLEM THIS SOLVES:</title>
 <para>The standard mega_fused_attention_prefill has a bottleneck: attn_out [num_heads, tokens, head_dim] (head-major) → <ref refid="mega__fused__attention__prefill_8c_1a3c0ac15e87fbf875bd91aad8288b7e7c" kindref="member">flatten_head_major()</ref> - 448 memcpy calls for 32 tokens × 14 heads! → token-major buffer → GEMM output projection</para>
 <para>This kernel eliminates the flatten by reading head-major data directly with strided access. The output projection computes:</para>

@@ -15,6 +15,10 @@ var tokenizer_8h =
       [ "CK_SPACE_PREFIX_GPT2", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
       [ "CK_SPACE_PREFIX_SPM", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ]
     ] ],
+    [ "CKSpmMode", "tokenizer_8h.html#a8a61458f294240972a499c24a5a47488", [
+      [ "CK_SPM_MODE_UNIGRAM", "tokenizer_8h.html#a8a61458f294240972a499c24a5a47488a94f29df13784ecd1dbb820f1e9671497", null ],
+      [ "CK_SPM_MODE_LLAMA", "tokenizer_8h.html#a8a61458f294240972a499c24a5a47488a996472bd3b2654c56c58777a3a8d2ad5", null ]
+    ] ],
     [ "CKTokenizerType", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa", [
       [ "CK_TOKENIZER_BPE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaaacc79f950f4619c0f760920d41453dc0", null ],
       [ "CK_TOKENIZER_WORDPIECE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaae3780f9d7b735346810efb8302a88621", null ],
@@ -32,11 +36,15 @@ var tokenizer_8h =
     [ "ck_tokenizer_encode_tokens", "tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91", null ],
     [ "ck_tokenizer_encode_with_special", "tokenizer_8h.html#acf3cafe5474fe8230132d201545dd40a", null ],
     [ "ck_tokenizer_load_binary", "tokenizer_8h.html#a4de5533c0e1c9f89bfb77bee05cf97fd", null ],
+    [ "ck_tokenizer_load_binary_with_scores", "tokenizer_8h.html#a1b96aadee83cb18a6d1ce9b04ccab5b9", null ],
     [ "ck_tokenizer_load_gguf", "tokenizer_8h.html#a39549bbef5bf2e9d93ce346b0f842660", null ],
     [ "ck_tokenizer_load_json", "tokenizer_8h.html#a3fb09ff735a91316e5810e84ce11f3f2", null ],
     [ "ck_tokenizer_load_merges", "tokenizer_8h.html#ae246055217081d433db25cb6a754f5b9", null ],
     [ "ck_tokenizer_load_text", "tokenizer_8h.html#a39187b4d68c71ab61cdab7dbf8ab0d68", null ],
     [ "ck_tokenizer_vocab_size", "tokenizer_8h.html#a70e41f10b6806f4f543285d3484da0c3", null ],
+    [ "add_bos", "tokenizer_8h.html#a7cc51ec584feb41327c453e546740e7c", null ],
+    [ "add_eos", "tokenizer_8h.html#a49175a027841adf7e7d66a6061aed7ed", null ],
+    [ "add_space_prefix", "tokenizer_8h.html#a4ce4bea5b5798ca1aa9a1a3061f3d668", null ],
     [ "bos", "tokenizer_8h.html#afbcf72e6f3f003096f1fb9ce31a13736", null ],
     [ "eos", "tokenizer_8h.html#ae2ac59d55593a1262747f8e0c4b575d9", null ],
     [ "id", "tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e", null ],
@@ -47,6 +55,7 @@ var tokenizer_8h =
     [ "out_len", "tokenizer_8h.html#afcd8f560b02b3c7a2bc2b3effa325fcf", null ],
     [ "pad", "tokenizer_8h.html#ae478acd31a350e380062e576e1d8d61c", null ],
     [ "score", "tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741", null ],
+    [ "spm_mode", "tokenizer_8h.html#a6cf5b659a496d344ebd7ae14a0392033", null ],
     [ "style", "tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346", null ],
     [ "text", "tokenizer_8h.html#a462f1390f421769e5f487370f8f21ee9", null ],
     [ "token", "tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6", null ],

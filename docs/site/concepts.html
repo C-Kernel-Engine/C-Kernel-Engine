@@ -870,6 +870,7 @@
                         <div class="menu-heading">Core</div>
                         <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
                         <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
                         <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
                         <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
@@ -946,9 +947,10 @@
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
+    <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
-    <li><a href="#activations">Activations: SwiGLU, GELU</a></li>
+    <li><a href="#activations">Activations: SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
 
@@ -1199,6 +1201,99 @@ Online (Flash):
 
 <hr>
 
+<h2 id="sliding-window">Sliding-Window Attention</h2>
+
+<p>Sliding-window attention limits each query to the most recent <strong>W</strong> tokens. It is exact within the window, keeps compute linear in sequence length, and provides predictable latency for long contexts.</p>
+
+<div class="img-container svg-viewer" data-title="Sliding-Window Attention Window">
+    <svg width="100%" height="240" viewBox="0 0 900 240" role="img" aria-label="Sliding-window attention window and mask">
+        <defs>
+            <linearGradient id="sw-bg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#0b1220"/>
+                <stop offset="100%" stop-color="#122238"/>
+            </linearGradient>
+            <pattern id="sw-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1f2a3d" stroke-width="1"/>
+            </pattern>
+            <marker id="sw-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                <polygon points="0,0 10,5 0,10" fill="#9bdcff"/>
+            </marker>
+        </defs>
+        <rect x="0" y="0" width="900" height="240" fill="url(#sw-bg)"/>
+
+        <!-- Token timeline -->
+        <rect x="40" y="50" width="540" height="100" rx="14" fill="#0f1b2d" opacity="0.7"/>
+        <text x="60" y="78" fill="#9bdcff" font-size="14" font-family="monospace">tokens</text>
+
+        <!-- Window highlight -->
+        <rect x="305" y="85" width="245" height="40" rx="10" fill="#2e8bc0" opacity="0.35"/>
+        <line x1="310" y1="72" x2="545" y2="72" stroke="#9bdcff" stroke-width="2"/>
+        <line x1="310" y1="72" x2="310" y2="80" stroke="#9bdcff" stroke-width="2"/>
+        <line x1="545" y1="72" x2="545" y2="80" stroke="#9bdcff" stroke-width="2"/>
+        <text x="365" y="62" fill="#9bdcff" font-size="14" font-family="monospace">window W=4</text>
+
+        <!-- Token boxes -->
+        <g font-family="monospace" font-size="14" fill="#e6f4ff">
+            <rect x="70" y="90" width="50" height="30" rx="6" fill="#1e293b"/>
+            <text x="88" y="110">0</text>
+            <rect x="130" y="90" width="50" height="30" rx="6" fill="#1e293b"/>
+            <text x="148" y="110">1</text>
+            <rect x="190" y="90" width="50" height="30" rx="6" fill="#1e293b"/>
+            <text x="208" y="110">2</text>
+            <rect x="250" y="90" width="50" height="30" rx="6" fill="#1e293b"/>
+            <text x="268" y="110">3</text>
+            <rect x="310" y="90" width="50" height="30" rx="6" fill="#2e8bc0"/>
+            <text x="328" y="110">4</text>
+            <rect x="370" y="90" width="50" height="30" rx="6" fill="#2e8bc0"/>
+            <text x="388" y="110">5</text>
+            <rect x="430" y="90" width="50" height="30" rx="6" fill="#2e8bc0"/>
+            <text x="448" y="110">6</text>
+            <rect x="490" y="90" width="50" height="30" rx="6" fill="#2e8bc0"/>
+            <text x="508" y="110">7</text>
+        </g>
+
+        <!-- Attention mask sketch -->
+        <rect x="620" y="40" width="240" height="160" rx="12" fill="url(#sw-grid)" stroke="#2b3c55" stroke-width="2"/>
+        <polygon points="620,200 860,200 860,140 700,40 620,40" fill="#2e8bc0" opacity="0.35"/>
+        <line x1="620" y1="200" x2="860" y2="40" stroke="#9bdcff" stroke-width="2" marker-end="url(#sw-arrow)"/>
+        <text x="640" y="60" fill="#9bdcff" font-size="12" font-family="monospace">allowed region</text>
+    </svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Windowed Causal Mask</h3>
+        <pre>
+For token i:
+  attend j in [max(0, i - W + 1), i]
+
+scores[i][j] = -inf if j > i
+scores[i][j] = -inf if i - j >= W
+        </pre>
+        <p>Compute: <strong>O(N * W)</strong> vs O(N²). Memory stays O(N * D).</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why It Matters</h3>
+        <ul>
+            <li>Long contexts without quadratic blow-up</li>
+            <li>Stable decode latency (only last W KV entries)</li>
+            <li>Works with Flash Attention (online softmax inside the window)</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">C-Kernel-Engine Implementation</h3>
+    <p>We expose a dedicated op <code>attention_sliding</code> that uses the same head-major GQA layout as standard attention.</p>
+    <ul>
+        <li><code>attention_forward_causal_head_major_gqa_flash_strided_sliding</code> (prefill)</li>
+        <li><code>attention_forward_decode_head_major_gqa_flash_sliding</code> (decode)</li>
+    </ul>
+    <p>The only difference from causal attention is the window bounds. The math and softmax remain exact inside the window.</p>
+</div>
+
+<hr>
+
 <h2 id="gqa">Grouped Query Attention (GQA)</h2>
 
 <p>GQA reduces memory and compute by sharing K, V heads across multiple Q heads.</p>
@@ -1283,9 +1378,9 @@ y = gamma * x / (rms + eps)
 
 <hr>
 
-<h2 id="activations">Activations: SwiGLU, GELU</h2>
+<h2 id="activations">Activations: SwiGLU, GeGLU, GELU</h2>
 
-<p>Activation functions introduce non-linearity. Modern LLMs use gated activations for better gradient flow.</p>
+<p>Activation functions introduce non-linearity. Modern LLMs use gated activations (SwiGLU, GeGLU) for better gradient flow and expressivity.</p>
 
 <div class="img-container svg-viewer" data-title="SwiGLU: Gated Linear Unit">
     <img src="assets/kernel-swiglu.svg" alt="SwiGLU Activation">
@@ -1312,11 +1407,69 @@ SwiGLU(x) = Swish(x @ W_gate) * (x @ W_up)
     </div>
 </div>
 
+<div class="img-container svg-viewer" data-title="GeGLU Dataflow">
+    <svg width="100%" height="260" viewBox="0 0 900 260" role="img" aria-label="GeGLU dataflow diagram">
+        <defs>
+            <linearGradient id="geglu-bg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#0b1220"/>
+                <stop offset="100%" stop-color="#122238"/>
+            </linearGradient>
+            <marker id="geglu-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                <polygon points="0,0 10,5 0,10" fill="#9bdcff"/>
+            </marker>
+        </defs>
+        <rect x="0" y="0" width="900" height="260" fill="url(#geglu-bg)"/>
+
+        <!-- Input split -->
+        <rect x="40" y="90" width="160" height="80" rx="12" fill="#1e293b"/>
+        <line x1="120" y1="90" x2="120" y2="170" stroke="#2e8bc0" stroke-width="2"/>
+        <text x="60" y="122" fill="#e6f4ff" font-size="14" font-family="monospace">a</text>
+        <text x="140" y="122" fill="#e6f4ff" font-size="14" font-family="monospace">b</text>
+        <text x="48" y="155" fill="#9bdcff" font-size="12" font-family="monospace">x [tokens, 2*dim]</text>
+
+        <!-- GELU block -->
+        <rect x="300" y="60" width="140" height="60" rx="12" fill="#2e8bc0"/>
+        <text x="342" y="95" fill="#0b1220" font-size="14" font-family="monospace">GELU</text>
+
+        <!-- Pass-through block -->
+        <rect x="300" y="150" width="140" height="60" rx="12" fill="#1f2937"/>
+        <text x="320" y="185" fill="#e6f4ff" font-size="12" font-family="monospace">pass-through</text>
+
+        <!-- Multiply node -->
+        <circle cx="540" cy="120" r="28" fill="#0f172a" stroke="#9bdcff" stroke-width="2"/>
+        <text x="532" y="125" fill="#9bdcff" font-size="18" font-family="monospace">x</text>
+
+        <!-- Output -->
+        <rect x="640" y="90" width="180" height="80" rx="12" fill="#2e8bc0"/>
+        <text x="680" y="125" fill="#0b1220" font-size="14" font-family="monospace">output [tokens, dim]</text>
+
+        <!-- Arrows -->
+        <line x1="200" y1="110" x2="300" y2="90" stroke="#9bdcff" stroke-width="2" marker-end="url(#geglu-arrow)"/>
+        <line x1="200" y1="150" x2="300" y2="180" stroke="#9bdcff" stroke-width="2" marker-end="url(#geglu-arrow)"/>
+        <line x1="440" y1="90" x2="512" y2="110" stroke="#9bdcff" stroke-width="2" marker-end="url(#geglu-arrow)"/>
+        <line x1="440" y1="180" x2="512" y2="130" stroke="#9bdcff" stroke-width="2" marker-end="url(#geglu-arrow)"/>
+        <line x1="568" y1="120" x2="640" y2="120" stroke="#9bdcff" stroke-width="2" marker-end="url(#geglu-arrow)"/>
+
+        <text x="320" y="30" fill="#9bdcff" font-size="14" font-family="monospace">GeGLU: output = GELU(a) * b</text>
+    </svg>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">GeGLU (Gemma, T5 variants)</h3>
+    <pre>
+Split input: x = [a | b]
+
+GeGLU(x) = GELU(a) * b
+GELU(a) = 0.5 * a * (1 + tanh(sqrt(2/pi) * (a + 0.044715 * a^3)))
+    </pre>
+    <p>GeGLU replaces the sigmoid/Swish gate with GELU, giving smoother gradients and better calibration for some model families.</p>
+</div>
+
 <div class="card">
     <h3 style="margin-top: 0;">Why Gating Works</h3>
     <p>The gate learns to selectively activate different features:</p>
     <pre>
-gate = sigmoid(x @ W_gate)  # Values in [0, 1]
+gate = activation(x @ W_gate)  # Swish (SwiGLU) or GELU (GeGLU)
 value = x @ W_up            # The actual content
 
 output = gate * value       # Gate controls information flow
@@ -1396,6 +1549,11 @@ With weight tying: W = E  (same matrix!)
             <td><code>rope_theta</code></td>
             <td>RoPE base frequency</td>
             <td>10000, 500000, 1000000</td>
+        </tr>
+        <tr>
+            <td><code>sliding_window</code></td>
+            <td>Attention window size (0 = full causal)</td>
+            <td>0, 256, 512, 1024</td>
         </tr>
         <tr>
             <td><code>rms_norm_eps</code></td>
@@ -1636,7 +1794,7 @@ With weight tying: W = E  (same matrix!)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
             </div>
         </div>
     </footer>

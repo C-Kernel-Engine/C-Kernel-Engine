@@ -1,0 +1,60 @@
+<svg width="980" height="420" viewBox="0 0 980 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SentencePiece tricky cases">
+  <defs>
+    <style>
+      .title { font: 600 18px/1.2 "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #0f172a; }
+      .label { font: 600 12px/1.2 "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #0f172a; }
+      .text  { font: 12px/1.4 "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #334155; }
+      .mono  { font: 12px/1.4 "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace; fill: #0f172a; }
+      .chip  { font: 11px/1.2 "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace; fill: #0f172a; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="420" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="28" y="38" class="title">SentencePiece Tricky Cases (CK Behavior)</text>
+
+  <!-- Card 1 -->
+  <rect x="24" y="64" width="452" height="148" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="44" y="92" class="label">Leading / trailing spaces</text>
+  <text x="44" y="116" class="text">Input</text>
+  <text x="120" y="116" class="mono">"  Hello"</text>
+  <text x="44" y="140" class="text">Preprocess</text>
+  <text x="120" y="140" class="mono">"▁Hello"</text>
+  <text x="44" y="164" class="text">Tokens</text>
+  <rect x="120" y="152" width="92" height="20" rx="6" fill="#e0f2fe"/>
+  <text x="128" y="166" class="chip">▁Hello</text>
+
+  <!-- Card 2 -->
+  <rect x="504" y="64" width="452" height="148" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="524" y="92" class="label">Already prefixed</text>
+  <text x="524" y="116" class="text">Input</text>
+  <text x="600" y="116" class="mono">"▁world"</text>
+  <text x="524" y="140" class="text">Preprocess</text>
+  <text x="600" y="140" class="mono">"▁world"</text>
+  <text x="524" y="164" class="text">Tokens</text>
+  <rect x="600" y="152" width="92" height="20" rx="6" fill="#dcfce7"/>
+  <text x="608" y="166" class="chip">▁world</text>
+
+  <!-- Card 3 -->
+  <rect x="24" y="236" width="452" height="148" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="44" y="264" class="label">Unknown run (UNK spans bytes)</text>
+  <text x="44" y="288" class="text">Input</text>
+  <text x="120" y="288" class="mono">"★☆"</text>
+  <text x="44" y="312" class="text">DP</text>
+  <text x="120" y="312" class="mono">UNK length = 6 bytes</text>
+  <text x="44" y="336" class="text">Tokens</text>
+  <rect x="120" y="324" width="58" height="20" rx="6" fill="#fee2e2"/>
+  <text x="128" y="338" class="chip">&lt;unk&gt;</text>
+
+  <!-- Card 4 -->
+  <rect x="504" y="236" width="452" height="148" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="524" y="264" class="label">Byte fallback</text>
+  <text x="524" y="288" class="text">Input</text>
+  <text x="600" y="288" class="mono">"\x00\x01"</text>
+  <text x="524" y="312" class="text">Fallback</text>
+  <text x="600" y="312" class="mono">byte_token_id[0], [1]</text>
+  <text x="524" y="336" class="text">Tokens</text>
+  <rect x="600" y="324" width="64" height="20" rx="6" fill="#fde68a"/>
+  <text x="608" y="338" class="chip">&lt;0x00&gt;</text>
+  <rect x="670" y="324" width="64" height="20" rx="6" fill="#fde68a"/>
+  <text x="678" y="338" class="chip">&lt;0x01&gt;</text>
+</svg>

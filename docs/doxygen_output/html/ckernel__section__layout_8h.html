@@ -226,7 +226,7 @@ Functions</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Section-Based Memory Layout: Header / Body / Footer Pattern. </p>
 <hr  />
- <h1><a class="anchor" id="autotoc_md3"></a>
+ <h1><a class="anchor" id="autotoc_md6"></a>
 PHILOSOPHY: WHY NO MEMORY REUSE?</h1>
 <ol type="1">
 <li>CPU PREFETCH NEEDS PREDICTABLE PATTERNS<ul>
@@ -255,12 +255,12 @@ PHILOSOPHY: WHY NO MEMORY REUSE?</h1>
 </li>
 </ol>
 <hr  />
- <h1><a class="anchor" id="autotoc_md5"></a>
+ <h1><a class="anchor" id="autotoc_md8"></a>
 SECTION ARCHITECTURE</h1>
 <p>Multi-modal models have multiple SECTIONS. Each section is a complete encoder/decoder/vision/audio module with its own dimensions.</p>
 <p>┌─────────────────────────────────────────────────────────────────┐ │ SINGLE ALLOCATION │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 0: Vision Encoder │ │ ├── HEADER: patch_embed, pos_embed │ │ ├── BODY: layer[0..N] (weights + activations interleaved) │ │ └── FOOTER: final_norm, bridge_to_text │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 1: Text Decoder │ │ ├── HEADER: token_embed, pos_embed │ │ ├── BODY: layer[0..N] (weights + activations interleaved) │ │ └── FOOTER: final_norm, lm_head, logits │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 2: Audio Encoder (optional) │ │ ├── HEADER: mel_embed │ │ ├── BODY: layer[0..N] │ │ └── FOOTER: bridge_to_text │ ├─────────────────────────────────────────────────────────────────┤ │ GRADIENTS (if training) │ │ └── Same layout: section[0].grads, section[1].grads, ... │ ├─────────────────────────────────────────────────────────────────┤ │ OPTIMIZER STATE (if training with Adam) │ │ └── m[], v[] for each weight │ └─────────────────────────────────────────────────────────────────┘</p>
 <hr  />
- <h1><a class="anchor" id="autotoc_md7"></a>
+ <h1><a class="anchor" id="autotoc_md10"></a>
 EXECUTION ORDER LAYOUT</h1>
 <p>Within each layer, memory is laid out in the ORDER operations execute:</p>
 <p>weight → activation → weight → activation → ...</p>

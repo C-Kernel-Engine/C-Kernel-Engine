@@ -457,7 +457,7 @@
     <detaileddescription>
 <para><hruler/>
  </para>
-<sect1 id="ckernel__section__layout_8h_1autotoc_md3">
+<sect1 id="ckernel__section__layout_8h_1autotoc_md6">
 <title>PHILOSOPHY: WHY NO MEMORY REUSE?</title>
 <para><orderedlist>
 <listitem><para>CPU PREFETCH NEEDS PREDICTABLE PATTERNS<itemizedlist>
@@ -489,14 +489,14 @@
 <para><hruler/>
  </para>
 </sect1>
-<sect1 id="ckernel__section__layout_8h_1autotoc_md5">
+<sect1 id="ckernel__section__layout_8h_1autotoc_md8">
 <title>SECTION ARCHITECTURE</title>
 <para>Multi-modal models have multiple SECTIONS. Each section is a complete encoder/decoder/vision/audio module with its own dimensions.</para>
 <para>┌─────────────────────────────────────────────────────────────────┐ │ SINGLE ALLOCATION │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 0: Vision Encoder │ │ ├── HEADER: patch_embed, pos_embed │ │ ├── BODY: layer[0..N] (weights + activations interleaved) │ │ └── FOOTER: final_norm, bridge_to_text │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 1: Text Decoder │ │ ├── HEADER: token_embed, pos_embed │ │ ├── BODY: layer[0..N] (weights + activations interleaved) │ │ └── FOOTER: final_norm, lm_head, logits │ ├─────────────────────────────────────────────────────────────────┤ │ SECTION 2: Audio Encoder (optional) │ │ ├── HEADER: mel_embed │ │ ├── BODY: layer[0..N] │ │ └── FOOTER: bridge_to_text │ ├─────────────────────────────────────────────────────────────────┤ │ GRADIENTS (if training) │ │ └── Same layout: section[0].grads, section[1].grads, ... │ ├─────────────────────────────────────────────────────────────────┤ │ OPTIMIZER STATE (if training with Adam) │ │ └── m[], v[] for each weight │ └─────────────────────────────────────────────────────────────────┘</para>
 <para><hruler/>
  </para>
 </sect1>
-<sect1 id="ckernel__section__layout_8h_1autotoc_md7">
+<sect1 id="ckernel__section__layout_8h_1autotoc_md10">
 <title>EXECUTION ORDER LAYOUT</title>
 <para>Within each layer, memory is laid out in the ORDER operations execute:</para>
 <para>weight → activation → weight → activation → ...</para>

@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e599f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#da77f2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="dpGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#74c0fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4dabf7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="backtrackGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#69db7c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#40c057;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="outputGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffd43b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fab005;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#74c0fc"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#51cf66"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#0d1b2a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#fff" text-anchor="middle">SentencePiece Viterbi/DP Tokenization</text>
+  <text x="600" y="72" font-family="Arial, sans-serif" font-size="14" fill="#888" text-anchor="middle">Optimal tokenization via dynamic programming with unigram language model scores</text>
+
+  <!-- Step 1: Input Preprocessing -->
+  <g transform="translate(50, 100)">
+    <rect width="1100" height="80" rx="12" fill="url(#inputGrad)" opacity="0.15" stroke="#e599f7" stroke-width="2"/>
+    <text x="30" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e599f7">STEP 1: SPACE NORMALIZATION</text>
+    <text x="30" y="50" font-family="monospace" font-size="14" fill="#fff">Input:  "Hello world"</text>
+    <text x="30" y="70" font-family="monospace" font-size="14" fill="#69db7c">Output: "▁Hello▁world"    (▁ = U+2581, spaces become ▁)</text>
+    <text x="750" y="55" font-family="Arial, sans-serif" font-size="11" fill="#aaa">SentencePiece adds ▁ at start + replaces all spaces</text>
+    <text x="750" y="72" font-family="Arial, sans-serif" font-size="11" fill="#aaa">This makes tokenization reversible (lossless)</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M600,195 L600,215" stroke="#e599f7" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 2: DP Forward Pass -->
+  <g transform="translate(50, 230)">
+    <rect width="1100" height="310" rx="12" fill="url(#dpGrad)" opacity="0.1" stroke="#74c0fc" stroke-width="2"/>
+    <text x="30" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#74c0fc">STEP 2: VITERBI FORWARD PASS (DYNAMIC PROGRAMMING)</text>
+    <text x="30" y="48" font-family="Arial, sans-serif" font-size="12" fill="#aaa">For each position, find all candidate tokens ending here. Pick the one that maximizes total score.</text>
+
+    <!-- DP table visualization -->
+    <g transform="translate(30, 70)">
+      <!-- Character positions -->
+      <text x="0" y="0" font-family="monospace" font-size="11" fill="#666">pos:</text>
+      <text x="80" y="0" font-family="monospace" font-size="13" fill="#fff">0</text>
+      <text x="155" y="0" font-family="monospace" font-size="13" fill="#fff">1</text>
+      <text x="230" y="0" font-family="monospace" font-size="13" fill="#fff">2</text>
+      <text x="305" y="0" font-family="monospace" font-size="13" fill="#fff">3</text>
+      <text x="380" y="0" font-family="monospace" font-size="13" fill="#fff">4</text>
+      <text x="455" y="0" font-family="monospace" font-size="13" fill="#fff">5</text>
+      <text x="530" y="0" font-family="monospace" font-size="13" fill="#fff">6</text>
+      <text x="605" y="0" font-family="monospace" font-size="13" fill="#fff">7</text>
+      <text x="680" y="0" font-family="monospace" font-size="13" fill="#fff">8</text>
+      <text x="755" y="0" font-family="monospace" font-size="13" fill="#fff">9</text>
+      <text x="830" y="0" font-family="monospace" font-size="13" fill="#fff">10</text>
+      <text x="905" y="0" font-family="monospace" font-size="13" fill="#fff">11</text>
+
+      <!-- Characters -->
+      <text x="0" y="25" font-family="monospace" font-size="11" fill="#666">char:</text>
+      <text x="75" y="25" font-family="monospace" font-size="13" fill="#69db7c">▁</text>
+      <text x="150" y="25" font-family="monospace" font-size="13" fill="#fff">H</text>
+      <text x="225" y="25" font-family="monospace" font-size="13" fill="#fff">e</text>
+      <text x="300" y="25" font-family="monospace" font-size="13" fill="#fff">l</text>
+      <text x="375" y="25" font-family="monospace" font-size="13" fill="#fff">l</text>
+      <text x="450" y="25" font-family="monospace" font-size="13" fill="#fff">o</text>
+      <text x="525" y="25" font-family="monospace" font-size="13" fill="#69db7c">▁</text>
+      <text x="600" y="25" font-family="monospace" font-size="13" fill="#fff">w</text>
+      <text x="675" y="25" font-family="monospace" font-size="13" fill="#fff">o</text>
+      <text x="750" y="25" font-family="monospace" font-size="13" fill="#fff">r</text>
+      <text x="825" y="25" font-family="monospace" font-size="13" fill="#fff">l</text>
+      <text x="900" y="25" font-family="monospace" font-size="13" fill="#fff">d</text>
+
+      <!-- DP cells - score[pos] = best score to reach pos -->
+      <text x="0" y="55" font-family="monospace" font-size="11" fill="#666">score:</text>
+      <!-- Position cells -->
+      <rect x="60" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#74c0fc" stroke-width="1"/>
+      <text x="90" y="56" font-family="monospace" font-size="11" fill="#74c0fc" text-anchor="middle">0.0</text>
+
+      <rect x="135" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="165" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-2.1</text>
+
+      <rect x="210" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="240" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-4.3</text>
+
+      <rect x="285" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="315" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-6.1</text>
+
+      <rect x="360" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="390" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-7.5</text>
+
+      <rect x="435" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="465" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-5.2</text>
+
+      <rect x="510" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#69db7c" stroke-width="1"/>
+      <text x="540" y="56" font-family="monospace" font-size="11" fill="#69db7c" text-anchor="middle">-3.8</text>
+
+      <rect x="585" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="615" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-5.9</text>
+
+      <rect x="660" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="690" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-8.1</text>
+
+      <rect x="735" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="765" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-9.7</text>
+
+      <rect x="810" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="840" y="56" font-family="monospace" font-size="11" fill="#aaa" text-anchor="middle">-7.3</text>
+
+      <rect x="885" y="38" width="60" height="26" rx="4" fill="#1e3a5f" stroke="#ffd43b" stroke-width="1"/>
+      <text x="915" y="56" font-family="monospace" font-size="11" fill="#ffd43b" text-anchor="middle">-5.6</text>
+    </g>
+
+    <!-- Candidate tokens example -->
+    <g transform="translate(30, 155)">
+      <text x="0" y="0" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc">Example: Candidates at position 6 (after "▁Hello")</text>
+
+      <rect x="0" y="12" width="300" height="24" rx="4" fill="#1e3a5f" stroke="#69db7c" stroke-width="1"/>
+      <text x="10" y="29" font-family="monospace" font-size="11" fill="#69db7c">"▁Hello" (0→6) score: -3.8  BEST</text>
+
+      <rect x="0" y="42" width="300" height="24" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="10" y="59" font-family="monospace" font-size="11" fill="#aaa">"llo"    (3→6) score: -6.1 + -4.2 = -10.3</text>
+
+      <rect x="0" y="72" width="300" height="24" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="10" y="89" font-family="monospace" font-size="11" fill="#aaa">"lo"     (4→6) score: -7.5 + -3.8 = -11.3</text>
+
+      <rect x="0" y="102" width="300" height="24" rx="4" fill="#1e3a5f" stroke="#555" stroke-width="1"/>
+      <text x="10" y="119" font-family="monospace" font-size="11" fill="#aaa">"o"      (5→6) score: -5.2 + -7.1 = -12.3</text>
+
+      <!-- Formula box -->
+      <rect x="380" y="12" width="650" height="115" rx="8" fill="#0d1b2a" stroke="#74c0fc" stroke-width="1"/>
+      <text x="400" y="35" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc">Recurrence (Viterbi):</text>
+      <text x="400" y="60" font-family="monospace" font-size="13" fill="#fff">score[end] = max over all tokens t ending at end:</text>
+      <text x="400" y="82" font-family="monospace" font-size="13" fill="#ffd43b">    score[end - len(t)] + log_prob(t)</text>
+      <text x="400" y="108" font-family="monospace" font-size="11" fill="#aaa">backtrack[end] = (start_pos, token_id) of best t</text>
+    </g>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M600,555 L600,575" stroke="#69db7c" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- Step 3: Backtrack -->
+  <g transform="translate(50, 590)">
+    <rect width="1100" height="120" rx="12" fill="url(#backtrackGrad)" opacity="0.1" stroke="#69db7c" stroke-width="2"/>
+    <text x="30" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#69db7c">STEP 3: BACKTRACK (OPTIMAL PATH)</text>
+    <text x="30" y="48" font-family="Arial, sans-serif" font-size="12" fill="#aaa">Follow backtrack pointers from end to start to recover the best tokenization.</text>
+
+    <!-- Backtrack visualization -->
+    <g transform="translate(30, 65)">
+      <rect x="0" y="0" width="120" height="30" rx="6" fill="#1e3a5f" stroke="#69db7c" stroke-width="2"/>
+      <text x="60" y="20" font-family="monospace" font-size="13" fill="#69db7c" text-anchor="middle">▁Hello</text>
+
+      <path d="M125,15 L155,15" stroke="#69db7c" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+      <rect x="160" y="0" width="120" height="30" rx="6" fill="#1e3a5f" stroke="#69db7c" stroke-width="2"/>
+      <text x="220" y="20" font-family="monospace" font-size="13" fill="#69db7c" text-anchor="middle">▁world</text>
+
+      <text x="340" y="20" font-family="monospace" font-size="13" fill="#fff">  →  [" ▁Hello", " ▁world"]</text>
+
+      <text x="660" y="20" font-family="monospace" font-size="12" fill="#ffd43b">Total score: -5.6 (optimal)</text>
+    </g>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M600,725 L600,745" stroke="#ffd43b" stroke-width="2" marker-end="url(#arrowOrange)"/>
+
+  <!-- Step 4: Output -->
+  <g transform="translate(50, 760)">
+    <rect width="1100" height="80" rx="12" fill="url(#outputGrad)" opacity="0.15" stroke="#ffd43b" stroke-width="2"/>
+    <text x="30" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffd43b">STEP 4: TOKEN ID LOOKUP + BYTE FALLBACK</text>
+    <text x="30" y="50" font-family="monospace" font-size="14" fill="#fff">Tokens: ["▁Hello", "▁world"]  →  IDs: [12345, 67890]</text>
+    <text x="30" y="70" font-family="Arial, sans-serif" font-size="11" fill="#aaa">Unknown characters use byte fallback: &lt;0xE2&gt; &lt;0x96&gt; &lt;0x81&gt; (one token per byte, guaranteed coverage)</text>
+  </g>
+
+  <!-- Key insight callout -->
+  <g transform="translate(750, 100)">
+    <rect width="380" height="60" rx="8" fill="#ffb400" opacity="0.12" stroke="#ffb400" stroke-width="1"/>
+    <text x="15" y="22" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffb400">KEY DIFFERENCE FROM BPE:</text>
+    <text x="15" y="40" font-family="Arial, sans-serif" font-size="11" fill="#fff">BPE = greedy merge by priority order</text>
+    <text x="15" y="55" font-family="Arial, sans-serif" font-size="11" fill="#fff">SPM = globally optimal via Viterbi DP</text>
+  </g>
+</svg>

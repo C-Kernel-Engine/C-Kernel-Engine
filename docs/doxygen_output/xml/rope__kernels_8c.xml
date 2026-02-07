@@ -121,7 +121,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE backward (inverse rotation) <xrefsect id="test_1_test000021"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward </para>
+<para>RoPE backward (inverse rotation) <xrefsect id="test_1_test000027"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward </para>
 <para>test_rope.py::TestRoPEBackward::test_rope_backward_vs_separate</para>
 </xrefdescription></xrefsect></para>
 <para>RoPE backward: inverse rotation (rotate by -θ). Since cos(-θ) = cos(θ) and sin(-θ) = -sin(θ): d_x[2i] = d0 * c + d1 * s d_x[2i+1] = -d0 * s + d1 * c</para>
@@ -173,7 +173,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE backward in-place (overwrite with inverse rotation) <xrefsect id="test_1_test000022"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward_inplace</para>
+<para>RoPE backward in-place (overwrite with inverse rotation) <xrefsect id="test_1_test000028"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward_inplace</para>
 </xrefdescription></xrefsect></para>
 <para>In-place backward: overwrite d_out with inverse-rotated gradients. Useful when d_x == d_out is acceptable (saves memory).</para>
 <para>After changes: make test </para>
@@ -238,7 +238,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE backward for both dQ and dK <xrefsect id="test_1_test000025"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward_qk</para>
+<para>RoPE backward for both dQ and dK <xrefsect id="test_1_test000031"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEBackward::test_rope_backward_qk</para>
 </xrefdescription></xrefsect></para>
 <para>Combined RoPE backward for both dQ and dK gradients.</para>
 <para>After changes: make test </para>
@@ -247,7 +247,7 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" line="497" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" bodystart="497" bodyend="512"/>
         <references refid="rope__kernels_8c_1af248ca325f0a6837ed9bfd3d34552c00" compoundref="rope__kernels_8c" startline="238" endline="334">rope_backward</references>
-        <referencedby refid="ckernel__orchestration_8h_1a1b75acba52e39a2063646dc1dff62ef4" compoundref="ckernel__orchestration_8c" startline="2645" endline="2785">ck_layer_backward_rmsnorm_swiglu</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a1b75acba52e39a2063646dc1dff62ef4" compoundref="ckernel__orchestration_8c" startline="2677" endline="2817">ck_layer_backward_rmsnorm_swiglu</referencedby>
       </memberdef>
       <memberdef kind="function" id="rope__kernels_8c_1a371dd522b2b7ce9064f35215f1551c28" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
         <type>void</type>
@@ -289,7 +289,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE forward (head-major layout, in-place) <xrefsect id="test_1_test000019"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward </para>
+<para>RoPE forward (head-major layout, in-place) <xrefsect id="test_1_test000025"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward </para>
 <para>test_rope.py::TestRoPEForward::test_rope_vs_separate </para>
 <para>test_parity.py::test_rope_parity</para>
 </xrefdescription></xrefsect></para>
@@ -399,7 +399,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE forward for both Q and K (common inference pattern) <xrefsect id="test_1_test000023"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward_qk </para>
+<para>RoPE forward for both Q and K (common inference pattern) <xrefsect id="test_1_test000029"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward_qk </para>
 <para>test_fused_attention_decode.py::TestFusedAttentionDecode::test_qk_rope </para>
 <para>test_parity.py::test_rope_qk_parity</para>
 </xrefdescription></xrefsect></para>
@@ -410,16 +410,16 @@
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" line="448" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" bodystart="448" bodyend="461"/>
         <references refid="rope__kernels_8c_1a371dd522b2b7ce9064f35215f1551c28" compoundref="rope__kernels_8c" startline="180" endline="196">rope_forward</references>
-        <referencedby refid="ckernel__orchestration_8h_1ab7dfa86e5bb0d80f0e346f85e870cb1d" compoundref="ckernel__orchestration_8c" startline="964" endline="1070">ck_layer_forward_rmsnorm_swiglu</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1a745d032ebb518826e284b4a3680a8cb5" compoundref="ckernel__orchestration_8c" startline="1257" endline="1415">ck_layer_forward_rmsnorm_swiglu_decode</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1ab8d674c4a63b69a0cc0b38bbe58fa9f2" compoundref="ckernel__orchestration_8c" startline="1417" endline="1570">ck_layer_forward_rmsnorm_swiglu_decode_fused</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ab7dfa86e5bb0d80f0e346f85e870cb1d" compoundref="ckernel__orchestration_8c" startline="996" endline="1102">ck_layer_forward_rmsnorm_swiglu</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a745d032ebb518826e284b4a3680a8cb5" compoundref="ckernel__orchestration_8c" startline="1289" endline="1447">ck_layer_forward_rmsnorm_swiglu_decode</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ab8d674c4a63b69a0cc0b38bbe58fa9f2" compoundref="ckernel__orchestration_8c" startline="1449" endline="1602">ck_layer_forward_rmsnorm_swiglu_decode_fused</referencedby>
         <referencedby refid="attention__decode__fused_8c_1a1e6628f9f140c9749a6dd7c2c9ce263a" compoundref="attention__decode__fused_8c" startline="181" endline="341">ck_layer_forward_rmsnorm_swiglu_decode_fused_attn_impl</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1abb01994013418ff7b8be71dc9bdcded5" compoundref="ckernel__orchestration_8c" startline="2085" endline="2367">ck_layer_forward_rmsnorm_swiglu_decode_q4_k</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1ae07680f1a438bd1824fa4b1c3e4e826e" compoundref="ckernel__orchestration_8c" startline="2480" endline="2643">ck_layer_forward_rmsnorm_swiglu_decode_quant</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1a7b9d9ef1181d1fa0f7c8b19eefb7846d" compoundref="ckernel__orchestration_8c" startline="1878" endline="2083">ck_layer_forward_rmsnorm_swiglu_q4_k</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1a4bfddd851b4b52f7502330118a3e853d" compoundref="ckernel__orchestration_8c" startline="2369" endline="2478">ck_layer_forward_rmsnorm_swiglu_quant</referencedby>
-        <referencedby refid="ckernel__orchestration_8h_1acc9d893cdd6cf7bf0dbf35d42c5f0e99" compoundref="ckernel__orchestration_8c" startline="1072" endline="1178">ck_layer_forward_rmsnorm_swiglu_ref</referencedby>
-        <referencedby refid="ck__parity__api_8h_1a15e78c3b254565f6061c47cc878b9209" compoundref="ck__parity__api_8c" startline="450" endline="525">ck_test_rope</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1abb01994013418ff7b8be71dc9bdcded5" compoundref="ckernel__orchestration_8c" startline="2117" endline="2399">ck_layer_forward_rmsnorm_swiglu_decode_q4_k</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1ae07680f1a438bd1824fa4b1c3e4e826e" compoundref="ckernel__orchestration_8c" startline="2512" endline="2675">ck_layer_forward_rmsnorm_swiglu_decode_quant</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a7b9d9ef1181d1fa0f7c8b19eefb7846d" compoundref="ckernel__orchestration_8c" startline="1910" endline="2115">ck_layer_forward_rmsnorm_swiglu_q4_k</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1a4bfddd851b4b52f7502330118a3e853d" compoundref="ckernel__orchestration_8c" startline="2401" endline="2510">ck_layer_forward_rmsnorm_swiglu_quant</referencedby>
+        <referencedby refid="ckernel__orchestration_8h_1acc9d893cdd6cf7bf0dbf35d42c5f0e99" compoundref="ckernel__orchestration_8c" startline="1104" endline="1210">ck_layer_forward_rmsnorm_swiglu_ref</referencedby>
+        <referencedby refid="ck__parity__api_8h_1a15e78c3b254565f6061c47cc878b9209" compoundref="ck__parity__api_8c" startline="567" endline="642">ck_test_rope</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a54e2aba39375fd8df03520d41ee5acff" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="4645" endline="4777">qwen2_0_5b_decode_layer_0_decode</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1a171746e628c6a4bf197f2181af543218" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="211" endline="367">qwen2_0_5b_decode_layer_0_prefill</referencedby>
         <referencedby refid="v6_85_2test__generated_2ck-kernel-inference_8c_1aa0bfb039a5a1afb4fd62a43ebb7ad301" compoundref="v6_85_2test__generated_2ck-kernel-inference_8c" startline="6015" endline="6147">qwen2_0_5b_decode_layer_10_decode</referencedby>
@@ -525,7 +525,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE forward for both Q and K with custom strides (KV cache layouts) <xrefsect id="test_1_test000024"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward_qk_strided </para>
+<para>RoPE forward for both Q and K with custom strides (KV cache layouts) <xrefsect id="test_1_test000030"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_forward_qk_strided </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_qk_rope_strided</para>
 </xrefdescription></xrefsect></para>
 <para>Combined QK RoPE with configurable strides for KV cache layouts.</para>
@@ -630,7 +630,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>RoPE forward with custom head stride (for KV cache layouts) <xrefsect id="test_1_test000020"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_strided </para>
+<para>RoPE forward with custom head stride (for KV cache layouts) <xrefsect id="test_1_test000026"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPEForward::test_rope_strided </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_rope_decode</para>
 </xrefdescription></xrefsect></para>
 <para>Variant with configurable head_stride_tokens for non-contiguous head layouts.</para>
@@ -670,7 +670,7 @@
         <briefdescription>
         </briefdescription>
         <detaileddescription>
-<para>Precompute RoPE cos/sin cache <xrefsect id="test_1_test000018"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPECache::test_cache_computation </para>
+<para>Precompute RoPE cos/sin cache <xrefsect id="test_1_test000024"><xreftitle>Test</xreftitle><xrefdescription><para>test_rope.py::TestRoPECache::test_cache_computation </para>
 <para>test_rope.py::TestRoPECache::test_cache_values</para>
 </xrefdescription></xrefsect></para>
 <para>Precomputes cos(m * theta_i) and sin(m * theta_i) for positions 0..max_seq_len-1. cos_cache, sin_cache: [max_seq_len, head_dim/2]</para>
@@ -679,14 +679,14 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" line="52" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/rope_kernels.c" bodystart="52" bodyend="73"/>
-        <referencedby refid="ck__parity__api_8h_1a15e78c3b254565f6061c47cc878b9209" compoundref="ck__parity__api_8c" startline="450" endline="525">ck_test_rope</referencedby>
+        <referencedby refid="ck__parity__api_8h_1a15e78c3b254565f6061c47cc878b9209" compoundref="ck__parity__api_8c" startline="567" endline="642">ck_test_rope</referencedby>
       </memberdef>
       </sectiondef>
     <briefdescription>
 <para>RoPE (Rotary Position Embedding) kernels with SIMD. </para>
     </briefdescription>
     <detaileddescription>
-<sect1 id="rope__kernels_8c_1autotoc_md75">
+<sect1 id="rope__kernels_8c_1autotoc_md83">
 <title>CK-ENGINE KERNEL RULES:</title>
 <para><orderedlist>
 <listitem><para>NO malloc/free - memory via bump allocator, pointers passed in</para>

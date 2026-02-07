@@ -870,6 +870,7 @@
                         <div class="menu-heading">Core</div>
                         <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
                         <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
                         <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
                         <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
@@ -1459,7 +1460,8 @@
           <p style="color: var(--text-secondary);">
             <strong>v6.6</strong> achieves <strong>pure IR-driven code generation</strong> for the
             core inference flow. Ops are emitted from IR, kernels selected automatically,
-            memory from layout.json. Small technical debt remains for model-specific values.
+            memory from layout.json. Model dimensions like <strong>attn_out_dim</strong> are now
+            part of the config contract (parsed from weights), reducing hardcoded paths.
           </p>
           <div class="ir-comparison">
             <div class="ir-column">
@@ -1469,6 +1471,7 @@
                 <li><span class="yes">✓</span> Kernel selection auto</li>
                 <li><span class="yes">✓</span> Memory from layout.json</li>
                 <li><span class="yes">✓</span> Fusion patterns</li>
+                <li><span class="yes">✓</span> Config contract (attn_out_dim)</li>
               </ul>
             </div>
             <div class="ir-column">
@@ -1485,8 +1488,8 @@
               <ul class="ir-feature-list">
                 <li>RoPE scaling type</li>
                 <li>KV cache layout</li>
-                <li>Default config values</li>
                 <li>Activation function</li>
+                <li>Chat template selection</li>
               </ul>
             </div>
           </div>
@@ -1500,7 +1503,7 @@
               <div class="ir-stat-label">MEGA Kernels</div>
             </div>
             <div class="ir-stat">
-              <div class="ir-stat-value">~5</div>
+              <div class="ir-stat-value">~4</div>
               <div class="ir-stat-label">Tech Debt Items</div>
             </div>
             <div class="ir-stat">
@@ -1509,11 +1512,11 @@
             </div>
           </div>
           <div class="ir-example">
-            // v6.6 style: IR-driven with minor hardcoded config
+            // v6.6 style: IR-driven with config contract
             ir = ir_from_model(model)           // Build IR from model
             fused = fuse_patterns(ir)           // Detect fusion patterns
             code = generate_c(fused, registry)  // Generate C
-            // Core flow IR-driven; some config values Qwen2-specific
+            // Core flow IR-driven; remaining model-specific defaults isolated
           </div>
         </div>
       </div>
@@ -1560,7 +1563,7 @@
       <tr>
         <td><strong>v7.0</strong></td>
         <td>Training Forward</td>
-        <td>IR extend to backward, all kernels get grad() support</td>
+        <td>IR extend to backward, all kernels get grad() support, toy-model parity (fwd+bwd)</td>
         <td>v6.6</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -1653,6 +1656,14 @@
             <span class="milestone-icon planned">○</span>
             <span class="milestone-text">make test-training target</span>
           </li>
+          <li class="milestone">
+            <span class="milestone-icon planned">○</span>
+            <span class="milestone-text">Parity gate: forward+backward on toy model (Karpathy llm)</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon planned">○</span>
+            <span class="milestone-text">Train small Qwen-style model end-to-end (inference-compatible)</span>
+          </li>
         </ul>
       </div>
     </div>
@@ -1683,7 +1694,11 @@
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">make llamacpp-parity-full (all kernels)</span>
+            <span class="milestone-text done">Thread pool for parallel prefill/decode</span>
+          </li>
+          <li class="milestone current">
+            <span class="milestone-icon building">▶</span>
+            <span class="milestone-text">make llamacpp-parity-full (all kernels) -- in progress</span>
           </li>
         </ul>
       </div>
@@ -2036,7 +2051,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-01-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
             </div>
         </div>
     </footer>

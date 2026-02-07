@@ -93,13 +93,13 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k_q8k.c" line="67" column="14" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k_q8k.c" bodystart="67" bodyend="117"/>
-        <references refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" compoundref="ckernel__quant_8h" startline="153">block_q8_K::d</references>
-        <references refid="ckernel__quant_8h_1a15b32ff704be7dc7da90abdc72487a97" compoundref="ckernel__quant_8h" startline="332">GGML_FP16_TO_FP32</references>
-        <references refid="structblock__q6__K_1aae24d4e8e582b9b2c5e8f219c467d008" compoundref="ckernel__quant_8h" startline="140">block_q6_K::qh</references>
+        <references refid="structblock__q8__K_1abb47e300e16fb14224979b2538edb966" compoundref="ckernel__quant_8h" startline="171">block_q8_K::d</references>
+        <references refid="ckernel__quant_8h_1a15b32ff704be7dc7da90abdc72487a97" compoundref="ckernel__quant_8h" startline="411">GGML_FP16_TO_FP32</references>
+        <references refid="structblock__q6__K_1aae24d4e8e582b9b2c5e8f219c467d008" compoundref="ckernel__quant_8h" startline="158">block_q6_K::qh</references>
         <references refid="ckernel__quant_8h_1afd2f43dcca46f268b2008cb200198e50" compoundref="ckernel__quant_8h" startline="120">QK_K</references>
-        <references refid="structblock__q6__K_1a2804e4fef4f6c2eaf41230ddbed8e479" compoundref="ckernel__quant_8h" startline="139">block_q6_K::ql</references>
-        <references refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" compoundref="ckernel__quant_8h" startline="154">block_q8_K::qs</references>
-        <references refid="structblock__q6__K_1a9c13aa47c6703aac41f1bc92e30e08af" compoundref="ckernel__quant_8h" startline="141">block_q6_K::scales</references>
+        <references refid="structblock__q6__K_1a2804e4fef4f6c2eaf41230ddbed8e479" compoundref="ckernel__quant_8h" startline="157">block_q6_K::ql</references>
+        <references refid="structblock__q8__K_1ac7219c4dba2b1f4192beca610a3999fc" compoundref="ckernel__quant_8h" startline="172">block_q8_K::qs</references>
+        <references refid="structblock__q6__K_1a9c13aa47c6703aac41f1bc92e30e08af" compoundref="ckernel__quant_8h" startline="159">block_q6_K::scales</references>
         <referencedby refid="ckernel__engine_8h_1aa7f87aba64d19dce415df9230e8eb0b8" compoundref="gemm__kernels__q6k__q8k_8c" startline="1014" endline="1038">gemv_q6_k_q8_k_parallel</referencedby>
         <referencedby refid="ckernel__engine_8h_1ae0038e921164892e7a0e7e460b491f76" compoundref="gemm__kernels__q6k__q8k_8c" startline="1046" endline="1098">gemv_q6_k_q8_k_parallel_simd</referencedby>
         <referencedby refid="gemm__kernels__q6k__q8k_8c_1a06c7e59ac3d04a760a5bcc83921ac9a9" compoundref="gemm__kernels__q6k__q8k_8c" startline="119" endline="136">gemv_q6_k_q8_k_ref</referencedby>
@@ -212,7 +212,7 @@
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k_q8k.c" line="1144" column="6" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/kernels/gemm_kernels_q6k_q8k.c" bodystart="1144" bodyend="1169"/>
         <references refid="show__config_8c_1a3d5cffd490a70d568b820514b5a0f937" compoundref="show__config_8c" startline="39">C</references>
         <references refid="gemm__kernels__q6k__q8k_8c_1a6f8eb04ad56d34cf1d38d49ea19a7639" compoundref="gemm__kernels__q6k__q8k_8c" startline="1110" endline="1126">gemm_q6_k_q8_k</references>
-        <referencedby refid="ck__parity__api_8h_1a7135e1b580a18f085b2d85b1e3fd0bf5" compoundref="ck__parity__api_8c" startline="342" endline="368">ck_test_gemm_q6_k</referencedby>
+        <referencedby refid="ck__parity__api_8h_1a7135e1b580a18f085b2d85b1e3fd0bf5" compoundref="ck__parity__api_8c" startline="425" endline="451">ck_test_gemm_q6_k</referencedby>
         <referencedby refid="prefill__fused__gemm_8c_1abafc3abe1909ec3e623f7b14ccffff93" compoundref="prefill__fused__gemm_8c" startline="938" endline="957">gemm_nt_q8_k_mlp_dispatch</referencedby>
         <referencedby refid="prefill__fused__gemm_8c_1a615bac7d9294b6bfd0cc45e0c1e2efcb" compoundref="prefill__fused__gemm_8c" startline="198" endline="217">gemm_nt_q8_k_qkv_dispatch</referencedby>
       </memberdef>
@@ -678,7 +678,7 @@
 <para>Q6_K (weights) x Q8_K (activations) kernels for inference. </para>
     </briefdescription>
     <detaileddescription>
-<sect1 id="gemm__kernels__q6k__q8k_8c_1autotoc_md54">
+<sect1 id="gemm__kernels__q6k__q8k_8c_1autotoc_md61">
 <title>CK-ENGINE KERNEL RULES:</title>
 <para><orderedlist>
 <listitem><para>NO malloc/free - memory via bump allocator, pointers passed in</para>

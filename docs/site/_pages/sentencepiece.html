@@ -1,0 +1,705 @@
+<!-- TITLE: SentencePiece Deep Dive -->
+<!-- NAV: sentencepiece -->
+<!-- DESCRIPTION: Deep dive into SentencePiece tokenization: Viterbi DP algorithm, comparison with BPE and WordPiece, byte fallback, and CK implementation -->
+
+<div class="hero">
+    <span class="badge badge-green">Viterbi DP</span>
+    <span class="badge badge-orange">Byte Fallback</span>
+    <h1>SentencePiece Tokenizer</h1>
+    <p>Deep dive into SentencePiece: the unigram language model tokenizer that finds the globally optimal tokenization via Viterbi dynamic programming, with byte fallback for guaranteed coverage.</p>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    </div>
+    <div>
+        <strong>This page complements the <a href="tokenizer.html" style="color: var(--blue);">Tokenizer overview</a>.</strong> The overview covers the full tokenizer architecture (BPE, WordPiece, SentencePiece, Trie, True BPE). This page goes deep on SentencePiece specifically &mdash; the algorithm, math, implementation, and how it differs from BPE and WordPiece.
+    </div>
+</div>
+
+<h2>What is SentencePiece?</h2>
+
+<p>SentencePiece is a <strong>language-agnostic, unsupervised text tokenizer</strong> developed by Google (Kudo &amp; Richardson, 2018). Unlike BPE which builds vocabulary bottom-up by merging frequent byte pairs, SentencePiece uses a <strong>unigram language model</strong> &mdash; each token has a learned probability score, and the tokenizer finds the sequence of tokens that <em>maximizes the total log-probability</em>.</p>
+
+<div class="grid grid-3">
+    <div class="card card-accent">
+        <div class="feature-icon orange">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Globally Optimal</h3>
+        <p>Viterbi DP finds the token sequence that maximizes total score &mdash; unlike BPE's greedy merge-by-priority approach.</p>
+    </div>
+    <div class="card card-green">
+        <div class="feature-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Byte Fallback</h3>
+        <p>Unknown characters decompose into byte tokens (<code>&lt;0xE2&gt;</code>), guaranteeing 100% coverage of any input.</p>
+    </div>
+    <div class="card card-blue">
+        <div class="feature-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3 style="margin-top: 0;">Fully Reversible</h3>
+        <p>The ▁ (U+2581) space marker makes tokenization lossless &mdash; decode always reconstructs the original text exactly.</p>
+    </div>
+</div>
+
+<h2>SentencePiece vs BPE vs WordPiece</h2>
+
+<p>The three major tokenization algorithms take fundamentally different approaches to the same problem. Here's how they compare:</p>
+
+<div class="img-container svg-viewer" data-title="BPE vs WordPiece vs SentencePiece Comparison">
+    <img src="assets/sentencepiece-vs-bpe-wordpiece.svg" alt="Side-by-side comparison of BPE, WordPiece, and SentencePiece tokenization algorithms">
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th>BPE (GPT-2)</th>
+            <th>WordPiece (BERT)</th>
+            <th>SentencePiece (LLaMA)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Algorithm</strong></td>
+            <td>Merge by priority</td>
+            <td>Greedy longest-match</td>
+            <td>Viterbi DP (max score)</td>
+        </tr>
+        <tr>
+            <td><strong>Training</strong></td>
+            <td>Count pairs, merge most frequent</td>
+            <td>Likelihood-based selection</td>
+            <td>EM: grow vocab, prune by loss</td>
+        </tr>
+        <tr>
+            <td><strong>Optimality</strong></td>
+            <td>Local (greedy merges)</td>
+            <td>Local (greedy search)</td>
+            <td style="color: var(--green); font-weight: 600;">Global (Viterbi DP)</td>
+        </tr>
+        <tr>
+            <td><strong>Space handling</strong></td>
+            <td>Ġ (U+0120) prefix</td>
+            <td>Whitespace split first</td>
+            <td>▁ (U+2581) prefix</td>
+        </tr>
+        <tr>
+            <td><strong>Unknown tokens</strong></td>
+            <td>Byte-level (no UNK)</td>
+            <td>[UNK] token</td>
+            <td style="color: var(--green); font-weight: 600;">Byte fallback (no UNK)</td>
+        </tr>
+        <tr>
+            <td><strong>Reversible</strong></td>
+            <td>Yes (byte-level)</td>
+            <td>No (## prefix lossy)</td>
+            <td style="color: var(--green); font-weight: 600;">Yes (▁ encoding)</td>
+        </tr>
+        <tr>
+            <td><strong>Sub-word marker</strong></td>
+            <td>None (Ġ prefix on word starts)</td>
+            <td>## prefix on continuations</td>
+            <td>▁ prefix on word starts</td>
+        </tr>
+        <tr>
+            <td><strong>Speed (CK)</strong></td>
+            <td>Fast (merge loop O(n))</td>
+            <td>Very fast (greedy O(k))</td>
+            <td>Moderate (DP O(n&times;k))</td>
+        </tr>
+        <tr>
+            <td><strong>Models using it</strong></td>
+            <td>GPT-2/4, Qwen, Mistral</td>
+            <td>BERT, RoBERTa, DistilBERT</td>
+            <td>LLaMA, T5, mBART, ALBERT</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>The Unigram Language Model</h2>
+
+<p>At the heart of SentencePiece is the <strong>unigram language model</strong>. Each token <em>t</em> in the vocabulary has a learned log-probability score <code>score(t)</code>. The tokenizer's goal is to find the segmentation <em>S = (t<sub>1</sub>, t<sub>2</sub>, ..., t<sub>n</sub>)</em> that maximizes:</p>
+
+<pre><code>P(S) = Π score(t_i)     or equivalently:     log P(S) = Σ log_score(t_i)
+
+Example vocabulary with scores:
+  "▁Hello"   → score: -3.8    (common word, high probability)
+  "▁Hell"    → score: -5.2    (less common prefix)
+  "o"        → score: -7.1    (single character, low probability)
+  "▁world"   → score: -3.1    (very common word)
+  "▁wor"     → score: -6.4    (uncommon prefix)
+  "ld"       → score: -5.8    (uncommon suffix)
+
+Tokenizing "Hello world":
+  Option A: ["▁Hello", "▁world"]       → score: -3.8 + -3.1 = -6.9  ← BEST
+  Option B: ["▁Hell", "o", "▁world"]   → score: -5.2 + -7.1 + -3.1 = -15.4
+  Option C: ["▁Hello", "▁wor", "ld"]   → score: -3.8 + -6.4 + -5.8 = -16.0</code></pre>
+
+<p>The key insight: <strong>scores are learned during training</strong>. Common subwords get high scores (less negative), rare ones get low scores. The Viterbi algorithm efficiently finds the globally optimal segmentation without trying all exponentially many possibilities.</p>
+
+<h2>The Viterbi DP Algorithm</h2>
+
+<p>Finding the optimal tokenization naively would require checking all possible segmentations &mdash; exponential in text length. The <strong>Viterbi algorithm</strong> solves this in O(n &times; k) time using dynamic programming, where n is the text length and k is the maximum token length.</p>
+
+<div class="img-container svg-viewer" data-title="Viterbi/DP Algorithm Visualization">
+    <img src="assets/sentencepiece-algorithm.svg" alt="Step-by-step visualization of the Viterbi dynamic programming algorithm for SentencePiece tokenization">
+</div>
+
+<h3>Forward Pass</h3>
+
+<p>The forward pass builds a score table from left to right. For each position, it considers all tokens that could end at that position and picks the one that gives the best cumulative score:</p>
+
+<pre><code>// Simplified Viterbi forward pass (from tokenizer.c)
+// score[i] = best total log-probability to tokenize text[0..i-1]
+// back[i]  = (start_position, token_id) of the best token ending at i
+
+score[0] = 0.0;  // Empty prefix has score 0
+
+for (int end = 1; end <= text_len; end++) {
+    score[end] = -INFINITY;  // Worst possible
+
+    // Try all tokens that end at position 'end'
+    for each token t in vocabulary where text[end-len(t)..end] == t:
+        int start = end - len(t);
+        float candidate = score[start] + t.log_score;
+
+        if (candidate > score[end]) {
+            score[end] = candidate;
+            back[end] = {start, t.id};
+        }
+}</code></pre>
+
+<h3>Backtrack Pass</h3>
+
+<p>Once the forward pass reaches the end, we follow the <code>back[]</code> pointers backwards to recover the optimal sequence:</p>
+
+<pre><code>// Backtrack from end to start
+int pos = text_len;
+int token_count = 0;
+int result[MAX_TOKENS];
+
+while (pos > 0) {
+    result[token_count++] = back[pos].token_id;
+    pos = back[pos].start_position;
+}
+
+// Reverse to get left-to-right order
+reverse(result, token_count);</code></pre>
+
+<h2>Space Handling: ▁ vs Ġ</h2>
+
+<p>Space encoding is one of the most important &mdash; and most confusing &mdash; aspects of tokenization. SentencePiece and GPT-2 use <strong>incompatible strategies</strong>, and getting this wrong produces completely wrong tokenizations.</p>
+
+<div class="img-container svg-viewer" data-title="Space Encoding: SentencePiece ▁ vs GPT-2 Ġ">
+    <img src="assets/sentencepiece-space-handling.svg" alt="Side-by-side comparison of SentencePiece ▁ (U+2581) and GPT-2 Ġ (U+0120) space encoding strategies">
+</div>
+
+<h2>Tricky Cases &amp; CK Behavior</h2>
+
+<p>SentencePiece looks simple on paper, but there are a few subtle edge cases where implementations diverge. These are the ones that most often cause parity bugs. The CK tokenizer implements these behaviors explicitly so we match SentencePiece in practice.</p>
+
+<div class="img-container svg-viewer" data-title="SentencePiece Tricky Cases">
+    <img src="assets/sentencepiece-tricky-cases.svg" alt="Visualization of tricky SentencePiece cases: leading spaces, existing ▁, unknown runs, and byte fallback">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Leading and Trailing Spaces</h3>
+        <p>SentencePiece uses a dummy prefix (<code>▁</code>) for word starts. CK matches SPM’s whitespace normalization (collapse spaces, avoid double prefix), but <strong>only if</strong> the model’s config enables it. Some models disable the dummy prefix entirely.</p>
+        <p class="muted">Pitfall: <code>add_dummy_prefix</code> (GGUF: <code>tokenizer.ggml.add_space_prefix</code>) can be <em>false</em>. If CK still inserts <code>▁</code>, tokenization diverges immediately.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Unknown Runs</h3>
+        <p>When no token matches at a position, SPM inserts a single <code>&lt;unk&gt;</code> that can cover multiple consecutive bytes. CK tracks the unknown run length so one UNK covers the entire span, then merges consecutive UNKs to match SentencePiece.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Token Types Matter</h3>
+        <p>SPM vocab entries carry types (NORMAL, UNKNOWN, CONTROL, USER_DEFINED, UNUSED, BYTE). CK excludes CONTROL/UNUSED/BYTE from DP and gives USER_DEFINED tokens a score of 0 (as in llama.cpp), preventing rare but costly mismatches.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Byte Fallback</h3>
+        <p>If no SPM tokenization exists, CK falls back to byte tokens using a fast 0-255 lookup table. This covers both raw byte tokens and <code>&lt;0xXX&gt;</code> style tokens when present. If a model lacks byte tokens, CK falls back to <code>&lt;unk&gt;</code>.</p>
+    </div>
+</div>
+
+<h3>Recent Parity Bugs &amp; Fixes</h3>
+<ul>
+    <li><strong>Dummy prefix mismatch:</strong> Some models (e.g., Gemma-3) ship with <code>tokenizer.ggml.add_space_prefix=false</code>. CK previously assumed <em>true</em>, which injected a leading <code>▁</code> and caused immediate token divergence.</li>
+    <li><strong>BOS/EOS handling:</strong> GGUF metadata includes <code>tokenizer.ggml.add_bos_token</code>/<code>add_eos_token</code> plus explicit IDs. Ignoring these shifts the entire token stream and breaks embedding parity.</li>
+    <li><strong>Test coverage gap:</strong> The original <code>make test-tokenizer-spm</code> only validated default SPM behavior. It now covers three suites: default SPM, <code>add_dummy_prefix=false</code>, and BOS/EOS enabled.</li>
+</ul>
+
+<h3>Practical Notes</h3>
+<ul>
+    <li><strong>Normalization:</strong> CK implements SPM defaults <em>and</em> respects GGUF overrides (<code>add_space_prefix</code>, BOS/EOS). If a model uses custom SPM normalizer options beyond these, use the Python tokenizer for strict parity.</li>
+    <li><strong>UNK penalty:</strong> CK applies a SentencePiece-style unknown penalty during DP scoring to match reference behavior.</li>
+    <li><strong>Validation:</strong> Run <code>make test-tokenizer-spm</code>. It now validates default SPM, <code>add_dummy_prefix=false</code>, and BOS/EOS modes.</li>
+</ul>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">SentencePiece: ▁ (U+2581)</h3>
+        <ul>
+            <li><strong>3 bytes</strong>: <code>0xE2 0x96 0x81</code></li>
+            <li>Character: lower one-eighth block (▁)</li>
+            <li>Adds ▁ at <strong>start of text</strong> + replaces all spaces</li>
+            <li>Tokens: <code>"▁Hello"</code>, <code>"▁the"</code>, <code>"▁world"</code></li>
+            <li>Used by: LLaMA, T5, mBART</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">GPT-2/BPE: Ġ (U+0120)</h3>
+        <ul>
+            <li><strong>2 bytes</strong>: <code>0xC4 0xA0</code></li>
+            <li>Character: Latin G with dot above (Ġ)</li>
+            <li>Replaces spaces only, <strong>no start prefix</strong></li>
+            <li>Tokens: <code>"Hello"</code>, <code>"Ġthe"</code>, <code>"Ġworld"</code></li>
+            <li>Used by: GPT-2, GPT-4, Qwen</li>
+        </ul>
+    </div>
+</div>
+
+<h3>CK Auto-Detection</h3>
+
+<p>C-Kernel automatically detects which space encoding a model uses by scanning the vocabulary:</p>
+
+<pre><code>// From tokenizer.c - Auto-detect space prefix style
+CKSpacePrefixStyle ck_tokenizer_detect_space_prefix_style(CKTokenizer *tok) {
+    int gpt2_count = 0;  // Count tokens starting with Ġ (0xC4 0xA0)
+    int spm_count = 0;   // Count tokens starting with ▁ (0xE2 0x96 0x81)
+
+    for (size_t i = 0; i < tok->vocab_size && i < 10000; i++) {
+        const char *token = tok->id_to_token[i];
+        if (!token) continue;
+
+        // Check for GPT-2 Ġ prefix
+        if ((unsigned char)token[0] == 0xC4 &&
+            (unsigned char)token[1] == 0xA0)
+            gpt2_count++;
+
+        // Check for SPM ▁ prefix
+        if ((unsigned char)token[0] == 0xE2 &&
+            (unsigned char)token[1] == 0x96 &&
+            (unsigned char)token[2] == 0x81)
+            spm_count++;
+    }
+
+    // SPM if ▁ tokens outnumber Ġ tokens by 2:1
+    if (spm_count > gpt2_count * 2)
+        return CK_SPACE_PREFIX_SPM;
+    else
+        return CK_SPACE_PREFIX_GPT2;
+}</code></pre>
+
+<h2>Byte Fallback</h2>
+
+<p>One of SentencePiece's strongest features is <strong>byte fallback</strong>: when a character doesn't match any token in the vocabulary, it gets decomposed into individual byte tokens. This guarantees that <em>every possible input</em> can be tokenized &mdash; no <code>[UNK]</code> tokens needed.</p>
+
+<pre><code>// Example: Emoji "🎉" (U+1F389) = 4 UTF-8 bytes: 0xF0 0x9F 0x8E 0x89
+//
+// If "🎉" is not in vocabulary, byte fallback produces:
+//   ["&lt;0xF0&gt;", "&lt;0x9F&gt;", "&lt;0x8E&gt;", "&lt;0x89&gt;"]
+//
+// Each byte token has a GGUF token type of GGUF_TOKEN_BYTE (6).
+
+// From tokenizer.c - Byte fallback during DP
+if (score[end] == -INFINITY) {
+    // No token found ending here — use byte fallback
+    unsigned char byte = (unsigned char)text[end - 1];
+    int32_t byte_id = tok->byte_token_id[byte];  // Pre-built lookup
+
+    if (byte_id >= 0) {
+        score[end] = score[end - 1] + BYTE_FALLBACK_SCORE;
+        back[end] = {end - 1, byte_id};
+    }
+}</code></pre>
+
+<div class="card">
+    <h4 style="margin-top: 0;">Byte Token Format in GGUF Models</h4>
+    <p>GGUF models store 256 byte tokens with names like <code>&lt;0x00&gt;</code> through <code>&lt;0xFF&gt;</code>. CK builds a lookup table at load time:</p>
+<pre><code>// Build byte → token_id lookup (from tokenizer.c)
+static void spm_build_byte_lookup(CKTokenizer *tok, ...) {
+    memset(tok->byte_token_id, -1, sizeof(tok->byte_token_id));
+
+    for (int i = 0; i < vocab_size; i++) {
+        if (tok->types[i] == GGUF_TOKEN_BYTE) {
+            // Parse hex value from token name like "&lt;0xAB&gt;"
+            unsigned int byte_val;
+            if (sscanf(tok->id_to_token[i], "&lt;0x%02X&gt;", &byte_val) == 1) {
+                tok->byte_token_id[byte_val] = i;
+            }
+        }
+    }
+}</code></pre>
+</div>
+
+<h2>CK Implementation Deep Dive</h2>
+
+<p>The C-Kernel tokenizer implements SentencePiece through several cooperating components. Here's how the pieces fit together:</p>
+
+<h3>Core Data Structures</h3>
+
+<pre><code>// Main tokenizer structure (from tokenizer.h)
+typedef struct CKTokenizer {
+    CKTokenizerConfig config;        // Type (BPE/WordPiece/SPM), BOS/EOS flags
+
+    // Vocabulary storage (two lookup methods)
+    CKTokenizerHashTable *vocab;     // token_string → TokenInfo (hash table)
+    CKTrie *vocab_trie;              // token_string → id (trie, O(k) lookup)
+
+    // Reverse lookup
+    char **id_to_token;              // token_id → token_string
+    size_t vocab_size;
+
+    // SentencePiece-specific fields
+    float *scores;                   // token_id → unigram log-probability
+    uint8_t *types;                  // token_id → GGUF type (normal/byte/control)
+    int32_t *byte_token_id;          // byte_value → token_id (256 entries)
+
+    // Special token IDs
+    int32_t unk_id, bos_id, eos_id, pad_id;
+
+    // BPE merge rules (used when type is BPE, not SPM)
+    int32_t *merge_pairs;
+    int32_t *merge_result;
+    int32_t num_merges;
+
+    // Memory management
+    CKTokenizerMemPool pool;         // Arena allocator (16MB default)
+} CKTokenizer;</code></pre>
+
+<h3>Token Types (GGUF)</h3>
+
+<p>GGUF models annotate each vocabulary entry with a type that controls how the tokenizer treats it:</p>
+
+<table>
+    <thead>
+        <tr><th>Type</th><th>Value</th><th>Behavior in DP</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>NORMAL</code></td><td>1</td><td>Considered as candidate, scored</td><td><code>"▁Hello"</code></td></tr>
+        <tr><td><code>UNKNOWN</code></td><td>2</td><td>Excluded from DP candidates</td><td><code>"&lt;unk&gt;"</code></td></tr>
+        <tr><td><code>CONTROL</code></td><td>3</td><td>Excluded from DP candidates</td><td><code>"&lt;s&gt;"</code>, <code>"&lt;/s&gt;"</code></td></tr>
+        <tr><td><code>USER_DEFINED</code></td><td>4</td><td>Included, score treated as 0.0</td><td><code>"&lt;|im_start|&gt;"</code></td></tr>
+        <tr><td><code>UNUSED</code></td><td>5</td><td>Excluded from DP candidates</td><td>Reserved slots</td></tr>
+        <tr><td><code>BYTE</code></td><td>6</td><td>Used only in byte fallback path</td><td><code>"&lt;0xE2&gt;"</code></td></tr>
+    </tbody>
+</table>
+
+<h3>The Encoding Pipeline</h3>
+
+<p>Here's the complete flow when <code>ck_tokenizer_encode()</code> is called with <code>CK_TOKENIZER_SPM</code> mode:</p>
+
+<pre><code>int ck_tokenizer_encode(CKTokenizer *tok, const char *text, int text_len,
+                        int32_t *output_ids, int max_ids) {
+    int count = 0;
+
+    // Step 1: Add BOS token if configured
+    if (tok->config.add_bos && tok->bos_id >= 0)
+        output_ids[count++] = tok->bos_id;
+
+    // Step 2: Preprocess — add ▁ prefix and replace spaces
+    char processed[MAX_LEN];
+    spm_preprocess(text, processed);
+    //   "Hello world" → "▁Hello▁world"
+
+    // Step 3: Viterbi DP (the core algorithm)
+    int num_tokens = spm_viterbi_encode(tok, processed, strlen(processed),
+                                         output_ids + count, max_ids - count);
+    count += num_tokens;
+
+    // Step 4: Add EOS token if configured
+    if (tok->config.add_eos && tok->eos_id >= 0)
+        output_ids[count++] = tok->eos_id;
+
+    return count;
+}</code></pre>
+
+<h3>Vocabulary Lookup: Trie vs Hash Table</h3>
+
+<p>The DP forward pass needs to find all vocabulary tokens matching at each position. CK supports two lookup strategies:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h4 style="margin-top: 0;">Trie Lookup (Default)</h4>
+<pre><code>// O(k) per position — single traversal
+CKTrieNode *node = trie->root;
+int pos = start;
+
+while (pos < end) {
+    node = node->children[(uint8_t)text[pos]];
+    if (!node) break;
+    pos++;
+
+    if (node->token_id >= 0) {
+        // Found a valid token!
+        consider_candidate(node->token_id,
+                          start, pos);
+    }
+}
+// Finds ALL matching tokens in one pass</code></pre>
+        <p style="color: var(--green); font-weight: 600;">256-way branching, zero hashing</p>
+    </div>
+    <div class="card">
+        <h4 style="margin-top: 0;">Hash Table Lookup</h4>
+<pre><code>// O(n×k) per position — try all lengths
+for (int len = max_len; len >= 1; len--) {
+    char tmp[MAX_TOKEN_LEN];
+    memcpy(tmp, text + start, len);
+    tmp[len] = '\0';
+
+    TokenInfo *info = hash_lookup(vocab, tmp);
+    if (info) {
+        consider_candidate(info->id,
+                          start, start + len);
+    }
+}
+// Must try each possible length separately</code></pre>
+        <p style="color: var(--text-muted);">MurmurHash3, memcpy per attempt</p>
+    </div>
+</div>
+
+<h3>Token Score Filtering</h3>
+
+<p>Not all vocabulary tokens should participate in the DP. The encoding function filters based on GGUF token type:</p>
+
+<pre><code>// During DP candidate evaluation
+for each candidate token t at position [start..end]:
+    // Skip non-scorable tokens
+    if (tok->types[t.id] == GGUF_TOKEN_UNKNOWN)  continue;  // &lt;unk&gt;
+    if (tok->types[t.id] == GGUF_TOKEN_CONTROL)   continue;  // &lt;s&gt;, &lt;/s&gt;
+    if (tok->types[t.id] == GGUF_TOKEN_UNUSED)    continue;  // reserved
+    if (tok->types[t.id] == GGUF_TOKEN_BYTE)       continue;  // byte fallback only
+
+    // Use score from vocabulary
+    float token_score = tok->scores[t.id];
+
+    // USER_DEFINED tokens get score 0 (highest priority)
+    if (tok->types[t.id] == GGUF_TOKEN_USER_DEFINED)
+        token_score = 0.0f;
+
+    // DP transition
+    float candidate = score[start] + token_score;
+    if (candidate > score[end]) {
+        score[end] = candidate;
+        back[end] = {start, t.id};
+    }</code></pre>
+
+<h2>Loading from GGUF</h2>
+
+<p>SentencePiece tokenizers in the LLaMA ecosystem are stored as part of GGUF model files. CK loads them through a binary format optimized for fast initialization:</p>
+
+<pre><code>// GGUF metadata keys used for tokenizer loading:
+//   tokenizer.ggml.model       = "llama" (indicates SPM)
+//   tokenizer.ggml.tokens      = ["&lt;unk&gt;", "&lt;s&gt;", "&lt;/s&gt;", ..., "▁Hello", ...]
+//   tokenizer.ggml.scores      = [-1e10, -1e10, -1e10, ..., -3.8, ...]
+//   tokenizer.ggml.token_type  = [2, 3, 3, ..., 1, ...]  (UNKNOWN, CONTROL, NORMAL...)
+//   tokenizer.ggml.add_space_prefix = true/false  (SPM add_dummy_prefix)
+//   tokenizer.ggml.add_bos_token    = true/false
+//   tokenizer.ggml.add_eos_token    = true/false
+//   tokenizer.ggml.bos_token_id     = 2
+//   tokenizer.ggml.eos_token_id     = 106
+//   tokenizer.ggml.unknown_token_id = 3
+//   tokenizer.ggml.padding_token_id = 0
+
+// Loading flow:
+CKTokenizer *tok = ck_tokenizer_create(CK_TOKENIZER_SPM);
+
+// Load vocabulary + scores from GGUF-extracted data
+ck_tokenizer_load_binary_with_scores(
+    tok,
+    vocab_size,      // e.g., 151936 for Qwen, 32000 for LLaMA
+    vocab_offsets,   // Byte offsets into string pool
+    vocab_strings,   // Concatenated token strings
+    vocab_scores,    // Float scores (log-probabilities)
+    vocab_types,     // uint8 GGUF types
+    num_merges,      // 0 for pure SPM (LLaMA), >0 for BPE (Qwen)
+    merge_data       // BPE merge triples (left_id, right_id, merged_id)
+);
+
+// Apply GGUF-configured flags + IDs
+ck_tokenizer_set_add_space_prefix(tok, add_space_prefix);
+ck_tokenizer_set_add_bos_eos(tok, add_bos, add_eos);
+ck_tokenizer_set_special_ids(tok, unk_id, bos_id, eos_id, pad_id, -1);
+
+// Auto-detect space prefix style from vocabulary contents
+ck_tokenizer_detect_and_set_space_prefix(tok);</code></pre>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>BPE vs SPM in GGUF:</strong> Some models (like Qwen) use BPE but are stored in GGUF format with scores. The <code>tokenizer.ggml.model</code> field determines which algorithm to use: <code>"llama"</code> = SentencePiece, <code>"gpt2"</code> = BPE. CK checks this field and switches encoding algorithm accordingly.
+    </div>
+</div>
+
+<h2>Decoding (Token IDs → Text)</h2>
+
+<p>SentencePiece decoding is simpler than encoding &mdash; concatenate token strings and reverse the space encoding:</p>
+
+<pre><code>// Decode token IDs back to text
+int ck_tokenizer_decode(CKTokenizer *tok, const int32_t *ids, int num_ids,
+                        char *output, int max_len) {
+    int pos = 0;
+
+    for (int i = 0; i < num_ids; i++) {
+        // Skip BOS/EOS control tokens
+        if (ids[i] == tok->bos_id || ids[i] == tok->eos_id)
+            continue;
+
+        const char *token = tok->id_to_token[ids[i]];
+
+        // Handle byte fallback tokens: "&lt;0xAB&gt;" → raw byte 0xAB
+        if (tok->types[ids[i]] == GGUF_TOKEN_BYTE) {
+            unsigned int byte_val;
+            sscanf(token, "&lt;0x%02X&gt;", &byte_val);
+            output[pos++] = (char)byte_val;
+            continue;
+        }
+
+        // Copy token string to output
+        int len = strlen(token);
+        memcpy(output + pos, token, len);
+        pos += len;
+    }
+    output[pos] = '\0';
+
+    // Post-process: replace ▁ with space, trim leading space
+    spm_postprocess(output);
+    //   "▁Hello▁world" → "Hello world"
+
+    return pos;
+}</code></pre>
+
+<h2>Memory Architecture</h2>
+
+<p>The tokenizer uses an arena allocator (<code>CKTokenizerMemPool</code>) for all string storage, avoiding per-token <code>malloc</code> overhead:</p>
+
+<div class="card">
+<pre><code>// Memory pool layout (16MB default)
+┌─────────────────────────────────────────────────────┐
+│ CKTokenizerMemPool (16 MB arena)                    │
+│                                                     │
+│ ┌───────────┬──────────┬──────────┬────────────┐   │
+│ │ "▁Hello"  │ "▁world" │ "&lt;unk&gt;"  │ "&lt;0xE2&gt;"  │...│
+│ │ 10 bytes  │ 10 bytes │ 6 bytes  │ 7 bytes    │   │
+│ └───────────┴──────────┴──────────┴────────────┘   │
+│                                                     │
+│ All strings packed contiguously, zero fragmentation │
+│ Aligned allocations for SIMD hash table operations  │
+└─────────────────────────────────────────────────────┘
+
+// Trie also allocated from pool
+CKTrie: 256-way branching nodes (256 × 8 bytes per node)
+  - Typical vocab (32K-152K tokens) → 50-200K trie nodes
+  - Total trie memory: 100 KB - 1.5 MB</code></pre>
+</div>
+
+<h2>Test Results</h2>
+
+<p>The SentencePiece implementation is validated against reference tokenizers:</p>
+
+<div class="grid grid-3">
+    <div class="card card-green">
+        <h4 style="margin-top: 0;">SPM Parity</h4>
+        <p><strong>100% match</strong></p>
+        <ul>
+            <li>ASCII text</li>
+            <li>UTF-8 multilingual</li>
+            <li>Emoji byte fallback</li>
+            <li>Whitespace edge cases</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h4 style="margin-top: 0;">Model Coverage</h4>
+        <p><strong>Validated models</strong></p>
+        <ul>
+            <li>LLaMA 2/3 (SPM)</li>
+            <li>Qwen 2/2.5/3 (BPE)</li>
+            <li>Gemma 3 (SPM)</li>
+        </ul>
+    </div>
+    <div class="card card-blue">
+        <h4 style="margin-top: 0;">Performance</h4>
+        <p><strong>Trie: ~100K chars/ms</strong></p>
+        <ul>
+            <li>27-156x vs Hash Table</li>
+            <li>20-104x vs Python</li>
+            <li>16MB arena, zero malloc</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Running Tokenizer Tests</h3>
+
+<pre><code># Full tokenizer test suite
+make test-tokenizer
+
+# SentencePiece-specific parity tests
+python unittest/test_tokenizer_spm_parity.py --verbose
+
+# Multi-model parity (LLaMA, Qwen, etc.)
+python unittest/test_tokenizer_multi_model.py --verbose
+
+# GGUF format parity
+python unittest/test_tokenizer_gguf_parity.py --verbose</code></pre>
+
+<h2>API Quick Reference</h2>
+
+<h3>Create &amp; Configure</h3>
+
+<pre><code>// Create SentencePiece tokenizer
+CKTokenizer *tok = ck_tokenizer_create(CK_TOKENIZER_SPM);
+
+// Configure BOS/EOS behavior
+tok->config.add_bos = true;   // Prepend &lt;s&gt; token
+tok->config.add_eos = false;  // Don't append &lt;/s&gt;
+
+// Enable trie lookups (faster DP)
+ck_tokenizer_set_use_trie(tok, true);</code></pre>
+
+<h3>Load Vocabulary</h3>
+
+<pre><code>// Add tokens with scores
+ck_tokenizer_add_token(tok, "▁Hello", 100, -3.8f);
+ck_tokenizer_add_token(tok, "▁world", 101, -3.1f);
+
+// Add special tokens
+ck_tokenizer_add_special_token(tok, "&lt;unk&gt;", 0);
+ck_tokenizer_add_special_token(tok, "&lt;s&gt;", 1);
+ck_tokenizer_add_special_token(tok, "&lt;/s&gt;", 2);
+
+// Or load from GGUF-extracted binary data
+ck_tokenizer_load_binary_with_scores(tok, vocab_size, offsets,
+    strings, scores, types, num_merges, merges);</code></pre>
+
+<h3>Encode &amp; Decode</h3>
+
+<pre><code>// Encode text → token IDs
+int32_t ids[1024];
+int n = ck_tokenizer_encode(tok, "Hello world", -1, ids, 1024);
+// ids = [1, 12345, 67890]  (BOS + "▁Hello" + "▁world")
+
+// Decode token IDs → text
+char text[4096];
+ck_tokenizer_decode(tok, ids, n, text, 4096);
+// text = "Hello world"
+
+// Cleanup
+ck_tokenizer_free(tok);</code></pre>
+
+<h2>Related Documentation</h2>
+
+<ul>
+    <li><a href="tokenizer.html">Tokenizer Overview</a> &mdash; Full architecture: BPE, WordPiece, SentencePiece, Trie, True BPE</li>
+    <li><a href="concepts.html">Deep Dive Concepts</a> &mdash; Transformer architecture fundamentals</li>
+    <li><a href="gguf-conversion.html">GGUF Parsing</a> &mdash; How GGUF model files are loaded</li>
+    <li><a href="gguf-bump.html">GGUF to Bump</a> &mdash; Weight conversion pipeline</li>
+    <li><a href="testing.html">Testing Guide</a> &mdash; Running parity and unit tests</li>
+</ul>

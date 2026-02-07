@@ -13,17 +13,17 @@
 <para>test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add </para>
 </listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1ad611fd5e8dba3e906482d6e68f919788" kindref="member">attention_backward_causal_head_major</ref>  (const float *d_output, const float *q, const float *k, const float *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000013"/>test_attention_backward.py::TestAttentionBackward::test_backward </para>
+<listitem><para><anchor id="test_1_test000015"/>test_attention_backward.py::TestAttentionBackward::test_backward </para>
 <para>test_attention_backward.py::TestAttentionBackward::test_backward_vs_separate </para>
 <para>test_parity.py::test_attention_backward_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1adbd2b55fbc53b6e288c98813b61cd6e3" kindref="member">attention_backward_causal_head_major_gqa</ref>  (const float *d_output, const float *q, const float *k, const float *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000012"/>test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_backward </para>
+<listitem><para><anchor id="test_1_test000014"/>test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_backward </para>
 <para>test_attention_backward.py::TestAttentionBackwardGQA::test_gqa_vs_separate </para>
 <para>test_parity.py::test_attention_backward_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1a352c96355571febacea23f997e1eca12" kindref="member">attention_backward_causal_head_major_gqa_bf16</ref>  (const uint16_t *d_output, float *d_x, const uint16_t *q, const uint16_t *k, const uint16_t *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window, float *scratch_d_output, float *scratch_q, float *scratch_k, float *scratch_v)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000011"/>bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_backward </para>
+<listitem><para><anchor id="test_1_test000013"/>bf16/test_attention_bf16.py::TestAttentionBF16::test_bf16_backward </para>
 </listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1a3d8664b9e0808546484af9ec7d4ddfe1" kindref="member">attention_forward_causal_head_major</ref>  (const float *q, const float *k, const float *v, float *scores, float *output, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window)</term></varlistentry>
 <listitem><para><anchor id="test_1_test000002"/>test_attention.py::TestAttentionForward::test_causal_forward </para>
@@ -60,96 +60,114 @@
 <listitem><para><anchor id="test_1_test000008"/>test_flash_attention.py::TestFlashAttention::test_flash_strided </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention </para>
 </listitem>
-<varlistentry><term>Global <ref refid="ckernel__engine_8h_1a84803f8c5509c325dd6b9feec50a0493" kindref="member">attention_forward_decode_head_major_gqa_flash</ref>  (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000009"/>test_flash_attention.py::TestFlashAttention::test_flash_decode </para>
+<varlistentry><term>Global <ref refid="ckernel__engine_8h_1a43ffa6b99b2073d4a8b25792fb518d9c" kindref="member">attention_forward_causal_head_major_gqa_flash_strided_sliding</ref>  (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000009"/>test_attention.py::TestAttentionForward::test_sliding_window_prefill </para>
+</listitem>
+<varlistentry><term>Global <ref refid="mega__fused__attention__decode__q5__0_8c_1a84803f8c5509c325dd6b9feec50a0493" kindref="member">attention_forward_decode_head_major_gqa_flash</ref>  (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000011"/>test_flash_attention.py::TestFlashAttention::test_flash_decode </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_flash_decode </para>
 <para>test_fused_attention_decode.py::TestFusedAttentionDecode::test_flash_decode </para>
 <para>test_attention.py::TestAttentionForward::test_flash_decode </para>
 </listitem>
+<varlistentry><term>Global <ref refid="ckernel__engine_8h_1a52ccbcfc06ddbe5086502aa2e8400b43" kindref="member">attention_forward_decode_head_major_gqa_flash_sliding</ref>  (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000010"/>test_attention.py::TestAttentionForward::test_sliding_window_decode </para>
+</listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1a935728e009d1712976ed3cff71f50387" kindref="member">attention_forward_decode_head_major_gqa_regular</ref>  (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000010"/>test_kv_cache_attention.py::TestKVCacheAttention::test_regular_decode </para>
+<listitem><para><anchor id="test_1_test000012"/>test_kv_cache_attention.py::TestKVCacheAttention::test_regular_decode </para>
 <para>test_attention.py::TestAttentionForward::test_regular_decode </para>
 </listitem>
 <varlistentry><term>Global <ref refid="ckernel__engine_8h_1a05c2cabc2f651bd23803aa46f953586e" kindref="member">axpy_f32</ref>  (float *y, const float *x, float alpha, int n)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000014"/>test_axpy.py::TestAXPY::test_axpy_f32 </para>
+<listitem><para><anchor id="test_1_test000016"/>test_axpy.py::TestAXPY::test_axpy_f32 </para>
 <para>test_axpy.py::TestAXPY::test_axpy_vs_naive </para>
 </listitem>
 <varlistentry><term>Global <ref refid="softmax__kernels_8c_1a920868f80137fe3e0c9cd11acb7ba567" kindref="member">causal_softmax_head_major</ref>  (float *scores, int num_heads, int num_tokens, int aligned_context_window)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000026"/>test_softmax.py::TestSoftmaxForward::test_causal_softmax </para>
+<listitem><para><anchor id="test_1_test000032"/>test_softmax.py::TestSoftmaxForward::test_causal_softmax </para>
 <para>test_softmax.py::TestSoftmaxForward::test_causal_vs_softmax </para>
 <para>test_attention.py::TestAttentionForward::test_softmax_correctness </para>
 </listitem>
 <varlistentry><term>Global <ref refid="softmax__kernels_8c_1a6ea7267298ef550524a6277b817a8ffb" kindref="member">causal_softmax_head_major_exact</ref>  (float *scores, int num_heads, int num_tokens, int aligned_context_window)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000027"/>test_softmax.py::TestSoftmaxForward::test_causal_softmax_exact </para>
+<listitem><para><anchor id="test_1_test000033"/>test_softmax.py::TestSoftmaxForward::test_causal_softmax_exact </para>
 <para>test_softmax.py::TestSoftmaxForward::test_exact_vs_fast </para>
 </listitem>
+<varlistentry><term>Global <ref refid="gelu__kernels_8c_1a44b759126bd6e478b5fc2720aa0dd2ea" kindref="member">geglu_backward_fp32</ref>  (const float *x, const float *d_out, float *d_x, int tokens, int dim)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000020"/>test_geglu.py::TestGeGLU::test_geglu_backward_fp32 </para>
+</listitem>
+<varlistentry><term>Global <ref refid="gelu__kernels_8c_1ac2146f8009ce79891bd0b7d54e174992" kindref="member">geglu_forward_bf16</ref>  (const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000019"/>test_geglu.py::TestGeGLU::test_geglu_forward_bf16 </para>
+</listitem>
+<varlistentry><term>Global <ref refid="gelu__kernels_8c_1a80b1ec81e751b153977f05a3e44b4fda" kindref="member">geglu_forward_fp32</ref>  (const float *x, float *out, int tokens, int dim)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000018"/>test_geglu.py::TestGeGLU::test_geglu_forward_fp32 </para>
+</listitem>
 <varlistentry><term>Global <ref refid="gelu__kernels_8c_1abc5977fca1e95c2406a779657c4d2365" kindref="member">gelu_fast_inplace</ref>  (float *data, size_t n)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000015"/>test_gelu.py::TestGELUForward::test_gelu_fast_inplace </para>
+<listitem><para><anchor id="test_1_test000017"/>test_gelu.py::TestGELUForward::test_gelu_fast_inplace </para>
 <para>test_gelu.py::TestGELUForward::test_gelu_vs_exact </para>
 <para>test_parity.py::test_gelu_parity </para>
 </listitem>
+<varlistentry><term>Global <ref refid="qk__norm__kernels_8c_1a7520c628ab3cdfbb8b5d6303a2db125a" kindref="member">qk_norm_forward</ref>  (float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</term></varlistentry>
+<listitem><para><anchor id="test_1_test000021"/>unittest/test_qk_norm.py  </para>
+</listitem>
 <varlistentry><term>Global <ref refid="rmsnorm__kernels_8c_1aca68d7dda1a7de9ff926920804751db0" kindref="member">rmsnorm_backward</ref>  (const float *d_output, const float *input, const float *gamma, const float *rstd_cache, float *d_input, float *d_gamma, int tokens, int d_model, int aligned_embed_dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000017"/>test_rmsnorm.py::TestRMSNormBackward::test_backward_tokens </para>
+<listitem><para><anchor id="test_1_test000023"/>test_rmsnorm.py::TestRMSNormBackward::test_backward_tokens </para>
 <para>test_rmsnorm.py::TestRMSNormBackward::test_backward_single </para>
 <para>test_parity.py::test_rmsnorm_backward_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rmsnorm__kernels_8c_1a9a068ed02d809a81a23f09e61b820baf" kindref="member">rmsnorm_forward</ref>  (const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000016"/>test_rmsnorm.py::TestRMSNormForward::test_fp32_tokens </para>
+<listitem><para><anchor id="test_1_test000022"/>test_rmsnorm.py::TestRMSNormForward::test_fp32_tokens </para>
 <para>test_rmsnorm.py::TestRMSNormForward::test_fp32_single </para>
 <para>test_rmsnorm.py::TestRMSNormForward::test_perf_rolled </para>
 <para>test_layernorm.py::TestLayerNormForward::test_rmsnorm_compat </para>
 <para>test_parity.py::test_rmsnorm_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1af248ca325f0a6837ed9bfd3d34552c00" kindref="member">rope_backward</ref>  (const float *d_out, float *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000021"/>test_rope.py::TestRoPEBackward::test_rope_backward </para>
+<listitem><para><anchor id="test_1_test000027"/>test_rope.py::TestRoPEBackward::test_rope_backward </para>
 <para>test_rope.py::TestRoPEBackward::test_rope_backward_vs_separate </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1a71f922f5016760db12457ed82924ded3" kindref="member">rope_backward_inplace</ref>  (float *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000022"/>test_rope.py::TestRoPEBackward::test_rope_backward_inplace </para>
+<listitem><para><anchor id="test_1_test000028"/>test_rope.py::TestRoPEBackward::test_rope_backward_inplace </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1a42fa03f293de94c5422681ada891a24f" kindref="member">rope_backward_qk</ref>  (const float *d_q_out, const float *d_k_out, float *d_q, float *d_k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000025"/>test_rope.py::TestRoPEBackward::test_rope_backward_qk </para>
+<listitem><para><anchor id="test_1_test000031"/>test_rope.py::TestRoPEBackward::test_rope_backward_qk </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1a371dd522b2b7ce9064f35215f1551c28" kindref="member">rope_forward</ref>  (float *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000019"/>test_rope.py::TestRoPEForward::test_rope_forward </para>
+<listitem><para><anchor id="test_1_test000025"/>test_rope.py::TestRoPEForward::test_rope_forward </para>
 <para>test_rope.py::TestRoPEForward::test_rope_vs_separate </para>
 <para>test_parity.py::test_rope_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1ab18869516e9a6ab5998038716ac8a179" kindref="member">rope_forward_qk</ref>  (float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000023"/>test_rope.py::TestRoPEForward::test_rope_forward_qk </para>
+<listitem><para><anchor id="test_1_test000029"/>test_rope.py::TestRoPEForward::test_rope_forward_qk </para>
 <para>test_fused_attention_decode.py::TestFusedAttentionDecode::test_qk_rope </para>
 <para>test_parity.py::test_rope_qk_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1a0c3b8a23b665607b44ca3100ad11f09d" kindref="member">rope_forward_qk_strided</ref>  (float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int q_stride_tokens, int k_stride_tokens)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000024"/>test_rope.py::TestRoPEForward::test_rope_forward_qk_strided </para>
+<listitem><para><anchor id="test_1_test000030"/>test_rope.py::TestRoPEForward::test_rope_forward_qk_strided </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_qk_rope_strided </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1af58d68d69b369d23d09e33016f679c5b" kindref="member">rope_forward_strided</ref>  (float *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int head_stride_tokens)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000020"/>test_rope.py::TestRoPEForward::test_rope_strided </para>
+<listitem><para><anchor id="test_1_test000026"/>test_rope.py::TestRoPEForward::test_rope_strided </para>
 <para>test_kv_cache_attention.py::TestKVCacheAttention::test_rope_decode </para>
 </listitem>
 <varlistentry><term>Global <ref refid="rope__kernels_8c_1a3c55e1a13ca92346f9cf41bc4453f3df" kindref="member">rope_precompute_cache</ref>  (float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000018"/>test_rope.py::TestRoPECache::test_cache_computation </para>
+<listitem><para><anchor id="test_1_test000024"/>test_rope.py::TestRoPECache::test_cache_computation </para>
 <para>test_rope.py::TestRoPECache::test_cache_values </para>
 </listitem>
 <varlistentry><term>Global <ref refid="swiglu__kernels_8c_1a2d1ada314dda9d7788371a08067917d6" kindref="member">swiglu_backward</ref>  (const float *input, const float *d_output, float *d_input, int tokens, int dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000029"/>test_swiglu.py::TestSwiGLUBackward::test_backward_tokens </para>
+<listitem><para><anchor id="test_1_test000035"/>test_swiglu.py::TestSwiGLUBackward::test_backward_tokens </para>
 <para>test_swiglu.py::TestSwiGLUBackward::test_backward_single </para>
 <para>test_parity.py::test_swiglu_backward_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="swiglu__kernels_8c_1a771ec9e8b054416576cf1788ea8d3747" kindref="member">swiglu_backward_exact</ref>  (const float *input, const float *d_output, float *d_input, int tokens, int dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000031"/>test_swiglu.py::TestSwiGLUBackward::test_exact_vs_fast </para>
+<listitem><para><anchor id="test_1_test000037"/>test_swiglu.py::TestSwiGLUBackward::test_exact_vs_fast </para>
 <para>test_swiglu.py::TestSwiGLUBackward::test_exact_single </para>
 </listitem>
 <varlistentry><term>Global <ref refid="swiglu__kernels_8c_1a26369aa07808fb6aae4502d54a1ba650" kindref="member">swiglu_forward</ref>  (const float *input, float *output, int tokens, int dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000028"/>test_swiglu.py::TestSwiGLUForward::test_forward_tokens </para>
+<listitem><para><anchor id="test_1_test000034"/>test_swiglu.py::TestSwiGLUForward::test_forward_tokens </para>
 <para>test_swiglu.py::TestSwiGLUForward::test_forward_single </para>
 <para>test_mlp.py::TestMLPForward::test_swiglu_mlp </para>
 <para>test_fused_swiglu_decode.py::TestFusedSwiGLUDecode::test_fused_swiglu_decode </para>
 <para>test_parity.py::test_swiglu_parity </para>
 </listitem>
 <varlistentry><term>Global <ref refid="swiglu__kernels_8c_1a102617ea5d170076dc9e1d6ac167617c" kindref="member">swiglu_forward_exact</ref>  (const float *input, float *output, int tokens, int dim)</term></varlistentry>
-<listitem><para><anchor id="test_1_test000030"/>test_swiglu.py::TestSwiGLUForward::test_exact_vs_fast </para>
+<listitem><para><anchor id="test_1_test000036"/>test_swiglu.py::TestSwiGLUForward::test_exact_vs_fast </para>
 <para>test_swiglu.py::TestSwiGLUForward::test_exact_single</para>
 </listitem>
 </variablelist>

@@ -147,8 +147,8 @@
         <inbodydescription>
         </inbodydescription>
         <location file="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/ck_tokenizer_v6.c" line="18" column="5" bodyfile="/home/antshiv/Workspace/C-Kernel-Engine/src/v6/ck_tokenizer_v6.c" bodystart="18" bodyend="56"/>
-        <references refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="49" endline="76">ck_pool_alloc</references>
-        <references refid="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" compoundref="ck__tokenizer_8c" startline="228" endline="254">ck_tokenizer_add_merge</references>
+        <references refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" compoundref="ck__tokenizer_8c" startline="69" endline="96">ck_pool_alloc</references>
+        <references refid="ck__tokenizer_8h_1a10ff92cd939960842b992ee6faf904cc" compoundref="ck__tokenizer_8c" startline="248" endline="274">ck_tokenizer_add_merge</references>
         <references refid="ck__tokenizer__v6_8c_1a6f11f138126f83f02adef65dc6ceef4b" compoundref="ck__tokenizer__v6_8c" startline="9" endline="16">hash_string</references>
         <references refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" compoundref="ck__tokenizer_8h" startline="58">CKVocabEntry::id</references>
         <references refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" compoundref="ck__tokenizer_8h" startline="86">CKTokenizer::id_to_token</references>
@@ -157,15 +157,15 @@
         <references refid="structCKVocabEntry_1a2d8a45dd0e89ae71a3a97e0bc02632df" compoundref="ck__tokenizer_8h" startline="59">CKVocabEntry::next</references>
         <references refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" compoundref="true__bpe_8h" startline="188">num_merges</references>
         <references refid="true__bpe_8h_1ab366d3078c02b7305089770c9de837b9" compoundref="true__bpe_8h" startline="186">offsets</references>
-        <references refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
+        <references refid="structCKTokenizer_1a32688c8d51853200d766b68f9e27b3e4" compoundref="ck__tokenizer_8h" startline="78">CKTokenizer::pool</references>
         <references refid="true__bpe_8h_1afb60251d57a9ee3324fbc011e4be71e9" compoundref="true__bpe_8h" startline="131">right</references>
         <references refid="true__bpe_8h_1a24d810ef07e5196cf41374aba53c3021" compoundref="true__bpe_8h" startline="187">strings</references>
         <references refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" compoundref="ck__tokenizer_8h" startline="56">CKVocabEntry::token</references>
-        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="262">token</references>
+        <references refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" compoundref="tokenizer_8h" startline="306">token</references>
         <references refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" compoundref="ck__tokenizer_8h" startline="57">CKVocabEntry::token_len</references>
         <references refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" compoundref="ck__tokenizer_8h" startline="82">CKTokenizer::vocab_hash</references>
         <references refid="structCKTokenizer_1a8271e0624b9f4efe137f25938204bbcb" compoundref="ck__tokenizer_8h" startline="83">CKTokenizer::vocab_hash_size</references>
-        <references refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
+        <references refid="structCKTokenizer_1ada5e95a402ab1abb0295df8e1ecccc04" compoundref="ck__tokenizer_8h" startline="81">CKTokenizer::vocab_size</references>
         <references refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" compoundref="true__bpe_8h" startline="185">vocab_size</references>
       </memberdef>
       <memberdef kind="function" id="ck__tokenizer__v6_8c_1a6f11f138126f83f02adef65dc6ceef4b" prot="public" static="yes" const="no" explicit="no" inline="no" virt="non-virtual">
@@ -222,13 +222,13 @@
 <codeline lineno="24"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(!tok<sp/>||<sp/>!<ref refid="true__bpe_8h_1ab366d3078c02b7305089770c9de837b9" kindref="member">offsets</ref><sp/>||<sp/>!<ref refid="true__bpe_8h_1a24d810ef07e5196cf41374aba53c3021" kindref="member">strings</ref>)<sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>-1;</highlight></codeline>
 <codeline lineno="25"><highlight class="normal"></highlight></codeline>
 <codeline lineno="26"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="comment">//<sp/>We<sp/>assume<sp/>ck_tokenizer_init<sp/>was<sp/>already<sp/>called<sp/>to<sp/>alloc<sp/>hash<sp/>tables</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref><sp/>=<sp/>0;</highlight></codeline>
+<codeline lineno="27"><highlight class="normal"><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1ada5e95a402ab1abb0295df8e1ecccc04" kindref="member">vocab_size</ref><sp/>=<sp/>0;</highlight></codeline>
 <codeline lineno="28"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight></codeline>
 <codeline lineno="29"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">for</highlight><highlight class="normal"><sp/>(</highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>i<sp/>=<sp/>0;<sp/>i<sp/>&lt;<sp/><ref refid="true__bpe_8h_1aa47c8f70dd1f7e8ed4d6c282015f9697" kindref="member">vocab_size</ref>;<sp/>i++)<sp/>{</highlight></codeline>
 <codeline lineno="30"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref><sp/>=<sp/><ref refid="true__bpe_8h_1a24d810ef07e5196cf41374aba53c3021" kindref="member">strings</ref><sp/>+<sp/><ref refid="true__bpe_8h_1ab366d3078c02b7305089770c9de837b9" kindref="member">offsets</ref>[i];</highlight></codeline>
 <codeline lineno="31"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>len<sp/>=<sp/>(int)strlen(<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>);</highlight></codeline>
 <codeline lineno="32"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/></highlight></codeline>
-<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*entry<sp/>=<sp/>(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*)<ref refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" kindref="member">ck_pool_alloc</ref>(&amp;tok-&gt;<ref refid="structCKTokenizer_1a3020b1dc0fb08152293a842448998ca5" kindref="member">pool</ref>,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref>));</highlight></codeline>
+<codeline lineno="33"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*entry<sp/>=<sp/>(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref><sp/>*)<ref refid="ck__tokenizer_8h_1aa03130843a2ba7714a87b1bf8ac7e10c" kindref="member">ck_pool_alloc</ref>(&amp;tok-&gt;<ref refid="structCKTokenizer_1a32688c8d51853200d766b68f9e27b3e4" kindref="member">pool</ref>,<sp/></highlight><highlight class="keyword">sizeof</highlight><highlight class="normal">(<ref refid="structCKVocabEntry" kindref="compound">CKVocabEntry</ref>));</highlight></codeline>
 <codeline lineno="34"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" kindref="member">token</ref><sp/>=<sp/>(</highlight><highlight class="keywordtype">char</highlight><highlight class="normal"><sp/>*)<ref refid="tokenizer_8h_1a7d3edfa508be401819bb24057b3c1be6" kindref="member">token</ref>;<sp/></highlight></codeline>
 <codeline lineno="35"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1a667d73bdaec1e4affe0a3f5f397aba85" kindref="member">token_len</ref><sp/>=<sp/>len;</highlight></codeline>
 <codeline lineno="36"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>entry-&gt;<ref refid="structCKVocabEntry_1ada9b8b0a4490ac11fa8c1571dbd540e9" kindref="member">id</ref><sp/>=<sp/>i;</highlight></codeline>
@@ -238,7 +238,7 @@
 <codeline lineno="40"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a52c39349a30ea0dfb6ab48fa975e6fed" kindref="member">vocab_hash</ref>[bucket]<sp/>=<sp/>entry;</highlight></codeline>
 <codeline lineno="41"><highlight class="normal"></highlight></codeline>
 <codeline lineno="42"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1ac75cc1f7fb0626acdd17eecac02a0557" kindref="member">id_to_token</ref>[i]<sp/>=<sp/>entry-&gt;<ref refid="structCKVocabEntry_1a408830871dd1e7bb7fd60fccd7097d13" kindref="member">token</ref>;</highlight></codeline>
-<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1a2993f4ea714c7d2996caccf32eb9ddef" kindref="member">vocab_size</ref>++;</highlight></codeline>
+<codeline lineno="43"><highlight class="normal"><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>tok-&gt;<ref refid="structCKTokenizer_1ada5e95a402ab1abb0295df8e1ecccc04" kindref="member">vocab_size</ref>++;</highlight></codeline>
 <codeline lineno="44"><highlight class="normal"><sp/><sp/><sp/><sp/>}</highlight></codeline>
 <codeline lineno="45"><highlight class="normal"></highlight></codeline>
 <codeline lineno="46"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">if</highlight><highlight class="normal"><sp/>(<ref refid="true__bpe_8h_1a2b7dde9ca7f0e8b68ba08a1a72af47a0" kindref="member">merges</ref><sp/>&amp;&amp;<sp/><ref refid="true__bpe_8h_1a23e4d8a6c1c7c5660fd950589c26c9ca" kindref="member">num_merges</ref><sp/>&gt;<sp/>0)<sp/>{</highlight></codeline>
