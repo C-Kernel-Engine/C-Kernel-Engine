@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780">
+  <defs>
+    <linearGradient id="bpeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#74c0fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4dabf7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="wpGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e599f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#da77f2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="spmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#69db7c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#40c057;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="780" fill="#0d1b2a"/>
+
+  <!-- Title -->
+  <text x="600" y="45" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#fff" text-anchor="middle">Tokenizer Algorithms: BPE vs WordPiece vs SentencePiece</text>
+  <text x="600" y="72" font-family="Arial, sans-serif" font-size="14" fill="#888" text-anchor="middle">How each algorithm tokenizes the same input text differently</text>
+
+  <!-- Column 1: BPE -->
+  <g transform="translate(30, 100)">
+    <rect width="370" height="620" rx="12" fill="url(#bpeGrad)" opacity="0.08" stroke="#74c0fc" stroke-width="2"/>
+
+    <!-- Header -->
+    <rect x="10" y="10" width="350" height="50" rx="8" fill="#74c0fc" opacity="0.2"/>
+    <text x="185" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#74c0fc" text-anchor="middle">BPE</text>
+    <text x="185" y="50" font-family="Arial, sans-serif" font-size="11" fill="#aaa" text-anchor="middle">Byte-Pair Encoding (GPT-2, Qwen, LLaMA)</text>
+
+    <!-- Algorithm -->
+    <text x="20" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc">Algorithm:</text>
+    <text x="20" y="108" font-family="Arial, sans-serif" font-size="11" fill="#fff">1. Split into characters</text>
+    <text x="20" y="126" font-family="Arial, sans-serif" font-size="11" fill="#fff">2. Merge most frequent pair</text>
+    <text x="20" y="144" font-family="Arial, sans-serif" font-size="11" fill="#fff">3. Repeat until vocab size reached</text>
+
+    <!-- Example -->
+    <text x="20" y="176" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc">Encoding "unbreakable":</text>
+    <rect x="15" y="185" width="340" height="170" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="25" y="205" font-family="monospace" font-size="11" fill="#aaa">Start: [u,n,b,r,e,a,k,a,b,l,e]</text>
+    <text x="25" y="225" font-family="monospace" font-size="11" fill="#fff">Merge 'a'+'b' → 'ab'  (priority 1)</text>
+    <text x="25" y="245" font-family="monospace" font-size="11" fill="#fff">Merge 'l'+'e' → 'le'  (priority 2)</text>
+    <text x="25" y="265" font-family="monospace" font-size="11" fill="#fff">Merge 'ab'+'le' → 'able' (pri 3)</text>
+    <text x="25" y="285" font-family="monospace" font-size="11" fill="#fff">Merge 'un'+'bre' → ...   </text>
+    <text x="25" y="310" font-family="monospace" font-size="12" fill="#74c0fc">→ ["un", "break", "able"]</text>
+    <text x="25" y="340" font-family="monospace" font-size="10" fill="#666">Merges applied in PRIORITY order</text>
+
+    <!-- Space handling -->
+    <text x="20" y="380" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#74c0fc">Space Handling:</text>
+    <text x="20" y="400" font-family="monospace" font-size="11" fill="#fff">GPT-2: space → Ġ (U+0120)</text>
+    <text x="20" y="418" font-family="monospace" font-size="11" fill="#aaa">"hello world" → "hello Ġworld"</text>
+
+    <!-- Pros/Cons -->
+    <text x="20" y="452" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Pros:</text>
+    <text x="20" y="472" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Byte-level = handles all inputs</text>
+    <text x="20" y="490" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Simple, fast merge algorithm</text>
+    <text x="20" y="508" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Most popular for LLMs</text>
+
+    <text x="20" y="538" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f85149">Cons:</text>
+    <text x="20" y="558" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Not globally optimal</text>
+    <text x="20" y="576" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Greedy = different from SPM</text>
+
+    <!-- Models -->
+    <rect x="15" y="590" width="340" height="24" rx="4" fill="#74c0fc" opacity="0.15"/>
+    <text x="185" y="607" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#74c0fc" text-anchor="middle">GPT-2 / GPT-4 / Qwen / Mistral</text>
+  </g>
+
+  <!-- Column 2: WordPiece -->
+  <g transform="translate(415, 100)">
+    <rect width="370" height="620" rx="12" fill="url(#wpGrad)" opacity="0.08" stroke="#e599f7" stroke-width="2"/>
+
+    <!-- Header -->
+    <rect x="10" y="10" width="350" height="50" rx="8" fill="#e599f7" opacity="0.2"/>
+    <text x="185" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#e599f7" text-anchor="middle">WordPiece</text>
+    <text x="185" y="50" font-family="Arial, sans-serif" font-size="11" fill="#aaa" text-anchor="middle">Greedy Longest-Match (BERT)</text>
+
+    <!-- Algorithm -->
+    <text x="20" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e599f7">Algorithm:</text>
+    <text x="20" y="108" font-family="Arial, sans-serif" font-size="11" fill="#fff">1. Split on whitespace</text>
+    <text x="20" y="126" font-family="Arial, sans-serif" font-size="11" fill="#fff">2. Greedy longest-match from vocab</text>
+    <text x="20" y="144" font-family="Arial, sans-serif" font-size="11" fill="#fff">3. Use ## prefix for continuations</text>
+
+    <!-- Example -->
+    <text x="20" y="176" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e599f7">Encoding "unbreakable":</text>
+    <rect x="15" y="185" width="340" height="170" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="25" y="205" font-family="monospace" font-size="11" fill="#aaa">Lookup: "unbreakable" → not found</text>
+    <text x="25" y="225" font-family="monospace" font-size="11" fill="#aaa">Lookup: "unbreakab"  → not found</text>
+    <text x="25" y="245" font-family="monospace" font-size="11" fill="#fff">Lookup: "un"         → FOUND!</text>
+    <text x="25" y="265" font-family="monospace" font-size="11" fill="#fff">Lookup: "##break"    → FOUND!</text>
+    <text x="25" y="285" font-family="monospace" font-size="11" fill="#fff">Lookup: "##able"     → FOUND!</text>
+    <text x="25" y="310" font-family="monospace" font-size="12" fill="#e599f7">→ ["un", "##break", "##able"]</text>
+    <text x="25" y="340" font-family="monospace" font-size="10" fill="#666">## prefix marks sub-word continuation</text>
+
+    <!-- Space handling -->
+    <text x="20" y="380" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e599f7">Space Handling:</text>
+    <text x="20" y="400" font-family="monospace" font-size="11" fill="#fff">Split on whitespace first</text>
+    <text x="20" y="418" font-family="monospace" font-size="11" fill="#aaa">"hello world" → ["hello", "world"]</text>
+
+    <!-- Pros/Cons -->
+    <text x="20" y="452" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Pros:</text>
+    <text x="20" y="472" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Very fast (greedy)</text>
+    <text x="20" y="490" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Simple implementation</text>
+    <text x="20" y="508" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Well-tested (BERT ecosystem)</text>
+
+    <text x="20" y="538" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f85149">Cons:</text>
+    <text x="20" y="558" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• [UNK] for unknown tokens</text>
+    <text x="20" y="576" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Not reversible (loses spaces)</text>
+
+    <!-- Models -->
+    <rect x="15" y="590" width="340" height="24" rx="4" fill="#e599f7" opacity="0.15"/>
+    <text x="185" y="607" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#e599f7" text-anchor="middle">BERT / RoBERTa / DistilBERT</text>
+  </g>
+
+  <!-- Column 3: SentencePiece -->
+  <g transform="translate(800, 100)">
+    <rect width="370" height="620" rx="12" fill="url(#spmGrad)" opacity="0.08" stroke="#69db7c" stroke-width="2"/>
+
+    <!-- Header -->
+    <rect x="10" y="10" width="350" height="50" rx="8" fill="#69db7c" opacity="0.2"/>
+    <text x="185" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#69db7c" text-anchor="middle">SentencePiece</text>
+    <text x="185" y="50" font-family="Arial, sans-serif" font-size="11" fill="#aaa" text-anchor="middle">Unigram LM + Viterbi DP (LLaMA, T5)</text>
+
+    <!-- Algorithm -->
+    <text x="20" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Algorithm:</text>
+    <text x="20" y="108" font-family="Arial, sans-serif" font-size="11" fill="#fff">1. Replace spaces with ▁</text>
+    <text x="20" y="126" font-family="Arial, sans-serif" font-size="11" fill="#fff">2. Viterbi DP: maximize Σlog_prob</text>
+    <text x="20" y="144" font-family="Arial, sans-serif" font-size="11" fill="#fff">3. Backtrack for optimal sequence</text>
+
+    <!-- Example -->
+    <text x="20" y="176" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Encoding "unbreakable":</text>
+    <rect x="15" y="185" width="340" height="170" rx="6" fill="#0d1b2a" stroke="#333"/>
+    <text x="25" y="205" font-family="monospace" font-size="11" fill="#aaa">Preprocess: "▁unbreakable"</text>
+    <text x="25" y="225" font-family="monospace" font-size="11" fill="#fff">DP forward pass:</text>
+    <text x="25" y="245" font-family="monospace" font-size="11" fill="#fff">  "▁un"     score: -2.3</text>
+    <text x="25" y="265" font-family="monospace" font-size="11" fill="#fff">  "break"   score: -1.8</text>
+    <text x="25" y="285" font-family="monospace" font-size="11" fill="#fff">  "able"    score: -1.5</text>
+    <text x="25" y="310" font-family="monospace" font-size="12" fill="#69db7c">→ ["▁un", "break", "able"]</text>
+    <text x="25" y="340" font-family="monospace" font-size="10" fill="#666">GLOBALLY OPTIMAL tokenization</text>
+
+    <!-- Space handling -->
+    <text x="20" y="380" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Space Handling:</text>
+    <text x="20" y="400" font-family="monospace" font-size="11" fill="#fff">SPM: space → ▁ (U+2581)</text>
+    <text x="20" y="418" font-family="monospace" font-size="11" fill="#aaa">"hello world" → "▁hello▁world"</text>
+
+    <!-- Pros/Cons -->
+    <text x="20" y="452" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#69db7c">Pros:</text>
+    <text x="20" y="472" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Globally optimal (Viterbi)</text>
+    <text x="20" y="490" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Fully reversible</text>
+    <text x="20" y="508" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Byte fallback (no UNK)</text>
+
+    <text x="20" y="538" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f85149">Cons:</text>
+    <text x="20" y="558" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Slower than greedy (O(n×k))</text>
+    <text x="20" y="576" font-family="Arial, sans-serif" font-size="11" fill="#aaa">• Scores needed (from training)</text>
+
+    <!-- Models -->
+    <rect x="15" y="590" width="340" height="24" rx="4" fill="#69db7c" opacity="0.15"/>
+    <text x="185" y="607" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#69db7c" text-anchor="middle">LLaMA / T5 / mBART / ALBERT</text>
+  </g>
+
+  <!-- Bottom comparison bar -->
+  <g transform="translate(50, 740)">
+    <rect width="1100" height="30" rx="6" fill="#ffb400" opacity="0.1" stroke="#ffb400" stroke-width="1"/>
+    <text x="550" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffb400" text-anchor="middle">C-Kernel-Engine supports ALL THREE algorithms — BPE (True BPE for 100% HF parity), WordPiece, and SentencePiece (Viterbi DP)</text>
+  </g>
+</svg>

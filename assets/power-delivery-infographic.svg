@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #ffb400; }
+      .subtitle { font-size: 14px; fill: #707070; }
+      .label { font-size: 13px; fill: #a0b0c0; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+      .label-bold { font-size: 13px; fill: #e0e0e0; font-weight: 700; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+      .axis-label { font-size: 11px; fill: #607080; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+      .section-title { font-size: 18px; font-weight: 700; }
+      .callout { font-size: 12px; fill: #c0c8d0; }
+      .callout-bold { font-size: 12px; fill: #ffffff; font-weight: 700; }
+      .stat-big { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+      .stat-unit { font-size: 14px; fill: #888; }
+      .stat-label { font-size: 12px; fill: #a0b0c0; }
+    </style>
+
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1b2a"/>
+      <stop offset="100%" style="stop-color:#0a1420"/>
+    </linearGradient>
+
+    <linearGradient id="gpuSpikeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#ff6b6b;stop-opacity:0.05"/>
+    </linearGradient>
+
+    <linearGradient id="cpuSteadyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#47b475;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#47b475;stop-opacity:0.05"/>
+    </linearGradient>
+
+    <linearGradient id="dangerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#ff4444"/>
+    </linearGradient>
+
+    <linearGradient id="safeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#2d7a4c"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+
+    <filter id="glowRed">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#ff6b6b" flood-opacity="0.3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <filter id="glowGreen">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood flood-color="#47b475" flood-opacity="0.3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="url(#bgGrad)" rx="12"/>
+
+  <!-- Title -->
+  <text x="600" y="45" class="title" text-anchor="middle">Power Delivery Reality: GPU Spikes vs CPU Steady State</text>
+  <text x="600" y="68" class="subtitle" text-anchor="middle">The hidden infrastructure cost that GPU benchmarks never show</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- GPU POWER PROFILE (Left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="30" y="90" width="560" height="310" rx="10" fill="#111a28" stroke="#2a2a3a" stroke-width="1" filter="url(#shadow)"/>
+  <text x="310" y="120" class="section-title" fill="#ff6b6b" text-anchor="middle">GPU Power Profile: Burst-Idle-Burst</text>
+
+  <!-- Chart area -->
+  <g transform="translate(70, 140)">
+    <!-- Y axis labels -->
+    <text x="-8" y="8" class="axis-label" text-anchor="end">700W</text>
+    <text x="-8" y="58" class="axis-label" text-anchor="end">500W</text>
+    <text x="-8" y="108" class="axis-label" text-anchor="end">300W</text>
+    <text x="-8" y="158" class="axis-label" text-anchor="end">150W</text>
+    <text x="-8" y="208" class="axis-label" text-anchor="end">0W</text>
+
+    <!-- Grid lines -->
+    <line x1="0" y1="5" x2="480" y2="5" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="55" x2="480" y2="55" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="105" x2="480" y2="105" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="155" x2="480" y2="155" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="205" x2="480" y2="205" stroke="#2a3a4a" stroke-width="1"/>
+
+    <!-- GPU spike waveform - burst/idle/burst pattern -->
+    <!-- Fill area under curve -->
+    <path d="M0,155 L0,155 L10,155 L15,10 L75,10 L80,155 L100,155 L105,10 L180,10 L185,155 L210,155 L215,10 L260,10 L265,155 L290,155 L295,10 L390,10 L395,155 L420,155 L425,10 L470,10 L475,155 L480,155 L480,205 L0,205 Z"
+          fill="url(#gpuSpikeGrad)"/>
+
+    <!-- GPU spike line -->
+    <path d="M0,155 L10,155 L15,10 L75,10 L80,155 L100,155 L105,10 L180,10 L185,155 L210,155 L215,10 L260,10 L265,155 L290,155 L295,10 L390,10 L395,155 L420,155 L425,10 L470,10 L475,155 L480,155"
+          fill="none" stroke="#ff6b6b" stroke-width="2.5" filter="url(#glowRed)"/>
+
+    <!-- di/dt spike annotations -->
+    <line x1="15" y1="10" x2="15" y2="155" stroke="#ff4444" stroke-width="1" stroke-dasharray="4,2" opacity="0.5"/>
+    <text x="17" y="85" class="axis-label" fill="#ff6b6b" transform="rotate(-90, 17, 85)" text-anchor="middle">di/dt spike</text>
+
+    <line x1="80" y1="10" x2="80" y2="155" stroke="#ff4444" stroke-width="1" stroke-dasharray="4,2" opacity="0.5"/>
+
+    <!-- Time axis labels -->
+    <text x="45" y="225" class="axis-label" text-anchor="middle">compute</text>
+    <text x="90" y="225" class="axis-label" text-anchor="middle">wait</text>
+    <text x="142" y="225" class="axis-label" text-anchor="middle">compute</text>
+    <text x="197" y="225" class="axis-label" text-anchor="middle">wait</text>
+    <text x="237" y="225" class="axis-label" text-anchor="middle">compute</text>
+    <text x="342" y="225" class="axis-label" text-anchor="middle">compute</text>
+    <text x="240" y="240" class="axis-label" text-anchor="middle">Time &#x2192;</text>
+  </g>
+
+  <!-- GPU stats -->
+  <text x="310" y="390" class="label" text-anchor="middle">Peak-to-idle ratio: <tspan fill="#ff6b6b" font-weight="700">5:1</tspan>  |  di/dt: <tspan fill="#ff6b6b" font-weight="700">Extreme</tspan>  |  Infrastructure: <tspan fill="#ff6b6b" font-weight="700">Substation-grade</tspan></text>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CPU POWER PROFILE (Right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="610" y="90" width="560" height="310" rx="10" fill="#111a28" stroke="#2a2a3a" stroke-width="1" filter="url(#shadow)"/>
+  <text x="890" y="120" class="section-title" fill="#47b475" text-anchor="middle">CPU Power Profile: Steady State</text>
+
+  <!-- Chart area -->
+  <g transform="translate(650, 140)">
+    <!-- Y axis labels -->
+    <text x="-8" y="8" class="axis-label" text-anchor="end">700W</text>
+    <text x="-8" y="58" class="axis-label" text-anchor="end">500W</text>
+    <text x="-8" y="108" class="axis-label" text-anchor="end">300W</text>
+    <text x="-8" y="158" class="axis-label" text-anchor="end">150W</text>
+    <text x="-8" y="208" class="axis-label" text-anchor="end">0W</text>
+
+    <!-- Grid lines -->
+    <line x1="0" y1="5" x2="480" y2="5" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="55" x2="480" y2="55" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="105" x2="480" y2="105" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="155" x2="480" y2="155" stroke="#1a2a3a" stroke-width="0.5" stroke-dasharray="3,3"/>
+    <line x1="0" y1="205" x2="480" y2="205" stroke="#2a3a4a" stroke-width="1"/>
+
+    <!-- CPU steady waveform - gentle variation around 300W -->
+    <!-- Fill area under curve -->
+    <path d="M0,105 Q20,100 40,108 Q60,112 80,105 Q100,98 120,102 Q140,108 160,105 Q180,100 200,107 Q220,112 240,105 Q260,98 280,103 Q300,108 320,105 Q340,100 360,107 Q380,110 400,105 Q420,100 440,108 Q460,112 480,105 L480,205 L0,205 Z"
+          fill="url(#cpuSteadyGrad)"/>
+
+    <!-- CPU steady line -->
+    <path d="M0,105 Q20,100 40,108 Q60,112 80,105 Q100,98 120,102 Q140,108 160,105 Q180,100 200,107 Q220,112 240,105 Q260,98 280,103 Q300,108 320,105 Q340,100 360,107 Q380,110 400,105 Q420,100 440,108 Q460,112 480,105"
+          fill="none" stroke="#47b475" stroke-width="2.5" filter="url(#glowGreen)"/>
+
+    <!-- DVFS label -->
+    <text x="240" y="90" class="axis-label" fill="#47b475" text-anchor="middle">DVFS: gradual, predictable transitions</text>
+
+    <!-- Steady band indicator -->
+    <rect x="0" y="98" width="480" height="16" fill="none" stroke="#47b475" stroke-width="0.5" stroke-dasharray="4,4" rx="3" opacity="0.4"/>
+
+    <!-- Time axis -->
+    <text x="240" y="225" class="axis-label" text-anchor="middle">Consistent load over time &#x2192;</text>
+  </g>
+
+  <!-- CPU stats -->
+  <text x="890" y="390" class="label" text-anchor="middle">Peak-to-idle ratio: <tspan fill="#47b475" font-weight="700">2:1</tspan>  |  di/dt: <tspan fill="#47b475" font-weight="700">Minimal</tspan>  |  Infrastructure: <tspan fill="#47b475" font-weight="700">Standard datacenter</tspan></text>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SIGNAL INTEGRITY PROBLEMS (Bottom Left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="30" y="420" width="370" height="280" rx="10" fill="#111a28" stroke="#2a2a3a" stroke-width="1" filter="url(#shadow)"/>
+  <text x="215" y="452" class="section-title" fill="#ff6b6b" text-anchor="middle">Signal Integrity Problems</text>
+  <text x="215" y="470" class="subtitle" text-anchor="middle">GPU high-speed switching side effects</text>
+
+  <!-- Signal reflection illustration -->
+  <g transform="translate(55, 490)">
+    <!-- Trace -->
+    <rect x="0" y="15" width="300" height="6" rx="3" fill="#1a2a3a"/>
+
+    <!-- Clean signal going right -->
+    <path d="M10,5 L30,5 L30,30 L50,30 L50,5 L70,5 L70,30 L90,30" fill="none" stroke="#ff6b6b" stroke-width="2"/>
+    <!-- Reflected/distorted signal -->
+    <path d="M150,5 L165,5 L168,30 L172,2 L180,28 L190,8 L200,25 L215,12 L225,20 L240,15"
+          fill="none" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.7"/>
+
+    <text x="50" y="50" class="axis-label" text-anchor="middle" fill="#c08080">Clean signal</text>
+    <text x="195" y="50" class="axis-label" text-anchor="middle" fill="#ff6b6b">Reflections + ringing</text>
+  </g>
+
+  <!-- Problem list -->
+  <g transform="translate(55, 560)">
+    <circle cx="8" cy="8" r="4" fill="#ff6b6b"/>
+    <text x="20" y="12" class="callout"><tspan class="callout-bold">Reflections</tspan> &#x2014; impedance mismatch at GPU transitions</text>
+
+    <circle cx="8" cy="33" r="4" fill="#ff6b6b"/>
+    <text x="20" y="37" class="callout"><tspan class="callout-bold">Crosstalk</tspan> &#x2014; adjacent signal lines interfere</text>
+
+    <circle cx="8" cy="58" r="4" fill="#ff6b6b"/>
+    <text x="20" y="62" class="callout"><tspan class="callout-bold">Ground bounce</tspan> &#x2014; simultaneous CUDA core switching</text>
+
+    <circle cx="8" cy="83" r="4" fill="#ff6b6b"/>
+    <text x="20" y="87" class="callout"><tspan class="callout-bold">EMI radiation</tspan> &#x2014; high di/dt radiates interference</text>
+
+    <circle cx="8" cy="108" r="4" fill="#ff6b6b"/>
+    <text x="20" y="112" class="callout"><tspan class="callout-bold">VRM stress</tspan> &#x2014; voltage regulators fight transient spikes</text>
+  </g>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- THEORY OF CONSTRAINTS (Bottom Center) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="415" y="420" width="370" height="280" rx="10" fill="#111a28" stroke="#2a2a3a" stroke-width="1" filter="url(#shadow)"/>
+  <text x="600" y="452" class="section-title" fill="#ffb400" text-anchor="middle">Theory of Constraints: Power</text>
+  <text x="600" y="470" class="subtitle" text-anchor="middle">Fastest and slowest parts should match</text>
+
+  <!-- GPU mismatch bar -->
+  <g transform="translate(440, 495)">
+    <text x="0" y="0" class="label-bold" fill="#ff6b6b">GPU: 5:1 mismatch</text>
+    <!-- Peak bar -->
+    <rect x="0" y="12" width="320" height="22" rx="4" fill="#ff6b6b" opacity="0.25"/>
+    <rect x="0" y="12" width="320" height="22" rx="4" fill="url(#dangerGrad)" opacity="0.8"/>
+    <text x="160" y="28" class="axis-label" fill="#fff" text-anchor="middle" font-weight="700">Peak: 700W burst</text>
+
+    <!-- Idle bar -->
+    <rect x="0" y="42" width="64" height="22" rx="4" fill="#ff6b6b" opacity="0.25"/>
+    <rect x="0" y="42" width="64" height="22" rx="4" fill="#882222"/>
+    <text x="32" y="58" class="axis-label" fill="#ff6b6b" text-anchor="middle" font-weight="700">150W</text>
+
+    <!-- Gap annotation -->
+    <line x1="64" y1="53" x2="320" y2="53" stroke="#ff6b6b" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>
+    <text x="192" y="78" class="axis-label" fill="#ff6b6b" text-anchor="middle">Wasted infrastructure capacity</text>
+  </g>
+
+  <!-- CPU match bar -->
+  <g transform="translate(440, 610)">
+    <text x="0" y="0" class="label-bold" fill="#47b475">CPU: 2:1 match</text>
+    <!-- Peak bar -->
+    <rect x="0" y="12" width="190" height="22" rx="4" fill="#47b475" opacity="0.25"/>
+    <rect x="0" y="12" width="190" height="22" rx="4" fill="url(#safeGrad)" opacity="0.8"/>
+    <text x="95" y="28" class="axis-label" fill="#fff" text-anchor="middle" font-weight="700">Peak: 400W steady</text>
+
+    <!-- Idle bar -->
+    <rect x="0" y="42" width="95" height="22" rx="4" fill="#47b475" opacity="0.25"/>
+    <rect x="0" y="42" width="95" height="22" rx="4" fill="#1d5a3c"/>
+    <text x="47" y="58" class="axis-label" fill="#47b475" text-anchor="middle" font-weight="700">200W</text>
+
+    <!-- Match annotation -->
+    <text x="95" y="78" class="axis-label" fill="#47b475" text-anchor="middle">Tight range = standard power delivery</text>
+  </g>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- INFRASTRUCTURE COST (Bottom Right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="800" y="420" width="370" height="280" rx="10" fill="#111a28" stroke="#2a2a3a" stroke-width="1" filter="url(#shadow)"/>
+  <text x="985" y="452" class="section-title" fill="#fbbf24" text-anchor="middle">Infrastructure Impact</text>
+  <text x="985" y="470" class="subtitle" text-anchor="middle">What GPU benchmarks never include</text>
+
+  <!-- GPU infrastructure -->
+  <g transform="translate(825, 490)">
+    <text x="0" y="0" class="label-bold" fill="#ff6b6b">GPU Data Center Requires:</text>
+
+    <rect x="0" y="14" width="320" height="28" rx="5" fill="#1a1020" stroke="#ff6b6b" stroke-width="0.5"/>
+    <text x="10" y="33" class="callout" fill="#ff9999">Specialized power substations</text>
+    <text x="310" y="33" class="callout" fill="#ff6b6b" text-anchor="end">$$$</text>
+
+    <rect x="0" y="48" width="320" height="28" rx="5" fill="#1a1020" stroke="#ff6b6b" stroke-width="0.5"/>
+    <text x="10" y="67" class="callout" fill="#ff9999">Overprovisioned PDUs for transient spikes</text>
+    <text x="310" y="67" class="callout" fill="#ff6b6b" text-anchor="end">$$</text>
+
+    <rect x="0" y="82" width="320" height="28" rx="5" fill="#1a1020" stroke="#ff6b6b" stroke-width="0.5"/>
+    <text x="10" y="101" class="callout" fill="#ff9999">Heavy-duty capacitor banks</text>
+    <text x="310" y="101" class="callout" fill="#ff6b6b" text-anchor="end">$$</text>
+
+    <rect x="0" y="116" width="320" height="28" rx="5" fill="#1a1020" stroke="#ff6b6b" stroke-width="0.5"/>
+    <text x="10" y="135" class="callout" fill="#ff9999">Enhanced cooling for thermal spikes</text>
+    <text x="310" y="135" class="callout" fill="#ff6b6b" text-anchor="end">$$</text>
+  </g>
+
+  <!-- CPU infrastructure -->
+  <g transform="translate(825, 650)">
+    <text x="0" y="0" class="label-bold" fill="#47b475">CPU Data Center Requires:</text>
+
+    <rect x="0" y="14" width="320" height="32" rx="5" fill="#0a1a15" stroke="#47b475" stroke-width="0.5"/>
+    <text x="160" y="35" class="callout" fill="#80c0a0" text-anchor="middle">Standard data center power delivery. That's it.</text>
+  </g>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- BOTTOM PUNCHLINE -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="30" y="720" width="1140" height="80" rx="10" fill="#1a1510" stroke="#ffb400" stroke-width="1.5"/>
+  <g transform="translate(60, 755)">
+    <rect x="0" y="-12" width="8" height="30" rx="2" fill="#ffb400"/>
+    <text x="22" y="5" fill="#ffb400" font-size="16" font-weight="700">The peak FLOPS that GPUs advertise are real.</text>
+    <text x="22" y="26" fill="#a0b0c0" font-size="14">The cost of actually delivering that power &#x2014; substations, PDUs, capacitor banks, signal integrity &#x2014; is hidden from every benchmark and marketing slide.</text>
+  </g>
+
+  <!-- Bottom right comparison stat -->
+  <g transform="translate(980, 740)">
+    <text x="0" y="8" class="stat-big" fill="#47b475" text-anchor="end">0</text>
+    <text x="5" y="8" class="stat-unit"> substations</text>
+    <text x="0" y="30" class="stat-label" text-anchor="start">required for CPU inference</text>
+  </g>
+
+  <!-- Watermark -->
+  <text x="600" y="835" fill="#252535" font-size="11" text-anchor="middle" font-family="monospace">C-Kernel-Engine | Power Delivery Reality</text>
+</svg>

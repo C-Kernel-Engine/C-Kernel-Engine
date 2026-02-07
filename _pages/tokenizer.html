@@ -174,14 +174,15 @@ Pretokenized: ["def", " fib", "onacci", "(", "n", "):"]
             <li>Case sensitivity options</li>
         </ul>
     </div>
-    <div class="card">
+    <div class="card card-green">
         <h3 style="margin-top: 0;">SentencePiece</h3>
         <ul>
             <li>Unigram language model</li>
-            <li>Whitespace normalization</li>
+            <li>Viterbi DP (globally optimal)</li>
+            <li>Byte fallback (no UNK)</li>
             <li>Reversible tokenization</li>
-            <li>Unicode-aware</li>
         </ul>
+        <p><a href="sentencepiece.html" style="color: var(--green); font-weight: 600;">Deep Dive &rarr;</a></p>
     </div>
 </div>
 
@@ -342,6 +343,7 @@ python unittest/test_tokenizer_unified.py --verbose</code></pre>
 <h2>Related Documentation</h2>
 
 <ul>
+    <li><a href="sentencepiece.html">SentencePiece Deep Dive</a> - Viterbi DP algorithm, byte fallback, space encoding</li>
     <li><a href="concepts.html">Core Concepts</a> - Tokenization fundamentals</li>
     <li><a href="kernels.html">Kernel Catalog</a> - Available operations</li>
     <li><a href="gguf-conversion.html">GGUF Format</a> - Model file format</li>
