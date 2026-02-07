@@ -16,6 +16,7 @@ var ckernel__dtype_8h =
       [ "CK_DT_Q8_K", "ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a56e5feef9706cd28009bf513a9448c0a", null ],
       [ "CK_DT_Q5_0", "ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226", null ],
       [ "CK_DT_Q5_1", "ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65ae58431c6a0ad3a7c32f7a4e746545688", null ],
+      [ "CK_DT_Q5_K", "ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a6a160e6789b7978dbb4e68f80c28850d", null ],
       [ "CK_DT_COUNT", "ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a405b96894cae73fedf29bfa4cdcff218", null ]
     ] ],
     [ "ck_dtype_block_bytes", "ckernel__dtype_8h.html#a5c8c0745aaf531bc18faf5fbabe496e3", null ],
