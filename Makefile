@@ -31,13 +31,19 @@ endif
 ifneq ($(findstring icx,$(CC)),)
     CXX ?= icpx
 endif
-# OpenMP flag varies by compiler (icx/icc prefer -qopenmp; gcc/clang use -fopenmp).
-OPENMP_FLAG ?= -fopenmp
+# OpenMP is opt-in for runtime stability (v6.6 uses threadpool parallelism).
+# Enable explicitly when needed:
+#   make CK_ENABLE_OPENMP=1
+CK_ENABLE_OPENMP ?= 0
+OPENMP_FLAG :=
+ifeq ($(CK_ENABLE_OPENMP),1)
+OPENMP_FLAG := -fopenmp
 ifneq (,$(findstring icc,$(CC)))
 OPENMP_FLAG := -qopenmp
 endif
 ifneq (,$(findstring icx,$(CC)))
 OPENMP_FLAG := -qopenmp
+endif
 endif
 # You can override AVX/arch flags from the environment if needed, e.g.:
 #   make AVX_FLAGS="-mavx2"
@@ -118,8 +124,12 @@ BUILD_STAMP := $(BUILD_DIR)/.ck_build_flags
 # =============================================================================
 # Intel oneAPI Integration (MKL / oneDNN)
 # =============================================================================
-# Auto-detection: MKL is used automatically if found
-# Disable with: make USE_NATIVE=1
+# Auto-detection: default to native backend for runtime portability.
+# Use MKL/oneDNN explicitly when needed:
+#   make USE_MKL=1
+#   make USE_ONEDNN=1
+# (This avoids pulling Intel OpenMP runtime into default builds.)
+USE_NATIVE ?= 1
 # Force MKL:    make USE_MKL=1
 # Force oneDNN: make USE_ONEDNN=1
 
@@ -225,10 +235,12 @@ SRCS    := src/backend_native.c \
 	           src/kernels/layernorm_kernels.c \
 	           src/kernels/layernorm_kernels_bf16.c \
 	           src/kernels/gelu_kernels.c \
+	           src/kernels/geglu_kernels.c \
 	           src/kernels/gelu_kernels_bf16.c \
 	           src/kernels/softmax_kernels.c \
 	           src/kernels/softmax_kernels_bf16.c \
 	           src/kernels/attention_kernels.c \
+	           src/kernels/attention_kernels_sliding.c \
 	           src/kernels/attention_flash_true.c \
 	           src/kernels/attention_decode_fused.c \
 	           src/kernels/embedding_kernels.c \
@@ -260,6 +272,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_kernels_q5_0.c \
 	           src/kernels/gemm_kernels_q5_0_sse_v2.c \
 	           src/kernels/gemm_kernels_q5_1.c \
+	           src/kernels/gemm_kernels_q5_1_q8_1.c \
+	           src/kernels/gemm_kernels_q5_k.c \
 	           src/kernels/gemm_kernels_q4k.c \
 	           src/kernels/gemm_kernels_q4k_sse.c \
 	           src/kernels/gemm_kernels_q4k_avx.c \
@@ -273,6 +287,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_batch_int8.c \
 	           src/kernels/fused/fused_rmsnorm_linear.c \
 	           src/kernels/gemm_kernels_q8_0.c \
+	           src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
 	           src/kernels/gemv_omp.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/fused/rmsnorm_q8_k_fused.c \
@@ -297,6 +312,7 @@ LIB_RELU     := $(BUILD_DIR)/libckernel_relu.so
 LIB_VISION   := $(BUILD_DIR)/libckernel_vision.so
 LIB_ATTENTION := $(BUILD_DIR)/libckernel_attention.so
 LIB_ROPE     := $(BUILD_DIR)/libckernel_rope.so
+LIB_PARITY   := $(BUILD_DIR)/libck_parity.so
 
 # Tokenizer library (new - from src/tokenizer/)
 SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
@@ -304,6 +320,7 @@ SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
                   src/tokenizer/memory_pool.c \
                   src/tokenizer/utf8.c \
                   src/tokenizer/tokenizer.c \
+                  src/tokenizer/tokenizer_spm.c \
                   src/tokenizer/true_bpe.c \
                   src/data_structures/tries/trie.c
 LIB_TOKENIZER := $(BUILD_DIR)/libckernel_tokenizer.so
@@ -498,7 +515,9 @@ ck_V2: ck-v2
 # Tokenizer library
 $(LIB_TOKENIZER): $(SRCS_TOKENIZER)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -shared -o $@ $(SRCS_TOKENIZER) -lm
+	# Bind tokenizer-internal symbol references locally to avoid collisions with
+	# legacy tokenizer symbols that may also be exported by libckernel_engine.so.
+	$(CC) $(CFLAGS) -shared -Wl,-Bsymbolic -o $@ $(SRCS_TOKENIZER) -lm
 
 tokenizer: $(LIB_TOKENIZER)
 	@echo "Tokenizer library built: $(LIB_TOKENIZER)"
@@ -529,7 +548,24 @@ test-tokenizer-special: $(LIB_TOKENIZER)
 	@echo "========================================"
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_true_bpe_special_tokens.py
 
-.PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama test-tokenizer-special
+test-tokenizer-spm: $(LIB_TOKENIZER)
+	@echo ""
+	@echo "========================================"
+	@echo "  REAL SPM Parity Tests (SentencePiece)"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_tokenizer_spm_real.py
+	@echo ""
+	@echo "========================================"
+	@echo "  Tokenizer Codegen Sync (init vs C)"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) version/v6.6/test/test_tokenizer_codegen_sync.py
+	@echo ""
+	@echo "========================================"
+	@echo "  Model Tokenizer Regression (GGUF vs C)"
+	@echo "========================================"
+	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) version/v6.6/test/test_tokenizer_model_parity.py
+
+.PHONY: tokenizer test-tokenizer test-tokenizer-quick test-tokenizer-llama test-tokenizer-special test-tokenizer-spm
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEGA-FUSED ATTENTION TESTS (DRAM Pressure & Flamegraph)
@@ -877,8 +913,8 @@ ck-emit-v2: emit-v2
 ck-emit: emit
 	@true
 
-$(LIB_GELU): $(BUILD_STAMP) src/kernels/gelu_kernels.c src/kernels/gelu_kernels_bf16.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/gelu_kernels.c src/kernels/gelu_kernels_bf16.c -lm
+$(LIB_GELU): $(BUILD_STAMP) src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/gelu_kernels_bf16.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/gelu_kernels_bf16.c -lm
 
 $(LIB_RMSNORM): $(BUILD_STAMP) src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c -lm
@@ -901,14 +937,14 @@ $(LIB_RELU): $(BUILD_STAMP) src/kernels/relu_kernels.c src/kernels/relu_kernels_
 $(LIB_VISION): $(BUILD_STAMP) src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c -lm
 
-$(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c -lm
+$(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c -lm
 
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c -lm
 
-$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c include/ckernel_quant.h include/ckernel_dtype.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c -lm
+$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c include/ckernel_quant.h include/ckernel_dtype.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c -lm
 
 # Convenience alias targets so existing commands still work.
 libckernel_gelu.so: $(LIB_GELU)
@@ -1014,6 +1050,59 @@ e2e-v66-full:
 	@cd version/v6.6/test && $(MAKE) all
 	@echo "========================================"
 	@echo "  v6.6 Full E2E Test PASSED"
+	@echo "========================================"
+
+# =============================================================================
+# LOCAL CI - Mirrors .github/workflows/ci-fast.yml
+# =============================================================================
+# Run this before pushing to catch failures early
+# Each step stops on first failure
+
+ci-local:
+	@echo "========================================"
+	@echo "  CK-Engine Local CI"
+	@echo "========================================"
+	@echo ""
+	@echo "[1/6] Kernel map validation..."
+	@$(PYTHON) version/v6.6/kernel_maps/test_validation.py --quick || { echo "FAIL: Kernel map validation"; exit 1; }
+	@echo ""
+	@echo "[2/6] Registry validation..."
+	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py || { echo "FAIL: Registry validation"; exit 1; }
+	@echo ""
+	@echo "[3/6] Unit tests (bindings, IR lowering, templates)..."
+	@$(PYTHON) -m pytest version/v6.6/test/test_kernel_bindings.py version/v6.6/test/test_ir_lowering.py version/v6.6/test/test_template_smoke.py -v || { echo "FAIL: Unit tests"; exit 1; }
+	@echo ""
+	@echo "[4/6] Build CK-Engine..."
+	@$(MAKE) clean || true
+	@$(MAKE) -j$(nproc) || { echo "FAIL: Build"; exit 1; }
+	@echo ""
+	@echo "[5/6] E2E Qwen2..."
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 4 --context-len 512 --force-compile || { echo "FAIL: Qwen2 E2E"; exit 1; }
+	@echo ""
+	@echo "[6/6] E2E Qwen3..."
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf" --prompt "Hello" --max-tokens 4 --context-len 512 --force-compile || { echo "FAIL: Qwen3 E2E"; exit 1; }
+	@echo ""
+	@echo "========================================"
+	@echo "  Local CI PASSED - safe to push"
+	@echo "========================================"
+
+# Fast version: validation only, no build/inference
+ci-local-fast:
+	@echo "========================================"
+	@echo "  CK-Engine Local CI (Fast)"
+	@echo "========================================"
+	@echo ""
+	@echo "[1/3] Kernel map validation..."
+	@$(PYTHON) version/v6.6/kernel_maps/test_validation.py --quick || { echo "FAIL: Kernel map validation"; exit 1; }
+	@echo ""
+	@echo "[2/3] Registry validation..."
+	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py || { echo "FAIL: Registry validation"; exit 1; }
+	@echo ""
+	@echo "[3/3] Unit tests (bindings, IR lowering, templates)..."
+	@$(PYTHON) -m pytest version/v6.6/test/test_kernel_bindings.py version/v6.6/test/test_ir_lowering.py version/v6.6/test/test_template_smoke.py -v || { echo "FAIL: Unit tests"; exit 1; }
+	@echo ""
+	@echo "========================================"
+	@echo "  Fast CI PASSED - ready for full CI"
 	@echo "========================================"
 
 # =============================================================================
@@ -1336,7 +1425,10 @@ test: $(LIB) test-libs
 	for t in $(PY_TESTS); do \
 	  echo "Running $$t"; \
 	  extra_args=""; \
-	  case "$$t" in *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; esac; \
+	  case "$$t" in \
+	    *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; \
+	    *test_mega_fused_attention.py) extra_args="--correctness";; \
+	  esac; \
 	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
@@ -2234,9 +2326,13 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/gemm_kernels_q6k_q8k.c \
                src/kernels/gemm_kernels_q4k_sse.c \
                src/kernels/gemm_kernels_q4k_avx.c \
+               src/kernels/gemm_kernels_q5_k.c \
                src/kernels/gemm_kernels_q5_0.c \
                src/kernels/gemm_kernels_q5_0_sse_v2.c \
+               src/kernels/gemm_kernels_q5_1.c \
+               src/kernels/gemm_kernels_q5_1_q8_1.c \
                src/kernels/gemm_kernels_q8_0.c \
+               src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
                src/kernels/gemm_batch_int8.c \
                src/kernels/quantize_row_q8_k_sse.c \
                src/kernels/rmsnorm_kernels.c \
@@ -2244,14 +2340,15 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/swiglu_kernels.c \
                src/kernels/softmax_kernels.c \
                src/kernels/sigmoid_kernels.c \
+               src/kernels/gelu_kernels.c \
+               src/kernels/geglu_kernels.c \
                src/kernels/attention_kernels.c \
+               src/kernels/attention_kernels_sliding.c \
                src/kernels/attention_flash_true.c \
                src/kernels/fused/prefill_fused_gemm.c \
                src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
                src/kernels/fused/gemv_fused_quant_bias.c \
                src/kernels/add_kernels_bf16.c
-
-LIB_PARITY := $(BUILD_DIR)/libck_parity.so
 
 # Build CK parity testing library
 $(LIB_PARITY): $(BUILD_DIR) $(PARITY_SRCS)
@@ -2920,7 +3017,15 @@ v6.6-test: v6.6-test-quick
 v6.6-download:
 	@cd version/v6.6 && scripts/ck_run_v6_6.py --download-only
 
-v6.6-build:
+validate-registry:
+	@echo "Validating kernel registry..."
+	@python version/v6.6/scripts/validate_kernel_registry.py
+	@if [ $$? -ne 0 ]; then \
+		echo "Registry validation failed"; \
+		exit 1; \
+	fi
+
+v6.6-build: validate-registry
 	@cd version/v6.6 && scripts/ck_run_v6_6.py --build-only
 
 v6.6: v6.6-download v6.6-build v6.6-test
@@ -2935,6 +3040,21 @@ v6.6-ir-visualizer:
 		open http://localhost:8080/ir_visualizer.html 2>/dev/null || \
 		echo "Open http://localhost:8080/ir_visualizer.html in your browser"; \
 	fi
+
+# IR Visualizer - New v6.6 targets
+.PHONY: vis vis-generate vis-list
+
+vis:
+	@echo "Opening IR visualizer..."
+	@python version/v6.6/tools/open_ir_visualizer.py
+
+vis-list:
+	@echo "Available models in cache:"
+	@python version/v6.6/tools/open_ir_visualizer.py --list
+
+vis-%:
+	@echo "Opening IR visualizer for $*..."
+	@python version/v6.6/tools/open_ir_visualizer.py $*
 
 # =============================================================================
 # V6.6 Comprehensive Profiling
@@ -3021,4 +3141,3 @@ bench-threadpool: $(TEST_THREADPOOL)
 	./$(TEST_THREADPOOL) --bench
 
 .PHONY: test-threadpool bench-threadpool
-
