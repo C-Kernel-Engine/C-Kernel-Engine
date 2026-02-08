@@ -268,8 +268,10 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
         # For GEMM M dimension (batch size), use num_tokens
         elif source == "dim:_m" and name == "M":
             expr = "num_tokens"
-        # For attention kv_stride: use num_tokens for compact K/V layout in prefill
-        elif name == "kv_stride_tokens" and op_type == "attn":
+        # For prefill attention kernels, K/V scratch is compact head-major:
+        # [Hkv, num_tokens, D]. The stride in tokens must be num_tokens, not
+        # MAX_SEQ_LEN/context length. Apply to both regular and sliding attention.
+        elif name == "kv_stride_tokens" and op_type in ("attn", "attn_sliding"):
             expr = "num_tokens"
 
         args.append(expr)
@@ -304,6 +306,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
 def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False) -> str:
     """Emit the prefill function with all ops unrolled."""
     lines = []
+    scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
+    embed_scale_emitted = False
     lines.append("""
 /* ============================================================================
  * PREFILL - Batched processing from IR Lower (prefill mode)
@@ -338,6 +342,26 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
     for seq_idx, op in enumerate(ops):
         lines.append(emit_prefill_op(op, seq_idx, config, profile=profile))
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
+        if (scale_embeddings_sqrt_dim
+                and not embed_scale_emitted
+                and op.get("op") == "dense_embedding_lookup"
+                and int(op.get("layer", -1)) == -1):
+            lines.append("""    /* Gemma embedding contract:
+     * llama.cpp applies inp_scaled = inp_embd * sqrt(n_embd) before layer-0.
+     * Without this, residual path parity diverges at sa_out even if q/k/v look close.
+     */
+    {
+        const float emb_scale = sqrtf((float)EMBED_DIM);
+        float *emb = (float*)(model->bump + A_EMBEDDED_INPUT);
+        const int n = num_tokens * EMBED_DIM;
+        for (int i = 0; i < n; ++i) {
+            emb[i] *= emb_scale;
+        }
+    }
+    #ifdef CK_PARITY_DUMP
+    ck_dump_tensor((float*)(model->bump + A_EMBEDDED_INPUT), -1, "inp_scaled", num_tokens * EMBED_DIM);
+    #endif""")
+            embed_scale_emitted = True
         lines.append("")
 
     lines.append("    model->pos = num_tokens;")

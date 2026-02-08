@@ -137,25 +137,43 @@ def build_hf_manifest(config: Dict, st_entries: Dict[str, Dict], max_layers: Opt
 
 
 def dtype_name(dt: int) -> str:
+    if dt == gguf.CK_DT_Q4_0:
+        return "q4_0"
+    if dt == gguf.CK_DT_Q4_1:
+        return "q4_1"
+    if dt == gguf.CK_DT_Q5_0:
+        return "q5_0"
+    if dt == gguf.CK_DT_Q5_1:
+        return "q5_1"
     if dt == gguf.CK_DT_Q4_K:
         return "q4_k"
+    if dt == gguf.CK_DT_Q5_K:
+        return "q5_k"
     if dt == gguf.CK_DT_Q6_K:
         return "q6_k"
+    if dt == gguf.CK_DT_Q8_0:
+        return "q8_0"
+    if dt == gguf.CK_DT_FP16:
+        return "fp16"
     return "fp32"
 
 
 def weight_dtype(info: "gguf.TensorInfo", label: str) -> int:
     supported_types = (
+        gguf.GGML_TYPE_Q4_0,
+        gguf.GGML_TYPE_Q4_1,
         gguf.GGML_TYPE_Q4_K,
-        gguf.GGML_TYPE_Q6_K,
         gguf.GGML_TYPE_Q5_0,
         gguf.GGML_TYPE_Q5_1,
+        gguf.GGML_TYPE_Q5_K,
+        gguf.GGML_TYPE_Q6_K,
         gguf.GGML_TYPE_Q8_0,
+        gguf.GGML_TYPE_F16,
         gguf.GGML_TYPE_F32,
     )
     if info.ggml_type not in supported_types:
         raise gguf.GGUFError(
-            f"{info.name}: expected Q4_K/Q6_K/Q5_0/Q5_1/Q8_0/F32 for {label}, got "
+            f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/F32 for {label}, got "
             f"{gguf.ggml_type_name(info.ggml_type)}"
         )
     return gguf.ck_dtype_from_ggml_type(info.ggml_type)
@@ -314,6 +332,8 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         if rms_eps is None:
             rms_eps = 1e-5
 
+        sliding_window = meta_int_arch("attention.sliding_window")
+
         if max_layers:
             num_layers = min(int(max_layers), int(num_layers))
 
@@ -338,10 +358,15 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             "has_attention_biases": has_attn_bias,
             "dtype": "fp32",
         }
+        if sliding_window is not None:
+            config["sliding_window"] = sliding_window
 
         manifest_entries: List[Dict] = []
 
         tok_dt = weight_dtype(tok, "token_emb")
+        if tok.ggml_type == gguf.GGML_TYPE_F16:
+            # Upcast token embedding to FP32 during conversion.
+            tok_dt = gguf.CK_DT_FP32
         manifest_entries.append({
             "name": "token_emb",
             "dtype": dtype_name(tok_dt),
@@ -352,6 +377,8 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         for layer in range(num_layers):
             attn_norm = tensors.get(f"blk.{layer}.attn_norm.weight")
             ffn_norm = tensors.get(f"blk.{layer}.ffn_norm.weight")
+            post_attention_norm = tensors.get(f"blk.{layer}.post_attention_norm.weight")
+            post_ffn_norm = tensors.get(f"blk.{layer}.post_ffn_norm.weight") or tensors.get(f"blk.{layer}.post_ffw_norm.weight")
             if not attn_norm or not ffn_norm:
                 raise gguf.GGUFError(f"Layer {layer}: missing norms")
 
@@ -367,6 +394,12 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             if not gate or not up or not down:
                 raise gguf.GGUFError(f"Layer {layer}: missing ffn tensors")
 
+            for info in (wq, wk, wv, wo, gate, up, down):
+                if info.ggml_type == gguf.GGML_TYPE_F16:
+                    raise gguf.GGUFError(
+                        f"{info.name}: FP16 weight matrices are not supported yet (only token_emb is upcast)."
+                    )
+
             gate_dt = weight_dtype(gate, "ffn_gate")
             up_dt = weight_dtype(up, "ffn_up")
             if gate_dt != up_dt:
@@ -376,6 +409,7 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
 
             layer_entries = [
                 {"name": f"layer.{layer}.ln1_gamma", "dtype": "fp32", "shape": [embed_dim]},
+                {"name": f"layer.{layer}.post_attention_norm", "dtype": "fp32", "shape": [embed_dim]} if post_attention_norm else None,
                 {"name": f"layer.{layer}.wq", "dtype": dtype_name(weight_dtype(wq, "attn_q")),
                  "shape": [wq.ne1, wq.ne0], "source_dtype": gguf.ggml_type_name(wq.ggml_type)},
                 {"name": f"layer.{layer}.wk", "dtype": dtype_name(weight_dtype(wk, "attn_k")),
@@ -385,6 +419,7 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
                 {"name": f"layer.{layer}.wo", "dtype": dtype_name(weight_dtype(wo, "attn_output")),
                  "shape": [wo.ne1, wo.ne0], "source_dtype": gguf.ggml_type_name(wo.ggml_type)},
             ]
+            layer_entries = [e for e in layer_entries if e is not None]
 
             # QK norm weights (Qwen3-style: per-head RMSNorm on Q and K)
             q_norm = tensors.get(f"blk.{layer}.attn_q_norm.weight")
@@ -398,11 +433,13 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
 
             layer_entries.extend([
                 {"name": f"layer.{layer}.ln2_gamma", "dtype": "fp32", "shape": [embed_dim]},
+                {"name": f"layer.{layer}.post_ffn_norm", "dtype": "fp32", "shape": [embed_dim]} if post_ffn_norm else None,
                 {"name": f"layer.{layer}.w1", "dtype": dtype_name(gate_dt),
                  "shape": [2 * intermediate, embed_dim], "source_dtype": gguf.ggml_type_name(gate.ggml_type)},
                 {"name": f"layer.{layer}.w2", "dtype": dtype_name(weight_dtype(down, "ffn_down")),
                  "shape": [embed_dim, intermediate], "source_dtype": gguf.ggml_type_name(down.ggml_type)},
             ])
+            layer_entries = [e for e in layer_entries if e is not None]
 
             manifest_entries.extend(layer_entries)
 

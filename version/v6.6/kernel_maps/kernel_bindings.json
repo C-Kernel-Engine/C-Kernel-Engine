@@ -123,10 +123,10 @@
       ]
     },
     "rmsnorm_forward": {
-      "note": "gamma source is determined by which weight is present: ln1_gamma, ln2_gamma, or final_ln_weight",
+      "note": "gamma source is determined by which weight is present (pre/post norms and final norm)",
       "params": [
         {"name": "input", "source": "activation:input", "cast": "const float*"},
-        {"name": "gamma", "source": "weight_f:_gamma", "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight"]},
+        {"name": "gamma", "source": "weight_f:_gamma", "alt": ["ln1_gamma", "ln2_gamma", "post_attention_norm", "post_ffn_norm", "final_ln_weight"]},
         {"name": "output", "source": "output:output", "cast": "float*"},
         {"name": "rstd_cache", "source": "null"},
         {"name": "tokens", "source": "dim:seq_len"},
@@ -208,6 +208,57 @@
         {"name": "aligned_head_dim", "source": "dim:head_dim"}
       ]
     },
+    "attention_forward_causal_head_major_gqa_flash_strided_sliding": {
+      "note": "Prefill: sliding window attention with causal mask",
+      "params": [
+        {"name": "q", "source": "scratch:q_scratch", "cast": "float*"},
+        {"name": "k", "source": "scratch:k_scratch", "cast": "float*"},
+        {"name": "v", "source": "scratch:v_scratch", "cast": "float*"},
+        {"name": "output", "source": "output:out", "cast": "float*"},
+        {"name": "num_heads", "source": "dim:num_heads"},
+        {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+        {"name": "num_tokens", "source": "dim:seq_len"},
+        {"name": "head_dim", "source": "dim:head_dim"},
+        {"name": "aligned_head_dim", "source": "dim:head_dim"},
+        {"name": "kv_stride_tokens", "source": "dim:max_seq_len"},
+        {"name": "sliding_window", "source": "dim:sliding_window"}
+      ]
+    },
+    "attention_forward_decode_head_major_gqa_flash_sliding": {
+      "note": "Decode: sliding window attention - single query token attends to last W KV cache entries",
+      "params": [
+        {"name": "q_token", "source": "scratch:q_scratch", "cast": "const float*"},
+        {"name": "k_cache", "source": "runtime:kv_cache_k_layer", "cast": "const float*"},
+        {"name": "v_cache", "source": "runtime:kv_cache_v_layer", "cast": "const float*"},
+        {"name": "out_token", "source": "output:out", "cast": "float*"},
+        {"name": "num_heads", "source": "dim:num_heads"},
+        {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+        {"name": "kv_tokens", "source": "runtime:seq_len"},
+        {"name": "cache_capacity", "source": "dim:max_seq_len"},
+        {"name": "head_dim", "source": "dim:head_dim"},
+        {"name": "aligned_head_dim", "source": "dim:head_dim"},
+        {"name": "sliding_window", "source": "dim:sliding_window"}
+      ]
+    },
+    "geglu_forward_fp32": {
+      "note": "GeGLU: out = GELU(a) * b where x = [a, b] along last dim",
+      "params": [
+        {"name": "x", "source": "activation:input", "cast": "const float*"},
+        {"name": "out", "source": "output:output", "cast": "float*"},
+        {"name": "tokens", "source": "dim:seq_len"},
+        {"name": "dim", "source": "dim:intermediate_size"}
+      ]
+    },
+    "geglu_forward_bf16": {
+      "note": "BF16 GeGLU: converts to FP32, computes, converts back",
+      "params": [
+        {"name": "x", "source": "activation:input", "cast": "const uint16_t*"},
+        {"name": "out", "source": "output:output", "cast": "uint16_t*"},
+        {"name": "tokens", "source": "dim:seq_len"},
+        {"name": "dim", "source": "dim:intermediate_size"},
+        {"name": "scratch", "source": "scratch:geglu_scratch", "cast": "float*"}
+      ]
+    },
     "ck_qkv_project_head_major_quant": {
       "note": "Prefill: head-major QKV projection into KV cache",
       "params": [
@@ -272,6 +323,29 @@
         {"name": "size", "source": "dim:_memcpy_bytes"}
       ]
     },
+    "kv_cache_batch_copy": {
+      "params": [
+        {"name": "k_dst", "source": "output:k_dst", "cast": "void*"},
+        {"name": "k_src", "source": "activation:k_src", "cast": "const void*"},
+        {"name": "v_dst", "source": "output:v_dst", "cast": "void*"},
+        {"name": "v_src", "source": "activation:v_src", "cast": "const void*"},
+        {"name": "size", "source": "dim:_kv_copy_bytes"}
+      ],
+      "notes": "Emit two memcpy calls: K and V cache batch copy in prefill mode."
+    },
+    "memmove": {
+      "params": [
+        {"name": "dst", "source": "output:dst", "cast": "void*"},
+        {"name": "src", "source": "activation:src", "cast": "const void*"},
+        {"name": "size", "source": "param:_copy_size"}
+      ]
+    },
+    "transpose_inplace": {
+      "params": [
+        {"name": "buf", "source": "scratch:buf", "cast": "void*"}
+      ],
+      "notes": "No-op: prefill codegen generates its own transpose loops"
+    },
     "gemv_q5_0_q8_0": {
       "params": [
         {"name": "y", "source": "output:y", "cast": "float*"},
@@ -313,6 +387,16 @@
       ],
       "notes": "FP32 activation version - no quantization needed"
     },
+    "gemv_q5_k": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_K: 5-bit super-block quant with nested scales."
+    },
     "gemv_q4_k_q8_k": {
       "params": [
         {"name": "y", "source": "output:y", "cast": "float*"},
@@ -330,6 +414,26 @@
         {"name": "M", "source": "dim:_output_dim"},
         {"name": "K", "source": "dim:_input_dim"}
       ]
+    },
+    "gemv_q5_1": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_1 uses minimum value (m) for better precision."
+    },
+    "gemv_q5_1_q8_1": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Q5_1 with internal FP32->Q8_1 activation contract."
     },
     "gemv_q8_0_q8_0": {
       "params": [
@@ -430,6 +534,54 @@
       ],
       "notes": "FP32 activation version - no quantization needed"
     },
+    "gemm_nt_q5_k": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_K: 5-bit super-block quant with nested scales."
+    },
+    "gemm_nt_q5_1": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_1 uses minimum value (m) for better precision."
+    },
+    "gemm_nt_q5_1_q8_1": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Q5_1 with internal FP32->Q8_1 activation contract."
+    },
+    "gemm_blocked_serial": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 fallback GEMM (blocked serial)"
+    },
     "gemm_nt_q8_0": {
       "params": [
         {"name": "A", "source": "activation:a", "cast": "const float*"},
@@ -441,6 +593,18 @@
         {"name": "K", "source": "dim:_input_dim"}
       ],
       "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemm_nt_q8_0_q8_0_contract": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Q8_0 contract path with internal activation quantization."
     },
     "gemm_nt_q5_0_q8_0": {
       "params": [
@@ -503,6 +667,53 @@
         {"name": "K", "source": "dim:_input_dim"}
       ],
       "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemv_q8_0_q8_0_contract": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "Q8_0 contract path with internal activation quantization."
+    },
+    "gemv_q4_0": {
+      "params": [
+        {"name": "y", "source": "output:y", "cast": "float*"},
+        {"name": "W", "source": "weight:_first_weight"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "M", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation with Q4_0 weight - no quantization needed"
+    },
+    "gemm_nt_q4_0": {
+      "params": [
+        {"name": "A", "source": "activation:a", "cast": "const float*"},
+        {"name": "B", "source": "weight:_first_weight"},
+        {"name": "bias", "source": "weight_f:_bias"},
+        {"name": "C", "source": "output:c", "cast": "float*"},
+        {"name": "M", "source": "dim:_m"},
+        {"name": "N", "source": "dim:_output_dim"},
+        {"name": "K", "source": "dim:_input_dim"}
+      ],
+      "notes": "FP32 activation with Q4_0 weight - no quantization needed"
+    },
+    "dense_embedding_lookup": {
+      "params": [
+        {"name": "token_ids", "source": "activation:tokens", "cast": "int32_t*"},
+        {"name": "token_count", "source": "dim:seq_len"},
+        {"name": "vocab_size", "source": "dim:vocab_size"},
+        {"name": "token_embeddings", "source": "weight:token_emb"},
+        {"name": "pos_embeddings", "source": "null"},
+        {"name": "output", "source": "output:output", "cast": "float*"},
+        {"name": "embed_dim", "source": "dim:embed_dim"},
+        {"name": "aligned_embed_dim", "source": "dim:embed_dim"},
+        {"name": "context_window", "source": "dim:seq_len"},
+        {"name": "add_pos", "source": "const:0"}
+      ],
+      "notes": "Token embedding lookup - fp16 weights dequantized to fp32 at load time"
     },
     "add_inplace_f32": {
       "params": [

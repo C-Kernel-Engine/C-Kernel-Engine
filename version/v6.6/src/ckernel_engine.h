@@ -3,6 +3,13 @@
  *
  * Provides all kernel function prototypes needed by generated v6.6 code.
  * This is the complete set used by codegen_v6_6.py output.
+ *
+ * NOTE: This header must include prototypes for ANY kernel that codegen may emit.
+ * If codegen selects a kernel that lacks a declaration here, model_v6_6.c will
+ * fail to compile with "call to undeclared function" errors.
+ *
+ * When adding new kernels to the kernel_maps/ registry, ensure their prototypes
+ * are added here as well to maintain build correctness.
  */
 
 #ifndef CKERNEL_ENGINE_H
@@ -113,8 +120,14 @@ void quantize_batch_q8_k(const float *x, void *y, int num_rows, int k);
 
 void gemv_q4_k(float *y, const void *W, const float *x, int M, int K);
 void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1_q8_1(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1_q8_1_ref(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q5_k(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
 void gemv_q6_k(float *y, const void *W, const float *x, int M, int K);
 void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q8_0_q8_0_contract(float *y, const void *W, const float *x, int M, int K);
 
 /* INT8 activation variants */
 void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
@@ -140,10 +153,19 @@ void gemv_fused_q5_0_bias_parallel_omp(float *y, const void *W, const float *x,
  * GEMM KERNELS (prefill mode - multiple tokens)
  * ============================================================================ */
 
+void gemm_blocked_serial(const float *A, const float *B, const float *bias,
+                        float *C, int M, int N, int K);
+
 void gemm_nt_q4_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1_q8_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1_q8_1_ref(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q6_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q8_0_q8_0_contract(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 
 /* INT8 activation GEMM variants (quantized input for prefill) */
 void gemm_nt_q4_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
@@ -198,6 +220,31 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
                                                            int aligned_head_dim,
                                                            int stride);
 
+/* Sliding window attention variants */
+void attention_forward_decode_head_major_gqa_flash_sliding(const float *q_token,
+                                                          const float *k_cache,
+                                                          const float *v_cache,
+                                                          float *out_token,
+                                                          int num_heads,
+                                                          int num_kv_heads,
+                                                          int kv_tokens,
+                                                          int cache_capacity,
+                                                          int head_dim,
+                                                          int aligned_head_dim,
+                                                          int sliding_window);
+
+void attention_forward_causal_head_major_gqa_flash_strided_sliding(const float *q,
+                                                                  const float *k,
+                                                                  const float *v,
+                                                                  float *out,
+                                                                  int num_heads,
+                                                                  int num_kv_heads,
+                                                                  int num_tokens,
+                                                                  int head_dim,
+                                                                  int aligned_head_dim,
+                                                                  int stride,
+                                                                  int sliding_window);
+
 /* ============================================================================
  * KV CACHE KERNELS
  * ============================================================================ */
@@ -216,6 +263,8 @@ void kv_cache_store(float *__restrict kv_cache_k,
  * ACTIVATION KERNELS
  * ============================================================================ */
 
+void geglu_forward_fp32(const float *x, float *out, int tokens, int dim);
+void geglu_forward_bf16(const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch);
 void swiglu_forward(const float *input, float *output, int num_tokens, int dim);
 
 /* ============================================================================

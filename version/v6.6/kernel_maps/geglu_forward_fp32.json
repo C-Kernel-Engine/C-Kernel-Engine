@@ -1,0 +1,33 @@
+{
+  "id": "geglu_forward_fp32",
+  "op": "geglu",
+  "variant": "geglu_fp32",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["tokens", "2*dim"], "desc": "Input tensor [tokens, 2*dim], split into [a, b] along last dim"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["tokens", "dim"], "desc": "Output tensor [tokens, dim], where out = GELU(a) * b"}
+  ],
+  "dims": ["tokens", "dim"],
+  "params": [],
+  "impl": {
+    "function": "geglu_forward_fp32",
+    "c_declaration": "void geglu_forward_fp32(const float *x, float *out, int tokens, int dim);",
+    "sources": ["src/kernels/geglu_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_geglu.py"],
+    "parity": []
+  },
+  "notes": "GeGLU activation: out = GELU(a) * b where input is split along last dimension. Used in LLaMA, Mistral, and other modern LLMs."
+}

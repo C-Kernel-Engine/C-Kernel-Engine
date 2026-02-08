@@ -1,0 +1,60 @@
+{
+  "id": "gemv_q5_1",
+  "op": "gemv",
+  "variant": "q5_1_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q5_1",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q5_1", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] stored transposed as [M, K] row-major"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "parallelization": {
+    "supported": ["output"],
+    "preferred": {"prefill": "output", "decode": "output"},
+    "strategies": [
+      {
+        "name": "output",
+        "partition_dim": "M",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across output rows; each thread computes subset of y."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q5_1 uses 32-value blocks; K should be a multiple of 32 for correct layout."
+  },
+  "impl": {
+    "function": "gemv_q5_1_q8_1",
+    "c_declaration": "void gemv_q5_1_q8_1(float *y, const void *W, const float *x, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_q5_1_q8_1.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemv_q5_1.py"],
+    "bench": ["scripts/bench_gemv_q5_1.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemv_q5_1.py --compare-numpy",
+        "tolerance": "1e-3",
+        "notes": "Compare dequantized output against numpy fp32 matmul"
+      }
+    ]
+  },
+  "notes": "Generalized matrix-vector multiplication for Q5_1 weights with FP32 activation input. Computes y = W @ x where W is stored transposed. Uses Q5_1 format with minimum value (m) for better precision than Q5_0."
+}

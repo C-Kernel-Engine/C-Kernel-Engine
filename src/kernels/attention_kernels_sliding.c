@@ -5,6 +5,7 @@
 
 #include "ckernel_engine.h"
 #include <math.h>
+#include <stdlib.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -469,6 +470,18 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
         return;
     }
 
+    /* Debug escape hatch:
+     * For Gemma bring-up, force the proven non-sliding flash kernel to isolate
+     * whether divergence is caused by sliding-window implementation details.
+     */
+    if (getenv("CK_FORCE_NONSLIDING_ATTN")) {
+        attention_forward_causal_head_major_gqa_flash_strided(
+            q, k, v, output, num_heads, num_kv_heads, num_tokens,
+            head_dim, aligned_head_dim, kv_stride_tokens
+        );
+        return;
+    }
+
     const float scale = 1.0f / sqrtf((float)head_dim);
     const int T = num_tokens;
     const size_t kv_head_stride = (size_t)kv_stride_tokens * (size_t)aligned_head_dim;
@@ -532,6 +545,19 @@ void attention_forward_decode_head_major_gqa_flash_sliding(
         return;
     }
     if (kv_tokens <= 0 || kv_tokens > cache_capacity || head_dim <= 0 || aligned_head_dim <= 0) {
+        return;
+    }
+
+    /* Debug escape hatch:
+     * Route decode through non-sliding flash attention when requested to
+     * quickly A/B check sliding-window kernel correctness.
+     */
+    if (getenv("CK_FORCE_NONSLIDING_ATTN")) {
+        attention_forward_decode_head_major_gqa_flash(
+            q_token, k_cache, v_cache, out_token,
+            num_heads, num_kv_heads, kv_tokens, cache_capacity,
+            head_dim, aligned_head_dim
+        );
         return;
     }
 

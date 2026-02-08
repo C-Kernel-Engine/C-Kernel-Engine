@@ -11,6 +11,19 @@
 
 #define CK_Q51_STACK_Q8_BLOCKS 256
 
+/* Q8_1 is used only by this contract kernel path. Keep a local definition so
+ * this file does not depend on global header churn.
+ * Layout matches ggml: fp16 d, fp16 s, 32 int8 quants. */
+#ifndef QK8_1
+#define QK8_1 32
+#endif
+
+typedef struct {
+    ck_half d;
+    ck_half s;
+    int8_t qs[QK8_1];
+} block_q8_1;
+
 /* Quantize one FP32 row to Q8_1 blocks (ggml-compatible scalar path). */
 static void quantize_row_q8_1_scalar(const float *x, block_q8_1 *y, int k) {
     const int nb = k / QK8_1;

@@ -491,62 +491,100 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: 
 
     # Add parity dump if enabled
     if dump:
-        # Map ops to dump names
+        # Normalize op names to the same family used by parity_test.py.
         dump_op_map = {
-            "dense_embedding_lookup": "embed_out",
-            "rmsnorm": "attn_norm" if "attn" in op_name else "ffn_norm",
+            "dense_embedding_lookup": "token_embedding",
+            "attn_norm": "attn_norm",
             "q_proj": "q_proj",
             "k_proj": "k_proj",
             "v_proj": "v_proj",
-            "qk_norm": "qk_norm",
-            "rope_qk": "rope_qk",
-            "attn": "attn_out",
-            "out_proj": "attn_proj",
-            "residual_add": "ffn_inp" if "mlp" in op_name else "layer_out",
-            "mlp_gate_up": "mlp_gate",
-            "silu_mul": "mlp_silu",
-            "mlp_down": "mlp_down",
-            "quantize_final_output": "final_norm",
-            "lm_head": "logits",
+            "attn_sliding": "attn_output",
+            "out_proj": "attn_output",
+            "post_attention_norm": "attn_post_norm",
+            "ffn_norm": "ffn_norm",
+            "mlp_gate_up": "ffn_gate_up",
+            "geglu": "ffn_gate_par",
+            "mlp_down": "down_proj",
+            "post_ffn_norm": "ffn_post_norm",
+            "final_rmsnorm": "final_norm",
+            "logits": "logits",
         }
-        dump_name = dump_op_map.get(op_name, op_name)
+        dump_name = dump_op_map.get(op_name)
 
-        # Find output buffer for dumping
-        output_expr = None
-        output_size = None
+        arg_expr_by_name = {}
         for arg in args:
-            source = arg.get("source", "")
-            expr = arg.get("expr", "")
-            if "(float*)" in expr and "const" not in expr:
-                output_expr = expr
-                # Try to determine size from source
-                if "main_stream" in source:
-                    output_size = "EMBED_DIM"
-                elif "q_scratch" in source:
-                    output_size = "NUM_HEADS * HEAD_DIM"
-                elif "k_scratch" in source:
-                    output_size = "NUM_KV_HEADS * HEAD_DIM"
-                elif "v_scratch" in source:
-                    output_size = "NUM_KV_HEADS * HEAD_DIM"
-                elif "attn_scratch" in source:
-                    output_size = "EMBED_DIM"
-                elif "mlp_scratch" in source:
-                    output_size = "EMBED_DIM"
-                elif "logits" in source:
-                    output_size = "VOCAB_SIZE"
-                break
+            nm = str(arg.get("name", "")).lower()
+            ex = str(arg.get("expr", ""))
+            if nm and ex and nm not in arg_expr_by_name:
+                arg_expr_by_name[nm] = ex
 
-        if output_expr and dump_name:
-            raw_expr = output_expr.replace("(float*)", "").strip()
-            size_expr = output_size if output_size else "0"
-            lines.append(f'    #ifdef CK_PARITY_DUMP')
-            lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "{dump_name}", {size_expr});')
-            lines.append(f'    #endif')
+        def _get_arg(*names: str) -> str | None:
+            for nm in names:
+                ex = arg_expr_by_name.get(nm.lower())
+                if ex:
+                    return ex
+            return None
+
+        def _mul_expr(*terms: str | None) -> str | None:
+            used = [f"({t})" for t in terms if t]
+            if not used:
+                return None
+            return " * ".join(used)
+
+        def _emit_dump(expr: str | None, name: str, size_expr: str | None) -> None:
+            if not expr or not size_expr:
+                return
+            raw_expr = expr.replace("(float*)", "").replace("(void*)", "").strip()
+            lines.append("    #ifdef CK_PARITY_DUMP")
+            lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "{name}", {size_expr});')
+            lines.append("    #endif")
+
+        tokens = _get_arg("tokens", "num_tokens", "token_count") or "1"
+        embed_dim = _get_arg("aligned_embed_dim", "d_model", "embed_dim") or "EMBED_DIM"
+        m_dim = _get_arg("m")
+        n_dim = _get_arg("n")
+        num_heads = _get_arg("num_heads") or "NUM_HEADS"
+        num_kv_heads = _get_arg("num_kv_heads") or "NUM_KV_HEADS"
+        head_dim = _get_arg("aligned_head_dim", "head_dim") or "HEAD_DIM"
+
+        if op_name == "qk_norm":
+            q_expr = _get_arg("q")
+            k_expr = _get_arg("k")
+            q_size = _mul_expr(_get_arg("num_tokens", "tokens") or tokens, num_heads, head_dim)
+            k_size = _mul_expr(_get_arg("num_tokens", "tokens") or tokens, num_kv_heads, head_dim)
+            _emit_dump(q_expr, "qcur_normed", q_size)
+            _emit_dump(k_expr, "kcur_normed", k_size)
+        elif dump_name:
+            out_expr = _get_arg("output", "out", "c", "y", "out_token")
+            size_expr = None
+
+            if op_name in ("dense_embedding_lookup", "attn_norm", "post_attention_norm", "ffn_norm", "post_ffn_norm", "residual_add"):
+                size_expr = _mul_expr(tokens, embed_dim)
+            elif op_name in ("q_proj", "k_proj", "v_proj", "out_proj", "mlp_gate_up", "mlp_down", "logits"):
+                if function.startswith("gemm_") and m_dim and n_dim:
+                    size_expr = _mul_expr(m_dim, n_dim)
+                else:
+                    size_expr = m_dim or n_dim
+            elif op_name == "attn_sliding":
+                size_expr = _mul_expr(tokens, num_heads, head_dim)
+            elif op_name == "geglu":
+                dim = _get_arg("dim")
+                size_expr = _mul_expr(tokens, dim) if dim else None
+
+            _emit_dump(out_expr, dump_name, size_expr)
 
     return "\n".join(lines)
 
 
-def emit_decode_function(ops: List[Dict], token_offset: int, token_base: str, debug: bool = False, profile: bool = False, dump: bool = False) -> str:
+def emit_decode_function(
+    ops: List[Dict],
+    token_offset: int,
+    token_base: str,
+    debug: bool = False,
+    profile: bool = False,
+    dump: bool = False,
+    scale_embeddings_sqrt_dim: bool = False,
+) -> str:
     """Emit the decode function with all ops unrolled."""
     lines = []
     lines.append("""
@@ -566,8 +604,28 @@ static void ck_decode(CKModel *model, int32_t token) {
     lines.append(f"    *(int32_t*)({token_base} + {token_offset}) = token;")
     lines.append("")
 
+    embed_scale_emitted = False
     for seq_idx, op in enumerate(ops):
         lines.append(emit_op(op, seq_idx, debug=debug, profile=profile, dump=dump))
+        if (scale_embeddings_sqrt_dim
+                and not embed_scale_emitted
+                and op.get("op") == "dense_embedding_lookup"
+                and int(op.get("layer", -1)) == -1):
+            lines.append("""    /* Gemma embedding contract:
+     * llama.cpp applies inp_scaled = inp_embd * sqrt(n_embd) before layer-0.
+     * Keep this in generated decode path so every new token follows the same rule.
+     */
+    {
+        const float emb_scale = sqrtf((float)EMBED_DIM);
+        float *emb = (float*)(model->bump + A_EMBEDDED_INPUT);
+        for (int i = 0; i < EMBED_DIM; ++i) {
+            emb[i] *= emb_scale;
+        }
+    }
+    #ifdef CK_PARITY_DUMP
+    ck_dump_tensor((float*)(model->bump + A_EMBEDDED_INPUT), -1, "inp_scaled", EMBED_DIM);
+    #endif""")
+            embed_scale_emitted = True
         lines.append("")
 
     lines.append("    model->pos++;")
@@ -1065,6 +1123,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
     vocab_size = int(config.get("vocab_size", 0))
     logits_stride = vocab_size if logits_layout == "full" else 0
     ops = ir.get("ops", ir.get("operations", []))  # Support both "ops" and "operations"
+    scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
     memory = layout.get("memory", ir.get("memory", {}))  # Use layout memory for offsets
 
     # Extract rope_theta from init_call config for header comment
@@ -1245,7 +1304,17 @@ static void _ck_profile_dump(void) {
 
     parts.append(emit_memory_layout(layout, config))
     parts.append(emit_model_and_api(init_call=init_call, profile=profile, logits_stride=logits_stride, dump=dump))  # Pass lowered init IR for init ops
-    parts.append(emit_decode_function(ops, token_offset, token_base, debug=debug, profile=profile, dump=dump))
+    parts.append(
+        emit_decode_function(
+            ops,
+            token_offset,
+            token_base,
+            debug=debug,
+            profile=profile,
+            dump=dump,
+            scale_embeddings_sqrt_dim=scale_embeddings_sqrt_dim,
+        )
+    )
 
     return "\n".join(parts)
 

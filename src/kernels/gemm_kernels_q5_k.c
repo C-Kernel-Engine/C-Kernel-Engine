@@ -44,6 +44,42 @@
 #define QK_K 256
 #define CK_Q5K_STACK_Q8_BLOCKS 128
 
+/* Q5_K block definition is required by this kernel file.
+ * Keep a local ggml-compatible layout to decouple from shared headers. */
+typedef struct {
+    ck_half d;
+    ck_half dmin;
+    uint8_t scales[K_SCALE_SIZE];
+    uint8_t qh[QK_K / 8];
+    uint8_t qs[QK_K / 2];
+} block_q5_K;
+
+/* Unpack 8 per-subblock scales and mins from packed Q5_K scale bytes.
+ * This mirrors the packing contract used by llama.cpp. */
+static inline void unpack_q5_k_scales(const uint8_t *scales,
+                                      uint8_t *sc,
+                                      uint8_t *m) {
+    sc[0] = scales[0] & 0x3F;
+    sc[1] = scales[1] & 0x3F;
+    sc[2] = scales[2] & 0x3F;
+    sc[3] = scales[3] & 0x3F;
+
+    m[0] = scales[4] & 0x3F;
+    m[1] = scales[5] & 0x3F;
+    m[2] = scales[6] & 0x3F;
+    m[3] = scales[7] & 0x3F;
+
+    sc[4] = (scales[8]  & 0x0F) | ((scales[0] >> 6) << 4);
+    sc[5] = (scales[9]  & 0x0F) | ((scales[1] >> 6) << 4);
+    sc[6] = (scales[10] & 0x0F) | ((scales[2] >> 6) << 4);
+    sc[7] = (scales[11] & 0x0F) | ((scales[3] >> 6) << 4);
+
+    m[4] = (scales[8]  >> 4) | ((scales[4] >> 6) << 4);
+    m[5] = (scales[9]  >> 4) | ((scales[5] >> 6) << 4);
+    m[6] = (scales[10] >> 4) | ((scales[6] >> 6) << 4);
+    m[7] = (scales[11] >> 4) | ((scales[7] >> 6) << 4);
+}
+
 /* quantize_row_q8_k() is implemented in gemm_kernels_q4k_q8k.c */
 void quantize_row_q8_k(const float *x, void *vy, int k);
 

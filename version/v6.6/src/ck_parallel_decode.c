@@ -38,6 +38,9 @@ extern void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int
 extern void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
 extern void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
 extern void gemv_q8_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
+extern void gemv_q5_1_q8_1(float *y, const void *W, const float *x, int M, int K);
+extern void gemv_q5_k(float *y, const void *W, const float *x, int M, int K);
+extern void gemv_q8_0_q8_0_contract(float *y, const void *W, const float *x, int M, int K);
 
 /* Serial fused fallback */
 extern void gemv_fused_q5_0_bias_dispatch(float *y, const void *W, const float *x,
@@ -79,6 +82,26 @@ typedef struct {
     int         K;
 } gemv_args_t;
 
+typedef struct {
+    float       *y;
+    const void  *W;
+    const float *x;
+    int          M;
+    int          K;
+    size_t       W_row_bytes;
+} gemv_fp32_args_t;
+
+/* Q5_K weights are row-major packed super-blocks.
+ * Keep a local layout copy to compute byte offsets without pulling in
+ * kernel-private headers. Must stay ggml-compatible. */
+typedef struct {
+    ck_half d;
+    ck_half dmin;
+    uint8_t scales[K_SCALE_SIZE];
+    uint8_t qh[QK_K / 8];
+    uint8_t qs[QK_K / 2];
+} ck_block_q5_K_layout_t;
+
 /* ============================================================================
  * Work Functions (called on each thread)
  * ============================================================================ */
@@ -105,6 +128,40 @@ static void work_gemv_q8_0_q8_0(int ith, int nth, void *args)
 {
     const gemv_args_t *a = (const gemv_args_t *)args;
     gemv_q8_0_q8_0_parallel_simd(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
+}
+
+static void work_gemv_q5_1_q8_1(int ith, int nth, void *args)
+{
+    const gemv_fp32_args_t *a = (const gemv_fp32_args_t *)args;
+    int dr = (a->M + nth - 1) / nth;
+    int r0 = dr * ith;
+    int r1 = (r0 + dr < a->M) ? (r0 + dr) : a->M;
+    if (r0 >= a->M) return;
+
+    gemv_q5_1_q8_1(
+        a->y + r0,
+        (const char *)a->W + (size_t)r0 * a->W_row_bytes,
+        a->x,
+        r1 - r0,
+        a->K
+    );
+}
+
+static void work_gemv_q5_k(int ith, int nth, void *args)
+{
+    const gemv_fp32_args_t *a = (const gemv_fp32_args_t *)args;
+    int dr = (a->M + nth - 1) / nth;
+    int r0 = dr * ith;
+    int r1 = (r0 + dr < a->M) ? (r0 + dr) : a->M;
+    if (r0 >= a->M) return;
+
+    gemv_q5_k(
+        a->y + r0,
+        (const char *)a->W + (size_t)r0 * a->W_row_bytes,
+        a->x,
+        r1 - r0,
+        a->K
+    );
 }
 
 /* ============================================================================
@@ -165,6 +222,66 @@ void gemv_q8_0_q8_0_parallel_dispatch(
 
     gemv_args_t args = { .y = y, .W = W, .x_q8 = x_q8, .M = M, .K = K };
     ck_threadpool_dispatch(pool, work_gemv_q8_0_q8_0, &args);
+}
+
+void gemv_q5_1_q8_1_parallel_dispatch(
+    float *y, const void *W, const float *x, int M, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M <= 1 || (K % QK5_1) != 0) {
+        gemv_q5_1_q8_1(y, W, x, M, K);
+        return;
+    }
+
+    const size_t W_row_bytes = (size_t)(K / QK5_1) * sizeof(block_q5_1);
+    gemv_fp32_args_t args = {
+        .y = y, .W = W, .x = x, .M = M, .K = K, .W_row_bytes = W_row_bytes
+    };
+    ck_threadpool_dispatch(pool, work_gemv_q5_1_q8_1, &args);
+}
+
+void gemv_q5_k_parallel_dispatch(
+    float *y, const void *W, const float *x, int M, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M <= 1 || (K % QK_K) != 0) {
+        gemv_q5_k(y, W, x, M, K);
+        return;
+    }
+
+    const size_t W_row_bytes = (size_t)(K / QK_K) * sizeof(ck_block_q5_K_layout_t);
+    gemv_fp32_args_t args = {
+        .y = y, .W = W, .x = x, .M = M, .K = K, .W_row_bytes = W_row_bytes
+    };
+    ck_threadpool_dispatch(pool, work_gemv_q5_k, &args);
+}
+
+/* Keep stack footprint aligned with the contract kernel implementation. */
+#define CK_Q80_STACK_Q8_BLOCKS 1024
+
+void gemv_q8_0_q8_0_contract_parallel_dispatch(
+    float *y, const void *W, const float *x, int M, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1) {
+        gemv_q8_0_q8_0_contract(y, W, x, M, K);
+        return;
+    }
+
+    if ((K % QK8_0) != 0) {
+        gemv_q8_0_q8_0_contract(y, W, x, M, K);
+        return;
+    }
+
+    const int n_blocks = K / QK8_0;
+    if (n_blocks <= 0 || n_blocks > CK_Q80_STACK_Q8_BLOCKS) {
+        gemv_q8_0_q8_0_contract(y, W, x, M, K);
+        return;
+    }
+
+    block_q8_0 x_q8_buf[n_blocks];
+    quantize_row_q8_0(x, x_q8_buf, K);
+    gemv_q8_0_q8_0_parallel_dispatch(y, W, x_q8_buf, M, K);
 }
 
 /* ============================================================================

@@ -52,6 +52,13 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
+# ANSI colors for output
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RESET = '\033[0m'
+
 # Import memory planner
 from memory_planner_v6_6 import plan_memory, MemoryPlanner
 
@@ -86,6 +93,26 @@ OP_DATAFLOW = {
 
     # Attention block
     "rmsnorm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "attn_norm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "post_attention_norm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "ffn_norm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "post_ffn_norm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "final_rmsnorm": {
         "inputs": {"input": "main_stream"},
         "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
     },
@@ -150,6 +177,10 @@ OP_DATAFLOW = {
         "inputs": {"q": "q_scratch", "k": "kv_cache", "v": "kv_cache"},
         "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
     },
+    "attn_sliding": {
+        "inputs": {"q": "q_scratch", "k": "kv_cache", "v": "kv_cache"},
+        "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
+    },
     "quantize_out_proj_input": {
         "inputs": {"input": "attn_scratch"},
         "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
@@ -181,7 +212,11 @@ OP_DATAFLOW = {
     },
     "silu_mul": {
         "inputs": {"x": "mlp_scratch"},
-        "outputs": {"x": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
+        "outputs": {"out": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
+    },
+    "geglu": {
+        "inputs": {"x": "mlp_scratch"},
+        "outputs": {"out": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
     },
     "quantize_mlp_down_input": {
         "inputs": {"input": "mlp_scratch"},
@@ -216,7 +251,10 @@ OP_DATAFLOW = {
 #   3. Clean separation of concerns
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges: int) -> Optional[Dict]:
+def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges: int,
+                               special_tokens: Optional[Dict] = None,
+                               model_type: Optional[str] = None,
+                               template_name: Optional[str] = None) -> Optional[Dict]:
     """
     Generate tokenizer-specific C code based on tokenizer type from template.
 
@@ -332,11 +370,220 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
 """
         }
 
-    # Future: Add other tokenizer types here
-    # elif tokenizer_type == "wordpiece":
-    #     return { ... wordpiece c_code ... }
-    # elif tokenizer_type == "sentencepiece":
-    #     return { ... sentencepiece c_code ... }
+    elif tokenizer_type == "sentencepiece":
+        add_bos = None
+        add_eos = None
+        add_space_prefix = None
+        tokenizer_model = None
+        unk_id = None
+        bos_id = None
+        eos_id = None
+        pad_id = None
+        mask_id = None
+        if special_tokens:
+            add_bos = special_tokens.get("add_bos_token")
+            add_eos = special_tokens.get("add_eos_token")
+            add_space_prefix = special_tokens.get("add_space_prefix")
+            tokenizer_model = special_tokens.get("tokenizer_model")
+            unk_id = special_tokens.get("unk_token_id")
+            bos_id = special_tokens.get("bos_token_id")
+            eos_id = special_tokens.get("eos_token_id")
+            pad_id = special_tokens.get("pad_token_id")
+            mask_id = special_tokens.get("mask_token_id")
+
+        tokenizer_model_lc = tokenizer_model.strip().lower() if isinstance(tokenizer_model, str) else ""
+        model_type_lc = model_type.strip().lower() if isinstance(model_type, str) else ""
+        template_name_lc = template_name.strip().lower() if isinstance(template_name, str) else ""
+        is_gemma_family = model_type_lc.startswith("gemma") or ("gemma" in template_name_lc)
+
+        # GGUF metadata may report tokenizer_model="llama" for Gemma-family models
+        # even though the SentencePiece behavior should be unigram. Keep an
+        # explicit override here so codegen does not silently select llama mode.
+        effective_spm_model = tokenizer_model_lc
+        if tokenizer_model_lc == "llama" and is_gemma_family:
+            effective_spm_model = "unigram"
+
+        # IMPORTANT: SPM add_space_prefix is model-family dependent.
+        # If metadata is missing this flag, default to:
+        # - true for llama-style SPM
+        # - false for unigram SPM (Gemma, etc.)
+        if add_space_prefix is None:
+            add_space_prefix = (effective_spm_model == "llama")
+
+        # Build config setters (only when provided)
+        config_lines = []
+        if add_bos is not None:
+            config_lines.append(
+                "            g_model->tokenizer->config.add_bos = %s;" %
+                ("true" if add_bos else "false")
+            )
+        if add_eos is not None:
+            config_lines.append(
+                "            g_model->tokenizer->config.add_eos = %s;" %
+                ("true" if add_eos else "false")
+            )
+        config_lines.append(
+            "            g_model->tokenizer->config.add_space_prefix = %s;" %
+            ("true" if add_space_prefix else "false")
+        )
+        if effective_spm_model:
+            if effective_spm_model == "llama":
+                config_lines.append(
+                    "            g_model->tokenizer->config.spm_mode = CK_SPM_MODE_LLAMA;"
+                )
+            else:
+                config_lines.append(
+                    "            g_model->tokenizer->config.spm_mode = CK_SPM_MODE_UNIGRAM;"
+                )
+        elif is_gemma_family:
+            # Defensive default for Gemma when tokenizer_model metadata is absent.
+            config_lines.append(
+                "            g_model->tokenizer->config.spm_mode = CK_SPM_MODE_UNIGRAM;"
+            )
+
+        # Special IDs: fall back to current if missing
+        if any(v is not None for v in [unk_id, bos_id, eos_id, pad_id, mask_id]):
+            config_lines.append("            ck_tokenizer_set_special_ids(g_model->tokenizer,")
+            config_lines.append("                " + (str(unk_id) if unk_id is not None else "g_model->tokenizer->unk_id") + ",")
+            config_lines.append("                " + (str(bos_id) if bos_id is not None else "g_model->tokenizer->bos_id") + ",")
+            config_lines.append("                " + (str(eos_id) if eos_id is not None else "g_model->tokenizer->eos_id") + ",")
+            config_lines.append("                " + (str(pad_id) if pad_id is not None else "g_model->tokenizer->pad_id") + ",")
+            config_lines.append("                " + (str(mask_id) if mask_id is not None else "g_model->tokenizer->mask_id") + ");")
+
+        config_block = "\n".join(config_lines)
+        return {
+            "type": "spm",
+            "include": '#include "tokenizer/tokenizer.h"',
+            "struct_field": "CKTokenizer *tokenizer;    /* SPM tokenizer */",
+            "init": f"""
+    /* Initialize SPM tokenizer from bump data */
+    if (getenv("CK_DISABLE_TOKENIZER")) {{
+        g_model->tokenizer = NULL;
+    }} else {{
+        if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
+            fprintf(stderr, "[Tokenizer] SPM init: begin\\n");
+        }}
+        g_model->tokenizer = ck_tokenizer_create(CK_TOKENIZER_SPM);
+        if (g_model->tokenizer) {{
+            if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
+                fprintf(stderr, "[Tokenizer] SPM load: begin\\n");
+            }}
+            #if defined(W_VOCAB_SCORES) && defined(W_VOCAB_TYPES)
+            ck_tokenizer_load_binary_with_scores(
+                g_model->tokenizer,
+                {vocab_size},
+                (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS),
+                (const char*)(g_model->bump + W_VOCAB_STRINGS),
+                (const float*)(g_model->bump + W_VOCAB_SCORES),
+                (const uint8_t*)(g_model->bump + W_VOCAB_TYPES),
+                0,  /* No BPE merges for SPM */
+                NULL
+            );
+            #else
+            ck_tokenizer_load_binary(
+                g_model->tokenizer,
+                {vocab_size},
+                (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS),
+                (const char*)(g_model->bump + W_VOCAB_STRINGS),
+                0,  /* No BPE merges for SPM */
+                NULL
+            );
+            #endif
+            if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
+                fprintf(stderr, "[Tokenizer] SPM load: done\\n");
+            }}
+
+{config_block if config_block else ""}
+
+            /* Register special tokens for SPM matching. */
+            if (!getenv("CK_SKIP_SPM_SPECIALS")) {{
+                static const char *special_tokens[] = {{
+                    "<unk>", "<s>", "</s>", "<bos>", "<eos>", "<pad>", "<mask>",
+                    NULL
+                }};
+                for (int i = 0; special_tokens[i] != NULL; i++) {{
+                    if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
+                        fprintf(stderr, "[Tokenizer] SPM special: %s\\n", special_tokens[i]);
+                    }}
+                    int32_t id = ck_tokenizer_lookup(g_model->tokenizer, special_tokens[i]);
+                    const char *check = ck_tokenizer_id_to_token(g_model->tokenizer, id);
+                    if (check && strcmp(check, special_tokens[i]) == 0) {{
+                        ck_tokenizer_add_special_token(g_model->tokenizer, special_tokens[i], id);
+                        #ifdef CK_DEBUG_TOKENIZER
+                        printf("[Tokenizer] Registered special: %s -> %d\\n", special_tokens[i], id);
+                        #endif
+                    }}
+                }}
+            }}
+            if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
+                fprintf(stderr, "[Tokenizer] SPM init: done\\n");
+            }}
+        }}
+    }}""",
+            "free": """
+    if (g_model->tokenizer) {
+        ck_tokenizer_free(g_model->tokenizer);
+        g_model->tokenizer = NULL;
+    }""",
+            "api_functions": """
+/* ============================================================================
+ * TOKENIZER API - Encode text to tokens using C tokenizer (SPM)
+ * ============================================================================
+ * Returns: number of tokens written to internal buffer
+ * The tokens are written to the same buffer that prefill() reads from.
+ * After encoding, call ck_model_prefill() with the returned count.
+ */
+CK_EXPORT int ck_model_encode_text(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return 0;
+    if (text_len < 0) text_len = (int)strlen(text);
+    if (text_len == 0) return 0;
+
+    /* Encode directly into the token_ids buffer that prefill uses */
+    int32_t *token_buf = (int32_t*)(g_model->bump + A_TOKEN_IDS);
+    int max_tokens = MAX_SEQ_LEN;
+
+    int num_tokens = ck_tokenizer_encode(
+        g_model->tokenizer,
+        text,
+        text_len,
+        token_buf,
+        max_tokens
+    );
+
+    return num_tokens;
+}
+
+/* Decode tokens back to text */
+CK_EXPORT int ck_model_decode_tokens(const int32_t *ids, int num_ids, char *text, int max_len) {
+    if (!g_model || !g_model->tokenizer || !ids || !text || max_len <= 0) return 0;
+    return ck_tokenizer_decode(g_model->tokenizer, ids, num_ids, text, max_len);
+}
+
+/* Check if tokenizer is available */
+CK_EXPORT int ck_model_has_tokenizer(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Get pointer to token buffer (for reading encoded tokens) */
+CK_EXPORT const int32_t* ck_model_get_token_buffer(void) {
+    return g_model ? (const int32_t*)(g_model->bump + A_TOKEN_IDS) : NULL;
+}
+
+/* Lookup single token by text (returns token ID or -1 if not found)
+ * Uses DIRECT vocabulary lookup, not encoding.
+ */
+CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    int32_t id = ck_tokenizer_lookup(g_model->tokenizer, text);
+    if (id < 0) return -1;
+    const char *token_str = ck_tokenizer_id_to_token(g_model->tokenizer, id);
+    if (token_str && strcmp(token_str, text) == 0) {
+        return id;
+    }
+    return -1;
+}
+"""
+        }
 
     # Unknown tokenizer type
     return None
@@ -419,20 +666,45 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
 
     if has_vocab and tokenizer_type:
         vocab_size = config.get("vocab_size", 151936)
+        special_tokens = manifest.get("special_tokens", {}) or {}
         # Build entry lookup dict
         entry_by_name = {e.get("name"): e for e in entries}
         vocab_offsets_info = entry_by_name.get("vocab_offsets", {})
         vocab_strings_info = entry_by_name.get("vocab_strings", {})
         vocab_merges_info = entry_by_name.get("vocab_merges", {})
+        vocab_scores_info = entry_by_name.get("vocab_scores", {})
+        vocab_types_info = entry_by_name.get("vocab_types", {})
 
         # Calculate number of merges from size (each merge is 3 int32s = 12 bytes)
         merges_size = vocab_merges_info.get("size", 0)
         num_merges = merges_size // 12  # 3 * sizeof(int32_t)
 
         # Generate tokenizer-specific c_code based on type from template
-        c_code = _generate_tokenizer_c_code(tokenizer_type, vocab_size, num_merges)
+        c_code = _generate_tokenizer_c_code(
+            tokenizer_type,
+            vocab_size,
+            num_merges,
+            special_tokens,
+            config.get("model_type"),
+            template.get("name"),
+        )
 
         if c_code:
+            # Build inputs dict - include scores/types if available (for SPM)
+            inputs = {
+                "vocab_offsets": {"dtype": "i32", "source": "weight:vocab_offsets"},
+                "vocab_strings": {"dtype": "u8", "source": "weight:vocab_strings"},
+            }
+            # Add vocab_merges for BPE
+            if "vocab_merges" in entry_names:
+                inputs["vocab_merges"] = {"dtype": "i32", "source": "weight:vocab_merges"}
+            # Add vocab_scores for SPM
+            if "vocab_scores" in entry_names:
+                inputs["vocab_scores"] = {"dtype": "f32", "source": "weight:vocab_scores"}
+            # Add vocab_types for SPM
+            if "vocab_types" in entry_names:
+                inputs["vocab_types"] = {"dtype": "u8", "source": "weight:vocab_types"}
+
             init_ops.append({
                 "op_id": op_id,
                 "kernel": f"tokenizer_{tokenizer_type}_init",
@@ -441,11 +713,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
                 "layer": -1,
                 "instance": 0,
                 "dataflow": {
-                    "inputs": {
-                        "vocab_offsets": {"dtype": "i32", "source": "weight:vocab_offsets"},
-                        "vocab_strings": {"dtype": "u8", "source": "weight:vocab_strings"},
-                        "vocab_merges": {"dtype": "i32", "source": "weight:vocab_merges"},
-                    },
+                    "inputs": inputs,
                     "outputs": {}
                 },
                 "params": {
@@ -528,7 +796,8 @@ class DataflowTracker:
         # Clear main stream slots but keep residual
         pass  # Slots persist, residual_save will update the residual slot
 
-    def record_op(self, op_id: int, op_type: str, layer: int, instance: int) -> Dict[str, Any]:
+    def record_op(self, op_id: int, op_type: str, layer: int, instance: int,
+                  input_slot_override: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Record an op's dataflow and return the dataflow info to embed in IR1.
 
@@ -549,6 +818,8 @@ class DataflowTracker:
         # Build inputs from current slot state
         inputs = {}
         for input_name, slot_name in dataflow_def.get("inputs", {}).items():
+            if input_slot_override and input_name in input_slot_override:
+                slot_name = input_slot_override[input_name]
             if slot_name.startswith("external:"):
                 # External input (token_ids, etc.)
                 inputs[input_name] = {
@@ -712,8 +983,10 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
 
     mlp_size = seq_len * intermediate_size * 2 * 4
     fused_attn_scratch = max(350 * 1024, 3 * num_heads * seq_len * head_dim * 4 + embed_dim * 4 * seq_len * 4)
-    scratch_size = max(mlp_size, fused_attn_scratch)
-    add("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn)]")
+    # BF16 GeGLU needs 3 * seq_len * dim * 4 (input [a,b] + output)
+    geglu_bf16_scratch = seq_len * intermediate_size * 3 * 4
+    scratch_size = max(mlp_size, fused_attn_scratch, geglu_bf16_scratch)
+    add("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn, geglu_bf16)]")
 
     # Layer output
     layer_out_size = seq_len * embed_dim * 4
@@ -745,10 +1018,15 @@ TEMPLATE_TO_KERNEL_OP = {
 
     # Attention block
     "rmsnorm": "rmsnorm",
+    "attn_norm": "rmsnorm",
+    "post_attention_norm": "rmsnorm",
+    "ffn_norm": "rmsnorm",
+    "post_ffn_norm": "rmsnorm",
     "qkv_proj": "qkv_projection",  # Or fallback to 3x matmul
     "rope_qk": "rope",
     "kv_cache_store": "kv_cache_store",  # Store K,V to KV cache at pos
     "attn": "attention",
+    "attn_sliding": "attention_sliding",
     "out_proj": "matmul",  # gemv (decode) or gemm (prefill)
 
     # Residual
@@ -760,6 +1038,7 @@ TEMPLATE_TO_KERNEL_OP = {
     # Use simple matmul for mlp_gate_up to avoid the mismatch.
     "mlp_gate_up": "matmul",  # gemv (decode) or gemm (prefill) - use unfused MLP
     "silu_mul": "swiglu",
+    "geglu": "geglu",
     "mlp_down": "matmul",  # gemv (decode) or gemm (prefill)
 
     # QK norm (Qwen3-style: per-head RMSNorm on Q and K after projection)
@@ -784,6 +1063,8 @@ WEIGHT_TO_KERNEL_INPUT = {
     "b1": "bias", "b2": "bias",
     # Layer norms → gamma
     "ln1_gamma": "gamma", "ln2_gamma": "gamma",
+    "attn_norm": "gamma", "post_attention_norm": "gamma",
+    "ffn_norm": "gamma", "post_ffn_norm": "gamma",
     # QK norm weights → q_gamma, k_gamma
     "q_norm": "q_gamma", "k_norm": "k_gamma",
     # Embeddings
@@ -849,6 +1130,49 @@ def load_manifest(manifest_path: Path) -> Dict:
         return json.load(f)
 
 
+def _merge_external_config(manifest: Dict, manifest_path: Path) -> None:
+    """Merge optional config.json into manifest["config"] (fill missing keys only)."""
+    config = manifest.get("config", {}) or {}
+    cfg_path = Path(manifest_path).parent / "config.json"
+    if not cfg_path.exists():
+        manifest["config"] = config
+        return
+    try:
+        with open(cfg_path, "r") as f:
+            external = json.load(f)
+    except Exception as e:
+        print(f"Warning: Failed to load config.json ({cfg_path}): {e}")
+        manifest["config"] = config
+        return
+
+    # Map HF-style config keys to internal names
+    mapped = {
+        "embed_dim": external.get("hidden_size"),
+        "num_layers": external.get("num_hidden_layers"),
+        "num_heads": external.get("num_attention_heads"),
+        "num_kv_heads": external.get("num_key_value_heads"),
+        "context_length": external.get("max_position_embeddings"),
+        "max_seq_len": external.get("max_position_embeddings"),
+        "rms_eps": external.get("rms_norm_eps"),
+        "rope_theta": external.get("rope_theta"),
+        "attn_out_dim": external.get("attn_out_dim"),
+        "sliding_window": external.get("sliding_window"),
+        "intermediate_size": external.get("intermediate_size"),
+        "vocab_size": external.get("vocab_size"),
+        "model": external.get("model_type"),
+        "model_name": external.get("model_name"),
+        "finetune": external.get("finetune"),
+        "chat_template": external.get("chat_template"),
+    }
+
+    for k, v in mapped.items():
+        if v is None:
+            continue
+        config.setdefault(k, v)
+
+    manifest["config"] = config
+
+
 def validate_template_ops(template_ops: List[str]) -> List[str]:
     """
     Validate that all template ops have kernel mappings.
@@ -861,10 +1185,21 @@ def validate_template_ops(template_ops: List[str]) -> List[str]:
     return unmapped
 
 
+# Fallback mapping: when a specific op isn't available, try these fallbacks
+# This prevents hard faults when the exact op isn't registered
+OP_FALLBACKS = {
+    "attention_sliding": "attention",
+    "attn_sliding": "attention",
+}
+
+
 def validate_kernel_availability(registry: Dict, kernel_ops: List[str]) -> Dict[str, bool]:
     """
     Check which kernel ops are available in the registry.
     Returns dict: {kernel_op: is_available}
+
+    Also checks fallback ops - if a op isn't directly available but has a fallback,
+    the fallback is checked too.
     """
     available_ops = set()
     for kernel in registry["kernels"]:
@@ -872,7 +1207,15 @@ def validate_kernel_availability(registry: Dict, kernel_ops: List[str]) -> Dict[
 
     availability = {}
     for op in kernel_ops:
-        availability[op] = op in available_ops
+        # Check if op is directly available
+        if op in available_ops:
+            availability[op] = True
+        # Check if fallback is available
+        elif op in OP_FALLBACKS:
+            fallback = OP_FALLBACKS[op]
+            availability[op] = fallback in available_ops
+        else:
+            availability[op] = False
 
     return availability
 
@@ -921,10 +1264,13 @@ def find_kernel(
 
         # Match weight quantization
         if "weight" in quant:
-            weight_quant = k_quant.get("weight", "")
+            weight_quant = k_quant.get("weight", "none")
             # Support multi-quant kernels (e.g., "q5_0|q8_0|q4_k")
             allowed_quants = weight_quant.split("|")
-            if quant["weight"] not in allowed_quants and weight_quant != "none":
+            # Skip kernels without a specific weight quant when we need one
+            # This prevents meta-kernels like "dense_embedding_lookup" from being selected
+            # when we need an actual implementation like "embedding_forward_q8_0"
+            if quant["weight"] not in allowed_quants:
                 continue
 
         # Match mode (if kernel specifies it)
@@ -945,6 +1291,30 @@ def find_kernel(
         matches.append(candidate)
 
     if not matches:
+        # Fallback: fp16 weights can be dequantized to fp32 at load time
+        # Pass original op (not actual_op) since matmul→gemv/gemm mapping happens inside
+        if "weight" in quant and quant["weight"] == "fp16":
+            return find_kernel(registry, op=op, quant={**quant, "weight": "fp32"}, mode=mode,
+                             prefer_q8_activation=prefer_q8_activation, prefer_parallel=prefer_parallel)
+
+        # Fallback: Q4_0 → Q4_K (similar K-quant format)
+        # Q4_0 GEMV kernels don't exist in the library, but Q4_K does
+        if "weight" in quant and quant["weight"] == "q4_0":
+            return find_kernel(registry, op=op, quant={**quant, "weight": "q4_k"}, mode=mode,
+                             prefer_q8_activation=prefer_q8_activation, prefer_parallel=prefer_parallel)
+
+        # Fallback: sliding attention → regular attention (if sliding kernel not available)
+        if op == "attention_sliding":
+            return find_kernel(registry, op="attention", quant=quant, mode=mode,
+                             prefer_q8_activation=prefer_q8_activation, prefer_parallel=prefer_parallel)
+
+        # Fallback: embedding with FP32 weights → embedding with Q8_0 weights
+        # The embedding_forward function doesn't exist, but embedding_forward_q8_0 does
+        # We cast the FP32 weight pointer to void* which is compatible
+        if op == "embedding" and quant.get("weight") == "fp32":
+            return find_kernel(registry, op="embedding", quant={**quant, "weight": "q8_0"}, mode=mode,
+                             prefer_q8_activation=prefer_q8_activation, prefer_parallel=prefer_parallel)
+
         return None
 
     # Sort by activation type preference
@@ -954,16 +1324,24 @@ def find_kernel(
         act = k.get("quant", {}).get("activation", "fp32")
         if prefer_q8_activation:
             # V6.5 parity mode: prefer Q8_0 activation (quantized input)
+            # Then prefer fp32 over bf16 (bf16 is slower and rarely needed)
             if act == "q8_0":
                 return 0  # Prefer Q8_0 activation
             if act == "q8_k":
                 return 1  # Q8_K is second choice
-            return 2  # FP32 last
-        else:
-            # FP32 mode: prefer FP32 activation (original behavior)
             if act == "fp32":
-                return 0  # Prefer FP32 activation
-            return 1  # Quantized last
+                return 2  # FP32 preferred
+            if act == "bf16":
+                return 3  # BF16 last choice
+            return 4  # Unknown activation types
+        else:
+            # FP32 mode: prefer FP32 activation, then BF16
+            # Explicit ordering to prevent BF16 being chosen over FP32
+            if act == "fp32":
+                return 0  # Prefer FP32
+            if act == "bf16":
+                return 1  # BF16 second choice
+            return 2  # Quantized last
 
     matches.sort(key=activation_priority)
 
@@ -1015,8 +1393,94 @@ def get_quantize_kernel_for_activation(activation_dtype: str) -> Optional[str]:
     return None
 
 
+# Quantization formats that require native kernels (no safe fallback)
+# These formats have incompatible memory layouts that cannot be safely fed to other kernels
+UNSAFE_QUANT_FALLBACKS = {
+    "q4_k",  # Super-block format (8 values per block) - now has native gemm_nt_q4_k, gemv_q4_k
+    "q6_k",  # Super-block format (16 values per block) - now has native gemm_nt_q6_k, gemv_q6_k
+}
+
+# Quantization formats that have safe fallbacks (same block structure)
+SAFE_QUANT_FALLBACKS = {
+    "q5_k": "q5_0",  # Q5_K super-block -> Q5_0 simple blocks (lossy but functional)
+    "q5_1": "q5_0",  # Both use 32-value blocks, Q5_1 has min value
+    "q4_1": "q4_0",  # Both use 32-value blocks, Q4_1 has min value
+}
+
+
+def validate_quant_safety(manifest: Dict, registry: Dict, allow_fallback: bool = False) -> None:
+    """
+    Validate that all quantization formats in the model have native kernel support.
+
+    Args:
+        manifest: Weights manifest with quant_summary
+        registry: Kernel registry
+        allow_fallback: If True, allow unsafe fallbacks with warnings
+
+    Raises:
+        RuntimeError: If model uses unsupported quant formats without fallback
+    """
+    quant_summary = manifest.get("quant_summary", {})
+    if not isinstance(quant_summary, dict):
+        return
+
+    # Collect all quant types used
+    used_quants = set()
+    for key, value in quant_summary.items():
+        if isinstance(value, dict):
+            # Layer dict with individual weight dtypes
+            for dtype in value.values():
+                if isinstance(dtype, str):
+                    used_quants.add(dtype.lower())
+        elif isinstance(value, str):
+            used_quants.add(value.lower())
+
+    # Check for native kernel support
+    missing_kernels = []
+    for qtype in used_quants:
+        if qtype in UNSAFE_QUANT_FALLBACKS:
+            # Check if any kernel supports this quant
+            has_native = False
+            for k in registry.get("kernels", []):
+                kq = k.get("quant", {}).get("weight")
+                if not kq:
+                    continue
+                if qtype in str(kq).split("|"):
+                    has_native = True
+                    break
+
+            if not has_native:
+                if allow_fallback:
+                    # Check if safe fallback exists
+                    fallback = SAFE_QUANT_FALLBACKS.get(qtype)
+                    if fallback:
+                        print(f"  {YELLOW}WARNING: {qtype.upper()} weights detected but no native kernel.{RESET}")
+                        print(f"  {YELLOW}  Falling back to {fallback.upper()} - this may cause accuracy issues.{RESET}")
+                        print(f"  {YELLOW}  Use --allow-quant-fallback with caution.{RESET}")
+                    else:
+                        print(f"  {YELLOW}WARNING: {qtype.upper()} weights detected but no native kernel.{RESET}")
+                        print(f"  {YELLOW}  No safe fallback available - this may cause segfaults!{RESET}")
+                else:
+                    missing_kernels.append(qtype)
+
+    if missing_kernels:
+        print(f"\n{RED}ERROR: Model uses quantization formats without native kernel support:{RESET}")
+        for qtype in sorted(missing_kernels):
+            print(f"  {RED}  - {qtype.upper()}: No kernel map exists for this format{RESET}")
+        print()
+        print(f"  {YELLOW}Options:{RESET}")
+        print(f"    1. Add kernel maps for {', '.join(sorted(missing_kernels))}")
+        print(f"    2. Convert weights to a supported format (q5_0, q8_0, fp32)")
+        print(f"    3. Use --allow-quant-fallback to attempt unsafe fallback (not recommended)")
+        raise RuntimeError(
+            f"Unsupported quantization formats: {', '.join(sorted(missing_kernels))}. "
+            "Add native kernels or convert weights."
+        )
+
+
 def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
-                     prefer_parallel: bool = False) -> List[str]:
+                     prefer_parallel: bool = False,
+                     allow_quant_fallback: bool = False) -> List[str]:
     """
     Direct mapping: Template + Quant Summary → Kernel IDs.
 
@@ -1034,6 +1498,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         prefer_parallel: If True, select _parallel_omp kernel variants for decode.
                          These have the same signature as serial kernels but use
                          OpenMP internally — the IR just swaps the function name.
+        allow_quant_fallback: If True, allow unsafe quant fallbacks (not recommended)
 
     Returns:
         List of kernel IDs (C function names) in execution order
@@ -1043,8 +1508,23 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     """
     template = manifest.get("template", {})
     quant_summary = manifest.get("quant_summary", {})
+    header_quant = {}
+    if isinstance(quant_summary, dict):
+        token_q = quant_summary.get("token_emb")
+        if isinstance(token_q, str) and token_q:
+            header_quant["token_emb"] = token_q
+        lm_q = quant_summary.get("lm_head")
+        if isinstance(lm_q, str) and lm_q:
+            header_quant["lm_head"] = lm_q
     config = manifest.get("config", {})
+    # Default to Q8 activation preference for V6.5/V6.6 parity and stable Qwen behavior.
+    # Model-specific overrides can still force FP32 by setting config["prefer_q8_activation"]=false.
+    prefer_q8_activation = bool(config.get("prefer_q8_activation", True))
     registry = load_kernel_registry()
+
+    # Validate quant safety before proceeding
+    print(f"\n  [Quant Safety Check]")
+    validate_quant_safety(manifest, registry, allow_fallback=allow_quant_fallback)
 
     num_layers = config.get("num_layers", 0)
 
@@ -1101,6 +1581,27 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             print(f"\n❌ HARD FAULT: Cannot auto-bump - no .gguf or .bump file found")
             print(f"   Searched in: {manifest_dir}")
             raise RuntimeError("Template missing and cannot auto-bump")
+
+    template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
+    # Template-controlled opt-in: use FP32->Q8_0 contract adapters for Q8_0 kernels.
+    # Keep this disabled by default so non-Gemma families (e.g., Qwen2/Qwen3) stay on
+    # the standard gemv_q8_0/gemm_nt_q8_0 implementations.
+    prefer_q8_contract = bool(template_flags.get("prefer_q8_0_contract", False))
+    # Gemma parity guardrail: keep logits projection on FP32-activation kernels.
+    # This prevents footer quantize+q8 logits paths from changing token ranking
+    # while we stabilize Gemma prefill/decode behavior.
+    prefer_fp32_logits = bool(template_flags.get("prefer_fp32_logits", False))
+    # Gemma-family input contract: scale token embeddings by sqrt(embed_dim)
+    # before layer-0 residual_save. Keep a Gemma fallback so older cached
+    # manifests (without the new template flag) still generate correctly.
+    model_lc = str(config.get("model", "")).lower()
+    template_name_lc = str(template.get("name", "")).lower()
+    is_gemma_family = model_lc.startswith("gemma") or ("gemma" in template_name_lc)
+    if "scale_embeddings_sqrt_dim" in template_flags:
+        scale_embeddings_sqrt_dim = bool(template_flags.get("scale_embeddings_sqrt_dim"))
+    else:
+        scale_embeddings_sqrt_dim = is_gemma_family
+    config["scale_embeddings_sqrt_dim"] = scale_embeddings_sqrt_dim
 
     # Extract ops sequences from v2 template (header, body, footer)
     block_name = template["sequence"][0]
@@ -1179,6 +1680,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     print(f"\nBuilding IR1 from template...")
     print(f"  Mode: {mode}")
     print(f"  Layers: {num_layers}")
+    print(f"  Q8 contract override: {'ON' if prefer_q8_contract else 'OFF'}")
+    print(f"  FP32 logits preference: {'ON' if prefer_fp32_logits else 'OFF'}")
+    print(f"  Embed sqrt(dim) scale: {'ON' if scale_embeddings_sqrt_dim else 'OFF'}")
 
     arranged_kernels = []  # Pass 1: list of {kernel, op, section, layer, op_id, instance, dataflow}
     global_op_id = 0  # Global operation ID counter
@@ -1192,6 +1696,39 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
     # Initialize dataflow tracker
     dataflow_tracker = DataflowTracker()
+
+    # Build activation dtype lookup (kernel_id -> activation dtype)
+    kernel_act_dtype = {
+        k.get("id"): k.get("quant", {}).get("activation", "fp32")
+        for k in registry.get("kernels", [])
+    }
+
+    def _input_slot_override_for_kernel(op_type: str, kernel_id: Optional[str]) -> Optional[Dict[str, str]]:
+        """Override dataflow input slot based on kernel activation dtype."""
+        if not kernel_id:
+            return None
+        act = kernel_act_dtype.get(kernel_id, "fp32")
+        if op_type in ("q_proj", "k_proj", "v_proj", "mlp_gate_up"):
+            return {"x": "main_stream" if act == "fp32" else "main_stream_q8"}
+        if op_type == "out_proj":
+            return {"x": "attn_scratch" if act == "fp32" else "main_stream_q8"}
+        if op_type == "mlp_down":
+            return {"x": "mlp_scratch" if act == "fp32" else "main_stream_q8"}
+        if op_type == "logits":
+            return {"x": "main_stream" if act == "fp32" else "main_stream_q8"}
+        return None
+
+    def _maybe_apply_q8_contract(kernel_id: Optional[str], weight_dtype: Optional[str]) -> Optional[str]:
+        """Optionally remap standard Q8_0 kernels to explicit contract adapters."""
+        if not kernel_id or not prefer_q8_contract:
+            return kernel_id
+        if weight_dtype != "q8_0":
+            return kernel_id
+        if kernel_id == "gemv_q8_0":
+            return "gemv_q8_0_q8_0_contract"
+        if kernel_id == "gemm_nt_q8_0":
+            return "gemm_nt_q8_0_q8_0_contract"
+        return kernel_id
 
     # Weight entries from manifest (for Pass 2 binding)
     entries = manifest.get("entries", [])
@@ -1211,14 +1748,21 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
         # Ops with fp32 weights (no quant lookup needed)
         "rmsnorm": None,  # gamma is always fp32
+        "attn_norm": None,
+        "post_attention_norm": None,
+        "ffn_norm": None,
+        "post_ffn_norm": None,
+        "final_rmsnorm": None,
         "qk_norm": None,  # Per-head RMSNorm gamma is always fp32
 
         # Ops without weights (compute-only)
         "rope_qk": None,
         "kv_cache_store": None,  # Store K,V to KV cache (no weights)
         "attn": None,
+        "attn_sliding": None,
         "residual_add": None,
         "silu_mul": None,
+        "geglu": None,
 
         # Metadata ops (no kernel)
         "tokenizer": "metadata",  # Deprecated, use bpe_tokenizer
@@ -1229,7 +1773,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "lm_head": "metadata",  # Signals separate lm_head weight (not tied)
     }
 
-    def map_op_to_kernel(op: str, layer_quant: Dict, mode: str) -> List[str]:
+    PRE_NORM_OPS = {"rmsnorm", "attn_norm", "ffn_norm"}
+
+    def map_op_to_kernel(op: str, layer_quant: Dict, mode: str, header_quant: Dict) -> List[str]:
         """
         Map template op → kernel ID(s).
 
@@ -1275,8 +1821,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
             # Try fused kernel first (e.g., qkv_projection)
             weight_dtype = layer_quant.get(weight_info[0], "fp32")
-            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
-                                    prefer_parallel=use_parallel)
+            kernel_id = find_kernel(
+                registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
+                prefer_q8_activation=prefer_q8_activation,
+                prefer_parallel=use_parallel
+            )
+            kernel_id = _maybe_apply_q8_contract(kernel_id, weight_dtype)
             if kernel_id:
                 return [kernel_id]
 
@@ -1290,29 +1840,60 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             }
             for w_key in weight_info:
                 w_dtype = layer_quant.get(w_key, "fp32")
-                k = find_kernel(registry, op="matmul", quant={"weight": w_dtype}, mode=mode,
-                                prefer_parallel=use_parallel)
+                k = find_kernel(
+                    registry, op="matmul", quant={"weight": w_dtype}, mode=mode,
+                    prefer_q8_activation=prefer_q8_activation,
+                    prefer_parallel=use_parallel
+                )
                 if k:
+                    k = _maybe_apply_q8_contract(k, w_dtype)
                     split_op = weight_to_split_op.get(w_key, op)
                     kernels.append((k, split_op))
             return kernels
 
         # Header/footer ops with weights (embedding, logits)
         if isinstance(weight_info, list) and not weight_info:
-            # These use fixed quant (typically q8_0)
-            kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "q8_0"}, mode=mode,
-                                    prefer_parallel=use_parallel)
+            # Header/footer ops with weights (embedding/logits).
+            if op in ("dense_embedding_lookup", "embedding"):
+                weight_dtype = header_quant.get("token_emb", "q8_0")
+            elif op == "logits":
+                weight_dtype = header_quant.get("lm_head") or header_quant.get("token_emb") or "q8_0"
+            else:
+                weight_dtype = "q8_0"
+
+            kernel_prefer_q8_activation = prefer_q8_activation
+            if op == "logits" and prefer_fp32_logits:
+                kernel_prefer_q8_activation = False
+
+            kernel_id = find_kernel(
+                registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
+                prefer_q8_activation=kernel_prefer_q8_activation,
+                prefer_parallel=use_parallel
+            )
+            kernel_id = _maybe_apply_q8_contract(kernel_id, weight_dtype)
+            if op == "logits":
+                print(
+                    f"  [debug/logits] mode={mode} weight={weight_dtype} "
+                    f"prefer_q8={kernel_prefer_q8_activation} "
+                    f"prefer_fp32_logits={prefer_fp32_logits} -> {kernel_id}"
+                )
             return [kernel_id] if kernel_id else []
 
         # Ops with fp32 weights or no weights
-        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "fp32"}, mode=mode,
-                                prefer_parallel=use_parallel)
+        kernel_id = find_kernel(
+            registry, op=kernel_op, quant={"weight": "fp32"}, mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
+            prefer_parallel=use_parallel
+        )
         if kernel_id:
             return [kernel_id]
 
         # Try without weight quant requirement
-        kernel_id = find_kernel(registry, op=kernel_op, quant={"weight": "none"}, mode=mode,
-                                prefer_parallel=use_parallel)
+        kernel_id = find_kernel(
+            registry, op=kernel_op, quant={"weight": "none"}, mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
+            prefer_parallel=use_parallel
+        )
         return [kernel_id] if kernel_id else []
 
     # ═══════════════════════════════════════════════════════════
@@ -1371,17 +1952,17 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
                     print(f"\n    Layer {layer_idx}:")
 
-                    # Track rmsnorm instance for quantize insertion
-                    rmsnorm_instance = 0
+                    # Track pre-norm instance for quantize insertion
+                    norm_instance = 0
 
                     for op_idx, op in enumerate(ops):
-                        kernels = map_op_to_kernel(op, layer_quant, mode)
+                        kernels = map_op_to_kernel(op, layer_quant, mode, header_quant)
 
                         # Check if we need to insert quantize op after rmsnorm
                         # V6.5 compatibility: quantize activation before Q8_0 activation kernels
-                        if op == "rmsnorm" and op_idx + 1 < len(ops):
+                        if op in PRE_NORM_OPS and op_idx + 1 < len(ops):
                             next_op = ops[op_idx + 1]
-                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode)
+                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode, header_quant)
                             needs_quantize = False
 
                             for nk in next_kernels:
@@ -1391,7 +1972,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                     break
 
                             if needs_quantize:
-                                # Insert quantize op after rmsnorm (will be appended after rmsnorm below)
+                                # Insert quantize op after pre-norm (will be appended after op below)
                                 pass  # Flag is set, handled below
 
                         # Check if we need to insert quantize op BEFORE out_proj or mlp_down
@@ -1419,8 +2000,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                             print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED]")
                                         break
 
-                        # Insert residual_save BEFORE rmsnorm to save input for skip connection
-                        if op == "rmsnorm":
+                        # Insert residual_save BEFORE pre-norm to save input for skip connection
+                        if op in PRE_NORM_OPS:
                             residual_save_op_name = f"residual_save"
                             residual_save_info = get_op_info(residual_save_op_name, "body", layer_idx)
                             arranged_kernels.append({
@@ -1429,10 +2010,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 "op": residual_save_op_name,
                                 "section": "body",
                                 "layer": layer_idx,
-                                "instance": rmsnorm_instance,  # Same instance as rmsnorm
+                                "instance": norm_instance,  # Same instance as pre-norm
                                 "_auto_inserted": True,
                             })
-                            print(f"      [{residual_save_info['op_id']:3d}] {residual_save_op_name:20s} → memcpy  (inst: {rmsnorm_instance}) [AUTO-INSERTED before rmsnorm]")
+                            print(f"      [{residual_save_info['op_id']:3d}] {residual_save_op_name:20s} → memcpy  (inst: {norm_instance}) [AUTO-INSERTED before {op}]")
 
                         for k in kernels:
                             # Handle both plain kernel ID and (kernel_id, split_op) tuples
@@ -1455,9 +2036,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
 
                         # Insert quantize op after rmsnorm if needed
-                        if op == "rmsnorm" and op_idx + 1 < len(ops):
+                        if op in PRE_NORM_OPS and op_idx + 1 < len(ops):
                             next_op = ops[op_idx + 1]
-                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode)
+                            next_kernels = map_op_to_kernel(next_op, layer_quant, mode, header_quant)
 
                             for nk in next_kernels:
                                 nk_id = nk[0] if isinstance(nk, tuple) else nk
@@ -1468,7 +2049,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                             act_dtype = kreg.get("quant", {}).get("activation", "fp32")
                                             quantize_kernel = get_quantize_kernel_for_activation(act_dtype)
                                             if quantize_kernel:
-                                                quant_op_name = f"quantize_input_{rmsnorm_instance}"
+                                                quant_op_name = f"quantize_input_{norm_instance}"
                                                 quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
                                                 arranged_kernels.append({
                                                     "op_id": quant_op_info["op_id"],
@@ -1476,12 +2057,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                     "op": quant_op_name,
                                                     "section": "body",
                                                     "layer": layer_idx,
-                                                    "instance": rmsnorm_instance,
+                                                    "instance": norm_instance,
                                                 })
-                                                print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: {rmsnorm_instance}) [AUTO-INSERTED]")
+                                                print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: {norm_instance}) [AUTO-INSERTED]")
                                             break
                                     break
-                            rmsnorm_instance += 1
+                            norm_instance += 1
 
                         if not kernels and OP_TO_WEIGHT_KEYS.get(op) != "metadata":
                             print(f"            {op:20s} → (no kernel)")
@@ -1491,7 +2072,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 print(f"\n    {section_name.capitalize()}:")
                 footer_quantize_inserted = False  # Track if we've inserted quantize for footer
                 for op_idx, op in enumerate(ops):
-                    kernels = map_op_to_kernel(op, {}, mode)
+                    kernels = map_op_to_kernel(op, {}, mode, header_quant)
 
                     # Footer: Insert quantize op BEFORE any op that needs Q8 activation
                     # (after rmsnorm outputs FP32, before logits needs Q8_0)
@@ -1567,8 +2148,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             dataflow_tracker.reset_for_layer(layer)
             current_layer = layer
 
-        # Record dataflow for this op
-        dataflow_info = dataflow_tracker.record_op(op_id, op_type, layer, instance)
+        # Record dataflow for this op (override input slot based on kernel activation dtype)
+        kernel_id = ir_op.get("kernel")
+        input_override = _input_slot_override_for_kernel(op_type, kernel_id)
+        dataflow_info = dataflow_tracker.record_op(op_id, op_type, layer, instance, input_override)
         ir_op["dataflow"] = dataflow_info
 
     # Print dataflow stats
@@ -1588,6 +2171,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # rmsnorm: 1st (pre-attention) uses ln1_gamma, 2nd (pre-MLP) uses ln2_gamma
         ("rmsnorm", 0): ["ln1_gamma"],      # Pre-attention norm
         ("rmsnorm", 1): ["ln2_gamma"],      # Pre-MLP norm
+        ("attn_norm", 0): ["ln1_gamma"],    # Pre-attention norm (Gemma)
+        ("ffn_norm", 0): ["ln2_gamma"],     # Pre-MLP norm (Gemma)
+        ("post_attention_norm", 0): ["post_attention_norm"],
+        ("post_ffn_norm", 0): ["post_ffn_norm"],
         # residual_add: both instances use same weights (none), but tracked for consistency
         ("residual_add", 0): [],            # Post-attention residual
         ("residual_add", 1): [],            # Post-MLP residual
@@ -1596,6 +2183,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Footer-specific weights (no instance tracking needed)
     FOOTER_OP_WEIGHTS = {
         "rmsnorm": ["final_ln_weight", "final_ln_bias"],
+        "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
+        "logits": ["token_emb"],  # Weight-tied models use token_emb as lm_head
     }
 
     for ir_op in arranged_kernels:
@@ -1645,7 +2234,138 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     total_weights = sum(len(op["weights"]) for op in arranged_kernels)
     print(f"  ✓ Pass 2: Bound {total_weights} weights to {len(arranged_kernels)} ops")
 
+    # ==========================================================================
+    # POST-IR1 COMPLETENESS CHECK
+    # Validate that no template ops were silently dropped.
+    # This catches the class of bugs where a required kernel returns None
+    # and the op is silently skipped (e.g., Gemma logits drop).
+    # ==========================================================================
+    _check_ir1_completeness(manifest, arranged_kernels)
+
     return arranged_kernels
+
+
+def _check_ir1_completeness(manifest: Dict, ir1_ops: List[Dict]) -> None:
+    """
+    Verify that all expected template ops are present in IR1.
+
+    This catches silent kernel drops where find_kernel() returns None
+    but the error is not propagated.
+
+    Handles:
+    - op splitting (qkv_proj → q_proj + k_proj + v_proj)
+    - metadata ops (tokenizer, weight_tying, lm_head - not in IR1)
+    - optional ops (post_attention_norm, post_ffn_norm - only if weights exist)
+
+    Raises:
+        RuntimeError: If required ops are missing from IR1
+    """
+    template = manifest.get("template", {})
+    if not template or "sequence" not in template:
+        return  # Can't validate without template
+
+    # Op groups for validation
+    # Only include splits if both parts are real ops that can exist in IR1
+    SPLIT_OPS = {
+        "qkv_proj": ["q_proj", "k_proj", "v_proj"],
+        # mlp_gate_up -> mlp_gate + mlp_up is not a real split pattern
+        # mlp_gate_up produces gate+up tensor, geglu/silu_mul processes it
+    }
+
+    METADATA_OPS = {
+        "bpe_tokenizer",
+        "wordpiece_tokenizer",
+        "tokenizer",
+        "weight_tying",
+        "lm_head",
+        "patch_embeddings",
+        "dense_embedding_lookup",  # Meta-kernel, expanded to embedding_forward
+    }
+
+    OPTIONAL_OPS = {
+        "post_attention_norm",
+        "post_ffn_norm",
+    }
+
+    # Parse template structure correctly
+    block_name = template["sequence"][0]
+    block = template["block_types"].get(block_name, {})
+
+    # Extract ops from header, body, and footer
+    def extract_ops(section):
+        """Extract op names from template section (handles dict and string formats)."""
+        out = []
+        for item in section:
+            if isinstance(item, dict):
+                if "op" in item:
+                    out.append(item["op"])
+            elif isinstance(item, str):
+                out.append(item)
+        return out
+
+    header_ops = extract_ops(block.get("header", []))
+    body_raw = block.get("body", {})
+    if isinstance(body_raw, dict):
+        body_ops = extract_ops(body_raw.get("ops", []))
+    else:
+        body_ops = extract_ops(body_raw)
+    footer_ops = extract_ops(block.get("footer", []))
+
+    template_ops = header_ops + body_ops + footer_ops
+
+    # Determine which optional ops are present in manifest
+    manifest_entries = {e.get("name", "") for e in manifest.get("entries", [])}
+
+    def optional_present(op: str) -> bool:
+        """Check if optional op should be present based on manifest weights."""
+        if op == "post_attention_norm":
+            return any("post_attention_norm" in n for n in manifest_entries)
+        if op == "post_ffn_norm":
+            # Handle both naming conventions (ln3 vs post_ffn_norm)
+            return any(x in n for x in ["post_ffn_norm", "post_ffw_norm", "ln3"] for n in manifest_entries)
+        return True
+
+    # Collect actual ops from IR1 (use "op" field, not "kernel")
+    actual_ops = {op.get("op", "") for op in ir1_ops}
+
+    missing = []
+
+    for op in template_ops:
+        # Skip metadata ops - they don't generate IR1 kernels
+        if op in METADATA_OPS:
+            continue
+
+        # Skip optional ops that aren't present in manifest
+        if op in OPTIONAL_OPS and not optional_present(op):
+            continue
+
+        # Handle split ops: accept either fused or split versions
+        if op in SPLIT_OPS:
+            split_required = SPLIT_OPS[op]
+            # Check if fused version exists
+            if op in actual_ops:
+                continue
+            # Check if all split versions exist
+            if all(x in actual_ops for x in split_required):
+                continue
+            # Neither fused nor split found - mark as missing
+            missing.append(f"{op} (requires: {split_required})")
+        else:
+            # Regular op - must exist in IR1
+            if op not in actual_ops:
+                missing.append(op)
+
+    if missing:
+        raise RuntimeError(
+            f"\n❌ HARD FAULT: Incomplete IR1 - {len(missing)} ops silently dropped\n"
+            f"   Missing ops: {sorted(missing)}\n"
+            f"   Template ops: {sorted(set(template_ops))}\n"
+            f"   Actual IR1 ops: {sorted(actual_ops)}\n"
+            f"   This indicates find_kernel() returned None for required ops.\n"
+            f"   Fix: Ensure kernel is registered or add fallback in OP_FALLBACKS.\n"
+        )
+
+    print(f"  ✓ IR1 completeness check passed ({len(template_ops)} expected, {len(ir1_ops)} generated)")
 
 
 def apply_fusion_pass(ir1_ops: List[Dict], registry: Dict, mode: str, no_fusion: bool = False) -> tuple[List[Dict], Dict]:
@@ -1841,6 +2561,7 @@ def insert_bias_add_ops(
     registry: Dict,
     manifest: Dict,
     mode: str,
+    manifest_path: Optional[Path] = None,
 ) -> List[Dict]:
     """
     Insert explicit bias_add ops after projections when kernels do not apply bias.
@@ -1854,6 +2575,15 @@ def insert_bias_add_ops(
 
     kernel_maps_dir = PROJECT_ROOT / "kernel_maps"
     kernel_map_cache: Dict[str, Dict] = {}
+    entry_by_name: Dict[str, Dict[str, Any]] = {
+        e.get("name"): e for e in (manifest.get("entries", []) or []) if e.get("name")
+    }
+    bias_zero_cache: Dict[str, bool] = {}
+    bump_path: Optional[Path] = None
+    if manifest_path:
+        candidate = manifest_path.parent / "weights.bump"
+        if candidate.exists():
+            bump_path = candidate
 
     def load_kernel_map(kernel_id: str) -> Optional[Dict]:
         if kernel_id in kernel_map_cache:
@@ -1884,6 +2614,52 @@ def insert_bias_add_ops(
                 return True
         return False
 
+    def is_zero_bias_tensor(weight_name: str) -> bool:
+        """
+        Return True if a bias tensor is all zeros in weights.bump.
+        Falls back to False on missing metadata/files.
+        """
+        if weight_name in bias_zero_cache:
+            return bias_zero_cache[weight_name]
+        if bump_path is None:
+            bias_zero_cache[weight_name] = False
+            return False
+        entry = entry_by_name.get(weight_name)
+        if not entry:
+            bias_zero_cache[weight_name] = False
+            return False
+        dtype = str(entry.get("dtype", "")).lower()
+        if dtype not in ("fp32", "f32", "float32"):
+            bias_zero_cache[weight_name] = False
+            return False
+        size = int(entry.get("size", 0) or 0)
+        file_offset = entry.get("file_offset")
+        if size <= 0 or file_offset is None:
+            bias_zero_cache[weight_name] = False
+            return False
+
+        try:
+            with open(bump_path, "rb") as f:
+                f.seek(int(file_offset))
+                remaining = size
+                zero = True
+                while remaining > 0:
+                    chunk = f.read(min(remaining, 16384))
+                    if not chunk:
+                        break
+                    # Fast path: any non-zero byte means tensor has non-zero values.
+                    if any(b != 0 for b in chunk):
+                        zero = False
+                        break
+                    remaining -= len(chunk)
+                if remaining > 0:
+                    zero = False
+            bias_zero_cache[weight_name] = zero
+            return zero
+        except Exception:
+            bias_zero_cache[weight_name] = False
+            return False
+
     bias_key_by_op = {
         "q_proj": "bq",
         "k_proj": "bk",
@@ -1896,6 +2672,7 @@ def insert_bias_add_ops(
     config = manifest.get("config", {})
     out: List[Dict] = []
     inserted = 0
+    skipped_zero = 0
 
     for op in ir_ops:
         out.append(op)
@@ -1904,6 +2681,15 @@ def insert_bias_add_ops(
         if not bias_key:
             continue
         if bias_key not in op.get("weights", {}):
+            continue
+        bias_weight_ref = op["weights"].get(bias_key)
+        bias_weight_name = None
+        if isinstance(bias_weight_ref, str):
+            bias_weight_name = bias_weight_ref
+        elif isinstance(bias_weight_ref, dict):
+            bias_weight_name = bias_weight_ref.get("name")
+        if isinstance(bias_weight_name, str) and is_zero_bias_tensor(bias_weight_name):
+            skipped_zero += 1
             continue
         if kernel_supports_bias(op.get("kernel", "")):
             continue
@@ -1926,6 +2712,8 @@ def insert_bias_add_ops(
 
     if inserted:
         print(f"  Inserted {inserted} bias_add ops (mode={mode})")
+    if skipped_zero:
+        print(f"  Skipped {skipped_zero} zero bias_add ops (mode={mode})")
 
     return out
 
@@ -2027,6 +2815,11 @@ def generate_ir_lower_1(
             embed_dim = manifest.get("config", {}).get("embed_dim", 896)
             seq_len = 1 if mode == "decode" else manifest.get("config", {}).get("context_length", 2048)
             lowered_op["params"]["_memcpy_bytes"] = embed_dim * seq_len * 4  # FP32 = 4 bytes
+        elif op_name == "kv_cache_batch_copy":
+            num_kv_heads = int(lowered_op["params"].get("num_kv_heads", manifest.get("config", {}).get("num_kv_heads", 1)))
+            head_dim = int(lowered_op["params"].get("head_dim", manifest.get("config", {}).get("head_dim", 1)))
+            seq_len = int(lowered_op["params"].get("seq_len", manifest.get("config", {}).get("context_length", 1)))
+            lowered_op["params"]["_kv_copy_bytes"] = num_kv_heads * head_dim * seq_len * 4  # FP32 bytes
 
         # Map kernel input activations from kernel map
         # New format has 4 sections:
@@ -2039,8 +2832,9 @@ def generate_ir_lower_1(
         # Build set of weight names from kernel map to filter out weight inputs
         # (handles legacy format where weights were mixed into 'inputs')
         kernel_weight_names = set()
-        for kw in kernel_map.get("weights", []):
-            kernel_weight_names.add(kw["name"])
+        for kw in (kernel_map.get("weights") or []):
+            if isinstance(kw, dict):
+                kernel_weight_names.add(kw["name"])
         # Also check IR1 weights mapped to kernel input names
         for wkey in ir_weights.keys():
             kernel_weight_names.add(wkey)
@@ -2049,8 +2843,12 @@ def generate_ir_lower_1(
                 kernel_weight_names.add(mapped_name)
 
         for kernel_input in kernel_inputs:
-            input_name = kernel_input["name"]
-            input_dtype = kernel_input["dtype"]
+            if not isinstance(kernel_input, dict):
+                continue
+            input_name = kernel_input.get("name")
+            if not input_name:
+                continue
+            input_dtype = kernel_input.get("dtype", "fp32")
             input_shape = kernel_input.get("shape", [])
 
             # Skip if this is actually a weight parameter
@@ -2066,9 +2864,13 @@ def generate_ir_lower_1(
             }
 
         # Map kernel outputs
-        for kernel_output in kernel_map.get("outputs", []):
-            output_name = kernel_output["name"]
-            output_dtype = kernel_output["dtype"]
+        for kernel_output in (kernel_map.get("outputs") or []):
+            if not isinstance(kernel_output, dict):
+                continue
+            output_name = kernel_output.get("name")
+            if not output_name:
+                continue
+            output_dtype = kernel_output.get("dtype", "fp32")
             output_shape = kernel_output.get("shape", [])
 
             # Create output buffer name
@@ -2133,11 +2935,16 @@ def generate_ir_lower_1(
                 kv_store_count += 1
 
             # For decode mode, update attention ops to use decode kernel
-            if op["op"] == "attn" and "attention" in op["kernel"]:
-                # Switch to decode attention kernel
-                op["kernel"] = "attention_forward_decode_head_major_gqa_flash"
-                op["function"] = "attention_forward_decode_head_major_gqa_flash"
+            if op["op"] in ("attn", "attn_sliding") and "attention" in op["kernel"]:
+                # Switch to decode attention kernel (sliding vs non-sliding)
+                if op["op"] == "attn_sliding":
+                    decode_kernel = "attention_forward_decode_head_major_gqa_flash_sliding"
+                else:
+                    decode_kernel = "attention_forward_decode_head_major_gqa_flash"
+                op["kernel"] = decode_kernel
+                op["function"] = decode_kernel
                 # Update inputs to use KV cache instead of scratch
+                op.setdefault("inputs", {})
                 op["inputs"]["k_cache"] = {"type": "kv_cache", "source": f"kv_cache_k_L{op['layer']}"}
                 op["inputs"]["v_cache"] = {"type": "kv_cache", "source": f"kv_cache_v_L{op['layer']}"}
                 # Remove scratch K/V references if present
@@ -2203,7 +3010,7 @@ def generate_ir_lower_1(
 
             # For prefill: after attention, transpose output from head-major [H, T, D] to token-major [T, H*D]
             # Then insert kv_cache_batch_copy to copy K/V from scratch to cache
-            if op["op"] == "attn":
+            if op["op"] in ("attn", "attn_sliding"):
                 layer = op["layer"]
                 # First: transpose attention output from head-major to token-major
                 transpose_attn_out_op = {
@@ -2227,7 +3034,7 @@ def generate_ir_lower_1(
                     "op": "kv_cache_batch_copy",
                     "layer": layer,
                     "section": op["section"],
-                    "function": "memcpy",  # Will emit memcpy calls for K and V
+                    "function": "kv_cache_batch_copy",  # Codegen emits two memcpy calls (K and V)
                     "weights": {},
                     "inputs": {
                         "k_src": {"type": "scratch", "source": "k_scratch"},
@@ -2268,7 +3075,9 @@ def generate_ir_lower_1(
             },
             "scratch": [],
             "_auto_inserted": True,
-            "_copy_size": "vocab_size * sizeof(float)",
+            "params": {
+                "_copy_size": "vocab_size * sizeof(float)",
+            },
         }
         final_ops.append(copy_last_logits_op)
         copy_last_logits_inserted = True
@@ -2310,6 +3119,10 @@ WEIGHT_PATTERNS = {
     "bk": ["layer.{L}.bk", "layers.{L}.attention.bk"],
     "bv": ["layer.{L}.bv", "layers.{L}.attention.bv"],
 
+    # QK norm weights (per-head RMSNorm gamma for Q and K)
+    "q_norm": ["layer.{L}.q_norm", "layers.{L}.attention.q_norm"],
+    "k_norm": ["layer.{L}.k_norm", "layers.{L}.attention.k_norm"],
+
     # Output projection
     "wo": ["layer.{L}.wo", "layers.{L}.attention.wo"],
     "bo": ["layer.{L}.bo", "layers.{L}.attention.bo"],
@@ -2324,6 +3137,8 @@ WEIGHT_PATTERNS = {
     # Layer norms
     "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight"],
     "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight"],
+    "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
+    "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight"],
 
     # Header weights
     "token_emb": ["token_emb", "token_embd.weight", "embed_tokens.weight"],
@@ -2354,6 +3169,11 @@ TEMPLATE_OP_WEIGHTS = {
     # Body: uses ln1_gamma, ln2_gamma (per-layer)
     # Footer: uses final_ln_weight, final_ln_bias (once)
     "rmsnorm": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "final_ln_bias"],
+    "attn_norm": ["ln1_gamma"],
+    "post_attention_norm": ["post_attention_norm"],
+    "ffn_norm": ["ln2_gamma"],
+    "post_ffn_norm": ["post_ffn_norm"],
+    "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
     "qkv_proj": ["wq", "wk", "wv", "bq", "bk", "bv"],  # QKV + optional biases (for fused kernel)
     "q_proj": ["wq", "bq"],  # Q projection only (when split)
     "k_proj": ["wk", "bk"],  # K projection only (when split)
@@ -2361,12 +3181,14 @@ TEMPLATE_OP_WEIGHTS = {
     "qk_norm": ["q_norm", "k_norm"],  # Per-head RMSNorm gamma weights for Q and K
     "rope_qk": [],  # No model weights (uses precomputed tables)
     "attn": [],  # No model weights
+    "attn_sliding": [],  # No model weights (kernel op handles windowing)
     "out_proj": ["wo", "bo"],  # Output projection + optional bias
     "residual_add": [],  # No model weights
 
     # MLP block
     "mlp_gate_up": ["w1", "w3", "b1"],  # Gate + up projection
     "silu_mul": [],  # No model weights
+    "geglu": [],  # No model weights
     "mlp_down": ["w2", "b2"],  # Down projection
 
     # Footer
@@ -2539,7 +3361,7 @@ def generate_memory_layout(
     all_weight_names = set(all_weights.keys())
 
     # Weights in manifest that are NOT model weights (tokenizer data)
-    non_model_weights = {"vocab_offsets", "vocab_strings", "vocab_merges"}
+    non_model_weights = {"vocab_offsets", "vocab_strings", "vocab_merges", "vocab_scores", "vocab_types"}
     model_weights = all_weight_names - non_model_weights
 
     # Weights expected but not used by IR1
@@ -2754,8 +3576,10 @@ def generate_memory_layout(
     # Formula: 3 * num_heads * seq_len * head_dim * 4 + qkv_scratch (embed_dim * 4 * tokens + overhead)
     # For safety, use at least 350KB for decode fused attention
     fused_attn_scratch = max(350 * 1024, 3 * num_heads * seq_len * head_dim * 4 + embed_dim * 4 * seq_len * 4)
-    scratch_size = max(mlp_size, fused_attn_scratch)
-    add_buffer("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn)]")
+    # BF16 GeGLU needs 3 * seq_len * dim * 4 (input [a,b] + output)
+    geglu_bf16_scratch = seq_len * intermediate_size * 3 * 4
+    scratch_size = max(mlp_size, fused_attn_scratch, geglu_bf16_scratch)
+    add_buffer("mlp_scratch", scratch_size, f"[max({seq_len}*{intermediate_size*2}, fused_attn, geglu_bf16)]")
 
     # Layer output: [seq_len, embed_dim]
     layer_out_size = seq_len * embed_dim * 4
@@ -3038,7 +3862,7 @@ def generate_memory_layout_packed(
             current_input_buffer = "embedded_input"
             current_output_buffer = "layer_input"
         elif op_type in ("q_proj", "k_proj", "v_proj", "qkv_proj", "rope_qk", "bias_add") or \
-                (mode == "prefill" and op_type == "attn"):
+                (mode == "prefill" and op_type in ("attn", "attn_sliding")):
             pass
         else:
             current_input_buffer, current_output_buffer = current_output_buffer, current_input_buffer
@@ -3368,31 +4192,53 @@ def generate_ir_lower_2(
             # ═══════════════════════════════════════════════════════════════
             # USE MEMORY PLANNER for QKV input buffer assignment
             # The memory planner knows the correct buffer (main_stream_q8)
+            #
+            # CRITICAL: Buffer selection depends on kernel's activation dtype:
+            # - Kernels with fp32 activation (e.g., gemm_nt_q5_1) need FP32 input
+            #   → use embedded_input (FP32 buffer)
+            # - Kernels with q8_0 activation (e.g., gemm_nt_q8_0_q8_0) need Q8 input
+            #   → use layer_input (Q8 buffer, where quantize_input writes)
             # ═══════════════════════════════════════════════════════════════
             op_id = ir_op.get("idx", ir_op.get("op_id", -1))
+            kernel_id = ir_op.get("kernel", "")
+
+            # Determine the correct input buffer based on kernel's activation dtype
+            # Default to layer_input (Q8 buffer), but use embedded_input (FP32) for fp32-activation kernels
+            needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
+            default_buf_name = "layer_input" if needs_q8_input else "embedded_input"
+            default_buf = activation_buffers.get(default_buf_name)
 
             for input_name, input_info in ir_op.get("inputs", {}).items():
                 # Skip weight inputs
                 if input_name in ir_op.get("weights", {}):
                     continue
 
-                # Use memory planner for input buffer
-                planned = get_planned_buffer(op_id, "inputs", input_name)
-
-                if planned:
-                    planner_buf = planned.get("buffer", "layer_input")
-                    buf_name = buffer_name_map.get(planner_buf, planner_buf)
-                    buf = activation_buffers.get(buf_name)
+                # Buffer selection: kernel activation dtype takes priority
+                # FP32-activation kernels (e.g., gemm_nt_q5_1) MUST read FP32 buffer,
+                # even if the memory planner assigns Q8 buffer (planner is driven by
+                # OP_DATAFLOW which hardcodes main_stream_q8 for QKV inputs).
+                if not needs_q8_input:
+                    # FP32 kernel: always use embedded_input (FP32 buffer)
+                    buf_name = default_buf_name  # "embedded_input"
+                    buf = default_buf
                 else:
-                    # Fallback to layer_input (Q8 buffer) - this is where quantize_input writes
-                    buf_name = "layer_input"
-                    buf = activation_buffers.get("layer_input")
+                    # Q8 kernel: use memory planner assignment
+                    planned = get_planned_buffer(op_id, "inputs", input_name)
+                    if planned:
+                        planner_buf = planned.get("buffer", default_buf_name)
+                        buf_name = buffer_name_map.get(planner_buf, planner_buf)
+                        buf = activation_buffers.get(buf_name)
+                    else:
+                        buf_name = default_buf_name  # "layer_input"
+                        buf = default_buf
 
                 if buf:
+                    # Set dtype based on kernel's activation requirement (q8_0 for Q8 kernels, fp32 for FP32 kernels)
+                    act_dtype = "q8_0" if needs_q8_input else "fp32"
                     lowered_op["activations"][input_name] = {
                         "buffer": buf_name,
                         "activation_offset": buf["offset"],
-                        "dtype": input_info.get("dtype", "q8_0"),
+                        "dtype": input_info.get("dtype", act_dtype),
                         "ptr_expr": f"activations + {buf['offset']}",
                     }
             # Q writes to q_scratch
@@ -3430,9 +4276,91 @@ def generate_ir_lower_2(
                 last_output_buffer = "k_scratch"
             elif op_type == "v_proj":
                 last_output_buffer = "v_scratch"
+        elif op_type == "logits":
+            # Footer logits projection: input buffer must match kernel activation dtype.
+            # - fp32 activation kernels (gemv_q8_0 / gemm_nt_q8_0) read embedded_input
+            # - q8 activation kernels (gemv_q8_0_q8_0 / gemm_nt_q8_0_q8_0) read layer_input
+            op_id = ir_op.get("idx", ir_op.get("op_id", -1))
+            kernel_id = ir_op.get("kernel", "")
+            needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
+            default_buf_name = "layer_input" if needs_q8_input else "embedded_input"
+            default_buf = activation_buffers.get(default_buf_name)
+
+            for input_name, input_info in ir_op.get("inputs", {}).items():
+                # Skip weight-style kernel params (B, bias, etc.)
+                is_weight_input = input_name in ir_op.get("weights", {})
+                if not is_weight_input:
+                    for wkey in ir_op.get("weights", {}).keys():
+                        if WEIGHT_TO_KERNEL_INPUT.get(wkey) == input_name:
+                            is_weight_input = True
+                            break
+                if is_weight_input:
+                    continue
+
+                if not needs_q8_input:
+                    # FP32 kernel: force FP32 stream to avoid stale Q8 buffer.
+                    buf_name = default_buf_name
+                    buf = default_buf
+                else:
+                    # Q8 kernel: planner assignment is valid.
+                    dataflow_name = {"A": "x", "x_q8": "x", "x": "x", "input": "x"}.get(input_name, input_name)
+                    planned = get_planned_buffer(op_id, "inputs", dataflow_name)
+                    if not planned:
+                        planned = get_planned_buffer(op_id, "inputs", input_name)
+                    if planned:
+                        planner_buf = planned.get("buffer", default_buf_name)
+                        buf_name = buffer_name_map.get(planner_buf, planner_buf)
+                        buf = activation_buffers.get(buf_name)
+                    else:
+                        buf_name = default_buf_name
+                        buf = default_buf
+
+                if buf:
+                    act_dtype = "q8_0" if needs_q8_input else "fp32"
+                    lowered_op["activations"][input_name] = {
+                        "buffer": buf_name,
+                        "activation_offset": buf["offset"],
+                        "dtype": input_info.get("dtype", act_dtype),
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    }
+
+            logits_buf = activation_buffers.get("logits")
+            if logits_buf:
+                for output_name, output_info in ir_op.get("outputs", {}).items():
+                    lowered_op["outputs"][output_name] = {
+                        "buffer": "logits",
+                        "activation_offset": logits_buf["offset"],
+                        "dtype": output_info.get("dtype", "fp32"),
+                        "ptr_expr": f"activations + {logits_buf['offset']}",
+                    }
+                last_output_buffer = "logits"
         else:
             # Process activation inputs - add concrete buffer offsets
-            for input_name, input_info in ir_op.get("inputs", {}).items():
+            # For header ops (layer=-1), inputs may be in dataflow instead of top-level
+            op_inputs = ir_op.get("inputs", {})
+            if not op_inputs:
+                # Fallback to dataflow inputs for header ops
+                dataflow = ir_op.get("dataflow", {})
+                op_inputs = dataflow.get("inputs", {})
+            for input_name, input_info in op_inputs.items():
+                input_type = str(input_info.get("type", ""))
+
+                # Type-directed fast path: when IR already specifies scratch/KV-cache
+                # buffers, preserve that exact contract instead of planner fallback.
+                if input_type in ("scratch", "kv_cache"):
+                    src_name = input_info.get("source") or input_info.get("buffer")
+                    if isinstance(src_name, str) and src_name:
+                        buf_name = buffer_name_map.get(src_name, src_name)
+                        buf = activation_buffers.get(buf_name)
+                        if buf:
+                            lowered_op["activations"][input_name] = {
+                                "buffer": buf_name,
+                                "activation_offset": buf["offset"],
+                                "dtype": input_info.get("dtype", "fp32"),
+                                "ptr_expr": f"activations + {buf['offset']}",
+                            }
+                            continue
+
                 # Special case: embedding operation reads from token_ids, not layer_input
                 if "embedding" in ir_op.get("kernel", "").lower() and "token" in input_name.lower():
                     buf = activation_buffers.get("token_ids")
@@ -3466,6 +4394,13 @@ def generate_ir_lower_2(
                 # Map from kernel input names to dataflow names
                 # Kernel maps use: A (input), B (weight), C (output)
                 # Dataflow uses: x (input), y (output)
+                #
+                # IMPORTANT: kernel I/O names MUST map to dataflow names.
+                # If a kernel adds new names (e.g., out_token, k_cache, v_cache),
+                # update this map or memory planner will silently fall back
+                # to main stream buffers (embedded_input/layer_input).
+                # This caused a silent correctness bug where attention decode
+                # outputs were written to embedded_input instead of attn_scratch.
                 kernel_to_dataflow_input = {
                     "A": "x",      # Matrix input for gemm/gemv
                     "x": "x",      # Direct match
@@ -3475,6 +4410,10 @@ def generate_ir_lower_2(
                     "src": "src",  # memcpy source
                     "gate": "x",   # swiglu gate input -> reads from mlp_scratch
                     "up": "x",     # swiglu up input -> reads from mlp_scratch
+                    # Attention decode/prefill kernel names -> dataflow names
+                    "q_token": "q",
+                    "k_cache": "k",
+                    "v_cache": "v",
                 }
                 dataflow_name = kernel_to_dataflow_input.get(input_name, input_name)
                 planned = get_planned_buffer(op_id, "inputs", dataflow_name)
@@ -3508,18 +4447,48 @@ def generate_ir_lower_2(
                     }
 
             # Process outputs - add concrete offsets (for non-QKV ops)
-            for output_name, output_info in ir_op.get("outputs", {}).items():
+            # For header ops (layer=-1), outputs may be in dataflow instead of top-level
+            op_outputs = ir_op.get("outputs", {})
+            if not op_outputs:
+                # Fallback to dataflow outputs for header ops
+                dataflow = ir_op.get("dataflow", {})
+                op_outputs = dataflow.get("outputs", {})
+            for output_name, output_info in op_outputs.items():
+                output_type = str(output_info.get("type", ""))
+
+                # Type-directed fast path: preserve explicit scratch/KV-cache targets.
+                if output_type in ("scratch", "kv_cache"):
+                    dst_name = output_info.get("buffer") or output_info.get("source")
+                    if isinstance(dst_name, str) and dst_name:
+                        output_buf_name = buffer_name_map.get(dst_name, dst_name)
+                        buf = activation_buffers.get(output_buf_name)
+                        if buf:
+                            lowered_op["outputs"][output_name] = {
+                                "buffer": output_buf_name,
+                                "activation_offset": buf["offset"],
+                                "dtype": output_info.get("dtype", "fp32"),
+                                "ptr_expr": f"activations + {buf['offset']}",
+                            }
+                            if not last_output_buffer:
+                                last_output_buffer = output_buf_name
+                            continue
+
                 # ═══════════════════════════════════════════════════════════════
                 # USE MEMORY PLANNER for output buffer assignment
                 # ═══════════════════════════════════════════════════════════════
                 op_id = ir_op.get("idx", ir_op.get("op_id", -1))
 
                 # Map from kernel output names to dataflow names
+                # IMPORTANT: Same rules as input mapping - all kernel output names
+                # must be mapped here or fall back to wrong buffer.
                 kernel_to_dataflow_output = {
                     "C": "y",       # Matrix output for gemm/gemv
                     "y": "y",       # Direct match
                     "output": "output",  # Quantize output
                     "dst": "dst",   # memcpy destination
+                    # Attention decode output name -> dataflow output
+                    "out_token": "out",
+                    "out": "out",
                 }
                 dataflow_name = kernel_to_dataflow_output.get(output_name, output_name)
                 planned = get_planned_buffer(op_id, "outputs", dataflow_name)
@@ -3535,7 +4504,7 @@ def generate_ir_lower_2(
                     # Fallback to legacy logic for unplanned ops
                     if "embedding" in ir_op.get("kernel", "").lower():
                         output_buf_name = "embedded_input"
-                    elif ir_op.get("op") == "attn" and mode == "prefill":
+                    elif ir_op.get("op") in ("attn", "attn_sliding"):
                         output_buf_name = "attn_scratch"
                     elif ir_op.get("op") == "logits":
                         output_buf_name = "logits"
@@ -3666,6 +4635,20 @@ def generate_ir_lower_2(
                     "ptr_expr": f"activations + {buf['offset']}",
                 })
 
+        # Special handling for GeGLU: ensure scratch buffer is allocated
+        # GeGLU BF16 variant requires 3 * tokens * dim scratch for input + output
+        if ir_op.get("op", "") == "geglu":
+            # Use mlp_scratch which is already allocated for MLP operations
+            mlp_buf = activation_buffers.get("mlp_scratch")
+            if mlp_buf:
+                lowered_op["scratch"].append({
+                    "name": "geglu_scratch",
+                    "scratch_offset": mlp_buf["offset"],
+                    "size": mlp_buf["size"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {mlp_buf['offset']}",
+                })
+
         # Add model config parameters (merge with any op-specific params)
         params = dict(ir_op.get("params", {}) or {})
         params.setdefault("embed_dim", config.get("embed_dim", 896))
@@ -3676,10 +4659,21 @@ def generate_ir_lower_2(
         params.setdefault("num_layers", config.get("num_layers", 24))
         params.setdefault("mode", mode)
 
+        # Add sliding_window for attention_sliding operations
+        if op_type == "attn_sliding":
+            sliding_window = config.get("sliding_window", 0)
+            params.setdefault("sliding_window", sliding_window)
+
         if mode == "decode":
-            params.setdefault("seq_len", 1)
+            effective_seq_len = 1
         else:
-            params.setdefault("seq_len", config.get("max_seq_len", config.get("context_length", 2048)))
+            # Prefill must follow the effective runtime context length (e.g. --context-len),
+            # not the model's training max_seq_len (often 32768+), otherwise kernels
+            # run with massively inflated token counts and diverge/slow down.
+            effective_seq_len = int(config.get("context_length", config.get("max_seq_len", 2048)))
+        # Override stale seq_len injected earlier in the pipeline (IR1 may still carry
+        # model max_seq_len). Lowered IR must always reflect runtime-effective length.
+        params["seq_len"] = effective_seq_len
 
         # Add matmul dims for IR Lower 3 bindings (_input_dim/_output_dim/_m)
         out_dim, in_dim = compute_matmul_dims(op_type, config)
@@ -3695,7 +4689,8 @@ def generate_ir_lower_2(
                     params["_output_dim"] = size // 4
                     break
 
-        params.setdefault("_m", params.get("seq_len", 1))
+        # Keep _m aligned with effective seq_len for token-major kernels.
+        params["_m"] = params.get("seq_len", 1)
         lowered_op["params"] = params
 
         lowered_ops.append(lowered_op)
@@ -3715,7 +4710,7 @@ def generate_ir_lower_2(
             current_output_buffer = "layer_input"
         elif op_type in ("q_proj", "k_proj", "v_proj", "qkv_proj", "rope_qk",
                          "mlp_gate_up", "silu_mul", "mlp_down", "bias_add") or \
-                (mode == "prefill" and op_type == "attn"):
+                (mode == "prefill" and op_type in ("attn", "attn_sliding")):
             # Ops that don't advance the token-major stream, don't ping-pong
             pass
         else:
@@ -3734,7 +4729,180 @@ def generate_ir_lower_2(
         "operations": lowered_ops,
     }
 
+    # ==========================================================================
+    # HARD VALIDATION: Check buffer assignments for decode mode
+    # This catches silent mis-routing bugs where kernel I/O names aren't mapped
+    # to dataflow names, causing operations to read/write wrong buffers.
+    # ==========================================================================
+    if mode == "decode":
+        validate_buffer_assignments(lowered_ir)
+
     return lowered_ir
+
+
+def validate_buffer_assignments(lowered_ir: Dict) -> None:
+    """
+    Validate that critical operations use the correct buffers in decode mode.
+
+    This prevents a class of silent correctness bugs where kernel I/O names
+    aren't mapped to dataflow names, causing operations to read/write wrong
+    buffers (e.g., attention output written to embedded_input instead of
+    attn_scratch).
+
+    Raises:
+        RuntimeError: If a critical mismatch is detected.
+    """
+    ops = lowered_ir.get("operations", [])
+    registry = load_kernel_registry()
+
+    for op in ops:
+        op_name = op.get("op", op.get("kernel", "unknown"))
+        layer = op.get("layer", -1)
+
+        # ===== ATTENTION OPERATIONS =====
+        if op_name in ("attn", "attention", "attn_sliding"):
+            outputs = op.get("outputs", {})
+            activations = op.get("activations", {})
+
+            # Check output buffer: must be attn_scratch
+            out_token = outputs.get("out_token") or outputs.get("out")
+            if out_token:
+                out_buf = out_token.get("buffer", "")
+                if out_buf not in ("attn_scratch",):
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected output buffer: attn_scratch\n"
+                        f"   got: {out_buf}\n"
+                        f"   Fix: Add kernel I/O -> dataflow name mapping in generate_ir_lower_2()\n"
+                    )
+
+            # Check KV cache inputs: must come from kv_cache
+            k_cache = activations.get("k_cache") or activations.get("k")
+            if k_cache:
+                k_buf = k_cache.get("buffer", "")
+                if k_buf not in ("kv_cache",):
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected k_cache input: kv_cache\n"
+                        f"   got: {k_buf}\n"
+                        f"   Fix: Add kernel I/O -> dataflow name mapping in generate_ir_lower_2()\n"
+                    )
+
+            v_cache = activations.get("v_cache") or activations.get("v")
+            if v_cache:
+                v_buf = v_cache.get("buffer", "")
+                if v_buf not in ("kv_cache",):
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected v_cache input: kv_cache\n"
+                        f"   got: {v_buf}\n"
+                        f"   Fix: Add kernel I/O -> dataflow name mapping in generate_ir_lower_2()\n"
+                    )
+
+        # ===== ROPE QK =====
+        elif op_name in ("rope_qk", "rope"):
+            outputs = op.get("outputs", {})
+            activations = op.get("activations", {})
+
+            # Q and K must use scratch buffers, not main stream
+            q_out = outputs.get("q") or outputs.get("q_out")
+            if q_out:
+                q_buf = q_out.get("buffer", "")
+                if q_buf in ("embedded_input", "layer_input"):
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected q output: q_scratch or attn_scratch\n"
+                        f"   got: {q_buf}\n"
+                        f"   Fix: Ensure q_proj/k_proj outputs are assigned scratch buffers\n"
+                    )
+
+        # ===== Q/K/V PROJECTIONS =====
+        elif op_name in ("q_proj", "k_proj", "v_proj", "qkv_proj"):
+            outputs = op.get("outputs", {})
+            outputs_to_check = {
+                "q_proj": ["q", "q_out"],
+                "k_proj": ["k", "k_out"],
+                "v_proj": ["v", "v_out"],
+            }
+            expected_buffers = {
+                "q_proj": "q_scratch",
+                "k_proj": "k_scratch",
+                "v_proj": "v_scratch",
+            }
+            expected = expected_buffers.get(op_name, "scratch")
+            for out_name in outputs_to_check.get(op_name, []):
+                if out_name in outputs:
+                    buf = outputs[out_name].get("buffer", "")
+                    if buf not in (expected,):
+                        raise RuntimeError(
+                            f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                            f"   op={op_name} layer={layer}\n"
+                            f"   expected output: {expected}\n"
+                            f"   got: {buf}\n"
+                            f"   Fix: Ensure projection outputs use correct scratch buffer\n"
+                        )
+
+        # ===== LOGITS =====
+        elif op_name == "logits":
+            activations = op.get("activations", {})
+            outputs = op.get("outputs", {})
+
+            # Input buffer must match logits kernel activation dtype:
+            # - fp32 activation kernels read embedded_input (main_stream)
+            # - q8 activation kernels read layer_input (main_stream_q8)
+            kernel_id = op.get("kernel", "")
+            needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
+            expected_input_buf = "layer_input" if needs_q8_input else "embedded_input"
+
+            x_in = (
+                activations.get("x")
+                or activations.get("A")
+                or activations.get("x_q8")
+                or activations.get("input")
+            )
+            if x_in:
+                x_buf = x_in.get("buffer", "")
+                if x_buf != expected_input_buf:
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   kernel={kernel_id}\n"
+                        f"   expected logits input: {expected_input_buf}\n"
+                        f"   got: {x_buf}\n"
+                    )
+
+            # Output must be logits
+            logits_out = outputs.get("logits") or outputs.get("out")
+            if logits_out:
+                out_buf = logits_out.get("buffer", "")
+                if out_buf != "logits":
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected output: logits\n"
+                        f"   got: {out_buf}\n"
+                    )
+
+        # ===== QUANTIZE FINAL OUTPUT =====
+        elif op_name in ("quantize_final_output", "quantize"):
+            outputs = op.get("outputs", {})
+            out = outputs.get("output") or outputs.get("y")
+            if out:
+                buf = out.get("buffer", "")
+                # Quantize output goes to layer_input (main stream Q8 buffer)
+                if buf not in ("layer_input",):
+                    raise RuntimeError(
+                        f"\n❌ HARD FAULT: Invalid buffer assignment\n"
+                        f"   op={op_name} layer={layer}\n"
+                        f"   expected output: layer_input (main_stream_q8)\n"
+                        f"   got: {buf}\n"
+                    )
+
+    print(f"  ✓ Buffer validation passed for {len(ops)} ops")
 
 
 def load_kernel_bindings() -> Dict[str, Dict]:
@@ -3823,6 +4991,24 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         op_errors = []
         op_warnings = []
 
+        # Keep explicit transpose placeholder ops in lowered_call.
+        # Prefill codegen materializes the data movement based on op type.
+        # If we drop these ops here, generated prefill C skips all required
+        # token-major <-> head-major transposes and attention consumes wrong layouts.
+        op_name = op.get("op", "")
+        if op_name in ("transpose_qkv_to_head_major", "transpose_kv_to_head_major", "transpose_attn_out_to_token_major"):
+            call_ops.append({
+                "idx": op.get("idx", -1),
+                "function": func,
+                "op": op_name,
+                "layer": op.get("layer", -1),
+                "section": op.get("section", ""),
+                "args": [],
+                "errors": [],
+                "warnings": [],
+            })
+            continue
+
         if not binding:
             op_errors.append(f"Missing binding for function '{func}'")
             call_ops.append({
@@ -3854,7 +5040,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             "src": ["src", "input", "a", "A"],  # memcpy source
         }
         out_aliases = {
-            "out": ["output", "out", "C", "c"],
+            "out": ["output", "out", "out_token", "C", "c"],
             "c": ["C", "c", "output"],  # GEMM uses "C" in IR, "c" in binding
             "y": ["y", "Y", "output"],  # GEMV output
             "dst": ["dst", "output"],  # memcpy destination
@@ -3966,14 +5152,31 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 key = src.split(":", 1)[1]
                 if key in params:
                     expr = str(params[key])
+                elif key == "max_seq_len":
+                    # Prefer context_length override when present (e.g., --context-len)
+                    if "context_length" in config:
+                        expr = str(config["context_length"])
+                    elif "context_len" in config:
+                        expr = str(config["context_len"])
+                    elif key in config:
+                        expr = str(config[key])
+                    else:
+                        op_errors.append(f"{func}.{name}: missing dim '{key}'")
+                        expr = "0"
                 elif key in config:
                     expr = str(config[key])
-                elif key == "max_seq_len" and "context_length" in config:
-                    expr = str(config["context_length"])
                 elif key == "intermediate_size" and "intermediate_dim" in config:
                     expr = str(config["intermediate_dim"])
                 else:
                     op_errors.append(f"{func}.{name}: missing dim '{key}'")
+                    expr = "0"
+
+            elif src.startswith("param:"):
+                key = src.split(":", 1)[1]
+                if key in params:
+                    expr = str(params[key])
+                else:
+                    op_errors.append(f"{func}.{name}: missing param '{key}'")
                     expr = "0"
 
             elif src.startswith("runtime:"):
@@ -4266,6 +5469,12 @@ def main(args: List[str]) -> int:
         help="Disable kernel fusion pass (use unfused ops)"
     )
     parser.add_argument(
+        "--allow-quant-fallback",
+        action="store_true",
+        help="Allow unsafe quantization fallbacks (e.g., Q5_K → Q5_0). "
+             "Not recommended - may cause accuracy issues or segfaults."
+    )
+    parser.add_argument(
         "--layout-mode",
         choices=["region", "packed"],
         default="region",
@@ -4292,6 +5501,11 @@ def main(args: List[str]) -> int:
         action="store_true",
         help="Enable per-kernel profiling instrumentation in generated code"
     )
+    parser.add_argument(
+        "--prefer-q8-activation",
+        action="store_true",
+        help="Prefer Q8-activation matmul kernels (gemv/gemm *_q8_* variants) for speed"
+    )
 
     parsed_args = parser.parse_args(args)
 
@@ -4309,17 +5523,21 @@ def main(args: List[str]) -> int:
 
     print(f"Loading manifest: {manifest_path}")
     manifest = load_manifest(manifest_path)
+    _merge_external_config(manifest, manifest_path)
+    if parsed_args.prefer_q8_activation:
+        manifest.setdefault("config", {})["prefer_q8_activation"] = True
     # Override logits layout if requested (propagates into layout + codegen config)
     manifest.setdefault("config", {})["logits_layout"] = parsed_args.logits_layout
 
     # Build IR1
     registry = load_kernel_registry()
     ir1 = build_ir1_direct(manifest, manifest_path, mode=parsed_args.mode,
-                           prefer_parallel=parsed_args.parallel)
+                           prefer_parallel=parsed_args.parallel,
+                           allow_quant_fallback=parsed_args.allow_quant_fallback)
 
     # Insert bias_add ops BEFORE fusion pass so fused kernels can match
     # [quantize + gemv + bias_add] sequences
-    ir1_with_bias = insert_bias_add_ops(ir1, registry, manifest, parsed_args.mode)
+    ir1_with_bias = insert_bias_add_ops(ir1, registry, manifest, parsed_args.mode, manifest_path)
 
     # Fusion pass: combine kernels (fused attention, fused MLP, fused GEMV+bias)
     fused_ops, fusion_stats = apply_fusion_pass(ir1_with_bias, registry, parsed_args.mode, no_fusion=parsed_args.no_fusion)

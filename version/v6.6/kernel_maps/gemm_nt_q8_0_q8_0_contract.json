@@ -1,0 +1,30 @@
+{
+  "id": "gemm_nt_q8_0_q8_0_contract",
+  "op": "gemm",
+  "variant": "q8_0_w_fp32_a_fp32_out_contract",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (FP32)"},
+    {"name": "B", "dtype": "q8_0", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q8_0 uses 32-value blocks; K should be a multiple of 32."
+  },
+  "impl": {
+    "function": "gemm_nt_q8_0_q8_0_contract",
+    "c_declaration": "void gemm_nt_q8_0_q8_0_contract(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": ["src/kernels/gemm_kernels_q8_0_q8_0_contract.c", "src/kernels/gemm_kernels_q8_0.c"]
+  },
+  "notes": "Opt-in contract path: internally quantizes FP32 activations to Q8_0 before compute."
+}

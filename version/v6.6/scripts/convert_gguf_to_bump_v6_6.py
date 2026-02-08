@@ -69,6 +69,12 @@ DOWNSTREAM CONSISTENCY REQUIREMENTS
 Notes:
   - This tool is intentionally "offline": it may convert/reshape tensors while
     writing the bump file so runtime code stays simple (no format juggling).
+  - Template selection is intentionally strict and MUST fail on unknown arch:
+      arch -> templates/<arch>.json
+    Do not alias or guess similar families. If a new model family (e.g. "paper")
+    appears, conversion must fail until templates/paper.json exists. This keeps
+    architecture-specific changes isolated so "paper" edits cannot silently
+    affect qwen/llama and vice versa.
   - For Q4_K/Q6_K models, we treat GGUF tensors of type GGML_TYPE_Q4_K/Q6_K as the
     canonical on-disk representation (same block layout as llama.cpp).
   - The bump file encodes a per-tensor dtype table. The runtime reads
@@ -127,6 +133,7 @@ CK_DT_Q8_0 = 9
 CK_DT_Q8_K = 10
 CK_DT_Q5_0 = 11
 CK_DT_Q5_1 = 12
+CK_DT_Q5_K = 13
 
 
 def align_up(n: int, a: int) -> int:
@@ -207,6 +214,9 @@ def write_bumpv5_footer(f: BinaryIO, meta_size: int, meta_sha256: bytes) -> None
 
 
 def load_template_for_arch(arch: str) -> dict:
+    # Intentional contract: template selection is strict (arch -> templates/<arch>.json).
+    # We do not alias or guess here; supported models are explicit via templates.
+    # By design: unknown arch MUST fail so new families get their own templates.
     template_name = str(arch).lower()
     base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "templates"))
     template_path = os.path.join(base_dir, f"{template_name}.json")
@@ -231,7 +241,7 @@ def _extract_unk_token(data: dict) -> Optional[str]:
     return unk_token if isinstance(unk_token, str) and unk_token else None
 
 
-def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, list[int]]:
+def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, list[int], list[float], list[int]]:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -277,6 +287,10 @@ def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, l
             strings_blob.extend(token.encode("utf-8"))
         strings_blob.append(0)
 
+    # SPM scores and types are not available in JSON format
+    scores_data: list[float] = [0.0] * vocab_size
+    types_data: list[int] = [0] * vocab_size  # 0 = normal token
+
     merges_data: list[int] = []
     if isinstance(merges, list):
         for entry in merges:
@@ -300,10 +314,10 @@ def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, l
                 continue
             merges_data.extend([left_id, right_id, merged_id])
 
-    return offsets, bytes(strings_blob), merges_data
+    return offsets, bytes(strings_blob), merges_data, scores_data, types_data
 
 
-def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list[int], bytes, list[int]]]:
+def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list[int], bytes, list[int], list[float], list[int]]]:
     """Extract tokenizer vocabulary directly from GGUF metadata.
 
     GGUF files contain tokenizer data in these metadata keys:
@@ -313,7 +327,7 @@ def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list
       - tokenizer.ggml.merges: BPE merge pairs (optional)
 
     Returns:
-        (vocab_offsets, vocab_strings, merges_data) or None if not found
+        (vocab_offsets, vocab_strings, merges_data, scores_data, types_data) or None if not found
     """
     tokens = meta.get("tokenizer.ggml.tokens")
     if not tokens or not isinstance(tokens, (list, tuple)):
@@ -336,6 +350,26 @@ def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list
         offsets.append(len(strings_blob))
         strings_blob.extend(f"<|pad_{len(offsets)-1}|>".encode("utf-8"))
         strings_blob.append(0)
+
+    # Extract token scores (for SPM)
+    scores_data: list[float] = []
+    gguf_scores = meta.get("tokenizer.ggml.scores")
+    if gguf_scores and isinstance(gguf_scores, (list, tuple)):
+        for i in range(min(vocab_size, len(gguf_scores))):
+            scores_data.append(float(gguf_scores[i]))
+    # Pad with zeros if not enough scores
+    while len(scores_data) < vocab_size:
+        scores_data.append(0.0)
+
+    # Extract token types (for SPM)
+    types_data: list[int] = []
+    gguf_types = meta.get("tokenizer.ggml.token_type")
+    if gguf_types and isinstance(gguf_types, (list, tuple)):
+        for i in range(min(vocab_size, len(gguf_types))):
+            types_data.append(int(gguf_types[i]))
+    # Pad with zeros (normal token) if not enough types
+    while len(types_data) < vocab_size:
+        types_data.append(0)
 
     # Extract BPE merges if present
     merges_data: list[int] = []
@@ -362,7 +396,7 @@ def load_tokenizer_from_gguf(meta: dict, vocab_size: int) -> Optional[tuple[list
                         if 0 <= left_id < vocab_size and 0 <= right_id < vocab_size and 0 <= merged_id < vocab_size:
                             merges_data.extend([left_id, right_id, merged_id])
 
-    return offsets, bytes(strings_blob), merges_data
+    return offsets, bytes(strings_blob), merges_data, scores_data, types_data
 
 
 class HashingWriter:
@@ -531,8 +565,28 @@ def _gguf_read_value(r: GGUFReader, vtype: int):
         elem_size = _gguf_scalar_size(elem_type)
         if elem_size is None:
             raise GGUFError(f"Unsupported GGUF array elem type {elem_type}")
-        r._read_exact(int(n) * elem_size)
-        return {"type": "array", "elem_type": elem_type, "len": n}
+        raw = r._read_exact(int(n) * elem_size)
+        if elem_type == GGUF_TYPE_UINT8:
+            return list(raw)
+        if elem_type == GGUF_TYPE_INT8:
+            return list(struct.unpack(f"<{n}b", raw))
+        if elem_type == GGUF_TYPE_UINT16:
+            return list(struct.unpack(f"<{n}H", raw))
+        if elem_type == GGUF_TYPE_INT16:
+            return list(struct.unpack(f"<{n}h", raw))
+        if elem_type == GGUF_TYPE_UINT32:
+            return list(struct.unpack(f"<{n}I", raw))
+        if elem_type == GGUF_TYPE_INT32:
+            return list(struct.unpack(f"<{n}i", raw))
+        if elem_type == GGUF_TYPE_UINT64:
+            return list(struct.unpack(f"<{n}Q", raw))
+        if elem_type == GGUF_TYPE_INT64:
+            return list(struct.unpack(f"<{n}q", raw))
+        if elem_type == GGUF_TYPE_FLOAT32:
+            return list(struct.unpack(f"<{n}f", raw))
+        if elem_type == GGUF_TYPE_FLOAT64:
+            return list(struct.unpack(f"<{n}d", raw))
+        raise GGUFError(f"Unsupported GGUF array elem type {elem_type}")
     raise GGUFError(f"Unsupported GGUF value type {vtype}")
 
 
@@ -647,6 +701,8 @@ def ck_dtype_from_ggml_type(ggml_type: int) -> int:
         return CK_DT_Q5_0
     if ggml_type == GGML_TYPE_Q5_1:
         return CK_DT_Q5_1
+    if ggml_type == GGML_TYPE_Q5_K:
+        return CK_DT_Q5_K
     if ggml_type == GGML_TYPE_Q6_K:
         return CK_DT_Q6_K
     if ggml_type == GGML_TYPE_Q8_0:
@@ -666,6 +722,7 @@ def get_quant_type_name(ggml_type: int) -> str:
         GGML_TYPE_Q5_1: "q5_1",
         GGML_TYPE_Q8_0: "q8_0",
         GGML_TYPE_Q4_K: "q4_k",
+        GGML_TYPE_Q5_K: "q5_k",
         GGML_TYPE_Q6_K: "q6_k",
     }.get(ggml_type, f"unknown_{ggml_type}")
 
@@ -719,6 +776,10 @@ def ggml_row_bytes(ggml_type: int, ne0: int) -> int:
         if ne0 % 256 != 0:
             raise GGUFError(f"Q6_K requires ne0 % 256 == 0 (got ne0={ne0})")
         return (ne0 // 256) * 210
+    if ggml_type == GGML_TYPE_Q5_K:
+        if ne0 % 256 != 0:
+            raise GGUFError(f"Q5_K requires ne0 % 256 == 0 (got ne0={ne0})")
+        return (ne0 // 256) * 176  # 2 (scale) + 2 (min) + 128 (5 bits × 256 / 8) + 44 (quants) = 176
     raise GGUFError(f"Unsupported ggml_type={ggml_type_name(ggml_type)} for row sizing")
 
 
@@ -769,6 +830,20 @@ def copy_bytes_stream(f_in: BinaryIO, src_pos: int, nbytes: int, w_out: HashingW
         if len(buf) != take:
             raise GGUFError(f"Unexpected EOF while copying bytes (wanted {take}, got {len(buf)})")
         w_out.write(buf)
+        remaining -= take
+
+
+def copy_f16_to_f32_stream(f_in: BinaryIO, src_pos: int, n_elems: int, w_out: HashingWriter,
+                           chunk_elems: int = 1 << 20) -> None:
+    f_in.seek(src_pos, os.SEEK_SET)
+    remaining = n_elems
+    while remaining > 0:
+        take = min(remaining, chunk_elems)
+        buf = f_in.read(take * 2)
+        if len(buf) != take * 2:
+            raise GGUFError(f"Unexpected EOF while copying f16 (wanted {take * 2}, got {len(buf)})")
+        arr = np.frombuffer(buf, dtype=np.float16)
+        w_out.write(arr.astype(np.float32).tobytes())
         remaining -= take
 
 
@@ -889,6 +964,9 @@ def print_conversion_report(
                 mapping = {
                     "attn_norm.weight": f"layer.{layer}.ln1_gamma",
                     "ffn_norm.weight": f"layer.{layer}.ln2_gamma",
+                    "post_attention_norm.weight": f"layer.{layer}.post_attention_norm",
+                    "post_ffn_norm.weight": f"layer.{layer}.post_ffn_norm",
+                    "post_ffw_norm.weight": f"layer.{layer}.post_ffn_norm",
                     "attn_q.weight": f"layer.{layer}.wq",
                     "attn_k.weight": f"layer.{layer}.wk",
                     "attn_v.weight": f"layer.{layer}.wv",
@@ -924,6 +1002,8 @@ def print_conversion_report(
                 mapping = {
                     "ln1_gamma": f"blk.{layer}.attn_norm.weight",
                     "ln2_gamma": f"blk.{layer}.ffn_norm.weight",
+                    "post_attention_norm": f"blk.{layer}.post_attention_norm.weight",
+                    "post_ffn_norm": f"blk.{layer}.post_ffw_norm.weight",
                     "wq": f"blk.{layer}.attn_q.weight",
                     "wk": f"blk.{layer}.attn_k.weight",
                     "wv": f"blk.{layer}.attn_v.weight",
@@ -1432,11 +1512,24 @@ def main() -> None:
         "qwen3.attention.layer_norm_rms_epsilon",
         "qwen3.attention.key_length",
         "qwen3.attention.value_length",
+        # Gemma3-style keys
+        "gemma3.block_count",
+        "gemma3.context_length",
+        "gemma3.embedding_length",
+        "gemma3.feed_forward_length",
+        "gemma3.attention.head_count",
+        "gemma3.attention.head_count_kv",
+        "gemma3.attention.key_length",
+        "gemma3.attention.value_length",
+        "gemma3.attention.layer_norm_rms_epsilon",
+        "gemma3.attention.sliding_window",
+        "gemma3.rope.freq_base",
         # Tokenizer keys (for automatic extraction from GGUF)
         "tokenizer.ggml.tokens",
         "tokenizer.ggml.merges",
         "tokenizer.ggml.scores",
         "tokenizer.ggml.token_type",
+        "tokenizer.ggml.model",
         # Special token IDs (EOS, BOS, etc.) - propagated to manifest for orchestrator
         "tokenizer.ggml.eos_token_id",
         "tokenizer.ggml.bos_token_id",
@@ -1444,6 +1537,7 @@ def main() -> None:
         "tokenizer.ggml.padding_token_id",
         "tokenizer.ggml.add_bos_token",
         "tokenizer.ggml.add_eos_token",
+        "tokenizer.ggml.add_space_prefix",
         "tokenizer.chat_template",
     }
 
@@ -1681,13 +1775,19 @@ def main() -> None:
         def weight_dtype(info: TensorInfo, label: str) -> int:
             # Support all common quantization types
             supported_types = (
-                GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32,
-                GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0
+                GGML_TYPE_Q4_0, GGML_TYPE_Q4_1,
+                GGML_TYPE_Q4_K, GGML_TYPE_Q6_K,
+                GGML_TYPE_Q5_0, GGML_TYPE_Q5_1,
+                GGML_TYPE_Q5_K,
+                GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32,
             )
             if info.ggml_type not in supported_types:
                 raise GGUFError(
-                    f"{info.name}: expected Q4_K/Q6_K/Q5_0/Q5_1/Q8_0/F32 for {label}, got {ggml_type_name(info.ggml_type)}"
+                    f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/F32 for {label}, got {ggml_type_name(info.ggml_type)}"
                 )
+            if info.ggml_type == GGML_TYPE_F16:
+                # Upcast FP16 weights to FP32 in bump output (runtime is FP32-only for dense weights).
+                return CK_DT_FP32
             return ck_dtype_from_ggml_type(info.ggml_type)
 
         tok_name = "token_embd.weight"
@@ -1696,18 +1796,24 @@ def main() -> None:
         tok = tensors[tok_name]
         if len(tok.dims) != 2:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
-        embed_dim = meta_int("deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length", "llama.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length") or tok.ne0
+        embed_dim = meta_int(
+            "deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length",
+            "llama.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length",
+            "gemma3.embedding_length"
+        ) or tok.ne0
         vocab_size = tok.ne1
 
         vocab_offsets = None
         vocab_strings = None
         vocab_merges = None
+        vocab_scores = None
+        vocab_types = None
         num_merges = 0
         total_vocab_bytes = 0
         if args.tokenizer_json:
             if not os.path.exists(args.tokenizer_json):
                 raise GGUFError(f"tokenizer.json not found: {args.tokenizer_json}")
-            vocab_offsets, vocab_strings, vocab_merges = load_tokenizer_json(args.tokenizer_json, vocab_size)
+            vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = load_tokenizer_json(args.tokenizer_json, vocab_size)
             num_merges = len(vocab_merges) // 3
             total_vocab_bytes = len(vocab_strings)
             print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from tokenizer.json")
@@ -1715,12 +1821,16 @@ def main() -> None:
             # Try to extract tokenizer directly from GGUF metadata
             gguf_tokenizer = load_tokenizer_from_gguf(meta, vocab_size)
             if gguf_tokenizer:
-                vocab_offsets, vocab_strings, vocab_merges = gguf_tokenizer
+                vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = gguf_tokenizer
                 num_merges = len(vocab_merges) // 3
                 total_vocab_bytes = len(vocab_strings)
                 print(f"[tokenizer] extracted {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from GGUF metadata")
 
-        num_layers = meta_int("deepseek2.block_count", "mistral3.block_count", "mistral.block_count", "llama.block_count", "qwen3.block_count", "qwen2.block_count")
+        num_layers = meta_int(
+            "deepseek2.block_count", "mistral3.block_count", "mistral.block_count",
+            "llama.block_count", "qwen3.block_count", "qwen2.block_count",
+            "gemma3.block_count"
+        )
         if num_layers is None:
             # Infer from present blocks.
             layer_ids = []
@@ -1734,7 +1844,11 @@ def main() -> None:
                 raise GGUFError("Could not infer num_layers (missing block_count and no blk.* tensors found)")
             num_layers = max(layer_ids) + 1
 
-        intermediate = meta_int("deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length", "llama.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length")
+        intermediate = meta_int(
+            "deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length",
+            "llama.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length",
+            "gemma3.feed_forward_length"
+        )
         if intermediate is None:
             gate0 = tensors.get("blk.0.ffn_gate.weight")
             if gate0 and len(gate0.dims) == 2:
@@ -1742,19 +1856,49 @@ def main() -> None:
         if intermediate is None:
             raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
-        num_heads = meta_int("deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count", "llama.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count")
+        num_heads = meta_int(
+            "deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count",
+            "llama.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
+            "gemma3.attention.head_count"
+        )
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
-        num_kv_heads = meta_int("deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv", "llama.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv") or num_heads
+        num_kv_heads = meta_int(
+            "deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv",
+            "llama.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv",
+            "gemma3.attention.head_count_kv"
+        ) or num_heads
 
-        context_len = meta_int("deepseek2.context_length", "mistral3.context_length", "mistral.context_length", "llama.context_length", "qwen3.context_length", "qwen2.context_length") or 0
+        context_len = meta_int(
+            "deepseek2.context_length", "mistral3.context_length", "mistral.context_length",
+            "llama.context_length", "qwen3.context_length", "qwen2.context_length",
+            "gemma3.context_length"
+        ) or 0
         if args.context is not None:
             context_len = int(args.context)
         if context_len <= 0:
             raise GGUFError("Could not determine context length (use --context to override)")
 
-        rope_theta = meta_float("deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base", "llama.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base") or 10000.0
-        rms_eps = meta_float("deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon", "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps", "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon") or 1e-5
+        sliding_window = meta_int(
+            "attention.sliding_window",
+            "llama.attention.sliding_window",
+            "gemma.attention.sliding_window",
+            "gemma3.attention.sliding_window",
+        )
+        # Note: sliding_window attention is now supported via attention_sliding kernels
+        # The value is stored in config and passed to attention_sliding ops
+
+        rope_theta = meta_float(
+            "deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base",
+            "llama.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
+            "gemma3.rope.freq_base"
+        ) or 10000.0
+        rms_eps = meta_float(
+            "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
+            "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
+            "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon",
+            "gemma3.attention.layer_norm_rms_epsilon"
+        ) or 1e-5
 
         if embed_dim != tok.ne0:
             raise GGUFError(f"{tok_name}: embedding_length mismatch (meta={embed_dim}, tensor.ne0={tok.ne0})")
@@ -1812,6 +1956,8 @@ def main() -> None:
         for layer in range(num_layers):
             attn_norm = tensors.get(f"blk.{layer}.attn_norm.weight")
             ffn_norm = tensors.get(f"blk.{layer}.ffn_norm.weight")
+            post_attention_norm = tensors.get(f"blk.{layer}.post_attention_norm.weight")
+            post_ffn_norm = tensors.get(f"blk.{layer}.post_ffn_norm.weight") or tensors.get(f"blk.{layer}.post_ffw_norm.weight")
             if not attn_norm or not ffn_norm:
                 raise GGUFError(f"Layer {layer}: missing attn_norm/ffn_norm tensors")
 
@@ -1862,6 +2008,13 @@ def main() -> None:
                     f"{down.name}: expected dims [ne0={intermediate}, ne1={embed_dim}] for down, got {down.dims}"
                 )
 
+            for name, info in (("attn_q", wq), ("attn_k", wk), ("attn_v", wv), ("attn_output", wo),
+                               ("ffn_gate", gate), ("ffn_up", up), ("ffn_down", down)):
+                if info.ggml_type == GGML_TYPE_F16:
+                    raise GGUFError(
+                        f"{info.name}: FP16 weight matrices are not supported yet (only token_emb is upcast)."
+                    )
+
             wq_dt = weight_dtype(wq, "attn_q")
             wk_dt = weight_dtype(wk, "attn_k")
             wv_dt = weight_dtype(wv, "attn_v")
@@ -1880,9 +2033,15 @@ def main() -> None:
                 for dt in (wq_dt, wk_dt, wv_dt, wo_dt, gate_dt, up_dt, down_dt)
             )
 
-            dtype_table.extend([
+            layer_dtypes = [
                 CK_DT_FP32,  # ln1_gamma
                 CK_DT_FP32,  # ln2_gamma
+            ]
+            if post_attention_norm is not None:
+                layer_dtypes.append(CK_DT_FP32)  # post_attention_norm
+            if post_ffn_norm is not None:
+                layer_dtypes.append(CK_DT_FP32)  # post_ffn_norm
+            layer_dtypes.extend([
                 wq_dt,
                 CK_DT_FP32,  # bq
                 wk_dt,
@@ -1896,10 +2055,13 @@ def main() -> None:
                 down_dt,
                 CK_DT_FP32,  # b2
             ])
+            dtype_table.extend(layer_dtypes)
 
             layer_infos.append({
                 "attn_norm": attn_norm,
                 "ffn_norm": ffn_norm,
+                "post_attention_norm": post_attention_norm,
+                "post_ffn_norm": post_ffn_norm,
                 "wq": wq,
                 "wk": wk,
                 "wv": wv,
@@ -1974,12 +2136,19 @@ def main() -> None:
             w.write(dtype_table_bytes)
 
             # 1) token embeddings
-            tok_size = ggml_tensor_bytes(tok)
-            record_entry("token_emb", get_quant_type_name(tok.ggml_type), tok_size)
-            copy_bytes_stream(f, data_start + tok.offset, tok_size, w)
+            tok_elems = int(tok.ne0) * int(tok.ne1)
+            if tok.ggml_type == GGML_TYPE_F16:
+                # Upcast token embeddings to FP32 for runtime compatibility.
+                tok_size = tok_elems * 4
+                record_entry("token_emb", "fp32", tok_size)
+                copy_f16_to_f32_stream(f, data_start + tok.offset, tok_elems, w)
+            else:
+                tok_size = ggml_tensor_bytes(tok)
+                record_entry("token_emb", get_quant_type_name(tok.ggml_type), tok_size)
+                copy_bytes_stream(f, data_start + tok.offset, tok_size, w)
 
             # 1b) tokenizer data (optional)
-            if vocab_offsets is not None and vocab_strings is not None and vocab_merges is not None:
+            if vocab_offsets is not None and vocab_strings is not None:
                 offsets_bytes = struct.pack(f"<{len(vocab_offsets)}i", *vocab_offsets)
                 record_entry("vocab_offsets", "i32", len(offsets_bytes))
                 w.write(offsets_bytes)
@@ -1987,6 +2156,19 @@ def main() -> None:
                 record_entry("vocab_strings", "u8", len(vocab_strings))
                 w.write(vocab_strings)
 
+                # Write scores for SPM (float32 per token)
+                if vocab_scores is not None:
+                    scores_bytes = struct.pack(f"<{len(vocab_scores)}f", *vocab_scores)
+                    record_entry("vocab_scores", "f32", len(scores_bytes))
+                    w.write(scores_bytes)
+
+                # Write types for SPM (uint8 per token)
+                if vocab_types is not None:
+                    types_bytes = struct.pack(f"<{len(vocab_types)}B", *vocab_types)
+                    record_entry("vocab_types", "u8", len(types_bytes))
+                    w.write(types_bytes)
+
+                # Write merges for BPE (optional, may be None)
                 merges_bytes = b""
                 if vocab_merges:
                     merges_bytes = struct.pack(f"<{len(vocab_merges)}i", *vocab_merges)
@@ -2015,6 +2197,16 @@ def main() -> None:
                 write_f32_padded(w, ln1, aligned_embed_dim)
                 record_entry(f"layer.{layer}.ln2_gamma", "fp32", ln_size)
                 write_f32_padded(w, ln2, aligned_embed_dim)
+
+                # Optional post-attention / post-FFN norms (Gemma3-style)
+                if info.get("post_attention_norm") is not None:
+                    post_attn = read_vector_f32(f, data_start, info["post_attention_norm"])
+                    record_entry(f"layer.{layer}.post_attention_norm", "fp32", ln_size)
+                    write_f32_padded(w, post_attn, aligned_embed_dim)
+                if info.get("post_ffn_norm") is not None:
+                    post_ffn = read_vector_f32(f, data_start, info["post_ffn_norm"])
+                    record_entry(f"layer.{layer}.post_ffn_norm", "fp32", ln_size)
+                    write_f32_padded(w, post_ffn, aligned_embed_dim)
 
                 # WQ
                 wq_size = ggml_row_bytes(info["wq"].ggml_type, aligned_embed_dim) * (num_heads * aligned_head_dim)
@@ -2159,7 +2351,10 @@ def main() -> None:
                     config["model_name"] = model_name
 
                 # Build quantization summary from layer_infos
-                quant_summary = {}
+                # Header/footer ops (embedding/logits) use token_emb quant.
+                quant_summary = {
+                    "token_emb": get_quant_type_name(tok.ggml_type),
+                }
                 for i, info in enumerate(layer_infos):
                     quant_summary[f"layer.{i}"] = {
                         "wq": get_quant_type_name(info["wq"].ggml_type),
@@ -2190,10 +2385,16 @@ def main() -> None:
                     special_tokens["pad_token_id"] = int(pad_id)
                 add_bos = meta.get("tokenizer.ggml.add_bos_token")
                 add_eos = meta.get("tokenizer.ggml.add_eos_token")
+                add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
+                tokenizer_model = meta.get("tokenizer.ggml.model")
                 if add_bos is not None:
                     special_tokens["add_bos_token"] = bool(add_bos)
                 if add_eos is not None:
                     special_tokens["add_eos_token"] = bool(add_eos)
+                if add_space_prefix is not None:
+                    special_tokens["add_space_prefix"] = bool(add_space_prefix)
+                if tokenizer_model is not None:
+                    special_tokens["tokenizer_model"] = str(tokenizer_model)
 
                 # Calculate hashes
                 if args.manifest_out:
@@ -2314,6 +2515,8 @@ def main() -> None:
         cfg["attn_out_dim"] = int(attn_out_dim)
         cfg["num_merges"] = num_merges
         cfg["total_vocab_bytes"] = total_vocab_bytes
+        if sliding_window and sliding_window > 0:
+            cfg["sliding_window"] = int(sliding_window)
         chat_template = meta.get("tokenizer.chat_template")
         if isinstance(chat_template, str) and chat_template.strip():
             cfg["chat_template"] = chat_template
@@ -2368,13 +2571,19 @@ def main() -> None:
             special_tokens["unk_token_id"] = int(unk_id)
         if pad_id is not None:
             special_tokens["pad_token_id"] = int(pad_id)
-        # Also extract add_bos/add_eos flags
+        # Also extract tokenizer behavior flags
         add_bos = meta.get("tokenizer.ggml.add_bos_token")
         add_eos = meta.get("tokenizer.ggml.add_eos_token")
+        add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
+        tokenizer_model = meta.get("tokenizer.ggml.model")
         if add_bos is not None:
             special_tokens["add_bos_token"] = bool(add_bos)
         if add_eos is not None:
             special_tokens["add_eos_token"] = bool(add_eos)
+        if add_space_prefix is not None:
+            special_tokens["add_space_prefix"] = bool(add_space_prefix)
+        if tokenizer_model is not None:
+            special_tokens["tokenizer_model"] = str(tokenizer_model)
 
         manifest = manifest_dict or {
             "version": 5,

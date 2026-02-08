@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "name": "gemma3",
+  "family": "llama",
+  "flags": {
+    "use_qkv_bias": "from_weights",
+    "activation": "geglu",
+    "rope": "rope",
+    "tokenizer": "sentencepiece",
+    "scale_embeddings_sqrt_dim": true,
+    "prefer_q8_0_contract": true,
+    "prefer_fp32_logits": true,
+    "attention": "sliding_window",
+    "has_qk_norm": true,
+    "post_attention_norm": true,
+    "post_ffn_norm": true
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "attn_norm",
+          "qkv_proj",
+          "qk_norm",
+          "rope_qk",
+          "attn_sliding",
+          "out_proj",
+          "post_attention_norm",
+          "residual_add",
+          "ffn_norm",
+          "mlp_gate_up",
+          "geglu",
+          "mlp_down",
+          "post_ffn_norm",
+          "residual_add"
+        ]
+      },
+      "footer": [
+        "final_rmsnorm",
+        "weight_tying",
+        "logits"
+      ]
+    }
+  }
+}

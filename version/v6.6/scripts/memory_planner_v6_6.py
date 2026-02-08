@@ -268,8 +268,14 @@ class MemoryPlanner:
                 return "A_RESIDUAL", "fp32"
 
         elif op_type in ("q_proj", "k_proj", "v_proj"):
-            # QKV projections read quantized input
-            return self.state.main_stream_q8_buffer, dtype
+            # QKV projections read FP32 or quantized input based on kernel activation
+            # Only use Q8 buffer when dtype is explicitly q8_0 or q8_k.
+            # "unknown" or anything else → FP32 (covers FP32-activation kernels
+            # like gemm_nt_q5_1 where OP_DATAFLOW points to main_stream_q8 but
+            # no quantize_input was inserted, leaving dtype as "unknown")
+            if dtype in ("q8_0", "q8_k"):
+                return self.state.main_stream_q8_buffer, dtype
+            return self.state.main_stream_buffer, "fp32"
 
         elif op_type == "out_proj":
             if dtype == "fp32":
@@ -279,11 +285,11 @@ class MemoryPlanner:
             return self.state.main_stream_q8_buffer, dtype
 
         elif op_type == "mlp_gate_up":
-            if dtype == "fp32":
-                # Fused op: quantize absorbed, reads FP32 from main stream
-                return self.state.main_stream_buffer, "fp32"
-            # Unfused: reads quantized input after second rmsnorm
-            return self.state.main_stream_q8_buffer, dtype
+            # Same logic as QKV: only use Q8 buffer for explicitly quantized dtype
+            if dtype in ("q8_0", "q8_k"):
+                return self.state.main_stream_q8_buffer, dtype
+            # FP32, unknown, or fused op: reads FP32 from main stream
+            return self.state.main_stream_buffer, "fp32"
 
         elif op_type == "mlp_down":
             # mlp_down reads quantized MLP intermediate unless fused (FP32 input)
@@ -293,6 +299,10 @@ class MemoryPlanner:
 
         elif op_type == "silu_mul":
             # silu_mul reads/writes MLP scratch (in-place)
+            return "A_MLP_SCRATCH", "fp32"
+
+        elif op_type == "geglu":
+            # geglu reads/writes MLP scratch (in-place)
             return "A_MLP_SCRATCH", "fp32"
 
         elif op_type in ("rmsnorm",):
@@ -315,7 +325,7 @@ class MemoryPlanner:
             # quantize_final_output reads from main stream (footer rmsnorm output)
             return self.state.main_stream_buffer, "fp32"
 
-        elif op_type == "attn":
+        elif op_type in ("attn", "attn_sliding"):
             if input_name == "q":
                 return "A_ATTN_SCRATCH", "fp32"
             else:
@@ -390,7 +400,7 @@ class MemoryPlanner:
             # RoPE writes in-place to attention scratch
             return "A_ATTN_SCRATCH", "fp32"
 
-        elif op_type == "attn":
+        elif op_type in ("attn", "attn_sliding"):
             # Attention writes to attention scratch
             buffer = "A_ATTN_SCRATCH"
             self.state.record_write(buffer, op_id, "fp32")
@@ -410,6 +420,10 @@ class MemoryPlanner:
 
         elif op_type == "silu_mul":
             # silu_mul writes in-place to MLP scratch
+            return "A_MLP_SCRATCH", "fp32"
+
+        elif op_type == "geglu":
+            # geglu writes in-place to MLP scratch
             return "A_MLP_SCRATCH", "fp32"
 
         elif op_type == "mlp_down":
