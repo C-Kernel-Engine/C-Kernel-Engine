@@ -129,12 +129,23 @@ void gemm_nt_q4_0(const float *A, const void *B, const float *bias, float *C, in
 void gemm_nt_q4_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q5_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q5_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1_q8_1(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_1_q8_1_ref(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q5_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);
 void gemm_nt_q8_0(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
+void gemm_nt_q8_0_q8_0_contract(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);
 
 // GEMV versions (for decode mode - single token)
 void gemv_q4_0(float *y, const void *W, const float *x, int M, int K);
 void gemv_q5_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1_q8_1(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_1_q8_1_ref(float *y, const void *W, const void *x_q8, int M, int K);
+void gemv_q5_k(float *y, const void *W, const float *x, int M, int K);
+void gemv_q5_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
 void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);
+void gemv_q8_0_q8_0_contract(float *y, const void *W, const float *x, int M, int K);
 
 /* Parallel Q5_0 versions - caller provides ith/nth from OpenMP region */
 void gemv_q5_0_parallel(float *y, const void *W, const float *x,
@@ -819,6 +830,16 @@ void gelu_backward_fast_bf16(const uint16_t *input,
                              float *scratch_d_output,
                              float *scratch_d_input);
 
+// GeGLU: out = GELU(a) * b where x = [a, b] along last dimension
+// Input shape: [tokens, 2 * dim], Output shape: [tokens, dim]
+void geglu_forward_fp32(const float *x, float *out, int tokens, int dim);
+void geglu_forward_bf16(const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch);
+void geglu_backward_fp32(const float *x,
+                         const float *d_out,
+                         float *d_x,
+                         int tokens,
+                         int dim);
+
 	// ReLU kernels.
 	void relu_forward(const float *input, float *output, size_t n);
 	void relu_forward_inplace(float *data, size_t n);
@@ -994,6 +1015,37 @@ void attention_forward_decode_head_major_gqa_regular(const float *q_token,
                                                     int cache_capacity,
                                                     int head_dim,
                                                     int aligned_head_dim);
+
+// Sliding-window attention forward (prefill, flash-style)
+// Each token attends to the last `sliding_window` tokens.
+//   sliding_window: window size (0 or negative = no limit, like regular causal)
+void attention_forward_causal_head_major_gqa_flash_strided_sliding(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    int sliding_window);
+
+// Sliding-window attention forward (decode, flash-style)
+// Single query token attends to the last `sliding_window` tokens in KV cache.
+void attention_forward_decode_head_major_gqa_flash_sliding(
+    const float *q_token,
+    const float *k_cache,
+    const float *v_cache,
+    float *out_token,
+    int num_heads,
+    int num_kv_heads,
+    int kv_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    int sliding_window);
 
 // TRUE Flash Attention (O(1) for decode) - Tri Dao's algorithm
 //   out: [T_q, H, D_h]

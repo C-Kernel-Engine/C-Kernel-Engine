@@ -1,3 +1,37 @@
+/**
+ * @file ckernel_orchestration.h
+ *
+ * ===========================================================================
+ * LEGACY HEADER - NOT USED IN v6.6
+ * ===========================================================================
+ *
+ * This header declares v6.5 orchestration functions that are NO LONGER USED.
+ * v6.6 uses IR Lower 3 + codegen instead of hardcoded orchestration.
+ *
+ * v6.6 Architecture (REPLACEMENT):
+ *   - Kernel dispatch: version/v6.6/scripts/build_ir_v6_6.py + ckernel_codegen.c
+ *   - Memory planning: version/v6.6/scripts/memory_planner_v6_6.py
+ *   - Registry: version/v6.6/kernel_maps/KERNEL_REGISTRY.json
+ *   - Kernel bindings: version/v6.6/kernel_maps/kernel_bindings.json
+ *
+ * Deprecated functions (NOT used in v6.6):
+ *   - ck_layer_forward_rmsnorm_swiglu*      -> IR Lower 3 + mega_fused_* kernels
+ *   - ck_qkv_project_head_major*            -> q_proj/k_proj/v_proj ops in IR
+ *   - ck_attention_project_head_major*      -> out_proj op in IR
+ *   - ck_mlp_swiglu_forward*                -> mlp_gate_up/mlp_down ops in IR
+ *   - ck_gemm_nt_quant                      -> KERNEL_REGISTRY.json dispatch
+ *   - ck_residual_add_token_major           -> residual_add op in IR
+ *
+ * To remove completely:
+ *   1. Delete this header
+ *   2. Delete ckernel_orchestration.c
+ *   3. Remove from Makefile SRCS list
+ *
+ * Last used: v6.5
+ * Deprecated: v6.6 (2026-02)
+ * ===========================================================================
+ */
+
 #ifndef CKERNEL_ORCHESTRATION_H
 #define CKERNEL_ORCHESTRATION_H
 

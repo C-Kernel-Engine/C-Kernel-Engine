@@ -43,6 +43,7 @@ typedef enum {
     CK_DT_Q8_K,          /* 9.125 bits/weight (292 bytes per 256 weights) */
     CK_DT_Q5_0,          /* 5.5 bits/weight (22 bytes per 32 weights) */
     CK_DT_Q5_1,          /* 6.0 bits/weight (24 bytes per 32 weights) */
+    CK_DT_Q5_K,          /* 5.5 bits/weight (176 bytes per 256 weights) - Q5_K super-block */
 
     CK_DT_COUNT
 } CKDataType;
@@ -57,7 +58,7 @@ typedef uint32_t CKDataTypeMask;
 static inline int ck_dtype_is_quantized(CKDataType dt)
 {
     return dt == CK_DT_Q4_0 || dt == CK_DT_Q4_1 || dt == CK_DT_Q5_0 || dt == CK_DT_Q5_1 ||
-           dt == CK_DT_Q4_K || dt == CK_DT_Q6_K || dt == CK_DT_Q8_0 || dt == CK_DT_Q8_K;
+           dt == CK_DT_Q5_K || dt == CK_DT_Q4_K || dt == CK_DT_Q6_K || dt == CK_DT_Q8_0 || dt == CK_DT_Q8_K;
 }
 
 /**
@@ -93,6 +94,7 @@ static inline size_t ck_dtype_block_size(CKDataType dt)
     case CK_DT_Q8_0:
         return 32;
     case CK_DT_Q4_K:
+    case CK_DT_Q5_K:
     case CK_DT_Q6_K:
     case CK_DT_Q8_K:
         return 256;
@@ -117,6 +119,8 @@ static inline size_t ck_dtype_block_bytes(CKDataType dt)
         return 24;   /* 2 (scale) + 2 (min) + 4 (high bit) + 16 (low 4-bit) */
     case CK_DT_Q4_K:
         return 144;  /* 2 + 2 + 12 + 128 */
+    case CK_DT_Q5_K:
+        return 176;  /* 2 + 2 + 12 + 32 + 128 */
     case CK_DT_Q6_K:
         return 210;  /* 2 + 16 + 128 + 64 */
     case CK_DT_Q8_0:

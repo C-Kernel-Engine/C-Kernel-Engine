@@ -1,3 +1,28 @@
+/**
+ * @file ckernel_codegen.c
+ *
+ * ===========================================================================
+ * LEGACY CODE - NOT USED IN v6.6
+ * ===========================================================================
+ *
+ * This file contains the older C-side kernel/codegen orchestration path.
+ * It is kept for reference and potential fallback use but is not part of the
+ * v6.6 generated-model inference flow.
+ *
+ * v6.6 Architecture:
+ *   - IR Lower 1/2/3 drives execution planning
+ *   - version/v6.6/scripts/codegen_v6_6.py emits model_v6_6.c directly
+ *   - Kernel dispatch is selected from kernel_maps + lowered call IR
+ *
+ * To remove completely:
+ *   1. Delete this file
+ *   2. Remove ckernel_codegen.* references from legacy build paths
+ *
+ * Last used: v6.5
+ * Deprecated: v6.6 (2026-02)
+ * ===========================================================================
+ */
+
 #include "ckernel_codegen.h"
 #include "ckernel_registry.h"
 #include "ckernel_kernel_specs.h"

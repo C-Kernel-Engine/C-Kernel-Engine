@@ -1,3 +1,35 @@
+/**
+ * @file ckernel_orchestration.c
+ *
+ * ===========================================================================
+ * LEGACY CODE - NOT USED IN v6.6
+ * ===========================================================================
+ *
+ * This file contains v6.5 orchestration code that is NO LONGER USED.
+ * It is kept for reference and potential future use but is NOT compiled
+ * into the v6.6 engine.
+ *
+ * v6.6 Architecture:
+ *   - IR Lower 3 handles all orchestration via dataflow graph
+ *   - Kernel dispatch via ckernel_codegen.c (for dynamically loaded kernels)
+ *   - Memory planning via memory_planner_v6_6.py
+ *
+ * Contents of this file (NOT used):
+ *   - ck_attention_flash_decode_wrapper: Flash attention wrapper (use
+ *     mega_fused_attention_prefill/avx instead)
+ *   - ck_quantized_gemm: Dispatcher for Q4_K, Q5_0, Q5_1, Q6_K, Q8_0
+ *     (use kernel_maps/KERNEL_REGISTRY.json + codegen instead)
+ *
+ * To remove completely:
+ *   1. Delete this file
+ *   2. Remove from Makefile SRCS list
+ *   3. Remove ckernel_orchestration.h
+ *
+ * Last used: v6.5
+ * Deprecated: v6.6 (2026-02)
+ * ===========================================================================
+ */
+
 #include "ckernel_orchestration.h"
 
 #include "ckernel_engine.h"
