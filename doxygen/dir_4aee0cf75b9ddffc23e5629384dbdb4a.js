@@ -5,6 +5,7 @@ var dir_4aee0cf75b9ddffc23e5629384dbdb4a =
     [ "murmurhash3.c", "murmurhash3_8c.html", "murmurhash3_8c" ],
     [ "test_tokenizer.c", "test__tokenizer_8c.html", "test__tokenizer_8c" ],
     [ "tokenizer.c", "tokenizer_8c.html", "tokenizer_8c" ],
+    [ "tokenizer_spm.c", "tokenizer__spm_8c.html", "tokenizer__spm_8c" ],
     [ "true_bpe.c", "true__bpe_8c.html", "true__bpe_8c" ],
     [ "utf8.c", "utf8_8c.html", "utf8_8c" ]
 ];

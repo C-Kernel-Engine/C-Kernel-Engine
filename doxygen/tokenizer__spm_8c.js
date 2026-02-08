@@ -1,0 +1,27 @@
+var tokenizer__spm_8c =
+[
+    [ "GGUF_TOKEN_BYTE", "tokenizer__spm_8c.html#ad622d978ef0bbec95bbfd2fb40e031a8", null ],
+    [ "GGUF_TOKEN_CONTROL", "tokenizer__spm_8c.html#a32a873c1bb8103804ea65cfc93fce4b8", null ],
+    [ "GGUF_TOKEN_NORMAL", "tokenizer__spm_8c.html#afa4fb7ab0ae07314afc885cfe245962d", null ],
+    [ "GGUF_TOKEN_UNKNOWN", "tokenizer__spm_8c.html#aebfc8e903d40787ae3bae076f38beb96", null ],
+    [ "GGUF_TOKEN_UNUSED", "tokenizer__spm_8c.html#ab88434b0ebe5c3ab2643fe6074064c31", null ],
+    [ "GGUF_TOKEN_USER_DEFINED", "tokenizer__spm_8c.html#a80742b73116479d68d521463c2557047", null ],
+    [ "ck_tokenizer_encode_spm_dispatch", "tokenizer__spm_8c.html#a67319d1870a3020397c7c458d577f8ec", null ],
+    [ "ck_tokenizer_encode_spm_impl", "tokenizer__spm_8c.html#af9d9d18a96516792c699612d0af9ae31", null ],
+    [ "ck_tokenizer_encode_spm_llama_impl", "tokenizer__spm_8c.html#a2784a2b8c1f823c805a2ab0caf3c9286", null ],
+    [ "ck_tokenizer_load_binary_with_scores", "tokenizer__spm_8c.html#a1b96aadee83cb18a6d1ce9b04ccab5b9", null ],
+    [ "ck_tokenizer_lookup_exact", "tokenizer__spm_8c.html#a04f9b4652a73de7cd6967be1d1f0e71e", null ],
+    [ "ck_tokenizer_lookup_exact_n", "tokenizer__spm_8c.html#a7446b7c8e331748f3ddde1ec2b5c87a0", null ],
+    [ "preprocess_spm_llama_text", "tokenizer__spm_8c.html#a0c6dbd0838689b6ed2ecb6d46765db27", null ],
+    [ "preprocess_spm_text", "tokenizer__spm_8c.html#a53df3f29ccea1cbd8ead6bda957df1ae", null ],
+    [ "spm_build_byte_lookup", "tokenizer__spm_8c.html#a42f04c4dc0545d3dd116440fd12e8030", null ],
+    [ "spm_count_unknown_run", "tokenizer__spm_8c.html#ae3c876345a3e3568add1e6cf2ebf50a4", null ],
+    [ "spm_encode_byte_fallback", "tokenizer__spm_8c.html#a63f0b07ac771c9cbb812d0c410e8b906", null ],
+    [ "spm_find_candidates_at_pos", "tokenizer__spm_8c.html#a0340206795887d7bbb15e71e05188637", null ],
+    [ "spm_get_byte_token", "tokenizer__spm_8c.html#ad59fb38a43ea4766fec534e96d15ff60", null ],
+    [ "spm_is_byte_token", "tokenizer__spm_8c.html#ad3db1a4fbb3401529e0238273cbda4b0", null ],
+    [ "spm_llama_resegment_node", "tokenizer__spm_8c.html#a6751fb6ff4d001d0e28a652642030585", null ],
+    [ "spm_token_allowed_in_dp", "tokenizer__spm_8c.html#a2c7f98baa1b54c93346843cf02b007ad", null ],
+    [ "spm_token_is_byte_format", "tokenizer__spm_8c.html#a10dee59a220ccb2077f669275958c611", null ],
+    [ "utf8_len", "tokenizer__spm_8c.html#a8ac84844873197352834b51dd6e8dbb8", null ]
+];
