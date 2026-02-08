@@ -1240,59 +1240,14 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Project Structure</span>
-        <span class="folder-updated">Updated: 2026-02-07 07:14</span>
+        <span class="folder-updated">Updated: 2026-02-08 18:30</span>
     </div>
     <pre class="tree-output">
 .
-|-- ~
-|-- analysis
-|   |-- comprehensive_implementation_plan.md
-|   |-- CORRECTED_performance_analysis.md
-|   |-- flash_attention_and_quantization.md
-|   |-- flash_attention_implementation_plan.md
-|   |-- fused_kernels_comparison.md
-|   |-- implementation_status.md
-|   |-- performance_analysis_detailed.md
-|   |-- report_01_ck_engine_profile.md
-|   |-- report_02_ck_vtune.md
-|   |-- report_03_llamacpp_profile.md
-|   |-- report_04_llamacpp_vtune.md
-|   |-- report_05_comparison.md
-|   `-- report_06_threadpool_design.md
 |-- assets
 |   `-- cover_image.png
 |-- benchmarks
-|   |-- bench_parallel_gemv.c
 |   `-- perf_flash_attn_micro.c
-|-- claude-code
-|   |-- examples
-|   |   `-- hooks
-|   |-- plugins
-|   |   |-- agent-sdk-dev
-|   |   |-- claude-opus-4-5-migration
-|   |   |-- code-review
-|   |   |-- commit-commands
-|   |   |-- explanatory-output-style
-|   |   |-- feature-dev
-|   |   |-- frontend-design
-|   |   |-- hookify
-|   |   |-- learning-output-style
-|   |   |-- plugin-dev
-|   |   |-- pr-review-toolkit
-|   |   |-- ralph-wiggum
-|   |   |-- security-guidance
-|   |   `-- README.md
-|   |-- Script
-|   |   `-- run_devcontainer_claude_code.ps1
-|   |-- scripts
-|   |   |-- auto-close-duplicates.ts
-|   |   |-- backfill-duplicate-comments.ts
-|   |   `-- comment-on-duplicates.sh
-|   |-- CHANGELOG.md
-|   |-- demo.gif
-|   |-- LICENSE.md
-|   |-- README.md
-|   `-- SECURITY.md
 |-- docs
 |   |-- adr
 |   |   |-- 0001-ir-v4-pipeline.md
@@ -1310,7 +1265,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- COMPARISON_PLAN.md
 |   |   |-- CONVERTER-SOLUTION.md
 |   |   |-- FILES_CREATED.md
-|   |   |-- fix_q4k_packing.md
 |   |   |-- FOCUS_INT8_ONLY.md
 |   |   |-- FUSION_ANALYSIS_SUMMARY.md
 |   |   |-- FUSION_BENCHMARK_TOOLKIT.md
@@ -1325,31 +1279,32 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- PERFORMANCE_ANALYSIS.md
 |   |   |-- PERFORMANCE_OPTIMIZATION_COMPLETE_REPORT.md
 |   |   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
-|   |   |-- performance_V6.5_qwen.md
 |   |   |-- PHASE2_ANALYSIS_REPORT.md
 |   |   |-- PREFILL_ACTION_PLAN.md
 |   |   |-- PREFILL_ANALYSIS.md
 |   |   |-- QUICK_SUMMARY.md
 |   |   |-- README-BUMP-CONVERTER.md
-|   |   |-- scaling_v2.md
 |   |   |-- START_HERE.md
 |   |   |-- SUMMARY.md
 |   |   |-- TESTING.md
 |   |   |-- V6.5_CLOSURE_PLAN.md
 |   |   |-- V6.5_PERFORMANCE_ANALYSIS_REPORT.md
-|   |   |-- vibe_docs.md
 |   |   |-- VIBE_GENERATED_CONTENT.md
-|   |   `-- VTUNE_GUIDE.md
+|   |   |-- VTUNE_GUIDE.md
+|   |   |-- fix_q4k_packing.md
+|   |   |-- performance_V6.5_qwen.md
+|   |   |-- scaling_v2.md
+|   |   `-- vibe_docs.md
 |   |-- site
+|   |   |-- _pages
+|   |   |-- _partials
 |   |   |-- assets
 |   |   |-- doxygen -&gt; ../doxygen_output/html
 |   |   |-- nightly-results
-|   |   |-- _pages
-|   |   |-- _partials
 |   |   |-- scripts
 |   |   |-- api.html
-|   |   |-- architecture.html
 |   |   |-- architecture-links.html
+|   |   |-- architecture.html
 |   |   |-- build.sh
 |   |   |-- codegen.html
 |   |   |-- concepts.html
@@ -1359,8 +1314,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- deterministic-memory.html
 |   |   |-- developer-guide.html
 |   |   |-- flash_attention.html
-|   |   |-- gemm-memory-layout.html
 |   |   |-- gemm-memory-layout-temp.html
+|   |   |-- gemm-memory-layout.html
 |   |   |-- gemm-optimization.html
 |   |   |-- gguf-bump.html
 |   |   |-- gguf-conversion.html
@@ -1374,17 +1329,17 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- profiling.html
 |   |   |-- pytorch-parity.html
 |   |   |-- quant-formats.html
-|   |   |-- quantization.html
 |   |   |-- quantization-math-temp.html
 |   |   |-- quantization-visuals.html
+|   |   |-- quantization.html
 |   |   |-- quickstart.html
 |   |   |-- research.html
 |   |   |-- scaling.html
 |   |   |-- sentencepiece.html
 |   |   |-- simd-architecture.html
-|   |   |-- testing.html
 |   |   |-- test-report.html
 |   |   |-- test-viewer.html
+|   |   |-- testing.html
 |   |   |-- threadpool.html
 |   |   |-- tokenizer.html
 |   |   `-- version-history.html
@@ -1399,14 +1354,31 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- 03-microkernel-design.md
 |   |   |-- 04-ai-shape-optimizations.md
 |   |   |-- 08-computational-complexity.md
-|   |   |-- career-roadmap-8-months.md
-|   |   `-- README.md
+|   |   |-- README.md
+|   |   `-- career-roadmap-8-months.md
 |   |-- 00-quickstart.md
 |   |-- 01-llm-kernel-shapes.md
 |   |-- 02-kernel-parallelism-and-backends.md
 |   |-- 03-ir-and-codegen-design.md
 |   |-- 04-ir-v2-format.md
 |   |-- 05-ir-v4-design.md
+|   |-- DETAILED_PARITY_TESTING_PLAN.md
+|   |-- DEVLOG.md
+|   |-- Doxyfile
+|   |-- LAYERED_TEST_STRATEGY.md
+|   |-- MEGA_FUSED.md
+|   |-- MEGA_FUSION_CALCULATIONS.md
+|   |-- MEGA_FUSION_PREFILL_PLAN.md
+|   |-- MEMORY_PROFILING_GUIDE.md
+|   |-- PARITY_TESTING_GUIDE.md
+|   |-- PARITY_TESTING_PLAN.md
+|   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
+|   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
+|   |-- PERFORMANCE_TESTING_METHODOLOGY.md
+|   |-- PROFILING_REPORT.md
+|   |-- Q5_Q8_KERNEL_ANALYSIS.md
+|   |-- QUANTIZATION_GUIDE.md
+|   |-- V6_6_FUSION_PLAN.md
 |   |-- architecture_diagram.md
 |   |-- bf16_format.svg
 |   |-- bf16_rounding.svg
@@ -1414,10 +1386,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- c-kernel-engine-infographic.html
 |   |-- c-kernel-engine-overview.svg
 |   |-- cpu-gpu-analysis.svg
-|   |-- DETAILED_PARITY_TESTING_PLAN.md
 |   |-- developer-guide.md
-|   |-- DEVLOG.md
-|   |-- Doxyfile
 |   |-- doxygen_header.html
 |   |-- gemm-in-transformers.md
 |   |-- gguf-conversion.md
@@ -1428,23 +1397,10 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- iteration-philosophy.svg
 |   |-- kernel-catalog.md
 |   |-- kernel-design-pattern.md
-|   |-- LAYERED_TEST_STRATEGY.md
-|   |-- MEGA_FUSED.md
 |   |-- mega_fused_test_plan.md
-|   |-- MEGA_FUSION_CALCULATIONS.md
-|   |-- MEGA_FUSION_PREFILL_PLAN.md
 |   |-- memory_layout_demo.md
-|   |-- MEMORY_PROFILING_GUIDE.md
 |   |-- navigation-map.html
-|   |-- PARITY_TESTING_GUIDE.md
-|   |-- PARITY_TESTING_PLAN.md
-|   |-- PERFORMANCE_IMPROVEMENT_PLAN.md
-|   |-- PERFORMANCE_OPTIMIZATION_PLAN.md
-|   |-- PERFORMANCE_TESTING_METHODOLOGY.md
 |   |-- preview.html
-|   |-- PROFILING_REPORT.md
-|   |-- Q5_Q8_KERNEL_ANALYSIS.md
-|   |-- QUANTIZATION_GUIDE.md
 |   |-- qwen_layer_dataflow.md
 |   |-- qwen_layer_dataflow.svg
 |   |-- scale-economics.svg
@@ -1452,228 +1408,13 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- threading-strategy.md
 |   |-- tokenizer-architecture.svg
 |   |-- tokenizer-hash-vs-trie.svg
-|   |-- tokenizer.md
 |   |-- tokenizer-performance-comparison.svg
+|   |-- tokenizer.md
 |   |-- v4-design.md
-|   |-- V6_6_FUSION_PLAN.md
-|   |-- v6_plan_inkscape.svg
-|   `-- v6_plan.svg
+|   |-- v6_plan.svg
+|   `-- v6_plan_inkscape.svg
 |-- errata
 |   `-- smolm.md
-|-- examples
-|   |-- generated_multimodal_layout.c
-|   |-- generated_qwen_0.5b.c
-|   |-- generated_qwen_0.5b.h
-|   |-- generated_qwen_0.5b.map
-|   `-- generated_with_kernels_example.c
-|-- FlameGraph
-|   |-- demos
-|   |   |-- brkbytes-mysql.svg
-|   |   |-- cpu-grep.svg
-|   |   |-- cpu-illumos-ipdce.svg
-|   |   |-- cpu-illumos-syscalls.svg
-|   |   |-- cpu-illumos-tcpfuse.svg
-|   |   |-- cpu-iozone.svg
-|   |   |-- cpu-ipnet-diff.svg
-|   |   |-- cpu-linux-tar.svg
-|   |   |-- cpu-linux-tcpsend.svg
-|   |   |-- cpu-mixedmode-flamegraph-java.svg
-|   |   |-- cpu-mysql-filt.svg
-|   |   |-- cpu-mysql.svg
-|   |   |-- cpu-qemu-both.svg
-|   |   |-- cpu-zoomable.html
-|   |   |-- hotcold-kernelthread.svg
-|   |   |-- io-gzip.svg
-|   |   |-- io-mysql.svg
-|   |   |-- mallocbytes-bash.svg
-|   |   |-- off-bash.svg
-|   |   |-- off-mysql-busy.svg
-|   |   |-- off-mysql-idle.svg
-|   |   |-- palette-example-broken.svg
-|   |   |-- palette-example-working.svg
-|   |   `-- README
-|   |-- dev
-|   |   |-- gatherhc-kern.d
-|   |   |-- gatherthc-kern.d
-|   |   |-- hcstackcollapse.pl
-|   |   |-- hotcoldgraph.pl
-|   |   |-- README
-|   |   `-- thcstackcollapse.pl
-|   |-- docs
-|   |   `-- cddl1.txt
-|   |-- test
-|   |   |-- results
-|   |   |-- perf-cycles-instructions-01.txt
-|   |   |-- perf-dd-stacks-01.txt
-|   |   |-- perf-funcab-cmd-01.txt
-|   |   |-- perf-funcab-pid-01.txt
-|   |   |-- perf-iperf-stacks-pidtid-01.txt
-|   |   |-- perf-java-faults-01.txt
-|   |   |-- perf-java-stacks-01.txt
-|   |   |-- perf-java-stacks-02.txt
-|   |   |-- perf-js-stacks-01.txt
-|   |   |-- perf-mirageos-stacks-01.txt
-|   |   |-- perf-numa-stacks-01.txt
-|   |   |-- perf-rust-Yamakaky-dcpu.txt
-|   |   `-- perf-vertx-stacks-01.txt
-|   |-- aix-perf.pl
-|   |-- difffolded.pl
-|   |-- example-dtrace-stacks.txt
-|   |-- example-dtrace.svg
-|   |-- example-perf-stacks.txt.gz
-|   |-- example-perf.svg
-|   |-- files.pl
-|   |-- flamegraph.pl
-|   |-- jmaps
-|   |-- pkgsplit-perf.pl
-|   |-- range-perf.pl
-|   |-- README.md
-|   |-- record-test.sh
-|   |-- stackcollapse-aix.pl
-|   |-- stackcollapse-bpftrace.pl
-|   |-- stackcollapse-chrome-tracing.py
-|   |-- stackcollapse-elfutils.pl
-|   |-- stackcollapse-faulthandler.pl
-|   |-- stackcollapse-gdb.pl
-|   |-- stackcollapse-go.pl
-|   |-- stackcollapse-ibmjava.pl
-|   |-- stackcollapse-instruments.pl
-|   |-- stackcollapse-java-exceptions.pl
-|   |-- stackcollapse-jstack.pl
-|   |-- stackcollapse-ljp.awk
-|   |-- stackcollapse-perf.pl
-|   |-- stackcollapse-perf-sched.awk
-|   |-- stackcollapse.pl
-|   |-- stackcollapse-pmc.pl
-|   |-- stackcollapse-recursive.pl
-|   |-- stackcollapse-sample.awk
-|   |-- stackcollapse-stap.pl
-|   |-- stackcollapse-vsprof.pl
-|   |-- stackcollapse-vtune-mc.pl
-|   |-- stackcollapse-vtune.pl
-|   |-- stackcollapse-wcp.pl
-|   |-- stackcollapse-xdebug.php
-|   `-- test.sh
-|-- ggml
-|   |-- ci
-|   |   `-- run.sh
-|   |-- cmake
-|   |   |-- BuildTypes.cmake
-|   |   |-- common.cmake
-|   |   |-- ggml-config.cmake.in
-|   |   `-- GitVars.cmake
-|   |-- docs
-|   |   `-- gguf.md
-|   |-- examples
-|   |   |-- gpt-2
-|   |   |-- gpt-j
-|   |   |-- magika
-|   |   |-- mnist
-|   |   |-- perf-metal
-|   |   |-- prompts
-|   |   |-- python
-|   |   |-- sam
-|   |   |-- simple
-|   |   |-- test-cmake
-|   |   |-- yolo
-|   |   |-- CMakeLists.txt
-|   |   |-- common.cpp
-|   |   |-- common-ggml.cpp
-|   |   |-- common-ggml.h
-|   |   |-- common.h
-|   |   |-- stb_image.h
-|   |   `-- stb_image_write.h
-|   |-- include
-|   |   |-- ggml-alloc.h
-|   |   |-- ggml-backend.h
-|   |   |-- ggml-blas.h
-|   |   |-- ggml-cann.h
-|   |   |-- ggml-cpp.h
-|   |   |-- ggml-cpu.h
-|   |   |-- ggml-cuda.h
-|   |   |-- ggml.h
-|   |   |-- ggml-hexagon.h
-|   |   |-- ggml-metal.h
-|   |   |-- ggml-opencl.h
-|   |   |-- ggml-opt.h
-|   |   |-- ggml-rpc.h
-|   |   |-- ggml-sycl.h
-|   |   |-- ggml-vulkan.h
-|   |   |-- ggml-webgpu.h
-|   |   |-- ggml-zdnn.h
-|   |   |-- ggml-zendnn.h
-|   |   `-- gguf.h
-|   |-- scripts
-|   |   |-- gen-authors.sh
-|   |   |-- release.sh
-|   |   |-- sync-llama-am.sh
-|   |   |-- sync-llama.last
-|   |   |-- sync-llama.sh
-|   |   |-- sync-whisper-am.sh
-|   |   |-- sync-whisper.last
-|   |   `-- sync-whisper.sh
-|   |-- src
-|   |   |-- ggml-blas
-|   |   |-- ggml-cann
-|   |   |-- ggml-cpu
-|   |   |-- ggml-cuda
-|   |   |-- ggml-hexagon
-|   |   |-- ggml-hip
-|   |   |-- ggml-metal
-|   |   |-- ggml-musa
-|   |   |-- ggml-opencl
-|   |   |-- ggml-rpc
-|   |   |-- ggml-sycl
-|   |   |-- ggml-vulkan
-|   |   |-- ggml-webgpu
-|   |   |-- ggml-zdnn
-|   |   |-- ggml-zendnn
-|   |   |-- CMakeLists.txt
-|   |   |-- ggml-alloc.c
-|   |   |-- ggml-backend.cpp
-|   |   |-- ggml-backend-impl.h
-|   |   |-- ggml-backend-reg.cpp
-|   |   |-- ggml.c
-|   |   |-- ggml-common.h
-|   |   |-- ggml.cpp
-|   |   |-- ggml-impl.h
-|   |   |-- ggml-opt.cpp
-|   |   |-- ggml-quants.c
-|   |   |-- ggml-quants.h
-|   |   |-- ggml-threading.cpp
-|   |   |-- ggml-threading.h
-|   |   `-- gguf.cpp
-|   |-- tests
-|   |   |-- CMakeLists.txt
-|   |   |-- test-arange.cpp
-|   |   |-- test-backend-ops.cpp
-|   |   |-- test-cont.c
-|   |   |-- test-conv1d.cpp
-|   |   |-- test-conv1d-dw-c1.cpp
-|   |   |-- test-conv1d-dw-c2.cpp
-|   |   |-- test-conv2d.cpp
-|   |   |-- test-conv2d-dw.cpp
-|   |   |-- test-conv-transpose-1d.cpp
-|   |   |-- test-conv-transpose.c
-|   |   |-- test-customop.c
-|   |   |-- test-dup.c
-|   |   |-- test-interpolate.cpp
-|   |   |-- test-opt.cpp
-|   |   |-- test-pad-reflect-1d.cpp
-|   |   |-- test-pool.c
-|   |   |-- test-quantize-fns.cpp
-|   |   |-- test-quantize-perf.cpp
-|   |   |-- test-rel-pos.c
-|   |   |-- test-roll.cpp
-|   |   `-- test-timestep_embedding.cpp
-|   |-- AUTHORS
-|   |-- CMakeLists.txt
-|   |-- CONTRIBUTING.md
-|   |-- ggml.pc.in
-|   |-- LICENSE
-|   |-- README.md
-|   `-- requirements.txt
-|-- HPCEmbedding -&gt; /home/antshiv/Workspace/BCGov/citz-imb-ai/HPC/HPC_Embeddings/
 |-- include
 |   |-- data_structures
 |   |   `-- tries
@@ -1685,6 +1426,12 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- true_bpe.h
 |   |   `-- utf8.h
 |   |-- bf16_utils.h
+|   |-- ck_features.h
+|   |-- ck_metrics.h
+|   |-- ck_model_api.h
+|   |-- ck_parity_api.h
+|   |-- ck_threadpool.h
+|   |-- ck_tokenizer.h
 |   |-- ckernel_alloc.h
 |   |-- ckernel_bump_v5.h
 |   |-- ckernel_codegen.h
@@ -1695,20 +1442,14 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- ckernel_ir_v2.h
 |   |-- ckernel_ir_v2_lower.h
 |   |-- ckernel_kernel_specs.h
-|   |-- ckernel_memory_layout.h
 |   |-- ckernel_mem_plan.h
+|   |-- ckernel_memory_layout.h
 |   |-- ckernel_model.h
 |   |-- ckernel_model_load_v4.h
 |   |-- ckernel_orchestration.h
 |   |-- ckernel_quant.h
 |   |-- ckernel_registry.h
 |   |-- ckernel_section_layout.h
-|   |-- ck_features.h
-|   |-- ck_metrics.h
-|   |-- ck_model_api.h
-|   |-- ck_parity_api.h
-|   |-- ck_threadpool.h
-|   |-- ck_tokenizer.h
 |   |-- cpu_features.h
 |   |-- fused_kernels.h
 |   |-- mega_fused_attention.h
@@ -1727,394 +1468,11 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- rmsnorm.json
 |   |   |-- rope.json
 |   |   `-- swiglu.json
-|   |-- decoder_layer_plan_backward.json
-|   |-- decoder_layer_plan.json
-|   |-- global_buffers.json
-|   `-- README.md
-|-- layer_dumps
-|-- llama.cpp
-|   |-- builds
-|   |   |-- bin
-|   |   |-- CMakeFiles
-|   |   |-- common
-|   |   |-- examples
-|   |   |-- ggml
-|   |   |-- pocs
-|   |   |-- src
-|   |   |-- Testing
-|   |   |-- tests
-|   |   |-- tools
-|   |   |-- vendor
-|   |   |-- CMakeCache.txt
-|   |   |-- cmake_install.cmake
-|   |   |-- compile_commands.json
-|   |   |-- CTestTestfile.cmake
-|   |   |-- DartConfiguration.tcl
-|   |   |-- llama-config.cmake
-|   |   |-- llama.pc
-|   |   |-- llama-version.cmake
-|   |   `-- Makefile
-|   |-- ci
-|   |   |-- README.md
-|   |   `-- run.sh
-|   |-- cmake
-|   |   |-- arm64-apple-clang.cmake
-|   |   |-- arm64-windows-llvm.cmake
-|   |   |-- arm64-windows-msvc.cmake
-|   |   |-- build-info.cmake
-|   |   |-- common.cmake
-|   |   |-- git-vars.cmake
-|   |   |-- llama-config.cmake.in
-|   |   |-- llama.pc.in
-|   |   `-- x64-windows-llvm.cmake
-|   |-- common
-|   |   |-- cmake
-|   |   |-- minja
-|   |   |-- arg.cpp
-|   |   |-- arg.h
-|   |   |-- base64.hpp
-|   |   |-- build-info.cpp
-|   |   |-- build-info.cpp.in
-|   |   |-- chat.cpp
-|   |   |-- chat.h
-|   |   |-- CMakeLists.txt
-|   |   |-- common.cpp
-|   |   |-- common.h
-|   |   |-- console.cpp
-|   |   |-- console.h
-|   |   |-- json.hpp
-|   |   |-- json-schema-to-grammar.cpp
-|   |   |-- json-schema-to-grammar.h
-|   |   |-- llguidance.cpp
-|   |   |-- log.cpp
-|   |   |-- log.h
-|   |   |-- ngram-cache.cpp
-|   |   |-- ngram-cache.h
-|   |   |-- sampling.cpp
-|   |   |-- sampling.h
-|   |   |-- speculative.cpp
-|   |   |-- speculative.h
-|   |   `-- stb_image.h
-|   |-- docs
-|   |   |-- backend
-|   |   |-- development
-|   |   |-- android.md
-|   |   |-- build.md
-|   |   |-- cuda-fedora.md
-|   |   |-- docker.md
-|   |   |-- function-calling.md
-|   |   |-- install.md
-|   |   `-- llguidance.md
-|   |-- examples
-|   |   |-- batched
-|   |   |-- batched-bench
-|   |   |-- batched.swift
-|   |   |-- convert-llama2c-to-ggml
-|   |   |-- cvector-generator
-|   |   |-- deprecation-warning
-|   |   |-- embedding
-|   |   |-- eval-callback
-|   |   |-- export-lora
-|   |   |-- gbnf-validator
-|   |   |-- gen-docs
-|   |   |-- gguf
-|   |   |-- gguf-hash
-|   |   |-- gguf-split
-|   |   |-- gritlm
-|   |   |-- imatrix
-|   |   |-- infill
-|   |   |-- jeopardy
-|   |   |-- llama.android
-|   |   |-- llama-bench
-|   |   |-- llama.swiftui
-|   |   |-- llava
-|   |   |-- lookahead
-|   |   |-- lookup
-|   |   |-- main
-|   |   |-- parallel
-|   |   |-- passkey
-|   |   |-- perplexity
-|   |   |-- quantize
-|   |   |-- quantize-stats
-|   |   |-- retrieval
-|   |   |-- rpc
-|   |   |-- run
-|   |   |-- save-load-state
-|   |   |-- server
-|   |   |-- simple
-|   |   |-- simple-chat
-|   |   |-- simple-cmake-pkg
-|   |   |-- speculative
-|   |   |-- speculative-simple
-|   |   |-- sycl
-|   |   |-- tokenize
-|   |   |-- tts
-|   |   |-- chat-13B.bat
-|   |   |-- chat-13B.sh
-|   |   |-- chat-persistent.sh
-|   |   |-- chat.sh
-|   |   |-- chat-vicuna.sh
-|   |   |-- CMakeLists.txt
-|   |   |-- convert_legacy_llama.py
-|   |   |-- json_schema_pydantic_example.py
-|   |   |-- json_schema_to_grammar.py
-|   |   |-- llama.vim
-|   |   |-- llm.vim
-|   |   |-- Miku.sh
-|   |   |-- pydantic_models_to_grammar_examples.py
-|   |   |-- pydantic_models_to_grammar.py
-|   |   |-- reason-act.sh
-|   |   |-- regex_to_grammar.py
-|   |   |-- server_embd.py
-|   |   |-- server-llama2-13B.sh
-|   |   `-- ts-type-to-grammar.sh
-|   |-- ggml
-|   |   |-- cmake
-|   |   |-- include
-|   |   |-- src
-|   |   `-- CMakeLists.txt
-|   |-- gguf-py
-|   |   |-- examples
-|   |   |-- gguf
-|   |   |-- tests
-|   |   |-- LICENSE
-|   |   |-- pyproject.toml
-|   |   `-- README.md
-|   |-- grammars
-|   |   |-- arithmetic.gbnf
-|   |   |-- c.gbnf
-|   |   |-- chess.gbnf
-|   |   |-- english.gbnf
-|   |   |-- japanese.gbnf
-|   |   |-- json_arr.gbnf
-|   |   |-- json.gbnf
-|   |   |-- list.gbnf
-|   |   `-- README.md
-|   |-- include
-|   |   |-- llama-cpp.h
-|   |   `-- llama.h
-|   |-- llama_dump
-|   |   `-- prompt_tokens.json
-|   |-- media
-|   |   |-- llama0-banner.png
-|   |   |-- llama0-logo.png
-|   |   |-- llama1-banner.png
-|   |   |-- llama1-logo.png
-|   |   |-- matmul.png
-|   |   `-- matmul.svg
-|   |-- models
-|   |   |-- templates
-|   |   |-- ggml-vocab-aquila.gguf
-|   |   |-- ggml-vocab-baichuan.gguf
-|   |   |-- ggml-vocab-bert-bge.gguf
-|   |   |-- ggml-vocab-bert-bge.gguf.inp
-|   |   |-- ggml-vocab-bert-bge.gguf.out
-|   |   |-- ggml-vocab-chameleon.gguf.inp
-|   |   |-- ggml-vocab-chameleon.gguf.out
-|   |   |-- ggml-vocab-command-r.gguf
-|   |   |-- ggml-vocab-command-r.gguf.inp
-|   |   |-- ggml-vocab-command-r.gguf.out
-|   |   |-- ggml-vocab-deepseek-coder.gguf
-|   |   |-- ggml-vocab-deepseek-coder.gguf.inp
-|   |   |-- ggml-vocab-deepseek-coder.gguf.out
-|   |   |-- ggml-vocab-deepseek-llm.gguf
-|   |   |-- ggml-vocab-deepseek-llm.gguf.inp
-|   |   |-- ggml-vocab-deepseek-llm.gguf.out
-|   |   |-- ggml-vocab-deepseek-r1-qwen.gguf.inp
-|   |   |-- ggml-vocab-deepseek-r1-qwen.gguf.out
-|   |   |-- ggml-vocab-falcon.gguf
-|   |   |-- ggml-vocab-falcon.gguf.inp
-|   |   |-- ggml-vocab-falcon.gguf.out
-|   |   |-- ggml-vocab-gpt-2.gguf
-|   |   |-- ggml-vocab-gpt-2.gguf.inp
-|   |   |-- ggml-vocab-gpt-2.gguf.out
-|   |   |-- ggml-vocab-gpt-4o.gguf.inp
-|   |   |-- ggml-vocab-gpt-4o.gguf.out
-|   |   |-- ggml-vocab-gpt-neox.gguf
-|   |   |-- ggml-vocab-llama-bpe.gguf
-|   |   |-- ggml-vocab-llama-bpe.gguf.inp
-|   |   |-- ggml-vocab-llama-bpe.gguf.out
-|   |   |-- ggml-vocab-llama-spm.gguf
-|   |   |-- ggml-vocab-llama-spm.gguf.inp
-|   |   |-- ggml-vocab-llama-spm.gguf.out
-|   |   |-- ggml-vocab-mpt.gguf
-|   |   |-- ggml-vocab-mpt.gguf.inp
-|   |   |-- ggml-vocab-mpt.gguf.out
-|   |   |-- ggml-vocab-phi-3.gguf
-|   |   |-- ggml-vocab-phi-3.gguf.inp
-|   |   |-- ggml-vocab-phi-3.gguf.out
-|   |   |-- ggml-vocab-qwen2.gguf
-|   |   |-- ggml-vocab-qwen2.gguf.inp
-|   |   |-- ggml-vocab-qwen2.gguf.out
-|   |   |-- ggml-vocab-refact.gguf
-|   |   |-- ggml-vocab-refact.gguf.inp
-|   |   |-- ggml-vocab-refact.gguf.out
-|   |   |-- ggml-vocab-roberta-bpe.gguf.inp
-|   |   |-- ggml-vocab-roberta-bpe.gguf.out
-|   |   |-- ggml-vocab-starcoder.gguf
-|   |   |-- ggml-vocab-starcoder.gguf.inp
-|   |   `-- ggml-vocab-starcoder.gguf.out
-|   |-- pocs
-|   |   |-- vdot
-|   |   `-- CMakeLists.txt
-|   |-- prompts
-|   |   |-- alpaca.txt
-|   |   |-- assistant.txt
-|   |   |-- chat.txt
-|   |   |-- chat-with-baichuan.txt
-|   |   |-- chat-with-bob.txt
-|   |   |-- chat-with-qwen.txt
-|   |   |-- chat-with-vicuna-v0.txt
-|   |   |-- chat-with-vicuna-v1.txt
-|   |   |-- dan-modified.txt
-|   |   |-- dan.txt
-|   |   |-- LLM-questions.txt
-|   |   |-- mnemonics.txt
-|   |   |-- parallel-questions.txt
-|   |   `-- reason-act.txt
-|   |-- requirements
-|   |   |-- requirements-all.txt
-|   |   |-- requirements-compare-llama-bench.txt
-|   |   |-- requirements-convert_hf_to_gguf.txt
-|   |   |-- requirements-convert_hf_to_gguf_update.txt
-|   |   |-- requirements-convert_legacy_llama.txt
-|   |   |-- requirements-convert_llama_ggml_to_gguf.txt
-|   |   |-- requirements-convert_lora_to_gguf.txt
-|   |   |-- requirements-pydantic.txt
-|   |   |-- requirements-test-tokenizer-random.txt
-|   |   `-- requirements-tool_bench.txt
-|   |-- scripts
-|   |   |-- apple
-|   |   |-- build-info.sh
-|   |   |-- check-requirements.sh
-|   |   |-- ci-run.sh
-|   |   |-- compare-commits.sh
-|   |   |-- compare-llama-bench.py
-|   |   |-- debug-test.sh
-|   |   |-- fetch_server_test_models.py
-|   |   |-- gen-authors.sh
-|   |   |-- gen-unicode-data.py
-|   |   |-- get_chat_template.py
-|   |   |-- get-flags.mk
-|   |   |-- get-hellaswag.sh
-|   |   |-- get-pg.sh
-|   |   |-- get-wikitext-103.sh
-|   |   |-- get-wikitext-2.sh
-|   |   |-- get-winogrande.sh
-|   |   |-- hf.sh
-|   |   |-- install-oneapi.bat
-|   |   |-- qnt-all.sh
-|   |   |-- run-all-perf.sh
-|   |   |-- run-all-ppl.sh
-|   |   |-- sync-ggml-am.sh
-|   |   |-- sync-ggml.last
-|   |   |-- sync-ggml.sh
-|   |   |-- tool_bench.py
-|   |   |-- tool_bench.sh
-|   |   |-- verify-checksum-models.py
-|   |   `-- xxd.cmake
-|   |-- src
-|   |   |-- CMakeLists.txt
-|   |   |-- llama-adapter.cpp
-|   |   |-- llama-adapter.h
-|   |   |-- llama-arch.cpp
-|   |   |-- llama-arch.h
-|   |   |-- llama-batch.cpp
-|   |   |-- llama-batch.h
-|   |   |-- llama-chat.cpp
-|   |   |-- llama-chat.h
-|   |   |-- llama-context.cpp
-|   |   |-- llama-context.h
-|   |   |-- llama-cparams.cpp
-|   |   |-- llama-cparams.h
-|   |   |-- llama.cpp
-|   |   |-- llama-grammar.cpp
-|   |   |-- llama-grammar.h
-|   |   |-- llama-hparams.cpp
-|   |   |-- llama-hparams.h
-|   |   |-- llama-impl.cpp
-|   |   |-- llama-impl.h
-|   |   |-- llama-kv-cache.cpp
-|   |   |-- llama-kv-cache.h
-|   |   |-- llama-mmap.cpp
-|   |   |-- llama-mmap.h
-|   |   |-- llama-model.cpp
-|   |   |-- llama-model.h
-|   |   |-- llama-model-loader.cpp
-|   |   |-- llama-model-loader.h
-|   |   |-- llama-quant.cpp
-|   |   |-- llama-quant.h
-|   |   |-- llama-sampling.cpp
-|   |   |-- llama-sampling.h
-|   |   |-- llama-vocab.cpp
-|   |   |-- llama-vocab.h
-|   |   |-- unicode.cpp
-|   |   |-- unicode-data.cpp
-|   |   |-- unicode-data.h
-|   |   `-- unicode.h
-|   |-- tests
-|   |   |-- CMakeLists.txt
-|   |   |-- get-model.cpp
-|   |   |-- get-model.h
-|   |   |-- run-json-schema-to-grammar.mjs
-|   |   |-- test-arg-parser.cpp
-|   |   |-- test-autorelease.cpp
-|   |   |-- test-backend-ops.cpp
-|   |   |-- test-barrier.cpp
-|   |   |-- test-c.c
-|   |   |-- test-chat.cpp
-|   |   |-- test-chat-template.cpp
-|   |   |-- test-double-float.cpp
-|   |   |-- test-ggml-ops-parity.cpp
-|   |   |-- test-gguf.cpp
-|   |   |-- test-grammar-integration.cpp
-|   |   |-- test-grammar-llguidance.cpp
-|   |   |-- test-grammar-parser.cpp
-|   |   |-- test-json-schema-to-grammar.cpp
-|   |   |-- test-kernel-parity.cpp
-|   |   |-- test-llama-grammar.cpp
-|   |   |-- test-log.cpp
-|   |   |-- test-lora-conversion-inference.sh
-|   |   |-- test-model-load-cancel.cpp
-|   |   |-- test-opt.cpp
-|   |   |-- test-quantize-fns.cpp
-|   |   |-- test-quantize-perf.cpp
-|   |   |-- test-rope.cpp
-|   |   |-- test-sampling.cpp
-|   |   |-- test-tokenizer-0.cpp
-|   |   |-- test-tokenizer-0.py
-|   |   |-- test-tokenizer-0.sh
-|   |   |-- test-tokenizer-1-bpe.cpp
-|   |   |-- test-tokenizer-1-spm.cpp
-|   |   `-- test-tokenizer-random.py
-|   |-- AUTHORS
-|   |-- build-xcframework.sh
-|   |-- CMakeLists.txt
-|   |-- CMakePresets.json
-|   |-- CODEOWNERS
-|   |-- CONTRIBUTING.md
-|   |-- convert_hf_to_gguf.py
-|   |-- convert_hf_to_gguf_update.py
-|   |-- convert_llama_ggml_to_gguf.py
-|   |-- convert_lora_to_gguf.py
-|   |-- debug_kv.py
-|   |-- dump_llama_prompt.cpp
-|   |-- dump_llama_tokens.cpp
-|   |-- flake.lock
-|   |-- flake.nix
-|   |-- LICENSE
-|   |-- llama_cpp_debug.diff
-|   |-- main -&gt; build/bin/llama-cli
-|   |-- Makefile
-|   |-- mypy.ini
-|   |-- poetry.lock
-|   |-- pyproject.toml
-|   |-- pyrightconfig.json
 |   |-- README.md
-|   |-- requirements.txt
-|   |-- SECURITY.md
-|   `-- verify_decode_only.py
-|-- llama_dump
+|   |-- decoder_layer_plan.json
+|   |-- decoder_layer_plan_backward.json
+|   `-- global_buffers.json
+|-- llama.cpp
 |-- logs
 |   |-- 2025-12-26-training-fix
 |   |   |-- CHANGES.md
@@ -2127,146 +1485,13 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |-- notebooks
 |   `-- kernel_testing_workflow.ipynb
 |-- patches
+|   |-- README.md
 |   |-- ck-engine-parity-bench.patch
 |   |-- fix_avx512_qh_bits.patch
-|   |-- llama_cpp_debug.diff
 |   |-- llama.patch
-|   |-- llama_tensor_dump_ckdmp.patch
-|   |-- README.md
+|   |-- llama_cpp_debug.diff
 |   |-- single_layer_dump.cpp
-|   |-- test-ggml-ops-parity.cpp
-|   |-- test-kernel-parity.cpp
-|   `-- test-kernel-parity-sliding-geglu.patch
-|-- profile_results
-|   |-- avx_analysis
-|   |   |-- cachegrind.out
-|   |   |-- callgrind_combined.out
-|   |   |-- callgrind.out
-|   |   |-- callgrind_with_avx.out
-|   |   `-- PROFILING_REPORT.md
-|   |-- full_analysis
-|   |   |-- cachegrind.out
-|   |   |-- callgrind.out
-|   |   `-- perf.data
-|   |-- gemv_omp
-|   |   |-- 20260129-125914
-|   |   `-- 20260129-130015
-|   `-- OPTIMIZATION_LOG.md
-|-- research
-|   `-- AI -&gt; /home/antshiv/Documents/AI/
-|-- rllm
-|   |-- docs
-|   |   |-- api
-|   |   |-- assets
-|   |   |-- core-concepts
-|   |   |-- examples
-|   |   |-- getting-started
-|   |   |-- stylesheets
-|   |   |-- contributing.md
-|   |   |-- index.md
-|   |   |-- README.md
-|   |   `-- requirements.txt
-|   |-- examples
-|   |   |-- appworld
-|   |   |-- countdown
-|   |   |-- deepcoder
-|   |   |-- deepresearch
-|   |   |-- deepscaler
-|   |   |-- eval_protocol
-|   |   |-- fireworks_math
-|   |   |-- frozenlake
-|   |   |-- geo3k
-|   |   |-- geo3k_tinker
-|   |   |-- gsm8k_lora
-|   |   |-- math_tinker
-|   |   |-- math_tool
-|   |   |-- mcp
-|   |   |-- miniwob
-|   |   |-- ocr
-|   |   |-- sdk
-|   |   |-- search
-|   |   |-- sft
-|   |   |-- sft_tinker
-|   |   |-- simple_math
-|   |   |-- smolagents
-|   |   |-- solver_judge
-|   |   |-- solver_judge_tinker
-|   |   |-- strands
-|   |   |-- swe
-|   |   |-- terminal
-|   |   |-- verifiers_env
-|   |   `-- vimgolf
-|   |-- rllm
-|   |   |-- agents
-|   |   |-- data
-|   |   |-- docs
-|   |   |-- engine
-|   |   |-- environments
-|   |   |-- experimental
-|   |   |-- integrations
-|   |   |-- parser
-|   |   |-- patches
-|   |   |-- rewards
-|   |   |-- sdk
-|   |   |-- tools
-|   |   |-- trainer
-|   |   |-- utils
-|   |   |-- workflows
-|   |   |-- globals.py
-|   |   |-- __init__.py
-|   |   |-- misc.py
-|   |   |-- system_prompts.py
-|   |   `-- trajectory_visualizer.py
-|   |-- scripts
-|   |   |-- agent
-|   |   |-- benchmark
-|   |   |-- data
-|   |   |-- train
-|   |   |-- dump_cfg.py
-|   |   `-- launch_litellm.sh
-|   |-- tests
-|   |   |-- agents
-|   |   |-- envs
-|   |   |-- experimental
-|   |   |-- parser
-|   |   |-- rewards
-|   |   |-- sdk
-|   |   |-- tools
-|   |   `-- trainer
-|   |-- build_docs.sh
-|   |-- Dockerfile
-|   |-- LICENSE
-|   |-- mkdocs.yml
-|   |-- pyproject.toml
-|   |-- README.md
-|   `-- uv.lock
-|-- Screenshots
-|   |-- Screenshot 2026-01-13 at 16-09-58 TestReport C-Kernel-Engine.png
-|   |-- Screenshot-2026-01-16_06-29.png
-|   |-- Screenshot 2026-01-16 at 06-58-32 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 07-06-34 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 07-09-51 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 10-41-23 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 11-09-59 Settings · Ruleset · C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 11-14-25 Settings · Ruleset · C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 13-20-35 Workflow runs · antshiv_C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 15-14-17 Workflow runs · antshiv_C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 15-16-27 Pages.png
-|   |-- Screenshot 2026-01-16 at 19-53-01 Settings · Rulesets · C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-16 at 19-56-41 Settings · Rulesets · C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-17 at 04-45-59 Pages.png
-|   |-- Screenshot 2026-01-17 at 04-49-01 Pages.png
-|   |-- Screenshot 2026-01-17 at 04-49-51 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-17 at 04-54-27 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-22 at 05-15-39 C-Kernel-Engine_site_nightly-results at gh-pages · antshiv_C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-22 at 05-20-39 antshiv_C-Kernel-Engine at gh-pages.png
-|   |-- Screenshot 2026-01-27 at 06-57-43 IR Visualizer C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-28 at 09-35-57 TestReport C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-28 at 18-53-50 VersionHistory C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-28 at 18-59-19 VersionHistory C-Kernel-Engine.png
-|   |-- Screenshot 2026-01-28 at 19-18-26 IR Visualizer C-Kernel-Engine.png
-|   |-- Screenshot 2026-02-01 at 20-15-28 IR Visualizer C-Kernel-Engine.png
-|   `-- Screenshot 2026-02-06 at 09-51-42 Qwen Optimization 60x to 1x vs llama.cpp.png
+|   `-- test-kernel-parity.cpp
 |-- scripts
 |   |-- test
 |   |   |-- compare_perf_results.py
@@ -2285,14 +1510,15 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- ck_model_smoke_v4.py
 |   |   |-- ck_run_v4.py
 |   |   |-- codegen_v4.py
-|   |   |-- convert_gguf_to_bump_v4_patched.py
 |   |   |-- convert_gguf_to_bump_v4.py
+|   |   |-- convert_gguf_to_bump_v4_patched.py
 |   |   |-- convert_hf_to_bump_v4.py
 |   |   |-- test_v4_q4k_pipeline.py
 |   |   `-- validate_bump_v4.py
 |   |-- v6
 |   |   |-- v3
 |   |   |-- v4
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- build_ir_v6.py
 |   |   |-- chat_template_utils.py
 |   |   |-- ck_model_smoke_v6.py
@@ -2307,7 +1533,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- fusion_patterns.py
 |   |   |-- inspect_weights_v6.py
 |   |   |-- parallel_planner.py
-|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- q4_k_quantize.py
 |   |   |-- quant_types.py
 |   |   |-- training_config.py
@@ -2315,6 +1540,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- v6.5
 |   |   |-- v3
 |   |   |-- v4
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- build_ir_v6_5.py
 |   |   |-- ck_model_smoke_v6_5.py
 |   |   |-- ck_run_v6_5.py
@@ -2330,7 +1556,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- inspect_weights_v6_5.py
 |   |   |-- parallel_planner.py
 |   |   |-- profile_inference.py
-|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- q4_k_quantize.py
 |   |   |-- quant_types.py
 |   |   |-- test_kernel_direct.py
@@ -2340,6 +1565,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- v6.6
 |   |   |-- v3
 |   |   |-- v4
+|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- build_ir_v6_6.py
 |   |   |-- ck_model_smoke_v6_6.py
 |   |   |-- ck_run_v6_6.py
@@ -2356,7 +1582,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- kernel_registry.py
 |   |   |-- parallel_planner.py
 |   |   |-- profile_inference.py
-|   |   |-- PROFILING_AND_OPTIMIZATION_PLAN.md
 |   |   |-- q4_k_quantize.py
 |   |   |-- quant_types.py
 |   |   |-- test_kernel_direct.py
@@ -2364,38 +1589,29 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- v6_6_ir_lowering.py
 |   |   `-- verify_test_bug.py
 |   |-- add_parallel_decode.sh
-|   |-- add_parity_dumps.py
 |   |-- analyze_parity.py
-|   |-- benchmark_avx512.sh
-|   |-- benchmark_vs_llamacpp.py
 |   |-- bench_mega_fused_attention_prefill.py
 |   |-- bench_mega_fused_outproj_mlp_prefill.py
 |   |-- bench_prefill_fused_mlp.py
 |   |-- bench_prefill_fused_qkv.py
+|   |-- benchmark_avx512.sh
+|   |-- benchmark_vs_llamacpp.py
 |   |-- build_ir_v5.py
 |   |-- build_ir_v5_wrapper_backup.py
 |   |-- build_model.py
-|   |-- check_ffn_norm_contract.py
-|   |-- check_post_attn_chain_prefill.py
-|   |-- check_post_attn_chain.py
-|   |-- check_qproj_contract.py
 |   |-- ck_chat.py
 |   |-- ck_chat_validated.py
 |   |-- ck_download.py
-|   |-- ck_dump_tokens.py
 |   |-- ck_run_v5.py
 |   |-- codegen_v5.py
-|   |-- compare_activations.py
 |   |-- compare_bump_payload.py
 |   |-- compare_bump_to_hf.py
 |   |-- compare_layer_llamacpp.py
 |   |-- compare_layer_outputs.py
 |   |-- compare_parity_huggingface.py
-|   |-- compare_perf.py
 |   |-- compare_runtime_parity.py
 |   |-- compare_single_thread.sh
 |   |-- compare_wq_weights.py
-|   |-- compile_model_v6_6.sh
 |   |-- comprehensive_test.sh
 |   |-- convert_any_gguf.py
 |   |-- convert_any_gguf.sh
@@ -2415,26 +1631,23 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- full_integration_testing.sh
 |   |-- fusion_pass.py
 |   |-- fusion_patterns.py
-|   |-- generate_test_report.py
 |   |-- gen_kernel_registry.py
 |   |-- gen_kernel_specs.py
 |   |-- gen_memory_layout.py
 |   |-- gen_random_bump.py
 |   |-- gen_random_tokens.py
+|   |-- generate_test_report.py
 |   |-- gguf_tokenizer.py
 |   |-- inspect_model.py
 |   |-- inspect_weights_v5.py
 |   |-- kernel_coverage.py
-|   |-- kernel_test_coverage.py
 |   |-- layer_sweep_parity.py
 |   |-- llama_dump_logits.c
 |   |-- llama_hack.c
-|   |-- llama_to_ckdmp_converter.py
 |   |-- measure_dram.sh
 |   |-- nightly_runner.py
 |   |-- optimization_status.py
 |   |-- parallel_planner.py
-|   |-- parity_autopsy.py
 |   |-- patch_bump_converter.py
 |   |-- patch_gguf_converter.py
 |   |-- perf_decode_simple.c
@@ -2447,11 +1660,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- profile_perf.py
 |   |-- q4_k_quantize.py
 |   |-- quant_types.py
-|   |-- quick_perf.py
-|   |-- roofline_analysis.py
 |   |-- run_all_tests.sh
 |   |-- run_full_validation.sh
-|   |-- run_gemma_first_divergence.sh
 |   |-- run_litmus_demo.sh
 |   |-- run_mega_fusion_test.sh
 |   |-- run_parity_smoketest.sh
@@ -2487,12 +1697,11 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_q_kernel_direct.py
 |   |-- test_q_projection.py
 |   |-- test_tensor_flow.py
-|   |-- test_training_fix.sh
 |   |-- test_training.py
+|   |-- test_training_fix.sh
 |   |-- tiny_train_parity.py
 |   |-- tokenizer_to_bump.py
 |   |-- training_config.py
-|   |-- validate_kernel_registry.py
 |   |-- validate_model.py
 |   |-- version_check.py
 |   |-- vocab_to_tokenizer.py
@@ -2502,146 +1711,150 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   `-- tries
 |   |-- kernels
 |   |   |-- fused
+|   |   |-- KERNEL_STATUS.md
+|   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
+|   |   |-- README.md
 |   |   |-- add_kernels_bf16.c
 |   |   |-- attention_decode_fused.c
 |   |   |-- attention_flash_true.c
 |   |   |-- attention_kernels.c
+|   |   |-- attention_kernels_sliding.c
 |   |   |-- axpy_kernels.c
 |   |   |-- dequant_kernels.c
-|   |   |-- embedding_kernels_bf16.c
 |   |   |-- embedding_kernels.c
+|   |   |-- embedding_kernels_bf16.c
 |   |   |-- fp16_convert.c
-|   |   |-- gelu_kernels_bf16.c
+|   |   |-- geglu_kernels.c
 |   |   |-- gelu_kernels.c
+|   |   |-- gelu_kernels_bf16.c
 |   |   |-- gemm_batch_int8.c
 |   |   |-- gemm_fused_kernels.c
 |   |   |-- gemm_head_major_output.c
+|   |   |-- gemm_kernels.c
 |   |   |-- gemm_kernels_amx.c
 |   |   |-- gemm_kernels_bf16.c
-|   |   |-- gemm_kernels.c
 |   |   |-- gemm_kernels_f16.c
 |   |   |-- gemm_kernels_q4_0.c
 |   |   |-- gemm_kernels_q4_1.c
-|   |   |-- gemm_kernels_q4k_avx.c
 |   |   |-- gemm_kernels_q4k.c
-|   |   |-- gemm_kernels_q4k_q8k_avx2.c
+|   |   |-- gemm_kernels_q4k_avx.c
 |   |   |-- gemm_kernels_q4k_q8k.c
+|   |   |-- gemm_kernels_q4k_q8k_avx2.c
 |   |   |-- gemm_kernels_q4k_q8k_vnni.c
 |   |   |-- gemm_kernels_q4k_sse.c
 |   |   |-- gemm_kernels_q5_0.c
 |   |   |-- gemm_kernels_q5_0_sse.c
 |   |   |-- gemm_kernels_q5_0_sse_v2.c
 |   |   |-- gemm_kernels_q5_1.c
+|   |   |-- gemm_kernels_q5_1_q8_1.c
 |   |   |-- gemm_kernels_q5_k.c
 |   |   |-- gemm_kernels_q6k.c
 |   |   |-- gemm_kernels_q6k_q8k.c
 |   |   |-- gemm_kernels_q6k_sse.c
 |   |   |-- gemm_kernels_q8_0.c
+|   |   |-- gemm_kernels_q8_0_q8_0_contract.c
 |   |   |-- gemm_microkernel.c
 |   |   |-- gemv_omp.c
 |   |   |-- gemv_omp.h
-|   |   |-- KERNEL_STATUS.md
 |   |   |-- kv_cache_kernels.c
-|   |   |-- layernorm_kernels_bf16.c
 |   |   |-- layernorm_kernels.c
-|   |   |-- loss_kernels_bf16.c
+|   |   |-- layernorm_kernels_bf16.c
 |   |   |-- loss_kernels.c
+|   |   |-- loss_kernels_bf16.c
 |   |   |-- mlp_fused_decode.c
-|   |   |-- mlp_kernels_bf16.c
 |   |   |-- mlp_kernels.c
-|   |   |-- optimizer_kernels_bf16.c
+|   |   |-- mlp_kernels_bf16.c
 |   |   |-- optimizer_kernels.c
-|   |   |-- Q5_0_Q8_0_KERNEL_PLAN.md
+|   |   |-- optimizer_kernels_bf16.c
 |   |   |-- qk_norm_kernels.c
 |   |   |-- quantize_row_q8_k_sse.c
-|   |   |-- README.md
-|   |   |-- relu_kernels_bf16.c
 |   |   |-- relu_kernels.c
-|   |   |-- rmsnorm_kernels_bf16.c
+|   |   |-- relu_kernels_bf16.c
 |   |   |-- rmsnorm_kernels.c
+|   |   |-- rmsnorm_kernels_bf16.c
 |   |   |-- rmsnorm_kernels_int4.c
 |   |   |-- rmsnorm_kernels_int8.c
-|   |   |-- rope_kernels_bf16.c
 |   |   |-- rope_kernels.c
-|   |   |-- sigmoid_kernels_bf16.c
+|   |   |-- rope_kernels_bf16.c
 |   |   |-- sigmoid_kernels.c
-|   |   |-- softmax_kernels_bf16.c
+|   |   |-- sigmoid_kernels_bf16.c
 |   |   |-- softmax_kernels.c
-|   |   |-- swiglu_kernels_bf16.c
+|   |   |-- softmax_kernels_bf16.c
 |   |   |-- swiglu_kernels.c
+|   |   |-- swiglu_kernels_bf16.c
 |   |   |-- topk_kernels.c
-|   |   |-- vision_kernels_bf16.c
-|   |   `-- vision_kernels.c
+|   |   |-- vision_kernels.c
+|   |   `-- vision_kernels_bf16.c
 |   |-- tokenizer
 |   |   |-- hash_table.c
 |   |   |-- memory_pool.c
 |   |   |-- murmurhash3.c
 |   |   |-- test_tokenizer.c
 |   |   |-- tokenizer.c
+|   |   |-- tokenizer_spm.c
 |   |   |-- true_bpe.c
 |   |   `-- utf8.c
 |   |-- v2_legacy
+|   |   |-- ck_tokenizer_v2.c
 |   |   |-- ckernel_codegen_v2.c
 |   |   |-- ckernel_codegen_v2_dispatch.c
 |   |   |-- ckernel_codegen_v2_emit.h
 |   |   |-- ckernel_codegen_v2_schedule.c
 |   |   |-- ckernel_codegen_v2_sections.c
 |   |   |-- ckernel_codegen_v2_struct.c
-|   |   |-- ckernel_ir_v2_builder.c
 |   |   |-- ckernel_ir_v2.c
+|   |   |-- ckernel_ir_v2_builder.c
 |   |   |-- ckernel_ir_v2_demo.c
-|   |   |-- ckernel_ir_v2_lower.c
-|   |   `-- ck_tokenizer_v2.c
+|   |   `-- ckernel_ir_v2_lower.c
 |   |-- v4_legacy
 |   |   `-- ckernel_model_load_v4.c
 |   |-- v6
 |   |   |-- scripts
-|   |   |-- build.sh
 |   |   |-- CHAT_TEMPLATE_BUMP_PLAN.md
 |   |   |-- CHAT_TEMPLATE_PLAN.md
-|   |   |-- ck_cli_v6.c
-|   |   |-- ck-engine-v6
-|   |   |-- ckernel_alloc_v6.c
-|   |   |-- ckernel_codegen_v6.c
-|   |   |-- ckernel_ir_v6.c
-|   |   |-- ck_format.md
-|   |   |-- ck_tokenizer_v6.c
 |   |   |-- CONTEXT_LIMIT_PLAN.md
 |   |   |-- SPECIAL_TOKENS_PLAN.md
 |   |   |-- STOP_TOKEN_TABLE_PLAN.md
 |   |   |-- UTF8_PLAN.md
+|   |   |-- build.sh
+|   |   |-- ck-engine-v6
+|   |   |-- ck_cli_v6.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.c
+|   |   |-- ckernel_alloc_v6.c
+|   |   |-- ckernel_codegen_v6.c
+|   |   |-- ckernel_ir_v6.c
 |   |   |-- v6_cli.c
 |   |   |-- v6_cli_todo.md
 |   |   |-- v6_inference.c
 |   |   |-- v6_pipeline.md
 |   |   `-- v6_simple.c
 |   |-- v6.5
-|   |   |-- generated
 |   |   |-- scripts
 |   |   |-- test_generated
 |   |   |-- 6.5_prorgess.md
 |   |   |-- 6.5_roadmap.md
+|   |   |-- INT8_ACTIVATION_PLAN.md
+|   |   |-- V6.5_UNIFIED_CLI_PLAN.md
 |   |   |-- build.sh
-|   |   |-- ck_cli_v6.5.c
 |   |   |-- ck-engine-v6.5
+|   |   |-- ck_cli_v6.5.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.5.c
 |   |   |-- ckernel_alloc_v6.5.c
 |   |   |-- ckernel_codegen_v6.5.c
 |   |   |-- ckernel_ir_v6.5.c
-|   |   |-- ck_format.md
-|   |   |-- ck_tokenizer_v6.5.c
-|   |   |-- INT8_ACTIVATION_PLAN.md
 |   |   |-- profiling.md
 |   |   |-- test_bump_tokenizer.c
 |   |   |-- test_generic_api.c
 |   |   |-- test_inference_with_bump_tokenizer.c
-|   |   |-- v6.5_cli.c
-|   |   |-- v6.5_cli_todo.md
 |   |   |-- v6.5_DEBUGGING_SUMMARY.md
 |   |   |-- v6.5_GIBBERISH_DEBUGGING_REPORT.md
+|   |   |-- v6.5_cli.c
+|   |   |-- v6.5_cli_todo.md
 |   |   |-- v6.5_inference.c
 |   |   |-- v6.5_pipeline.md
 |   |   |-- v6.5_simple.c
-|   |   |-- V6.5_UNIFIED_CLI_PLAN.md
 |   |   `-- v7_v15_roadmap.md
 |   |-- v6.6
 |   |   |-- generated
@@ -2650,41 +1863,45 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |   |-- test_generated
 |   |   |-- 6.6_prorgess.md
 |   |   |-- 6.6_roadmap.md
-|   |   |-- build.sh
-|   |   |-- ck_cli_v6.6.c
-|   |   |-- ck-engine-v6.6
-|   |   |-- ckernel_alloc_v6.6.c
-|   |   |-- ckernel_codegen_v6.6.c
-|   |   |-- ckernel_ir_v6.6.c
-|   |   |-- ck_format.md
-|   |   |-- ck_tokenizer_v6.6.c
 |   |   |-- FUSION_FINDINGS.md
 |   |   |-- IMPLEMENTATION_STATUS.md
 |   |   |-- INT8_ACTIVATION_PLAN.md
 |   |   |-- IR_FUSION_OPENMP_PLAN.md
 |   |   |-- MEMORY_BANDWIDTH_ANALYSIS.md
 |   |   |-- PARALLELISM_PLAN.md
+|   |   |-- TRUE_SIMD_FUSION_PLAN.md
+|   |   |-- V6.6_FUSION_PLAN.md
+|   |   |-- V6.6_UNIFIED_CLI_PLAN.md
+|   |   |-- build.sh
+|   |   |-- ck-engine-v6.6
+|   |   |-- ck_cli_v6.6.c
+|   |   |-- ck_format.md
+|   |   |-- ck_tokenizer_v6.6.c
+|   |   |-- ckernel_alloc_v6.6.c
+|   |   |-- ckernel_codegen_v6.6.c
+|   |   |-- ckernel_ir_v6.6.c
 |   |   |-- parallel_orchestration.c
 |   |   |-- profiling.md
 |   |   |-- test_bump_tokenizer.c
 |   |   |-- test_generic_api.c
 |   |   |-- test_inference_with_bump_tokenizer.c
-|   |   |-- TRUE_SIMD_FUSION_PLAN.md
+|   |   |-- v6.6_DEBUGGING_SUMMARY.md
+|   |   |-- v6.6_GIBBERISH_DEBUGGING_REPORT.md
 |   |   |-- v6.6_cli.c
 |   |   |-- v6.6_cli_todo.md
-|   |   |-- v6.6_DEBUGGING_SUMMARY.md
-|   |   |-- V6.6_FUSION_PLAN.md
-|   |   |-- v6.6_GIBBERISH_DEBUGGING_REPORT.md
 |   |   |-- v6.6_inference.c
 |   |   |-- v6.6_pipeline.md
 |   |   |-- v6.6_simple.c
-|   |   |-- V6.6_UNIFIED_CLI_PLAN.md
 |   |   `-- v7_v15_roadmap.md
 |   |-- v7
 |   |   |-- build.sh
 |   |   `-- v7_pipeline.md
 |   |-- backend_native.c
 |   |-- ck_cli_v5.c
+|   |-- ck_parity_api.c
+|   |-- ck_threadpool.c
+|   |-- ck_tokenizer.c
+|   |-- ck_tokenizer_v2.c
 |   |-- ckernel_alloc.c
 |   |-- ckernel_codegen.c
 |   |-- ckernel_ir.c
@@ -2696,15 +1913,9 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- ckernel_orchestration.c
 |   |-- ckernel_registry.c
 |   |-- ckernel_strict.c
-|   |-- ck_parity_api.c
-|   |-- ck_threadpool.c
-|   |-- ck_tokenizer.c
-|   |-- ck_tokenizer_v2.c
 |   |-- cpu_features.c
 |   |-- show_config.c
 |   `-- system_topology.c
-|-- test_results
-|   `-- mega_fused_test_report.json
 |-- tests
 |   |-- test_gemm_avx_bench.c
 |   |-- test_gemv_omp_parity.c
@@ -2737,32 +1948,32 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- fusion
 |   |   |-- test_gemm_vs_gemv.c
 |   |   |-- test_gemv_fused_quant_bias.py
+|   |   |-- test_mega_fused_attention.py
 |   |   |-- test_mega_fused_attention_prefill.py
 |   |   |-- test_mega_fused_attention_prefill_q8_0.py
-|   |   |-- test_mega_fused_attention.py
 |   |   |-- test_mega_fused_outproj_mlp_prefill.py
 |   |   |-- test_mega_fusion_outproj_mlp_parity.py
 |   |   `-- test_mega_fusion_parity.py
 |   |-- validation
+|   |   |-- __init__.py
 |   |   |-- auto_validate.py
 |   |   |-- base.py
 |   |   |-- gibberish_detector.py
-|   |   |-- __init__.py
 |   |   |-- kernel_registry.py
 |   |   |-- stage1_weight_validation.py
 |   |   |-- stage2_dimension_validation.py
 |   |   |-- stage3_single_layer.py
 |   |   `-- utils.py
+|   |-- REGRESSION_TESTS.md
 |   |-- bf16_utils.py
 |   |-- build_dequant_test.sh
 |   |-- compare_outputs.py
 |   |-- flash_attention_omp_wrapper.c
 |   |-- generate_reference_data.py
 |   |-- lib_loader.py
-|   |-- REGRESSION_TESTS.md
 |   |-- test_add.py
-|   |-- test_attention_backward.py
 |   |-- test_attention.py
+|   |-- test_attention_backward.py
 |   |-- test_attention_sliding.py
 |   |-- test_axpy.py
 |   |-- test_codegen_v4_single_layer.py
@@ -2772,8 +1983,8 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_debug_codegen.py
 |   |-- test_dequant_vs_llamacpp
 |   |-- test_dequant_vs_llamacpp.c
-|   |-- test_embedding_parity.py
 |   |-- test_embedding.py
+|   |-- test_embedding_parity.py
 |   |-- test_embedding_runtime.py
 |   |-- test_flash_attention.py
 |   |-- test_fused_attention_decode.py
@@ -2783,10 +1994,10 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_fusion_benchmark.py
 |   |-- test_geglu.py
 |   |-- test_gelu.py
+|   |-- test_gemm.py
 |   |-- test_gemm_batch_int8.py
 |   |-- test_gemm_fused.py
 |   |-- test_gemm_microkernel.py
-|   |-- test_gemm.py
 |   |-- test_gemm_variants.py
 |   |-- test_gemv_kernels_comprehensive.py
 |   |-- test_gemv_performance.c
@@ -2795,11 +2006,11 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_kv_cache_attention.py
 |   |-- test_kv_cache_layer_decode.py
 |   |-- test_layer_divergence.py
-|   |-- test_layernorm.py
 |   |-- test_layer_weights_parity.py
+|   |-- test_layernorm.py
 |   |-- test_lm_head_litmus.py
-|   |-- test_mlp_fusion_benchmark.py
 |   |-- test_mlp.py
+|   |-- test_mlp_fusion_benchmark.py
 |   |-- test_multi_layer_parity.py
 |   |-- test_optimizer.py
 |   |-- test_orchestration_layer.py
@@ -2808,32 +2019,32 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   |-- test_prefill_fused_mlp_quant.py
 |   |-- test_prefill_fused_rmsnorm_qkv_quant.py
 |   |-- test_pytorch_parity.py
-|   |-- test_q4k_debug.py
 |   |-- test_q4_k_dequant_match.py
-|   |-- test_q4k_kernels.py
 |   |-- test_q4_k_q8_k_matvec.py
 |   |-- test_q4_k_quantize.py
+|   |-- test_q4k_debug.py
+|   |-- test_q4k_kernels.py
 |   |-- test_q5_0_dequant_match.py
 |   |-- test_q5_0_parity.py
 |   |-- test_q6k_fused.py
 |   |-- test_q6k_kernels.py
 |   |-- test_q6k_q8k_parity.py
 |   |-- test_qk_norm.py
-|   |-- test_quantize_batch_parity.py
 |   |-- test_quant_kernels.py
 |   |-- test_quant_vs_llamacpp.py
+|   |-- test_quantize_batch_parity.py
 |   |-- test_relu.py
 |   |-- test_rmsnorm.py
 |   |-- test_rope.py
 |   |-- test_sigmoid.py
-|   |-- test_softmax_backward.py
 |   |-- test_softmax.py
+|   |-- test_softmax_backward.py
 |   |-- test_swiglu.py
+|   |-- test_tokenizer.py
 |   |-- test_tokenizer_full_parity.py
 |   |-- test_tokenizer_gguf_parity.py
 |   |-- test_tokenizer_llamacpp.py
 |   |-- test_tokenizer_multi_model.py
-|   |-- test_tokenizer.py
 |   |-- test_tokenizer_qwen_parity.py
 |   |-- test_tokenizer_spm_parity.py
 |   |-- test_tokenizer_spm_real.py
@@ -2847,7 +2058,6 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |   `-- validate_kernel.py
 |-- version
 |   `-- v6.6
-|       |-- cache
 |       |-- docs
 |       |-- include
 |       |-- kernel_maps
@@ -2858,369 +2068,23 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
 |       |-- test
 |       |-- tests
 |       |-- tools
-|       |-- unittest
-|       |-- DIRECTORY_FINALIZE_V6_6_PLAN.md
 |       |-- IR_FIX_RECOMMENDATIONS.md
 |       |-- MEMORY_PLANNING_SPEC.md
-|       |-- notes.txt
 |       |-- PIPELINE.md
-|       |-- prompt_init.txt
 |       |-- README.md
-|       |-- run_me.read.md
 |       |-- V6_5_VS_V6_6_COMPARISON.md
-|       `-- V6_6_UPGRADE_PLAN.md
-|-- vllm
-|   |-- benchmarks
-|   |   |-- attention_benchmarks
-|   |   |-- auto_tune
-|   |   |-- cutlass_benchmarks
-|   |   |-- disagg_benchmarks
-|   |   |-- fused_kernels
-|   |   |-- kernels
-|   |   |-- multi_turn
-|   |   |-- overheads
-|   |   |-- structured_schemas
-|   |   |-- backend_request_func.py
-|   |   |-- benchmark_batch_invariance.py
-|   |   |-- benchmark_block_pool.py
-|   |   |-- benchmark_hash.py
-|   |   |-- benchmark_latency.py
-|   |   |-- benchmark_long_document_qa_throughput.py
-|   |   |-- benchmark_ngram_proposer.py
-|   |   |-- benchmark_prefix_block_hash.py
-|   |   |-- benchmark_prefix_caching.py
-|   |   |-- benchmark_prioritization.py
-|   |   |-- benchmark_serving.py
-|   |   |-- benchmark_serving_structured_output.py
-|   |   |-- benchmark_throughput.py
-|   |   |-- benchmark_utils.py
-|   |   |-- README.md
-|   |   |-- run_structured_output_benchmark.sh
-|   |   `-- sonnet.txt
-|   |-- cmake
-|   |   |-- external_projects
-|   |   |-- cpu_extension.cmake
-|   |   |-- hipify.py
-|   |   `-- utils.cmake
-|   |-- csrc
-|   |   |-- attention
-|   |   |-- core
-|   |   |-- cpu
-|   |   |-- cutlass_extensions
-|   |   |-- mamba
-|   |   |-- moe
-|   |   |-- quantization
-|   |   |-- quickreduce
-|   |   |-- rocm
-|   |   |-- sparse
-|   |   |-- activation_kernels.cu
-|   |   |-- cache.h
-|   |   |-- cache_kernels.cu
-|   |   |-- cache_kernels_fused.cu
-|   |   |-- cub_helpers.h
-|   |   |-- cuda_compat.h
-|   |   |-- cuda_utils.h
-|   |   |-- cuda_utils_kernels.cu
-|   |   |-- cuda_view.cu
-|   |   |-- cumem_allocator_compat.h
-|   |   |-- cumem_allocator.cpp
-|   |   |-- custom_all_reduce.cu
-|   |   |-- custom_all_reduce.cuh
-|   |   |-- custom_all_reduce_test.cu
-|   |   |-- custom_quickreduce.cu
-|   |   |-- dispatch_utils.h
-|   |   |-- fused_qknorm_rope_kernel.cu
-|   |   |-- launch_bounds_utils.h
-|   |   |-- layernorm_kernels.cu
-|   |   |-- layernorm_quant_kernels.cu
-|   |   |-- ops.h
-|   |   |-- permute_cols.cu
-|   |   |-- pos_encoding_kernels.cu
-|   |   |-- sampler.cu
-|   |   |-- torch_bindings.cpp
-|   |   `-- type_convert.cuh
-|   |-- docker
-|   |   |-- docker-bake.hcl
-|   |   |-- Dockerfile
-|   |   |-- Dockerfile.cpu
-|   |   |-- Dockerfile.nightly_torch
-|   |   |-- Dockerfile.ppc64le
-|   |   |-- Dockerfile.rocm
-|   |   |-- Dockerfile.rocm_base
-|   |   |-- Dockerfile.s390x
-|   |   |-- Dockerfile.tpu
-|   |   |-- Dockerfile.xpu
-|   |   `-- versions.json
-|   |-- docs
-|   |   |-- api
-|   |   |-- assets
-|   |   |-- benchmarking
-|   |   |-- cli
-|   |   |-- community
-|   |   |-- configuration
-|   |   |-- contributing
-|   |   |-- deployment
-|   |   |-- design
-|   |   |-- examples
-|   |   |-- features
-|   |   |-- getting_started
-|   |   |-- governance
-|   |   |-- mkdocs
-|   |   |-- models
-|   |   |-- serving
-|   |   |-- training
-|   |   |-- usage
-|   |   `-- README.md
-|   |-- examples
-|   |   |-- offline_inference
-|   |   |-- online_serving
-|   |   |-- others
-|   |   |-- pooling
-|   |   |-- template_alpaca.jinja
-|   |   |-- template_baichuan.jinja
-|   |   |-- template_chatglm2.jinja
-|   |   |-- template_chatglm.jinja
-|   |   |-- template_chatml.jinja
-|   |   |-- template_dse_qwen2_vl.jinja
-|   |   |-- template_falcon_180b.jinja
-|   |   |-- template_falcon.jinja
-|   |   |-- template_inkbot.jinja
-|   |   |-- template_teleflm.jinja
-|   |   |-- template_vlm2vec_phi3v.jinja
-|   |   |-- template_vlm2vec_qwen2vl.jinja
-|   |   |-- tool_chat_template_deepseekr1.jinja
-|   |   |-- tool_chat_template_deepseekv31.jinja
-|   |   |-- tool_chat_template_deepseekv3.jinja
-|   |   |-- tool_chat_template_functiongemma.jinja
-|   |   |-- tool_chat_template_gemma3_pythonic.jinja
-|   |   |-- tool_chat_template_glm4.jinja
-|   |   |-- tool_chat_template_granite_20b_fc.jinja
-|   |   |-- tool_chat_template_granite.jinja
-|   |   |-- tool_chat_template_hermes.jinja
-|   |   |-- tool_chat_template_hunyuan_a13b.jinja
-|   |   |-- tool_chat_template_internlm2_tool.jinja
-|   |   |-- tool_chat_template_llama3.1_json.jinja
-|   |   |-- tool_chat_template_llama3.2_json.jinja
-|   |   |-- tool_chat_template_llama3.2_pythonic.jinja
-|   |   |-- tool_chat_template_llama4_json.jinja
-|   |   |-- tool_chat_template_llama4_pythonic.jinja
-|   |   |-- tool_chat_template_minimax_m1.jinja
-|   |   |-- tool_chat_template_mistral3.jinja
-|   |   |-- tool_chat_template_mistral.jinja
-|   |   |-- tool_chat_template_mistral_parallel.jinja
-|   |   |-- tool_chat_template_phi4_mini.jinja
-|   |   |-- tool_chat_template_qwen3coder.jinja
-|   |   |-- tool_chat_template_toolace.jinja
-|   |   |-- tool_chat_template_xlam_llama.jinja
-|   |   `-- tool_chat_template_xlam_qwen.jinja
-|   |-- requirements
-|   |   |-- build.txt
-|   |   |-- common.txt
-|   |   |-- cpu-build.txt
-|   |   |-- cpu.txt
-|   |   |-- cuda.txt
-|   |   |-- dev.txt
-|   |   |-- docs.txt
-|   |   |-- kv_connectors_rocm.txt
-|   |   |-- kv_connectors.txt
-|   |   |-- lint.txt
-|   |   |-- nightly_torch_test.txt
-|   |   |-- rocm-build.txt
-|   |   |-- rocm-test.txt
-|   |   |-- rocm.txt
-|   |   |-- test.in
-|   |   |-- test.txt
-|   |   |-- tpu.txt
-|   |   `-- xpu.txt
-|   |-- tests
-|   |   |-- basic_correctness
-|   |   |-- benchmarks
-|   |   |-- compile
-|   |   |-- config
-|   |   |-- cuda
-|   |   |-- detokenizer
-|   |   |-- distributed
-|   |   |-- engine
-|   |   |-- entrypoints
-|   |   |-- evals
-|   |   |-- kernels
-|   |   |-- lora
-|   |   |-- model_executor
-|   |   |-- models
-|   |   |-- multimodal
-|   |   |-- plugins
-|   |   |-- plugins_tests
-|   |   |-- prompts
-|   |   |-- quantization
-|   |   |-- reasoning
-|   |   |-- renderers
-|   |   |-- rocm
-|   |   |-- samplers
-|   |   |-- standalone_tests
-|   |   |-- system_messages
-|   |   |-- tokenizers_
-|   |   |-- tool_parsers
-|   |   |-- tools
-|   |   |-- tool_use
-|   |   |-- transformers_utils
-|   |   |-- utils_
-|   |   |-- v1
-|   |   |-- vllm_test_utils
-|   |   |-- weight_loading
-|   |   |-- ci_envs.py
-|   |   |-- conftest.py
-|   |   |-- __init__.py
-|   |   |-- test_access_log_filter.py
-|   |   |-- test_attention_backend_registry.py
-|   |   |-- test_config.py
-|   |   |-- test_embedded_commit.py
-|   |   |-- test_envs.py
-|   |   |-- test_inputs.py
-|   |   |-- test_logger.py
-|   |   |-- test_logprobs.py
-|   |   |-- test_outputs.py
-|   |   |-- test_pooling_params.py
-|   |   |-- test_regression.py
-|   |   |-- test_scalartype.py
-|   |   |-- test_seed_behavior.py
-|   |   |-- test_sequence.py
-|   |   |-- test_triton_utils.py
-|   |   |-- test_version.py
-|   |   |-- test_vllm_port.py
-|   |   `-- utils.py
-|   |-- tools
-|   |   |-- ep_kernels
-|   |   |-- pre_commit
-|   |   |-- profiler
-|   |   |-- vllm-rocm
-|   |   |-- vllm-tpu
-|   |   |-- check_repo.sh
-|   |   |-- flashinfer-build.sh
-|   |   |-- generate_cmake_presets.py
-|   |   |-- generate_versions_json.py
-|   |   |-- install_deepgemm.sh
-|   |   |-- install_gdrcopy.sh
-|   |   |-- install_nixl_from_source_ubuntu.py
-|   |   |-- install_torchcodec_rocm.sh
-|   |   `-- report_build_time_ninja.py
-|   |-- vllm
-|   |   |-- assets
-|   |   |-- benchmarks
-|   |   |-- compilation
-|   |   |-- config
-|   |   |-- device_allocator
-|   |   |-- distributed
-|   |   |-- engine
-|   |   |-- entrypoints
-|   |   |-- grpc
-|   |   |-- inputs
-|   |   |-- kernels
-|   |   |-- logging_utils
-|   |   |-- lora
-|   |   |-- model_executor
-|   |   |-- multimodal
-|   |   |-- platforms
-|   |   |-- plugins
-|   |   |-- profiler
-|   |   |-- ray
-|   |   |-- reasoning
-|   |   |-- renderers
-|   |   |-- third_party
-|   |   |-- tokenizers
-|   |   |-- tool_parsers
-|   |   |-- transformers_utils
-|   |   |-- triton_utils
-|   |   |-- usage
-|   |   |-- utils
-|   |   |-- v1
-|   |   |-- vllm_flash_attn
-|   |   |-- _aiter_ops.py
-|   |   |-- _bc_linter.py
-|   |   |-- beam_search.py
-|   |   |-- collect_env.py
-|   |   |-- connections.py
-|   |   |-- _custom_ops.py
-|   |   |-- env_override.py
-|   |   |-- envs.py
-|   |   |-- exceptions.py
-|   |   |-- forward_context.py
-|   |   |-- __init__.py
-|   |   |-- _ipex_ops.py
-|   |   |-- logger.py
-|   |   |-- logits_process.py
-|   |   |-- logprobs.py
-|   |   |-- model_inspection.py
-|   |   |-- outputs.py
-|   |   |-- pooling_params.py
-|   |   |-- py.typed
-|   |   |-- sampling_params.py
-|   |   |-- scalar_type.py
-|   |   |-- scripts.py
-|   |   |-- sequence.py
-|   |   |-- tasks.py
-|   |   |-- tracing.py
-|   |   `-- version.py
-|   |-- CMakeLists.txt
-|   |-- codecov.yml
-|   |-- CODE_OF_CONDUCT.md
-|   |-- CONTRIBUTING.md
-|   |-- DCO
-|   |-- LICENSE
-|   |-- MANIFEST.in
-|   |-- mkdocs.yaml
-|   |-- pyproject.toml
-|   |-- README.md
-|   |-- RELEASE.md
-|   |-- SECURITY.md
-|   |-- setup.py
-|   `-- use_existing_torch.py
-|-- add_int8_kernel.sh
-|-- agent_prompt.txt
-|-- benchmark_gemm_vs_fp32.py
-|-- blog-article-ai-workflow.html
-|-- check_mlp_down_buffers.sh
-|-- check.py
-|-- c-kernel-engine-power-infographic.svg
-|-- ck-kernel-inference-int8.c
-|-- config.json
+|       |-- V6_6_UPGRADE_PLAN.md
+|       |-- notes.txt
+|       |-- prompt_init.txt
+|       `-- run_me.read.md
 |-- CONTRIBUTING.md
-|-- debug_code.c
+|-- Makefile
+|-- config.json
 |-- default.config.json
 |-- default.json
-|-- divergence2.txt
-|-- divergence3.txt
-|-- divergence.txt
-|-- dump_llama_layer.cpp
-|-- interactive-infographic.html
-|-- llama.cpp_comparison_test.cpp
-|-- llamacpp-parity-full.txt
-|-- llamacpp-performance.txt
-|-- Makefile
-|-- model_v6_6.c
-|-- profile_vs_llamacpp.sh
-|-- quick_perf_compare.sh
-|-- README.md
-|-- requirements.txt
-|-- run_flamegraph_v6.sh
-|-- test_kernel_compare
-|-- test_kernel_compare.c
-|-- test_out.log
-|-- test_unroll_benchmark
-|-- test_unroll_benchmark.c
-|-- test_v65_detailed
-|-- test_v65_detailed.c
-|-- test_v66_detailed
-|-- test_v66_detailed.c
-|-- test_v66_runtime_load
-|-- test_v66_runtime_load.c
-|-- test_vs_llamacpp.cpp
-|-- v6.5-profile.svg
-|-- v6.6_performance.txt
-|-- v6.6_prompt.txt
-|-- valdiate_buffer.txt
-`-- valdiate_data_flow.txt
+`-- requirements.txt
 
-437 directories, 1538 files
+83 directories, 757 files
 </pre>
 </div>
 
@@ -3472,7 +2336,7 @@ make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-08</p>
             </div>
         </div>
     </footer>
