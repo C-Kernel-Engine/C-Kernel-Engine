@@ -456,3 +456,33 @@ If full refactor is too large, here's a minimal fix:
    - Allocate `residual` buffer
    - Copy input before layer processing
    - Add residual back at correct point
+
+---
+
+## Update (2026-02-09): Modern v6.6 Fixes Verified
+
+The issues called out above were re-checked against current `version/v6.6` scripts. The modern pipeline now fixes the two critical problems.
+
+**What was tested**
+- Used cached model manifest:
+  - `/home/antshiv/.cache/ck-engine-v6.6/models/unsloth--gemma-3-270m-it-GGUF/ck_build/weights_manifest.json`
+- Generated IR + layout + call-ready IR:
+  - `python3 version/v6.6/scripts/build_ir_v6_6.py --manifest=... --mode=decode --output=/tmp/ir1_decode.json --layout-output=/tmp/layout_decode.json --lowered-output=/tmp/lowered_decode.json --call-output=/tmp/lowered_decode_call.json`
+
+**Results**
+1. **Single bump allocation is now used**
+   - `version/v6.6/scripts/codegen_v6_6.py` allocates one `aligned_alloc` for `g_model->bump`, then slices weights/activations/kv/rope/logits from the same base pointer.
+   - This fixes the older multi-allocation fragmentation issue.
+
+2. **Activation offsets are no longer ignored**
+   - Call-ready IR now emits `model->bump + <macro/offset>` expressions with non-zero offsets.
+   - Sample check on `/tmp/lowered_decode_call.json`:
+     - 983 bump expressions, **zero** `model->bump + 0` cases.
+     - 228 unique offsets/macros (e.g., `A_EMBEDDED_INPUT`, `A_Q_SCRATCH`, `A_ATTN_SCRATCH`).
+
+3. **Shared scratch buffers remain by design**
+   - Buffers like `q_scratch`, `attn_scratch`, `mlp_scratch`, `layer_input`, `layer_output` are still shared, but residual handling is explicit via `residual_save` and a dedicated `residual` buffer.
+   - This is intentional, but still the most likely place for scheduling bugs if dataflow changes.
+
+**Conclusion**
+The modern v6.6 pipeline **does** fix the “6 separate allocs” and “activation offsets ignored” issues. The remaining caution is around shared scratch buffer correctness when the graph topology evolves.

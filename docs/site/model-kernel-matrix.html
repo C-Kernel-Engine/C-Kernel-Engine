@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeterministicMemory | C-Kernel-Engine</title>
+    <title>Model+KernelMatrix | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -928,348 +928,317 @@
     <main>
 
 <div class="container">
-  <h1>Deterministic Memory Layout</h1>
+  <h1>Model + Kernel Matrix</h1>
   <p class="lead">
-    Why static memory offsets matter, and what they enable for monitoring, debugging, and mechanistic interpretability.
+    A visual map of what the C Kernel Engine supports today (Qwen2, Qwen3, Gemma3)
+    and the kernel families that power them. This is grounded in our own templates,
+    IR lowering, and the GGUF test models we run locally.
   </p>
 
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">The Core Insight</h3>
-    <p>
-      C-Kernel-Engine generates C code with <strong>compile-time known memory offsets</strong>.
-      Every tensor, every weight, every activation has a fixed address that never changes between runs.
-    </p>
-    <p>
-      This isn't just an implementation detail&mdash;it's a fundamental architectural choice that unlocks
-      capabilities impossible in dynamic frameworks like PyTorch or JAX.
-    </p>
-  </div>
-
-  <h2>Why Deterministic Memory?</h2>
-
-  <div class="svg-diagram">
-    <img src="assets/comparison-diagram.svg" alt="Dynamic vs Deterministic Memory Comparison" style="width: 100%; max-width: 900px; margin: 0 auto; display: block;">
-  </div>
-
-  <div class="grid-2" style="margin-top: 2rem;">
-    <div class="card">
-      <h3>Dynamic Frameworks (PyTorch)</h3>
-      <ul>
-        <li>Memory allocated at runtime</li>
-        <li>Addresses change every run</li>
-        <li>Need hooks to observe tensors</li>
-        <li>Hooks add overhead to training</li>
-        <li>Can't observe without perturbing</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>C-Kernel-Engine</h3>
-      <ul>
-        <li>Memory layout computed at compile time</li>
-        <li>Same offsets every run</li>
-        <li>Direct memory access via RDMA</li>
-        <li>Zero overhead observation</li>
-        <li>Observe without disturbing compute</li>
-      </ul>
-    </div>
-  </div>
-
-  <h2>The Layout JSON: Your Memory Address Book</h2>
-
-  <p>
-    When you generate code with <code>build_ir_v4.py</code>, you also get a <code>layout.json</code>
-    that maps every tensor to its exact memory location:
-  </p>
-
-  <pre><code class="language-json">{
-  "model": "Qwen2-0.5B",
-  "layers": {
-    "layer_15": {
-      "attn_q": {"offset": "0x0A2400", "size": 1605632, "dtype": "bf16"},
-      "attn_k": {"offset": "0x0A4800", "size": 1605632, "dtype": "bf16"},
-      "attn_v": {"offset": "0x0A6C00", "size": 1605632, "dtype": "bf16"},
-      "mlp_gate": {"offset": "0x0B2000", "size": 3211264, "dtype": "q4_k"}
+  <style>
+    .matrix-hero {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
     }
-  }
-}</code></pre>
+    .model-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .model-badge {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: #15202b;
+      color: #9ed6ff;
+      border: 1px solid #22313f;
+    }
+    .model-title {
+      margin: 0.25rem 0 0.5rem;
+      font-size: 1.3rem;
+      color: var(--orange);
+      font-weight: 700;
+    }
+    .model-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    .tag {
+      background: #0f151c;
+      border: 1px solid #263242;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+    .matrix-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: 160px repeat(8, minmax(110px, 1fr));
+      gap: 0.4rem;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .matrix-grid .cell {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      padding: 0.5rem 0.6rem;
+      text-align: center;
+    }
+    .matrix-grid .row-head {
+      text-align: left;
+      font-weight: 700;
+      color: var(--orange);
+    }
+    .ok {
+      color: #47b475;
+      font-weight: 700;
+    }
+    .warn {
+      color: #ffb400;
+      font-weight: 700;
+    }
+    .dim {
+      color: var(--text-muted);
+    }
+    .kernel-list {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .kernel-chip {
+      background: #121a24;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+      color: var(--text-secondary);
+    }
+    .quant-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .qchip {
+      background: #151f2b;
+      border: 1px solid #2b3a4a;
+      color: #9ed6ff;
+      border-radius: 6px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.78rem;
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .test-item {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+    }
+    .roadmap {
+      margin-top: 1.2rem;
+      background: #0d141b;
+      border: 1px dashed #2a3a4f;
+      border-radius: 10px;
+      padding: 1rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .roadmap strong {
+      color: var(--orange);
+    }
+  </style>
 
-  <p>
-    This "address book" is the key to everything that follows. You can point to any tensor by name
-    and know exactly where it lives in memory.
-  </p>
-
-  <div class="svg-diagram" style="margin: 2rem 0;">
-    <img src="assets/memory-layout-map.svg" alt="Model Memory Layout Map" style="width: 100%; max-width: 800px; margin: 0 auto; display: block;">
+  <div class="matrix-hero">
+    <div class="model-card">
+      <span class="model-badge">Template: qwen2.json</span>
+      <div class="model-title">Qwen2</div>
+      <div class="dim">RMSNorm + RoPE + SwiGLU</div>
+      <div class="model-tags">
+        <span class="tag">QKV bias: from weights</span>
+        <span class="tag">Tokenizer: BPE</span>
+        <span class="tag">Activation: SwiGLU</span>
+        <span class="tag">Attention: full</span>
+      </div>
+    </div>
+    <div class="model-card">
+      <span class="model-badge">Template: qwen3.json</span>
+      <div class="model-title">Qwen3</div>
+      <div class="dim">RMSNorm + RoPE + QK‑Norm + SwiGLU</div>
+      <div class="model-tags">
+        <span class="tag">QKV bias: no</span>
+        <span class="tag">Tokenizer: BPE</span>
+        <span class="tag">Activation: SwiGLU</span>
+        <span class="tag">QK‑Norm: yes</span>
+      </div>
+    </div>
+    <div class="model-card">
+      <span class="model-badge">Template: gemma3.json</span>
+      <div class="model-title">Gemma3</div>
+      <div class="dim">RMSNorm + RoPE + QK‑Norm + GeGLU + Sliding Window</div>
+      <div class="model-tags">
+        <span class="tag">Tokenizer: SentencePiece</span>
+        <span class="tag">Attention: sliding</span>
+        <span class="tag">Post‑Norms: yes</span>
+        <span class="tag">Prefer Q8_0 contract</span>
+      </div>
+    </div>
   </div>
 
-  <h2>What This Enables</h2>
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Kernel Families by Model</h2>
+    <div class="matrix-grid">
+      <div class="cell row-head">Model</div>
+      <div class="cell">Tokenizer</div>
+      <div class="cell">QKV Bias</div>
+      <div class="cell">QK‑Norm</div>
+      <div class="cell">RoPE</div>
+      <div class="cell">Attention</div>
+      <div class="cell">MLP</div>
+      <div class="cell">Post‑Norms</div>
+      <div class="cell">Logits</div>
 
-  <h3>1. Zero-Overhead RDMA Monitoring</h3>
+      <div class="cell row-head">Qwen2</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Causal</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
 
-  <div class="card">
-    <p>
-      RDMA (Remote Direct Memory Access) supports <strong>one-sided operations</strong>. An observer
-      can read memory from compute nodes without those nodes even knowing it happened&mdash;no interrupts,
-      no CPU involvement, no overhead on training.
+      <div class="cell row-head">Qwen3</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Causal</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">LM head</div>
+
+      <div class="cell row-head">Gemma3</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Sliding</div>
+      <div class="cell ok">GeGLU</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Tied</div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">IR + Quant Contracts</h2>
+    <div class="matrix-grid">
+      <div class="cell row-head">Model</div>
+      <div class="cell">Embed Scale</div>
+      <div class="cell">Prefer Q8 Contract</div>
+      <div class="cell">Prefer FP32 Logits</div>
+      <div class="cell">Tokenizer I/O</div>
+      <div class="cell">Attention Kernel</div>
+      <div class="cell">MLP Kernel</div>
+      <div class="cell">Residual Save</div>
+      <div class="cell">LM Head Tie</div>
+
+      <div class="cell row-head">Qwen2</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Qwen3</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn + qk_norm</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
+      <div class="cell row-head">Gemma3</div>
+      <div class="cell ok">sqrt(dim)</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">attn_sliding</div>
+      <div class="cell ok">geglu</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Supported Quant + DType Coverage</h2>
+    <p style="margin-top: 0.6rem; color: var(--text-secondary);">
+      We target weight‑only quantized GEMM/GEMV kernels with BF16/FP32 activations and Q8_* activation contracts.
+      This is the quant palette used by our GGUF conversions and kernel registry.
     </p>
-
-    <div class="svg-diagram" style="margin: 1.5rem 0;">
-      <img src="assets/rdma-observer-architecture.svg" alt="RDMA Observer Architecture" style="width: 100%; max-width: 900px; margin: 0 auto; display: block;">
+    <div class="quant-badges">
+      <span class="qchip">Q4_0</span>
+      <span class="qchip">Q4_1</span>
+      <span class="qchip">Q4_K</span>
+      <span class="qchip">Q5_0</span>
+      <span class="qchip">Q5_1</span>
+      <span class="qchip">Q5_K</span>
+      <span class="qchip">Q6_K</span>
+      <span class="qchip">Q8_0</span>
+      <span class="qchip">Q8_K</span>
+      <span class="qchip">BF16</span>
+      <span class="qchip">FP32</span>
     </div>
 
-    <p>
-      The observer laptop can sample any tensor at any rate (1Hz, 10Hz, 100Hz) without
-      affecting training throughput. Traditional logging requires compute nodes to serialize
-      and send data&mdash;that's overhead you can't avoid.
-    </p>
+    <div class="kernel-list">
+      <div class="kernel-chip"><strong>GEMV:</strong> q4_k, q5_0, q5_1, q5_k, q6_k, q8_0, fp32</div>
+      <div class="kernel-chip"><strong>GEMM:</strong> q4_k, q5_0, q5_k, q6_k, q8_0, fp32</div>
+      <div class="kernel-chip"><strong>Activations:</strong> fp32, bf16, q8_0, q8_k</div>
+      <div class="kernel-chip"><strong>Fused:</strong> attention + outproj + MLP (prefill) variants</div>
+    </div>
   </div>
 
-  <h3>2. Live Tensor Inspector</h3>
-
-  <div class="card">
-    <pre>
-┌─────────────────────────────────────────────────────────┐
-│ Layer 15 Attention                                      │
-├─────────────────────────────────────────────────────────┤
-│ Q [0x0A2400 - 0x0A4800]  896×896 bf16  ████████░░ 2.1ms │
-│ K [0x0A4800 - 0x0A6C00]  896×896 bf16  ██████████ 1.8ms │
-│ V [0x0A6C00 - 0x0A9000]  896×896 bf16  ███░░░░░░░ 0.4ms │
-│ Scores [0x0A9000]        896×896 f32   computing...     │
-└─────────────────────────────────────────────────────────┘
-    </pre>
-    <p>
-      Click any tensor to see values, histograms, NaN detection. Because memory layout is static,
-      these offsets work across runs&mdash;you can compare the same tensor position across different
-      training experiments.
-    </p>
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Current GGUF Test Corpus</h2>
+    <div class="test-grid">
+      <div class="test-item">Qwen--Qwen2-0.5B-Instruct-GGUF</div>
+      <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
+      <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
+    </div>
   </div>
 
-  <h3>3. Pipeline Parallel Visualization</h3>
-
-  <div class="card">
-    <pre>
-Node 0 (Layers 0-7)    Node 1 (Layers 8-15)   Node 2 (Layers 16-23)
-┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ █ Micro-batch 0  │──▶│ █ Micro-batch 0  │──▶│ ░ waiting        │
-│ █ Micro-batch 1  │   │ ░ Micro-batch 1  │   │                  │
-│ ░ Micro-batch 2  │   │                  │   │                  │
-└──────────────────┘   └──────────────────┘   └──────────────────┘
-  RDMA: 12.4 GB/s        RDMA: 11.8 GB/s
-    </pre>
-    <p>
-      For distributed training, you know exactly which bytes transfer between nodes. Track
-      pipeline bubble efficiency in real-time without any instrumentation overhead.
-    </p>
-  </div>
-
-  <h3>4. Checkpoint Diff Tool</h3>
-
-  <div class="card">
-    <pre><code class="language-bash">ck-diff checkpoint_step1000.bump checkpoint_step2000.bump
-
-Layer 15 MLP Gate [0x0B2000]:
-  Step 1000: mean=-0.0012, std=0.0234
-  Step 2000: mean=-0.0018, std=0.0241
-  Delta:     mean=-0.0006, std=+0.0007  ✓ healthy
-
-Layer 23 Output [0x2A0000]:
-  WARNING: std increased 3x - possible gradient explosion</code></pre>
-    <p>
-      Compare checkpoints byte-by-byte. Because layout is deterministic, offset 0x0B2000 means
-      the same thing in both files.
-    </p>
-  </div>
-
-  <h3>5. Deterministic Replay Debugging</h3>
-
-  <div class="card">
-    <p>
-      Since memory layout is static:
-    </p>
-    <ul>
-      <li>Record input tokens + random seeds</li>
-      <li>Replay exact same forward pass</li>
-      <li>Step through layer-by-layer with known offsets</li>
-      <li>Compare across runs (impossible in PyTorch where allocations differ)</li>
-    </ul>
-  </div>
-
-  <h2>Mechanistic Interpretability</h2>
-
-  <p>
-    This is where deterministic memory becomes transformative. Mechanistic interpretability
-    research aims to understand <em>how</em> neural networks actually work internally.
-    The field struggles because frameworks hide everything behind abstractions.
-  </p>
-
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">The Interpretability Unlock</h3>
-    <table>
-      <tr>
-        <th>Traditional Approach</th>
-        <th>With C-Kernel-Engine</th>
-      </tr>
-      <tr>
-        <td>"What's attention head 7 doing?"<br>→ Add hooks, slow down training</td>
-        <td><code>layer_15_head_7 @ 0x0A2400</code><br>→ RDMA read, zero overhead</td>
-      </tr>
-      <tr>
-        <td>"Patch this activation"<br>→ Framework gymnastics</td>
-        <td><code>memcpy(0x0A2400, patch, size)</code><br>→ Direct memory write</td>
-      </tr>
-      <tr>
-        <td>"Trace information flow"<br>→ Black box</td>
-        <td>Follow the offsets in layout.json<br>→ Explicit dataflow graph</td>
-      </tr>
-    </table>
-  </div>
-
-  <h3>Live Circuit Discovery</h3>
-
-  <pre><code class="language-python"># While training is running, observe attention patterns
-for layer in range(24):
-    for head in range(14):
-        attn = rdma_read(f"layer_{layer}_head_{head}_scores")
-        if attn[query_pos, key_pos] > 0.8:
-            print(f"Strong connection: L{layer}H{head}")</code></pre>
-
-  <p>No hooks. No slowdown. Just read memory.</p>
-
-  <h3>Activation Patching at Scale</h3>
-
-  <pre><code class="language-python"># Causal intervention: "What happens if we zero this head?"
-original = rdma_read(node=0, offset=LAYER_15_HEAD_7)
-rdma_write(node=0, offset=LAYER_15_HEAD_7, data=zeros)
-# Observe effect on output
-rdma_write(node=0, offset=LAYER_15_HEAD_7, data=original)  # Restore</code></pre>
-
-  <h3>Neuron-Level Probing</h3>
-
-  <pre>
-Layer 15, Neuron 847:
-  Activates strongly on: "capital cities", "country names"
-  Offset: 0x0B2400 + 847*4
-  Historical max: 12.4 (on token "Paris")
-  Current: 0.02
-  </pre>
-
-  <h3>Gradient Attribution</h3>
-
-  <pre>
-"Which weights most affected this prediction?"
-
-∂Loss/∂W for every weight, at known offsets:
-  layer_15_mlp_gate[0x0B2000]: 0.0023  ← high attribution
-  layer_15_mlp_up[0x0B4000]:   0.0001  ← low
-  layer_22_attn_o[0x1A2000]:   0.0089  ← highest!
-  </pre>
-
-  <h2>Comparison with Traditional Approaches</h2>
-
-  <table>
-    <tr>
-      <th>Capability</th>
-      <th>Dynamic Framework</th>
-      <th>C-Kernel-Engine</th>
-    </tr>
-    <tr>
-      <td>Memory layout</td>
-      <td>Changes every run</td>
-      <td>Fixed at compile time</td>
-    </tr>
-    <tr>
-      <td>Observability</td>
-      <td>Hooks (add overhead)</td>
-      <td>Direct RDMA read (zero overhead)</td>
-    </tr>
-    <tr>
-      <td>Activation patching</td>
-      <td>Slow, framework-specific</td>
-      <td>Direct memory write</td>
-    </tr>
-    <tr>
-      <td>Probing classifiers</td>
-      <td>Offline analysis</td>
-      <td>Real-time</td>
-    </tr>
-    <tr>
-      <td>Attention visualization</td>
-      <td>Post-hoc</td>
-      <td>Live during training</td>
-    </tr>
-    <tr>
-      <td>Circuit tracing</td>
-      <td>Manual, tedious</td>
-      <td>Automated via layout.json</td>
-    </tr>
-    <tr>
-      <td>Reproducibility</td>
-      <td>Difficult (allocation varies)</td>
-      <td>Guaranteed (same offsets)</td>
-    </tr>
-  </table>
-
-  <h2>The Observer Architecture</h2>
-
-  <p>
-    A third machine (laptop, monitoring server) can observe training clusters via RDMA
-    without affecting their performance:
-  </p>
-
-  <div class="card">
-    <pre><code class="language-python"># observer.py - runs on separate machine
-class TrainingObserver:
-    def __init__(self, nodes, layout_json):
-        self.layout = load_layout(layout_json)  # Static offsets!
-        self.rdma = RDMAConnection(nodes)
-
-    def sample_gradients(self, layer):
-        offset = self.layout[f"layer_{layer}"]["grad_offset"]
-        size = self.layout[f"layer_{layer}"]["grad_size"]
-
-        # One-sided read - compute node doesn't notice
-        data = self.rdma.read(node=layer // 12, offset=offset, size=size)
-        return np.frombuffer(data, dtype=np.float32)
-
-    def check_for_nans(self):
-        for layer in range(24):
-            grad = self.sample_gradients(layer)
-            if np.isnan(grad).any():
-                alert(f"NaN detected in layer {layer}!")</code></pre>
-  </div>
-
-  <h2>The Philosophy</h2>
-
-  <blockquote>
-    "We can't interpret what we can't see."
-  </blockquote>
-
-  <p>
-    Dynamic frameworks hide computation behind layers of abstraction. The memory allocator
-    decides where tensors live. Hooks and callbacks add overhead to observe what's happening.
-  </p>
-
-  <p>
-    C-Kernel-Engine takes the opposite approach: <strong>everything is explicit</strong>.
-    The generated C code shows exactly what computation happens. The layout.json shows
-    exactly where every tensor lives. RDMA lets you observe without disturbing.
-  </p>
-
-  <p>
-    This doesn't solve interpretability&mdash;the science is still hard. But it removes
-    the <em>infrastructure barriers</em> that make interpretability research difficult.
-    When you can see everything, you can start to understand everything.
-  </p>
-
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">Summary</h3>
-    <ul>
-      <li><strong>Deterministic layout</strong> → Reproducible experiments, same offsets every run</li>
-      <li><strong>Zero-overhead observation</strong> → Don't perturb what you measure</li>
-      <li><strong>Explicit computation</strong> → No hidden framework magic</li>
-      <li><strong>Known offsets</strong> → Point to any neuron, any layer, any time</li>
-      <li><strong>RDMA observer</strong> → Separate monitoring from compute</li>
-    </ul>
+  <div class="roadmap">
+    <strong>Growth path:</strong> v6.6 locks inference parity and kernel coverage (Qwen2/Qwen3/Gemma3). v7 targets full training:
+    backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules. This page will evolve into a
+    single matrix that shows inference + training coverage per model family.
   </div>
 </div>
     </main>
