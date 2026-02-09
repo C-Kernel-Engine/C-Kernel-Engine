@@ -295,6 +295,9 @@ class CKModel:
         if mode == "qwen":
             self.use_chat_template = True
             return
+        if mode == "gemma":
+            self.use_chat_template = True
+            return
 
         # Auto mode: require chat_template metadata + instruct finetune
         meta = self._load_model_meta()
@@ -512,12 +515,24 @@ class CKModel:
             return user_message
 
         if system_prompt is None:
-            system_prompt = "You are a helpful assistant."
+            # Qwen ChatML usually benefits from an explicit system prompt.
+            # Gemma chat templates are commonly used without one.
+            system_prompt = "" if self.chat_template_mode == "gemma" else "You are a helpful assistant."
 
-        prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        prompt += f"<|im_start|>user\n{user_message}<|im_end|>\n"
-        prompt += "<|im_start|>assistant\n"
-        return prompt
+        if self.chat_template_mode == "qwen":
+            prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+            prompt += f"<|im_start|>user\n{user_message}<|im_end|>\n"
+            prompt += "<|im_start|>assistant\n"
+            return prompt
+
+        if self.chat_template_mode == "gemma":
+            user_block = f"{system_prompt}\n\n{user_message}" if system_prompt else user_message
+            prompt = "<bos>"
+            prompt += f"<start_of_turn>user\n{user_block}<end_of_turn>\n"
+            prompt += "<start_of_turn>model\n"
+            return prompt
+
+        return user_message
 
     def forward(self, token_ids: list) -> np.ndarray:
         """Run forward pass and return logits for last position."""
@@ -622,11 +637,13 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     start_time = time.time()
 
     if model.has_kv_decode and model.kv_cache_enable():
+        # Each generate() call is a fresh prompt pass.
+        # Reset KV state so prior turns do not leak into the new prefill/decode.
+        model.kv_cache_reset()
         # KV-cache path: prefill once, then decode token-by-token.
         t0 = time.time()
         if no_prefill:
             # Slow path: feed prompt tokens via decode to avoid prefill crashes
-            model.kv_cache_reset()
             logits = None
             for idx, tok in enumerate(token_ids):
                 model.set_parity_token_index(idx)
@@ -858,8 +875,8 @@ def main():
                        help="Disable prefill; feed prompt tokens via decode (slow)")
     parser.add_argument("--python-tokenizer", action="store_true",
                        help="Force Python tokenizer instead of C tokenizer")
-    parser.add_argument("--chat-template", choices=["auto", "none", "qwen"], default="auto",
-                       help="Chat template mode: auto (from GGUF), none, or qwen")
+    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "gemma"], default="auto",
+                       help="Chat template mode: auto (from GGUF), none, qwen, or gemma")
     parser.add_argument("--no-chat-template", action="store_true",
                        help="Disable chat template formatting (same as --chat-template=none)")
     args = parser.parse_args()

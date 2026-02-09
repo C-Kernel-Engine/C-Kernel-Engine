@@ -112,6 +112,58 @@ def run_cmd_allow_fail(cmd: list, cwd: Path = None) -> subprocess.CompletedProce
     return subprocess.run(cmd, cwd=cwd)
 
 
+def _sync_runtime_lib(src: Path, dst: Path, label: str) -> None:
+    """Copy runtime shared library into model dir, overwriting stale copies."""
+    if not src.exists():
+        return
+    try:
+        # Always overwrite: stale sidecar libs in cache can segfault after refactors.
+        shutil.copy2(src, dst)
+        log(f"  Refreshed {label} at {dst}", C_DIM)
+    except Exception as e:
+        log(f"  Warning: failed to refresh {label}: {e}", C_ORANGE)
+
+
+def _detect_default_ck_threads() -> int:
+    """Best-effort physical core count with sensible fallback."""
+    logical = None
+    try:
+        logical = len(os.sched_getaffinity(0))
+    except Exception:
+        logical = os.cpu_count() or 1
+
+    physical = 0
+    try:
+        pairs = set()
+        phys_id = None
+        core_id = None
+        with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    if phys_id is not None and core_id is not None:
+                        pairs.add((phys_id, core_id))
+                    phys_id = None
+                    core_id = None
+                    continue
+                if line.startswith("physical id"):
+                    phys_id = int(line.split(":", 1)[1].strip())
+                elif line.startswith("core id"):
+                    core_id = int(line.split(":", 1)[1].strip())
+        if phys_id is not None and core_id is not None:
+            pairs.add((phys_id, core_id))
+        physical = len(pairs)
+    except Exception:
+        physical = 0
+
+    # Match C-side behavior: if physical core detection is unreliable, use logical.
+    if physical <= 1 and (logical or 1) > 1:
+        return int(logical)
+    if physical > 1:
+        return min(int(physical), int(logical or physical))
+    return int(logical or 1)
+
+
 def load_manifest_non_fp_dtypes(manifest_path: Path) -> set[str]:
     """Return non-FP dtype set from a v4 weights manifest."""
     try:
@@ -727,7 +779,13 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
     return ir1_paths.get("decode", ir1_paths[target_modes[0]])
 
 
-def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False, profile: bool = False) -> Path:
+def step_codegen(
+    ir1_path: Path,
+    output_dir: Path,
+    force: bool = False,
+    profile: bool = False,
+    dump: bool = False,
+) -> Path:
     """Generate v6.6 C code from lowered IR.
 
     The lowered IR contains everything needed for codegen:
@@ -780,6 +838,8 @@ def step_codegen(ir1_path: Path, output_dir: Path, force: bool = False, profile:
     ]
     if profile:
         cmd.append("--profile")
+    if dump:
+        cmd.append("--parity-dump")
     # Filter empty args
     cmd = [c for c in cmd if c]
 
@@ -796,6 +856,7 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     # Output library name (ck_chat.py expects libmodel.so or ck-kernel-inference.so)
     lib_path = output_dir / "libmodel.so"
     kernel_lib = BUILD_DIR / "libckernel_engine.so"
+    tokenizer_lib = BUILD_DIR / "libckernel_tokenizer.so"
 
     log(f"  Source: {model_c_path}", C_DIM)
     log(f"  Lines: {sum(1 for _ in open(model_c_path))}", C_DIM)
@@ -847,8 +908,10 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         str(v66_src / "ck_parallel_prefill.c"),  # Thread-pool parallel GEMM dispatch (prefill)
         f"-L{BUILD_DIR}",
         f"-L{output_dir}",  # Also look in output_dir for libckernel_engine.so
-        "-lckernel_engine",
         "-lckernel_tokenizer",  # BPE tokenizer library
+        # Keep tokenizer before engine: both export legacy ck_tokenizer_* symbols,
+        # and Gemma's generated code must bind to the tokenizer ABI.
+        "-lckernel_engine",
         "-lm",
         f"-Wl,-rpath,$ORIGIN",  # Use $ORIGIN so library can find deps in same dir
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -857,6 +920,9 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     # Add profiling define if requested
     if os.environ.get("CK_PROFILE") == "1":
         cmd.append("-DCK_PROFILE")
+    # Enable ck_dump_tensor instrumentation in generated C when requested.
+    if os.environ.get("CK_PARITY_DUMP") == "1":
+        cmd.append("-DCK_PARITY_DUMP")
 
     log(f"  Compiling...", C_DIM)
     try:
@@ -864,6 +930,8 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             log(f"  Compiled: {lib_path}", C_GREEN)
+            _sync_runtime_lib(kernel_lib, output_dir / "libckernel_engine.so", "libckernel_engine.so")
+            _sync_runtime_lib(tokenizer_lib, output_dir / "libckernel_tokenizer.so", "libckernel_tokenizer.so")
             # Create symlink for ck-kernel-inference.so (legacy name)
             symlink_path = output_dir / "ck-kernel-inference.so"
             try:
@@ -1169,28 +1237,28 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
 
     # Ensure libckernel_engine.so is findable
     kernel_lib = BUILD_DIR / "libckernel_engine.so"
-    if kernel_lib.exists():
-        # Copy to model dir so it's always available
-        dst_lib = model_dir / "libckernel_engine.so"
-        if not dst_lib.exists():
-            import shutil
-            shutil.copy(kernel_lib, dst_lib)
-            log(f"  Copied libckernel_engine.so to {model_dir}", C_DIM)
+    dst_lib = model_dir / "libckernel_engine.so"
+    _sync_runtime_lib(kernel_lib, dst_lib, "libckernel_engine.so")
 
     # Ensure libckernel_tokenizer.so is findable (for BPE tokenizer)
     tokenizer_lib = BUILD_DIR / "libckernel_tokenizer.so"
-    if tokenizer_lib.exists():
-        dst_tok = model_dir / "libckernel_tokenizer.so"
-        if not dst_tok.exists():
-            import shutil
-            shutil.copy(tokenizer_lib, dst_tok)
-            log(f"  Copied libckernel_tokenizer.so to {model_dir}", C_DIM)
+    dst_tok = model_dir / "libckernel_tokenizer.so"
+    _sync_runtime_lib(tokenizer_lib, dst_tok, "libckernel_tokenizer.so")
 
     if kernel_lib.exists():
         # Also set LD_LIBRARY_PATH for the subprocess
         ld_path = str(BUILD_DIR)
         current_ld = os.environ.get("LD_LIBRARY_PATH", "")
         os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{model_dir}:{current_ld}"
+
+    # Threading policy:
+    # - CK threadpool handles parallelism (CK_NUM_THREADS).
+    # - Leave OpenMP effectively serial by default to avoid oversubscription/races.
+    #   Users can still override explicitly in their shell env.
+    if not os.environ.get("CK_NUM_THREADS"):
+        os.environ["CK_NUM_THREADS"] = str(_detect_default_ck_threads())
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("OMP_DYNAMIC", "FALSE")
 
     cmd = [
         sys.executable,
@@ -1201,7 +1269,7 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
 
     if gguf_path:
         cmd.extend(["--gguf", str(gguf_path)])
-    if args.temperature:
+    if args.temperature is not None:
         cmd.extend(["--temperature", str(args.temperature)])
     if args.max_tokens:
         cmd.extend(["--max-tokens", str(args.max_tokens)])
@@ -1269,6 +1337,195 @@ def step_run_c_cli_smoke(lib_path: Path, weights_path: Path, prompt: str, max_to
         sys.exit(1)
 
     log(f"  {C_GREEN}Native v6 CLI smoke test: OK{C_RESET}", C_DIM)
+
+
+def step_run_c_cli_parity_dump(
+    lib_path: Path,
+    weights_path: Path,
+    prompt: str,
+    max_tokens: int,
+    ctx_size: int | None,
+) -> None:
+    """Run native ck-cli to generate CK parity dumps (dump.bin)."""
+    log(f"{C_ORANGE}[parity]{C_RESET} Running ck-cli-v6.6 for CK dumps")
+
+    cli_path = PROJECT_ROOT / "build" / "ck-cli-v6.6"
+    if not cli_path.exists():
+        run_cmd(["make", "build/ck-cli-v6.6"], cwd=PROJECT_ROOT)
+
+    env = os.environ.copy()
+    ld_path = str(PROJECT_ROOT / "build")
+    env["LD_LIBRARY_PATH"] = f"{ld_path}:{env.get('LD_LIBRARY_PATH', '')}"
+
+    parity_dump_dir = lib_path.parent / "ck_parity_dumps"
+    parity_dump_dir.mkdir(parents=True, exist_ok=True)
+    env["CK_PARITY_DUMP"] = "1"
+    env["CK_PARITY_DIR"] = str(parity_dump_dir)
+
+    if max_tokens <= 0:
+        max_tokens = 1
+
+    cmd = [
+        str(cli_path),
+        str(lib_path),
+        str(weights_path),
+        "--prompt",
+        prompt,
+        "--max-tokens",
+        str(max_tokens),
+        "--no-chat-template",
+    ]
+    if ctx_size and ctx_size > 0:
+        cmd.extend(["--context", str(ctx_size)])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            env=env,
+            input="",
+            text=True,
+            capture_output=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as e:
+        log_error("ck-cli parity dump timed out")
+        if e.stdout:
+            print(e.stdout)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
+        return
+
+    if result.returncode != 0:
+        log_error("ck-cli parity dump failed")
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        return
+
+    dump_file = parity_dump_dir / "dump.bin"
+    if not dump_file.exists() or dump_file.stat().st_size == 0:
+        log_error("ck-cli parity dump empty")
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        return
+
+    log(f"  {C_GREEN}ck-cli parity dump: OK{C_RESET}", C_DIM)
+
+
+def _run_llamacpp_parity(
+    work_dir: Path,
+    prompt: str,
+    max_tokens: int,
+    ctx_size: int | None = None,
+    temperature: float | None = None,
+    llama_filter: str | None = None,
+    llama_layer: int | None = None,
+    llama_stop_after: int | None = None,
+    llama_include_global: bool = False,
+    llama_timeout: int | None = None,
+    gguf_path_hint: Path | None = None,
+) -> bool:
+    """Run llama.cpp parity binary to generate reference dumps."""
+    log(f"\n{C_ORANGE}[llamacpp-parity]{C_RESET} Running llama.cpp for reference dumps")
+
+    # Prefer patched parity binary; fallback to local llama.cpp main.
+    llm_path = PROJECT_ROOT / "build" / "llama-parity"
+    if not llm_path.exists():
+        llm_path = PROJECT_ROOT / "llama.cpp" / "main"
+    if not llm_path.exists():
+        log_error("llama.cpp parity binary not found (expected build/llama-parity or llama.cpp/main)")
+        return False
+
+    gguf_path = gguf_path_hint if gguf_path_hint and gguf_path_hint.exists() else None
+    if not gguf_path:
+        for pattern in ("*.gguf", "*/*.gguf"):
+            found = next(iter(work_dir.glob(pattern)), None)
+            if found:
+                gguf_path = found
+                break
+    if not gguf_path:
+        gguf_path = next(iter(work_dir.parent.glob("*.gguf")), None)
+    if not gguf_path:
+        log_error("GGUF file not found for llama parity run")
+        return False
+
+    ref_dump_dir = work_dir / "llama_parity_dumps"
+    ref_dump_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env["CKDMP_DIR"] = str(ref_dump_dir)
+    if llama_layer is None:
+        env["CKDMP_ALL_LAYERS"] = "1"
+    if llama_filter:
+        env["CKDMP_FILTER"] = llama_filter
+    if llama_layer is not None:
+        env["CKDMP_LAYER"] = str(llama_layer)
+    if llama_stop_after is not None:
+        env["CKDMP_STOP_AFTER"] = str(llama_stop_after)
+    if llama_include_global:
+        env["CKDMP_INCLUDE_GLOBAL"] = "1"
+
+    temp = 0.0 if temperature is None else float(temperature)
+    cmd = [
+        str(llm_path),
+        "-m",
+        str(gguf_path),
+        "-p",
+        prompt,
+        "-no-cnv",
+        "--simple-io",
+        "--no-warmup",
+        "--temp",
+        f"{temp}",
+        "-n",
+        str(max_tokens),
+    ]
+    if ctx_size and ctx_size > 0:
+        cmd.extend(["--ctx-size", str(ctx_size)])
+
+    try:
+        timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
+        if timeout_sec <= 0:
+            timeout_sec = None
+        result = subprocess.run(
+            cmd,
+            cwd=work_dir,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired:
+        log_error("llama.cpp parity run timed out")
+        return False
+    except Exception as e:
+        log_error(f"llama.cpp parity run error: {e}")
+        return False
+
+    ref_dump = ref_dump_dir / "dump.bin"
+    ref_index = ref_dump_dir / "index.json"
+    has_dump = ref_dump.exists() and ref_dump.stat().st_size > 0
+    has_index = ref_index.exists() and ref_index.stat().st_size > 0
+
+    if result.returncode == 0 and has_dump:
+        log(f"  Reference dump: {ref_dump}", C_GREEN)
+        return True
+
+    # CKDMP_STOP_AFTER intentionally exits non-zero after enough dumps.
+    if result.returncode != 0 and has_dump and has_index:
+        log(f"  llama.cpp exited with code {result.returncode} after writing dumps", C_ORANGE)
+        log(f"  Reference dump: {ref_dump}", C_GREEN)
+        return True
+
+    log_error("llama.cpp parity dump failed")
+    if result.stderr:
+        log(f"  {result.stderr[:300]}", C_DIM)
+    return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1496,8 +1753,19 @@ def run_pipeline(args: argparse.Namespace):
         sys.exit(1)
 
     # Build IR
-    # If debug or parity is enabled, force recompile to ensure special code is generated
-    force_for_debug = args.force_compile or getattr(args, 'debug', False) or getattr(args, 'parity', False) or getattr(args, 'profile', False)
+    # If debug/parity/profiling is enabled, force recompile for instrumentation.
+    parity_dump = bool(getattr(args, "parity_dump", False))
+    detailed_llama_parity = bool(getattr(args, "detailed_llamacpp_parity", False))
+    if detailed_llama_parity:
+        parity_dump = True
+    force_for_debug = (
+        args.force_compile
+        or getattr(args, "debug", False)
+        or getattr(args, "parity", False)
+        or getattr(args, "profile", False)
+        or parity_dump
+        or detailed_llama_parity
+    )
     manifest_for_dtype = None
     
     # Vocabulary metadata (prefer non-zero values from config/manifest)
@@ -1572,7 +1840,13 @@ def run_pipeline(args: argparse.Namespace):
     )
 
     # Generate C code
-    model_c_path = step_codegen(layout_path, work_dir, force=force_for_debug, profile=getattr(args, 'profile', False))
+    model_c_path = step_codegen(
+        layout_path,
+        work_dir,
+        force=force_for_debug,
+        profile=getattr(args, 'profile', False),
+        dump=parity_dump,
+    )
 
     # Run reverse validation if requested (validates IR Lower 3 before compile)
     if getattr(args, 'reverse_test', False):
@@ -1591,6 +1865,20 @@ def run_pipeline(args: argparse.Namespace):
         os.environ["CK_PROFILE_CSV"] = str(work_dir / "profile_decode.csv")
         os.environ["CK_PROFILE_JSON"] = str(work_dir / "profile_decode.json")
         log(f"  Profiling enabled: CSV → {work_dir / 'profile_decode.csv'}", C_DIM)
+    else:
+        os.environ.pop("CK_PROFILE", None)
+        os.environ.pop("CK_PROFILE_CSV", None)
+        os.environ.pop("CK_PROFILE_JSON", None)
+
+    if parity_dump:
+        parity_dump_dir = work_dir / "ck_parity_dumps"
+        parity_dump_dir.mkdir(parents=True, exist_ok=True)
+        os.environ["CK_PARITY_DUMP"] = "1"
+        os.environ["CK_PARITY_DIR"] = str(parity_dump_dir)
+        log(f"  Parity dumping enabled: {parity_dump_dir}", C_DIM)
+    else:
+        os.environ.pop("CK_PARITY_DUMP", None)
+        os.environ.pop("CK_PARITY_DIR", None)
 
     # Compile
     lib_path = step_compile(model_c_path, work_dir, force=force_for_debug)
@@ -1635,6 +1923,9 @@ def run_pipeline(args: argparse.Namespace):
         else:
             log("  Skipping parity tests (build/libckernel_engine.so missing)", C_DIM)
 
+    # Determine effective context length for parity tools (prefer explicit CLI override).
+    effective_ctx = getattr(args, "context_len", None)
+
     # Run chat (unless generate-only)
     if args.generate_only or args.test_only:
         log(f"\n{C_GREEN}Generated:{C_RESET}")
@@ -1651,7 +1942,29 @@ def run_pipeline(args: argparse.Namespace):
             prompt = getattr(args, "c_cli_prompt", None) or "Hello"
             max_tokens = int(getattr(args, "c_cli_max_tokens", 16) or 16)
             step_run_c_cli_smoke(lib_path, weights_bump, prompt, max_tokens)
-        step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
+        if detailed_llama_parity:
+            weights_bump = Path(weights_path) if weights_path else (work_dir / "weights.bump")
+            if not weights_bump.exists():
+                log_error(f"weights.bump not found at {weights_bump}")
+                sys.exit(1)
+            parity_prompt = getattr(args, "prompt", None) or "Hello"
+            parity_max_tokens = int(getattr(args, "max_tokens", 1) or 1)
+            step_run_c_cli_parity_dump(lib_path, weights_bump, parity_prompt, parity_max_tokens, effective_ctx)
+            _run_llamacpp_parity(
+                work_dir,
+                prompt=parity_prompt,
+                max_tokens=parity_max_tokens,
+                ctx_size=effective_ctx,
+                temperature=getattr(args, "temperature", None),
+                llama_filter=getattr(args, "llama_filter", None),
+                llama_layer=getattr(args, "llama_layer", None),
+                llama_stop_after=getattr(args, "llama_stop_after", None),
+                llama_include_global=getattr(args, "llama_include_global", False),
+                llama_timeout=getattr(args, "llama_timeout", None),
+                gguf_path_hint=gguf_path_for_tokenizer,
+            )
+        else:
+            step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
 
     # Generate profile summary if profiling was enabled
     if getattr(args, 'profile', False):
@@ -1902,6 +2215,20 @@ Examples:
                            help='Max tokens for native v6 CLI smoke test (default: 16)')
     run_parser.add_argument('--profile', action='store_true',
                            help='Enable per-kernel timing profiling (CK_PROFILE)')
+    run_parser.add_argument('--parity-dump', action='store_true',
+                           help='Dump CK tensors to work_dir/ck_parity_dumps/dump.bin')
+    run_parser.add_argument('--detailed-llamacpp-parity', action='store_true',
+                           help='Run CK parity dump + llama.cpp parity dump for reference comparison')
+    run_parser.add_argument('--llama-filter', type=str, default=None,
+                           help='llama.cpp CKDMP filter (comma-separated tensor name substrings)')
+    run_parser.add_argument('--llama-layer', type=int, default=None,
+                           help='llama.cpp CKDMP layer filter (dump only this layer id)')
+    run_parser.add_argument('--llama-stop-after', type=int, default=None,
+                           help='llama.cpp CKDMP stop after N dumps')
+    run_parser.add_argument('--llama-include-global', action='store_true',
+                           help='Include global tensors when using --llama-layer')
+    run_parser.add_argument('--llama-timeout', type=int, default=None,
+                           help='llama.cpp parity timeout in seconds (default 600)')
     run_parser.add_argument('--parallel-decode', action='store_true',
                            help='[DEPRECATED] Was: OpenMP parallel GEMV for decode. '
                                 'Superseded by persistent pthread thread pool '

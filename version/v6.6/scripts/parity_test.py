@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import re
 import struct
 import sys
 from pathlib import Path
@@ -27,22 +28,74 @@ import numpy as np
 # Binary Dump Reader
 # =============================================================================
 
-CKDUMP_MAGIC = b"CKDMP\x00\x00"
+CKDUMP_MAGIC = b"CKDMP\x00\x00\x00"
 
-# Header format (128 bytes total)
-HEADER_SPEC = struct.Struct(
-    "<8s"      # magic (8)
-    "I"        # version (4)
-    "i"        # layer_id (4)
-    "32s"      # op_name (32)
-    "I"        # dtype (4)
-    "I"        # rank (4)
-    "4q"       # shape[4] (32)
-    "I"        # elem_count (4)
-    "i"        # token_id (4)
-    "24x"      # reserved (24)
-)
-HEADER_SIZE = 128
+# CKDMP format has drifted across branches; support the known variants.
+# Keep the parser permissive and infer the record layout from the header bytes.
+HEADER_FORMATS = [
+    {
+        "name": "rank_120",
+        "spec": struct.Struct("<8sIi32sII4qIi24x"),  # 120 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": u[5],
+            "shape": [u[6], u[7], u[8], u[9]],
+            "elem_count": u[10],
+            "token_id": u[11],
+        },
+    },
+    {
+        "name": "rank_124",
+        "spec": struct.Struct("<8sIi32sII4qIi28x"),  # 124 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": u[5],
+            "shape": [u[6], u[7], u[8], u[9]],
+            "elem_count": u[10],
+            "token_id": u[11],
+        },
+    },
+    {
+        "name": "rank_dump_type_128",
+        "spec": struct.Struct("<8sIi32sII4qIiI28x"),  # 128 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": u[5],
+            "shape": [u[6], u[7], u[8], u[9]],
+            "elem_count": u[10],
+            "token_id": u[11],
+        },
+    },
+    {
+        "name": "legacy_no_rank_124",
+        "spec": struct.Struct("<8sIi32sI4qIQi24x"),  # 124 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": 0,
+            "shape": [u[5], u[6], u[7], u[8]],
+            "elem_count": u[9],
+            "token_id": int(u[10]),
+        },
+    },
+]
+MAX_HEADER_SIZE = max(f["spec"].size for f in HEADER_FORMATS)
+MIN_HEADER_SIZE = min(f["spec"].size for f in HEADER_FORMATS)
 
 
 class ParityDump:
@@ -61,6 +114,113 @@ class ParityDump:
                f"shape={self.data.shape}, token={self.token_id})"
 
 
+def _is_plausible_header(h: Dict) -> bool:
+    if h["magic"] != CKDUMP_MAGIC:
+        return False
+    if h["version"] <= 0 or h["version"] > 1000:
+        return False
+    if h["dtype"] < 0 or h["dtype"] > 16:
+        return False
+    if h["elem_count"] < 0 or h["elem_count"] > (1 << 31):
+        return False
+    rank = int(h.get("rank", 0))
+    if rank < 0 or rank > 4:
+        return False
+    shape = h.get("shape", [0, 0, 0, 0])
+    if len(shape) != 4:
+        return False
+    if any(int(s) < 0 for s in shape):
+        return False
+    return True
+
+
+def _decode_header(header_bytes: bytes) -> Optional[Tuple[Dict, int]]:
+    # Prefer larger formats first so we can parse newer writers when possible.
+    for fmt in sorted(HEADER_FORMATS, key=lambda x: x["spec"].size, reverse=True):
+        size = fmt["spec"].size
+        if len(header_bytes) < size:
+            continue
+        try:
+            unpacked = fmt["spec"].unpack(header_bytes[:size])
+        except struct.error:
+            continue
+        header = fmt["decoder"](unpacked)
+        if _is_plausible_header(header):
+            return header, size
+    return None
+
+
+def _normalize_layer_and_op(layer_id: int, op_name: str) -> Tuple[int, str]:
+    op = op_name.strip()
+    if " (" in op:
+        op = op.split(" (", 1)[0]
+
+    # Many llama dumps encode layer in the op name (e.g. Qcur-0).
+    m = re.match(r"^(.*?)-(\d+)$", op)
+    if m:
+        op = m.group(1)
+        parsed_layer = int(m.group(2))
+        if layer_id < 0:
+            layer_id = parsed_layer
+
+    aliases = {
+        "inp_embd": "token_embedding",
+        "token_embd": "token_embedding",
+        "attn_norm": "attn_norm",
+        "qcur": "q_proj",
+        "kcur": "k_proj",
+        "vcur": "v_proj",
+        "qcur_normed": "qcur_normed",
+        "kcur_normed": "kcur_normed",
+        "attn_out": "attn_output",
+        "sa_out": "attn_output",
+        "ffn_gate": "gate_proj",
+        "ffn_up": "up_proj",
+        "ffn_down": "down_proj",
+        "final_norm": "final_norm",
+        "ln_final": "final_norm",
+        "result_norm": "final_norm",
+    }
+    return layer_id, aliases.get(op.lower(), op)
+
+
+def _dtype_to_elem_size(dtype: int) -> int:
+    if dtype == 0:
+        return 4
+    if dtype in (1, 2):
+        return 2
+    if dtype == 3:
+        return 1
+    return 4
+
+
+def _choose_elem_size(blob: bytes, rec_start: int, header_size: int, elem_count: int, dtype: int) -> int:
+    preferred = _dtype_to_elem_size(dtype)
+    candidates = [preferred, 4, 2, 1]
+    unique_candidates = []
+    for c in candidates:
+        if c not in unique_candidates:
+            unique_candidates.append(c)
+
+    for elem_size in unique_candidates:
+        next_off = rec_start + header_size + elem_count * elem_size
+        if next_off > len(blob):
+            continue
+        if next_off == len(blob):
+            return elem_size
+        if blob[next_off:next_off + len(CKDUMP_MAGIC)] == CKDUMP_MAGIC:
+            return elem_size
+        if next_off + MIN_HEADER_SIZE <= len(blob):
+            if _decode_header(blob[next_off:next_off + MAX_HEADER_SIZE]) is not None:
+                return elem_size
+
+    # Fallback: any size that stays in-bounds.
+    for elem_size in unique_candidates:
+        if rec_start + header_size + elem_count * elem_size <= len(blob):
+            return elem_size
+    return preferred
+
+
 def read_dump_file(path: Path) -> List[ParityDump]:
     """Read all tensor dumps from a binary file."""
     dumps = []
@@ -69,46 +229,68 @@ def read_dump_file(path: Path) -> List[ParityDump]:
         print(f"[WARNING] Dump file not found: {path}")
         return dumps
 
-    with open(path, "rb") as f:
-        while True:
-            header_bytes = f.read(HEADER_SIZE)
-            if len(header_bytes) < HEADER_SIZE:
+    blob = path.read_bytes()
+    offset = 0
+    warned_dtype_mismatch = False
+
+    while offset + MIN_HEADER_SIZE <= len(blob):
+        rec_start = offset
+        decoded = _decode_header(blob[offset:offset + MAX_HEADER_SIZE])
+        if decoded is None:
+            nxt = blob.find(CKDUMP_MAGIC, offset + 1)
+            if nxt < 0:
+                print(f"[WARNING] Could not decode header at offset {rec_start}")
                 break
+            print(f"[WARNING] Resyncing dump parse: bad header at {rec_start}, next magic at {nxt}")
+            offset = nxt
+            continue
 
-            unpacked = HEADER_SPEC.unpack(header_bytes)
-            magic, version, layer_id, op_name_bytes, dtype, rank, \
-                shape0, shape1, shape2, shape3, elem_count, token_id = unpacked
+        h, header_size = decoded
+        op_name = h["op_name_bytes"].split(b"\x00")[0].decode("utf-8", errors="ignore")
 
-            # Verify magic
-            if magic != CKDUMP_MAGIC:
-                print(f"[WARNING] Invalid magic at offset {f.tell() - HEADER_SIZE}")
-                continue
+        rank = int(h["rank"])
+        elem_count = int(h["elem_count"])
+        token_id = int(h["token_id"])
+        dtype = int(h["dtype"])
+        shape = [int(h["shape"][0]), int(h["shape"][1]), int(h["shape"][2]), int(h["shape"][3])][:rank]
+        if not any(shape):
+            shape = [elem_count]
 
-            # Parse op name (null-terminated)
-            op_name = op_name_bytes.split(b"\x00")[0].decode("utf-8", errors="ignore")
+        elem_size = _choose_elem_size(blob, rec_start, header_size, elem_count, dtype)
+        expected_elem_size = _dtype_to_elem_size(dtype)
+        if elem_size != expected_elem_size and not warned_dtype_mismatch:
+            print(
+                f"[WARNING] CKDMP dtype/data-size mismatch detected (offset={rec_start}, op={op_name}); "
+                "using size-inferred parse to keep alignment"
+            )
+            warned_dtype_mismatch = True
 
-            # Get actual shape based on rank
-            shape = [shape0, shape1, shape2, shape3][:rank]
-            if not any(shape):
-                shape = [elem_count]
+        data_start = rec_start + header_size
+        data_end = data_start + elem_count * elem_size
+        if data_end > len(blob):
+            print(f"[WARNING] Unexpected EOF reading {op_name}")
+            break
+        data_bytes = blob[data_start:data_end]
 
-            # Read data
-            dtype_map = {0: np.float32, 1: np.float16, 2: np.float16}
-            np_dtype = dtype_map.get(dtype, np.float32)
-            elem_size = 4 if dtype == 0 else 2
-            data_size = elem_count * elem_size
+        if elem_size == 4:
+            np_dtype = np.float32
+            dtype_name = "fp32"
+        elif elem_size == 2:
+            np_dtype = np.float16
+            dtype_name = "fp16" if dtype == 1 else "bf16"
+        else:
+            np_dtype = np.int8
+            dtype_name = "int8"
 
-            data_bytes = f.read(data_size)
-            if len(data_bytes) < data_size:
-                print(f"[WARNING] Unexpected EOF reading {op_name}")
-                break
-
-            # Convert to numpy
-            data = np.frombuffer(data_bytes, dtype=np_dtype).astype(np.float32)
+        data = np.frombuffer(data_bytes, dtype=np_dtype).astype(np.float32)
+        try:
             data = data.reshape(shape)
+        except ValueError:
+            data = data.reshape(-1)
 
-            dtype_name = ["fp32", "fp16", "bf16"][dtype] if dtype < 3 else "unknown"
-            dumps.append(ParityDump(layer_id, op_name, data, token_id, dtype_name))
+        norm_layer, norm_op = _normalize_layer_and_op(int(h["layer_id"]), op_name)
+        dumps.append(ParityDump(norm_layer, norm_op, data, token_id, dtype_name))
+        offset = data_end
 
     return dumps
 
@@ -297,7 +479,7 @@ def run_parity_test(
         ck_dump = ck_by_layer_op.get((layer_id, op_name))
         ref_dump = reference.get(layer_id, op_name)
 
-        if notck_dump:
+        if not ck_dump:
             status = "MISSING"
             max_diff = mean_diff = "N/A"
             ref_range = test_range = "N/A"
@@ -370,15 +552,15 @@ def run_parity_test(
             print(f"{layer_id:<6} {op_name:<18} {color}{status:<8}{reset} "
                   f"{max_diff:<12} {mean_diff:<12} {ref_range:<20} {test_range:<20}")
 
+    # Summary counters are needed for both verbose and quiet exit logic.
+    passed = sum(1 for r in results if r["status"] == "PASS")
+    failed = sum(1 for r in results if r["status"] == "FAIL")
+    errors = sum(1 for r in results if r["status"] == "ERROR")
+    warnings = sum(1 for r in results if r["status"] == "WARN")
+    total = len(results)
+
     if verbose:
         print("-" * 130)
-
-        # Summary
-        passed = sum(1 for r in results if r["status"] == "PASS")
-        failed = sum(1 for r in results if r["status"] == "FAIL")
-        errors = sum(1 for r in results if r["status"] == "ERROR")
-        warnings = sum(1 for r in results if r["status"] == "WARN")
-        total = len(results)
 
         print(f"\nSUMMARY: {passed}/{total} passed, {failed} failed, {errors} errors, {warnings} warnings")
 

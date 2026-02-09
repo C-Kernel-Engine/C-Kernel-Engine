@@ -28,37 +28,12 @@ typedef struct {
     bool is_special;
 } TokenInfo;
 
-/* Tokenizer structure */
-struct CKTokenizer {
-    /* Vocabulary: token string -> TokenInfo */
-    CKTokenizerHashTable *vocab;
-
-    /* Trie for fast longest-match lookups */
-    CKTrie *vocab_trie;
-
-    /* Reverse vocab: id -> token string */
-    char **id_to_token;
-    size_t vocab_size;
-    size_t vocab_capacity;
-
-    /* Special token IDs */
-    int32_t unk_id;
-    int32_t bos_id;
-    int32_t eos_id;
-    int32_t pad_id;
-    int32_t mask_id;
-
-    /* Configuration */
-    CKTokenizerConfig config;
-
-    /* Memory pool for internal allocations */
-    CKTokenizerMemPool pool;
-
-    /* BPE Merges */
-    int32_t num_merges;
-    /* Simplified merge storage: left * vocab_size + right -> merged */
-    /* For now, we'll keep it as a list for greedy merging */
-};
+/* Tokenizer structure - defined in tokenizer.h via typedef */
+int ck_tokenizer_encode_spm_dispatch(const CKTokenizer *tok,
+                                     const char *text,
+                                     int text_len,
+                                     int32_t *ids,
+                                     int max_ids);
 
 /* Create a new tokenizer */
 CKTokenizer *ck_tokenizer_create(CKTokenizerType type) {
@@ -100,11 +75,17 @@ CKTokenizer *ck_tokenizer_create(CKTokenizerType type) {
     tok->pad_id = -1;
     tok->mask_id = -1;
 
+    /* Initialize scores and types for SPM */
+    tok->scores = NULL;
+    tok->types = NULL;
+
     /* Set config */
     tok->config.type = type;
     tok->config.add_bos = false;
     tok->config.add_eos = false;
+    tok->config.add_space_prefix = true;
     tok->config.unk_score = -1e10f;
+    tok->config.spm_mode = CK_SPM_MODE_UNIGRAM;
 
     ck_tokenizer_mempool_init(&tok->pool, 1024 * 1024);
 
@@ -136,6 +117,11 @@ void ck_tokenizer_free(CKTokenizer *tok) {
         free(tok->id_to_token);
     }
 
+    /* Free SPM-related arrays */
+    if (tok->scores) free(tok->scores);
+    if (tok->types) free(tok->types);
+    if (tok->byte_token_id) free(tok->byte_token_id);
+
     ck_tokenizer_mempool_free(&tok->pool);
     free(tok);
 }
@@ -158,6 +144,18 @@ void ck_tokenizer_reset(CKTokenizer *tok) {
     }
 
     tok->vocab_size = 0;
+
+    /* Reset SPM-related arrays using actual allocated sizes */
+    if (tok->scores && tok->scores_size > 0) {
+        memset(tok->scores, 0, tok->scores_size * sizeof(float));
+    }
+    if (tok->types && tok->types_size > 0) {
+        memset(tok->types, 0, tok->types_size * sizeof(uint8_t));
+    }
+    /* Clear byte lookup table */
+    if (tok->byte_token_id) {
+        memset(tok->byte_token_id, -1, 256 * sizeof(int32_t));
+    }
 }
 
 /* Add a token to vocabulary */
@@ -245,6 +243,22 @@ void ck_tokenizer_set_special_ids(CKTokenizer *tok, int32_t unk, int32_t bos, in
     tok->eos_id = eos;
     tok->pad_id = pad;
     tok->mask_id = mask;
+}
+
+void ck_tokenizer_set_add_bos_eos(CKTokenizer *tok, bool add_bos, bool add_eos) {
+    if (!tok) return;
+    tok->config.add_bos = add_bos;
+    tok->config.add_eos = add_eos;
+}
+
+void ck_tokenizer_set_add_space_prefix(CKTokenizer *tok, bool add_space_prefix) {
+    if (!tok) return;
+    tok->config.add_space_prefix = add_space_prefix;
+}
+
+void ck_tokenizer_set_spm_mode(CKTokenizer *tok, CKSpmMode spm_mode) {
+    if (!tok) return;
+    tok->config.spm_mode = spm_mode;
 }
 
 /* Set whether to use trie for lookups */
@@ -410,10 +424,15 @@ static int preprocess_bpe_spaces(const char *text, int text_len, char *out, int 
     return out_len;
 }
 
-/* Encode text to token IDs using greedy longest-match */
+/* Encode text to token IDs using greedy longest-match or Viterbi for SPM */
 int ck_tokenizer_encode(const CKTokenizer *tok, const char *text, int text_len, int32_t *ids, int max_ids) {
     if (!tok || !text || !ids || max_ids <= 0) return 0;
     if (text_len < 0) text_len = (int)strlen(text);
+
+    /* SentencePiece implementation lives in tokenizer_spm.c */
+    if (tok->config.type == CK_TOKENIZER_SPM) {
+        return ck_tokenizer_encode_spm_dispatch(tok, text, text_len, ids, max_ids);
+    }
 
     /* For BPE tokenizers, convert spaces to appropriate prefix marker.
      * Auto-detect style from vocabulary if not already set. */
@@ -501,15 +520,7 @@ int ck_tokenizer_load_binary(CKTokenizer *tok,
                              const char *strings,
                              int num_merges,
                              const int32_t *merges) {
-    if (!tok || !offsets || !strings) return -1;
-    ck_tokenizer_reset(tok);
-    for (int i = 0; i < vocab_size; i++) {
-        const char *token = strings + offsets[i];
-        ck_tokenizer_add_token(tok, token, i, 0.0f);
-    }
-    /* TODO: Merges */
-    (void)num_merges; (void)merges;
-    return 0;
+    return ck_tokenizer_load_binary_with_scores(tok, vocab_size, offsets, strings, NULL, NULL, num_merges, merges);
 }
 
 /* Placeholders for header compliance */

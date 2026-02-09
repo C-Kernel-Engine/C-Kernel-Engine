@@ -63,17 +63,25 @@ typedef enum {
     CK_SPACE_PREFIX_SPM = 2      /* SentencePiece style: ▁ (U+2581, bytes 0xE2 0x96 0x81) */
 } CKSpacePrefixStyle;
 
+/* SentencePiece mode */
+typedef enum {
+    CK_SPM_MODE_UNIGRAM = 0,     /* SentencePiece unigram/Viterbi */
+    CK_SPM_MODE_LLAMA = 1        /* llama.cpp merge-style SPM */
+} CKSpmMode;
+
 /* Tokenizer configuration */
 typedef struct {
     CKTokenizerType type;           /* Tokenization algorithm */
     bool add_bos;                   /* Add beginning-of-sequence token */
     bool add_eos;                   /* Add end-of-sequence token */
+    bool add_space_prefix;          /* For SPM: add ▁ at start (SentencePiece) */
     bool lowercase;                 /* Convert text to lowercase before tokenizing */
     bool treat_whitespace_as_suffix; /* For SentencePiece */
     float unk_score;               /* Unknown token score (for SPM) */
     bool use_trie;                  /* Use trie for lookups (faster), false = use hash table */
     CKSpacePrefixStyle space_prefix_style; /* Space prefix style (GPT-2 Ġ vs SentencePiece ▁) */
     bool space_prefix_detected;     /* True if auto-detection has run */
+    CKSpmMode spm_mode;             /* SPM mode: unigram or llama-style */
 } CKTokenizerConfig;
 
 /* Vocabulary entry */
@@ -84,7 +92,7 @@ typedef struct {
 } CKTokenizerToken;
 
 /* Main tokenizer structure */
-typedef struct {
+typedef struct CKTokenizer {
     /* Configuration */
     CKTokenizerConfig config;
 
@@ -98,6 +106,15 @@ typedef struct {
     char **id_to_token;
     size_t vocab_size;
     size_t vocab_capacity;
+
+    /* Token scores for SPM (Viterbi/DP encoding) */
+    float *scores;
+    size_t scores_size;    /* Allocated size for scores array */
+    uint8_t *types;  /* Token type (GGUF: 1=normal, 2=unknown, 3=control, 4=user_defined, 6=byte) */
+    size_t types_size;    /* Allocated size for types array */
+
+    /* Byte token lookup table for SPM (built during load) */
+    int32_t *byte_token_id;  /* Map byte value (0-255) to token ID, -1 = not found */
 
     /* Special token IDs */
     int32_t unk_id;
@@ -214,6 +231,33 @@ CK_TOKENIZER_API void ck_tokenizer_set_special_ids(CKTokenizer *tok,
                                   int32_t eos,
                                   int32_t pad,
                                   int32_t mask);
+
+/**
+ * Set whether to add BOS/EOS tokens during encoding.
+ *
+ * @param tok      Tokenizer
+ * @param add_bos  If true, prepend BOS token (if available)
+ * @param add_eos  If true, append EOS token (if available)
+ */
+CK_TOKENIZER_API void ck_tokenizer_set_add_bos_eos(CKTokenizer *tok, bool add_bos, bool add_eos);
+
+/**
+ * Set whether to add the SentencePiece space prefix (▁) at the start.
+ *
+ * This mirrors SentencePiece's add_dummy_prefix behavior.
+ *
+ * @param tok              Tokenizer
+ * @param add_space_prefix If true, add leading ▁ when appropriate
+ */
+CK_TOKENIZER_API void ck_tokenizer_set_add_space_prefix(CKTokenizer *tok, bool add_space_prefix);
+
+/**
+ * Set SentencePiece mode.
+ *
+ * @param tok       Tokenizer
+ * @param spm_mode  SPM mode (unigram or llama-style)
+ */
+CK_TOKENIZER_API void ck_tokenizer_set_spm_mode(CKTokenizer *tok, CKSpmMode spm_mode);
 
 /**
  * Set whether to lowercase input text before tokenizing.
@@ -421,6 +465,31 @@ int ck_tokenizer_load_binary(CKTokenizer *tok,
                              const char *strings,
                              int num_merges,
                              const int32_t *merges);
+
+/**
+ * Load vocabulary from memory-mapped binary data with scores and types.
+ *
+ * This extended version supports SPM (SentencePiece) tokenizers which require
+ * token scores for Viterbi/DP encoding.
+ *
+ * @param tok         Tokenizer
+ * @param vocab_size  Number of tokens
+ * @param offsets     Array of offsets into strings pool
+ * @param strings     String pool containing null-terminated tokens
+ * @param scores      Array of token scores (float32), can be NULL
+ * @param types       Array of token types (uint8), can be NULL
+ * @param num_merges  Number of BPE merges
+ * @param merges      Merge rules as (left, right, merged) triplets
+ * @return            0 on success, -1 on error
+ */
+int ck_tokenizer_load_binary_with_scores(CKTokenizer *tok,
+                                         int vocab_size,
+                                         const int32_t *offsets,
+                                         const char *strings,
+                                         const float *scores,
+                                         const uint8_t *types,
+                                         int num_merges,
+                                         const int32_t *merges);
 
 /**
  * Load vocabulary from GGUF file.
