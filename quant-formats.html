@@ -1191,6 +1191,166 @@
     </div>
 </div>
 
+<div class="container" style="margin-top: 2.5rem;">
+    <h2 style="color: var(--orange); margin-bottom: 0.75rem;">Quant Summary (v6.6+)</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+        These are the formats we actively use across Qwen, Gemma, and the v6.6 kernel registry.
+        The goal is practical: pick the smallest dtype that preserves accuracy for the specific projection or MLP path.
+    </p>
+
+    <style>
+        .quant-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+        .quant-card {
+            background: var(--dark-card);
+            border: 1px solid var(--grey);
+            border-radius: 10px;
+            padding: 1rem 1.1rem;
+        }
+        .quant-title {
+            font-weight: 700;
+            color: var(--orange);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .quant-tag {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            background: #1e2b3b;
+            color: #9ed6ff;
+            border: 1px solid #2a3a4f;
+        }
+        .quant-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.5rem;
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+        .bitbar {
+            margin-top: 0.75rem;
+            background: #0d141b;
+            border: 1px solid #1f2a36;
+            border-radius: 6px;
+            height: 10px;
+            overflow: hidden;
+        }
+        .bitbar > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #00c7fd, #47b475);
+        }
+        .quant-note {
+            margin-top: 0.6rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .quant-flow {
+            margin-top: 1.5rem;
+            background: #0f151c;
+            border: 1px dashed #2a3a4f;
+            border-radius: 10px;
+            padding: 1rem;
+        }
+        .flow-row {
+            display: grid;
+            grid-template-columns: 1fr 32px 1fr 32px 1fr;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .flow-box {
+            background: var(--dark-card);
+            border: 1px solid var(--grey);
+            border-radius: 8px;
+            padding: 0.6rem 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .flow-arrow {
+            text-align: center;
+            color: #9ed6ff;
+            font-weight: 700;
+        }
+        .quant-legend {
+            margin-top: 0.75rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .legend-chip {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 6px;
+            background: #15202b;
+            border: 1px solid #22313f;
+            color: #9ed6ff;
+            margin-right: 0.4rem;
+        }
+    </style>
+
+    <div class="quant-summary">
+        <div class="quant-card">
+            <div class="quant-title">Q8_0 <span class="quant-tag">32‑block</span></div>
+            <div class="quant-row"><span>Use</span><span>Activations, V‑proj</span></div>
+            <div class="quant-row"><span>Strength</span><span>Stable, fast GEMV</span></div>
+            <div class="bitbar"><span style="width: 80%;"></span></div>
+            <div class="quant-note">Best default for activation quantization and high‑sensitivity paths.</div>
+        </div>
+        <div class="quant-card">
+            <div class="quant-title">Q5_0 / Q5_1 <span class="quant-tag">32‑block</span></div>
+            <div class="quant-row"><span>Use</span><span>Q/K/O projections</span></div>
+            <div class="quant-row"><span>Strength</span><span>Good speed/quality</span></div>
+            <div class="bitbar"><span style="width: 65%;"></span></div>
+            <div class="quant-note">Q5_1 adds an offset for asymmetric ranges; Q5_0 is symmetric.</div>
+        </div>
+        <div class="quant-card">
+            <div class="quant-title">Q5_K <span class="quant-tag">256‑block</span></div>
+            <div class="quant-row"><span>Use</span><span>Gemma MLP / proj</span></div>
+            <div class="quant-row"><span>Strength</span><span>Higher compression</span></div>
+            <div class="bitbar"><span style="width: 58%;"></span></div>
+            <div class="quant-note">K‑quant with nested scales; improves size without wrecking MLP quality.</div>
+        </div>
+        <div class="quant-card">
+            <div class="quant-title">Q6_K <span class="quant-tag">256‑block</span></div>
+            <div class="quant-row"><span>Use</span><span>Down proj / MLP</span></div>
+            <div class="quant-row"><span>Strength</span><span>Higher fidelity</span></div>
+            <div class="bitbar"><span style="width: 70%;"></span></div>
+            <div class="quant-note">Often selected for sensitive MLP paths where Q5_K is too lossy.</div>
+        </div>
+        <div class="quant-card">
+            <div class="quant-title">Q4_K <span class="quant-tag">256‑block</span></div>
+            <div class="quant-row"><span>Use</span><span>Max compression</span></div>
+            <div class="quant-row"><span>Strength</span><span>Smallest footprint</span></div>
+            <div class="bitbar"><span style="width: 45%;"></span></div>
+            <div class="quant-note">Great for footprint, but easiest to destabilize if overused.</div>
+        </div>
+    </div>
+
+    <div class="quant-flow">
+        <div class="flow-row">
+            <div class="flow-box">Token Embedding<br><span style="color: var(--text-muted);">Q8_0</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">Attention Proj<br><span style="color: var(--text-muted);">Q5_0 / Q5_1</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">MLP (Gate/Down)<br><span style="color: var(--text-muted);">Q5_K / Q6_K</span></div>
+        </div>
+        <div class="quant-legend">
+            <div><span class="legend-chip">Q8_0</span> Stable activation path, safest for logits and V‑proj.</div>
+            <div><span class="legend-chip">Q5_K</span> Compression‑first MLP blocks (Gemma‑friendly).</div>
+            <div><span class="legend-chip">Q6_K</span> Higher‑fidelity MLP when accuracy is tight.</div>
+        </div>
+    </div>
+</div>
+
 <div style="margin-top: 2rem; padding: 1.5rem; background: var(--dark-card); border-radius: 8px;">
     <h3 style="color: var(--orange); margin-bottom: 1rem;">Related Documentation</h3>
     <ul style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; padding: 0;">
@@ -1409,7 +1569,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-09</p>
             </div>
         </div>
     </footer>

@@ -47,6 +47,11 @@
     <text x="100" y="93" fill="#7ee787" font-size="12" font-weight="bold">Q5_0: 5.5 bits</text>
     <text x="200" y="93" fill="#8b949e" font-size="11">(5-bit + shared scale) = 22 bytes / 32 weights</text>
 
+    <!-- Q5_K bar -->
+    <rect x="700" y="45" width="69" height="25" rx="4" fill="#ff7b72" opacity="0.8"/>
+    <text x="785" y="63" fill="#ff7b72" font-size="12" font-weight="bold">Q5_K: ~5.5 bits</text>
+    <text x="905" y="63" fill="#8b949e" font-size="11">K-quant block, nested scales (256)</text>
+
     <!-- Q4_K bar -->
     <rect x="700" y="15" width="56" height="25" rx="4" fill="#f5576c" opacity="0.8"/>
     <text x="770" y="33" fill="#f5576c" font-size="12" font-weight="bold">Q4_K: 4.5 bits</text>
@@ -54,7 +59,7 @@
 
     <!-- Memory savings -->
     <text x="700" y="75" fill="#ffd700" font-size="13" font-weight="bold">Memory savings vs FP32:</text>
-    <text x="700" y="93" fill="#8b949e" font-size="11">Q4_K: 7x smaller | Q5_0: 6x smaller | Q8_0: 4x smaller</text>
+    <text x="700" y="93" fill="#8b949e" font-size="11">Q4_K: ~7x | Q5_K: ~6x | Q5_0: ~6x | Q8_0: ~4x</text>
   </g>
 
   <!-- TRANSFORMER LAYER DIAGRAM -->
@@ -161,7 +166,7 @@
   <text x="50" y="610" fill="#58a6ff" font-size="18" font-weight="bold">KERNEL SELECTION BY WEIGHT TYPE</text>
 
   <g transform="translate(50, 630)">
-    <rect x="0" y="0" width="1100" height="150" rx="8" fill="#161b22" stroke="#30363d"/>
+    <rect x="0" y="0" width="1100" height="180" rx="8" fill="#161b22" stroke="#30363d"/>
 
     <!-- Table header -->
     <rect x="10" y="10" width="180" height="30" fill="#1c2128" rx="4"/>
@@ -194,18 +199,24 @@
     <text x="635" y="115" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q4_k()</text>
     <text x="930" y="115" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~3-4x faster</text>
 
+    <!-- Q5_K row -->
+    <text x="100" y="140" fill="#ff7b72" font-size="12" text-anchor="middle">Q5_K</text>
+    <text x="350" y="140" fill="#7ee787" font-size="11" text-anchor="middle">gemm_nt_q5_k()</text>
+    <text x="635" y="140" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q5_k()</text>
+    <text x="930" y="140" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~3-4x faster</text>
+
     <!-- Q6_K row -->
-    <text x="100" y="140" fill="#f5576c" font-size="12" text-anchor="middle">Q6_K</text>
-    <text x="350" y="140" fill="#ff7b72" font-size="11" text-anchor="middle">❌ Not implemented</text>
-    <text x="635" y="140" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q6_k()</text>
-    <text x="930" y="140" fill="#8b949e" font-size="12" text-anchor="middle">FP32 only</text>
+    <text x="100" y="165" fill="#f5576c" font-size="12" text-anchor="middle">Q6_K</text>
+    <text x="350" y="165" fill="#7ee787" font-size="11" text-anchor="middle">gemm_nt_q6_k_q8_k()</text>
+    <text x="635" y="165" fill="#ffd700" font-size="11" text-anchor="middle">gemm_nt_q6_k()</text>
+    <text x="930" y="165" fill="#7ee787" font-size="12" text-anchor="middle" font-weight="bold">~3-4x faster</text>
   </g>
 
   <!-- KEY TAKEAWAYS -->
-  <rect x="50" y="800" width="1100" height="130" rx="8" fill="#1c2128" stroke="#f0883e" stroke-width="2"/>
-  <text x="600" y="830" fill="#f0883e" font-size="16" font-weight="bold" text-anchor="middle">KEY TAKEAWAYS</text>
+  <rect x="50" y="820" width="1100" height="130" rx="8" fill="#1c2128" stroke="#f0883e" stroke-width="2"/>
+  <text x="600" y="850" fill="#f0883e" font-size="16" font-weight="bold" text-anchor="middle">KEY TAKEAWAYS</text>
 
-  <g transform="translate(80, 850)">
+  <g transform="translate(80, 870)">
     <text x="0" y="0" fill="#7ee787" font-size="13">1. Weights are quantized at model conversion time (offline)</text>
     <text x="0" y="25" fill="#7ee787" font-size="13">2. Activations are quantized at runtime (FP32 → Q8_0/Q8_K) before each GEMM</text>
     <text x="0" y="50" fill="#7ee787" font-size="13">3. Integer dot products are ~4x faster than FP32 (SIMD parallelism + simpler ALU)</text>

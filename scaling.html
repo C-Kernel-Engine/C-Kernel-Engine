@@ -972,8 +972,9 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>Two First Principles. Everything Else Follows.</strong><br>
-        Our entire scaling philosophy rests on two fundamental truths from first-principles thinking.
+        <strong>TL;DR — Two First Principles</strong><br>
+        1) <strong>0 × ∞ = 0:</strong> If the model doesn't fit in memory, FLOPS don't matter.<br>
+        2) <strong>Theory of Constraints:</strong> At the Ethernet boundary, CPUs and GPUs face the same bottleneck.
     </div>
 </div>
 
@@ -983,14 +984,14 @@
     <div class="card card-accent">
         <h3 style="margin-top: 0;">Principle 1: 0 × ∞ = 0</h3>
         <p><strong>If your model doesn't fit in memory, compute speed is irrelevant.</strong></p>
-        <p>A GPU with 80GB VRAM running at infinite FLOPS still equals zero if your 70B model requires 140GB+ for weights alone.</p>
+        <p>Here, "0" means infeasible under the operational constraints: memory capacity, KV cache size, optimizer states, and reliability requirements. A GPU with 80GB VRAM running at infinite FLOPS still equals zero if your 70B model requires 140GB+ for weights alone.</p>
         <p><strong>The cost implication:</strong> You're FORCED to buy 8+ GPUs ($320K+) just to fit the model. With CPUs and 4TB RAM per server, you need 1-2 servers ($60K).</p>
     </div>
     <div class="card card-green">
         <h3 style="margin-top: 0;">Principle 2: Theory of Constraints</h3>
         <p><strong>Your system is only as fast as its slowest component.</strong></p>
-        <p>NVLink is fast (900 GB/s) <em>within a node</em>. But NVLink doesn't scale infinitely. At scale, EVERYONE hits Ethernet.</p>
-        <p><strong>The equalizer:</strong> At the Ethernet boundary, CPUs and GPUs face the same constraint. Without NVLink, GPUs are often <em>slower</em> than server-grade CPUs.</p>
+        <p>NVLink is fast (900 GB/s) <em>within a node</em>. But NVLink doesn't scale infinitely—at cluster scale, the dominant cost shifts to network + coordination, and Ethernet becomes the first-class design constraint.</p>
+        <p><strong>The equalizer:</strong> At the Ethernet boundary, CPUs and GPUs face the same interconnect constraint. In memory-bound or low-batch regimes where compute utilization is low, GPUs often underutilize their theoretical FLOPS advantage.</p>
     </div>
 </div>
 
@@ -1015,44 +1016,20 @@
 <div class="table-container">
     <table>
         <thead>
-            <tr><th>Era</th><th>Incumbent (Expensive)</th><th>Disruptor (Commodity)</th><th>Result</th></tr>
+            <tr><th>Era</th><th>Incumbent</th><th>Disruptor</th><th>Result</th></tr>
         </thead>
         <tbody>
             <tr>
                 <td><strong>1998</strong></td>
                 <td>Sun/SGI servers ($500K+)</td>
-                <td>Google: x86 PCs + MapReduce/GFS</td>
+                <td>x86 PCs + MapReduce/GFS</td>
                 <td style="color: #4ade80;">Sun bankrupt (2010)</td>
-            </tr>
-            <tr>
-                <td><strong>2006</strong></td>
-                <td>Enterprise data centers</td>
-                <td>AWS: Shopping server excess → EC2</td>
-                <td style="color: #4ade80;">$80B cloud market created</td>
-            </tr>
-            <tr>
-                <td><strong>2011</strong></td>
-                <td>HP/Dell proprietary servers</td>
-                <td>Facebook Open Compute Project</td>
-                <td style="color: #4ade80;">Industry-wide cost reduction</td>
             </tr>
             <tr>
                 <td><strong>1990s</strong></td>
                 <td>SPARC, Alpha, PA-RISC</td>
                 <td>Intel x86 commodity chips</td>
-                <td style="color: #4ade80;">RISC architectures dead</td>
-            </tr>
-            <tr>
-                <td><strong>1990s</strong></td>
-                <td>Solaris, AIX, HP-UX ($$$)</td>
-                <td>Linux (free)</td>
-                <td style="color: #4ade80;">Unix market collapsed</td>
-            </tr>
-            <tr>
-                <td><strong>2014</strong></td>
-                <td>Oracle Database ($47K/core)</td>
-                <td>PostgreSQL (free) + good engineering</td>
-                <td style="color: #4ade80;">Oracle losing market share</td>
+                <td style="color: #4ade80;">RISC dead ends</td>
             </tr>
             <tr>
                 <td><strong>2009</strong></td>
@@ -1064,15 +1041,13 @@
     </table>
 </div>
 
-<div class="alert alert-info" style="margin: 20px 0; padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid #3b82f6;">
-    <p style="margin: 0; color: #a0b0c0; font-size: 15px; line-height: 1.6;">
-        <strong style="color: #fbbf24;">In 1998, "serious" computing meant Sun Enterprise servers.</strong>
-        Google used cheap x86 PCs with software that expected hardware to fail (GFS, MapReduce), and scaled horizontally.
-        <strong>Result:</strong> Sun Microsystems filed for bankruptcy in 2010.
-        The same pattern is emerging in AI: as models hit hundreds of gigabytes, the dominant costs shift from compute to memory, coordination, and reliability.
-        CPUs—built for exactly this regime—are positioned to disrupt GPU-centric assumptions.
-    </p>
-</div>
+<p style="margin-top: 1rem; color: #a0b0c0; font-size: 15px; line-height: 1.6;">
+    <strong style="color: #fbbf24;">1998: "Serious" computing meant Sun Enterprise servers.</strong>
+    Google used cheap x86 PCs with software that expected hardware to fail—and scaled horizontally.
+    <strong>Result:</strong> Sun bankrupt in 2010.
+    The pattern is repeating: as models hit hundreds of gigabytes, costs shift from compute to memory + coordination.
+    CPUs—built for exactly this regime—are positioned to disrupt GPU-centric assumptions.
+</p>
 
 <div class="alert alert-warning">
     <div class="alert-icon">
@@ -1092,6 +1067,10 @@
     <h3 style="margin-top: 0;">The GPU Memory Trap</h3>
     <p>Yes, you CAN fit a 70B model on GPUs using tensor/pipeline parallelism. That's not the point.</p>
     <p><strong>The point is: you're now FORCED to buy 8+ GPUs.</strong></p>
+</div>
+
+<div class="alert alert-info" style="margin-bottom: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid #3b82f6;">
+    <strong>Assumptions:</strong> BF16 precision for weights; inference workloads (no optimizer states unless noted); 2024-2025 street pricing; tensor parallelism for multi-GPU; DDR5 ECC RAM for CPU servers. Costs are hardware-only, excluding networking, cooling, and housing.
 </div>
 
 <div class="table-container">
@@ -1166,7 +1145,7 @@ CPU Path:
             <li><strong>AVX</strong> - 256-bit vector (Intel Sandy Bridge+, AMD Zen 1)</li>
             <li><strong>NEON</strong> - 128-bit (ARM64, Apple Silicon)</li>
         </ul>
-        <p><strong>Auto-detection:</strong> The engine selects the best kernel at compile time.</p>
+        <p><strong>Auto-detection:</strong> The engine selects the best kernel at build time with runtime dispatch for optional extensions.</p>
     </div>
     <div class="card">
         <h3 style="margin-top: 0;">CPU Requirements</h3>
@@ -1288,6 +1267,10 @@ CPU Path:
 </div>
 
 <h2>Why CPU-Only?</h2>
+
+<div class="card card-accent" style="margin-bottom: 1.5rem;">
+    <p><strong>GPUs dominate when you can keep them highly utilized.</strong> Large batches, dense GEMMs, and well-packed workloads that fit comfortably in VRAM let GPUs exercise their theoretical FLOPS advantage. C-Kernel-Engine isn't anti-GPU—we're anti-waste: wasted money on unused capacity, wasted energy at low utilization, and wasted coordination overhead at scale.</p>
+</div>
 
 <div class="grid grid-2">
     <div class="card card-green">
@@ -3418,7 +3401,7 @@ That's it. For any model size.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-07</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-09</p>
             </div>
         </div>
     </footer>

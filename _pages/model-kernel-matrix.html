@@ -1,0 +1,317 @@
+<!-- TITLE: Model + Kernel Matrix -->
+<!-- NAV: ARCHITECTURE -->
+
+<div class="container">
+  <h1>Model + Kernel Matrix</h1>
+  <p class="lead">
+    A visual map of what the C Kernel Engine supports today (Qwen2, Qwen3, Gemma3)
+    and the kernel families that power them. This is grounded in our own templates,
+    IR lowering, and the GGUF test models we run locally.
+  </p>
+
+  <style>
+    .matrix-hero {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .model-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .model-badge {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: #15202b;
+      color: #9ed6ff;
+      border: 1px solid #22313f;
+    }
+    .model-title {
+      margin: 0.25rem 0 0.5rem;
+      font-size: 1.3rem;
+      color: var(--orange);
+      font-weight: 700;
+    }
+    .model-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    .tag {
+      background: #0f151c;
+      border: 1px solid #263242;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+    .matrix-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: 160px repeat(8, minmax(110px, 1fr));
+      gap: 0.4rem;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .matrix-grid .cell {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      padding: 0.5rem 0.6rem;
+      text-align: center;
+    }
+    .matrix-grid .row-head {
+      text-align: left;
+      font-weight: 700;
+      color: var(--orange);
+    }
+    .ok {
+      color: #47b475;
+      font-weight: 700;
+    }
+    .warn {
+      color: #ffb400;
+      font-weight: 700;
+    }
+    .dim {
+      color: var(--text-muted);
+    }
+    .kernel-list {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .kernel-chip {
+      background: #121a24;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+      color: var(--text-secondary);
+    }
+    .quant-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .qchip {
+      background: #151f2b;
+      border: 1px solid #2b3a4a;
+      color: #9ed6ff;
+      border-radius: 6px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.78rem;
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .test-item {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+    }
+    .roadmap {
+      margin-top: 1.2rem;
+      background: #0d141b;
+      border: 1px dashed #2a3a4f;
+      border-radius: 10px;
+      padding: 1rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .roadmap strong {
+      color: var(--orange);
+    }
+  </style>
+
+  <div class="matrix-hero">
+    <div class="model-card">
+      <span class="model-badge">Template: qwen2.json</span>
+      <div class="model-title">Qwen2</div>
+      <div class="dim">RMSNorm + RoPE + SwiGLU</div>
+      <div class="model-tags">
+        <span class="tag">QKV bias: from weights</span>
+        <span class="tag">Tokenizer: BPE</span>
+        <span class="tag">Activation: SwiGLU</span>
+        <span class="tag">Attention: full</span>
+      </div>
+    </div>
+    <div class="model-card">
+      <span class="model-badge">Template: qwen3.json</span>
+      <div class="model-title">Qwen3</div>
+      <div class="dim">RMSNorm + RoPE + QK‑Norm + SwiGLU</div>
+      <div class="model-tags">
+        <span class="tag">QKV bias: no</span>
+        <span class="tag">Tokenizer: BPE</span>
+        <span class="tag">Activation: SwiGLU</span>
+        <span class="tag">QK‑Norm: yes</span>
+      </div>
+    </div>
+    <div class="model-card">
+      <span class="model-badge">Template: gemma3.json</span>
+      <div class="model-title">Gemma3</div>
+      <div class="dim">RMSNorm + RoPE + QK‑Norm + GeGLU + Sliding Window</div>
+      <div class="model-tags">
+        <span class="tag">Tokenizer: SentencePiece</span>
+        <span class="tag">Attention: sliding</span>
+        <span class="tag">Post‑Norms: yes</span>
+        <span class="tag">Prefer Q8_0 contract</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Kernel Families by Model</h2>
+    <div class="matrix-grid">
+      <div class="cell row-head">Model</div>
+      <div class="cell">Tokenizer</div>
+      <div class="cell">QKV Bias</div>
+      <div class="cell">QK‑Norm</div>
+      <div class="cell">RoPE</div>
+      <div class="cell">Attention</div>
+      <div class="cell">MLP</div>
+      <div class="cell">Post‑Norms</div>
+      <div class="cell">Logits</div>
+
+      <div class="cell row-head">Qwen2</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Causal</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
+
+      <div class="cell row-head">Qwen3</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Causal</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">LM head</div>
+
+      <div class="cell row-head">Gemma3</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Sliding</div>
+      <div class="cell ok">GeGLU</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Tied</div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">IR + Quant Contracts</h2>
+    <div class="matrix-grid">
+      <div class="cell row-head">Model</div>
+      <div class="cell">Embed Scale</div>
+      <div class="cell">Prefer Q8 Contract</div>
+      <div class="cell">Prefer FP32 Logits</div>
+      <div class="cell">Tokenizer I/O</div>
+      <div class="cell">Attention Kernel</div>
+      <div class="cell">MLP Kernel</div>
+      <div class="cell">Residual Save</div>
+      <div class="cell">LM Head Tie</div>
+
+      <div class="cell row-head">Qwen2</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Qwen3</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn + qk_norm</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
+      <div class="cell row-head">Gemma3</div>
+      <div class="cell ok">sqrt(dim)</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">attn_sliding</div>
+      <div class="cell ok">geglu</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Supported Quant + DType Coverage</h2>
+    <p style="margin-top: 0.6rem; color: var(--text-secondary);">
+      We target weight‑only quantized GEMM/GEMV kernels with BF16/FP32 activations and Q8_* activation contracts.
+      This is the quant palette used by our GGUF conversions and kernel registry.
+    </p>
+    <div class="quant-badges">
+      <span class="qchip">Q4_0</span>
+      <span class="qchip">Q4_1</span>
+      <span class="qchip">Q4_K</span>
+      <span class="qchip">Q5_0</span>
+      <span class="qchip">Q5_1</span>
+      <span class="qchip">Q5_K</span>
+      <span class="qchip">Q6_K</span>
+      <span class="qchip">Q8_0</span>
+      <span class="qchip">Q8_K</span>
+      <span class="qchip">BF16</span>
+      <span class="qchip">FP32</span>
+    </div>
+
+    <div class="kernel-list">
+      <div class="kernel-chip"><strong>GEMV:</strong> q4_k, q5_0, q5_1, q5_k, q6_k, q8_0, fp32</div>
+      <div class="kernel-chip"><strong>GEMM:</strong> q4_k, q5_0, q5_k, q6_k, q8_0, fp32</div>
+      <div class="kernel-chip"><strong>Activations:</strong> fp32, bf16, q8_0, q8_k</div>
+      <div class="kernel-chip"><strong>Fused:</strong> attention + outproj + MLP (prefill) variants</div>
+    </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Current GGUF Test Corpus</h2>
+    <div class="test-grid">
+      <div class="test-item">Qwen--Qwen2-0.5B-Instruct-GGUF</div>
+      <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
+      <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
+    </div>
+  </div>
+
+  <div class="roadmap">
+    <strong>Growth path:</strong> v6.6 locks inference parity and kernel coverage (Qwen2/Qwen3/Gemma3). v7 targets full training:
+    backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules. This page will evolve into a
+    single matrix that shows inference + training coverage per model family.
+  </div>
+</div>
