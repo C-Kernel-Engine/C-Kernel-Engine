@@ -1305,6 +1305,7 @@ showtests:
 	@echo "llama.cpp Parity (Q4_K kernel validation):"
 	@echo "  make llamacpp-parity      Quick parity vs llama.cpp/ggml"
 	@echo "  make llamacpp-parity-full Full parity test (all kernels)"
+	@echo "  make llamacpp-parity-full-all-isa-variants Full parity + AVX/AVX2/AVX-512 sweep"
 	@echo "  Note: Requires llama.cpp submodule (git submodule update --init)"
 	@echo ""
 	@echo "End-to-End Tests:"
@@ -1733,6 +1734,12 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running GEMM AVX vs scalar benchmark..."
 	@$(MAKE) --no-print-directory test-gemm-avx-bench
+
+# Full parity + ISA variant sweep for GEMM AVX benchmarks
+llamacpp-parity-full-all-isa-variants:
+	@echo "Running ISA variant sweep (AVX/AVX2/AVX-512) + full parity..."
+	@./scripts/test_isa_variants.sh
+	@$(MAKE) --no-print-directory llamacpp-parity-full
 
 # Parity tests with performance benchmarks (CK vs llama.cpp)
 llamacpp-parity-perf:
@@ -2979,7 +2986,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-cachegrind profile-v6-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-cachegrind profile-v6-full
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
