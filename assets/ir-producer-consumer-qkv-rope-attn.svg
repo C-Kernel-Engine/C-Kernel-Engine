@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 520" width="1600" height="520" role="img" aria-label="Producer consumer flow for qkv to rope to attention">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#061424"/>
+      <stop offset="100%" stop-color="#081a2e"/>
+    </linearGradient>
+    <linearGradient id="nodeProd" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#123425"/>
+      <stop offset="100%" stop-color="#0f2a1f"/>
+    </linearGradient>
+    <linearGradient id="nodeCons" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#11293e"/>
+      <stop offset="100%" stop-color="#0d2133"/>
+    </linearGradient>
+    <linearGradient id="nodeBoth" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2c2538"/>
+      <stop offset="100%" stop-color="#221d2d"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#8fb3d8"/>
+    </marker>
+    <style>
+      .title { font: 700 36px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #f0f6ff; }
+      .sub { font: 500 18px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #9fb7d0; }
+      .nodeTitle { font: 700 24px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #f0f6ff; }
+      .nodeBody { font: 500 18px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #c8d8ea; }
+      .small { font: 600 15px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #d8e4f3; }
+      .edge { font: 700 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #9bc0e5; }
+      .legend { font: 600 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; fill: #d4e2f2; }
+    </style>
+  </defs>
+
+  <rect x="4" y="4" width="1592" height="512" rx="20" fill="url(#bg)" stroke="#23405a" stroke-width="2"/>
+
+  <text x="46" y="58" class="title">Producer vs Consumer: qkv_proj -&gt; rope_qk -&gt; attn</text>
+  <text x="46" y="88" class="sub">Producer writes outputs. Consumer reads those outputs via dataflow edges.</text>
+
+  <circle cx="54" cy="122" r="10" fill="#29c172"/>
+  <text x="72" y="128" class="legend">Producer node</text>
+  <circle cx="236" cy="122" r="10" fill="#4ca3ff"/>
+  <text x="254" y="128" class="legend">Consumer node</text>
+  <circle cx="430" cy="122" r="10" fill="#c79dff"/>
+  <text x="448" y="128" class="legend">Mixed node (consumes + produces)</text>
+
+  <rect x="120" y="186" width="318" height="150" rx="16" fill="url(#nodeProd)" stroke="#2cc673" stroke-width="2.5"/>
+  <text x="146" y="230" class="nodeTitle">qkv_proj (op 12)</text>
+  <text x="146" y="262" class="nodeBody">Produces: q, k, v</text>
+  <text x="146" y="292" class="nodeBody">Role: producer</text>
+  <rect x="365" y="204" width="54" height="28" rx="14" fill="#1a5f3d" stroke="#2cc673"/>
+  <text x="392" y="223" text-anchor="middle" class="small">P</text>
+
+  <rect x="612" y="166" width="376" height="190" rx="16" fill="url(#nodeBoth)" stroke="#b68df3" stroke-width="2.5"/>
+  <text x="640" y="214" class="nodeTitle">rope_qk (op 13)</text>
+  <text x="640" y="248" class="nodeBody">Consumes: q, k</text>
+  <text x="640" y="278" class="nodeBody">Produces: q_rot, k_rot</text>
+  <text x="640" y="308" class="nodeBody">Role: consumer + producer</text>
+  <rect x="886" y="184" width="54" height="28" rx="14" fill="#24466b" stroke="#4ca3ff"/>
+  <text x="913" y="203" text-anchor="middle" class="small">C</text>
+  <rect x="946" y="184" width="54" height="28" rx="14" fill="#1a5f3d" stroke="#2cc673"/>
+  <text x="973" y="203" text-anchor="middle" class="small">P</text>
+
+  <rect x="1128" y="186" width="338" height="150" rx="16" fill="url(#nodeCons)" stroke="#4ca3ff" stroke-width="2.5"/>
+  <text x="1158" y="230" class="nodeTitle">attn (op 14)</text>
+  <text x="1158" y="262" class="nodeBody">Consumes: q_rot, k_rot, v</text>
+  <text x="1158" y="292" class="nodeBody">Role: consumer</text>
+  <rect x="1392" y="204" width="54" height="28" rx="14" fill="#24466b" stroke="#4ca3ff"/>
+  <text x="1419" y="223" text-anchor="middle" class="small">C</text>
+
+  <path d="M438 228 C 515 228, 540 224, 612 224" fill="none" stroke="#8fb3d8" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="514" y="213" class="edge">q</text>
+
+  <path d="M438 262 C 516 262, 540 258, 612 258" fill="none" stroke="#8fb3d8" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="515" y="250" class="edge">k</text>
+
+  <path d="M988 244 C 1060 244, 1082 236, 1128 236" fill="none" stroke="#8fb3d8" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="1049" y="226" class="edge">q_rot</text>
+
+  <path d="M988 282 C 1060 282, 1082 274, 1128 274" fill="none" stroke="#8fb3d8" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="1054" y="264" class="edge">k_rot</text>
+
+  <path d="M438 320 C 660 430, 910 430, 1128 320" fill="none" stroke="#8fb3d8" stroke-width="3" stroke-dasharray="6 6" marker-end="url(#arrow)"/>
+  <text x="782" y="443" class="edge">v (bypasses rope_qk, still consumed by attn)</text>
+
+  <text x="48" y="486" class="sub">IR view: dataflow.inputs maps consumer args to producer op IDs. Example: rope_qk consumes q/k from op 12; attn consumes q_rot/k_rot from op 13.</text>
+</svg>

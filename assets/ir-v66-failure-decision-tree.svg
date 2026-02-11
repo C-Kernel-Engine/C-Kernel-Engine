@@ -1,0 +1,102 @@
+<svg width="1780" height="1220" viewBox="0 0 1780 1220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v6.6 failure decision tree">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1827"/>
+      <stop offset="100%" stop-color="#0f2133"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15283d"/>
+      <stop offset="100%" stop-color="#111f31"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8dc0e8"/>
+    </marker>
+    <style>
+      .title { font: 800 42px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #f4f9ff; }
+      .sub { font: 500 19px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #b8cce1; }
+      .q { font: 700 20px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #ffdca9; }
+      .a { font: 500 16px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #c5d9ed; }
+      .cmd { font: 700 15px 'IBM Plex Mono', monospace; fill: #8fdfff; }
+      .tag { font: 700 13px 'IBM Plex Sans', sans-serif; fill: #132537; }
+    </style>
+  </defs>
+
+  <rect width="1780" height="1220" fill="url(#bg)"/>
+  <rect x="28" y="24" width="1724" height="1172" rx="16" fill="none" stroke="#2f4863" stroke-width="2"/>
+
+  <text x="64" y="90" class="title">v6.6 Failure Decision Tree</text>
+  <text x="64" y="126" class="sub">Start from the first failing gate. Do not debug everything at once.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="660" y="170" width="460" height="110" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="120" y="350" width="460" height="180" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="660" y="350" width="460" height="180" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="1200" y="350" width="460" height="180" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="120" y="620" width="460" height="210" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="660" y="620" width="460" height="210" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="1200" y="620" width="460" height="210" rx="14" fill="url(#box)" stroke="#436486"/>
+    <rect x="660" y="920" width="460" height="210" rx="14" fill="url(#box)" stroke="#436486"/>
+  </g>
+
+  <rect x="684" y="194" width="132" height="28" rx="14" fill="#ffe0a8"/>
+  <text x="704" y="213" class="tag">ENTRYPOINT</text>
+  <text x="684" y="246" class="q">make v6.6-gate failed?</text>
+
+  <line x1="890" y1="280" x2="350" y2="348" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="890" y1="280" x2="890" y2="346" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="890" y1="280" x2="1430" y2="348" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="150" y="390" class="q">L0/L1 fail?</text>
+  <text x="150" y="420" class="a">Kernel map or tooling contracts failed.</text>
+  <text x="150" y="450" class="cmd">make v6.6-kernel-map-gate</text>
+  <text x="150" y="476" class="cmd">make v6.6-validate-contracts</text>
+  <text x="150" y="508" class="a">First inspect:</text>
+  <text x="150" y="532" class="cmd">version/v6.6/tools/contract_report_latest.json</text>
+
+  <text x="690" y="390" class="q">L2 fail?</text>
+  <text x="690" y="420" class="a">Matrix smoke failed (build/artifact/smoke).</text>
+  <text x="690" y="450" class="cmd">make v6.6-validate-matrix-smoke</text>
+  <text x="690" y="482" class="a">Inspect report row by model first.</text>
+  <text x="690" y="506" class="cmd">version/v6.6/tools/model_matrix_report_latest.json</text>
+
+  <text x="1230" y="390" class="q">L3/L4 fail?</text>
+  <text x="1230" y="420" class="a">Parity matrix or long-decode gate failed.</text>
+  <text x="1230" y="450" class="cmd">make v6.6-validate-parity-matrix</text>
+  <text x="1230" y="476" class="cmd">make v6.6-validate-longdecode</text>
+  <text x="1230" y="508" class="a">Check runtime availability and SKIP policy.</text>
+
+  <line x1="350" y1="532" x2="350" y2="618" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="890" y1="532" x2="890" y2="618" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1430" y1="532" x2="1430" y2="618" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="150" y="662" class="q">Contract drift branch</text>
+  <text x="150" y="692" class="a">Compare changed script signatures, flags, and maps.</text>
+  <text x="150" y="722" class="cmd">git diff version/v6.6/scripts</text>
+  <text x="150" y="748" class="cmd">git diff version/v6.6/kernel_maps</text>
+  <text x="150" y="780" class="a">Re-run only failing contract checker before full gate.</text>
+
+  <text x="690" y="662" class="q">Model row failure branch</text>
+  <text x="690" y="692" class="a">Use failing row note, then rerun single model command.</text>
+  <text x="690" y="722" class="cmd">python version/v6.6/scripts/validate_model_matrix_v6_6.py --with-smoke</text>
+  <text x="690" y="754" class="a">Typical causes: cache mismatch, smoke load, build artifact path.</text>
+  <text x="690" y="784" class="cmd">version/v6.6/tools/model_matrix_report_latest.json</text>
+
+  <text x="1230" y="662" class="q">Parity/long-decode branch</text>
+  <text x="1230" y="692" class="a">If runtime is missing, SKIP may fail with require-all.</text>
+  <text x="1230" y="722" class="cmd">ls build/llama-parity llama.cpp/main</text>
+  <text x="1230" y="748" class="cmd">make llamacpp-parity-build</text>
+  <text x="1230" y="780" class="a">Then rerun parity matrix and long decode validators.</text>
+
+  <line x1="890" y1="830" x2="890" y2="918" stroke="#8dc0e8" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="690" y="962" class="q">Finish branch</text>
+  <text x="690" y="992" class="a">After the failing leaf is green, rerun full gate once.</text>
+  <text x="690" y="1022" class="cmd">make v6.6-gate</text>
+  <text x="690" y="1054" class="a">Only then continue to broader E2E/perf sweeps.</text>
+
+  <rect x="120" y="1138" width="1540" height="52" rx="12" fill="#102033" stroke="#3a6085"/>
+  <text x="148" y="1172" class="a">Operational rule: isolate one failing gate, one failing model row, one failing contract at a time.</text>
+</svg>

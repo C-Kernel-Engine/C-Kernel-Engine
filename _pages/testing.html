@@ -488,6 +488,62 @@ layer.0.wv   max_diff=4.891e-06
 
   <hr>
 
+  <h2>v6.6 Contract + Matrix Gates</h2>
+  <p>
+    Before heavy E2E/parity runs, v6.6 uses two explicit preflight gates:
+    a static tooling-contract checker and a dynamic 3-model matrix checker.
+  </p>
+
+  <pre class="code-block">
+# Primary v6.6 release gate (recommended)
+make v6.6-gate
+
+# Runtime-required parity matrix (when llama parity runtime is present)
+make v6.6-validate-parity-matrix-required
+
+# Optional standalone gates
+make v6.6-validate-contracts
+make v6.6-kernel-map-gate
+make v6.6-validate-matrix-smoke
+make v6.6-validate-longdecode
+  </pre>
+
+  <p>
+    Reports are also written to:
+    <code>version/v6.6/tools/contract_report_latest.json</code> and
+    <code>version/v6.6/tools/model_matrix_report_latest.json</code>.
+    When kernel maps change, regenerate with <code>make v6.6-kernel-map-regenerate</code>.
+  </p>
+
+  <hr>
+
+  <h2>Sliding-Window Regression Coverage</h2>
+  <p>
+    Sliding-window attention now has an explicit contract test that is wired into
+    regular test, llama.cpp parity flow, and nightly reporting.
+  </p>
+
+  <pre class="code-block">
+# Run only sliding-window contract check
+make test-attention-sliding
+
+# Included in main kernel suite
+make test
+
+# Included in llama.cpp parity smoke/full flows
+make llamacpp-parity
+make llamacpp-parity-full
+  </pre>
+
+  <p>
+    Implementation path:
+    <code>unittest/test_attention_sliding_contract.py</code>,
+    <code>scripts/run_parity_smoketest.sh</code>, and
+    <code>scripts/nightly_runner.py</code>.
+  </p>
+
+  <hr>
+
   <h2>Case Study: Finding the RoPE Bug</h2>
   <p>
     This methodology found a subtle RoPE rotation convention bug that caused

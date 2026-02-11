@@ -11,6 +11,213 @@
   </div>
 </div>
 
+<h2>Operator Start Here (Snapshot: February 11, 2026)</h2>
+
+<p>If you revisit this page in six months, begin with the gate entrypoint first. It encodes the current v6.6 release contract better than any prose summary.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">One Command First</h3>
+    <pre>make v6.6-gate</pre>
+    <p style="margin: 0;">This runs kernel-map sync, tooling contracts, matrix smoke, parity matrix (runtime-optional), and long-decode stability in sequence.</p>
+</div>
+
+<div class="img-container svg-viewer" data-title="v6.6 Gate Ladder">
+    <img src="assets/ir-v66-gate-ladder.svg" alt="v6.6 gate ladder from kernel-map sync to long-decode stability">
+</div>
+
+<h2>Runtime Modes and Preconditions</h2>
+
+<p>v6.6 operates in two practical modes: build-smoke mode and full-parity mode. Full parity requires llama parity runtime artifacts; without them, strict parity gates can report <code>SKIP</code> and fail under <code>--require-all</code>.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Runtime Modes">
+    <img src="assets/ir-v66-runtime-modes.svg" alt="v6.6 runtime modes: preflight only, build-smoke, and full parity">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Minimal Preflight (No Parity Runtime)</h3>
+        <pre>make v6.6-kernel-map-gate
+make v6.6-validate-contracts
+make v6.6-validate-matrix-smoke</pre>
+        <p style="margin: 0;">Use this path to validate IR/codegen/build stability without parity runtime binaries.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Full Release Gate (Parity Required)</h3>
+        <pre>make llamacpp-parity-build
+make v6.6-gate
+make v6.6-validate-parity-matrix-required</pre>
+        <p style="margin: 0;">Use this path before release claims that depend on strict CK vs llama parity confidence.</p>
+    </div>
+</div>
+
+<h2>Fast Failure Triage</h2>
+
+<p>Do not read all logs linearly. Start from the first failed gate, open the corresponding JSON report, then move upstream to the producer script.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Failure Decision Tree">
+    <img src="assets/ir-v66-failure-decision-tree.svg" alt="Decision tree for triaging v6.6 gate failures">
+</div>
+
+<table>
+    <tr>
+        <th>Gate</th>
+        <th>Command</th>
+        <th>First File to Inspect</th>
+    </tr>
+    <tr>
+        <td><strong>L0</strong> Kernel map sync</td>
+        <td><code>make v6.6-kernel-map-gate</code></td>
+        <td><code>version/v6.6/kernel_maps/KERNEL_REGISTRY.json</code></td>
+    </tr>
+    <tr>
+        <td><strong>L1</strong> Tooling contracts</td>
+        <td><code>make v6.6-validate-contracts</code></td>
+        <td><code>version/v6.6/tools/contract_report_latest.json</code></td>
+    </tr>
+    <tr>
+        <td><strong>L2</strong> Matrix smoke</td>
+        <td><code>make v6.6-validate-matrix-smoke</code></td>
+        <td><code>version/v6.6/tools/model_matrix_report_latest.json</code></td>
+    </tr>
+    <tr>
+        <td><strong>L3</strong> Parity matrix (runtime-optional)</td>
+        <td><code>make v6.6-validate-parity-matrix</code></td>
+        <td><code>version/v6.6/tools/parity_matrix_report_latest.json</code></td>
+    </tr>
+    <tr>
+        <td><strong>L3R</strong> Strict parity matrix (runtime-required)</td>
+        <td><code>make v6.6-validate-parity-matrix-required</code></td>
+        <td><code>version/v6.6/tools/parity_matrix_report_latest.json</code></td>
+    </tr>
+    <tr>
+        <td><strong>L4</strong> Long decode stability</td>
+        <td><code>make v6.6-validate-longdecode</code></td>
+        <td><code>version/v6.6/tools/long_decode_report_latest.json</code></td>
+    </tr>
+</table>
+
+<h2>Live Gate Status (From JSON Reports)</h2>
+
+<p>This panel reads the latest v6.6 gate artifacts from <code>version/v6.6/tools/*.json</code> and summarizes gate health at a glance.</p>
+
+<div class="card card-accent" id="v66-live-gate-card">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+        <h3 style="margin: 0;">v6.6 Gate Dashboard</h3>
+        <button id="v66-gate-refresh" type="button" style="border: 1px solid #36506b; background: #102131; color: #dbe7f3; padding: 0.4rem 0.7rem; border-radius: 8px; cursor: pointer;">
+            Refresh
+        </button>
+    </div>
+    <p id="v66-gate-meta" style="margin: 0.65rem 0 0; color: #9fb4c8;">Loading gate reports...</p>
+    <div id="v66-gate-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.8rem; margin-top: 0.95rem;">
+        <div class="v66-gate-cell" data-gate-key="contracts">
+            <div class="v66-gate-title">L1 Contracts</div>
+            <div class="v66-gate-pill v66-pill-loading">LOADING</div>
+            <div class="v66-gate-note">Checking report...</div>
+        </div>
+        <div class="v66-gate-cell" data-gate-key="matrix">
+            <div class="v66-gate-title">L2 Matrix Smoke</div>
+            <div class="v66-gate-pill v66-pill-loading">LOADING</div>
+            <div class="v66-gate-note">Checking report...</div>
+        </div>
+        <div class="v66-gate-cell" data-gate-key="parity">
+            <div class="v66-gate-title">L3 Parity Matrix</div>
+            <div class="v66-gate-pill v66-pill-loading">LOADING</div>
+            <div class="v66-gate-note">Checking report...</div>
+        </div>
+        <div class="v66-gate-cell" data-gate-key="longdecode">
+            <div class="v66-gate-title">L4 Long Decode</div>
+            <div class="v66-gate-pill v66-pill-loading">LOADING</div>
+            <div class="v66-gate-note">Checking report...</div>
+        </div>
+    </div>
+    <p id="v66-gate-errors" style="margin: 0.9rem 0 0; color: #ffb4b4; display: none;"></p>
+</div>
+
+<h2>Validation + Test Gates (Detailed View)</h2>
+
+<p>This stack diagram shows what each gate validates, where it runs, and how failures surface in artifacts and CI output.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Validation and Test Gates">
+    <img src="assets/ir-v66-test-gates.svg" alt="v6.6 validation and parity gates from tooling contracts to nightly CI">
+</div>
+
+<h2>Artifact Lineage (Who Produces What)</h2>
+
+<p>For fast debugging, think in artifact lineage: report JSON -&gt; producer script -&gt; upstream artifact input.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Artifact Lineage">
+    <img src="assets/ir-v66-artifact-lineage.svg" alt="Lineage graph for v6.6 gate artifacts and producing scripts">
+</div>
+
+<h2>Status Semantics</h2>
+
+<p>Gate status words are shared, but strictness is configurable. Use this table as operational truth.</p>
+
+<table>
+    <tr>
+        <th>Status</th>
+        <th>Operational Meaning</th>
+        <th>Effect in Strict Gate</th>
+    </tr>
+    <tr>
+        <td><strong>PASS</strong></td>
+        <td>Contract/rule satisfied</td>
+        <td>Continues</td>
+    </tr>
+    <tr>
+        <td><strong>WARN</strong></td>
+        <td>Potential drift, still executable</td>
+        <td>Can fail when strict mode is enabled</td>
+    </tr>
+    <tr>
+        <td><strong>SKIP</strong></td>
+        <td>Validation not run (runtime/input unavailable)</td>
+        <td>Fails when <code>--require-all</code> is active</td>
+    </tr>
+    <tr>
+        <td><strong>FAIL</strong></td>
+        <td>Contract violation or runtime error</td>
+        <td>Stops gate immediately</td>
+    </tr>
+</table>
+
+<h2>v6.6 Evolution Timeline</h2>
+
+<p>This timeline uses explicit dates so later readers can reconstruct why gate behavior changed and what constraints were introduced.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Evolution Timeline">
+    <img src="assets/ir-v66-evolution-timeline.svg" alt="Timeline of v6.6 evolution from initial build flow to operator gate stack">
+</div>
+
+<h2>Edge-Case Coverage to Preserve</h2>
+
+<p>This matrix captures edge cases that matter most for keeping v6.6 stable over time.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Edge-Case Matrix">
+    <img src="assets/ir-v66-edge-case-matrix.svg" alt="v6.6 edge-case matrix covering runtime, cache, and sliding-window boundaries">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">High-Value Test Cases and Edge Cases</h3>
+    <ul>
+        <li><strong>No parity runtime installed</strong>: verify expected <code>SKIP</code> path and explicit failure path for required parity mode</li>
+        <li><strong>Offline cached model flow</strong>: <code>v6.6-validate-matrix-smoke</code> should pass when cache is warm and network is unavailable</li>
+        <li><strong>Sliding-window boundaries</strong>: validate <code>sliding_window = -1, 0, 1, &gt; seq_len</code> for both prefill and decode</li>
+        <li><strong>Model override hygiene</strong>: wrappers passing <code>--model</code> / <code>--model-dir</code> must avoid hidden default-cache behavior</li>
+        <li><strong>Layout compatibility</strong>: ensure flat <code>memory.weights.entries</code> and legacy formats both remain parseable where needed</li>
+        <li><strong>Concurrent gate runs</strong>: protect shared cache outputs from cross-run artifact corruption</li>
+        <li><strong>Long decode reliability</strong>: enforce minimum decode-run count and stable no-NaN/no-Inf summary checks</li>
+    </ul>
+</div>
+
+<h2>Six-Month Operator Memory Card</h2>
+
+<p>This card is intentionally redundant. If you read only one visual after a long break, read this one.</p>
+
+<div class="img-container svg-viewer" data-title="v6.6 Operator Memory Card">
+    <img src="assets/ir-v66-operator-cheatsheet.svg" alt="Six-month operator memory card for v6.6 gate flow">
+</div>
+
 <h2>Kernel AMP Strategy</h2>
 
 <p><strong>AMP</strong> here means <strong>automatic mixed precision per operation</strong>. It is <em>not</em> the GPU-style AMP most people know. In v6.6, AMP decides whether each op runs on FP32 activations or Q8 activations based on quant summary, template flags, and kernel availability.</p>
@@ -133,6 +340,131 @@
 }</pre>
     <p style="margin: 0;">Lowered call will pass <code>token_ids</code> and <code>embedded_input</code> pointers.</p>
     <p style="margin: 0.5rem 0 0;">See: <code>version/v6.6/kernel_maps/embedding_forward_q8_0.json</code></p>
+</div>
+
+<h2>Producer vs Consumer (Plain Language)</h2>
+
+<p>In this page, <strong>producer</strong> and <strong>consumer</strong> are data-flow terms, not people. A producer writes a value/buffer/artifact. A consumer reads it in the same stage or the next stage.</p>
+
+<table>
+    <tr>
+        <th>Context</th>
+        <th>Producer</th>
+        <th>Consumer</th>
+        <th>What It Means</th>
+    </tr>
+    <tr>
+        <td><strong>Stage handoff</strong></td>
+        <td>Current stage script writes JSON/C artifact</td>
+        <td>Next stage script reads that artifact</td>
+        <td>Example: <code>build_ir_v6_6.py</code> produces <code>lowered_decode_call.json</code>; <code>codegen_v6_6.py</code> consumes it</td>
+    </tr>
+    <tr>
+        <td><strong>IR op graph (IR1)</strong></td>
+        <td>Earlier op writes named outputs</td>
+        <td>Later op references those outputs via <code>dataflow.inputs</code></td>
+        <td>If op 13 has <code>"q": 12</code>, op 12 is producer of <code>q</code>, op 13 is consumer of <code>q</code></td>
+    </tr>
+    <tr>
+        <td><strong>Kernel call contract</strong></td>
+        <td><code>outputs[]</code> args in kernel map</td>
+        <td><code>inputs[]</code> args in kernel map</td>
+        <td>Kernel map defines who writes and who reads for each call argument</td>
+    </tr>
+    <tr>
+        <td><strong>Memory planner</strong></td>
+        <td>Logical buffer assignment for produced tensors</td>
+        <td>Later calls reading same logical value</td>
+        <td>Planner decides where produced data lives (scratch/main/KV) so consumers can read it safely</td>
+    </tr>
+    <tr>
+        <td><strong>Codegen/runtime</strong></td>
+        <td>Lowered call IR produces concrete call args in C</td>
+        <td>Compiled runtime executes calls in order</td>
+        <td>Codegen does not invent producers/consumers; it emits what IR already resolved</td>
+    </tr>
+</table>
+
+<div class="img-container svg-viewer" data-title="Producer vs Consumer: qkv to rope to attention">
+    <img src="assets/ir-producer-consumer-qkv-rope-attn.svg" alt="Producer consumer chain for qkv projection, rope, and attention">
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">How to Read One Dataflow Edge</h3>
+    <pre>{
+  "op_id": 12,
+  "op": "qkv_proj",
+  "outputs": { "q": "...", "k": "...", "v": "..." }
+}
+{
+  "op_id": 13,
+  "op": "rope_qk",
+  "dataflow": { "inputs": { "q": 12, "k": 12 } }
+}</pre>
+    <p style="margin: 0;">Interpretation: op 12 produces <code>q</code>/<code>k</code>; op 13 consumes those outputs and produces rotated <code>q</code>/<code>k</code> for the next consumer (usually attention).</p>
+</div>
+
+<h2>When QKV "Split" Happens (Head Handling)</h2>
+
+<p><strong>Short answer:</strong> in v6.6, split happens during Q/K/V projection itself (head-major outputs), not as a separate "split kernel" after one big projection.</p>
+
+<table>
+    <tr>
+        <th>Stage</th>
+        <th>What Happens</th>
+        <th>Shape Intent</th>
+    </tr>
+    <tr>
+        <td><strong>Q/K/V projection</strong></td>
+        <td>IR emits <code>q_proj</code>, <code>k_proj</code>, <code>v_proj</code> (or fused head-major QKV in selected paths).</td>
+        <td><code>q: [H, T, AD]</code>, <code>k/v: [KV, T, AD]</code> (already split by heads)</td>
+    </tr>
+    <tr>
+        <td><strong>QK norm (optional)</strong></td>
+        <td><code>qk_norm</code> runs on projected Q/K.</td>
+        <td>Same head-major layout, normalized in place</td>
+    </tr>
+    <tr>
+        <td><strong>RoPE</strong></td>
+        <td><code>rope_qk</code> rotates Q and K only.</td>
+        <td>Q/K stay head-major; V is unchanged</td>
+    </tr>
+    <tr>
+        <td><strong>Attention</strong></td>
+        <td><code>attention_forward_*_head_major_gqa_* </code> consumes Q/K/V and computes attention.</td>
+        <td>Kernel loops all query heads internally and maps to KV heads via GQA</td>
+    </tr>
+</table>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Do We Do QKV + RoPE "All At Once"?</h3>
+    <p style="margin: 0 0 0.6rem 0;">Not in the default conservative v6.6 path.</p>
+    <ul>
+        <li>Q, K, V are produced first (three ops or a selected fused QKV op).</li>
+        <li>RoPE runs after Q/K exist, before attention.</li>
+        <li>Attention kernel then handles head iteration and GQA mapping internally.</li>
+    </ul>
+    <p style="margin: 0;">A sliding-window variant uses the same contract and adds <code>sliding_window</code> as an extra runtime parameter.</p>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Kernel-Level Head Mapping (What "Automatic" Means)</h3>
+    <p style="margin: 0 0 0.6rem 0;">Inside attention kernels, heads are iterated in-kernel and mapped to KV groups:</p>
+    <pre>for (h = 0; h &lt; num_heads; ++h) {
+  kv_head = h * num_kv_heads / num_heads;  // GQA mapping
+  ... attention for this head ...
+}</pre>
+    <p style="margin: 0;">Caller still provides <code>num_heads</code>, <code>num_kv_heads</code>, <code>head_dim</code>, and buffers. The kernel does not infer model dims.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">References</h3>
+    <ul>
+        <li><code>version/v6.6/kernel_maps/attention_forward_causal_head_major_gqa_flash_strided.json</code></li>
+        <li><code>version/v6.6/kernel_maps/attention_forward_causal_head_major_gqa_flash_strided_sliding.json</code></li>
+        <li><code>src/kernels/attention_kernels.c</code></li>
+        <li><code>src/kernels/attention_kernels_sliding.c</code></li>
+    </ul>
 </div>
 
 <h2>IR1 to IR Lowering</h2>
@@ -338,8 +670,19 @@ gemv_q8_0(
 python version/v6.6/tools/open_ir_visualizer.py gemma3
 
 # Or generate only (no browser):
-python version/v6.6/tools/open_ir_visualizer.py --generate gemma3</pre>
+python version/v6.6/tools/open_ir_visualizer.py --generate gemma3
+
+# Generate with decode profile artifacts:
+python version/v6.6/tools/open_ir_visualizer.py --generate gemma3 --with-profile --force-compile
+
+# Generate with probes (memory sign-off + perf stat/flamegraph + perf budgets):
+python version/v6.6/tools/open_ir_visualizer.py --generate gemma3 --with-probes --force-compile</pre>
     <p style="margin: 0;">This generates <code>ir_report.html</code> inside the model’s <code>ck_build</code> directory.</p>
+    <p style="margin: 0.5rem 0 0; color: #9aa3ad;">
+        For cached model aliases that are not directly runnable checkpoints, pass
+        <code>--run-model hf://.../model.gguf</code>. Example for Gemma:
+        <code>--run-model hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf --chat-template none</code>.
+    </p>
 </div>
 
 <div class="card">
@@ -347,9 +690,131 @@ python version/v6.6/tools/open_ir_visualizer.py --generate gemma3</pre>
     <p>Open <code>version/v6.6/tools/ir_visualizer.html</code> in a browser and load:</p>
     <ul>
         <li><code>ir1_decode.json</code> / <code>ir1_prefill.json</code></li>
-        <li><code>lowered_decode.json</code> / <code>lowered_prefill.json</code></li>
+        <li><code>lowered_decode_call.json</code> / <code>lowered_prefill_call.json</code> (or <code>lowered_*.json</code> fallback)</li>
         <li><code>layout_decode.json</code> / <code>layout_prefill.json</code></li>
+        <li><code>weights_manifest.json</code> (optional but recommended)</li>
+        <li><code>profile_summary.json</code> (optional)</li>
     </ul>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Recommended Run Flow (Baked Report)</h3>
+    <pre># 1) List models that already have IR artifacts
+python version/v6.6/tools/open_ir_visualizer.py --list
+
+# 2) Open an interactive report in your browser
+python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF
+
+# 3) Generate report only (no auto-open)
+python version/v6.6/tools/open_ir_visualizer.py --generate Qwen--Qwen3-0.6B-GGUF
+
+# Optional: custom output path
+python version/v6.6/tools/open_ir_visualizer.py --generate Qwen--Qwen3-0.6B-GGUF --output /tmp/ir_report.html
+
+# One-command rich report (profile + probes + embedded artifacts)
+python version/v6.6/tools/open_ir_visualizer.py \
+  --generate Qwen--Qwen3-0.6B-GGUF \
+  --with-probes --force-compile \
+  --output /tmp/ir_report.html</pre>
+    <p style="margin: 0;">
+        By default this writes <code>ir_report.html</code> in the model's <code>ck_build</code> directory.
+        The generated report now embeds decode/prefill IR data so it opens as a standalone artifact.
+    </p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Open the Generated Report</h3>
+    <pre># Linux desktop
+xdg-open ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF/ir_report.html
+
+# Or run auto-open directly (no separate xdg-open step)
+python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF</pre>
+    <p style="margin: 0;">
+        If your environment has no GUI, copy the generated <code>ir_report.html</code> to a machine with a browser and open it there.
+    </p>
+</div>
+
+<h3>How to Read the Viewer in 10 Minutes</h3>
+
+<table>
+    <tr>
+        <th>Panel</th>
+        <th>What to Verify</th>
+        <th>Bug Signal to Watch</th>
+    </tr>
+    <tr>
+        <td><strong>Operator Snapshot</strong></td>
+        <td>Mode (<code>decode</code>/<code>prefill</code>), required file coverage, warnings, runbook</td>
+        <td>Missing required files, unexpected warnings, wrong model metadata</td>
+    </tr>
+    <tr>
+        <td><strong>Memory Layout</strong></td>
+        <td>Weights/activations sizes and region bars match expectation</td>
+        <td>Offsets jump backward, suspicious tiny/huge buffers, KV cache missing</td>
+    </tr>
+    <tr>
+        <td><strong>Kernel Flow</strong></td>
+        <td>Op order is coherent; expected kernels appear per layer</td>
+        <td>Missing op families, wrong kernel variants, layer count drift</td>
+    </tr>
+    <tr>
+        <td><strong>Quantization Audit</strong></td>
+        <td>Dtype-to-kernel mapping consistency (<code>q8_0</code> -> q8 kernels, etc.)</td>
+        <td>Dtype mismatch rows, unexpected fp32 fallback in quant path</td>
+    </tr>
+    <tr>
+        <td><strong>Dataflow Graph</strong></td>
+        <td>Producer/consumer edges for q/k/v, residual, and MLP chain</td>
+        <td>Uninitialized inputs, missing producer IDs, broken residual flow</td>
+    </tr>
+    <tr>
+        <td><strong>Profile</strong></td>
+        <td>Hotspots align with architecture expectations</td>
+        <td>Sudden hotspot shift without a deliberate kernel/runtime change</td>
+    </tr>
+</table>
+
+<h3>Producer/Consumer Tracing (Concrete Recipe)</h3>
+
+<div class="card">
+    <ol>
+        <li>Load report and select the right mode (<code>decode</code> or <code>prefill</code>).</li>
+        <li>Open <strong>Dataflow Graph</strong>, filter to layer/op of interest (e.g., <code>rope_qk</code>, <code>attn</code>).</li>
+        <li>Read the op row: find <code>inputs</code> with <code>from_op</code> and <code>from_output</code>.</li>
+        <li>Jump to that producer op ID and confirm it emits the named output with expected dtype.</li>
+        <li>Cross-check memory implications in <strong>Memory Layout</strong> (buffer exists, size and role are sane).</li>
+    </ol>
+    <p style="margin: 0.7rem 0 0;">
+        Rule of thumb: every consumer input should trace to exactly one intentional producer path. If you cannot explain the edge in one sentence, treat it as suspect.
+    </p>
+</div>
+
+<h3>When Tests Pass But You Still Suspect a Bug</h3>
+
+<div class="card">
+    <ul>
+        <li><strong>Decode vs prefill divergence:</strong> same op family but different kernel variant or dtype without explicit reason</li>
+        <li><strong>Residual path anomalies:</strong> extra/missing residual save-add pair in one layer</li>
+        <li><strong>Silent dtype drift:</strong> quantized weights but fp32-heavy execution path in lowered calls</li>
+        <li><strong>Memory planner smell:</strong> unusually large scratch growth or KV cache footprint jump</li>
+        <li><strong>Graph coherence:</strong> orphan node/edge patterns that suggest missing producer wiring</li>
+    </ul>
+    <p style="margin: 0.7rem 0 0;">
+        These are high-signal human checks that catch regressions before they become parity failures.
+    </p>
+</div>
+
+<h3>Operator Workflow (Daily Use)</h3>
+
+<div class="card">
+    <pre># Gate first
+make v6.6-gate
+
+# For release-level strictness
+make v6.6-validate-parity-matrix-required
+
+# Then inspect visual report for topology/memory sanity
+python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF</pre>
 </div>
 
 <h2>What AMP Means Here</h2>
@@ -402,3 +867,208 @@ python version/v6.6/tools/open_ir_visualizer.py --generate gemma3</pre>
         Templates and IR are dynamic by design. The generated C is the stable artifact that can be stripped into a lightweight runtime.
     </div>
 </div>
+
+<style>
+#v66-live-gate-card .v66-gate-cell {
+    border: 1px solid #2d4358;
+    border-radius: 10px;
+    padding: 0.7rem 0.75rem;
+    background: rgba(9, 20, 32, 0.65);
+}
+#v66-live-gate-card .v66-gate-title {
+    font-size: 0.95rem;
+    color: #d7e4ef;
+    margin-bottom: 0.45rem;
+}
+#v66-live-gate-card .v66-gate-pill {
+    display: inline-block;
+    min-width: 72px;
+    text-align: center;
+    padding: 0.22rem 0.56rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.79rem;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+}
+#v66-live-gate-card .v66-gate-note {
+    margin-top: 0.45rem;
+    color: #9fb4c8;
+    font-size: 0.82rem;
+}
+#v66-live-gate-card .v66-pill-pass { background: rgba(36, 179, 113, 0.16); border-color: #22b573; color: #90f5c5; }
+#v66-live-gate-card .v66-pill-warn { background: rgba(255, 179, 0, 0.15); border-color: #ffb400; color: #ffd881; }
+#v66-live-gate-card .v66-pill-fail { background: rgba(231, 76, 60, 0.15); border-color: #e74c3c; color: #ffb0a8; }
+#v66-live-gate-card .v66-pill-skip { background: rgba(87, 164, 255, 0.16); border-color: #57a4ff; color: #b7d9ff; }
+#v66-live-gate-card .v66-pill-missing { background: rgba(145, 158, 171, 0.15); border-color: #75869a; color: #d4dde5; }
+#v66-live-gate-card .v66-pill-loading { background: rgba(98, 111, 126, 0.2); border-color: #4d6178; color: #cdd7e1; }
+</style>
+
+<script>
+(function () {
+    const REPORT_CANDIDATE_BASES = [
+        "version/v6.6/tools/",
+        "./version/v6.6/tools/",
+        "/version/v6.6/tools/",
+        "assets/v6.6-tools/"
+    ];
+
+    const REPORTS = [
+        { key: "contracts", file: "contract_report_latest.json" },
+        { key: "matrix", file: "model_matrix_report_latest.json" },
+        { key: "parity", file: "parity_matrix_report_latest.json" },
+        { key: "longdecode", file: "long_decode_report_latest.json" }
+    ];
+
+    function rankStatus(status) {
+        const order = { FAIL: 5, WARN: 4, SKIP: 3, PASS: 2, MISSING: 1, LOADING: 0 };
+        return order[status] || 0;
+    }
+
+    function pickWorst(a, b) {
+        return rankStatus(a) >= rankStatus(b) ? a : b;
+    }
+
+    function statusClass(status) {
+        if (status === "PASS") return "v66-pill-pass";
+        if (status === "WARN") return "v66-pill-warn";
+        if (status === "FAIL") return "v66-pill-fail";
+        if (status === "SKIP") return "v66-pill-skip";
+        if (status === "MISSING") return "v66-pill-missing";
+        return "v66-pill-loading";
+    }
+
+    function summarizeCounts(counts) {
+        if (!counts || typeof counts !== "object") return "no-summary";
+        const keys = ["PASS", "WARN", "SKIP", "FAIL"];
+        const parts = [];
+        for (const k of keys) {
+            if (Object.prototype.hasOwnProperty.call(counts, k)) {
+                parts.push(k + " " + counts[k]);
+            }
+        }
+        return parts.length ? parts.join(" · ") : "no-summary";
+    }
+
+    async function fetchJsonWithFallback(filename) {
+        for (const base of REPORT_CANDIDATE_BASES) {
+            const url = base + filename;
+            try {
+                const res = await fetch(url, { cache: "no-store" });
+                if (!res.ok) continue;
+                const data = await res.json();
+                return { ok: true, url: url, data: data };
+            } catch (e) {
+                // keep trying candidate paths
+            }
+        }
+        return { ok: false, url: null, data: null };
+    }
+
+    function deriveStatus(reportKey, payload) {
+        if (!payload || typeof payload !== "object") {
+            return { status: "MISSING", note: "report unavailable" };
+        }
+
+        if (reportKey === "contracts") {
+            const summary = payload.summary || {};
+            if ((summary.FAIL || 0) > 0) return { status: "FAIL", note: summarizeCounts(summary) };
+            if ((summary.WARN || 0) > 0) return { status: "WARN", note: summarizeCounts(summary) };
+            return { status: "PASS", note: summarizeCounts(summary) };
+        }
+
+        if (reportKey === "matrix") {
+            const summary = payload.summary || {};
+            if ((summary.FAIL || 0) > 0) return { status: "FAIL", note: summarizeCounts(summary) };
+            if ((summary.WARN || 0) > 0) return { status: "WARN", note: summarizeCounts(summary) };
+            if ((summary.SKIP || 0) > 0) return { status: "SKIP", note: summarizeCounts(summary) };
+            return { status: "PASS", note: summarizeCounts(summary) };
+        }
+
+        if (reportKey === "parity") {
+            const summary = payload.summary || {};
+            const runtimeAvailable = payload.runtime_available;
+            if ((summary.FAIL || 0) > 0) return { status: "FAIL", note: summarizeCounts(summary) };
+            if ((summary.WARN || 0) > 0) return { status: "WARN", note: summarizeCounts(summary) };
+            if ((summary.SKIP || 0) > 0) {
+                const suffix = runtimeAvailable === false ? " (runtime missing)" : "";
+                return { status: "SKIP", note: summarizeCounts(summary) + suffix };
+            }
+            return { status: "PASS", note: summarizeCounts(summary) };
+        }
+
+        if (reportKey === "longdecode") {
+            const summary = payload.summary || {};
+            if ((summary.FAIL || 0) > 0) return { status: "FAIL", note: summarizeCounts(summary) };
+            if ((summary.WARN || 0) > 0) return { status: "WARN", note: summarizeCounts(summary) };
+            if ((summary.SKIP || 0) > 0) return { status: "SKIP", note: summarizeCounts(summary) };
+            return { status: "PASS", note: summarizeCounts(summary) };
+        }
+
+        return { status: "MISSING", note: "unknown report type" };
+    }
+
+    function setGateCell(key, status, note) {
+        const cell = document.querySelector('#v66-live-gate-card .v66-gate-cell[data-gate-key="' + key + '"]');
+        if (!cell) return;
+        const pill = cell.querySelector(".v66-gate-pill");
+        const text = cell.querySelector(".v66-gate-note");
+        if (pill) {
+            pill.textContent = status;
+            pill.className = "v66-gate-pill " + statusClass(status);
+        }
+        if (text) {
+            text.textContent = note;
+        }
+    }
+
+    async function loadV66GateStatus() {
+        const meta = document.getElementById("v66-gate-meta");
+        const errors = document.getElementById("v66-gate-errors");
+        if (!meta) return;
+
+        meta.textContent = "Loading gate reports...";
+        if (errors) {
+            errors.style.display = "none";
+            errors.textContent = "";
+        }
+
+        let overall = "PASS";
+        const missing = [];
+
+        for (const item of REPORTS) {
+            setGateCell(item.key, "LOADING", "Checking report...");
+            const fetched = await fetchJsonWithFallback(item.file);
+            if (!fetched.ok) {
+                setGateCell(item.key, "MISSING", "could not fetch " + item.file);
+                overall = pickWorst(overall, "MISSING");
+                missing.push(item.file);
+                continue;
+            }
+
+            const derived = deriveStatus(item.key, fetched.data);
+            setGateCell(item.key, derived.status, derived.note);
+            overall = pickWorst(overall, derived.status);
+        }
+
+        const now = new Date();
+        meta.textContent = "Overall: " + overall + " · Updated: " + now.toLocaleString();
+
+        if (missing.length && errors) {
+            errors.style.display = "block";
+            errors.textContent =
+                "Some reports are not reachable from this docs server root. Missing: " +
+                missing.join(", ") +
+                ". Run docs from repository root, or expose version/v6.6/tools/ under your docs server.";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const refreshBtn = document.getElementById("v66-gate-refresh");
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", loadV66GateStatus);
+        }
+        loadV66GateStatus();
+    });
+})();
+</script>

@@ -1,0 +1,88 @@
+<svg width="1780" height="1180" viewBox="0 0 1780 1180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v6.6 edge case matrix">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1827"/>
+      <stop offset="100%" stop-color="#12273a"/>
+    </linearGradient>
+    <style>
+      .title { font: 800 40px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #f4f9ff; }
+      .sub { font: 500 18px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #b9cee3; }
+      .h { font: 700 16px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #ffe0b3; }
+      .b { font: 500 14px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #c6d9ec; }
+      .tag { font: 700 12px 'IBM Plex Sans', sans-serif; fill: #162a3d; }
+      .cmd { font: 700 13px 'IBM Plex Mono', monospace; fill: #8edfff; }
+    </style>
+  </defs>
+
+  <rect width="1780" height="1180" fill="url(#bg)"/>
+  <rect x="22" y="20" width="1736" height="1140" rx="16" fill="none" stroke="#2f4b66" stroke-width="2"/>
+
+  <text x="58" y="82" class="title">v6.6 Edge-Case Matrix</text>
+  <text x="58" y="116" class="sub">Cases that should stay explicit to keep future operator behavior predictable.</text>
+
+  <rect x="60" y="160" width="1660" height="70" rx="10" fill="#13263a" stroke="#3f6286"/>
+  <text x="90" y="205" class="h">Case</text>
+  <text x="520" y="205" class="h">Why It Matters</text>
+  <text x="1020" y="205" class="h">Minimum Check</text>
+  <text x="1470" y="205" class="h">Owner</text>
+
+  <rect x="60" y="246" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="262" width="118" height="24" rx="12" fill="#ffd69c"/>
+  <text x="92" y="279" class="tag">RUNTIME</text>
+  <text x="90" y="314" class="b">No llama parity runtime</text>
+  <text x="520" y="294" class="b">Parity matrix reports SKIP; strict require-all can fail release gate.</text>
+  <text x="1020" y="286" class="cmd">make v6.6-validate-parity-matrix</text>
+  <text x="1020" y="314" class="cmd">make v6.6-validate-parity-matrix-required</text>
+  <text x="1470" y="304" class="b">Parity tooling</text>
+
+  <rect x="60" y="362" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="378" width="118" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="96" y="395" class="tag">NETWORK</text>
+  <text x="90" y="430" class="b">Offline warm-cache run</text>
+  <text x="520" y="410" class="b">Build/smoke confidence must survive network outages in operator environments.</text>
+  <text x="1020" y="402" class="cmd">make v6.6-validate-matrix-smoke</text>
+  <text x="1470" y="420" class="b">Build matrix</text>
+
+  <rect x="60" y="478" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="494" width="118" height="24" rx="12" fill="#9ff3bd"/>
+  <text x="103" y="511" class="tag">KERNEL</text>
+  <text x="90" y="546" class="b">Sliding window boundaries</text>
+  <text x="520" y="526" class="b">Window semantics can drift silently and break decode parity.</text>
+  <text x="1020" y="518" class="cmd">make test-attention-sliding</text>
+  <text x="1470" y="536" class="b">Kernel tests</text>
+
+  <rect x="60" y="594" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="610" width="118" height="24" rx="12" fill="#ffce8a"/>
+  <text x="102" y="627" class="tag">LAYOUT</text>
+  <text x="90" y="662" class="b">Flat vs legacy layout schema</text>
+  <text x="520" y="642" class="b">Schema drift can break smoke/analysis paths that parse layout fields.</text>
+  <text x="1020" y="634" class="cmd">python version/v6.6/scripts/validate_tooling_contracts.py</text>
+  <text x="1470" y="652" class="b">IR tooling</text>
+
+  <rect x="60" y="710" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="726" width="118" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="103" y="743" class="tag">WRAPPER</text>
+  <text x="90" y="778" class="b">Model override path hygiene</text>
+  <text x="520" y="758" class="b">Default-cache assumptions cause false confidence and brittle local runs.</text>
+  <text x="1020" y="750" class="cmd">make v6.6-test-quick MODEL=/path/to/ck_build</text>
+  <text x="1470" y="768" class="b">Test harness</text>
+
+  <rect x="60" y="826" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="842" width="118" height="24" rx="12" fill="#9ff3bd"/>
+  <text x="103" y="859" class="tag">STABILITY</text>
+  <text x="90" y="894" class="b">Long decode reliability</text>
+  <text x="520" y="874" class="b">Short smoke can pass while sustained decode diverges or accumulates NaN/Inf.</text>
+  <text x="1020" y="866" class="cmd">make v6.6-validate-longdecode</text>
+  <text x="1470" y="884" class="b">Runtime validation</text>
+
+  <rect x="60" y="942" width="1660" height="104" rx="10" fill="#102133" stroke="#35577b"/>
+  <rect x="70" y="958" width="118" height="24" rx="12" fill="#ffd69c"/>
+  <text x="102" y="975" class="tag">RACE</text>
+  <text x="90" y="1010" class="b">Concurrent gate runs</text>
+  <text x="520" y="990" class="b">Shared cache writes can overwrite artifacts and create nondeterministic failures.</text>
+  <text x="1020" y="982" class="cmd">run v6.6-gate in isolated output dirs for CI shards</text>
+  <text x="1470" y="1000" class="b">CI ops</text>
+
+  <rect x="60" y="1062" width="1660" height="82" rx="12" fill="#13263b" stroke="#3f6286"/>
+  <text x="90" y="1106" class="b">Keep this matrix updated whenever gate commands, require-all behavior, or report schemas change.</text>
+</svg>

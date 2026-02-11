@@ -1,139 +1,189 @@
-<svg width="1200" height="980" viewBox="0 0 1200 980" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IR pipeline with expanded explanations of inputs and each IR stage">
+<svg width="1400" height="1340" viewBox="0 0 1400 1340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="C-Kernel-Engine v6.6 IR pipeline from GGUF and template to generated C runtime">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0f151c"/>
-      <stop offset="100%" stop-color="#0b1218"/>
+      <stop offset="0%" stop-color="#0f151d"/>
+      <stop offset="100%" stop-color="#0a1016"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ff9b3d"/>
-      <stop offset="100%" stop-color="#4cc0ff"/>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101b28"/>
+      <stop offset="100%" stop-color="#0d1621"/>
     </linearGradient>
-    <linearGradient id="chip" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#1a2430"/>
-      <stop offset="100%" stop-color="#131c26"/>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#152335"/>
+      <stop offset="100%" stop-color="#111d2c"/>
     </linearGradient>
-    <linearGradient id="lane" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#101a24"/>
-      <stop offset="100%" stop-color="#0d141b"/>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff9d3a"/>
+      <stop offset="100%" stop-color="#42c4ff"/>
     </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6f86a0"/>
+    </marker>
   </defs>
 
-  <rect x="0" y="0" width="1200" height="980" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1400" height="1340" fill="url(#bg)"/>
 
-  <!-- Title -->
-  <text x="60" y="48" font-family="Inter, Segoe UI, Arial" font-size="26" fill="#ff9b3d">IR Pipeline (v6.6)</text>
-  <text x="60" y="72" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#9fb1c2">
-    Inputs → IR1 → IR2 → IR3 → Codegen → C runtime (each stage reduces ambiguity)
+  <!-- Header -->
+  <text x="64" y="56" font-family="Inter, Segoe UI, Arial" font-size="34" fill="#ffad53">IR Pipeline (v6.6)</text>
+  <text x="64" y="88" font-family="Inter, Segoe UI, Arial" font-size="17" fill="#a8b9ca">
+    Future-you view: each stage removes choices until C code only emits explicit calls and offsets.
+  </text>
+  <rect x="64" y="102" width="640" height="6" rx="3" fill="url(#accent)"/>
+
+  <!-- Orientation chips -->
+  <rect x="64" y="128" width="190" height="34" rx="10" fill="#122131" stroke="#2a3e55"/>
+  <text x="82" y="150" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d2dfec">1) Validate logic</text>
+  <rect x="270" y="128" width="220" height="34" rx="10" fill="#122131" stroke="#2a3e55"/>
+  <text x="288" y="150" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d2dfec">2) Bind dataflow + kernels</text>
+  <rect x="506" y="128" width="240" height="34" rx="10" fill="#122131" stroke="#2a3e55"/>
+  <text x="524" y="150" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d2dfec">3) Freeze memory + call args</text>
+  <rect x="762" y="128" width="250" height="34" rx="10" fill="#122131" stroke="#2a3e55"/>
+  <text x="780" y="150" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d2dfec">4) Execute with thread pool</text>
+
+  <!-- Section: Inputs -->
+  <rect x="52" y="186" width="1296" height="236" rx="16" fill="url(#panel)" stroke="#2b4058"/>
+  <text x="74" y="220" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#d8e6f3">Inputs and Normalization</text>
+  <text x="74" y="246" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#90a5bb">
+    Converter materializes stable inputs so IR stages do not parse GGUF directly.
   </text>
 
-  <!-- Inputs block -->
-  <rect x="60" y="100" width="1080" height="230" rx="14" fill="url(#lane)" stroke="#25384a"/>
-  <text x="80" y="132" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cfe1f1">Inputs</text>
+  <rect x="74" y="266" width="300" height="134" rx="12" fill="#0f1c2a" stroke="#2c4158"/>
+  <text x="92" y="294" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#ffb15f">GGUF</text>
+  <text x="92" y="318" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">raw tensors + model metadata</text>
+  <text x="92" y="340" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">contains quant blocks, tokenizer, rope keys</text>
+  <text x="92" y="362" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">not layout-ready for runtime arena</text>
 
-  <!-- Input cards row 1 -->
-  <rect x="80" y="150" width="500" height="70" rx="10" fill="#0f1a24" stroke="#25384a"/>
-  <circle cx="104" cy="182" r="10" fill="#223447"/>
-  <text x="100" y="186" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff9b3d">B</text>
-  <text x="128" y="176" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb1c2">BUMP weights</text>
-  <text x="128" y="196" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#c7d6e4">contiguous tensor blob (quantized + aligned)</text>
-  <text x="128" y="212" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: entries[{name, offset, dtype, size}]</text>
+  <rect x="404" y="266" width="300" height="134" rx="12" fill="#0f1c2a" stroke="#2c4158"/>
+  <text x="422" y="294" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#ffb15f">Converter</text>
+  <text x="422" y="318" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">GGUF -&gt; BUMP + sidecar</text>
+  <text x="422" y="340" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">normalizes dims, dtypes, quant summary</text>
+  <text x="422" y="362" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">records model config for downstream IR</text>
 
-  <rect x="620" y="150" width="500" height="70" rx="10" fill="#0f1a24" stroke="#25384a"/>
-  <circle cx="644" cy="182" r="10" fill="#223447"/>
-  <text x="640" y="186" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff9b3d">S</text>
-  <text x="668" y="176" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb1c2">Sidecar manifest</text>
-  <text x="668" y="196" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#c7d6e4">JSON offsets + dtypes + model config</text>
-  <text x="668" y="212" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: config, quant_summary, template</text>
+  <rect x="734" y="266" width="300" height="134" rx="12" fill="#0f1c2a" stroke="#2c4158"/>
+  <text x="752" y="294" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#ffb15f">BUMP + Sidecar</text>
+  <text x="752" y="318" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">runtime-friendly source of truth</text>
+  <text x="752" y="340" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">BUMP: contiguous tensor bytes</text>
+  <text x="752" y="362" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">Sidecar: offsets, dtypes, config, template</text>
 
-  <!-- Input cards row 2 -->
-  <rect x="80" y="235" width="500" height="70" rx="10" fill="#0f1a24" stroke="#25384a"/>
-  <circle cx="104" cy="267" r="10" fill="#223447"/>
-  <text x="100" y="271" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff9b3d">C</text>
-  <text x="128" y="261" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb1c2">Converter (GGUF → BUMP)</text>
-  <text x="128" y="281" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#c7d6e4">reads GGUF, normalizes, quantizes, writes</text>
-  <text x="128" y="297" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: gguf → weights.bump + manifest.json</text>
+  <rect x="1064" y="266" width="266" height="134" rx="12" fill="#0f1c2a" stroke="#2c4158"/>
+  <text x="1082" y="294" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#ffb15f">Kernel Registry</text>
+  <text x="1082" y="318" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">JSON kernel maps</text>
+  <text x="1082" y="340" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">id, signature, dtypes, constraints</text>
+  <text x="1082" y="362" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9cb0c4">used for resolver and codegen args</text>
 
-  <rect x="620" y="235" width="500" height="70" rx="10" fill="#0f1a24" stroke="#25384a"/>
-  <circle cx="644" cy="267" r="10" fill="#223447"/>
-  <text x="640" y="271" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff9b3d">K</text>
-  <text x="668" y="261" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb1c2">Kernel registry</text>
-  <text x="668" y="281" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#c7d6e4">kernel IDs + params + dtypes + constraints</text>
-  <text x="668" y="297" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: kernel_maps/*.json</text>
+  <line x1="374" y1="333" x2="404" y2="333" stroke="#6f86a0" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="704" y1="333" x2="734" y2="333" stroke="#6f86a0" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="1034" y1="333" x2="1064" y2="333" stroke="#6f86a0" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Section: Main pipeline -->
+  <rect x="52" y="446" width="1296" height="388" rx="16" fill="url(#panel)" stroke="#2b4058"/>
+  <text x="74" y="480" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#d8e6f3">IR to C Pipeline</text>
+  <text x="74" y="506" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#90a5bb">
+    Input of each stage is the output of the previous stage. Ambiguity strictly decreases.
+  </text>
 
   <!-- Stage cards -->
-  <g transform="translate(60,430)">
-    <rect x="0" y="0" width="255" height="190" rx="12" fill="url(#chip)" stroke="#2a3a4f"/>
-    <text x="18" y="30" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#ffb15e">IR1 (Validate)</text>
-    <text x="18" y="56" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• parse template ops → kernel families</text>
-    <text x="18" y="76" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• resolve kernel IDs + dtypes</text>
-    <text x="18" y="96" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• fail fast if missing/mismatched</text>
-    <text x="18" y="122" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Output: ir1_decode.json / ir1_prefill.json</text>
-    <text x="18" y="140" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">contains: op list + kernel IDs + dtypes</text>
-    <text x="18" y="158" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: {"op":"q_proj","kernel":"gemv_q5_1"}</text>
-
-    <rect x="285" y="0" width="255" height="190" rx="12" fill="url(#chip)" stroke="#2a3a4f"/>
-    <text x="303" y="30" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#ffb15e">IR2 (Dataflow)</text>
-    <text x="303" y="56" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• stitch dataflow edges + logical buffers</text>
-    <text x="303" y="76" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• insert KV cache + quant ops</text>
-    <text x="303" y="96" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• conservative fusions (if safe)</text>
-    <text x="303" y="122" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Output: lowered_*.json (buffer names)</text>
-    <text x="303" y="140" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">contains: dataflow edges + scratch plan</text>
-    <text x="303" y="158" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: inputs.q → q_scratch, outputs → attn_scratch</text>
-
-    <rect x="570" y="0" width="255" height="190" rx="12" fill="url(#chip)" stroke="#2a3a4f"/>
-    <text x="588" y="30" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#ffb15e">IR3 (Layout)</text>
-    <text x="588" y="56" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• pack weights + activations into one arena</text>
-    <text x="588" y="76" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• assign offsets + macros</text>
-    <text x="588" y="96" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• emit ordered call args</text>
-    <text x="588" y="122" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Output: layout_*.json + lowered_*_call.json</text>
-    <text x="588" y="140" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">contains: offsets + call args (ptr + sizes)</text>
-    <text x="588" y="158" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: A_Q_SCRATCH=0x1A4000, args=[ptr+off]</text>
-
-    <rect x="855" y="0" width="255" height="190" rx="12" fill="url(#chip)" stroke="#2a3a4f"/>
-    <text x="873" y="30" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#ffb15e">Codegen</text>
-    <text x="873" y="56" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• dumb emitter (no decisions)</text>
-    <text x="873" y="76" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• reads IR3 + init_call.json only</text>
-    <text x="873" y="96" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c7d6e4">• writes model_v6_6.c + headers</text>
-    <text x="873" y="122" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Output: self‑contained runtime</text>
-    <text x="873" y="140" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">contains: kernel calls stitched into C</text>
-    <text x="873" y="122" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#7f94a8">kernel calls stitched into C</text>
-    <text x="873" y="158" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">example: rope_init(...), gemv_q5_1(...)</text>
+  <g filter="url(#shadow)">
+    <rect x="74" y="530" width="302" height="278" rx="14" fill="url(#card)" stroke="#355172"/>
+    <rect x="396" y="530" width="302" height="278" rx="14" fill="url(#card)" stroke="#355172"/>
+    <rect x="718" y="530" width="302" height="278" rx="14" fill="url(#card)" stroke="#355172"/>
+    <rect x="1040" y="530" width="290" height="278" rx="14" fill="url(#card)" stroke="#355172"/>
   </g>
 
-  <!-- Legend row -->
-  <g transform="translate(60,700)">
-    <text x="0" y="0" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Legend</text>
-    <rect x="70" y="-12" width="140" height="26" rx="6" fill="#0f1a24" stroke="#25384a"/>
-    <text x="82" y="6" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c7d6e4">weights = immutable</text>
-    <rect x="230" y="-12" width="170" height="26" rx="6" fill="#0f1a24" stroke="#25384a"/>
-    <text x="242" y="6" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c7d6e4">activations = per‑token</text>
-    <rect x="420" y="-12" width="140" height="26" rx="6" fill="#0f1a24" stroke="#25384a"/>
-    <text x="432" y="6" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c7d6e4">scratch = reused</text>
-    <rect x="585" y="-12" width="175" height="26" rx="6" fill="#0f1a24" stroke="#25384a"/>
-    <text x="597" y="6" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c7d6e4">KV cache = persistent</text>
-  </g>
+  <text x="94" y="564" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffb15f">IR1</text>
+  <text x="152" y="564" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#d7e6f6">Validate</text>
+  <text x="94" y="592" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Purpose</text>
+  <text x="94" y="612" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">template ops -&gt; legal op graph with kernel ids</text>
+  <text x="94" y="638" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Reads</text>
+  <text x="94" y="658" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">template + config + registry</text>
+  <text x="94" y="684" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Writes</text>
+  <text x="94" y="704" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">ir1_decode.json, ir1_prefill.json</text>
+  <text x="94" y="730" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Intuition</text>
+  <text x="94" y="750" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">"Are we doing valid math with known kernels?"</text>
+  <text x="94" y="776" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#7f97ae">example op: qkv_proj -> gemv_q5_1</text>
 
-  <!-- Mini example: IR1 → IR3 -->
-  <g transform="translate(60,735)">
-    <text x="0" y="0" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">Example (same op, more concrete)</text>
-    <rect x="0" y="10" width="520" height="52" rx="8" fill="#0f1a24" stroke="#25384a"/>
-    <text x="14" y="32" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c7d6e4">IR1: {"op":"q_proj","kernel":"gemv_q5_1","inputs":{"x":"layer_input"}}</text>
-    <text x="14" y="48" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">IR3: gemv_q5_1(W=..., x=A_LAYER_INPUT, y=A_Q_SCRATCH, m=1, n=...)</text>
-  </g>
+  <text x="416" y="564" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffb15f">IR2</text>
+  <text x="474" y="564" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#d7e6f6">Dataflow</text>
+  <text x="416" y="592" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Purpose</text>
+  <text x="416" y="612" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">connect producers/consumers, schedule, safe fusions</text>
+  <text x="416" y="638" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Reads</text>
+  <text x="416" y="658" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">IR1 ops + model config + quant summary</text>
+  <text x="416" y="684" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Writes</text>
+  <text x="416" y="704" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">lowered_*.json (op order, buffers, parallel hints)</text>
+  <text x="416" y="730" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Intuition</text>
+  <text x="416" y="750" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">"Which tensor feeds which kernel call?"</text>
+  <text x="416" y="776" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#7f97ae">fusion is conservative; parallel tags feed runtime dispatch</text>
 
-  <!-- Labeled arrows (Inputs → IR1, IR3 → Codegen) -->
-  <text x="250" y="345" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">parse + map</text>
-  <text x="945" y="345" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7f94a8">emit only</text>
+  <text x="738" y="564" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffb15f">IR3</text>
+  <text x="796" y="564" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#d7e6f6">Layout + Calls</text>
+  <text x="738" y="592" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Purpose</text>
+  <text x="738" y="612" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">freeze arena layout, offsets, and concrete call args</text>
+  <text x="738" y="638" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Reads</text>
+  <text x="738" y="658" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">IR2 graph + bump metadata + context config</text>
+  <text x="738" y="684" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Writes</text>
+  <text x="738" y="704" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">layout_*.json + lowered_*_call.json + macros</text>
+  <text x="738" y="730" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Intuition</text>
+  <text x="738" y="750" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">"Where exactly does each pointer live?"</text>
+  <text x="738" y="776" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#7f97ae">arena slices: weights | activations | kv | rope | logits</text>
 
-  <!-- Artifact strip -->
-  <rect x="60" y="820" width="1080" height="110" rx="12" fill="url(#lane)" stroke="#25384a"/>
-  <text x="80" y="848" font-family="Inter, Segoe UI, Arial" font-size="15" fill="#cfe1f1">Artifacts</text>
-  <text x="80" y="870" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb1c2">
-    ir1_*.json · layout_*.json · lowered_*_call.json · init_call.json · model_v6_6.c
+  <text x="1060" y="564" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffb15f">Codegen</text>
+  <text x="1060" y="592" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Purpose</text>
+  <text x="1060" y="612" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">emit C from fully specified IR3</text>
+  <text x="1060" y="638" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Reads</text>
+  <text x="1060" y="658" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">lowered_*_call.json + init_call.json</text>
+  <text x="1060" y="684" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Writes</text>
+  <text x="1060" y="704" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">model_v6_6.c and runtime headers</text>
+  <text x="1060" y="730" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c9d8e8">Intuition</text>
+  <text x="1060" y="750" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9db2c7">"No planner left. Just emit ordered calls."</text>
+  <text x="1060" y="776" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#7f97ae">emits runtime hooks (threadpool init, decode/prefill loops)</text>
+
+  <line x1="376" y1="668" x2="396" y2="668" stroke="#6f86a0" stroke-width="2.6" marker-end="url(#arrow)"/>
+  <line x1="698" y1="668" x2="718" y2="668" stroke="#6f86a0" stroke-width="2.6" marker-end="url(#arrow)"/>
+  <line x1="1020" y1="668" x2="1040" y2="668" stroke="#6f86a0" stroke-width="2.6" marker-end="url(#arrow)"/>
+
+  <!-- Execution, memory and parallelism strip -->
+  <rect x="52" y="850" width="1296" height="250" rx="16" fill="url(#panel)" stroke="#2b4058"/>
+  <text x="74" y="884" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#d8e6f3">Logic, Memory Layout, and Parallel Execution</text>
+
+  <rect x="74" y="904" width="1248" height="48" rx="10" fill="#102132" stroke="#2c435b"/>
+  <text x="92" y="934" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d1dfed">
+    Logic lane: template intent -> legal kernels (IR1) -> connected graph (IR2) -> fixed call order (IR3)
   </text>
 
-  <text x="60" y="900" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb1c2">
-    Each stage makes the next simpler: by the time we emit C, both logic and memory are fully specified.
+  <rect x="74" y="964" width="1248" height="48" rx="10" fill="#102132" stroke="#2c435b"/>
+  <text x="92" y="994" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d1dfed">
+    Memory lane: symbolic buffers -> reuse/scratch lifetimes -> aligned arena offsets -> pointer args in C
   </text>
-  <rect x="60" y="914" width="380" height="6" rx="3" fill="url(#accent)"/>
+  <text x="92" y="1012" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9eb2c7">
+    layout examples: A_LAYER_INPUT, A_Q_SCRATCH, KV_CACHE, ROPE_COS, LOGITS
+  </text>
+
+  <rect x="74" y="1030" width="1248" height="48" rx="10" fill="#102132" stroke="#2c435b"/>
+  <text x="92" y="1060" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#d1dfed">
+    Execution lane: IR2 tags parallel-safe regions; runtime uses thread pool for prefill/decode and kernel SIMD dispatch
+  </text>
+  <text x="92" y="1078" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9eb2c7">
+    dispatch examples: scalar -> avx -> avx2 -> vnni (depending on kernel and CPU flags)
+  </text>
+
+  <!-- Artifact footer -->
+  <rect x="52" y="1120" width="1296" height="178" rx="16" fill="url(#panel)" stroke="#2b4058"/>
+  <text x="74" y="1152" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#d8e6f3">Artifacts You Can Inspect</text>
+  <text x="74" y="1179" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#9fb2c7">
+    ir1_decode.json | lowered_decode.json | layout_decode.json | init_call.json | model_v6_6.c
+  </text>
+  <text x="74" y="1203" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#7f97ae">
+    mental shortcut: if output looks wrong, inspect right-to-left (C call -> lowered call args -> layout -> IR2 -> IR1)
+  </text>
+  <text x="74" y="1225" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#7f97ae">
+    fusion/debug check: compare IR1 op list against lowered op list to confirm what fused and what stayed explicit
+  </text>
+  <rect x="74" y="1242" width="520" height="6" rx="3" fill="url(#accent)"/>
+
+  <text x="1040" y="1262" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#7f97ae">
+    C-Kernel-Engine v6.6 pipeline view
+  </text>
 </svg>

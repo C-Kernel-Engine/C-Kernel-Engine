@@ -1341,6 +1341,24 @@
     </div>
   </div>
 
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Validation Commands (v6.6)</h2>
+    <p style="margin-top: 0.6rem; color: var(--text-secondary);">
+      These commands are the current inference readiness gates for Qwen2/Qwen3/Gemma3.
+    </p>
+    <pre style="margin-top: 0.8rem;"><code>make v6.6-validate-contracts
+make v6.6-validate-matrix
+make v6.6-validate-matrix-smoke
+
+# Sliding-window kernel contract (also in make test / nightly)
+make test-attention-sliding
+</code></pre>
+    <p class="source-note" style="margin-top: 0.6rem;">
+      Nightly visibility: <code>scripts/nightly_runner.py</code> and
+      <code>.github/workflows/nightly.yml</code> (includes llama.cpp parity + kernel suite).
+    </p>
+  </div>
+
   <div class="roadmap">
     <strong>Growth path:</strong> v6.6 locks inference parity and kernel coverage (Qwen2/Qwen3/Gemma3). v7 targets full training:
     backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules. This page will evolve into a
@@ -1564,7 +1582,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-11</p>
             </div>
         </div>
     </footer>
