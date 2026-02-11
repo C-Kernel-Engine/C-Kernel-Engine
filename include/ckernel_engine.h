@@ -1442,12 +1442,21 @@ void attention_backward_causal_head_major_gqa_bf16(
     float *scratch_v);        /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
 // RoPE (Rotary Position Embedding) kernels.
-// Precompute cos/sin cache: [max_seq_len, head_dim/2].
+// Precompute cos/sin cache: [max_seq_len, rotary_dim/2].
+void rope_precompute_cache_split(float *cos_cache,
+                                float *sin_cache,
+                                int max_seq_len,
+                                int head_dim,
+                                float base);
+
 void rope_precompute_cache(float *cos_cache,
                            float *sin_cache,
                            int max_seq_len,
                            int head_dim,
-                           float base);
+                           float base,
+                           int rotary_dim,
+                           const char *scaling_type,
+                           float scaling_factor);
 
 // Apply RoPE forward in-place: x[num_heads, num_tokens, aligned_head_dim].
 void rope_forward(float *x,
@@ -1458,6 +1467,16 @@ void rope_forward(float *x,
                   int head_dim,
                   int aligned_head_dim,
                   int pos_offset);
+
+void rope_forward_with_rotary_dim(float *x,
+                                  const float *cos_cache,
+                                  const float *sin_cache,
+                                  int num_heads,
+                                  int num_tokens,
+                                  int head_dim,
+                                  int aligned_head_dim,
+                                  int pos_offset,
+                                  int rotary_dim);
 
 // RoPE backward: inverse rotation.
 void rope_backward(const float *d_out,
@@ -1514,10 +1533,21 @@ void rope_forward_strided(float *x,
                           int pos_offset,
                           int head_stride_tokens);
 
+void rope_forward_strided_with_rotary_dim(float *x,
+                                          const float *cos_cache,
+                                          const float *sin_cache,
+                                          int num_heads,
+                                          int num_tokens,
+                                          int head_dim,
+                                          int aligned_head_dim,
+                                          int pos_offset,
+                                          int head_stride_tokens,
+                                          int rotary_dim);
+
 // Combined RoPE for Q and K.
-	void rope_forward_qk(float *q,
-	                     float *k,
-	                     const float *cos_cache,
+void rope_forward_qk(float *q,
+                     float *k,
+                     const float *cos_cache,
                      const float *sin_cache,
                      int num_heads,
                      int num_kv_heads,
@@ -1526,22 +1556,48 @@ void rope_forward_strided(float *x,
                      int aligned_head_dim,
                      int pos_offset);
 
-	void rope_forward_qk_strided(float *q,
-	                             float *k,
-	                             const float *cos_cache,
-	                             const float *sin_cache,
-	                             int num_heads,
-	                             int num_kv_heads,
-	                             int num_tokens,
-	                             int head_dim,
-	                             int aligned_head_dim,
-	                             int pos_offset,
-	                             int q_stride_tokens,
-	                             int k_stride_tokens);
+void rope_forward_qk_with_rotary_dim(float *q,
+                                     float *k,
+                                     const float *cos_cache,
+                                     const float *sin_cache,
+                                     int num_heads,
+                                     int num_kv_heads,
+                                     int num_tokens,
+                                     int head_dim,
+                                     int aligned_head_dim,
+                                     int pos_offset,
+                                     int rotary_dim);
 
-	void rope_backward_qk(const float *d_q_out,
-	                      const float *d_k_out,
-	                      float *d_q,
+void rope_forward_qk_strided(float *q,
+                             float *k,
+                             const float *cos_cache,
+                             const float *sin_cache,
+                             int num_heads,
+                             int num_kv_heads,
+                             int num_tokens,
+                             int head_dim,
+                             int aligned_head_dim,
+                             int pos_offset,
+                             int q_stride_tokens,
+                             int k_stride_tokens);
+
+void rope_forward_qk_strided_with_rotary_dim(float *q,
+                                             float *k,
+                                             const float *cos_cache,
+                                             const float *sin_cache,
+                                             int num_heads,
+                                             int num_kv_heads,
+                                             int num_tokens,
+                                             int head_dim,
+                                             int aligned_head_dim,
+                                             int pos_offset,
+                                             int q_stride_tokens,
+                                             int k_stride_tokens,
+                                             int rotary_dim);
+
+void rope_backward_qk(const float *d_q_out,
+                      const float *d_k_out,
+                      float *d_q,
                       float *d_k,
                       const float *cos_cache,
                       const float *sin_cache,
@@ -1549,40 +1605,65 @@ void rope_forward_strided(float *x,
                       int num_kv_heads,
                       int num_tokens,
                       int head_dim,
-	                      int aligned_head_dim,
-	                      int pos_offset);
+                      int aligned_head_dim,
+                      int pos_offset);
 
-	/* BF16 RoPE forward for Q and K - caller provides scratch buffers */
-	void rope_forward_qk_bf16(uint16_t *q,
-	                          uint16_t *k,
-	                          const float *cos_cache,
-	                          const float *sin_cache,
-	                          int num_heads,
-	                          int num_kv_heads,
-	                          int num_tokens,
-	                          int head_dim,
-	                          int aligned_head_dim,
-	                          int pos_offset,
-	                          float *scratch_q,  /* [num_heads * num_tokens * aligned_head_dim] */
-	                          float *scratch_k); /* [num_kv_heads * num_tokens * aligned_head_dim] */
+/* BF16 RoPE forward for Q and K - caller provides scratch buffers */
+void rope_forward_qk_bf16(uint16_t *q,
+                          uint16_t *k,
+                          const float *cos_cache,
+                          const float *sin_cache,
+                          int num_heads,
+                          int num_kv_heads,
+                          int num_tokens,
+                          int head_dim,
+                          int aligned_head_dim,
+                          int pos_offset,
+                          float *scratch_q,  /* [num_heads * num_tokens * aligned_head_dim] */
+                          float *scratch_k); /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
-	/* BF16 RoPE backward for Q and K - caller provides scratch buffers */
-	void rope_backward_qk_bf16(const uint16_t *d_q_out,
-	                           const uint16_t *d_k_out,
-	                           uint16_t *d_q,
-	                           uint16_t *d_k,
-	                           const float *cos_cache,
-	                           const float *sin_cache,
-	                           int num_heads,
-	                           int num_kv_heads,
-	                           int num_tokens,
-	                           int head_dim,
-	                           int aligned_head_dim,
-	                           int pos_offset,
-	                           float *scratch_dq_out, /* [num_heads * num_tokens * aligned_head_dim] */
-	                           float *scratch_dq,     /* [num_heads * num_tokens * aligned_head_dim] */
-	                           float *scratch_dk_out, /* [num_kv_heads * num_tokens * aligned_head_dim] */
-	                           float *scratch_dk);    /* [num_kv_heads * num_tokens * aligned_head_dim] */
+void rope_forward_qk_bf16_with_rotary_dim(uint16_t *q,
+                                          uint16_t *k,
+                                          const float *cos_cache,
+                                          const float *sin_cache,
+                                          int num_heads,
+                                          int num_kv_heads,
+                                          int num_tokens,
+                                          int head_dim,
+                                          int aligned_head_dim,
+                                          int pos_offset,
+                                          int rotary_dim,
+                                          float *scratch_q,
+                                          float *scratch_k);
+
+void rope_forward_bf16_with_rotary_dim(uint16_t *x,
+                                       const float *cos_cache,
+                                       const float *sin_cache,
+                                       int num_heads,
+                                       int num_tokens,
+                                       int head_dim,
+                                       int aligned_head_dim,
+                                       int pos_offset,
+                                       int rotary_dim,
+                                       float *scratch);
+
+/* BF16 RoPE backward for Q and K - caller provides scratch buffers */
+void rope_backward_qk_bf16(const uint16_t *d_q_out,
+                           const uint16_t *d_k_out,
+                           uint16_t *d_q,
+                           uint16_t *d_k,
+                           const float *cos_cache,
+                           const float *sin_cache,
+                           int num_heads,
+                           int num_kv_heads,
+                           int num_tokens,
+                           int head_dim,
+                           int aligned_head_dim,
+                           int pos_offset,
+                           float *scratch_dq_out, /* [num_heads * num_tokens * aligned_head_dim] */
+                           float *scratch_dq,     /* [num_heads * num_tokens * aligned_head_dim] */
+                           float *scratch_dk_out, /* [num_kv_heads * num_tokens * aligned_head_dim] */
+                           float *scratch_dk);    /* [num_kv_heads * num_tokens * aligned_head_dim] */
 
 // Token embedding lookup (optionally adds positional embeddings).
 // token_embeddings: [vocab_size x aligned_embed_dim]

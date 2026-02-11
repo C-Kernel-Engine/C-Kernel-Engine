@@ -1275,6 +1275,12 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
         cmd.extend(["--max-tokens", str(args.max_tokens)])
     if args.prompt:
         cmd.extend(["--prompt", args.prompt])
+    if getattr(args, "no_chat_template", False):
+        cmd.append("--no-chat-template")
+    elif getattr(args, "chat_template", None):
+        cmd.extend(["--chat-template", args.chat_template])
+    if getattr(args, "python_tokenizer", False):
+        cmd.append("--python-tokenizer")
     if getattr(args, 'parity', False):
         cmd.append("--parity")
 
@@ -1344,7 +1350,7 @@ def step_run_c_cli_parity_dump(
     weights_path: Path,
     prompt: str,
     max_tokens: int,
-    ctx_size: int | None,
+    ctx_size: Optional[int],
 ) -> None:
     """Run native ck-cli to generate CK parity dumps (dump.bin)."""
     log(f"{C_ORANGE}[parity]{C_RESET} Running ck-cli-v6.6 for CK dumps")
@@ -1420,14 +1426,14 @@ def _run_llamacpp_parity(
     work_dir: Path,
     prompt: str,
     max_tokens: int,
-    ctx_size: int | None = None,
-    temperature: float | None = None,
-    llama_filter: str | None = None,
-    llama_layer: int | None = None,
-    llama_stop_after: int | None = None,
+    ctx_size: Optional[int] = None,
+    temperature: Optional[float] = None,
+    llama_filter: Optional[str] = None,
+    llama_layer: Optional[int] = None,
+    llama_stop_after: Optional[int] = None,
     llama_include_global: bool = False,
-    llama_timeout: int | None = None,
-    gguf_path_hint: Path | None = None,
+    llama_timeout: Optional[int] = None,
+    gguf_path_hint: Optional[Path] = None,
 ) -> bool:
     """Run llama.cpp parity binary to generate reference dumps."""
     log(f"\n{C_ORANGE}[llamacpp-parity]{C_RESET} Running llama.cpp for reference dumps")
@@ -2177,6 +2183,12 @@ Examples:
     run_parser.add_argument('--max-tokens', type=int, default=512,
                            help='Max tokens to generate (default: 512)')
     run_parser.add_argument('--prompt', help='Single prompt (non-interactive)')
+    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma'], default='auto',
+                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, gemma)')
+    run_parser.add_argument('--no-chat-template', action='store_true',
+                           help='Disable chat template formatting (same as --chat-template=none)')
+    run_parser.add_argument('--python-tokenizer', action='store_true',
+                           help='Force Python tokenizer in ck_chat.py (skip C tokenizer)')
     run_parser.add_argument('--force-download', action='store_true',
                            help='Re-download model files')
     run_parser.add_argument('--force-convert', action='store_true',

@@ -14,18 +14,19 @@
   "weights": [],
   "activations": [],
   "runtime_buffers": [
-    {"name": "cos_cache", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE cos cache [max_seq, head_dim/2]"},
-    {"name": "sin_cache", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE sin cache [max_seq, head_dim/2]"}
+    {"name": "cos_cache", "dtype": "fp32", "shape": ["max_T", "rotary_dim", 2], "desc": "RoPE cos cache [max_seq, rotary_dim/2]"},
+    {"name": "sin_cache", "dtype": "fp32", "shape": ["max_T", "rotary_dim", 2], "desc": "RoPE sin cache [max_seq, rotary_dim/2]"}
   ],
   "outputs": [
     {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Query tensor after RoPE application (in-place)"},
     {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "desc": "Key tensor after RoPE application (in-place)"}
   ],
   "scratch": [],
-  "dims": ["H", "KV", "T", "D"],
+  "dims": ["H", "KV", "T", "D", "rotary_dim"],
   "params": [
     {"name": "aligned_head_dim", "dtype": "int32", "desc": "Aligned head dimension for SIMD"},
-    {"name": "pos_offset", "dtype": "int32", "desc": "Position offset for cos/sin cache lookup"}
+    {"name": "pos_offset", "dtype": "int32", "desc": "Position offset for cos/sin cache lookup"},
+    {"name": "rotary_dim", "dtype": "int32", "desc": "RoPE rotary dimensions (only rotate first rotary_dim channels)"}
   ],
   "parallelization": {
     "supported": ["head", "token"],
@@ -50,8 +51,8 @@
     "notes": "D should be multiple of 64 for optimal SIMD. D is the unpadded dimension; AD is used for alignment."
   },
   "impl": {
-    "function": "rope_forward_qk",
-    "c_declaration": "void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset);",
+    "function": "rope_forward_qk_with_rotary_dim",
+    "c_declaration": "void rope_forward_qk_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim);",
     "sources": ["src/kernels/rope_kernels.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
@@ -71,5 +72,5 @@
       }
     ]
   },
-  "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta)"
+  "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta). Only rotates first rotary_dim channels; remaining channels pass through unchanged."
 }

@@ -30,6 +30,9 @@ typedef struct {
     int context_window;     // max positions / context length (if available)
     float rms_norm_eps;     // RMSNorm epsilon (if available)
     float rope_theta;       // RoPE base (0 disables RoPE)
+    int rotary_dim;         // RoPE rotary dimensions (0 = use head_dim)
+    float rope_scaling_factor; // RoPE scaling factor (1.0 = no scaling)
+    char rope_scaling_type[16]; // RoPE scaling type: "none", "linear", "dynamic", "yarn"
 } CKModelConfig;
 
 typedef enum {

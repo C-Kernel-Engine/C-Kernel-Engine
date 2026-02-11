@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 320">
+  <defs>
+    <linearGradient id="tlHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <marker id="arrowTl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="980" height="320" fill="#232323"/>
+
+  <text x="490" y="32" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">Why IR1 → IR2 → IR3</text>
+  <text x="490" y="52" font-family="Inter, sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">Each stage makes the next stage simpler and more deterministic</text>
+
+  <g transform="translate(40, 90)">
+    <rect width="260" height="140" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="260" height="28" rx="10" fill="url(#tlHeader)"/>
+    <text x="130" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">IR1</text>
+    <text x="130" y="58" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Validate ops + kernels</text>
+    <text x="130" y="78" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Attach dataflow edges</text>
+    <text x="130" y="98" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Fail fast</text>
+  </g>
+
+  <g transform="translate(320, 160)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowTl)"/>
+  </g>
+
+  <g transform="translate(390, 90)">
+    <rect width="260" height="140" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="260" height="28" rx="10" fill="url(#tlHeader)"/>
+    <text x="130" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">IR2</text>
+    <text x="130" y="58" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Optional fusions</text>
+    <text x="130" y="78" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Kernel variants</text>
+    <text x="130" y="98" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Conservative in v6.6</text>
+  </g>
+
+  <g transform="translate(670, 160)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowTl)"/>
+  </g>
+
+  <g transform="translate(740, 90)">
+    <rect width="200" height="140" rx="10" fill="#2a2a2a" stroke="#47b475" stroke-width="3"/>
+    <rect width="200" height="28" rx="10" fill="#47b475"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">IR3 (Lowered)</text>
+    <text x="100" y="58" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Memory layout + pointers</text>
+    <text x="100" y="78" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Call-ready args</text>
+    <text x="100" y="98" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">Codegen emits verbatim</text>
+  </g>
+</svg>

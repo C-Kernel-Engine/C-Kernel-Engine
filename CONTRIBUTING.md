@@ -48,6 +48,23 @@ git merge fix/my-fix-name
 git push origin main
 ```
 
+### Enable Git Hooks (Required)
+This repo ships pre-push checks in `.githooks/pre-push`. Git does **not** enable repo hooks automatically on clone/pull.
+
+Run once after cloning:
+
+```bash
+./scripts/setup-hooks.sh
+```
+
+Verify:
+
+```bash
+git config core.hooksPath
+```
+
+It should print `.githooks`. If not, pushes will **not** run the pre-checks/e2e.
+
 ### Pre-Merge Requirements
 
 Before merging to `main`, ALL of these must pass:

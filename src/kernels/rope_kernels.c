@@ -15,7 +15,7 @@
  * Used by Llama, SmolLM, and most modern transformer architectures.
  *
  * Math (Llama-style rotate-half):
- *   Split head_dim into two halves (0..half-1, half..head_dim-1).
+ *   Split rotary_dim into two halves (0..half-1, half..rotary_dim-1).
  *   For each position m and index i in [0, half):
  *     x0 = x[i], x1 = x[i + half]
  *     x'[i]       = x0 * cos(m * theta_i) - x1 * sin(m * theta_i)
@@ -25,11 +25,12 @@
  *
  * Layout:
  *   x: [num_heads, num_tokens, head_dim] head-major
- *   cos_cache, sin_cache: [max_seq_len, head_dim/2] precomputed
+ *   cos_cache, sin_cache: [max_seq_len, rotary_dim/2] precomputed
  */
 
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -39,27 +40,72 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/* Forward declarations for extended RoPE entry points used by wrappers. */
+void rope_forward_with_rotary_dim(float *x,
+                                  const float *cos_cache,
+                                  const float *sin_cache,
+                                  int num_heads,
+                                  int num_tokens,
+                                  int head_dim,
+                                  int aligned_head_dim,
+                                  int pos_offset,
+                                  int rotary_dim);
+void rope_forward_strided_with_rotary_dim(float *x,
+                                          const float *cos_cache,
+                                          const float *sin_cache,
+                                          int num_heads,
+                                          int num_tokens,
+                                          int head_dim,
+                                          int aligned_head_dim,
+                                          int pos_offset,
+                                          int head_stride_tokens,
+                                          int rotary_dim);
+void rope_forward_qk_with_rotary_dim(float *q,
+                                     float *k,
+                                     const float *cos_cache,
+                                     const float *sin_cache,
+                                     int num_heads,
+                                     int num_kv_heads,
+                                     int num_tokens,
+                                     int head_dim,
+                                     int aligned_head_dim,
+                                     int pos_offset,
+                                     int rotary_dim);
+void rope_forward_qk_strided_with_rotary_dim(float *q,
+                                             float *k,
+                                             const float *cos_cache,
+                                             const float *sin_cache,
+                                             int num_heads,
+                                             int num_kv_heads,
+                                             int num_tokens,
+                                             int head_dim,
+                                             int aligned_head_dim,
+                                             int pos_offset,
+                                             int q_stride_tokens,
+                                             int k_stride_tokens,
+                                             int rotary_dim);
+
 /**
- * Precompute RoPE cos/sin cache
- * @test test_rope.py::TestRoPECache::test_cache_computation
- * @test test_rope.py::TestRoPECache::test_cache_values
+ * Precompute RoPE cos/sin cache (split layout: head_dim/2)
+ * Legacy layout used before rotary_dim/scaling support.
  *
- * Precomputes cos(m * theta_i) and sin(m * theta_i) for positions 0..max_seq_len-1.
- * cos_cache, sin_cache: [max_seq_len, head_dim/2]
- *
- * After changes: make test
+ * @param cos_cache Output: [max_seq_len, head_dim/2] cos values
+ * @param sin_cache Output: [max_seq_len, head_dim/2] sin values
+ * @param max_seq_len Maximum sequence length for cache
+ * @param head_dim Full head dimension
+ * @param base RoPE base frequency (theta)
  */
-void rope_precompute_cache(float *cos_cache,
-                           float *sin_cache,
-                           int max_seq_len,
-                           int head_dim,
-                           float base)
+void rope_precompute_cache_split(float *cos_cache,
+                                 float *sin_cache,
+                                 int max_seq_len,
+                                 int head_dim,
+                                 float base)
 {
     int half_dim = head_dim / 2;
-
     long double base_ld = (long double)base;
     long double head_dim_ld = (long double)head_dim;
     long double log_base = logl(base_ld);
+
     for (int pos = 0; pos < max_seq_len; ++pos) {
         for (int i = 0; i < half_dim; ++i) {
             long double exponent = ((long double)(2 * i)) / head_dim_ld;
@@ -72,32 +118,110 @@ void rope_precompute_cache(float *cos_cache,
     }
 }
 
+/**
+ * Precompute RoPE cos/sin cache with rotary_dim and scaling support
+ * @test test_rope.py::TestRoPECache::test_cache_computation
+ * @test test_rope.py::TestRoPECache::test_cache_values
+ *
+ * Precomputes cos(m * theta_i) and sin(m * theta_i) for positions 0..max_seq_len-1.
+ * Only computes for first rotary_dim channels; remaining head_dim - rotary_dim
+ * channels are NOT rotated (pass through unchanged).
+ *
+ * Scaling types:
+ *   - "none": Standard RoPE
+ *   - "linear": Scale positions by 1/scaling_factor
+ *   - "dynamic": NTK-aware dynamic scaling
+ *   - "yarn": YaRN scaling (beta-based)
+ *
+ * @param cos_cache Output: [max_seq_len, rotary_dim/2] cos values
+ * @param sin_cache Output: [max_seq_len, rotary_dim/2] sin values
+ * @param max_seq_len Maximum sequence length for cache
+ * @param head_dim Full head dimension (for frequency computation)
+ * @param base RoPE base frequency (theta)
+ * @param rotary_dim Number of dimensions to rotate (0 = use head_dim)
+ * @param scaling_type Scaling type string: "none", "linear", "dynamic", "yarn"
+ * @param scaling_factor Scaling factor (1.0 = no scaling)
+ *
+ * After changes: make test
+ */
+void rope_precompute_cache(float *cos_cache,
+                           float *sin_cache,
+                           int max_seq_len,
+                           int head_dim,
+                           float base,
+                           int rotary_dim,
+                           const char *scaling_type,
+                           float scaling_factor)
+{
+    // Use rotary_dim = head_dim if not specified
+    if (rotary_dim <= 0 || rotary_dim > head_dim) {
+        rotary_dim = head_dim;
+    }
+
+    // Use no scaling if not specified
+    int is_linear_scaling = 0;
+    if (scaling_type != NULL && strcmp(scaling_type, "linear") == 0 && scaling_factor > 0.0f && scaling_factor != 1.0f) {
+        is_linear_scaling = 1;
+    }
+
+    int rotary_half = rotary_dim / 2;
+
+    long double base_ld = (long double)base;
+    long double rotary_dim_ld = (long double)rotary_dim;
+    long double log_base = logl(base_ld);
+
+    for (int pos = 0; pos < max_seq_len; ++pos) {
+        // Apply linear scaling to position if needed
+        float effective_pos = (float)pos;
+        if (is_linear_scaling) {
+            effective_pos = (float)pos / scaling_factor;
+        }
+
+        for (int i = 0; i < rotary_half; ++i) {
+            // Frequency spacing should be based on rotary_dim (not full head_dim)
+            long double exponent = ((long double)(2 * i)) / rotary_dim_ld;
+            long double freq = expl(-exponent * log_base);
+            float freq_f = (float)freq;
+            float angle_f = effective_pos * freq_f;
+            cos_cache[pos * rotary_half + i] = cosf(angle_f);
+            sin_cache[pos * rotary_half + i] = sinf(angle_f);
+        }
+    }
+}
+
 // Apply RoPE to a single head's Q or K tensor in-place.
 // x: [num_tokens, head_dim] for one head
-// cos_cache, sin_cache: [max_seq_len, head_dim/2]
+// cos_cache, sin_cache: [max_seq_len, rotary_dim/2]
 // pos_offset: starting position (for KV cache continuation)
+// rotary_dim: number of dimensions to rotate (0 = use head_dim)
 static inline void rope_apply_head(float *x,
                                    const float *cos_cache,
                                    const float *sin_cache,
                                    int num_tokens,
                                    int head_dim,
                                    int aligned_head_dim,
-                                   int pos_offset)
+                                   int pos_offset,
+                                   int rotary_dim)
 {
-    int half_dim = head_dim / 2;
+    // Use head_dim if rotary_dim not specified or invalid
+    if (rotary_dim <= 0 || rotary_dim > head_dim) {
+        rotary_dim = head_dim;
+    }
+
+    int rotary_half = rotary_dim / 2;
 
     for (int t = 0; t < num_tokens; ++t) {
         int pos = pos_offset + t;
-        const float *cos_row = cos_cache + pos * half_dim;
-        const float *sin_row = sin_cache + pos * half_dim;
+        const float *cos_row = cos_cache + pos * rotary_half;
+        const float *sin_row = sin_cache + pos * rotary_half;
         float *x_row = x + (size_t)t * (size_t)aligned_head_dim;
 
 #if defined(__AVX512F__)
-        // Process 16 pairs at a time
+        // Process 16 pairs at a time (within rotary_half)
         int i = 0;
-        for (; i + 16 <= half_dim; i += 16) {
+        for (; i + 16 <= rotary_half; i += 16) {
             __m512 x0 = _mm512_loadu_ps(&x_row[i]);
-            __m512 x1 = _mm512_loadu_ps(&x_row[i + half_dim]);
+            __m512 x1 = _mm512_loadu_ps(&x_row[i + rotary_half]);
             __m512 c = _mm512_loadu_ps(&cos_row[i]);
             __m512 s = _mm512_loadu_ps(&sin_row[i]);
 
@@ -107,24 +231,24 @@ static inline void rope_apply_head(float *x,
             __m512 r1 = _mm512_fmadd_ps(x0, s, _mm512_mul_ps(x1, c));
 
             _mm512_storeu_ps(&x_row[i], r0);
-            _mm512_storeu_ps(&x_row[i + half_dim], r1);
+            _mm512_storeu_ps(&x_row[i + rotary_half], r1);
         }
-        // Handle remaining elements
-        for (; i < half_dim; ++i) {
+        // Handle remaining elements in rotary portion
+        for (; i < rotary_half; ++i) {
             float x0 = x_row[i];
-            float x1 = x_row[i + half_dim];
+            float x1 = x_row[i + rotary_half];
             float c = cos_row[i];
             float s = sin_row[i];
             x_row[i] = x0 * c - x1 * s;
-            x_row[i + half_dim] = x0 * s + x1 * c;
+            x_row[i + rotary_half] = x0 * s + x1 * c;
         }
 
 #elif defined(__AVX__)
-        // Process 8 pairs at a time
+        // Process 8 pairs at a time (within rotary_half)
         int i = 0;
-        for (; i + 8 <= half_dim; i += 8) {
+        for (; i + 8 <= rotary_half; i += 8) {
             __m256 x0 = _mm256_loadu_ps(&x_row[i]);
-            __m256 x1 = _mm256_loadu_ps(&x_row[i + half_dim]);
+            __m256 x1 = _mm256_loadu_ps(&x_row[i + rotary_half]);
             __m256 c = _mm256_loadu_ps(&cos_row[i]);
             __m256 s = _mm256_loadu_ps(&sin_row[i]);
 
@@ -139,30 +263,33 @@ static inline void rope_apply_head(float *x,
             __m256 r1 = _mm256_add_ps(x0s, x1c);
 
             _mm256_storeu_ps(&x_row[i], r0);
-            _mm256_storeu_ps(&x_row[i + half_dim], r1);
+            _mm256_storeu_ps(&x_row[i + rotary_half], r1);
         }
-        // Handle remaining elements
-        for (; i < half_dim; ++i) {
+        // Handle remaining elements in rotary portion
+        for (; i < rotary_half; ++i) {
             float x0 = x_row[i];
-            float x1 = x_row[i + half_dim];
+            float x1 = x_row[i + rotary_half];
             float c = cos_row[i];
             float s = sin_row[i];
             x_row[i] = x0 * c - x1 * s;
-            x_row[i + half_dim] = x0 * s + x1 * c;
+            x_row[i + rotary_half] = x0 * s + x1 * c;
         }
 
 #else
         // Scalar fallback
-        for (int i = 0; i < half_dim; ++i) {
+        for (int i = 0; i < rotary_half; ++i) {
             float x0 = x_row[i];
-            float x1 = x_row[i + half_dim];
+            float x1 = x_row[i + rotary_half];
             float c = cos_row[i];
             float s = sin_row[i];
 
             x_row[i] = x0 * c - x1 * s;
-            x_row[i + half_dim] = x0 * s + x1 * c;
+            x_row[i + rotary_half] = x0 * s + x1 * c;
         }
 #endif
+
+        // Channels [rotary_dim, head_dim) pass through unchanged - nothing to do
+        // They're already in place and don't need rotation
     }
 }
 
@@ -186,12 +313,26 @@ void rope_forward(float *x,
                   int aligned_head_dim,
                   int pos_offset)
 {
+    rope_forward_with_rotary_dim(x, cos_cache, sin_cache, num_heads, num_tokens,
+                                 head_dim, aligned_head_dim, pos_offset, head_dim);
+}
+
+void rope_forward_with_rotary_dim(float *x,
+                                  const float *cos_cache,
+                                  const float *sin_cache,
+                                  int num_heads,
+                                  int num_tokens,
+                                  int head_dim,
+                                  int aligned_head_dim,
+                                  int pos_offset,
+                                  int rotary_dim)
+{
     size_t head_stride = (size_t)num_tokens * (size_t)aligned_head_dim;
 
     for (int h = 0; h < num_heads; ++h) {
         rope_apply_head(x + h * head_stride,
                         cos_cache, sin_cache,
-                        num_tokens, head_dim, aligned_head_dim, pos_offset);
+                        num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);
     }
 }
 
@@ -214,12 +355,28 @@ void rope_forward_strided(float *x,
                           int pos_offset,
                           int head_stride_tokens)
 {
+    rope_forward_strided_with_rotary_dim(x, cos_cache, sin_cache, num_heads, num_tokens,
+                                         head_dim, aligned_head_dim, pos_offset,
+                                         head_stride_tokens, head_dim);
+}
+
+void rope_forward_strided_with_rotary_dim(float *x,
+                                          const float *cos_cache,
+                                          const float *sin_cache,
+                                          int num_heads,
+                                          int num_tokens,
+                                          int head_dim,
+                                          int aligned_head_dim,
+                                          int pos_offset,
+                                          int head_stride_tokens,
+                                          int rotary_dim)
+{
     size_t head_stride = (size_t)head_stride_tokens * (size_t)aligned_head_dim;
 
     for (int h = 0; h < num_heads; ++h) {
         rope_apply_head(x + h * head_stride,
                         cos_cache, sin_cache,
-                        num_tokens, head_dim, aligned_head_dim, pos_offset);
+                        num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);
     }
 }
 
@@ -456,8 +613,26 @@ void rope_forward_qk(float *q,
                      int aligned_head_dim,
                      int pos_offset)
 {
-    rope_forward(q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
-    rope_forward(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
+    rope_forward_qk_with_rotary_dim(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,
+                                    num_tokens, head_dim, aligned_head_dim, pos_offset, head_dim);
+}
+
+void rope_forward_qk_with_rotary_dim(float *q,
+                                     float *k,
+                                     const float *cos_cache,
+                                     const float *sin_cache,
+                                     int num_heads,
+                                     int num_kv_heads,
+                                     int num_tokens,
+                                     int head_dim,
+                                     int aligned_head_dim,
+                                     int pos_offset,
+                                     int rotary_dim)
+{
+    rope_forward_with_rotary_dim(q, cos_cache, sin_cache, num_heads, num_tokens,
+                                head_dim, aligned_head_dim, pos_offset, rotary_dim);
+    rope_forward_with_rotary_dim(k, cos_cache, sin_cache, num_kv_heads, num_tokens,
+                                head_dim, aligned_head_dim, pos_offset, rotary_dim);
 }
 
 /**
@@ -482,8 +657,31 @@ void rope_forward_qk_strided(float *q,
                              int q_stride_tokens,
                              int k_stride_tokens)
 {
-    rope_forward_strided(q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, q_stride_tokens);
-    rope_forward_strided(k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, k_stride_tokens);
+    rope_forward_qk_strided_with_rotary_dim(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,
+                                           num_tokens, head_dim, aligned_head_dim, pos_offset,
+                                           q_stride_tokens, k_stride_tokens, head_dim);
+}
+
+void rope_forward_qk_strided_with_rotary_dim(float *q,
+                                             float *k,
+                                             const float *cos_cache,
+                                             const float *sin_cache,
+                                             int num_heads,
+                                             int num_kv_heads,
+                                             int num_tokens,
+                                             int head_dim,
+                                             int aligned_head_dim,
+                                             int pos_offset,
+                                             int q_stride_tokens,
+                                             int k_stride_tokens,
+                                             int rotary_dim)
+{
+    rope_forward_strided_with_rotary_dim(q, cos_cache, sin_cache, num_heads, num_tokens,
+                                       head_dim, aligned_head_dim, pos_offset,
+                                       q_stride_tokens, rotary_dim);
+    rope_forward_strided_with_rotary_dim(k, cos_cache, sin_cache, num_kv_heads, num_tokens,
+                                       head_dim, aligned_head_dim, pos_offset,
+                                       k_stride_tokens, rotary_dim);
 }
 
 /**

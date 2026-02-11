@@ -69,45 +69,108 @@ fi
 # =============================================================================
 echo -e "${YELLOW}[3/3]${NC} Running E2E inference test..."
 
-# Find GGUF file
-GGUF_FILE=""
-for p in "$HOME/.cache/ck-engine-v6.5/models/"*/*.gguf \
-         "$HOME/.cache/ck-engine-v6.6/models/"*/*.gguf; do
-    if [ -f "$p" ]; then
-        GGUF_FILE="$p"
-        break
-    fi
-done
+# Prefer explicit HF GGUF URLs (Gemma3 -> Qwen3 -> Qwen2)
+HF_CANDIDATES=(
+  "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf"
+  "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"
+  "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf"
+)
 
-if [ -n "$GGUF_FILE" ]; then
-    RUNNER=""
-    for r in "scripts/v6.5/ck_run_v6_5.py" "scripts/v6/ck_run_v6.py"; do
-        if [ -f "$r" ]; then
-            RUNNER="$r"
+PROMPTS=(
+  "Hello! Reply with a single short sentence."
+  "Give a tiny C function that returns 42."
+  "Give a tiny Python function that returns 42."
+  "Give a tiny SQL query that selects the number 42."
+)
+
+RUNNER=""
+if [ -f "version/v6.6/scripts/ck_run_v6_6.py" ]; then
+    RUNNER="version/v6.6/scripts/ck_run_v6_6.py"
+elif [ -f "scripts/v6.6/ck_run_v6_6.py" ]; then
+    RUNNER="scripts/v6.6/ck_run_v6_6.py"
+fi
+
+if [ -n "$RUNNER" ]; then
+    e2e_ok=0
+    e2e_fail=0
+    for HF in "${HF_CANDIDATES[@]}"; do
+        echo -e "${YELLOW}  ↳ E2E model: ${HF}${NC}"
+        echo -e "${YELLOW}    Prompts:${NC}"
+        for P in "${PROMPTS[@]}"; do
+            echo -e "${YELLOW}    - ${P}${NC}"
+        done
+
+        for P in "${PROMPTS[@]}"; do
+            OUTPUT=$(timeout 180 python3 "$RUNNER" run "$HF" \
+                --prompt "$P" \
+                --max-tokens 5 \
+                --context-len 128 \
+                --force-compile 2>&1 || true)
+
+            if echo "$OUTPUT" | grep -qiE "Missing attention.head_count|GGUFError"; then
+                echo -e "${YELLOW}  ⚠ Skipped (GGUF metadata missing)${NC}"
+                e2e_fail=1
+                break
+            fi
+            if echo "$OUTPUT" | grep -qiE "segfault|SIGSEGV|Traceback|assertion failed|abort"; then
+                echo -e "${RED}  ✗ E2E inference crashed${NC}"
+                echo "$OUTPUT" | tail -5
+                failed=1
+                e2e_fail=1
+                break
+            elif echo "$OUTPUT" | grep -qiE "mmap failed|Cannot allocate memory|out of memory|ENOMEM"; then
+                echo -e "${RED}  ✗ E2E inference failed (insufficient memory)${NC}"
+                echo "$OUTPUT" | tail -3
+                failed=1
+                e2e_fail=1
+                break
+            elif echo "$OUTPUT" | grep -qE "tok/s|Response:|Generated"; then
+                e2e_ok=1
+            else
+                echo -e "${YELLOW}  ⚠ E2E inference unclear (check output)${NC}"
+                echo "$OUTPUT" | tail -3
+                e2e_fail=1
+                break
+            fi
+
+            # Basic perf warning (non-fatal)
+            if command -v rg >/dev/null 2>&1; then
+                tok_s=$(echo "$OUTPUT" | rg -o "([0-9]+\\.?[0-9]*)\\s*tok/s" | head -1 | rg -o "[0-9]+\\.?[0-9]*")
+            else
+                tok_s=$(echo "$OUTPUT" | grep -oE "([0-9]+\\.?[0-9]*)[[:space:]]*tok/s" | head -1 | grep -oE "[0-9]+\\.?[0-9]*")
+            fi
+            if [ -n "$tok_s" ]; then
+                warn=$(python3 - <<PY
+tok = float("$tok_s")
+print("1" if tok < 2.0 else "0")
+PY
+)
+                if [ "$warn" = "1" ]; then
+                    echo -e "${YELLOW}  ⚠ Low throughput: ${tok_s} tok/s${NC}"
+                fi
+            fi
+        done
+
+        if [ "$e2e_fail" -ne 0 ] || [ "$failed" -ne 0 ]; then
+            break
+        fi
+        if [ "$e2e_ok" -eq 0 ]; then
+            e2e_fail=1
             break
         fi
     done
 
-    if [ -n "$RUNNER" ]; then
-        OUTPUT=$(timeout 120 python3 "$RUNNER" run "$GGUF_FILE" \
-            --prompt "What is 2+2? Answer with just the number." \
-            --max-tokens 10 2>&1 || true)
-
-        if echo "$OUTPUT" | grep -qiE "segfault|SIGSEGV|Traceback|assertion failed|abort"; then
-            echo -e "${RED}  ✗ E2E inference crashed${NC}"
-            echo "$OUTPUT" | tail -5
-            failed=1
-        elif echo "$OUTPUT" | grep -qE "tok/s|Response:|Generated"; then
-            echo -e "${GREEN}  ✓ E2E inference completed${NC}"
-        else
-            echo -e "${YELLOW}  ⚠ E2E inference unclear (check output)${NC}"
-            echo "$OUTPUT" | tail -3
-        fi
+    if [ "$failed" -eq 0 ] && [ "$e2e_ok" -eq 0 ]; then
+        echo -e "${RED}  ✗ E2E inference failed (no usable HF model)${NC}"
+        failed=1
+    elif [ "$failed" -eq 0 ] && [ "$e2e_fail" -ne 0 ]; then
+        echo -e "${RED}  ✗ E2E inference failed (one or more models/prompts failed)${NC}"
+        failed=1
     else
-        echo -e "${YELLOW}  ⚠ Skipped (no runner script found)${NC}"
+        echo -e "${GREEN}  ✓ E2E inference completed for all models${NC}"
     fi
 else
-    echo -e "${YELLOW}  ⚠ Skipped (no GGUF model in cache)${NC}"
+    echo -e "${YELLOW}  ⚠ Skipped (no runner script found)${NC}"
 fi
 
 # =============================================================================

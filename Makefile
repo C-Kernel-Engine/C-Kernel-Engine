@@ -2246,6 +2246,13 @@ help:
 	@echo "  python scripts/ck_run_v5.py run <gguf-url-or-path>"
 	@echo ""
 	@echo "  ┌─────────────────────────────────────────────────────────────────────┐"
+	@echo "  │  V6.6 PIPELINE                                                      │"
+	@echo "  └─────────────────────────────────────────────────────────────────────┘"
+	@echo "  make v6.6            Build v6.6 artifacts"
+	@echo "  make v6.6-e2e        Manual E2E sweep (Qwen2/Qwen3/Gemma)"
+	@echo "  make v6.6-help       Show v6.6 HF URLs + commands"
+	@echo ""
+	@echo "  ┌─────────────────────────────────────────────────────────────────────┐"
 	@echo "  │  BUILD                                                              │"
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make                  Build full engine library ($(LIB))"
@@ -2983,12 +2990,37 @@ report-md:
 #   make v6.6-test-memory       - Memory validation
 #   make v6.6-test-all          - Run all v6.6 tests
 #   make v6.6-download          - Download model
-#   make v6.6-build             - Build v6.6
-#   make v6.6                   - Download, build, test
+#   make v6.6-build             - Build v6.6 artifacts
+#   make v6.6                   - Build v6.6 artifacts (main)
+#   make v6.6-e2e               - Manual E2E sweep (Qwen2/Qwen3/Gemma)
 # ============================================================================
 
 v6.6-test-help:
 	@cd version/v6.6/test && make help
+
+v6.6-help:
+	@echo "=== v6.6 Quick Help ==="
+	@echo ""
+	@echo "Build v6.6 artifacts:"
+	@echo "  make v6.6"
+	@echo ""
+	@echo "Manual E2E sweep (Qwen2/Qwen3/Gemma):"
+	@echo "  make v6.6-e2e"
+	@echo ""
+	@echo "Manual E2E (HF URLs):"
+	@echo "  python3 version/v6.6/scripts/ck_run_v6_6.py run \\"
+	@echo "    \"hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf\" \\"
+	@echo "    --context-len 1024 --force-compile --prompt \"Hello\" --max-tokens 32"
+	@echo "  python3 version/v6.6/scripts/ck_run_v6_6.py run \\"
+	@echo "    \"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf\" \\"
+	@echo "    --context-len 1024 --force-compile --prompt \"Hello\" --max-tokens 32"
+	@echo "  python3 version/v6.6/scripts/ck_run_v6_6.py run \\"
+	@echo "    \"hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf\" \\"
+	@echo "    --context-len 1024 --force-compile --prompt \"Hello\" --max-tokens 32"
+	@echo ""
+	@echo "Docs:"
+	@echo "  version/v6.6/run_me.read.md"
+	@echo "  version/v6.6/E2E_HELP.md"
 
 v6.6-test-quick v6.6-sanity:
 	@cd version/v6.6/test && $(MAKE) quick
@@ -3026,9 +3058,12 @@ validate-registry:
 	fi
 
 v6.6-build: validate-registry
-	@cd version/v6.6 && scripts/ck_run_v6_6.py --build-only
+	@python3 version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" --generate-only --force-compile --context-len 128 --max-tokens 1 --prompt "Hello"
 
-v6.6: v6.6-download v6.6-build v6.6-test
+v6.6: v6.6-build
+
+v6.6-e2e:
+	@./scripts/e2e_manual_v66.sh
 
 v6.6-full: v6.6-download v6.6-build v6.6-test-all
 

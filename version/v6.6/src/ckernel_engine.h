@@ -177,11 +177,20 @@ void gemm_nt_q8_0_q8_0(const void *A_q8, const void *B, const float *bias, float
  * ROPE KERNELS
  * ============================================================================ */
 
+void rope_precompute_cache_split(float *cos_cache,
+                                float *sin_cache,
+                                int max_seq_len,
+                                int head_dim,
+                                float base);
+
 void rope_precompute_cache(float *cos_cache,
                            float *sin_cache,
                            int max_seq_len,
                            int head_dim,
-                           float base);
+                           float base,
+                           int rotary_dim,
+                           const char *scaling_type,
+                           float scaling_factor);
 
 void rope_forward_qk(float *q,
                      float *k,
@@ -193,6 +202,18 @@ void rope_forward_qk(float *q,
                      int head_dim,
                      int aligned_head_dim,
                      int pos);
+
+void rope_forward_qk_with_rotary_dim(float *q,
+                                     float *k,
+                                     const float *cos_cache,
+                                     const float *sin_cache,
+                                     int num_heads,
+                                     int num_kv_heads,
+                                     int num_tokens,
+                                     int head_dim,
+                                     int aligned_head_dim,
+                                     int pos,
+                                     int rotary_dim);
 
 /* ============================================================================
  * ATTENTION KERNELS

@@ -72,6 +72,7 @@ class CKModel:
         self.logits_stride = None  # Optional: logits stride in floats (0 = last-only)
         self.use_chat_template = True
         self.chat_template_mode = "auto"
+        self.default_system_prompt = "You are a helpful assistant."
 
     def load(self, gguf_path: str = None, force_python_tokenizer: bool = False,
              chat_template: str = "auto") -> bool:
@@ -270,7 +271,7 @@ class CKModel:
             try:
                 with open(config_path, "r") as f:
                     cfg = json.load(f)
-                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name")})
+                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name", "model_type", "default_system_prompt")})
             except Exception:
                 pass
         manifest_path = self.model_dir / "weights_manifest.json"
@@ -279,7 +280,7 @@ class CKModel:
                 with open(manifest_path, "r") as f:
                     manifest = json.load(f)
                 cfg = manifest.get("config", {})
-                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name")})
+                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name", "model_type", "default_system_prompt")})
             except Exception:
                 pass
         return meta
@@ -304,12 +305,37 @@ class CKModel:
         chat_template = meta.get("chat_template") or ""
         finetune = str(meta.get("finetune") or "").lower()
         model_name = str(meta.get("model_name") or meta.get("name") or "").lower()
+        model_type = str(meta.get("model_type") or "").lower()
+        default_system = meta.get("default_system_prompt")
 
-        if chat_template and ("instruct" in finetune or "chat" in finetune or "instruct" in model_name):
-            # Only support ChatML-style templates here.
+        if chat_template and (
+            "instruct" in finetune or "chat" in finetune or "instruct" in model_name or "it" in finetune
+            or "gemma" in model_type
+        ):
+            # ChatML-style templates (Qwen)
             if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
                 self.use_chat_template = True
                 self.chat_template_mode = "qwen"
+                # Default system prompt behavior:
+                # - Qwen2 templates inject a default system prompt if none is provided.
+                # - Qwen3 templates do NOT inject a default system prompt.
+                # Use model_type (if available) to avoid forcing a system prompt on Qwen3.
+                if isinstance(default_system, str) and default_system.strip():
+                    self.default_system_prompt = default_system
+                elif model_type == "qwen3":
+                    self.default_system_prompt = ""
+                else:
+                    self.default_system_prompt = "You are a helpful assistant."
+                return
+
+            # Gemma-style templates
+            if "<start_of_turn>" in chat_template and "<end_of_turn>" in chat_template:
+                self.use_chat_template = True
+                self.chat_template_mode = "gemma"
+                if isinstance(default_system, str) and default_system.strip():
+                    self.default_system_prompt = default_system
+                else:
+                    self.default_system_prompt = ""
                 return
 
         # Default: no chat template (base models or unknown templates)
@@ -515,9 +541,12 @@ class CKModel:
             return user_message
 
         if system_prompt is None:
-            # Qwen ChatML usually benefits from an explicit system prompt.
+            # Qwen ChatML default system prompt can differ by model family.
             # Gemma chat templates are commonly used without one.
-            system_prompt = "" if self.chat_template_mode == "gemma" else "You are a helpful assistant."
+            if self.chat_template_mode == "gemma":
+                system_prompt = ""
+            else:
+                system_prompt = self.default_system_prompt
 
         if self.chat_template_mode == "qwen":
             prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"

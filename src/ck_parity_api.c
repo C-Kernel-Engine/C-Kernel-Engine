@@ -65,7 +65,9 @@ extern void rope_forward_qk(float *q, float *k,
                             int num_heads, int num_kv_heads, int num_tokens,
                             int head_dim, int aligned_head_dim, int pos_offset);
 extern void rope_precompute_cache(float *cos_cache, float *sin_cache,
-                                  int max_seq_len, int head_dim, float base);
+                                  int max_seq_len, int head_dim, float base,
+                                  int rotary_dim, const char *scaling_type,
+                                  float scaling_factor);
 
 /* SwiGLU kernel (from swiglu_kernels.c) */
 extern void swiglu_forward(const float *input, float *output, int tokens, int dim);
@@ -463,7 +465,8 @@ void ck_test_rope(float *q, float *k,
         return;
     }
 
-    rope_precompute_cache(cos_cache, sin_cache, max_seq, head_dim, theta);
+    rope_precompute_cache(cos_cache, sin_cache, max_seq, head_dim, theta,
+                          head_dim, "none", 1.0f);
 
     /* CK RoPE expects layout [num_heads, num_tokens, head_dim]
      * Reshape from [n_tokens, n_heads * head_dim] to [n_heads, n_tokens, head_dim]

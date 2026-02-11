@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ck_run_v6.py - C-Kernel-Engine v6 Pipeline Runner (standalone)
+ck_run_v6.py - OBSOLETE (legacy v6 pipeline runner)
 
 Unified CLI that chains: download -> convert -> IR -> codegen -> compile -> run
 
@@ -10,10 +10,8 @@ v6 features:
   - Mixed-quant support via per-tensor dtypes
 
 Usage:
-  python scripts/v6/ck_run_v6.py run HuggingFaceTB/SmolLM-135M
-  python scripts/v6/ck_run_v6.py run ./model.gguf
-  python scripts/v6/ck_run_v6.py run ./local/config.json
-  python scripts/v6/ck_run_v6.py run Qwen/Qwen2-0.5B --weight-dtype=q4_k
+  (Obsolete) Use the v6.6 runner instead:
+  python version/v6.6/scripts/ck_run_v6_6.py run <model>
 """
 
 import argparse

@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v6.6/kernel_maps",
     "counts": {
-      "total": 60,
+      "total": 62,
       "by_op": {
         "attention": 2,
         "attention_projection": 1,
@@ -28,8 +28,8 @@
         "residual_add": 1,
         "residual_save": 1,
         "rmsnorm": 1,
-        "rope": 1,
-        "rope_init": 1,
+        "rope": 2,
+        "rope_init": 2,
         "swiglu": 1,
         "tokenizer": 1
       }
@@ -6661,6 +6661,193 @@
           "dtype": "fp32",
           "shape": [
             "max_T",
+            "rotary_dim",
+            2
+          ],
+          "desc": "RoPE cos cache [max_seq, rotary_dim/2]"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "rotary_dim",
+            2
+          ],
+          "desc": "RoPE sin cache [max_seq, rotary_dim/2]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor after RoPE application (in-place)"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor after RoPE application (in-place)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D",
+        "rotary_dim"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Position offset for cos/sin cache lookup"
+        },
+        {
+          "name": "rotary_dim",
+          "dtype": "int32",
+          "desc": "RoPE rotary dimensions (only rotate first rotary_dim channels)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head",
+          "token"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          },
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across tokens; each thread handles one or more tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "D should be multiple of 64 for optimal SIMD. D is the unpadded dimension; AD is used for alignment."
+      },
+      "impl": {
+        "function": "rope_forward_qk_with_rotary_dim",
+        "c_declaration": "void rope_forward_qk_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rope.py"
+        ],
+        "bench": [
+          "scripts/bench_rope.py"
+        ],
+        "parity": [
+          {
+            "kind": "numpy",
+            "command": "python unittest/test_rope.py --compare-numpy",
+            "tolerance": "1e-5",
+            "notes": "Verify RoPE rotation matches numpy reference"
+          }
+        ]
+      },
+      "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta). Only rotates first rotary_dim channels; remaining channels pass through unchanged.",
+      "name": "rope_forward_qk",
+      "_source_file": "rope_forward_qk.json"
+    },
+    {
+      "id": "rope_forward_qk_split",
+      "op": "rope",
+      "variant": "fp32_head_major",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
             "D",
             2
           ],
@@ -6799,12 +6986,131 @@
           }
         ]
       },
-      "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta)",
-      "name": "rope_forward_qk",
-      "_source_file": "rope_forward_qk.json"
+      "notes": "Split-cache RoPE for queries and keys (head_dim/2 cache layout). Matches legacy precompute layout.",
+      "name": "rope_forward_qk_split",
+      "_source_file": "rope_forward_qk_split.json"
     },
     {
       "id": "rope_precompute_cache",
+      "op": "rope_init",
+      "variant": "fp32",
+      "mode": "init",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_seq_len",
+            "half_rotary_dim"
+          ],
+          "desc": "RoPE cos cache [max_seq_len, rotary_dim/2]"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_seq_len",
+            "half_rotary_dim"
+          ],
+          "desc": "RoPE sin cache [max_seq_len, rotary_dim/2]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "max_seq_len",
+        "head_dim",
+        "rotary_dim"
+      ],
+      "params": [
+        {
+          "name": "base",
+          "dtype": "fp32",
+          "desc": "RoPE theta/base frequency (10000.0 for Llama2, 500000.0 for Llama3, 1000000.0 for Qwen2)"
+        },
+        {
+          "name": "rotary_dim",
+          "dtype": "int32",
+          "desc": "RoPE rotary dimensions (subset of head_dim to rotate, default: head_dim)"
+        },
+        {
+          "name": "scaling_type",
+          "dtype": "string",
+          "desc": "RoPE scaling type: none, linear, dynamic, yarn"
+        },
+        {
+          "name": "scaling_factor",
+          "dtype": "fp32",
+          "desc": "RoPE scaling factor (1.0 = no scaling)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "position"
+        ],
+        "preferred": {
+          "init": "position"
+        },
+        "strategies": [
+          {
+            "name": "position",
+            "partition_dim": "max_seq_len",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 64
+            },
+            "notes": "Parallelize across positions; each thread computes a range of positions."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "head_dim": 64
+        },
+        "notes": "rotary_dim should be even (uses rotary_dim/2 for rotation). Common values: 64, 128. If rotary_dim < head_dim, only first rotary_dim channels are rotated."
+      },
+      "impl": {
+        "function": "rope_precompute_cache",
+        "c_declaration": "void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base, int rotary_dim, const char *scaling_type, float scaling_factor);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rope.py"
+        ],
+        "bench": [],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": "python unittest/test_rope.py",
+            "tolerance": "5e-5",
+            "notes": "Verify cos/sin cache matches PyTorch reference for multiple theta values (10K, 500K, 1M)"
+          }
+        ]
+      },
+      "notes": "Precompute RoPE cos/sin cache for rotary position embeddings. Called ONCE at model init, not per-token. Different models use different base/theta values:\n- Llama 2, Mistral: 10000.0\n- Llama 3: 500000.0\n- Qwen2: 1000000.0\n\nRoPE Scaling:\n- none: Standard RoPE\n- linear: Scale positions by 1/factor (extends context)\n- dynamic: NTK-aware dynamic scaling\n- yarn: YaRN (Yet another RoPE extensioN)\n\nUsage: codegen should call this in do_init() with the model's rope_theta from config, NOT hardcode the value.",
+      "name": "rope_precompute_cache",
+      "_source_file": "rope_precompute_cache.json"
+    },
+    {
+      "id": "rope_precompute_cache_split",
       "op": "rope_init",
       "variant": "fp32",
       "mode": "init",
@@ -6872,11 +7178,11 @@
         "alignment": {
           "head_dim": 64
         },
-        "notes": "head_dim should be even (uses head_dim/2 for rotation). Common values: 64, 128."
+        "notes": "head_dim should be even (uses head_dim/2 for rotation)."
       },
       "impl": {
-        "function": "rope_precompute_cache",
-        "c_declaration": "void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base);",
+        "function": "rope_precompute_cache_split",
+        "c_declaration": "void rope_precompute_cache_split(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base);",
         "sources": [
           "src/kernels/rope_kernels.c"
         ],
@@ -6902,9 +7208,9 @@
           }
         ]
       },
-      "notes": "Precompute RoPE cos/sin cache for rotary position embeddings. Called ONCE at model init, not per-token. Different models use different base/theta values:\n- Llama 2, Mistral: 10000.0\n- Llama 3: 500000.0\n- Qwen2: 1000000.0\n\nUsage: codegen should call this in do_init() with the model's rope_theta from config, NOT hardcode the value.",
-      "name": "rope_precompute_cache",
-      "_source_file": "rope_precompute_cache.json"
+      "notes": "Legacy split-cache RoPE init (head_dim/2 cache layout).",
+      "name": "rope_precompute_cache_split",
+      "_source_file": "rope_precompute_cache_split.json"
     },
     {
       "id": "swiglu_forward",

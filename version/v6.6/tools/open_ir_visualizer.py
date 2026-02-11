@@ -39,8 +39,8 @@ def list_available_models():
 
         ck_build = model_dir / "ck_build"
         has_data = (
-            ck_build.exists() and
-            (ck_build / "ir1_decode.json").exists()
+            (ck_build.exists() and (ck_build / "ir1_decode.json").exists()) or
+            (model_dir / "ir1_decode.json").exists()
         )
 
         models.append({
@@ -76,6 +76,10 @@ def load_model_data(ck_build_path: Path) -> dict:
         "lowered_prefill_call": ck_build_path / "lowered_prefill_call.json",
         "manifest": ck_build_path / "weights_manifest.json",
     }
+    if not data_files["lowered_decode_call"].exists():
+        data_files["lowered_decode_call"] = ck_build_path / "lowered_decode.json"
+    if not data_files["lowered_prefill_call"].exists():
+        data_files["lowered_prefill_call"] = ck_build_path / "lowered_prefill.json"
 
     data = {
         "meta": {
@@ -120,7 +124,7 @@ def generate_html_report(ck_build_path: Path, output_path: Path = None):
     """Generate standalone HTML report."""
     from datetime import datetime
 
-    model_name = ck_build_path.parent.name
+    model_name = ck_build_path.parent.name if ck_build_path.name == "ck_build" else ck_build_path.name
     print(f"Generating report for: {model_name}")
 
     # Load data
@@ -199,17 +203,30 @@ Examples:
         return
 
     if args.model:
-        # Determine path
-        if Path(args.model).exists():
-            ck_build = Path(args.model)
+        # Determine path (allow model dir, ck_build dir, or cache name)
+        candidate = Path(args.model)
+        if candidate.exists():
+            if candidate.is_dir():
+                if candidate.name == "ck_build":
+                    ck_build = candidate
+                else:
+                    ck_build = candidate / "ck_build" if (candidate / "ck_build").exists() else candidate
+            else:
+                print(f"Error: Model path is not a directory: {candidate}")
+                return
         else:
             ck_build = CACHE_PATH / args.model / "ck_build"
             if not ck_build.exists():
-                print(f"Error: Model not found: {args.model}")
-                print("\nAvailable models:")
-                for m in list_available_models():
-                    print(f"  - {m['name']}")
-                return
+                # Fall back to model dir without ck_build
+                model_dir = CACHE_PATH / args.model
+                if model_dir.exists():
+                    ck_build = model_dir
+                else:
+                    print(f"Error: Model not found: {args.model}")
+                    print("\nAvailable models:")
+                    for m in list_available_models():
+                        print(f"  - {m['name']}")
+                    return
 
         # Generate report
         output = args.output or ck_build / "ir_report.html"

@@ -1750,7 +1750,10 @@ int ck_codegen_emit_runtime(const CKIRGraph *forward, const char *path, CKEmitMo
             "                             ptr_f32(m->memory_base, m->rope_sin_cache_offset),\n"
             "                             m->context_window,\n"
             "                             m->head_dim,\n"
-            "                             m->rope_theta);\n"
+            "                             m->rope_theta,\n"
+            "                             m->head_dim,\n"
+            "                             \"none\",\n"
+            "                             1.0f);\n"
             "    }\n"
             "    return 0;\n"
             "}\n\n");

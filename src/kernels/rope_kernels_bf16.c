@@ -35,13 +35,28 @@ void rope_forward_bf16(uint16_t *x,
                        int pos_offset,
                        float *scratch)
 {
+    rope_forward_bf16_with_rotary_dim(x, cos_cache, sin_cache, num_heads, num_tokens,
+                                     head_dim, aligned_head_dim, pos_offset, head_dim, scratch);
+}
+
+void rope_forward_bf16_with_rotary_dim(uint16_t *x,
+                                       const float *cos_cache,
+                                       const float *sin_cache,
+                                       int num_heads,
+                                       int num_tokens,
+                                       int head_dim,
+                                       int aligned_head_dim,
+                                       int pos_offset,
+                                       int rotary_dim,
+                                       float *scratch)
+{
     if (!scratch) return;
 
     size_t total = (size_t)num_heads * (size_t)num_tokens * (size_t)aligned_head_dim;
 
     bf16_tensor_to_float(x, scratch, total);
-    rope_forward(scratch, cos_cache, sin_cache,
-                 num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
+    rope_forward_with_rotary_dim(scratch, cos_cache, sin_cache,
+                                num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);
     float_tensor_to_bf16(scratch, x, total);
 }
 
@@ -89,12 +104,33 @@ void rope_forward_qk_bf16(uint16_t *q,
                           float *scratch_q,
                           float *scratch_k)
 {
+    rope_forward_qk_bf16_with_rotary_dim(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,
+                                        num_tokens, head_dim, aligned_head_dim, pos_offset,
+                                        head_dim, scratch_q, scratch_k);
+}
+
+void rope_forward_qk_bf16_with_rotary_dim(uint16_t *q,
+                                          uint16_t *k,
+                                          const float *cos_cache,
+                                          const float *sin_cache,
+                                          int num_heads,
+                                          int num_kv_heads,
+                                          int num_tokens,
+                                          int head_dim,
+                                          int aligned_head_dim,
+                                          int pos_offset,
+                                          int rotary_dim,
+                                          float *scratch_q,
+                                          float *scratch_k)
+{
     if (!q || !k) return;
 
-    rope_forward_bf16(q, cos_cache, sin_cache,
-                      num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, scratch_q);
-    rope_forward_bf16(k, cos_cache, sin_cache,
-                      num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, scratch_k);
+    rope_forward_bf16_with_rotary_dim(q, cos_cache, sin_cache,
+                                      num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset,
+                                      rotary_dim, scratch_q);
+    rope_forward_bf16_with_rotary_dim(k, cos_cache, sin_cache,
+                                      num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset,
+                                      rotary_dim, scratch_k);
 }
 
 /*

@@ -187,8 +187,81 @@ def _sanitize_macro(name: str) -> str:
     return s
 
 
+def _pick_first(config: Dict, keys: List[str], default=None):
+    for key in keys:
+        if key in config and config[key] is not None:
+            return config[key]
+    return default
+
+
+def _normalize_model_config(config: Dict) -> Dict:
+    """Normalize common model config aliases to canonical keys used by codegen."""
+    out = dict(config)
+
+    embed_dim = _pick_first(out, ["embed_dim", "hidden_size", "n_embd", "d_model"])
+    num_heads = _pick_first(out, ["num_heads", "num_attention_heads", "n_head"])
+    num_kv_heads = _pick_first(out, ["num_kv_heads", "num_key_value_heads", "n_kv_head"], default=num_heads)
+    head_dim = _pick_first(out, ["head_dim"])
+    intermediate = _pick_first(out, ["intermediate_size", "ffn_dim", "n_inner"])
+    vocab_size = _pick_first(out, ["vocab_size", "n_vocab"])
+    context_length = _pick_first(out, ["context_length", "max_position_embeddings", "context_window", "max_seq_len"])
+    num_layers = _pick_first(out, ["num_layers", "n_layer"])
+
+    missing = []
+    if embed_dim is None:
+        missing.append("embed_dim/hidden_size")
+    if num_heads is None:
+        missing.append("num_heads/num_attention_heads")
+    if intermediate is None:
+        missing.append("intermediate_size/ffn_dim")
+    if vocab_size is None:
+        missing.append("vocab_size")
+    if context_length is None:
+        missing.append("context_length/max_position_embeddings")
+    if num_layers is None:
+        missing.append("num_layers")
+    if missing:
+        raise ValueError(f"Missing required model config keys: {', '.join(missing)}")
+
+    embed_dim = int(embed_dim)
+    num_heads = int(num_heads)
+    num_kv_heads = int(num_kv_heads)
+    intermediate = int(intermediate)
+    vocab_size = int(vocab_size)
+    context_length = int(context_length)
+    num_layers = int(num_layers)
+
+    if head_dim is None:
+        if num_heads <= 0 or embed_dim % num_heads != 0:
+            raise ValueError(f"Cannot derive head_dim from embed_dim={embed_dim}, num_heads={num_heads}")
+        head_dim = embed_dim // num_heads
+    head_dim = int(head_dim)
+
+    rotary_dim = int(_pick_first(out, ["rotary_dim"], default=head_dim))
+    rope_theta = float(_pick_first(out, ["rope_theta", "rope_base", "theta"], default=10000.0))
+    rope_scaling_type = str(_pick_first(out, ["rope_scaling_type"], default="none"))
+    rope_scaling_factor = float(_pick_first(out, ["rope_scaling_factor"], default=1.0))
+
+    out.update({
+        "embed_dim": embed_dim,
+        "num_heads": num_heads,
+        "num_kv_heads": num_kv_heads,
+        "head_dim": head_dim,
+        "intermediate_size": intermediate,
+        "vocab_size": vocab_size,
+        "context_length": context_length,
+        "num_layers": num_layers,
+        "rotary_dim": rotary_dim,
+        "rope_theta": rope_theta,
+        "rope_scaling_type": rope_scaling_type,
+        "rope_scaling_factor": rope_scaling_factor,
+    })
+    return out
+
+
 def emit_memory_layout(layout: Dict, config: Dict) -> str:
     """Emit C code for memory layout from layout.json."""
+    config = _normalize_model_config(config)
 
     weights = layout.get("memory", {}).get("weights", {})
     activations = layout.get("memory", {}).get("activations", {})
@@ -207,14 +280,10 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
             kv_cache_size = int(buf.get("size", 0))
             break
 
-    num_layers = config.get("num_layers", 24)
+    num_layers = config["num_layers"]
 
     # Get bump_layout from layout (passed through from manifest via build_ir)
-    bump_layout = layout.get("bump_layout", {
-        "header_size": 128,
-        "ext_metadata_size": 24,
-        "data_start": 152,
-    })
+    bump_layout = layout.get("bump_layout", {})
 
     lines = []
 
@@ -234,18 +303,25 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
 ''')
 
     # Model dimensions
+    # Extract RoPE params from init_call or config
+    rotary_dim = config["rotary_dim"]
+    rope_scaling_type = config["rope_scaling_type"]
+    rope_scaling_factor = config["rope_scaling_factor"]
+
     lines.append(f'''
 /* ============================================================================
  * MODEL CONFIGURATION
  * ============================================================================ */
-#define EMBED_DIM {config.get("embed_dim", 896)}
-#define NUM_HEADS {config.get("num_heads", 14)}
-#define NUM_KV_HEADS {config.get("num_kv_heads", 2)}
-#define HEAD_DIM {config.get("head_dim", 64)}
-#define INTERMEDIATE_SIZE {config.get("intermediate_size", 4864)}
+#define EMBED_DIM {config["embed_dim"]}
+#define NUM_HEADS {config["num_heads"]}
+#define NUM_KV_HEADS {config["num_kv_heads"]}
+#define HEAD_DIM {config["head_dim"]}
+#define ROTARY_DIM {rotary_dim}
+#define INTERMEDIATE_SIZE {config["intermediate_size"]}
 #define NUM_LAYERS {num_layers}
-#define VOCAB_SIZE {config.get("vocab_size", 151936)}
-#define MAX_SEQ_LEN {config.get("context_length", 32768)}
+#define VOCAB_SIZE {config["vocab_size"]}
+#define MAX_SEQ_LEN {config["context_length"]}
+/* RoPE scaling: type={rope_scaling_type}, factor={rope_scaling_factor} */
 
 /* Memory sizes */
 #define WEIGHTS_SIZE {weights_size}ULL
@@ -901,7 +977,7 @@ static int do_init(void) {{
     g_model->activations = (float*)(g_model->bump + BUMP_ACT_OFFSET);
     g_model->kv_cache = (float*)(g_model->bump + A_KV_CACHE);
     g_model->rope_cos = (float*)(g_model->bump + A_ROPE_CACHE);
-    g_model->rope_sin = g_model->rope_cos + MAX_SEQ_LEN * HEAD_DIM / 2;
+    g_model->rope_sin = g_model->rope_cos + MAX_SEQ_LEN * ROTARY_DIM / 2;
     g_model->logits = (float*)(g_model->bump + A_LOGITS);
     g_model->pos = 0;
 
@@ -1119,6 +1195,7 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
         merged = dict(config)
         merged.update(layout_config)
         config = merged
+    config = _normalize_model_config(config)
     logits_layout = _infer_logits_layout(config, layout)
     vocab_size = int(config.get("vocab_size", 0))
     logits_stride = vocab_size if logits_layout == "full" else 0
@@ -1126,13 +1203,38 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
     scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
     memory = layout.get("memory", ir.get("memory", {}))  # Use layout memory for offsets
 
-    # Extract rope_theta from init_call config for header comment
-    rope_theta = 10000.0  # Safe default (Llama 2)
+    # Extract RoPE params from init_call config for header comment
+    rope_theta = config["rope_theta"]
+    rotary_dim = config["rotary_dim"]
+    rope_scaling_type = config["rope_scaling_type"]
+    rope_scaling_factor = config["rope_scaling_factor"]
+    rope_init_kernel = "rope_precompute_cache"
+    rope_qk_kernel = "rope_forward_qk"
+
     if init_call:
         init_config = init_call.get("config", {})
         rope_theta = init_config.get("rope_theta", rope_theta)
+        rotary_dim = init_config.get("rotary_dim", rotary_dim)
+        rope_scaling_type = init_config.get("rope_scaling_type", rope_scaling_type)
+        rope_scaling_factor = init_config.get("rope_scaling_factor", rope_scaling_factor)
+        # Infer init kernel from lowered init ops (if present)
+        for op in init_call.get("operations", []):
+            if op.get("op") == "rope_init":
+                rope_init_kernel = op.get("function", op.get("kernel", rope_init_kernel))
+                break
     elif "rope_theta" in config:
         rope_theta = config.get("rope_theta", rope_theta)
+        rotary_dim = config.get("rotary_dim", rotary_dim)
+        rope_scaling_type = config.get("rope_scaling_type", rope_scaling_type)
+        rope_scaling_factor = config.get("rope_scaling_factor", rope_scaling_factor)
+
+    # Infer rope_qk kernel from IR ops (if present)
+    for op in ops:
+        if op.get("op") == "rope_qk":
+            rope_qk_kernel = op.get("function", op.get("kernel", rope_qk_kernel))
+            break
+
+    rope_cache_layout = "head_dim/2" if rope_init_kernel == "rope_precompute_cache_split" else "rotary_dim/2"
 
     # Fail fast if IR Lower 3 has errors or missing args
     ir_errors = ir.get("errors", [])
@@ -1177,7 +1279,8 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
  * Model: {config.get("model", "unknown")}
  * Mode: {ir.get("mode", "decode")}
  * Layers: {config.get("num_layers", 0)} (unrolled)
- * RoPE theta: {rope_theta}
+ * RoPE: theta={rope_theta}, rotary={rotary_dim}, scaling={rope_scaling_type}/{rope_scaling_factor}
+ * RoPE kernels: init={rope_init_kernel}, qk={rope_qk_kernel}, cache={rope_cache_layout}
  */
 
 #define _GNU_SOURCE
@@ -1358,8 +1461,12 @@ def main():
             print(f"  Loaded init_call IR from {init_call_path}")
             init_ops = init_call_obj.get("operations", [])
             if init_ops:
-                rope_theta = init_call_obj.get("config", {}).get("rope_theta", 10000.0)
-                print(f"  - {len(init_ops)} init ops (rope_theta={rope_theta})")
+                init_config = init_call_obj.get("config", {})
+                rope_theta = init_config.get("rope_theta")
+                rotary_dim = init_config.get("rotary_dim", init_config.get("head_dim"))
+                rope_scaling_type = init_config.get("rope_scaling_type")
+                rope_scaling_factor = init_config.get("rope_scaling_factor")
+                print(f"  - {len(init_ops)} init ops (rope_theta={rope_theta}, rotary={rotary_dim}, scaling={rope_scaling_type}/{rope_scaling_factor})")
         else:
             # Try legacy init.json path
             init_path = decode_ir.parent / "init.json"

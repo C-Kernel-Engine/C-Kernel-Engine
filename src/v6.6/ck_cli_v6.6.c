@@ -52,6 +52,7 @@ static double g_prefill_time_ms = 0.0;
 static double g_decode_time_ms = 0.0;
 static int g_decode_count = 0;
 static int g_prompt_tokens = 0;
+static bool g_use_byte_decoder = true;
 
 static void handle_sigint(int sig) {
     (void)sig;
@@ -508,8 +509,55 @@ static void output_append(char *buf, size_t *len, const char *text) {
     *len += n;
 }
 
+static bool token_has_gpt2_bytes(const char *token) {
+    if (!token) return false;
+    const unsigned char *p = (const unsigned char *)token;
+    while (*p) {
+        if ((p[0] & 0x80) == 0) {
+            p++;
+            continue;
+        }
+        if ((p[0] & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80) {
+            unsigned int cp = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+            if ((cp >= 0x100 && cp <= 0x120) || (cp >= 0x17F && cp <= 0x1A0)) {
+                return true;
+            }
+            p += 2;
+            continue;
+        }
+        if ((p[0] & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+            p += 3;
+            continue;
+        }
+        if ((p[0] & 0xF8) == 0xF0 && (p[1] & 0xC0) == 0x80 &&
+            (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+            p += 4;
+            continue;
+        }
+        p++;
+    }
+    return false;
+}
+
+static bool detect_gpt2_byte_fallback(CKTrueBPE *tokenizer, int vocab_size) {
+    if (!tokenizer || vocab_size <= 0) return false;
+    int limit = vocab_size < 2048 ? vocab_size : 2048;
+    for (int i = 0; i < limit; i++) {
+        const char *tok = ck_true_bpe_id_to_token(tokenizer, i);
+        if (tok && token_has_gpt2_bytes(tok)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void output_token(char *buf, size_t *len, const char *token) {
     if (!token || !*token) return;
+
+    if (!g_use_byte_decoder) {
+        output_append(buf, len, token);
+        return;
+    }
 
     /* Decode BPE byte-level encoding to actual bytes */
     char decoded[1024];
@@ -1281,6 +1329,11 @@ int main(int argc, char **argv) {
         if (opt.verbose) {
             printf("[Tokenizer] Registered %d special tokens for pre-BPE matching\n", registered);
         }
+    }
+
+    g_use_byte_decoder = detect_gpt2_byte_fallback(tokenizer, vocab_size);
+    if (opt.verbose) {
+        printf("[Tokenizer] Byte-level decoder: %s\n", g_use_byte_decoder ? "ON" : "OFF");
     }
 
     printf("Ready! Vocab: %d, Context: %d, Template: %s\n",

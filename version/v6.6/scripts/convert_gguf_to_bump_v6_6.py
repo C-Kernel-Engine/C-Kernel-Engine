@@ -94,7 +94,7 @@ import os
 import struct
 import sys
 from dataclasses import dataclass
-from typing import BinaryIO, Dict, Optional, Sequence, Tuple
+from typing import Any, BinaryIO, Dict, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -1443,6 +1443,8 @@ def main() -> None:
     ap.add_argument("--manifest-out", help="Output weights manifest JSON path with tensor offsets")
     ap.add_argument("--extract-vocab", help="Extract tokenizer to JSON file (runs scripts/extract_gguf_vocab.py)")
     ap.add_argument("--tokenizer-json", help="Tokenizer JSON (HuggingFace) to embed vocab + merges")
+    ap.add_argument("--strict-rope", action="store_true",
+                   help="Fail conversion if RoPE metadata is incomplete/unsupported (recommended for HF publishing)")
     ap.add_argument("--bump-version", type=int, default=BUMP_VERSION_V5, choices=[BUMP_VERSION_V4, BUMP_VERSION_V5],
                    help=f"BUMP format version (default: {BUMP_VERSION_V5}). V5 adds embedded metadata.")
     args = ap.parse_args()
@@ -1772,6 +1774,20 @@ def main() -> None:
                         return float(v)
             return None
 
+        def meta_str(*keys: str) -> Optional[str]:
+            """Get string from metadata, trying multiple keys in order."""
+            for key in keys:
+                v = meta.get(key)
+                if v is not None:
+                    if isinstance(v, str):
+                        return v
+                    if isinstance(v, bytes):
+                        try:
+                            return v.decode("utf-8")
+                        except Exception:
+                            return None
+            return None
+
         def weight_dtype(info: TensorInfo, label: str) -> int:
             # Support all common quantization types
             supported_types = (
@@ -1893,6 +1909,112 @@ def main() -> None:
             "llama.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
             "gemma3.rope.freq_base"
         ) or 10000.0
+
+        # Q/K/V head dimensions (some models report explicit key/value lengths)
+        key_length_meta = meta_int(
+            "qwen3.attention.key_length",
+            "gemma3.attention.key_length",
+            "llama.attention.key_length",
+        )
+        value_length_meta = meta_int(
+            "qwen3.attention.value_length",
+            "gemma3.attention.value_length",
+            "llama.attention.value_length",
+        )
+
+        # RoPE rotary dimensions (subset of head_dim that gets rotated).
+        # Resolve after head_dim is known.
+        rotary_dim_meta = meta_int(
+            "llama.rope.dim",
+            "attention.rotary_dim",
+            "qwen2.rotary_dim",
+            "qwen3.attention.key_length",
+            "gemma.attention.key_length",
+            "gemma3.attention.key_length",
+        )
+
+        # RoPE scaling (supports scalar and structured GGUF metadata)
+        rope_scaling_type = "none"
+        rope_scaling_factor = 1.0
+
+        def _maybe_set_rope_scaling(value: Any) -> None:
+            nonlocal rope_scaling_type, rope_scaling_factor
+            if value is None:
+                return
+            if isinstance(value, dict):
+                st = value.get("type")
+                sf = value.get("factor")
+                if st is not None:
+                    rope_scaling_type = str(st)
+                if sf is not None:
+                    try:
+                        rope_scaling_factor = float(sf)
+                    except Exception:
+                        pass
+                return
+            if isinstance(value, str):
+                rope_scaling_type = value
+                return
+            if isinstance(value, (int, float)):
+                if float(value) != 1.0:
+                    rope_scaling_type = "linear"
+                    rope_scaling_factor = float(value)
+
+        for key in [
+            "llama.rope.scaling",
+            "rope.scaling",
+            "rope_scaling",
+            "llama.rope.scaling.type",
+            "rope.scaling.type",
+            "rope_scaling_type",
+        ]:
+            if key in meta:
+                _maybe_set_rope_scaling(meta[key])
+
+        for key in [
+            "llama.rope.scaling.factor",
+            "rope.scaling.factor",
+            "rope_scaling_factor",
+        ]:
+            if key in meta:
+                try:
+                    rope_scaling_factor = float(meta[key])
+                except Exception:
+                    pass
+
+        # Legacy single-key format
+        if "rope.scale" in meta:
+            _maybe_set_rope_scaling(meta["rope.scale"])
+
+        # Canonical RoPE schema passthrough (always stored in config)
+        rope_layout_meta = meta_str(
+            "llama.rope.layout",
+            "rope.layout",
+            "rope_layout",
+        )
+        rope_original_context_length_meta = meta_int(
+            "llama.rope.scaling.original_max_length",
+            "rope.scaling.original_max_length",
+            "rope_original_context_length",
+            "rope.original_context_length",
+            "llama.rope.original_context_length",
+        )
+        rope_beta_fast_meta = meta_float(
+            "llama.rope.scaling.beta_fast",
+            "rope.scaling.beta_fast",
+            "rope_beta_fast",
+        )
+        rope_beta_slow_meta = meta_float(
+            "llama.rope.scaling.beta_slow",
+            "rope.scaling.beta_slow",
+            "rope_beta_slow",
+        )
+        rope_attn_factor_meta = meta_float(
+            "llama.rope.scaling.attn_factor",
+            "rope.scaling.attn_factor",
+            "rope_attn_factor",
+        )
+
         rms_eps = meta_float(
             "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
             "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
@@ -1905,8 +2027,53 @@ def main() -> None:
         if embed_dim % num_heads != 0:
             raise GGUFError(f"hidden_size {embed_dim} not divisible by num_heads {num_heads}")
 
-        head_dim = embed_dim // num_heads
+        head_dim = key_length_meta or (embed_dim // num_heads)
+        if value_length_meta is not None and value_length_meta != head_dim:
+            print(f"Warning: value_length {value_length_meta} != key_length {head_dim}; using key_length for head_dim")
+        rotary_dim = rotary_dim_meta or key_length_meta or head_dim
         embed_kv = num_kv_heads * head_dim
+
+        # Normalize RoPE schema defaults
+        rope_layout = (rope_layout_meta or "split").strip().lower()
+        rope_layout_aliases = {
+            "standard": "split",
+            "cos_sin_split": "split",
+            "half": "split",
+        }
+        rope_layout = rope_layout_aliases.get(rope_layout, rope_layout)
+        rope_original_context_length = int(rope_original_context_length_meta or context_len)
+        rope_beta_fast = float(rope_beta_fast_meta) if rope_beta_fast_meta is not None else 0.0
+        rope_beta_slow = float(rope_beta_slow_meta) if rope_beta_slow_meta is not None else 0.0
+        rope_attn_factor = float(rope_attn_factor_meta) if rope_attn_factor_meta is not None else 1.0
+
+        # Validate RoPE config (optional strict mode)
+        rope_scaling_type = str(rope_scaling_type).lower() if isinstance(rope_scaling_type, str) else rope_scaling_type
+        supported_scaling = {"none", "linear", "dynamic", "yarn"}
+        if args.strict_rope:
+            if rope_scaling_type not in supported_scaling:
+                raise GGUFError(f"Unsupported rope_scaling_type '{rope_scaling_type}' (strict mode)")
+            if rope_scaling_type != "none":
+                if rope_scaling_factor is None or float(rope_scaling_factor) <= 0.0:
+                    raise GGUFError("Invalid rope_scaling_factor (strict mode)")
+                if rope_scaling_type in ("dynamic", "yarn"):
+                    if not rope_original_context_length or rope_original_context_length <= 0:
+                        raise GGUFError("Missing rope_original_context_length for dynamic/yarn (strict mode)")
+                if rope_scaling_type == "yarn":
+                    if rope_beta_fast <= 0.0 or rope_beta_slow <= 0.0:
+                        raise GGUFError("Missing rope_beta_fast/rope_beta_slow for yarn (strict mode)")
+            if rope_layout not in {"split"}:
+                raise GGUFError(f"Unsupported rope_layout '{rope_layout}' (strict mode)")
+
+        if rotary_dim > head_dim:
+            if args.strict_rope:
+                raise GGUFError(f"rotary_dim {rotary_dim} exceeds head_dim {head_dim} (strict mode)")
+            print(f"Warning: rotary_dim {rotary_dim} > head_dim {head_dim}, clamping to head_dim")
+            rotary_dim = head_dim
+        if rotary_dim % 2 != 0:
+            if args.strict_rope:
+                raise GGUFError(f"rotary_dim {rotary_dim} must be even (strict mode)")
+            print(f"Warning: rotary_dim {rotary_dim} is odd, decrementing to make even")
+            rotary_dim -= 1
 
         # Infer correct dimensions from actual tensors if metadata doesn't match
         # This handles non-standard architectures like Qwen3/Devstral
@@ -1926,6 +2093,9 @@ def main() -> None:
                 # Update for consistency with actual tensors
                 embed_kv = k_dim1
                 head_dim = inferred_q_head_dim
+                # If rotary_dim was not explicitly provided, recompute from updated head_dim
+                if rotary_dim_meta is None:
+                    rotary_dim = head_dim
 
         # Attention output dim (attn_out). For most models this == embed_dim,
         # but some (e.g., Qwen3) use num_heads * head_dim.
@@ -2336,7 +2506,15 @@ def main() -> None:
                     "head_dim": int(head_dim),
                     "intermediate_size": int(intermediate),
                     "context_length": int(context_len),
-                    "rope_theta": float(rope_theta) if rope_theta else 1000000.0,
+                    "rope_theta": float(rope_theta),
+                    "rotary_dim": int(rotary_dim),
+                    "rope_scaling_type": rope_scaling_type,
+                    "rope_scaling_factor": float(rope_scaling_factor),
+                    "rope_layout": rope_layout,
+                    "rope_original_context_length": int(rope_original_context_length),
+                    "rope_beta_fast": float(rope_beta_fast),
+                    "rope_beta_slow": float(rope_beta_slow),
+                    "rope_attn_factor": float(rope_attn_factor),
                     "vocab_size": int(vocab_size),
                     "rms_eps": float(rms_eps) if rms_eps else 1e-5,
                 }

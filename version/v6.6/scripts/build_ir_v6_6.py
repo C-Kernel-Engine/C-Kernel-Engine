@@ -605,11 +605,13 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
             "outputs": {...}
         }
     """
+    config = _normalize_manifest_config(config)
     init_ops = []
     op_id = 0
 
     template = manifest.get("template", {})
     flags = template.get("flags", {})
+    template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
 
     # ═══════════════════════════════════════════════════════════
     # ROPE INIT: Precompute cos/sin tables if model uses RoPE
@@ -617,17 +619,34 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     rope_type = flags.get("rope", None)
     if rope_type in ("rope", "rope_qk", True):
         # Get config values
-        rope_theta = config.get("rope_theta", 10000.0)
-        head_dim = config.get("head_dim", 64)
-        max_seq_len = config.get("context_length", config.get("max_seq_len", 32768))
+        rope_theta = config["rope_theta"]
+        head_dim = config["head_dim"]
+        rotary_dim = config["rotary_dim"]
+        max_seq_len = config["context_length"]
 
         # RoPE scaling (for extended context models like Llama 3.1)
-        rope_scaling_type = config.get("rope_scaling_type", "none")
-        rope_scaling_factor = config.get("rope_scaling_factor", 1.0)
+        rope_scaling_type = config["rope_scaling_type"]
+        rope_scaling_factor = config["rope_scaling_factor"]
+        rope_layout = config.get("rope_layout", "split")
+        rope_original_context_length = config.get("rope_original_context_length", max_seq_len)
+        rope_beta_fast = config.get("rope_beta_fast", 0.0)
+        rope_beta_slow = config.get("rope_beta_slow", 0.0)
+        rope_attn_factor = config.get("rope_attn_factor", 1.0)
+
+        rope_init_kernel = template_kernels.get("rope_init", "rope_precompute_cache")
+        rope_init_params = {
+            "max_seq_len": {"source": "dim:max_seq_len", "value": max_seq_len},
+            "head_dim": {"source": "dim:head_dim", "value": head_dim},
+            "base": {"source": "config:rope_theta", "value": rope_theta},
+        }
+        if rope_init_kernel != "rope_precompute_cache_split":
+            rope_init_params["rotary_dim"] = {"source": "dim:rotary_dim", "value": rotary_dim}
+            rope_init_params["scaling_type"] = {"source": "config:rope_scaling_type", "value": rope_scaling_type}
+            rope_init_params["scaling_factor"] = {"source": "config:rope_scaling_factor", "value": rope_scaling_factor}
 
         init_ops.append({
             "op_id": op_id,
-            "kernel": "rope_precompute_cache",
+            "kernel": rope_init_kernel,
             "op": "rope_init",
             "section": "init",
             "layer": -1,
@@ -639,17 +658,19 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
                     "sin_cache": {"dtype": "fp32", "buffer": "rope_cache"},
                 }
             },
-            "params": {
-                "max_seq_len": {"source": "dim:max_seq_len", "value": max_seq_len},
-                "head_dim": {"source": "dim:head_dim", "value": head_dim},
-                "base": {"source": "config:rope_theta", "value": rope_theta},
-            },
+            "params": rope_init_params,
             "config": {
                 "rope_theta": rope_theta,
+                "rotary_dim": rotary_dim,
                 "rope_scaling_type": rope_scaling_type,
                 "rope_scaling_factor": rope_scaling_factor,
+                "rope_layout": rope_layout,
+                "rope_original_context_length": rope_original_context_length,
+                "rope_beta_fast": rope_beta_fast,
+                "rope_beta_slow": rope_beta_slow,
+                "rope_attn_factor": rope_attn_factor,
             },
-            "notes": f"RoPE cache init: theta={rope_theta}, head_dim={head_dim}, max_seq={max_seq_len}"
+            "notes": f"RoPE cache init: theta={rope_theta}, rotary_dim={rotary_dim}, scaling={rope_scaling_type}/{rope_scaling_factor}, max_seq={max_seq_len}"
         })
         op_id += 1
 
@@ -749,6 +770,7 @@ def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
             "ops": [...]
         }
     """
+    config = _normalize_manifest_config(config)
     init_ops = generate_init_ops(manifest, config)
 
     # Extract special tokens from manifest for propagation to generated code
@@ -761,9 +783,12 @@ def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
         "description": "Model initialization ops (run once at load time)",
         "config": {
             "model": config.get("model", "unknown"),
-            "rope_theta": config.get("rope_theta", 10000.0),
-            "head_dim": config.get("head_dim", 64),
-            "max_seq_len": config.get("context_length", 32768),
+            "rope_theta": config["rope_theta"],
+            "rotary_dim": config["rotary_dim"],
+            "rope_scaling_type": config["rope_scaling_type"],
+            "rope_scaling_factor": config["rope_scaling_factor"],
+            "head_dim": config["head_dim"],
+            "max_seq_len": config["context_length"],
             "num_heads": config.get("num_heads", 0),
             "num_kv_heads": config.get("num_kv_heads", 0),
         },
@@ -968,8 +993,10 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     total_kv_size = num_layers * 2 * kv_per_layer
     add("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
 
-    rope_size = context_len * (head_dim // 2) * 4 * 2
-    add("rope_cache", rope_size, f"[2, {context_len}, {head_dim // 2}]")
+    rotary_dim = config.get("rotary_dim", head_dim)
+    rope_half = int(rotary_dim) // 2
+    rope_size = context_len * rope_half * 4 * 2
+    add("rope_cache", rope_size, f"[2, {context_len}, {rope_half}]")
 
     # Scratch buffers
     q_size = num_heads * seq_len * head_dim * 4
@@ -1002,7 +1029,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
 
 # Script directory
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent
+PROJECT_ROOT = SCRIPT_DIR.parent  # version/v6.6
+REPO_ROOT = PROJECT_ROOT.parent.parent  # repo root
+V66_ROOT = REPO_ROOT / "version" / "v6.6"
 
 # Template Op → Kernel Op Mapping
 # This is the single source of truth for how template ops map to kernel registry ops
@@ -1118,8 +1147,8 @@ def _align_up(value: int, alignment: int) -> int:
 
 
 def load_kernel_registry() -> Dict:
-    """Load kernel registry."""
-    registry_path = PROJECT_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
+    """Load kernel registry (v6.6-specific)."""
+    registry_path = V66_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
     with open(registry_path, 'r') as f:
         return json.load(f)
 
@@ -1155,6 +1184,14 @@ def _merge_external_config(manifest: Dict, manifest_path: Path) -> None:
         "max_seq_len": external.get("max_position_embeddings"),
         "rms_eps": external.get("rms_norm_eps"),
         "rope_theta": external.get("rope_theta"),
+        "rotary_dim": external.get("rotary_dim"),
+        "rope_scaling_type": external.get("rope_scaling_type"),
+        "rope_scaling_factor": external.get("rope_scaling_factor"),
+        "rope_layout": external.get("rope_layout"),
+        "rope_original_context_length": external.get("rope_original_context_length"),
+        "rope_beta_fast": external.get("rope_beta_fast"),
+        "rope_beta_slow": external.get("rope_beta_slow"),
+        "rope_attn_factor": external.get("rope_attn_factor"),
         "attn_out_dim": external.get("attn_out_dim"),
         "sliding_window": external.get("sliding_window"),
         "intermediate_size": external.get("intermediate_size"),
@@ -1171,6 +1208,62 @@ def _merge_external_config(manifest: Dict, manifest_path: Path) -> None:
         config.setdefault(k, v)
 
     manifest["config"] = config
+
+
+def _normalize_manifest_config(config: Dict) -> Dict:
+    """Normalize aliases and derive canonical dimensions for IR/codegen."""
+    out = dict(config or {})
+
+    def _pick(*keys, default=None):
+        for key in keys:
+            if key in out and out[key] is not None:
+                return out[key]
+        return default
+
+    embed_dim = _pick("embed_dim", "hidden_size", "n_embd", "d_model")
+    num_heads = _pick("num_heads", "num_attention_heads", "n_head")
+    num_kv_heads = _pick("num_kv_heads", "num_key_value_heads", "n_kv_head", default=num_heads)
+    head_dim = _pick("head_dim")
+    context_length = _pick("context_length", "max_seq_len", "max_position_embeddings", "context_window")
+
+    if embed_dim is not None:
+        embed_dim = int(embed_dim)
+        out["embed_dim"] = embed_dim
+    if num_heads is not None:
+        num_heads = int(num_heads)
+        out["num_heads"] = num_heads
+    if num_kv_heads is not None:
+        out["num_kv_heads"] = int(num_kv_heads)
+
+    if head_dim is None and embed_dim is not None and num_heads:
+        if embed_dim % int(num_heads) == 0:
+            head_dim = embed_dim // int(num_heads)
+    if head_dim is not None:
+        out["head_dim"] = int(head_dim)
+
+    if context_length is not None:
+        out["context_length"] = int(context_length)
+        out.setdefault("max_seq_len", int(context_length))
+
+    # RoPE config (fallbacks remain model-agnostic and are overridden by converter when present)
+    out["rope_theta"] = float(_pick("rope_theta", "rope_base", "theta", default=10000.0))
+    out["rotary_dim"] = int(_pick("rotary_dim", default=out.get("head_dim", 64)))
+    out["rope_scaling_type"] = str(_pick("rope_scaling_type", default="none"))
+    out["rope_scaling_factor"] = float(_pick("rope_scaling_factor", default=1.0))
+    out["rope_layout"] = str(_pick("rope_layout", default="split"))
+    out["rope_original_context_length"] = int(
+        _pick("rope_original_context_length", default=out.get("context_length", 0))
+    )
+    out["rope_beta_fast"] = float(_pick("rope_beta_fast", default=0.0))
+    out["rope_beta_slow"] = float(_pick("rope_beta_slow", default=0.0))
+    out["rope_attn_factor"] = float(_pick("rope_attn_factor", default=1.0))
+
+    # Clamp rotary_dim to head_dim for safety
+    if out.get("head_dim") is not None:
+        head_dim = int(out["head_dim"])
+        if out.get("rotary_dim", head_dim) > head_dim:
+            out["rotary_dim"] = head_dim
+    return out
 
 
 def validate_template_ops(template_ops: List[str]) -> List[str]:
@@ -1583,6 +1676,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             raise RuntimeError("Template missing and cannot auto-bump")
 
     template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
+    template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
     # Template-controlled opt-in: use FP32->Q8_0 contract adapters for Q8_0 kernels.
     # Keep this disabled by default so non-Gemma families (e.g., Qwen2/Qwen3) stay on
     # the standard gemv_q8_0/gemm_nt_q8_0 implementations.
@@ -1796,6 +1890,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # kernels slower for inference. Each decode token calls kernels 500+ times,
         # so thread management overhead dominates. Needs persistent thread pool.
         use_parallel = False  # Was: prefer_parallel and op in PARALLEL_OPS
+
+        # Template-specified kernel override (keeps IR dumb and data-driven)
+        if op == "rope_qk":
+            rope_kernel = template_kernels.get("rope_qk")
+            if rope_kernel:
+                return [rope_kernel]
 
         kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
         if not kernel_op:
@@ -2573,7 +2673,7 @@ def insert_bias_add_ops(
         print("  Warning: bias_add kernel not found in registry; skipping bias ops")
         return ir_ops
 
-    kernel_maps_dir = PROJECT_ROOT / "kernel_maps"
+    kernel_maps_dir = V66_ROOT / "kernel_maps"
     kernel_map_cache: Dict[str, Dict] = {}
     entry_by_name: Dict[str, Dict[str, Any]] = {
         e.get("name"): e for e in (manifest.get("entries", []) or []) if e.get("name")
@@ -2756,7 +2856,7 @@ def generate_ir_lower_1(
 
     # Build kernel map index by loading individual kernel map files
     # KERNEL_REGISTRY.json is only used for validation, not as source of truth
-    kernel_maps_dir = PROJECT_ROOT / "kernel_maps"
+    kernel_maps_dir = V66_ROOT / "kernel_maps"
     kernel_map_index = {}
     for kernel in registry.get("kernels", []):
         kernel_id = kernel["id"]
@@ -3549,9 +3649,11 @@ def generate_memory_layout(
     total_kv_size = num_layers * 2 * kv_per_layer
     add_buffer("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
 
-    # RoPE tables: precomputed cos/sin [2, context_len, head_dim/2]
-    rope_size = context_len * (head_dim // 2) * 4 * 2
-    add_buffer("rope_cache", rope_size, f"[2, {context_len}, {head_dim // 2}]")
+    # RoPE tables: precomputed cos/sin [2, context_len, rotary_dim/2]
+    rotary_dim = config.get("rotary_dim", head_dim)
+    rope_half = int(rotary_dim) // 2
+    rope_size = context_len * rope_half * 4 * 2
+    add_buffer("rope_cache", rope_size, f"[2, {context_len}, {rope_half}]")
 
     # Layer scratch buffers (reused across layers)
     # Q output: [num_heads, seq_len, head_dim]
@@ -4655,6 +4757,7 @@ def generate_ir_lower_2(
         params.setdefault("num_heads", config.get("num_heads", 14))
         params.setdefault("num_kv_heads", config.get("num_kv_heads", 2))
         params.setdefault("head_dim", config.get("head_dim", 64))
+        params.setdefault("rotary_dim", config.get("rotary_dim", params.get("head_dim", 64)))
         params.setdefault("intermediate_size", config.get("intermediate_size", config.get("intermediate_dim", 4864)))
         params.setdefault("num_layers", config.get("num_layers", 24))
         params.setdefault("mode", mode)
@@ -4907,7 +5010,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
 
 def load_kernel_bindings() -> Dict[str, Dict]:
     """Load kernel parameter bindings for IR Lower 3."""
-    bindings_path = PROJECT_ROOT / "kernel_maps" / "kernel_bindings.json"
+    bindings_path = V66_ROOT / "kernel_maps" / "kernel_bindings.json"
     with open(bindings_path, "r") as f:
         data = json.load(f)
     return data.get("bindings", {})
@@ -5290,7 +5393,7 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
         return {"format": "lowered-init-v3", "version": 1, "operations": [], "errors": []}
 
     ops = init_ir.get("ops", [])
-    config = init_ir.get("config", {})
+    config = _normalize_manifest_config(init_ir.get("config", {}))
     memory = layout.get("memory", {}) if layout else {}
     act_buffers = {b.get("name"): b for b in memory.get("activations", {}).get("buffers", [])}
 
@@ -5308,7 +5411,9 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
 
         # Handle rope_init specifically
         if op_type == "rope_init" and func == "rope_precompute_cache":
-            # rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base)
+            # rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len,
+            #                      int head_dim, float base, int rotary_dim,
+            #                      const char *scaling_type, float scaling_factor)
 
             # cos_cache output buffer
             rope_cache_buf = act_buffers.get("rope_cache", act_buffers.get("rope_cos_cache", {}))
@@ -5319,15 +5424,16 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
                 "expr": f"(float*)(g_model->bump + {rope_cache_define})",
             })
 
-            # sin_cache output buffer (offset by half)
+            # sin_cache output buffer (offset by rotary_half)
+            # Note: uses ROTARY_DIM for cache sizing, not HEAD_DIM
             args.append({
                 "name": "sin_cache",
                 "source": "output:rope_sin",
-                "expr": f"(float*)(g_model->bump + {rope_cache_define}) + MAX_SEQ_LEN * HEAD_DIM / 2",
+                "expr": f"(float*)(g_model->bump + {rope_cache_define}) + MAX_SEQ_LEN * ROTARY_DIM / 2",
             })
 
             # max_seq_len from params or config
-            max_seq = params.get("max_seq_len", {}).get("value", config.get("max_seq_len", 32768))
+            max_seq = params.get("max_seq_len", {}).get("value", config["context_length"])
             args.append({
                 "name": "max_seq_len",
                 "source": "dim:max_seq_len",
@@ -5335,7 +5441,7 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
             })
 
             # head_dim from params or config
-            head_dim = params.get("head_dim", {}).get("value", config.get("head_dim", 64))
+            head_dim = params.get("head_dim", {}).get("value", config["head_dim"])
             args.append({
                 "name": "head_dim",
                 "source": "dim:head_dim",
@@ -5343,11 +5449,77 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
             })
 
             # base (rope_theta) from params or config - THIS IS THE KEY VALUE
-            rope_theta = params.get("base", {}).get("value", op_config.get("rope_theta", 10000.0))
+            rope_theta = params.get("base", {}).get("value", op_config.get("rope_theta", config["rope_theta"]))
             args.append({
                 "name": "base",
                 "source": "config:rope_theta",
                 "expr": f"{rope_theta}f",  # Emit as float literal
+            })
+
+            # rotary_dim from params or config
+            rotary_dim = params.get("rotary_dim", {}).get("value", op_config.get("rotary_dim", config["rotary_dim"]))
+            args.append({
+                "name": "rotary_dim",
+                "source": "dim:rotary_dim",
+                "expr": "ROTARY_DIM",  # Use the #define for consistency
+            })
+
+            # scaling_type from params or config
+            scaling_type = params.get("scaling_type", {}).get("value", op_config.get("rope_scaling_type", config["rope_scaling_type"]))
+            args.append({
+                "name": "scaling_type",
+                "source": "config:rope_scaling_type",
+                "expr": f'"{scaling_type}"',  # Emit as string literal
+            })
+
+            # scaling_factor from params or config
+            scaling_factor = params.get("scaling_factor", {}).get("value", op_config.get("rope_scaling_factor", config["rope_scaling_factor"]))
+            args.append({
+                "name": "scaling_factor",
+                "source": "config:rope_scaling_factor",
+                "expr": f"{scaling_factor}f",  # Emit as float literal
+            })
+
+        elif op_type == "rope_init" and func == "rope_precompute_cache_split":
+            # rope_precompute_cache_split(float *cos_cache, float *sin_cache,
+            #                             int max_seq_len, int head_dim, float base)
+
+            # cos_cache output buffer
+            rope_cache_buf = act_buffers.get("rope_cache", act_buffers.get("rope_cos_cache", {}))
+            rope_cache_define = rope_cache_buf.get("define", "A_ROPE_CACHE")
+            args.append({
+                "name": "cos_cache",
+                "source": "output:rope_cos",
+                "expr": f"(float*)(g_model->bump + {rope_cache_define})",
+            })
+
+            # sin_cache output buffer (offset by head_dim/2)
+            args.append({
+                "name": "sin_cache",
+                "source": "output:rope_sin",
+                "expr": f"(float*)(g_model->bump + {rope_cache_define}) + MAX_SEQ_LEN * HEAD_DIM / 2",
+            })
+
+            # max_seq_len
+            args.append({
+                "name": "max_seq_len",
+                "source": "dim:max_seq_len",
+                "expr": "MAX_SEQ_LEN",
+            })
+
+            # head_dim
+            args.append({
+                "name": "head_dim",
+                "source": "dim:head_dim",
+                "expr": "HEAD_DIM",
+            })
+
+            # base (rope_theta)
+            rope_theta = params.get("base", {}).get("value", op_config.get("rope_theta", config["rope_theta"]))
+            args.append({
+                "name": "base",
+                "source": "config:rope_theta",
+                "expr": f"{rope_theta}f",
             })
 
         elif op_type == "tokenizer_init":
@@ -5524,6 +5696,7 @@ def main(args: List[str]) -> int:
     print(f"Loading manifest: {manifest_path}")
     manifest = load_manifest(manifest_path)
     _merge_external_config(manifest, manifest_path)
+    manifest["config"] = _normalize_manifest_config(manifest.get("config", {}))
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True
     # Override logits layout if requested (propagates into layout + codegen config)
@@ -5681,7 +5854,10 @@ def main(args: List[str]) -> int:
         print(f"✓ Wrote init IR to: {parsed_args.init_output}")
         if init_ir["stats"]["has_rope_init"]:
             rope_theta = init_ir["config"].get("rope_theta", 10000.0)
-            print(f"  - rope_init: theta={rope_theta}")
+            rotary_dim = init_ir["config"].get("rotary_dim", "head_dim")
+            scaling_type = init_ir["config"].get("rope_scaling_type", "none")
+            scaling_factor = init_ir["config"].get("rope_scaling_factor", 1.0)
+            print(f"  - rope_init: theta={rope_theta}, rotary={rotary_dim}, scaling={scaling_type}/{scaling_factor}")
 
         # Also generate lowered init IR (init_call.json)
         init_call_path = parsed_args.init_output.parent / "init_call.json"

@@ -930,7 +930,7 @@
 <div class="container">
   <h1>Model + Kernel Matrix</h1>
   <p class="lead">
-    A visual map of what the C Kernel Engine supports today (Qwen2, Qwen3, Gemma3)
+    A visual map of what the C Kernel Engine supports today (GPT‑2, Qwen2, Qwen3, Gemma3)
     and the kernel families that power them. This is grounded in our own templates,
     IR lowering, and the GGUF test models we run locally.
   </p>
@@ -978,6 +978,14 @@
       padding: 0.15rem 0.45rem;
       font-size: 0.78rem;
       white-space: nowrap;
+    }
+    .tag.learned {
+      border-color: #2b3a4a;
+      color: #b7d6ff;
+    }
+    .tag.fixed {
+      border-color: #3b2a2a;
+      color: #ffb6b6;
     }
     .matrix-section {
       margin-top: 2rem;
@@ -1070,9 +1078,56 @@
     .roadmap strong {
       color: var(--orange);
     }
+    .why-grid {
+      margin-top: 1.2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      align-items: center;
+    }
+    .why-card {
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .why-card strong {
+      color: var(--orange);
+    }
+    .why-figure {
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 0.5rem;
+    }
+    .why-figure img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+    }
+    .source-note {
+      margin-top: 0.6rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
   </style>
 
   <div class="matrix-hero">
+    <div class="model-card">
+      <span class="model-badge">Template: gpt2.json</span>
+      <div class="model-title">GPT‑2</div>
+      <div class="dim">LayerNorm + Learned PosEmb + GELU</div>
+      <div class="model-tags">
+        <span class="tag">Positional: learned</span>
+        <span class="tag">Tokenizer: BPE</span>
+        <span class="tag">Activation: GELU</span>
+        <span class="tag">Attention: full</span>
+      </div>
+    </div>
     <div class="model-card">
       <span class="model-badge">Template: qwen2.json</span>
       <div class="model-title">Qwen2</div>
@@ -1082,6 +1137,8 @@
         <span class="tag">Tokenizer: BPE</span>
         <span class="tag">Activation: SwiGLU</span>
         <span class="tag">Attention: full</span>
+        <span class="tag learned">QK‑Norm: learned</span>
+        <span class="tag learned">RMSNorm: learned</span>
       </div>
     </div>
     <div class="model-card">
@@ -1093,6 +1150,8 @@
         <span class="tag">Tokenizer: BPE</span>
         <span class="tag">Activation: SwiGLU</span>
         <span class="tag">QK‑Norm: yes</span>
+        <span class="tag learned">QK‑Norm: learned</span>
+        <span class="tag learned">RMSNorm: learned</span>
       </div>
     </div>
     <div class="model-card">
@@ -1104,6 +1163,8 @@
         <span class="tag">Attention: sliding</span>
         <span class="tag">Post‑Norms: yes</span>
         <span class="tag">Prefer Q8_0 contract</span>
+        <span class="tag learned">QK‑Norm: learned</span>
+        <span class="tag learned">RMSNorm: learned</span>
       </div>
     </div>
   </div>
@@ -1115,11 +1176,21 @@
       <div class="cell">Tokenizer</div>
       <div class="cell">QKV Bias</div>
       <div class="cell">QK‑Norm</div>
-      <div class="cell">RoPE</div>
+      <div class="cell">RoPE / PosEmb</div>
       <div class="cell">Attention</div>
       <div class="cell">MLP</div>
       <div class="cell">Post‑Norms</div>
       <div class="cell">Logits</div>
+
+      <div class="cell row-head">GPT‑2</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Learned</div>
+      <div class="cell ok">Causal</div>
+      <div class="cell ok">GELU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
 
       <div class="cell row-head">Qwen2</div>
       <div class="cell ok">BPE</div>
@@ -1165,6 +1236,16 @@
       <div class="cell">MLP Kernel</div>
       <div class="cell">Residual Save</div>
       <div class="cell">LM Head Tie</div>
+
+      <div class="cell row-head">GPT‑2</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn</div>
+      <div class="cell ok">gelu</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
 
       <div class="cell row-head">Qwen2</div>
       <div class="cell dim">No</div>
@@ -1227,8 +1308,33 @@
   </div>
 
   <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Why Build C Kernel Engine?</h2>
+    <div class="why-grid">
+      <div class="why-card">
+        <strong>What this teaches</strong><br>
+        This stack forces us to understand the invariants that actually matter:
+        memory layout, kernel contracts, numerical stability, and graph scheduling.
+        It turns the model into something we can inspect — dump activations, trace
+        tensor ranges, validate gradients later — without guessing what’s happening
+        inside a framework. That clarity is the foundation for training on CPU.
+      </div>
+      <div class="why-figure">
+        <a href="assets/infra-ocean-stability.svg" target="_blank" rel="noopener">
+          <img src="assets/infra-ocean-stability.svg" alt="Ocean depth metaphor for fast-changing model UX vs stable math foundations">
+        </a>
+        <div class="source-note">Click to open full‑size SVG</div>
+      </div>
+    </div>
+    <div class="source-note">
+      Sources: calculus history (17th century), matrix theory formalization (19th century),
+      AI as a field (1956), backpropagation popularization (1986).
+    </div>
+  </div>
+
+  <div class="matrix-section">
     <h2 style="margin: 0; color: var(--orange);">Current GGUF Test Corpus</h2>
     <div class="test-grid">
+      <div class="test-item">gpt2 (baseline)</div>
       <div class="test-item">Qwen--Qwen2-0.5B-Instruct-GGUF</div>
       <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
       <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
@@ -1239,6 +1345,14 @@
     <strong>Growth path:</strong> v6.6 locks inference parity and kernel coverage (Qwen2/Qwen3/Gemma3). v7 targets full training:
     backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules. This page will evolve into a
     single matrix that shows inference + training coverage per model family.
+  </div>
+
+  <div class="source-note">
+    References:
+    <a href="https://www.britannica.com/science/calculus-mathematics" target="_blank" rel="noopener">Britannica — Calculus</a>,
+    <a href="https://mathshistory.st-andrews.ac.uk/HistTopics/Matrices_and_determinants/" target="_blank" rel="noopener">MacTutor — Matrices and determinants</a>,
+    <a href="https://www.dartmouth.edu/ai50/" target="_blank" rel="noopener">Dartmouth AI 1956</a>,
+    <a href="https://www.nature.com/articles/323533a0" target="_blank" rel="noopener">Nature 1986 — Backpropagation</a>
   </div>
 </div>
     </main>
@@ -1450,7 +1564,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-09</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-10</p>
             </div>
         </div>
     </footer>

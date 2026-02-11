@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 420">
+  <defs>
+    <linearGradient id="dfHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <marker id="arrowDf" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="980" height="420" fill="#232323"/>
+
+  <text x="490" y="32" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">IR Dataflow Stitching</text>
+  <text x="490" y="52" font-family="Inter, sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">Ops reference previous op IDs. Memory planner binds buffers to edges.</text>
+
+  <g transform="translate(50, 90)">
+    <rect width="200" height="90" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="200" height="26" rx="10" fill="url(#dfHeader)"/>
+    <text x="100" y="18" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">op_id 10</text>
+    <text x="100" y="55" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">attn_norm</text>
+    <text x="100" y="73" font-family="Inter, sans-serif" font-size="10" fill="#8a8a8a" text-anchor="middle">outputs: x_norm</text>
+  </g>
+
+  <g transform="translate(270, 135)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowDf)"/>
+  </g>
+
+  <g transform="translate(340, 90)">
+    <rect width="200" height="90" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="200" height="26" rx="10" fill="url(#dfHeader)"/>
+    <text x="100" y="18" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">op_id 11</text>
+    <text x="100" y="55" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">qkv_proj</text>
+    <text x="100" y="73" font-family="Inter, sans-serif" font-size="10" fill="#8a8a8a" text-anchor="middle">inputs: x_norm (10)</text>
+  </g>
+
+  <g transform="translate(560, 135)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowDf)"/>
+  </g>
+
+  <g transform="translate(630, 90)">
+    <rect width="200" height="90" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="200" height="26" rx="10" fill="url(#dfHeader)"/>
+    <text x="100" y="18" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">op_id 12</text>
+    <text x="100" y="55" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">rope_qk</text>
+    <text x="100" y="73" font-family="Inter, sans-serif" font-size="10" fill="#8a8a8a" text-anchor="middle">inputs: q/k (11)</text>
+  </g>
+
+  <g transform="translate(50, 230)">
+    <rect width="880" height="150" rx="12" fill="#1f1f1f" stroke="#333" stroke-width="2"/>
+    <text x="30" y="30" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffb400">Stitching rule</text>
+    <text x="30" y="56" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">Each op declares inputs as <code>dataflow.inputs</code> referencing previous op IDs.</text>
+    <text x="30" y="78" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">The memory planner assigns buffers to every edge and resolves pointers.</text>
+    <text x="30" y="100" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">Lowered IR replaces op IDs with actual pointers for codegen.</text>
+  </g>
+</svg>

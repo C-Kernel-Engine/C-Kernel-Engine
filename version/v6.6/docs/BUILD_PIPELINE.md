@@ -479,3 +479,88 @@ python3 version/v6.6/scripts/fusion_pass.py --ir ir.json --dry-run
 #   INTO: mega_fused_outproj_mlp_prefill
 #   SPEEDUP: 1.1x
 ```
+
+## RoPE Scaling and rotary_dim Support
+
+v6.6 supports RoPE scaling for extended context models and partial rotary dimensions.
+
+### Configuration Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `rotary_dim` | int | `head_dim` | Number of dimensions to rotate (subset of head_dim) |
+| `rope_scaling_type` | string | `"none"` | Scaling type: `"none"`, `"linear"`, `"dynamic"`, `"yarn"` |
+| `rope_scaling_factor` | float | `1.0` | Scaling factor (1.0 = no scaling) |
+
+### GGUF Metadata Keys
+
+RoPE parameters are extracted from GGUF metadata during conversion:
+
+| GGUF Key | v6.6 Config | Notes |
+|----------|------------|-------|
+| `llama.rope.dim` | `rotary_dim` | Standard Llama key |
+| `attention.rotary_dim` | `rotary_dim` | Alternative key |
+| `qwen2.rotary_dim` | `rotary_dim` | Qwen-specific |
+| `gemma.attention.key_length` | `rotary_dim` | Gemma uses key_length |
+| `llama.rope.scaling.type` | `rope_scaling_type` | Scaling type |
+| `rope.scaling.type` | `rope_scaling_type` | Generic key |
+| `llama.rope.scaling.factor` | `rope_scaling_factor` | Scaling factor |
+
+### Scaling Types
+
+1. **`"none"`**: Standard RoPE, no scaling
+2. **`"linear"`**: Scale positions by `1/scaling_factor` (extends context)
+3. **`"dynamic"`**: NTK-aware dynamic scaling
+4. **`"yarn"`**: YaRN (Yet another RoPE extensioN) scaling
+
+### Memory Layout
+
+```
+RoPE Cache: [2, max_seq_len, rotary_dim/2]
+  - cos_cache: [max_seq_len, rotary_dim/2]
+  - sin_cache: [max_seq_len, rotary_dim/2]
+
+# Codegen defines
+#define ROTARY_DIM <from config>
+#define ROPE_CACHE_SIZE (2 * MAX_SEQ_LEN * ROTARY_DIM / 2 * sizeof(float))
+```
+
+### Partial RoPE (rotary_dim < head_dim)
+
+When `rotary_dim < head_dim`:
+- Only the first `rotary_dim` channels are rotated
+- Channels `[rotary_dim, head_dim)` pass through unchanged
+- Cache is sized for `rotary_dim/2`, not `head_dim/2`
+
+### Example: Llama 3.1 128K Context
+
+```python
+# From GGUF metadata:
+rope_theta = 500000.0
+rotary_dim = 128  # head_dim is 4096/32=128 for Llama 3.1
+rope_scaling_type = "linear"
+rope_scaling_factor = 16.0
+
+# Generated defines:
+#define HEAD_DIM 128
+#define ROTARY_DIM 128
+#define ROPE_SCALING linear
+#define ROPE_SCALING_FACTOR 16.0f
+
+# Cache size: 2 * 131072 * 64 * 4 = 67 MB
+```
+
+### Example: Gemma with Partial Rotation
+
+```python
+# Gemma 3 uses key_length for rotary_dim:
+rotary_dim = 96  # attention.key_length
+head_dim = 96     # hidden_size / num_heads
+
+# Generated:
+#define HEAD_DIM 96
+#define ROTARY_DIM 96
+#define ROPE_SCALING none
+#define ROPE_SCALING_FACTOR 1.0f
+```
+

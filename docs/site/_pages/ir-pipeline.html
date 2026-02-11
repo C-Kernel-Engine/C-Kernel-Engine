@@ -1,0 +1,404 @@
+<!-- TITLE: IR Pipeline v6.6 -->
+<!-- NAV: ir-pipeline -->
+
+<h1>IR Pipeline v6.6</h1>
+
+<p>This page explains the v6.6 pipeline using visuals that match how the engine actually builds and runs models today. The goal is clarity: templates are declarative, IR is dynamic, and codegen is intentionally dumb.</p>
+
+<div class="callout" style="margin-top: 1.2rem;">
+  <div class="img-container svg-viewer" data-title="IR Pipeline (v6.6)">
+    <img src="assets/ir-pipeline-flow.svg" alt="IR pipeline flow from template to generated C" style="width: 100%; height: auto; border-radius: 12px; border: 1px solid #263242;">
+  </div>
+</div>
+
+<h2>Kernel AMP Strategy</h2>
+
+<p><strong>AMP</strong> here means <strong>automatic mixed precision per operation</strong>. It is <em>not</em> the GPU-style AMP most people know. In v6.6, AMP decides whether each op runs on FP32 activations or Q8 activations based on quant summary, template flags, and kernel availability.</p>
+
+<div class="img-container svg-viewer" data-title="Kernel AMP Strategy">
+    <img src="assets/ir-kernel-amp-strategy.svg" alt="Kernel AMP Strategy">
+</div>
+
+<h2>Templates to IR</h2>
+
+<p>Templates are architecture-level graphs. They define the op sequence and can optionally provide kernel overrides, but the IR builder still resolves the final kernel IDs from the registry based on quantization and availability.</p>
+
+<div class="img-container svg-viewer" data-title="Templates to IR">
+    <img src="assets/ir-templates-to-ir.svg" alt="Templates to IR">
+</div>
+
+<h2>Template Mechanics (How Ops Are Chosen)</h2>
+
+<p>Templates are declarative. They list ops in order and set flags. The IR builder interprets those ops, then resolves kernels using the registry. Templates <em>may</em> provide targeted kernel overrides (for stability or parity), but they never contain function pointers or memory layout details.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example Template Snippet</h3>
+    <pre>{
+  "name": "qwen3",
+  "flags": {
+    "use_qk_norm": true,
+    "prefer_fp32_logits": false
+  },
+  "block_types": {
+    "decoder": {
+      "body": { "ops": ["attn_norm", "qkv_proj", "qk_norm", "rope_qk", "attn", "out_proj", "residual_add",
+                        "ffn_norm", "mlp_gate_up", "silu_mul", "mlp_down", "residual_add"] }
+    }
+  }
+}</pre>
+    <p style="margin: 0;">IR1 builder expands this into concrete ops, assigns IDs, and attaches dataflow.</p>
+</div>
+
+<h2>Why IR1 Exists</h2>
+
+<p>IR1 is the <strong>validation and contract layer</strong>. It ensures the template ops are valid, mapped, and supported <em>before</em> we allocate memory or emit C. This is the earliest point to fail fast.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">IR1 Responsibilities</h3>
+    <ul>
+        <li>Validate template ops are mapped to kernel families</li>
+        <li>Check kernel availability in the registry</li>
+        <li>Attach dataflow edges (op IDs → inputs)</li>
+        <li>Record kernel IDs without allocating memory</li>
+    </ul>
+    <p style="margin: 0.5rem 0 0;">Implementation: <code>version/v6.6/scripts/build_ir_v6_6.py</code></p>
+</div>
+
+<h2>Kernel Maps + Registry</h2>
+
+<p>Kernel maps define how kernels are registered and discovered. IR never hardcodes kernels — it resolves them from the registry based on kernel IDs and supported dtypes.</p>
+
+<div class="img-container svg-viewer" data-title="Kernel Registry Flow">
+    <img src="assets/kernel-registry-flow.svg" alt="Kernel Registry Flow">
+</div>
+
+<h2>Kernel Map → C Signature</h2>
+
+<p>Kernel maps describe the C function signature, expected dtypes, and buffer roles. The IR lowerer wires input/output pointers and sizes based on this schema.</p>
+
+<div class="img-container svg-viewer" data-title="Kernel Registry Chain">
+    <img src="assets/ir-kernel-registry-chain.svg" alt="Kernel Registry Chain">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example Kernel Map Snippet</h3>
+    <pre>{
+  "id": "gemv_q8_0",
+  "signature": "void gemv_q8_0(const void* w, const float* x, float* y, int m, int k)",
+  "quant": { "weight": "q8_0", "activation": "fp32" },
+  "buffers": {
+    "w": { "role": "weight" },
+    "x": { "role": "activation", "buffer": "main_stream" },
+    "y": { "role": "activation", "buffer": "main_stream" }
+  }
+}</pre>
+</div>
+
+<h2>Kernel Map JSON → C Args (Concrete Mapping)</h2>
+
+<table>
+    <tr>
+        <th>Kernel Map Field</th>
+        <th>Meaning</th>
+        <th>Lowered/C Code</th>
+    </tr>
+    <tr>
+        <td><code>inputs[].name</code></td>
+        <td>Argument name in C signature</td>
+        <td>Pointer emitted by IR lower (e.g., <code>model-&gt;q_scratch</code>)</td>
+    </tr>
+    <tr>
+        <td><code>inputs[].dtype</code></td>
+        <td>Expected activation dtype</td>
+        <td>Kernel variant selection (fp32 vs q8)</td>
+    </tr>
+    <tr>
+        <td><code>outputs[].name</code></td>
+        <td>Output buffer label</td>
+        <td>Pointer emitted by IR lower</td>
+    </tr>
+    <tr>
+        <td><code>params[].name</code></td>
+        <td>Scalar arg (dims, stride)</td>
+        <td>Literal value in call</td>
+    </tr>
+</table>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example Kernel Map Entry</h3>
+    <pre>{
+  "id": "embedding_forward_q8_0",
+  "inputs": [{ "name": "tokens", "dtype": "int32", "shape": ["T"] }],
+  "outputs": [{ "name": "output", "dtype": "fp32", "shape": ["T","E"] }]
+}</pre>
+    <p style="margin: 0;">Lowered call will pass <code>token_ids</code> and <code>embedded_input</code> pointers.</p>
+    <p style="margin: 0.5rem 0 0;">See: <code>version/v6.6/kernel_maps/embedding_forward_q8_0.json</code></p>
+</div>
+
+<h2>IR1 to IR Lowering</h2>
+
+<p>IR1 is a declarative graph. IR2 adds scheduling and kernel selection details. The lower stages compute memory layout, resolve offsets, and produce call arguments for codegen.</p>
+
+<div class="img-container svg-viewer" data-title="IR Lowering Pipeline">
+    <img src="assets/ir-lowering-pipeline.svg" alt="IR Lowering Pipeline">
+</div>
+
+<h2>What IR2 Does (Optional Optimizations) <span class="badge badge-amber">Conservative</span></h2>
+
+<p>IR2 is the optimization staging area. This is where we can apply fusions, reorder safe ops, or choose specialized kernels. In v6.6, most of this is intentionally conservative or disabled to avoid behavioral drift.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">IR2 Focus</h3>
+    <ul>
+        <li>Optional fusion patterns (e.g., norm + QKV)</li>
+        <li>Kernel variant selection for prefill vs decode</li>
+        <li>Keeping behavior stable while enabling future speedups</li>
+    </ul>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">IR2 Fusions (Currently Disabled / Conservative)</h3>
+    <ul>
+        <li><code>version/v6.6/kernel_maps/mega_fused_attention_prefill.json</code></li>
+        <li><code>version/v6.6/kernel_maps/mega_fused_outproj_mlp_prefill.json</code></li>
+        <li><code>version/v6.6/kernel_maps/mega_fused_attention_decode_q5_0.json</code></li>
+    </ul>
+    <p style="margin: 0;">These exist in the registry but are kept conservative in v6.6 to avoid parity drift. Some require head-major constraints or rely on quantized activation contracts that are still being stabilized.</p>
+</div>
+
+<h2>Fusion vs Unfused (One Attention Block)</h2>
+
+<div class="img-container svg-viewer" data-title="Fusion vs Unfused">
+    <img src="assets/ir-fusion-vs-unfused.svg" alt="Fusion vs Unfused">
+</div>
+
+<h2>Dataflow Stitching (How IR Connects Ops)</h2>
+
+<p>IR1 uses op IDs and named outputs. Each op declares its inputs as outputs of previous ops. The dataflow tracker builds a graph, and the memory planner assigns buffers to each edge.</p>
+
+<div class="img-container svg-viewer" data-title="IR Dataflow Stitching">
+    <img src="assets/ir-dataflow-stitching.svg" alt="IR Dataflow Stitching">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">IR1 Example (Stitching)</h3>
+    <pre>{
+  "op_id": 12,
+  "op": "qkv_proj",
+  "outputs": { "q": "q_scratch", "k": "k_scratch", "v": "v_scratch" },
+  "dataflow": { "inputs": { "x": 11 } }
+}
+{
+  "op_id": 13,
+  "op": "rope_qk",
+  "dataflow": { "inputs": { "q": 12, "k": 12 } }
+}</pre>
+</div>
+
+<h2>Pipeline Outputs (Artifacts)</h2>
+
+<p>Each stage writes explicit artifacts. These files are the contract between stages and are the inputs for debugging tools.</p>
+
+<div class="img-container svg-viewer" data-title="IR Outputs">
+    <img src="assets/ir-output-artifacts.svg" alt="IR Output Artifacts">
+</div>
+
+<h2>IR File Schema (Quick Reference)</h2>
+
+<table>
+    <tr>
+        <th>File</th>
+        <th>Key Fields</th>
+        <th>Purpose</th>
+    </tr>
+    <tr>
+        <td><code>ir1_decode.json</code></td>
+        <td><code>ops</code>, <code>dataflow</code>, <code>kernel</code></td>
+        <td>Validated op graph, kernel IDs, dataflow edges</td>
+    </tr>
+    <tr>
+        <td><code>lowered_decode.json</code></td>
+        <td><code>operations</code>, <code>args</code>, <code>config</code></td>
+        <td>Call-ready args, resolved dims, runtime pointers</td>
+    </tr>
+    <tr>
+        <td><code>layout_decode.json</code></td>
+        <td><code>memory.weights</code>, <code>memory.activations</code></td>
+        <td>Buffer offsets and sizes for weights and activations</td>
+    </tr>
+    <tr>
+        <td><code>init_call.json</code></td>
+        <td><code>ops</code>, <code>params</code></td>
+        <td>One-time init kernels (RoPE cache, KV init)</td>
+    </tr>
+</table>
+
+<h2>JSON Walkthrough</h2>
+
+<p>This diagram shows how template → IR1 → lowered IR → layout relate. It is the quickest way to understand where each value comes from.</p>
+
+<div class="img-container svg-viewer" data-title="IR JSON Walkthrough">
+    <img src="assets/ir-json-walkthrough.svg" alt="IR JSON Walkthrough">
+</div>
+
+<h2>IR Timeline (Why Each Stage Exists)</h2>
+
+<div class="img-container svg-viewer" data-title="IR Timeline">
+    <img src="assets/ir-timeline-why.svg" alt="IR Timeline">
+</div>
+
+<h2>Real Snippet (From Model Cache)</h2>
+
+<p>This is a real IR1 + lowered op pulled from a v6.6 model cache (Qwen2‑0.5B). It shows how the same op is represented before and after lowering.</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">IR1 (before lowering)</h3>
+        <pre>{
+  "op_id": 0,
+  "kernel": "embedding_forward_q8_0",
+  "op": "dense_embedding_lookup",
+  "section": "header",
+  "layer": -1,
+  "dataflow": {
+    "inputs": { "token_ids": { "from": "external:token_ids", "dtype": "i32" } },
+    "outputs": { "out": { "dtype": "fp32" } }
+  },
+  "weights": {
+    "token_emb": { "dtype": "q8_0", "offset": 496, "size": 144643072 }
+  }
+}</pre>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Lowered (call-ready)</h3>
+        <pre>{
+  "kernel": "embedding_forward_q8_0",
+  "function": "embedding_forward_q8_0",
+  "weights": {
+    "token_emb": { "ptr_expr": "bump_weights + 0", "dtype": "q8_0" }
+  },
+  "activations": {
+    "tokens": { "ptr_expr": "activations + 16384", "dtype": "int32" }
+  },
+  "outputs": {
+    "output": { "ptr_expr": "activations + 20480", "dtype": "fp32" }
+  }
+}</pre>
+    </div>
+</div>
+
+<h2>Scratch vs Persistent Buffers</h2>
+
+<p>Generated C has two concerns: <strong>logic</strong> (which kernel to call) and <strong>memory</strong> (where buffers live). Scratch buffers are reused aggressively, while persistent buffers (KV cache, logits) are stable across steps.</p>
+
+<div class="img-container svg-viewer" data-title="Scratch vs Persistent Buffers">
+    <img src="assets/ir-scratch-vs-persistent.svg" alt="Scratch vs Persistent Buffers">
+</div>
+
+<h2>Logic vs Memory</h2>
+
+<p>We separate logic (what to run) from memory (where it lives). This is why the pipeline stays deterministic and codegen can stay dumb.</p>
+
+<div class="img-container svg-viewer" data-title="Logic vs Memory">
+    <img src="assets/ir-logic-vs-memory.svg" alt="Logic vs Memory">
+</div>
+
+<h2>Codegen Is Dumb (By Design)</h2>
+
+<p>Codegen only prints what the lowered IR says. This keeps C output clean and predictable. It also makes failures traceable to the IR builder, not the generator.</p>
+
+<div class="img-container svg-viewer" data-title="Dumb Codegen">
+    <img src="assets/ir-dumb-codegen.svg" alt="Dumb Codegen">
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Example Generated C Call</h3>
+    <pre>/* Lowered IR says: gemv_q8_0(w2, x, y, m, k) */
+gemv_q8_0(
+    model->bump + W_L2_MLP_DOWN,   // weight pointer (from layout)
+    model->layer_input,            // activation pointer
+    model->mlp_scratch,            // output scratch
+    INTERMEDIATE_SIZE,             // m
+    EMBED_DIM                       // k
+);</pre>
+    <p style="margin: 0;">Codegen does not decide kernels. It emits the call with exact pointers and sizes from IR + layout.</p>
+</div>
+
+<h2>Why C (Not Rust) for Runtime Control</h2>
+
+<p>The runtime is intentionally written in C so we control both the <strong>call logic</strong> and the <strong>memory layout</strong> without compiler-owned decisions. C gives explicit control over alignment, buffer reuse, and function dispatch — exactly what we need for deterministic, cache-aware inference.</p>
+
+<h2>View This in the IR Visualizer</h2>
+
+<p>The IR visualizer can load IR1, lowered IR, and layouts directly from a model cache directory.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Quick Start</h3>
+    <pre>python version/v6.6/tools/open_ir_visualizer.py --list
+python version/v6.6/tools/open_ir_visualizer.py gemma3
+
+# Or generate only (no browser):
+python version/v6.6/tools/open_ir_visualizer.py --generate gemma3</pre>
+    <p style="margin: 0;">This generates <code>ir_report.html</code> inside the model’s <code>ck_build</code> directory.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Manual Load</h3>
+    <p>Open <code>version/v6.6/tools/ir_visualizer.html</code> in a browser and load:</p>
+    <ul>
+        <li><code>ir1_decode.json</code> / <code>ir1_prefill.json</code></li>
+        <li><code>lowered_decode.json</code> / <code>lowered_prefill.json</code></li>
+        <li><code>layout_decode.json</code> / <code>layout_prefill.json</code></li>
+    </ul>
+</div>
+
+<h2>What AMP Means Here</h2>
+
+<p>In v6.6, AMP means <strong>automatic mixed precision per op</strong>. It decides the <em>activation dtype</em> each kernel uses. For example, Qwen2/Qwen3 can use Q8 activations for GEMV/GEMM, while Gemma may prefer FP32 logits for stability. This is not GPU AMP — it is a CPU‑oriented kernel selection policy.</p>
+
+<h2>Remaining Hardcoded Assumptions</h2>
+
+<p>These are known constraints in v6.6. They are documented so v7 can cleanly remove them.</p>
+
+<table>
+    <tr>
+        <th>Area</th>
+        <th>Current Behavior</th>
+        <th>Risk</th>
+    </tr>
+    <tr>
+        <td><strong>RoPE scaling</strong></td>
+        <td>No scaling types (linear, dynamic, yarn) yet</td>
+        <td>Context extension models may diverge</td>
+    </tr>
+    <tr>
+        <td><strong>RoPE layout</strong></td>
+        <td>Assumes half-dim cache layout</td>
+        <td>Models with rotary_dim or interleaved layouts can break</td>
+    </tr>
+    <tr>
+        <td><strong>Activation mapping</strong></td>
+        <td>silu_mul maps to swiglu by default</td>
+        <td>Non-SwiGLU models need explicit hidden_act mapping</td>
+    </tr>
+    <tr>
+        <td><strong>KV cache layout</strong></td>
+        <td>Head-major, static layout</td>
+        <td>Paged or alternative KV layouts not supported</td>
+    </tr>
+    <tr>
+        <td><strong>BUMP defaults</strong></td>
+        <td>Fallback layout constants</td>
+        <td>Should fail if converter omits layout</td>
+    </tr>
+</table>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Design Intent</strong><br>
+        Templates and IR are dynamic by design. The generated C is the stable artifact that can be stripped into a lightweight runtime.
+    </div>
+</div>
