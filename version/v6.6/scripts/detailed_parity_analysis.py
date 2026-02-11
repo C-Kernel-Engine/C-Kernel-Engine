@@ -37,7 +37,7 @@ PARITY_MODEL_MAP = {
     "llama": "llama",
     "qwen": "qwen",
     "qwen2": "qwen2",
-    "qwen3": "qwen2",  # parity_test maps qwen3 via qwen2 rules today
+    "qwen3": "qwen3",
     "mistral": "mistral",
 }
 

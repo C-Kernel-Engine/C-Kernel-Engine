@@ -21,6 +21,8 @@ from typing import Any
 
 import numpy as np
 
+from probe_defaults import getenv_prefill_tokens_csv
+
 
 DEFAULT_MODEL_DIR = Path("/tmp/gemma_ctx256_ck_build")
 
@@ -93,7 +95,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Check prefill post-attention norm/residual chain")
     ap.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     ap.add_argument("--layer", type=int, default=0)
-    ap.add_argument("--tokens", default="2,9259", help="comma-separated token ids (count>1 to force prefill)")
+    ap.add_argument(
+        "--tokens",
+        default=getenv_prefill_tokens_csv(),
+        help="comma-separated token ids (count>1 to force prefill)",
+    )
     args = ap.parse_args()
 
     tokens = parse_tokens_csv(args.tokens)

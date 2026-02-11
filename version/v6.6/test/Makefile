@@ -4,13 +4,26 @@
 # This Makefile provides convenient targets for running tests and
 # integrates with the parent Makefile for building.
 
-.PHONY: all quick sanity parity memory debug nan trace clean help
+.PHONY: all quick sanity parity memory debug nan trace clean help build download build-v66 bootstrap full test
 
-# Default model path (can override with MODEL=...)
-MODEL ?= ~/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF
+# Optional model path (can override with MODEL=...).
+# If empty, ck_test_runner auto-resolves from .ck_cache then ~/.cache.
+MODEL ?=
 
 # Python interpreter
 PYTHON ?= python3
+
+# Directory wiring
+TEST_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ROOT_DIR := $(abspath $(TEST_DIR)/../../..)
+
+# NOTE:
+# - This test Makefile is invoked by root targets like `make v6.6-test-quick`.
+# - Build/download targets below are convenience wrappers only and delegate to root Makefile.
+# - The authoritative release pipeline is rooted in top-level `make v6.6-gate`.
+
+# Convenience model for download bootstrap (HF GGUF URL, not local cache dir)
+DOWNLOAD_MODEL ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
 # ============================================================================
 # QUICK TEST TARGETS
@@ -19,38 +32,66 @@ PYTHON ?= python3
 # Quick sanity check (embedding, offsets, memory)
 quick sanity:
 	@echo "Running quick sanity check..."
-	$(PYTHON) ck_test_runner.py --quick --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --quick --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --quick; \
+	fi
 
 # Full parity check layer-by-layer
 parity:
 	@echo "Running layer-by-layer parity check..."
-	$(PYTHON) ck_test_runner.py --parity --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --parity --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --parity; \
+	fi
 
 # Comprehensive memory validation
 memory:
 	@echo "Running memory validation..."
-	$(PYTHON) ck_test_runner.py --memory --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --memory --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --memory; \
+	fi
 
 # Find divergence between v6.5 and v6.6
 divergence:
 	@echo "Finding divergence between v6.5 and v6.6..."
-	$(PYTHON) ck_test_runner.py --divergence --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --divergence --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --divergence; \
+	fi
 
 # Debug NaN issues
 nan:
 	@echo "Debugging NaN issues..."
-	$(PYTHON) ck_test_runner.py --nan --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --nan --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --nan; \
+	fi
 
 # Trace specific token
 trace: ARGS ?=
 trace:
 	@echo "Tracing execution..."
-	$(PYTHON) ck_test_runner.py --trace $(ARGS) --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --trace $(ARGS) --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --trace $(ARGS); \
+	fi
 
 # Run all tests
 all:
 	@echo "Running all tests..."
-	$(PYTHON) ck_test_runner.py --all --model $(MODEL)
+	@if [ -n "$(MODEL)" ]; then \
+		$(PYTHON) ck_test_runner.py --all --model "$(MODEL)"; \
+	else \
+		$(PYTHON) ck_test_runner.py --all; \
+	fi
 
 # ============================================================================
 # INDIVIDUAL TEST TARGETS
@@ -88,33 +129,22 @@ test-memory-deep:
 
 # Build v6.6 model (calls parent Makefile)
 build:
-	@echo "Building v6.6 model..."
-	cd $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/..
-	@if [ -f Makefile ]; then \
-		echo "Run 'make v6.6' in parent directory"; \
-	else \
-		echo "No Makefile in parent directory"; \
-	fi
-	@echo "Or use: cd .. && make v6.6"
+	@echo "Building v6.6 model via root Makefile..."
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR) v6.6
 
 # Download model and build everything
-download build: download build-v66
+bootstrap: download build-v66
 
 download:
 	@echo "Downloading model..."
-	$(PYTHON) scripts/ck_run_v6_6.py --download-only --model $(MODEL)
+	$(PYTHON) ../scripts/ck_run_v6_6.py run "$(DOWNLOAD_MODEL)" --inspect-only
 
 build-v66:
 	@echo "Building v6.6..."
-	cd $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/..
-	@if [ -f Makefile ]; then \
-		make v6.6; \
-	else \
-		echo "Run 'make v6.6' in parent directory"; \
-	fi
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR) v6.6
 
 # Full pipeline: download, build, test
-full: download build test
+full: bootstrap test
 
 # Run tests after build
 test: all

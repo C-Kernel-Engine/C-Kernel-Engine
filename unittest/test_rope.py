@@ -29,6 +29,9 @@ lib.rope_precompute_cache.argtypes = [
     ctypes.c_int,                    # max_seq_len
     ctypes.c_int,                    # head_dim
     ctypes.c_float,                  # base
+    ctypes.c_int,                    # rotary_dim
+    ctypes.c_char_p,                 # scaling_type
+    ctypes.c_float,                  # scaling_factor
 ]
 lib.rope_precompute_cache.restype = None
 
@@ -170,7 +173,8 @@ def run_cache_tests(max_seq_len=128, head_dim=64, warmup=10, iterations=1000):
         lib.rope_precompute_cache(
             cos_ptr, sin_ptr,
             ctypes.c_int(max_seq_len), ctypes.c_int(head_dim),
-            ctypes.c_float(10000.0)
+            ctypes.c_float(10000.0),
+            ctypes.c_int(head_dim), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
         )
 
     c_precompute()
@@ -245,7 +249,8 @@ def run_cache_tests_multi_theta():
         lib.rope_precompute_cache(
             numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
             ctypes.c_int(max_seq_len), ctypes.c_int(head_dim),
-            ctypes.c_float(theta)
+            ctypes.c_float(theta),
+            ctypes.c_int(head_dim), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
         )
 
         # PyTorch reference (high precision)
@@ -316,7 +321,8 @@ def run_rope_forward_multi_theta():
         # Precompute cache with this theta
         lib.rope_precompute_cache(
             numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
-            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(theta)
+            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(theta),
+            ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
         )
 
         # PyTorch reference
@@ -371,7 +377,8 @@ def run_rope_decode_positions_test():
     sin_np = np.zeros((max_cache_len, half_dim), dtype=np.float32)
     lib.rope_precompute_cache(
         numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
-        ctypes.c_int(max_cache_len), ctypes.c_int(D), ctypes.c_float(10000.0)
+        ctypes.c_int(max_cache_len), ctypes.c_int(D), ctypes.c_float(10000.0),
+        ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
     )
 
     cos_cache = torch.from_numpy(cos_np)
@@ -427,7 +434,8 @@ def run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500):
     # Precompute cache
     lib.rope_precompute_cache(
         numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
-        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0)
+        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0),
+        ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
     )
 
     # Torch tensors
@@ -495,7 +503,8 @@ def run_backward_tests(H=8, T=64, D=64, warmup=10, iterations=500):
     # Precompute cache
     lib.rope_precompute_cache(
         numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
-        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0)
+        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0),
+        ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
     )
 
     # Get pointers
@@ -570,7 +579,8 @@ def run_accuracy_tests():
 
         lib.rope_precompute_cache(
             numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
-            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0)
+            ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(10000.0),
+            ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
         )
 
         x = torch.from_numpy(x_np.copy())

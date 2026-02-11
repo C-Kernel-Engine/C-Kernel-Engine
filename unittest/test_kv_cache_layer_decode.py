@@ -85,6 +85,9 @@ lib.rope_precompute_cache.argtypes = [
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_float,
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_float,
 ]
 lib.rope_precompute_cache.restype = None
 
@@ -182,7 +185,10 @@ def run_decode_parity_test(seed=0):
     lib.rope_precompute_cache(ptr(rope_cos), ptr(rope_sin),
                               ctypes.c_int(cache_capacity),
                               ctypes.c_int(head_dim),
-                              ctypes.c_float(rope_theta))
+                              ctypes.c_float(rope_theta),
+                              ctypes.c_int(head_dim),
+                              ctypes.c_char_p(b"none"),
+                              ctypes.c_float(1.0))
 
     def alloc_buffers(token_slots, kv_tokens):
         return {

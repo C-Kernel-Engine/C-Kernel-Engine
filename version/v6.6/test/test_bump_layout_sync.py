@@ -338,12 +338,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
+    parser.add_argument("--model-dir", type=Path,
+                        help="Model directory to auto-fill --manifest/--layout/--c-file/--bump")
     parser.add_argument("--manifest", type=Path, help="Path to weights_manifest.json")
     parser.add_argument("--layout", type=Path, help="Path to layout_decode.json")
     parser.add_argument("--c-file", type=Path, help="Path to generated ck-kernel-inference.c")
     parser.add_argument("--bump", type=Path, help="Path to .bump file to validate")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
+
+    if args.model_dir:
+        if args.manifest is None:
+            args.manifest = args.model_dir / "weights_manifest.json"
+        if args.layout is None:
+            args.layout = args.model_dir / "layout_decode.json"
+        if args.c_file is None:
+            model_c = args.model_dir / "model_v6_6.c"
+            ck_c = args.model_dir / "ck-kernel-inference.c"
+            if model_c.exists():
+                args.c_file = model_c
+            elif ck_c.exists():
+                args.c_file = ck_c
+        if args.bump is None:
+            args.bump = args.model_dir / "weights.bump"
 
     print("=" * 70)
     print("BUMP LAYOUT SYNC VALIDATION")

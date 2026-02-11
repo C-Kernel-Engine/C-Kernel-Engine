@@ -1,0 +1,51 @@
+{
+  "summary": {
+    "PASS": 6,
+    "WARN": 0,
+    "FAIL": 0
+  },
+  "rows": [
+    {
+      "layer": "L1",
+      "handoff": "Template -> IR/Parity",
+      "contract": "Family coverage + mapping",
+      "status": "PASS",
+      "detail": "templates=gemma3,qwen2,qwen3"
+    },
+    {
+      "layer": "L2",
+      "handoff": "IR -> Codegen",
+      "contract": "Probe-required ops mapped for parity dumps",
+      "status": "PASS",
+      "detail": "dump-ops-present=15"
+    },
+    {
+      "layer": "L3",
+      "handoff": "Codegen Dump -> Parity Engine",
+      "contract": "run_parity_test kwargs accepted by parity_test.py",
+      "status": "PASS",
+      "detail": "caller-kwargs-compatible"
+    },
+    {
+      "layer": "L4",
+      "handoff": "Gemma Harness -> Parity CLI",
+      "contract": "run_gemma_parity_min.sh flags supported",
+      "status": "PASS",
+      "detail": "gemma-cli-compatible"
+    },
+    {
+      "layer": "L5",
+      "handoff": "Autocheck -> Probe Scripts",
+      "contract": "Probe token defaults externalized",
+      "status": "PASS",
+      "detail": "token defaults externalized via probe_defaults.py; users can set CK_V66_PROBE_* env vars; users=check_attn_norm_contract_prefill.py,check_post_attn_chain_prefill.py,check_qproj_contract.py,model_autocheck.py"
+    },
+    {
+      "layer": "L6",
+      "handoff": "Make/CI -> E2E/Parity",
+      "contract": "Contract validation runs before heavy tests",
+      "status": "PASS",
+      "detail": "make-preflight-wired"
+    }
+  ]
+}

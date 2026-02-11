@@ -102,6 +102,12 @@ lib.ck_layer_forward_rmsnorm_swiglu_ref.argtypes = [
 ]
 lib.ck_layer_forward_rmsnorm_swiglu_ref.restype = None
 
+try:
+    lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+    lib.ck_set_strict_parity.restype = None
+except AttributeError:
+    pass
+
 
 def aligned_empty(shape, dtype=np.float32, align=64):
     nbytes = int(np.prod(shape)) * np.dtype(dtype).itemsize
@@ -183,15 +189,20 @@ def run_layer_test(num_kv_heads,
                    num_heads=4,
                    intermediate_dim=64,
                    eps=1e-5,
+                   weight_std=0.02,
                    seed=0,
                    skip_c=False,
                    skip_ref=False,
                    strict_ref=False,
+                   strict_parity_kernels=True,
                    tol=1e-3):
     torch.manual_seed(seed)
     T = tokens
     D = embed_dim
     head_dim = D // num_heads
+
+    def randn_scaled(*shape):
+        return torch.randn(*shape, dtype=torch.float32) * weight_std
 
     aligned_embed_dim = align_up(D, 16)
     aligned_head_dim = align_up(head_dim, 16)
@@ -204,8 +215,8 @@ def run_layer_test(num_kv_heads,
 
     ln1_gamma = aligned_empty((aligned_embed_dim,))
     ln2_gamma = aligned_empty((aligned_embed_dim,))
-    ln1_gamma[:D] = torch.randn(D, dtype=torch.float32).numpy()
-    ln2_gamma[:D] = torch.randn(D, dtype=torch.float32).numpy()
+    ln1_gamma[:D] = (1.0 + randn_scaled(D)).numpy()
+    ln2_gamma[:D] = (1.0 + randn_scaled(D)).numpy()
     ln1_gamma[D:] = 0.0
     ln2_gamma[D:] = 0.0
 
@@ -222,12 +233,12 @@ def run_layer_test(num_kv_heads,
     bk.fill(0.0)
     bv.fill(0.0)
 
-    wq_t = torch.randn(num_heads, head_dim, D, dtype=torch.float32)
-    wk_t = torch.randn(num_kv_heads, head_dim, D, dtype=torch.float32)
-    wv_t = torch.randn(num_kv_heads, head_dim, D, dtype=torch.float32)
-    bq_t = torch.randn(num_heads, head_dim, dtype=torch.float32)
-    bk_t = torch.randn(num_kv_heads, head_dim, dtype=torch.float32)
-    bv_t = torch.randn(num_kv_heads, head_dim, dtype=torch.float32)
+    wq_t = randn_scaled(num_heads, head_dim, D)
+    wk_t = randn_scaled(num_kv_heads, head_dim, D)
+    wv_t = randn_scaled(num_kv_heads, head_dim, D)
+    bq_t = randn_scaled(num_heads, head_dim)
+    bk_t = randn_scaled(num_kv_heads, head_dim)
+    bv_t = randn_scaled(num_kv_heads, head_dim)
 
     wq[:, :head_dim, :D] = wq_t.numpy()
     wk[:, :head_dim, :D] = wk_t.numpy()
@@ -238,11 +249,11 @@ def run_layer_test(num_kv_heads,
 
     wo = aligned_empty((num_heads, aligned_embed_dim, aligned_head_dim))
     wo.fill(0.0)
-    wo_t = torch.randn(num_heads, D, head_dim, dtype=torch.float32)
+    wo_t = randn_scaled(num_heads, D, head_dim)
     wo[:, :D, :head_dim] = wo_t.numpy()
 
     bo = aligned_empty((aligned_embed_dim,))
-    bo[:D] = torch.randn(D, dtype=torch.float32).numpy()
+    bo[:D] = randn_scaled(D).numpy()
     bo[D:] = 0.0
 
     w1 = aligned_empty((2 * aligned_intermediate_dim, aligned_embed_dim))
@@ -254,10 +265,10 @@ def run_layer_test(num_kv_heads,
     b1.fill(0.0)
     b2.fill(0.0)
 
-    w1_t = torch.randn(2 * intermediate_dim, D, dtype=torch.float32)
-    b1_t = torch.randn(2 * intermediate_dim, dtype=torch.float32)
-    w2_t = torch.randn(D, intermediate_dim, dtype=torch.float32)
-    b2_t = torch.randn(D, dtype=torch.float32)
+    w1_t = randn_scaled(2 * intermediate_dim, D)
+    b1_t = randn_scaled(2 * intermediate_dim)
+    w2_t = randn_scaled(D, intermediate_dim)
+    b2_t = randn_scaled(D)
 
     w1[: 2 * intermediate_dim, :D] = w1_t.numpy()
     b1[: 2 * intermediate_dim] = b1_t.numpy()
@@ -312,6 +323,8 @@ def run_layer_test(num_kv_heads,
         rope_sin_ptr = sin_np.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     if not skip_c:
+        if hasattr(lib, "ck_set_strict_parity"):
+            lib.ck_set_strict_parity(1 if strict_parity_kernels else 0)
         params = CKLayerForwardParams(
             tokens=T,
             embed_dim=D,
@@ -554,6 +567,8 @@ if __name__ == "__main__":
     parser.add_argument("--kv-heads", type=int, default=None, help="KV heads (defaults to --heads).")
     parser.add_argument("--intermediate", type=int, default=64, help="MLP intermediate dimension.")
     parser.add_argument("--eps", type=float, default=1e-5, help="RMSNorm epsilon.")
+    parser.add_argument("--weight-std", type=float, default=0.02,
+                        help="Stddev for synthetic weights/biases (default: 0.02, model-like).")
     parser.add_argument("--rope", action=argparse.BooleanOptionalAction, default=None,
                         help="Enable or disable RoPE (default: off).")
     parser.add_argument("--rope-theta", type=float, default=10000.0, help="RoPE theta/base.")
@@ -564,6 +579,8 @@ if __name__ == "__main__":
     parser.add_argument("--skip-ref", action="store_true", help="Skip reference path (C-only).")
     parser.add_argument("--strict-ref", action="store_true",
                         help="Use C reference path (naive GEMM) instead of PyTorch.")
+    parser.add_argument("--strict-parity-kernels", action=argparse.BooleanOptionalAction, default=True,
+                        help="Enable exact/strict kernel paths for PyTorch parity checks.")
     parser.add_argument("--all", action="store_true",
                         help="Run both RoPE on/off and KV head variants for the given dims.")
     args = parser.parse_args()
@@ -591,10 +608,12 @@ if __name__ == "__main__":
                            num_heads=args.heads,
                            intermediate_dim=args.intermediate,
                            eps=args.eps,
+                           weight_std=args.weight_std,
                            seed=args.seed,
                            skip_c=args.skip_c,
                            skip_ref=args.skip_ref,
                            strict_ref=args.strict_ref,
+                           strict_parity_kernels=args.strict_parity_kernels,
                            tol=args.tol)
             run_layer_test(num_kv_heads=kv,
                            use_rope=True,
@@ -605,10 +624,12 @@ if __name__ == "__main__":
                            num_heads=args.heads,
                            intermediate_dim=args.intermediate,
                            eps=args.eps,
+                           weight_std=args.weight_std,
                            seed=args.seed,
                            skip_c=args.skip_c,
                            skip_ref=args.skip_ref,
                            strict_ref=args.strict_ref,
+                           strict_parity_kernels=args.strict_parity_kernels,
                            tol=args.tol)
     else:
         kv_heads = args.kv_heads if args.kv_heads is not None else args.heads
@@ -624,8 +645,10 @@ if __name__ == "__main__":
                        num_heads=args.heads,
                        intermediate_dim=args.intermediate,
                        eps=args.eps,
+                       weight_std=args.weight_std,
                        seed=args.seed,
                        skip_c=args.skip_c,
                        skip_ref=args.skip_ref,
                        strict_ref=args.strict_ref,
+                       strict_parity_kernels=args.strict_parity_kernels,
                        tol=args.tol)

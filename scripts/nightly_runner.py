@@ -230,6 +230,7 @@ TEST_SUITES = {
     "rope": TestSuite("RoPE", "kernels", UNITTEST_DIR / "test_rope.py"),
     "embedding": TestSuite("Embedding", "kernels", UNITTEST_DIR / "test_embedding.py"),
     "attention": TestSuite("Attention", "kernels", UNITTEST_DIR / "test_attention.py"),
+    "attention_sliding": TestSuite("Attention Sliding Window", "kernels", UNITTEST_DIR / "test_attention_sliding_contract.py"),
     "kv_cache": TestSuite("KV Cache Attention", "kernels", UNITTEST_DIR / "test_kv_cache_attention.py"),
     "kv_cache_decode": TestSuite("KV Cache Decode", "kernels", UNITTEST_DIR / "test_kv_cache_layer_decode.py"),
     "fused_attention_decode": TestSuite("Fused Attention Decode", "kernels", UNITTEST_DIR / "test_fused_attention_decode.py"),
@@ -312,6 +313,24 @@ MAKE_TARGETS = {
         "target": "test-threadpool-parity",
         "timeout_sec": 300,
     },
+    "v6_6_contracts": {
+        "name": "v6.6 Tooling Contracts",
+        "category": "parity",
+        "target": "v6.6-validate-contracts",
+        "timeout_sec": 180,
+    },
+    "v6_6_kernel_map_gate": {
+        "name": "v6.6 Kernel Map Gate",
+        "category": "parity",
+        "target": "v6.6-kernel-map-gate",
+        "timeout_sec": 240,
+    },
+    "v6_6_model_matrix": {
+        "name": "v6.6 Model Matrix (Build)",
+        "category": "parity",
+        "target": "v6.6-validate-matrix",
+        "timeout_sec": 2400,
+    },
 }
 
 # Benchmark targets with perf extraction
@@ -328,7 +347,7 @@ BENCH_TARGETS = {
 
 # Quick subset for fast validation
 QUICK_TESTS = [
-    "gemm", "relu", "softmax", "rmsnorm", "attention",
+    "gemm", "relu", "softmax", "rmsnorm", "attention", "attention_sliding",
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels",
 ]

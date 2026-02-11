@@ -85,7 +85,9 @@ class DtypeIssue:
 class DtypeValidator:
     """Validates dtype consistency across pipeline."""
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, model_dir: Path = CACHE_DIR, generated_dir: Path = GENERATED_DIR, verbose: bool = False):
+        self.model_dir = model_dir
+        self.generated_dir = generated_dir
         self.verbose = verbose
         self.issues: List[DtypeIssue] = []
 
@@ -96,17 +98,25 @@ class DtypeValidator:
         self.c_code = None
         self.registry = None
 
-        for base_dir in [GENERATED_DIR, CACHE_DIR]:
-            if (base_dir / "lowered_decode.json").exists():
-                with open(base_dir / "lowered_decode.json") as f:
-                    self.ir = json.load(f)
+        for base_dir in [self.model_dir, self.generated_dir]:
+            if self.ir is None:
+                for ir_name in ("lowered_decode_call.json", "lowered_decode.json"):
+                    ir_path = base_dir / ir_name
+                    if ir_path.exists():
+                        with open(ir_path) as f:
+                            self.ir = json.load(f)
+                        break
 
-            if (base_dir / "weights_manifest.json").exists():
+            if self.manifest is None and (base_dir / "weights_manifest.json").exists():
                 with open(base_dir / "weights_manifest.json") as f:
                     self.manifest = json.load(f)
 
-            if (base_dir / "ck-kernel-inference.c").exists():
-                self.c_code = (base_dir / "ck-kernel-inference.c").read_text()
+            if self.c_code is None:
+                for c_name in ("model_v6_6.c", "ck-kernel-inference.c"):
+                    c_path = base_dir / c_name
+                    if c_path.exists():
+                        self.c_code = c_path.read_text()
+                        break
 
         # Load kernel registry
         registry_path = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
@@ -352,10 +362,18 @@ class DtypeValidator:
 
 def main():
     parser = argparse.ArgumentParser(description="Validate dtype consistency")
+    parser.add_argument("--model-dir", type=Path, default=CACHE_DIR,
+                        help="Model directory containing generated artifacts")
+    parser.add_argument("--generated-dir", type=Path, default=GENERATED_DIR,
+                        help="Fallback generated source directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
-    validator = DtypeValidator(verbose=args.verbose)
+    validator = DtypeValidator(
+        model_dir=args.model_dir,
+        generated_dir=args.generated_dir,
+        verbose=args.verbose,
+    )
     success = validator.run_all_tests()
 
     return 0 if success else 1

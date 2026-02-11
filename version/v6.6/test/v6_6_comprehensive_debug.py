@@ -23,20 +23,68 @@ from typing import Dict, List, Optional, Tuple
 class V6DebugTester:
     """Comprehensive debug testing for v6.6."""
 
-    def __init__(self, model_dir: Path, verbose: bool = False):
+    def __init__(
+        self,
+        model_dir: Path,
+        token: int = 25,
+        threads: int = 1,
+        context_len: Optional[int] = None,
+        verbose: bool = False,
+    ):
         self.model_dir = model_dir
+        self.token = token
+        self.threads = max(1, int(threads))
+        self.context_len = context_len
         self.verbose = verbose
         self.lib = None
         self.base_ptr = None
         self.config = {}
         self.layout = {}
+        self.vocab_size = 0
+
+    def _preload_optional_runtime_libs(self) -> None:
+        lib_roots = [
+            Path("/opt/intel/oneapi/compiler/latest/lib"),
+            Path("/opt/intel/oneapi/compiler/2025.3/lib"),
+            Path("/opt/intel/oneapi/2025.3/lib"),
+        ]
+        lib_names = [
+            "libimf.so",
+            "libsvml.so",
+            "libintlc.so.5",
+            "libirc.so",
+            "libirc_s.so",
+            "libirng.so",
+        ]
+        for root in lib_roots:
+            if not root.exists():
+                continue
+            for name in lib_names:
+                p = root / name
+                if p.exists():
+                    try:
+                        ctypes.CDLL(str(p), mode=ctypes.RTLD_GLOBAL)
+                    except OSError:
+                        pass
 
     def load(self) -> bool:
         """Load model and config."""
+        import os
+        os.environ["CK_NUM_THREADS"] = str(self.threads)
+        os.environ["OMP_NUM_THREADS"] = str(self.threads)
+
         # Load lowered IR for offsets
         lowered_path = self.model_dir / "lowered_decode_call.json"
         if not lowered_path.exists():
             lowered_path = self.model_dir / "lowered_decode.json"
+        if not lowered_path.exists():
+            lowered_path = self.model_dir / "lowered_prefill_call.json"
+        if not lowered_path.exists():
+            lowered_path = self.model_dir / "lowered_prefill.json"
+
+        if not lowered_path.exists():
+            print(f"ERROR: No lowered IR found in {self.model_dir}")
+            return False
 
         with open(lowered_path) as f:
             self.lowered = json.load(f)
@@ -50,20 +98,26 @@ class V6DebugTester:
         self.config = self.lowered.get("config", {})
 
         # Load model library
-        lib_path = self.model_dir / "libmodel.so"
+        lib_path = self.model_dir / "ck-kernel-inference.so"
         if not lib_path.exists():
-            lib_path = self.model_dir / "ck-kernel-inference.so"
+            lib_path = self.model_dir / "libmodel.so"
 
         if not lib_path.exists():
             print(f"ERROR: No .so found in {self.model_dir}")
             return False
+
+        self._preload_optional_runtime_libs()
 
         # Load engine first
         engine_path = self.model_dir / "libckernel_engine.so"
         if engine_path.exists():
             ctypes.CDLL(str(engine_path), mode=ctypes.RTLD_GLOBAL)
 
-        self.lib = ctypes.CDLL(str(lib_path))
+        try:
+            self.lib = ctypes.CDLL(str(lib_path))
+        except OSError as e:
+            print(f"ERROR: Failed to load {lib_path}: {e}")
+            return False
 
         # Setup function signatures
         self.lib.ck_model_init.argtypes = [ctypes.c_char_p]
@@ -72,6 +126,8 @@ class V6DebugTester:
         self.lib.ck_model_decode.restype = ctypes.c_int
         self.lib.ck_model_free.argtypes = []
         self.lib.ck_model_free.restype = None
+        self.lib.ck_model_get_vocab_size.argtypes = []
+        self.lib.ck_model_get_vocab_size.restype = ctypes.c_int
         self.lib.ck_model_get_base_ptr.argtypes = []
         self.lib.ck_model_get_base_ptr.restype = ctypes.c_uint64
         self.lib.ck_model_get_logits.argtypes = []
@@ -84,8 +140,33 @@ class V6DebugTester:
             print(f"ERROR: ck_model_init failed with code {ret}")
             return False
 
+        if hasattr(self.lib, "ck_model_kv_cache_reset"):
+            try:
+                self.lib.ck_model_kv_cache_reset.argtypes = []
+                self.lib.ck_model_kv_cache_reset.restype = None
+                self.lib.ck_model_kv_cache_reset()
+            except Exception:
+                pass
+
+        if self.context_len is not None and hasattr(self.lib, "ck_model_get_context_window"):
+            try:
+                self.lib.ck_model_get_context_window.argtypes = []
+                self.lib.ck_model_get_context_window.restype = ctypes.c_int
+                runtime_ctx = int(self.lib.ck_model_get_context_window())
+                if runtime_ctx != int(self.context_len):
+                    print(
+                        f"WARNING: requested --context-len {self.context_len}, "
+                        f"runtime is compiled for {runtime_ctx}"
+                    )
+            except Exception:
+                pass
+
         self.base_ptr = self.lib.ck_model_get_base_ptr()
+        self.vocab_size = int(self.lib.ck_model_get_vocab_size())
+        if self.vocab_size <= 0:
+            self.vocab_size = int(self.config.get("vocab_size", 151936))
         print(f"Model loaded. Base pointer: 0x{self.base_ptr:x}")
+        print(f"Using token {self.token}, vocab_size={self.vocab_size}")
 
         return True
 
@@ -105,39 +186,41 @@ class V6DebugTester:
 
         for buf in buffers:
             if buf.get("name") == name:
-                return buf.get("abs_offset")
+                return buf.get("abs_offset", buf.get("offset"))
+            if buf.get("define") == name:
+                return buf.get("abs_offset", buf.get("offset"))
             # Check entries within buffer
             for entry in buf.get("entries", []):
                 if entry.get("name") == name:
-                    return entry.get("abs_offset")
+                    return entry.get("abs_offset", entry.get("offset"))
+                if entry.get("define") == name:
+                    return entry.get("abs_offset", entry.get("offset"))
         return None
 
     def get_weight_offset(self, name: str) -> Optional[int]:
         """Get weight offset from IR."""
-        memory = self.lowered.get("memory", {})
-        weights = memory.get("weights", {})
+        weights = self.layout.get("memory", {}).get("weights", {})
         entries = weights.get("entries", [])
 
         for entry in entries:
             if entry.get("name") == name or entry.get("define") == name:
-                return entry.get("abs_offset")
+                return entry.get("abs_offset", entry.get("offset"))
         return None
 
     def run_decode_with_stop(self, token: int, stop_op: int) -> Dict:
         """Run decode and stop at specific operation."""
         import os
         os.environ["CK_STOP_OP"] = str(stop_op)
-
-        vocab_size = self.config.get("vocab_size", 151936)
-        output = (ctypes.c_float * vocab_size)()
-
-        ret = self.lib.ck_model_decode(ctypes.c_int32(token), output)
-        result = {
-            "return_code": ret,
-            "logits": np.array(output[:], dtype=np.float32) if ret == 0 else None
-        }
-
-        del os.environ["CK_STOP_OP"]
+        output = (ctypes.c_float * self.vocab_size)()
+        try:
+            ret = self.lib.ck_model_decode(ctypes.c_int32(token), output)
+            result = {
+                "return_code": ret,
+                "logits": np.array(output[:], dtype=np.float32) if ret == 0 else None
+            }
+        finally:
+            if "CK_STOP_OP" in os.environ:
+                del os.environ["CK_STOP_OP"]
         return result
 
     def test_embedding(self) -> Tuple[bool, str]:
@@ -156,7 +239,7 @@ class V6DebugTester:
         print(f"A_EMBEDDED_INPUT layout offset: {emb_input_offset}")
 
         # Run decode, stop at op 0 (after embedding)
-        result = self.run_decode_with_stop(9707, 0)
+        result = self.run_decode_with_stop(self.token, 0)
 
         if result["logits"] is None:
             return False, f"Decode failed with code {result['return_code']}"
@@ -191,7 +274,7 @@ class V6DebugTester:
         print(f"A_LAYER_INPUT layout offset: {layer_input_offset}")
 
         # Run decode, stop after op 1 (after first rmsnorm)
-        result = self.run_decode_with_stop(9707, 1)
+        result = self.run_decode_with_stop(self.token, 1)
 
         if result["logits"] is None:
             return False, f"Decode failed"
@@ -235,7 +318,7 @@ class V6DebugTester:
         print(f"A_V_SCRATCH layout offset: {v_offset}")
 
         # Run decode, stop after QKV (op 2-3 for decode, op 3-4 for prefill)
-        result = self.run_decode_with_stop(9707, 3)
+        result = self.run_decode_with_stop(self.token, 3)
 
         if result["logits"] is None:
             return False, f"Decode failed"
@@ -252,7 +335,7 @@ class V6DebugTester:
         print("="*60)
 
         # Run decode through attention
-        result = self.run_decode_with_stop(9707, 10)
+        result = self.run_decode_with_stop(self.token, 10)
 
         if result["logits"] is None:
             return False, f"Decode failed"
@@ -269,7 +352,7 @@ class V6DebugTester:
         print("="*60)
 
         # Run decode through MLP
-        result = self.run_decode_with_stop(9707, 20)
+        result = self.run_decode_with_stop(self.token, 20)
 
         if result["logits"] is None:
             return False, f"Decode failed"
@@ -285,10 +368,9 @@ class V6DebugTester:
         print("TEST: FULL DECODE")
         print("="*60)
 
-        vocab_size = self.config.get("vocab_size", 151936)
-        output = (ctypes.c_float * vocab_size)()
+        output = (ctypes.c_float * self.vocab_size)()
 
-        ret = self.lib.ck_model_decode(ctypes.c_int32(9707), output)
+        ret = self.lib.ck_model_decode(ctypes.c_int32(self.token), output)
 
         if ret != 0:
             return False, f"Decode failed with code {ret}"
@@ -333,7 +415,7 @@ class V6DebugTester:
             for entry in buf.get("entries", []):
                 name = entry.get("name")
                 offset = entry.get("abs_offset")
-                if name and offset:
+                if name and offset is not None:
                     layout_offsets[name] = offset
 
         print(f"IR defines: {len(weight_defines)} weights")
@@ -382,12 +464,27 @@ def main():
     parser.add_argument("--model-dir", type=Path,
                        default=Path.home() / ".cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF",
                        help="Model directory")
+    parser.add_argument("--model", type=Path,
+                       help="Alias for --model-dir")
+    parser.add_argument("--token", type=int, default=25,
+                       help="Token ID to decode")
+    parser.add_argument("--threads", type=int, default=1,
+                       help="Force runtime threads (default: 1 for stable debug runs)")
+    parser.add_argument("--context-len", type=int, default=None,
+                       help="Expected runtime context window (warning if mismatch)")
     parser.add_argument("--stop-at", type=int, default=None,
                        help="Stop testing at specific step (0=embedding, 1=rmsnorm, 2=qkv, etc.)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
-    tester = V6DebugTester(args.model_dir, verbose=args.verbose)
+    model_dir = args.model or args.model_dir
+    tester = V6DebugTester(
+        model_dir,
+        token=args.token,
+        threads=args.threads,
+        context_len=args.context_len,
+        verbose=args.verbose,
+    )
 
     if not tester.load():
         return 1

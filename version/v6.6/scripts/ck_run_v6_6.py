@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -883,12 +884,19 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     loader_src = V66_ROOT / "src" / "ckernel_model_load_v6_6.c"
 
     # Detect compiler for OpenMP flag
+    # Override with CK_V6_COMPILER=gcc|icx|clang when needed (e.g., profiling portability).
     import shutil
     compiler = "gcc"
-    omp_flag = "-fopenmp"
-    if shutil.which("icx"):
+    requested_compiler = os.environ.get("CK_V6_COMPILER", "").strip()
+    if requested_compiler:
+        if not shutil.which(requested_compiler):
+            log_error(f"Requested CK_V6_COMPILER not found in PATH: {requested_compiler}")
+            sys.exit(1)
+        compiler = requested_compiler
+    elif shutil.which("icx"):
         compiler = "icx"
-        omp_flag = "-qopenmp"
+
+    omp_flag = "-qopenmp" if compiler == "icx" else "-fopenmp"
 
     cmd = [
         compiler,
@@ -916,6 +924,23 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         f"-Wl,-rpath,$ORIGIN",  # Use $ORIGIN so library can find deps in same dir
         f"-Wl,-rpath,{BUILD_DIR}",
     ]
+
+    # Allow caller to inject extra compile/link flags for perf tooling.
+    # Example: CK_V6_EXTRA_CFLAGS="-fno-omit-frame-pointer -g"
+    extra_cflags = os.environ.get("CK_V6_EXTRA_CFLAGS", "").strip()
+    extra_ldflags = os.environ.get("CK_V6_EXTRA_LDFLAGS", "").strip()
+    if extra_cflags:
+        try:
+            cmd.extend(shlex.split(extra_cflags))
+        except ValueError:
+            log_error(f"Invalid CK_V6_EXTRA_CFLAGS: {extra_cflags}")
+            sys.exit(1)
+    if extra_ldflags:
+        try:
+            cmd.extend(shlex.split(extra_ldflags))
+        except ValueError:
+            log_error(f"Invalid CK_V6_EXTRA_LDFLAGS: {extra_ldflags}")
+            sys.exit(1)
 
     # Add profiling define if requested
     if os.environ.get("CK_PROFILE") == "1":
@@ -972,6 +997,32 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
 
 
 def _layout_weight_buffers(layout: dict) -> list[dict]:
+    # New v6.6 layout format (flat memory spec).
+    mem = layout.get("memory")
+    if isinstance(mem, dict):
+        weights = mem.get("weights", {})
+        entries = weights.get("entries", [])
+        if isinstance(entries, list) and entries:
+            out = []
+            for ent in entries:
+                if not isinstance(ent, dict):
+                    continue
+                size = int(ent.get("size", 0))
+                if size <= 0:
+                    continue
+                out.append(
+                    {
+                        "name": ent.get("name", ""),
+                        "dtype": ent.get("dtype", "fp32"),
+                        # Offset within weight arena for runtime debug mapping.
+                        "offset": ent.get("offset", 0),
+                        "size": size,
+                    }
+                )
+            if out:
+                return out
+
+    # Legacy layout format (section/layer buffers).
     section = layout["sections"][0]
     buffers = []
     buffers.extend(section["header"]["buffers"])
@@ -1556,7 +1607,7 @@ def _generate_profile_summary(work_dir: Path):
         log(f"  Profile CSV is empty", C_DIM)
         return
 
-    # Aggregate by op (across all layers, first decode token only)
+    # Aggregate by op (legacy view: token_id == 0, typically prefill)
     by_op = {}
     by_layer = {}
     total_us = 0
@@ -1573,11 +1624,22 @@ def _generate_profile_summary(work_dir: Path):
                 by_layer[layer] = {}
             by_layer[layer][op] = by_layer[layer].get(op, 0) + us
 
+    # Also aggregate by explicit mode across all token ids.
+    by_mode = {}
+    for e in entries:
+        mode = e.get('mode', 'unknown')
+        op = e.get('op', 'unknown')
+        us = float(e.get('time_us', 0))
+        mode_bucket = by_mode.setdefault(mode, {"total_us": 0.0, "by_op": {}})
+        mode_bucket["total_us"] += us
+        mode_bucket["by_op"][op] = mode_bucket["by_op"].get(op, 0.0) + us
+
     summary = {
         "total_us": total_us,
         "total_ms": total_us / 1000,
         "by_op": by_op,
         "by_layer": {str(k): v for k, v in sorted(by_layer.items())},
+        "by_mode": by_mode,
         "entries": entries,
     }
 
@@ -1590,12 +1652,23 @@ def _generate_profile_summary(work_dir: Path):
     log(f"  CSV:   {csv_path}")
     log(f"  JSON:  {summary_path}")
 
-    # Show top 5 hotspots
+    # Show top 5 hotspots for token_id==0 view
     sorted_ops = sorted(by_op.items(), key=lambda x: x[1], reverse=True)
     if sorted_ops:
-        log(f"  Top hotspots:")
+        log(f"  Top hotspots (token_id=0):")
         for op, us in sorted_ops[:5]:
             pct = us / total_us * 100 if total_us > 0 else 0
+            log(f"    {op:20s} {us/1000:8.2f} ms ({pct:5.1f}%)")
+
+    # Decode-specific view across all decode tokens (what operators usually want).
+    decode_bucket = by_mode.get("decode", {})
+    decode_total = float(decode_bucket.get("total_us", 0.0))
+    decode_by_op = decode_bucket.get("by_op", {})
+    if decode_total > 0 and decode_by_op:
+        sorted_decode = sorted(decode_by_op.items(), key=lambda x: x[1], reverse=True)
+        log(f"  Top decode hotspots (all decode tokens):")
+        for op, us in sorted_decode[:5]:
+            pct = us / decode_total * 100 if decode_total > 0 else 0
             log(f"    {op:20s} {us/1000:8.2f} ms ({pct:5.1f}%)")
 
 

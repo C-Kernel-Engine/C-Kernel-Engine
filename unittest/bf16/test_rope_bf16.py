@@ -34,6 +34,9 @@ lib.rope_precompute_cache.argtypes = [
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_float,
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_float,
 ]
 lib.rope_precompute_cache.restype = None
 
@@ -103,6 +106,9 @@ def build_cache(tokens, head_dim, base=10000.0):
         ctypes.c_int(max_seq),
         ctypes.c_int(head_dim),
         ctypes.c_float(base),
+        ctypes.c_int(head_dim),
+        ctypes.c_char_p(b"none"),
+        ctypes.c_float(1.0),
     )
     return cos_cache, sin_cache
 

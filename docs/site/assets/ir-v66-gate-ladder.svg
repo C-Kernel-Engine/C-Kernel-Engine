@@ -1,0 +1,91 @@
+<svg width="1600" height="1220" viewBox="0 0 1600 1220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v6.6 gate ladder from kernel-map sync to long decode stability">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1725"/>
+      <stop offset="100%" stop-color="#101f30"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15273b"/>
+      <stop offset="100%" stop-color="#101e2f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffb256"/>
+      <stop offset="100%" stop-color="#53c7ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8ebce0"/>
+    </marker>
+    <style>
+      .title { font: 800 44px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #f4f9ff; }
+      .sub { font: 500 20px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #b7cade; }
+      .lane { font: 700 18px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #d5e6f6; }
+      .gate { font: 800 20px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #ffe0b3; }
+      .cmd { font: 700 18px 'IBM Plex Mono', 'JetBrains Mono', monospace; fill: #91ddff; }
+      .body { font: 500 16px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #c2d6ea; }
+      .meta { font: 600 14px 'IBM Plex Mono', 'JetBrains Mono', monospace; fill: #95b6d6; }
+      .pill { font: 700 13px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #132437; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="1220" fill="url(#bg)"/>
+  <rect x="30" y="26" width="1540" height="1168" rx="18" fill="none" stroke="#2e4660" stroke-width="2"/>
+
+  <text x="70" y="90" class="title">v6.6 Operator Gate Ladder</text>
+  <text x="70" y="126" class="sub">Run top-to-bottom. Each step emits a report artifact and narrows failure scope.</text>
+  <rect x="70" y="145" width="640" height="7" rx="4" fill="url(#accent)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="186" width="1420" height="165" rx="14" fill="url(#panel)" stroke="#355577"/>
+    <rect x="90" y="368" width="1420" height="165" rx="14" fill="url(#panel)" stroke="#355577"/>
+    <rect x="90" y="550" width="1420" height="165" rx="14" fill="url(#panel)" stroke="#355577"/>
+    <rect x="90" y="732" width="1420" height="165" rx="14" fill="url(#panel)" stroke="#355577"/>
+    <rect x="90" y="914" width="1420" height="165" rx="14" fill="url(#panel)" stroke="#355577"/>
+  </g>
+
+  <rect x="112" y="212" width="86" height="28" rx="14" fill="#7be0a0"/>
+  <text x="140" y="231" class="pill">L0</text>
+  <text x="220" y="232" class="gate">Kernel-Map Gate</text>
+  <text x="220" y="264" class="cmd">make v6.6-kernel-map-gate</text>
+  <text x="220" y="292" class="body">Checks kernel map sync, regenerated registry consistency, and registry/header contract alignment.</text>
+  <text x="220" y="322" class="meta">Primary file: version/v6.6/kernel_maps/KERNEL_REGISTRY.json</text>
+
+  <rect x="112" y="394" width="86" height="28" rx="14" fill="#7be0a0"/>
+  <text x="140" y="413" class="pill">L1</text>
+  <text x="220" y="414" class="gate">Tooling Contract Gate</text>
+  <text x="220" y="446" class="cmd">make v6.6-validate-contracts</text>
+  <text x="220" y="474" class="body">Verifies template-family maps, parity API compatibility, CLI flag contracts, and preflight wiring.</text>
+  <text x="220" y="504" class="meta">Artifact: version/v6.6/tools/contract_report_latest.json</text>
+
+  <rect x="112" y="576" width="86" height="28" rx="14" fill="#7be0a0"/>
+  <text x="140" y="595" class="pill">L2</text>
+  <text x="220" y="596" class="gate">Build + Smoke Matrix Gate</text>
+  <text x="220" y="628" class="cmd">make v6.6-validate-matrix-smoke</text>
+  <text x="220" y="656" class="body">Runs Qwen2/Qwen3/Gemma build checks, required artifact checks, and smoke-runtime execution.</text>
+  <text x="220" y="686" class="meta">Artifact: version/v6.6/tools/model_matrix_report_latest.json</text>
+
+  <rect x="112" y="758" width="86" height="28" rx="14" fill="#ffd488"/>
+  <text x="140" y="777" class="pill">L3</text>
+  <text x="220" y="778" class="gate">Strict Parity Matrix Gate</text>
+  <text x="220" y="810" class="cmd">make v6.6-validate-parity-matrix</text>
+  <text x="220" y="838" class="body">Runs detailed parity matrix; may SKIP when llama parity runtime is unavailable and fail under require-all mode.</text>
+  <text x="220" y="868" class="meta">Artifact: version/v6.6/tools/parity_matrix_report_latest.json</text>
+
+  <rect x="112" y="940" width="86" height="28" rx="14" fill="#ffd488"/>
+  <text x="140" y="959" class="pill">L4</text>
+  <text x="220" y="960" class="gate">Long Decode Stability Gate</text>
+  <text x="220" y="992" class="cmd">make v6.6-validate-longdecode</text>
+  <text x="220" y="1020" class="body">Validates sustained decode behavior (minimum runs, no NaN/Inf drift, report integrity across model matrix).</text>
+  <text x="220" y="1050" class="meta">Artifact: version/v6.6/tools/long_decode_report_latest.json</text>
+
+  <line x1="800" y1="352" x2="800" y2="366" stroke="#8ebce0" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="800" y1="534" x2="800" y2="548" stroke="#8ebce0" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="800" y1="716" x2="800" y2="730" stroke="#8ebce0" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="800" y1="898" x2="800" y2="912" stroke="#8ebce0" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="90" y="1102" width="1420" height="86" rx="12" fill="#0f1c2b" stroke="#355577"/>
+  <text x="118" y="1140" class="lane">Operator rule: if a gate fails, stop at that layer, inspect its report JSON first, and only then move upstream.</text>
+  <text x="118" y="1166" class="meta">Single entrypoint: make v6.6-gate | Optional strict runtime gate: make v6.6-validate-parity-matrix-required</text>
+</svg>

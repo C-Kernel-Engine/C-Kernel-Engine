@@ -23,6 +23,8 @@ from typing import Any
 
 import numpy as np
 
+from probe_defaults import getenv_prefill_tokens_csv
+
 
 DEFAULT_MODEL_DIR = Path.home() / ".cache/ck-engine-v6.6/models/unsloth--gemma-3-270m-it-GGUF/ck_build"
 
@@ -102,7 +104,11 @@ def main() -> int:
     ap.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR, help="ck_build model directory")
     ap.add_argument("--layer", type=int, default=0, help="layer index")
     ap.add_argument("--occurrence", type=int, default=0, help="which attn_norm occurrence in layer")
-    ap.add_argument("--tokens", default="2,9259", help="comma-separated token ids (need >1 for prefill)")
+    ap.add_argument(
+        "--tokens",
+        default=getenv_prefill_tokens_csv(),
+        help="comma-separated token ids (need >1 for prefill)",
+    )
     args = ap.parse_args()
 
     tokens = parse_tokens_csv(args.tokens)

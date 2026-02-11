@@ -1,0 +1,70 @@
+<svg width="1600" height="1020" viewBox="0 0 1600 1020" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v6.6 operator memory card">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1725"/>
+      <stop offset="100%" stop-color="#102436"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15293e"/>
+      <stop offset="100%" stop-color="#122235"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="9" stdDeviation="9" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .title { font: 800 42px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #f4f9ff; }
+      .sub { font: 500 18px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #b9cee3; }
+      .h { font: 700 22px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #ffdfb3; }
+      .b { font: 500 16px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #c6d9ec; }
+      .cmd { font: 700 17px 'IBM Plex Mono', monospace; fill: #8edfff; }
+      .tag { font: 700 12px 'IBM Plex Sans', sans-serif; fill: #16293d; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1020" fill="url(#bg)"/>
+  <rect x="28" y="24" width="1544" height="972" rx="16" fill="none" stroke="#31506d" stroke-width="2"/>
+
+  <text x="62" y="86" class="title">v6.6 Operator Memory Card</text>
+  <text x="62" y="120" class="sub">If you have 60 seconds: run this flow, read these files, ask these questions.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="162" width="1460" height="178" rx="16" fill="url(#card)" stroke="#426a90"/>
+    <rect x="70" y="362" width="710" height="292" rx="16" fill="url(#card)" stroke="#426a90"/>
+    <rect x="820" y="362" width="710" height="292" rx="16" fill="url(#card)" stroke="#426a90"/>
+    <rect x="70" y="676" width="1460" height="292" rx="16" fill="url(#card)" stroke="#426a90"/>
+  </g>
+
+  <rect x="94" y="186" width="126" height="24" rx="12" fill="#9ff3bd"/>
+  <text x="126" y="203" class="tag">STEP 1</text>
+  <text x="94" y="242" class="h">Run the gate entrypoint</text>
+  <text x="94" y="276" class="cmd">make v6.6-gate</text>
+  <text x="94" y="308" class="b">If it fails, stop at first failed gate. Do not jump to random logs.</text>
+
+  <rect x="94" y="386" width="126" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="126" y="403" class="tag">STEP 2</text>
+  <text x="94" y="442" class="h">Open the report JSON first</text>
+  <text x="94" y="474" class="cmd">contract_report_latest.json</text>
+  <text x="94" y="502" class="cmd">model_matrix_report_latest.json</text>
+  <text x="94" y="530" class="cmd">parity_matrix_report_latest.json</text>
+  <text x="94" y="558" class="cmd">long_decode_report_latest.json</text>
+  <text x="94" y="602" class="b">Look at the first failing row and the note field.</text>
+
+  <rect x="844" y="386" width="126" height="24" rx="12" fill="#ffd69c"/>
+  <text x="876" y="403" class="tag">STEP 3</text>
+  <text x="844" y="442" class="h">Rerun only that validator</text>
+  <text x="844" y="474" class="cmd">make v6.6-validate-contracts</text>
+  <text x="844" y="502" class="cmd">make v6.6-validate-matrix-smoke</text>
+  <text x="844" y="530" class="cmd">make v6.6-validate-parity-matrix</text>
+  <text x="844" y="558" class="cmd">make v6.6-validate-longdecode</text>
+  <text x="844" y="602" class="b">Rerun full gate only after failing leaf is green.</text>
+
+  <rect x="94" y="700" width="126" height="24" rx="12" fill="#9ff3bd"/>
+  <text x="126" y="717" class="tag">CHECKLIST</text>
+  <text x="94" y="756" class="h">Three questions to ask every time</text>
+  <text x="94" y="790" class="b">1) Is this a real FAIL or a SKIP under require-all policy?</text>
+  <text x="94" y="822" class="b">2) Is the model row using intended cache/artifacts?</text>
+  <text x="94" y="854" class="b">3) Did command semantics change without docs+infographic update?</text>
+
+  <text x="94" y="904" class="cmd">Strict parity runtime expected: build/llama-parity or llama.cpp/main</text>
+  <text x="94" y="934" class="b">Date anchor: this card reflects operator flow as of February 11, 2026.</text>
+</svg>

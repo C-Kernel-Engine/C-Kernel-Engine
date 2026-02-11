@@ -858,6 +858,8 @@ class MemoryPlannerTest:
 
 def main():
     parser = argparse.ArgumentParser(description="Memory layout validator")
+    # Compatibility no-op for wrappers that pass --model globally.
+    parser.add_argument("--model", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--layout", type=Path, required=True,
                         help="Path to layout JSON file")
     parser.add_argument("--ir", type=Path,

@@ -1,0 +1,118 @@
+<svg width="1760" height="1120" viewBox="0 0 1760 1120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v6.6 artifact lineage from scripts to reports">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1726"/>
+      <stop offset="100%" stop-color="#132538"/>
+    </linearGradient>
+    <linearGradient id="node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15283c"/>
+      <stop offset="100%" stop-color="#102031"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8fc4eb"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.27"/>
+    </filter>
+    <style>
+      .title { font: 800 40px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #f4f9ff; }
+      .sub { font: 500 18px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #b6cade; }
+      .h { font: 700 18px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #ffdca9; }
+      .b { font: 500 15px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #c4d9eb; }
+      .p { font: 700 14px 'IBM Plex Mono', monospace; fill: #8edfff; }
+      .pill { font: 700 12px 'IBM Plex Sans', sans-serif; fill: #132537; }
+    </style>
+  </defs>
+
+  <rect width="1760" height="1120" fill="url(#bg)"/>
+  <rect x="24" y="22" width="1712" height="1076" rx="16" fill="none" stroke="#2f4964" stroke-width="2"/>
+
+  <text x="60" y="84" class="title">v6.6 Artifact Lineage</text>
+  <text x="60" y="118" class="sub">Read right-to-left when debugging: failed report -> producer script -> upstream inputs.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="180" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="70" y="390" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="70" y="600" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="70" y="810" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+
+    <rect x="640" y="180" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="640" y="390" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="640" y="600" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="640" y="810" width="500" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+
+    <rect x="1210" y="180" width="480" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="1210" y="390" width="480" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="1210" y="600" width="480" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+    <rect x="1210" y="810" width="480" height="170" rx="14" fill="url(#node)" stroke="#3f6286"/>
+  </g>
+
+  <rect x="94" y="204" width="92" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="118" y="220" class="pill">INPUTS</text>
+  <text x="94" y="252" class="h">Kernel maps + registry</text>
+  <text x="94" y="282" class="p">version/v6.6/kernel_maps/*.json</text>
+  <text x="94" y="310" class="b">Source of truth for kernel IDs, bindings, and map sync.</text>
+
+  <rect x="94" y="414" width="92" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="118" y="430" class="pill">INPUTS</text>
+  <text x="94" y="462" class="h">Templates + family maps</text>
+  <text x="94" y="492" class="p">version/v6.6/templates/*.json</text>
+  <text x="94" y="520" class="b">Feeds static tooling contract checks (family coverage and parity map alignment).</text>
+
+  <rect x="94" y="624" width="92" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="118" y="640" class="pill">INPUTS</text>
+  <text x="94" y="672" class="h">GGUF/cache model inputs</text>
+  <text x="94" y="702" class="p">~/.cache or .ck_cache</text>
+  <text x="94" y="730" class="b">Used by matrix-smoke, parity matrix, and long-decode validators.</text>
+
+  <rect x="94" y="834" width="92" height="24" rx="12" fill="#9fe3ff"/>
+  <text x="118" y="850" class="pill">INPUTS</text>
+  <text x="94" y="882" class="h">Runtime binaries</text>
+  <text x="94" y="912" class="p">build/llama-parity, llama.cpp/main</text>
+  <text x="94" y="940" class="b">Controls strict parity execution vs SKIP behavior.</text>
+
+  <text x="664" y="252" class="h">v6.6-kernel-map-gate</text>
+  <text x="664" y="282" class="p">gen_kernel_registry_from_maps.py --check</text>
+  <text x="664" y="310" class="b">Detects map drift before downstream gates run.</text>
+
+  <text x="664" y="462" class="h">v6.6-validate-contracts</text>
+  <text x="664" y="492" class="p">validate_tooling_contracts.py</text>
+  <text x="664" y="520" class="b">Checks cross-script contracts, CLI compatibility, and preflight wiring.</text>
+
+  <text x="664" y="672" class="h">v6.6-validate-matrix-smoke</text>
+  <text x="664" y="702" class="p">validate_model_matrix_v6_6.py --with-smoke</text>
+  <text x="664" y="730" class="b">Model matrix build, artifact, sliding contract, smoke runtime.</text>
+
+  <text x="664" y="882" class="h">Parity + longdecode validators</text>
+  <text x="664" y="912" class="p">validate_parity_matrix_v6_6.py / validate_long_decode_stability_v6_6.py</text>
+  <text x="664" y="940" class="b">Strict parity and sustained decode stability gates.</text>
+
+  <text x="1234" y="252" class="h">contract_report_latest.json</text>
+  <text x="1234" y="282" class="p">version/v6.6/tools/contract_report_latest.json</text>
+  <text x="1234" y="310" class="b">Static contract verdicts (PASS/WARN/FAIL).</text>
+
+  <text x="1234" y="462" class="h">model_matrix_report_latest.json</text>
+  <text x="1234" y="492" class="p">version/v6.6/tools/model_matrix_report_latest.json</text>
+  <text x="1234" y="520" class="b">Per-model build/smoke/sliding results.</text>
+
+  <text x="1234" y="672" class="h">parity_matrix_report_latest.json</text>
+  <text x="1234" y="702" class="p">version/v6.6/tools/parity_matrix_report_latest.json</text>
+  <text x="1234" y="730" class="b">Per-model strict parity and coverage result rows.</text>
+
+  <text x="1234" y="882" class="h">long_decode_report_latest.json</text>
+  <text x="1234" y="912" class="p">version/v6.6/tools/long_decode_report_latest.json</text>
+  <text x="1234" y="940" class="b">Decode stability summary and failure notes.</text>
+
+  <line x1="570" y1="265" x2="638" y2="265" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="570" y1="475" x2="638" y2="475" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="570" y1="685" x2="638" y2="685" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="570" y1="895" x2="638" y2="895" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <line x1="1140" y1="265" x2="1208" y2="265" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1140" y1="475" x2="1208" y2="475" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1140" y1="685" x2="1208" y2="685" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1140" y1="895" x2="1208" y2="895" stroke="#8fc4eb" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="70" y="1012" width="1620" height="78" rx="12" fill="#102134" stroke="#3b6187"/>
+  <text x="100" y="1054" class="b">Debug rule: if a report row fails, run only that producer script with matching args before rerunning full v6.6-gate.</text>
+</svg>

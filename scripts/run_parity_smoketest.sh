@@ -17,6 +17,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$ROOT_DIR/llama.cpp"
 PATCHES_DIR="$ROOT_DIR/patches"
 BUILD_DIR="$ROOT_DIR/build"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 # Default options
 QUICK_MODE=false
@@ -429,7 +430,7 @@ if [ -f "$KERNEL_TEST" ]; then
         PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
         if [ -f "$PYTORCH_TEST" ]; then
             export LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH"
-            python3 "$PYTORCH_TEST" 2>&1 && {
+            "$PYTHON_BIN" "$PYTORCH_TEST" 2>&1 && {
                 log_success "PyTorch parity tests passed"
                 incr_passed
             } || {
@@ -446,10 +447,10 @@ if [ -f "$KERNEL_TEST" ]; then
 
         set +e
         if [ "$QUICK_MODE" = true ]; then
-            python3 "$KERNEL_TEST" --quick
+            "$PYTHON_BIN" "$KERNEL_TEST" --quick
             RET=$?
         else
-            python3 "$KERNEL_TEST" --all
+            "$PYTHON_BIN" "$KERNEL_TEST" --all
             RET=$?
         fi
         set -e
@@ -470,7 +471,7 @@ else
     PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
     if [ -f "$PYTORCH_TEST" ]; then
         export LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH"
-        python3 "$PYTORCH_TEST" 2>&1 && {
+        "$PYTHON_BIN" "$PYTORCH_TEST" 2>&1 && {
             log_success "PyTorch parity tests passed"
             incr_passed
         } || {
@@ -502,13 +503,13 @@ if [ -f "$GEMV_TEST" ]; then
     else
         set +e
         if [ "$QUICK_MODE" = true ]; then
-            python3 "$GEMV_TEST" --quick
+            "$PYTHON_BIN" "$GEMV_TEST" --quick
             RET=$?
         elif [ "$PERF_LARGE" = true ]; then
-            python3 "$GEMV_TEST" --large
+            "$PYTHON_BIN" "$GEMV_TEST" --large
             RET=$?
         else
-            python3 "$GEMV_TEST"
+            "$PYTHON_BIN" "$GEMV_TEST"
             RET=$?
         fi
         set -e
@@ -532,7 +533,7 @@ BATCH_QUANT_TEST="$ROOT_DIR/unittest/test_quantize_batch_parity.py"
 
 if [ -f "$BATCH_QUANT_TEST" ]; then
     set +e
-    python3 "$BATCH_QUANT_TEST"
+    "$PYTHON_BIN" "$BATCH_QUANT_TEST"
     RET=$?
     set -e
 
@@ -586,10 +587,10 @@ if [ "$PERF_MODE" = true ]; then
     if [ -f "$KERNEL_TEST" ]; then
         set +e
         if [ "$PERF_LARGE" = true ]; then
-            python3 "$KERNEL_TEST" --perf-large
+            "$PYTHON_BIN" "$KERNEL_TEST" --perf-large
             RET=$?
         else
-            python3 "$KERNEL_TEST" --perf
+            "$PYTHON_BIN" "$KERNEL_TEST" --perf
             RET=$?
         fi
         set -e
@@ -651,6 +652,28 @@ else
     incr_skipped
 fi
 
+# Step 3f: Sliding-window attention contract test
+log_step "[3f/5] Running sliding-window attention contract test..."
+SLIDING_TEST="$ROOT_DIR/unittest/test_attention_sliding_contract.py"
+
+if [ -f "$SLIDING_TEST" ]; then
+    set +e
+    LD_LIBRARY_PATH="$BUILD_DIR:$LD_LIBRARY_PATH" "$PYTHON_BIN" "$SLIDING_TEST"
+    RET=$?
+    set -e
+
+    if [ $RET -eq 0 ]; then
+        log_success "Sliding-window attention contract passed"
+        incr_passed
+    else
+        log_error "Sliding-window attention contract failed"
+        incr_failed
+    fi
+else
+    log_warn "Sliding-window test not found: $SLIDING_TEST"
+    incr_skipped
+fi
+
 # Step 4: PyTorch FP32 reference tests
 if [ "$KERNELS_ONLY" = false ]; then
     log_step "[4/5] Running PyTorch reference tests..."
@@ -663,10 +686,10 @@ if [ "$KERNELS_ONLY" = false ]; then
         set +e
         if [ "$QUICK_MODE" = true ]; then
             # Quick mode: run subset
-            python3 "$PYTORCH_TEST" --quick
+            "$PYTHON_BIN" "$PYTORCH_TEST" --quick
             RET=$?
         else
-            python3 "$PYTORCH_TEST"
+            "$PYTHON_BIN" "$PYTORCH_TEST"
             RET=$?
         fi
         set -e
@@ -699,7 +722,7 @@ if [ "$KERNELS_ONLY" = false ] && [ "$QUICK_MODE" = false ]; then
         # Check if dump directories exist (requires running llama.cpp and CK with parity flags)
         if [ -d "$LLAMA_DUMP_DIR" ] && [ -d "$CK_DUMP_DIR" ]; then
             set +e
-            python3 "$MODEL_PARITY_TEST" \
+            "$PYTHON_BIN" "$MODEL_PARITY_TEST" \
                 --llama-dump "$LLAMA_DUMP_DIR" \
                 --ck-dump "$CK_DUMP_DIR" \
                 --tol 1e-3 2>&1

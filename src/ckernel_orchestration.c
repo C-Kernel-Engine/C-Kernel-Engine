@@ -965,7 +965,11 @@ void ck_mlp_swiglu_forward(const float *input,
     gemm_blocked_serial(input, w1, b1, fc1_out,
                         tokens, up_dim, aligned_embed_dim);
 
-    swiglu_forward(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    if (ck_strict_parity_enabled()) {
+        swiglu_forward_exact(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    } else {
+        swiglu_forward(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    }
 
     gemm_blocked_serial(swiglu_out, w2, b2, output,
                         tokens, aligned_embed_dim, aligned_intermediate_dim);
@@ -987,7 +991,11 @@ static void ck_mlp_swiglu_forward_ref(const float *input,
     gemm_naive_parallel(input, w1, b1, fc1_out,
                         tokens, up_dim, aligned_embed_dim);
 
-    swiglu_forward(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    if (ck_strict_parity_enabled()) {
+        swiglu_forward_exact(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    } else {
+        swiglu_forward(fc1_out, swiglu_out, tokens, aligned_intermediate_dim);
+    }
 
     gemm_naive_parallel(swiglu_out, w2, b2, output,
                         tokens, aligned_embed_dim, aligned_intermediate_dim);
@@ -1034,17 +1042,31 @@ void ck_layer_forward_rmsnorm_swiglu(const CKLayerForwardParams *p)
     }
 
     if (p->scores) {
-        attention_forward_causal_head_major_gqa(p->q,
-                                               p->k,
-                                               p->v,
-                                               p->scores,
-                                               p->attn_out,
-                                               p->num_heads,
-                                               p->num_kv_heads,
-                                               p->tokens,
-                                               p->head_dim,
-                                               p->aligned_head_dim,
-                                               p->aligned_context_window);
+        if (ck_strict_parity_enabled()) {
+            attention_forward_causal_head_major_gqa_exact(p->q,
+                                                          p->k,
+                                                          p->v,
+                                                          p->scores,
+                                                          p->attn_out,
+                                                          p->num_heads,
+                                                          p->num_kv_heads,
+                                                          p->tokens,
+                                                          p->head_dim,
+                                                          p->aligned_head_dim,
+                                                          p->aligned_context_window);
+        } else {
+            attention_forward_causal_head_major_gqa(p->q,
+                                                   p->k,
+                                                   p->v,
+                                                   p->scores,
+                                                   p->attn_out,
+                                                   p->num_heads,
+                                                   p->num_kv_heads,
+                                                   p->tokens,
+                                                   p->head_dim,
+                                                   p->aligned_head_dim,
+                                                   p->aligned_context_window);
+        }
     } else {
         attention_forward_causal_head_major_gqa_flash(p->q,
                                                      p->k,
@@ -1142,17 +1164,31 @@ void ck_layer_forward_rmsnorm_swiglu_ref(const CKLayerForwardParams *p)
     }
 
     if (p->scores) {
-        attention_forward_causal_head_major_gqa(p->q,
-                                               p->k,
-                                               p->v,
-                                               p->scores,
-                                               p->attn_out,
-                                               p->num_heads,
-                                               p->num_kv_heads,
-                                               p->tokens,
-                                               p->head_dim,
-                                               p->aligned_head_dim,
-                                               p->aligned_context_window);
+        if (ck_strict_parity_enabled()) {
+            attention_forward_causal_head_major_gqa_exact(p->q,
+                                                          p->k,
+                                                          p->v,
+                                                          p->scores,
+                                                          p->attn_out,
+                                                          p->num_heads,
+                                                          p->num_kv_heads,
+                                                          p->tokens,
+                                                          p->head_dim,
+                                                          p->aligned_head_dim,
+                                                          p->aligned_context_window);
+        } else {
+            attention_forward_causal_head_major_gqa(p->q,
+                                                   p->k,
+                                                   p->v,
+                                                   p->scores,
+                                                   p->attn_out,
+                                                   p->num_heads,
+                                                   p->num_kv_heads,
+                                                   p->tokens,
+                                                   p->head_dim,
+                                                   p->aligned_head_dim,
+                                                   p->aligned_context_window);
+        }
     } else {
         attention_forward_causal_head_major_gqa_flash(p->q,
                                                      p->k,

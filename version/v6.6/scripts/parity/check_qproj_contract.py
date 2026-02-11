@@ -26,6 +26,8 @@ from typing import Any
 
 import numpy as np
 
+from probe_defaults import getenv_decode_token_id
+
 
 DEFAULT_MODEL_DIR = Path.home() / ".cache/ck-engine-v6.6/models/unsloth--gemma-3-270m-it-GGUF/ck_build"
 SUPPORTED_OPS = ("q_proj", "k_proj", "v_proj")
@@ -200,7 +202,7 @@ def main() -> int:
     ap.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR, help="ck_build model directory")
     ap.add_argument("--op", choices=SUPPORTED_OPS, default="q_proj", help="projection op to validate")
     ap.add_argument("--layer", type=int, default=0, help="layer index")
-    ap.add_argument("--token", type=int, default=9259, help="single decode token id")
+    ap.add_argument("--token", type=int, default=getenv_decode_token_id(), help="single decode token id")
     args = ap.parse_args()
 
     proj_op = args.op

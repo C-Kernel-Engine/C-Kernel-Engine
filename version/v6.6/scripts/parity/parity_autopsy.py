@@ -44,7 +44,7 @@ FAMILY_PROFILE = {
         "llama_filter": "inp_embd,rms_norm,attn_q,attn_k,attn_v,Qcur,Kcur,Vcur,__fattn__,kqv_out,ffn_norm,ffn_out,l_out",
     },
     "qwen3": {
-        "parity_model": "qwen2",  # reuse qwen2 mapping in parity_test.py
+        "parity_model": "qwen3",
         "llama_filter": "inp_embd,rms_norm,attn_q,attn_k,attn_v,Qcur,Kcur,Vcur,__fattn__,kqv_out,ffn_norm,ffn_out,l_out",
     },
     "llama": {

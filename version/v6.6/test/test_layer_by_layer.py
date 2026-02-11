@@ -1,298 +1,326 @@
 #!/usr/bin/env python3
 """
-Layer-by-layer test for v6.6 to identify where divergence occurs.
-Tests each step from token embedding through layer 0.
+Layer-by-layer validation for v6.6 artifacts only.
 
-Usage:
-    python test_layer_by_layer.py
-
-Compares:
-1. Token embedding output
-2. RMSNorm layer 0 output
-3. Q/K/V projections
-4. Attention output
-5. MLP output
+Examples:
+  python test_layer_by_layer.py --model ~/.cache/ck-engine-v6.6/models/gemma-3-270m-it-Q5_K_M
+  python test_layer_by_layer.py --model ~/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF --token 25
 """
 
-import ctypes
+import argparse
 import json
-import os
-import struct
-import subprocess
+import re
 import sys
-import numpy as np
 from pathlib import Path
+from typing import Dict, Optional
 
-# Model cache directory
-V66_DIR = Path("/home/antshiv/.cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF")
-V65_DIR = Path("/home/antshiv/.cache/ck-engine-v6.5/models/Qwen--Qwen2-0.5B-Instruct-GGUF")
+import numpy as np
 
-def load_q8_0_embedding(bump_path, offset, token_id, embed_dim=896):
-    """Load and dequantize Q8_0 embedding for a specific token."""
-    # Q8_0 format: 32 values per block
+DEFAULT_MODEL = Path.home() / ".cache/ck-engine-v6.6/models/Qwen--Qwen2-0.5B-Instruct-GGUF"
+
+MODEL_DIR: Path = DEFAULT_MODEL
+TEST_TOKEN: int = 100
+
+
+def load_q8_0_embedding(bump_path: Path, offset: int, token_id: int, embed_dim: int) -> np.ndarray:
+    """Load and dequantize one token row from a Q8_0 embedding matrix."""
     block_size = 32
-    num_blocks = (embed_dim + 31) // 32
+    num_blocks = (embed_dim + (block_size - 1)) // block_size
     bytes_per_block = 2 + 32  # fp16 scale + 32 int8 quants
-
-    # Calculate row offset
-    row_start = offset + token_id * num_blocks * bytes_per_block
+    row_start = offset + (token_id * num_blocks * bytes_per_block)
 
     values = []
-    with open(bump_path, 'rb') as f:
+    with open(bump_path, "rb") as f:
         for b in range(num_blocks):
             f.seek(row_start + b * bytes_per_block)
             block_data = f.read(bytes_per_block)
-
-            # Parse fp16 scale
+            if len(block_data) != bytes_per_block:
+                raise ValueError(f"Short read in {bump_path} for token={token_id}, block={b}")
             scale = np.frombuffer(block_data[:2], dtype=np.float16)[0]
-            # Parse int8 quants
             quants = np.frombuffer(block_data[2:], dtype=np.int8)
-            # Dequantize
-            dequant = quants.astype(np.float32) * float(scale)
-            values.extend(dequant.tolist())
+            values.extend((quants.astype(np.float32) * float(scale)).tolist())
 
     return np.array(values[:embed_dim], dtype=np.float32)
 
-def load_fp32_vector(bump_path, offset, count):
+
+def load_fp32_vector(bump_path: Path, offset: int, count: int) -> np.ndarray:
     """Load fp32 vector from bump file."""
-    with open(bump_path, 'rb') as f:
+    with open(bump_path, "rb") as f:
         f.seek(offset)
         data = f.read(count * 4)
+    if len(data) != count * 4:
+        raise ValueError(f"Short read in {bump_path} offset={offset} count={count}")
     return np.frombuffer(data, dtype=np.float32)
 
-def rmsnorm(x, gamma, eps=1e-6):
+
+def rmsnorm(x: np.ndarray, gamma: np.ndarray, eps: float = 1e-6) -> np.ndarray:
     """Compute RMSNorm."""
     x = np.asarray(x, dtype=np.float32)
     gamma = np.asarray(gamma, dtype=np.float32)
-
-    # RMS normalization
     variance = np.mean(x ** 2)
     x_norm = x / np.sqrt(variance + eps)
-
     return x_norm * gamma
 
-def test_v66_embedding():
-    """Test v6.6 embedding lookup."""
-    print("\n" + "="*60)
-    print("TEST 1: Token Embedding Lookup")
-    print("="*60)
 
-    # Load manifest
-    manifest = json.load(open(V66_DIR / "weights_manifest.json"))
-    entries = {e['name']: e for e in manifest.get('entries', [])}
+def load_manifest_entries(model_dir: Path) -> Dict[str, dict]:
+    manifest_path = model_dir / "weights_manifest.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"weights_manifest.json not found: {manifest_path}")
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    return {e["name"]: e for e in manifest.get("entries", [])}
 
-    tok_entry = entries['token_emb']
-    print(f"Token embedding: offset={tok_entry['file_offset']}, dtype={tok_entry['dtype']}")
 
-    # Test token 0 (often <unk> or similar)
-    test_tokens = [0, 1, 100, 1000]
+def infer_embed_dim(entries: Dict[str, dict]) -> int:
+    tok = entries.get("token_emb")
+    if tok and isinstance(tok, dict):
+        shape = tok.get("shape") or tok.get("dims")
+        if isinstance(shape, list) and len(shape) >= 2 and isinstance(shape[-1], int):
+            return int(shape[-1])
+    for key in ("layer.0.ln1_gamma", "layer.0.attention_norm", "final_norm"):
+        entry = entries.get(key)
+        if entry and entry.get("size"):
+            return int(entry["size"] // 4)
+    return 896
 
-    v66_bump = V66_DIR / "weights.bump"
-    v65_bump = V65_DIR / "weights.bump"
 
-    v65_manifest = json.load(open(V65_DIR / "weights_manifest.json"))
-    v65_entries = {e['name']: e for e in v65_manifest.get('entries', [])}
-    v65_tok = v65_entries['token_emb']
+def test_v66_embedding() -> None:
+    print("\n" + "=" * 60)
+    print("TEST 1: Token Embedding Lookup (v6.6)")
+    print("=" * 60)
+
+    entries = load_manifest_entries(MODEL_DIR)
+    if "token_emb" not in entries:
+        print("FAIL: token_emb missing in manifest")
+        return
+
+    tok_entry = entries["token_emb"]
+    embed_dim = infer_embed_dim(entries)
+    print(f"Token embedding: offset={tok_entry['file_offset']}, dtype={tok_entry.get('dtype', '?')}, dim={embed_dim}")
+
+    test_tokens = sorted({0, 1, TEST_TOKEN, 1000})
+    v66_bump = MODEL_DIR / "weights.bump"
+    if not v66_bump.exists():
+        raise FileNotFoundError(f"weights.bump not found: {v66_bump}")
 
     for token_id in test_tokens:
-        v66_emb = load_q8_0_embedding(v66_bump, tok_entry['file_offset'], token_id)
-        v65_emb = load_q8_0_embedding(v65_bump, v65_tok['file_offset'], token_id)
-
-        diff = np.abs(v66_emb - v65_emb).max()
-        mean_diff = np.abs(v66_emb - v65_emb).mean()
-
+        emb = load_q8_0_embedding(v66_bump, int(tok_entry["file_offset"]), token_id, embed_dim)
+        has_nan = bool(np.any(np.isnan(emb)))
         print(f"\nToken {token_id}:")
-        print(f"  v6.6 first 5: {v66_emb[:5]}")
-        print(f"  v6.5 first 5: {v65_emb[:5]}")
-        print(f"  Max diff: {diff:.8f}, Mean diff: {mean_diff:.8f}")
+        print(f"  first 5: {emb[:5]}")
+        print(f"  stats: min={emb.min():.6f}, max={emb.max():.6f}, mean={emb.mean():.6f}, nan={has_nan}")
 
-        if diff < 1e-6:
-            print("  ✓ MATCH")
-        else:
-            print("  ✗ MISMATCH")
 
-def test_v66_rmsnorm():
-    """Test v6.6 RMSNorm for layer 0."""
-    print("\n" + "="*60)
-    print("TEST 2: Layer 0 RMSNorm")
-    print("="*60)
+def test_v66_rmsnorm() -> None:
+    print("\n" + "=" * 60)
+    print("TEST 2: Layer 0 RMSNorm (v6.6)")
+    print("=" * 60)
 
-    # Load manifests
-    v66_manifest = json.load(open(V66_DIR / "weights_manifest.json"))
-    v65_manifest = json.load(open(V65_DIR / "weights_manifest.json"))
+    entries = load_manifest_entries(MODEL_DIR)
+    ln_keys = ["layer.0.ln1_gamma", "layer.0.attention_norm"]
+    ln_key = next((k for k in ln_keys if k in entries), None)
+    if not ln_key:
+        print("FAIL: no layer0 norm gamma found (expected one of layer.0.ln1_gamma or layer.0.attention_norm)")
+        return
 
-    v66_entries = {e['name']: e for e in v66_manifest.get('entries', [])}
-    v65_entries = {e['name']: e for e in v65_manifest.get('entries', [])}
+    ln_entry = entries[ln_key]
+    embed_dim = int(ln_entry["size"] // 4)
+    print(f"{ln_key}: offset={ln_entry['file_offset']} dim={embed_dim}")
 
-    # Load ln1_gamma for layer 0
-    v66_ln1 = v66_entries['layer.0.ln1_gamma']
-    v65_ln1 = v65_entries['layer.0.ln1_gamma']
+    gamma = load_fp32_vector(MODEL_DIR / "weights.bump", int(ln_entry["file_offset"]), embed_dim)
 
-    print(f"v6.6 ln1_gamma: offset={v66_ln1['file_offset']}")
-    print(f"v6.5 ln1_gamma: offset={v65_ln1['file_offset']}")
+    tok_entry = entries.get("token_emb")
+    if not tok_entry:
+        print("FAIL: token_emb missing for RMSNorm input probe")
+        return
 
-    v66_gamma = load_fp32_vector(V66_DIR / "weights.bump", v66_ln1['file_offset'], 896)
-    v65_gamma = load_fp32_vector(V65_DIR / "weights.bump", v65_ln1['file_offset'], 896)
-
-    gamma_diff = np.abs(v66_gamma - v65_gamma).max()
-    print(f"\nGamma comparison:")
-    print(f"  v6.6 first 5: {v66_gamma[:5]}")
-    print(f"  v6.5 first 5: {v65_gamma[:5]}")
-    print(f"  Max diff: {gamma_diff:.8f}")
-
-    if gamma_diff < 1e-6:
-        print("  ✓ Gamma values MATCH")
-    else:
-        print("  ✗ Gamma values MISMATCH")
-
-    # Now test RMSNorm computation
-    # Use token 0's embedding as input
-    tok_entry = v66_entries['token_emb']
-    input_emb = load_q8_0_embedding(V66_DIR / "weights.bump", tok_entry['file_offset'], 100)
-
-    output = rmsnorm(input_emb, v66_gamma)
-
-    print(f"\nRMSNorm test (token 100 embedding -> layer 0 input):")
+    input_emb = load_q8_0_embedding(
+        MODEL_DIR / "weights.bump",
+        int(tok_entry["file_offset"]),
+        TEST_TOKEN,
+        infer_embed_dim(entries),
+    )
+    output = rmsnorm(input_emb[:embed_dim], gamma)
+    print(f"\nRMSNorm probe (token {TEST_TOKEN} embedding -> layer 0 input):")
     print(f"  Input first 5: {input_emb[:5]}")
     print(f"  Output first 5: {output[:5]}")
     print(f"  Output stats: min={output.min():.4f}, max={output.max():.4f}, mean={output.mean():.4f}")
 
-def test_v66_layer0_weights():
-    """Compare all layer 0 weights between v6.5 and v6.6."""
-    print("\n" + "="*60)
-    print("TEST 3: Layer 0 All Weights Comparison")
-    print("="*60)
 
-    v66_manifest = json.load(open(V66_DIR / "weights_manifest.json"))
-    v65_manifest = json.load(open(V65_DIR / "weights_manifest.json"))
+def test_v66_layer0_weights() -> None:
+    print("\n" + "=" * 60)
+    print("TEST 3: Layer 0 Weight Integrity (v6.6)")
+    print("=" * 60)
 
-    v66_entries = {e['name']: e for e in v66_manifest.get('entries', [])}
-    v65_entries = {e['name']: e for e in v65_manifest.get('entries', [])}
+    entries = load_manifest_entries(MODEL_DIR)
+    v66_bump = MODEL_DIR / "weights.bump"
+    layer0_names = sorted(n for n in entries if n.startswith("layer.0."))
 
-    # List of layer 0 weights
-    layer0_weights = [
-        'layer.0.ln1_gamma', 'layer.0.ln2_gamma',
-        'layer.0.wq', 'layer.0.wk', 'layer.0.wv', 'layer.0.wo',
-        'layer.0.bq', 'layer.0.bk', 'layer.0.bv', 'layer.0.bo',
-        'layer.0.w1', 'layer.0.w2',
-        'layer.0.b1', 'layer.0.b2',
-    ]
+    if not layer0_names:
+        print("FAIL: no layer.0.* entries found in manifest")
+        return
 
-    v66_bump = V66_DIR / "weights.bump"
-    v65_bump = V65_DIR / "weights.bump"
+    all_readable = True
+    with open(v66_bump, "rb") as f:
+        for name in layer0_names:
+            e = entries[name]
+            offset = int(e.get("file_offset", -1))
+            size = int(e.get("size", 0))
+            dtype = e.get("dtype", "?")
+            sample_n = min(32, max(size, 0))
 
-    all_match = True
-    for name in layer0_weights:
-        v66_e = v66_entries.get(name)
-        v65_e = v65_entries.get(name)
+            if offset < 0 or size <= 0:
+                all_readable = False
+                print(f"✗ {name}: invalid metadata offset={offset} size={size} dtype={dtype}")
+                continue
 
-        if not v66_e or not v65_e:
-            print(f"{name}: MISSING (v66={v66_e is not None}, v65={v65_e is not None})")
-            continue
+            f.seek(offset)
+            sample = f.read(sample_n)
+            if len(sample) != sample_n:
+                all_readable = False
+                print(f"✗ {name}: short read offset={offset} size={size} dtype={dtype}")
+                continue
 
-        # Read first 64 bytes from each
-        with open(v66_bump, 'rb') as f:
-            f.seek(v66_e['file_offset'])
-            v66_data = f.read(min(64, v66_e['size']))
+            checksum = sum(sample) % 256
+            print(
+                f"✓ {name}: offset={offset}, size={size}, dtype={dtype}, "
+                f"sample_crc8={checksum:02x}, first8={sample[:8].hex()}"
+            )
 
-        with open(v65_bump, 'rb') as f:
-            f.seek(v65_e['file_offset'])
-            v65_data = f.read(min(64, v65_e['size']))
-
-        match = v66_data == v65_data
-        status = "✓" if match else "✗"
-        if not match:
-            all_match = False
-
-        print(f"{status} {name}: offset v66={v66_e['file_offset']}, v65={v65_e['file_offset']}, size={v66_e['size']}")
-        if not match:
-            print(f"    v66: {v66_data[:16].hex()}")
-            print(f"    v65: {v65_data[:16].hex()}")
-
-    if all_match:
-        print("\n✓ All layer 0 weights MATCH between v6.5 and v6.6")
+    if all_readable:
+        print("\n✓ All layer.0 weights are readable with valid metadata")
     else:
-        print("\n✗ Some layer 0 weights DIFFER!")
+        print("\n✗ Some layer.0 weights have invalid metadata or unreadable payload")
 
-def check_c_code_offsets():
-    """Check if C code W_* defines match manifest file_offset."""
-    print("\n" + "="*60)
-    print("TEST 4: C Code Offset Verification")
-    print("="*60)
 
-    model_c = V66_DIR / "model_v6_6.c"
-    manifest = json.load(open(V66_DIR / "weights_manifest.json"))
-    entries = {e['name']: e for e in manifest.get('entries', [])}
+def map_define_to_manifest_name(define_name: str) -> Optional[str]:
+    if define_name == "W_TOKEN_EMB":
+        return "token_emb"
+    if define_name == "W_LM_HEAD":
+        return "lm_head"
+    if define_name == "W_FINAL_NORM":
+        return "final_norm"
+    if define_name.startswith("W_LAYER_"):
+        rest = define_name[len("W_LAYER_"):]
+        parts = rest.split("_")
+        if len(parts) >= 2 and parts[0].isdigit():
+            layer = parts[0]
+            tail = "_".join(parts[1:]).lower()
+            return f"layer.{layer}.{tail}"
+    return None
 
-    # Parse W_* defines from C code
-    import re
-    c_defines = {}
+
+def check_c_code_offsets() -> None:
+    print("\n" + "=" * 60)
+    print("TEST 4: C Code Offset Verification (v6.6)")
+    print("=" * 60)
+
+    entries = load_manifest_entries(MODEL_DIR)
+    candidates = [
+        MODEL_DIR / "model_v6_6.c",
+        MODEL_DIR / "generated_model.c",
+        MODEL_DIR / "model.c",
+    ]
+    model_c = next((p for p in candidates if p.exists()), None)
+    if model_c is None:
+        print("SKIP: no generated C file found (checked model_v6_6.c, generated_model.c, model.c)")
+        return
+
+    c_defines: Dict[str, int] = {}
     with open(model_c) as f:
         for line in f:
-            m = re.match(r'#define\s+(W_\w+)\s+(\d+)', line)
+            m = re.match(r"#define\s+(W_\w+)\s+(\d+)", line)
             if m:
-                name = m.group(1)
-                value = int(m.group(2))
-                c_defines[name] = value
+                c_defines[m.group(1)] = int(m.group(2))
 
-    print(f"Found {len(c_defines)} W_* defines in C code")
+    print(f"Found {len(c_defines)} W_* defines in {model_c.name}")
+    if not c_defines:
+        print("SKIP: no W_* offset defines found")
+        return
 
-    # Map C define names to manifest names
-    name_map = {
-        'W_TOKEN_EMB': 'token_emb',
-        'W_LAYER_0_LN1_GAMMA': 'layer.0.ln1_gamma',
-        'W_LAYER_0_LN2_GAMMA': 'layer.0.ln2_gamma',
-        'W_LAYER_0_WQ': 'layer.0.wq',
-        'W_LAYER_0_WK': 'layer.0.wk',
-        'W_LAYER_0_WV': 'layer.0.wv',
-        'W_LAYER_0_WO': 'layer.0.wo',
-        'W_LAYER_0_BQ': 'layer.0.bq',
-        'W_LAYER_0_W1': 'layer.0.w1',
-        'W_LAYER_0_W2': 'layer.0.w2',
-    }
-
+    compared = 0
     all_match = True
-    for c_name, manifest_name in name_map.items():
-        c_offset = c_defines.get(c_name)
-        m_entry = entries.get(manifest_name, {})
-        m_offset = m_entry.get('file_offset')
-
-        if c_offset is None:
-            print(f"? {c_name}: not found in C code")
+    for c_name, c_offset in sorted(c_defines.items()):
+        manifest_name = map_define_to_manifest_name(c_name)
+        if not manifest_name:
             continue
-        if m_offset is None:
-            print(f"? {c_name}: {manifest_name} not found in manifest")
+        m_entry = entries.get(manifest_name)
+        if not m_entry:
             continue
-
+        compared += 1
+        m_offset = int(m_entry.get("file_offset", -1))
         match = c_offset == m_offset
-        status = "✓" if match else "✗"
         if not match:
             all_match = False
-
+        status = "✓" if match else "✗"
         print(f"{status} {c_name}: C={c_offset}, manifest={m_offset}")
         if not match:
             print(f"    Diff: {c_offset - m_offset}")
 
-    if all_match:
+    if compared == 0:
+        print("SKIP: no overlapping W_* defines matched manifest names")
+    elif all_match:
         print("\n✓ All checked C defines match manifest offsets")
     else:
-        print("\n✗ Some C defines differ from manifest!")
+        print("\n✗ Some C defines differ from manifest")
 
-def main():
-    print("="*60)
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="v6.6 layer-by-layer verification")
+    parser.add_argument(
+        "--model",
+        type=Path,
+        default=DEFAULT_MODEL,
+        help="v6.6 model directory (contains weights_manifest.json and weights.bump)",
+    )
+    parser.add_argument(
+        "--token",
+        type=int,
+        default=100,
+        help="Token id used for embedding/rmsnorm probe",
+    )
+    return parser.parse_args()
+
+
+def initialize_from_args(args: argparse.Namespace) -> Optional[str]:
+    global MODEL_DIR, TEST_TOKEN
+    MODEL_DIR = args.model.expanduser().resolve()
+    TEST_TOKEN = int(args.token)
+
+    if not MODEL_DIR.exists():
+        return f"Model directory does not exist: {MODEL_DIR}"
+    if not (MODEL_DIR / "weights_manifest.json").exists():
+        return f"weights_manifest.json missing in {MODEL_DIR}"
+    if not (MODEL_DIR / "weights.bump").exists():
+        return f"weights.bump missing in {MODEL_DIR}"
+
+    return None
+
+
+def main() -> int:
+    args = parse_args()
+    err = initialize_from_args(args)
+    if err:
+        print(f"ERROR: {err}")
+        return 1
+
+    print("=" * 60)
     print("V6.6 LAYER-BY-LAYER VERIFICATION")
-    print("="*60)
+    print("=" * 60)
+    print(f"Model: {MODEL_DIR}")
+    print(f"Token probe: {TEST_TOKEN}")
 
     test_v66_embedding()
     test_v66_rmsnorm()
     test_v66_layer0_weights()
     check_c_code_offsets()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("="*60)
-    print("If all tests pass, the bump file contents are correct.")
-    print("The issue would then be in runtime loading or kernel execution.")
+    print("=" * 60)
+    print("If these artifact checks pass but runtime still fails, investigate kernel execution with stop-op tracing.")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

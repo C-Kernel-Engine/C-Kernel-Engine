@@ -179,6 +179,9 @@ LLAMA_TO_CK_NAME_MAP = {
     },
 }
 
+# Qwen3 currently shares parity tensor naming with qwen2 in this converter.
+LLAMA_TO_CK_NAME_MAP["qwen3"] = dict(LLAMA_TO_CK_NAME_MAP["qwen2"])
+
 # Reverse map for CK to llama name
 CK_TO_LLAMA_NAME_MAP = {}
 for family, mapping in LLAMA_TO_CK_NAME_MAP.items():
@@ -492,7 +495,7 @@ Examples:
     parser.add_argument("-o", "--output", type=Path, required=True,
                        help="Output CKDMP file path")
     parser.add_argument("--model", default="gemma",
-                       choices=["gemma", "llama", "qwen", "qwen2", "mistral"],
+                       choices=["gemma", "llama", "qwen", "qwen2", "qwen3", "mistral"],
                        help="Model family for name mapping")
     parser.add_argument("--dtype", default=None,
                        choices=["fp32", "fp16", "bf16", "q8", "q4"],

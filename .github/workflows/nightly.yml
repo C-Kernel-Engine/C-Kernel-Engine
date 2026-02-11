@@ -133,6 +133,14 @@ jobs:
           echo ""
           echo "=== v6.6 E2E Test Complete ==="
 
+      - name: Run v6.6 Strict Parity Matrix (runtime-required)
+        run: |
+          echo "=== Running v6.6 Strict Parity Matrix ==="
+          echo "Enforces runtime-required parity checks (no SKIP pass-through)."
+          make v6.6-validate-parity-matrix-required 2>&1 | tee build/v66_parity_required.log
+          echo ""
+          echo "=== v6.6 Strict Parity Matrix Complete ==="
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()

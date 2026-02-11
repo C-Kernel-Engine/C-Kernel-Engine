@@ -42,6 +42,7 @@ LAYER_RESULTS=()
 # Options
 QUICK_MODE=false
 SPECIFIC_LAYER=0
+MAX_LAYER=6
 VERBOSE=false
 MODEL_DIR=""
 
@@ -54,6 +55,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --layer|-l)
             SPECIFIC_LAYER=$2
+            shift 2
+            ;;
+        --max-layer|-x)
+            MAX_LAYER=$2
             shift 2
             ;;
         --model-dir|-m)
@@ -70,6 +75,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --quick, -q       Skip slow tests (kernel parity)"
             echo "  --layer N, -l N   Run specific layer only (1-6)"
+            echo "  --max-layer N, -x N  Run layers 1..N only (default: 6)"
             echo "  --model-dir DIR   Use specific model directory"
             echo "  --verbose, -v     Verbose output"
             echo "  --help, -h        Show this help"
@@ -81,6 +87,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if ! [[ "$MAX_LAYER" =~ ^[0-9]+$ ]]; then
+    echo "Invalid --max-layer: $MAX_LAYER (must be integer 1-6)"
+    exit 1
+fi
+if [ "$MAX_LAYER" -lt 1 ] || [ "$MAX_LAYER" -gt 6 ]; then
+    echo "Invalid --max-layer: $MAX_LAYER (must be 1-6)"
+    exit 1
+fi
 
 # Find model directory if not specified
 if [ -z "$MODEL_DIR" ]; then
@@ -297,26 +312,50 @@ if [ $SPECIFIC_LAYER -gt 0 ]; then
             ;;
     esac
 else
-    # Run all layers in order
+    # Run layers 1..MAX_LAYER in order
     set +e  # Don't exit on first error for summary
 
-    run_layer 1 "Kernel Parity (llama.cpp)" "run_layer_1" \
-        "Check kernel implementations in src/kernels/" || true
+    if [ "$MAX_LAYER" -ge 1 ]; then
+        run_layer 1 "Kernel Parity (llama.cpp)" "run_layer_1" \
+            "Check kernel implementations in src/kernels/" || true
+    else
+        LAYER_RESULTS+=("1:SKIP")
+    fi
 
-    run_layer 2 "Bump Conversion" "run_layer_2" \
-        "Check scripts/v6/convert_gguf_to_bump_v6.py" || true
+    if [ "$MAX_LAYER" -ge 2 ]; then
+        run_layer 2 "Bump Conversion" "run_layer_2" \
+            "Check scripts/v6/convert_gguf_to_bump_v6.py" || true
+    else
+        LAYER_RESULTS+=("2:SKIP")
+    fi
 
-    run_layer 3 "IR Structure Validation" "run_layer_3" \
-        "Check scripts/v6/build_ir_v6.py" || true
+    if [ "$MAX_LAYER" -ge 3 ]; then
+        run_layer 3 "IR Structure Validation" "run_layer_3" \
+            "Check scripts/v6/build_ir_v6.py" || true
+    else
+        LAYER_RESULTS+=("3:SKIP")
+    fi
 
-    run_layer 4 "Codegen Validation" "run_layer_4" \
-        "Check scripts/v6/codegen_v6.py" || true
+    if [ "$MAX_LAYER" -ge 4 ]; then
+        run_layer 4 "Codegen Validation" "run_layer_4" \
+            "Check scripts/v6/codegen_v6.py" || true
+    else
+        LAYER_RESULTS+=("4:SKIP")
+    fi
 
-    run_layer 5 "Tensor Flow Validation" "run_layer_5" \
-        "Check IR shapes vs generated code dimensions" || true
+    if [ "$MAX_LAYER" -ge 5 ]; then
+        run_layer 5 "Tensor Flow Validation" "run_layer_5" \
+            "Check IR shapes vs generated code dimensions" || true
+    else
+        LAYER_RESULTS+=("5:SKIP")
+    fi
 
-    run_layer 6 "E2E Inference" "run_layer_6" \
-        "All lower layers passed, check runtime" || true
+    if [ "$MAX_LAYER" -ge 6 ]; then
+        run_layer 6 "E2E Inference" "run_layer_6" \
+            "All lower layers passed, check runtime" || true
+    else
+        LAYER_RESULTS+=("6:SKIP")
+    fi
 fi
 
 # =============================================================================

@@ -14,6 +14,9 @@ Usage:
 
     # With tolerance
     python version/v6.6/scripts/parity_test.py --ck-dump ck_parity_dumps/dump.bin --atol 1e-3
+
+    # Family + pass filter compatibility (used by higher-level v6.6 tooling)
+    python version/v6.6/scripts/parity_test.py --ck-dump ck_parity_dumps/dump.bin --model qwen3 --pass prefill
 """
 
 import argparse
@@ -418,12 +421,35 @@ def compare_dumps(
 # Main Test Runner
 # =============================================================================
 
+def _filter_by_pass(dumps: List[ParityDump], pass_filter: str | None) -> List[ParityDump]:
+    """
+    Best-effort prefill/decode splitter.
+
+    Dump format does not carry an explicit pass label today. We use token_id
+    heuristics so higher-level tools can still request pass-scoped checks.
+    """
+    if not pass_filter or pass_filter == "all":
+        return dumps
+
+    tokens = sorted({d.token_id for d in dumps})
+    if len(tokens) <= 1:
+        return dumps
+
+    last_token = tokens[-1]
+    if pass_filter == "decode":
+        return [d for d in dumps if d.token_id == last_token]
+    if pass_filter == "prefill":
+        return [d for d in dumps if d.token_id != last_token]
+    return dumps
+
 def run_parity_test(
     ck_dump_path: Path,
     ref_dump_path: Optional[Path] = None,
     atol: float = 1e-4,
     rtol: float = 1e-3,
     verbose: bool = True,
+    model_family: str = "gemma",
+    pass_filter: str = "all",
 ) -> Tuple[int, List[Dict]]:
     """Run parity test comparing CKE dumps against reference.
 
@@ -433,6 +459,8 @@ def run_parity_test(
         atol: Absolute tolerance
         rtol: Relative tolerance
         verbose: Print results
+        model_family: Compatibility selector for higher-level orchestration
+        pass_filter: all|prefill|decode (best-effort split by token_id)
 
     Returns:
         (exit_code, results_list)
@@ -447,10 +475,21 @@ def run_parity_test(
     # Load reference if provided
     reference = ReferenceData(ref_dump_path) if ref_dump_path else ReferenceData()
 
+    ck_dumps = _filter_by_pass(ck_dumps, pass_filter)
+    reference.dumps = _filter_by_pass(reference.dumps, pass_filter)
+    reference.by_layer_op = {}
+    for d in reference.dumps:
+        key = (d.layer_id, d.op_name)
+        if key not in reference.by_layer_op:
+            reference.by_layer_op[key] = []
+        reference.by_layer_op[key].append(d)
+
     if verbose:
         print("=" * 80)
         print("LAYER-BY-LAYER PARITY TEST")
         print("=" * 80)
+        print(f"Model family: {model_family}")
+        print(f"Pass filter: {pass_filter}")
         print(f"CKE dump: {ck_dump_path} ({len(ck_dumps)} tensors)")
         if ref_dump_path:
             print(f"Reference: {ref_dump_path} ({len(reference.dumps)} tensors)")
@@ -643,6 +682,12 @@ Examples:
                        help="Absolute tolerance (default: 1e-4)")
     parser.add_argument("--rtol", type=float, default=1e-3,
                        help="Relative tolerance (default: 1e-3)")
+    parser.add_argument("--model", default="gemma",
+                       choices=["gemma", "llama", "qwen", "qwen2", "qwen3", "mistral"],
+                       help="Model family (orchestration compatibility)")
+    parser.add_argument("--pass", dest="pass_filter", default="all",
+                       choices=["all", "prefill", "decode"],
+                       help="Pass filter (best-effort token_id split)")
     parser.add_argument("--quiet", "-q", action="store_true",
                        help="Suppress output")
     parser.add_argument("--json", action="store_true",
@@ -656,6 +701,8 @@ Examples:
         atol=args.atol,
         rtol=args.rtol,
         verbose=not args.quiet,
+        model_family=args.model,
+        pass_filter=args.pass_filter,
     )
 
     if args.json:

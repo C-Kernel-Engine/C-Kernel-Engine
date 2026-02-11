@@ -485,8 +485,17 @@ def main():
         if os.path.exists(os.path.join(root, manifest)):
             with open(os.path.join(root, manifest), "r", encoding="utf-8") as f:
                 extra_sources = [line.strip() for line in f if line.strip()]
+            norm_sources = {os.path.normpath(s) for s in extra_sources}
+            strict_src = os.path.normpath("src/ckernel_strict.c")
+            threadpool_src = os.path.normpath("src/ck_threadpool.c")
+            # ckernel_strict.c now references global threadpool helpers.
+            # Ensure standalone litmus links the required implementation.
+            if strict_src in norm_sources and threadpool_src not in norm_sources:
+                extra_sources.append("src/ck_threadpool.c")
             cmd.extend(extra_sources)
             cmd.insert(1, openmp_flag(cc))
+            if "src/ck_threadpool.c" in extra_sources and "-lpthread" not in cmd:
+                cmd.append("-lpthread")
         subprocess.run(cmd, cwd=root, check=True)
 
     T = int(cfg["max_position_embeddings"])

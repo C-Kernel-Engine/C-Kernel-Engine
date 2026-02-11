@@ -108,6 +108,7 @@ lib.rope_precompute_cache.argtypes = [
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
     ctypes.c_int, ctypes.c_int, ctypes.c_float,
+    ctypes.c_int, ctypes.c_char_p, ctypes.c_float,
 ]
 lib.rope_precompute_cache.restype = None
 
@@ -222,7 +223,8 @@ def run_multi_layer_test(num_layers, seed=42):
     rope_cos = aligned_empty((tokens, head_dim // 2))
     rope_sin = aligned_empty((tokens, head_dim // 2))
     lib.rope_precompute_cache(ptr(rope_cos), ptr(rope_sin),
-                              tokens, head_dim, config["rope_theta"])
+                              tokens, head_dim, config["rope_theta"],
+                              head_dim, b"none", 1.0)
     rope_cos_torch = torch.from_numpy(rope_cos).unsqueeze(0).unsqueeze(0)
     rope_sin_torch = torch.from_numpy(rope_sin).unsqueeze(0).unsqueeze(0)
 

@@ -22,6 +22,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from parity.probe_defaults import (
+    getenv_autocheck_probe_token_id,
+    getenv_prefill_tokens_csv,
+)
+
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -373,6 +378,17 @@ def main() -> int:
     ap.add_argument("--skip-detail", action="store_true")
     ap.add_argument("--timeout-cli", type=int, default=120)
     ap.add_argument("--report-prefix", default="model_autocheck")
+    ap.add_argument(
+        "--probe-token",
+        type=int,
+        default=getenv_autocheck_probe_token_id(),
+        help="decode token used by targeted contract probes",
+    )
+    ap.add_argument(
+        "--probe-prefill-tokens",
+        default=getenv_prefill_tokens_csv(),
+        help="comma-separated token ids used for prefill probe contracts",
+    )
     ap.add_argument("--ck-run-arg", action="append", default=[], help="extra arg forwarded to ck_run (repeatable)")
     args, passthrough = ap.parse_known_args()
     if passthrough and passthrough[0] == "--":
@@ -470,8 +486,20 @@ def main() -> int:
 
     probes: dict[str, Any] = {}
     if first_op in ("q_proj", "k_proj", "v_proj", "attn_proj", "attn_sliding", "qk_norm", "rope_qk"):
+        probe_tok = str(args.probe_token)
         for op in ("q_proj", "k_proj", "v_proj"):
-            cmd = [sys.executable, str(QPROJ_CONTRACT), "--model-dir", str(model_dir), "--op", op, "--layer", "0", "--token", "5"]
+            cmd = [
+                sys.executable,
+                str(QPROJ_CONTRACT),
+                "--model-dir",
+                str(model_dir),
+                "--op",
+                op,
+                "--layer",
+                "0",
+                "--token",
+                probe_tok,
+            ]
             probes[f"{op}_contract"] = run_probe(cmd)
         if QKV_LAYOUT.exists():
             cmd = [sys.executable, str(QKV_LAYOUT), "--ck-dump", str(model_dir / "ck_parity_dumps/dump.bin"), "--ref-dump", str(model_dir / "llama_parity_dumps/dump.bin"), "--layer", "0", "--token", "0"]
@@ -479,15 +507,42 @@ def main() -> int:
 
     if first_op in ("ffn_norm", "mlp_gate", "mlp_down"):
         if FFN_NORM_CONTRACT.exists():
-            cmd = [sys.executable, str(FFN_NORM_CONTRACT), "--model-dir", str(model_dir), "--layer", "0", "--token", "5"]
+            cmd = [
+                sys.executable,
+                str(FFN_NORM_CONTRACT),
+                "--model-dir",
+                str(model_dir),
+                "--layer",
+                "0",
+                "--token",
+                str(args.probe_token),
+            ]
             probes["ffn_norm_contract"] = run_probe(cmd)
 
     if first_op in ("post_attention_norm", "layer_out", "attn_proj"):
         if POST_ATTN_CHAIN.exists():
-            cmd = [sys.executable, str(POST_ATTN_CHAIN), "--model-dir", str(model_dir), "--layer", "0", "--token", "5"]
+            cmd = [
+                sys.executable,
+                str(POST_ATTN_CHAIN),
+                "--model-dir",
+                str(model_dir),
+                "--layer",
+                "0",
+                "--token",
+                str(args.probe_token),
+            ]
             probes["post_attn_chain_decode"] = run_probe(cmd)
         if POST_ATTN_CHAIN_PREFILL.exists():
-            cmd = [sys.executable, str(POST_ATTN_CHAIN_PREFILL), "--model-dir", str(model_dir), "--layer", "0", "--tokens", "2,9259"]
+            cmd = [
+                sys.executable,
+                str(POST_ATTN_CHAIN_PREFILL),
+                "--model-dir",
+                str(model_dir),
+                "--layer",
+                "0",
+                "--tokens",
+                args.probe_prefill_tokens,
+            ]
             probes["post_attn_chain_prefill"] = run_probe(cmd)
 
     report["probes"] = probes

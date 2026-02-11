@@ -421,6 +421,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_sigmoid.py \
             unittest/test_relu.py \
             unittest/test_attention.py \
+            unittest/test_attention_sliding_contract.py \
             unittest/test_attention_backward.py \
             unittest/test_kv_cache_attention.py \
             unittest/test_kv_cache_layer_decode.py \
@@ -1025,16 +1026,17 @@ e2e-smollm:
 	@echo "Running E2E test with SmolLM2-360M..."
 	@$(PYTHON) scripts/v6.5/ck_run_v6_5.py run "hf://itlwas/SmolLM2-360M-Q4_K_M-GGUF/smollm2-360m-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 10
 
-# v6.6 E2E test - runs full pipeline: download -> convert -> IR -> codegen -> compile -> test
+# v6.6 E2E test - runs release gate + local sanity.
+# NOTE:
+# - `v6.6-gate` is runtime-optional for parity (SKIP is allowed when llama runtime is absent).
+# - Use `v6.6-validate-parity-matrix-required` for strict runtime-required parity.
 e2e-v66:
 	@echo "========================================"
 	@echo "  CK-Engine v6.6 E2E Test"
 	@echo "========================================"
-	@echo "[1/3] Download model (if needed)..."
-	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --download-only || { echo "Download failed"; exit 1; }
-	@echo "[2/3] Build v6.6 (IR -> codegen -> compile)..."
-	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --build-only || { echo "Build failed"; exit 1; }
-	@echo "[3/3] Run quick sanity tests..."
+	@echo "[1/2] Run v6.6 gate suite (contracts + matrix-smoke + parity + long decode)..."
+	@$(MAKE) --no-print-directory v6.6-gate || { echo "v6.6 gate failed"; exit 1; }
+	@echo "[2/2] Run quick sanity tests..."
 	@cd version/v6.6/test && $(MAKE) quick || { echo "Tests failed"; exit 1; }
 	@echo "========================================"
 	@echo "  v6.6 E2E Test PASSED"
@@ -1045,8 +1047,7 @@ e2e-v66-full:
 	@echo "========================================"
 	@echo "  CK-Engine v6.6 Full E2E Test"
 	@echo "========================================"
-	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --download-only
-	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py --build-only
+	@$(MAKE) --no-print-directory v6.6-gate || { echo "v6.6 gate failed"; exit 1; }
 	@cd version/v6.6/test && $(MAKE) all
 	@echo "========================================"
 	@echo "  v6.6 Full E2E Test PASSED"
@@ -1063,23 +1064,26 @@ ci-local:
 	@echo "  CK-Engine Local CI"
 	@echo "========================================"
 	@echo ""
-	@echo "[1/6] Kernel map validation..."
+	@echo "[1/7] Tooling contract validation..."
+	@$(PYTHON) version/v6.6/scripts/validate_tooling_contracts.py || { echo "FAIL: Tooling contracts"; exit 1; }
+	@echo ""
+	@echo "[2/7] Kernel map validation..."
 	@$(PYTHON) version/v6.6/kernel_maps/test_validation.py --quick || { echo "FAIL: Kernel map validation"; exit 1; }
 	@echo ""
-	@echo "[2/6] Registry validation..."
+	@echo "[3/7] Registry validation..."
 	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py || { echo "FAIL: Registry validation"; exit 1; }
 	@echo ""
-	@echo "[3/6] Unit tests (bindings, IR lowering, templates)..."
+	@echo "[4/7] Unit tests (bindings, IR lowering, templates)..."
 	@$(PYTHON) -m pytest version/v6.6/test/test_kernel_bindings.py version/v6.6/test/test_ir_lowering.py version/v6.6/test/test_template_smoke.py -v || { echo "FAIL: Unit tests"; exit 1; }
 	@echo ""
-	@echo "[4/6] Build CK-Engine..."
+	@echo "[5/7] Build CK-Engine..."
 	@$(MAKE) clean || true
 	@$(MAKE) -j$(nproc) || { echo "FAIL: Build"; exit 1; }
 	@echo ""
-	@echo "[5/6] E2E Qwen2..."
+	@echo "[6/7] E2E Qwen2..."
 	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" --prompt "Hello" --max-tokens 4 --context-len 512 --force-compile || { echo "FAIL: Qwen2 E2E"; exit 1; }
 	@echo ""
-	@echo "[6/6] E2E Qwen3..."
+	@echo "[7/7] E2E Qwen3..."
 	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf" --prompt "Hello" --max-tokens 4 --context-len 512 --force-compile || { echo "FAIL: Qwen3 E2E"; exit 1; }
 	@echo ""
 	@echo "========================================"
@@ -1092,13 +1096,16 @@ ci-local-fast:
 	@echo "  CK-Engine Local CI (Fast)"
 	@echo "========================================"
 	@echo ""
-	@echo "[1/3] Kernel map validation..."
+	@echo "[1/4] Tooling contract validation..."
+	@$(PYTHON) version/v6.6/scripts/validate_tooling_contracts.py || { echo "FAIL: Tooling contracts"; exit 1; }
+	@echo ""
+	@echo "[2/4] Kernel map validation..."
 	@$(PYTHON) version/v6.6/kernel_maps/test_validation.py --quick || { echo "FAIL: Kernel map validation"; exit 1; }
 	@echo ""
-	@echo "[2/3] Registry validation..."
+	@echo "[3/4] Registry validation..."
 	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py || { echo "FAIL: Registry validation"; exit 1; }
 	@echo ""
-	@echo "[3/3] Unit tests (bindings, IR lowering, templates)..."
+	@echo "[4/4] Unit tests (bindings, IR lowering, templates)..."
 	@$(PYTHON) -m pytest version/v6.6/test/test_kernel_bindings.py version/v6.6/test/test_ir_lowering.py version/v6.6/test/test_template_smoke.py -v || { echo "FAIL: Unit tests"; exit 1; }
 	@echo ""
 	@echo "========================================"
@@ -1129,6 +1136,10 @@ test-full-pipeline:
 # Quick pipeline test (skips slow kernel parity)
 test-pipeline-quick:
 	@bash scripts/test_full_pipeline.sh --quick
+
+# Pipeline layers 1..5 only (skip L6 E2E)
+test-pipeline-l1-l5:
+	@bash scripts/test_full_pipeline.sh --max-layer 5
 
 # Layer 1: Kernel parity with llama.cpp
 test-kernel-parity:
@@ -1173,6 +1184,7 @@ test-pipeline-help:
 	@echo "Layered Pipeline Tests:"
 	@echo "  make test-full-pipeline      - Run all 6 layers"
 	@echo "  make test-pipeline-quick     - Run layers 2-6 (skip kernel parity)"
+	@echo "  make test-pipeline-l1-l5     - Run layers 1-5 (skip L6 e2e)"
 	@echo ""
 	@echo "Individual Layers:"
 	@echo "  make test-kernel-parity      - Layer 1: Kernel parity (quick)"
@@ -1213,6 +1225,7 @@ unittest:
 	@echo "  unittest/test_swiglu.py                - SwiGLU activation"
 	@echo "  unittest/test_relu.py                  - ReLU activation"
 	@echo "  unittest/test_attention.py             - Attention forward/backward"
+	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
 	@echo "  unittest/test_rope.py                  - RoPE forward/backward"
 	@echo ""
 	@echo "Orchestration Tests:"
@@ -1348,6 +1361,7 @@ showtests:
 	@echo "Full Pipeline (6 layers):"
 	@echo "  make test-full-pipeline   Run all 6 validation layers"
 	@echo "  make test-pipeline-quick  Skip kernel parity (faster)"
+	@echo "  make test-pipeline-l1-l5  Run L1-L5 only (no e2e)"
 	@echo ""
 	@echo "Individual Layers:"
 	@echo "  make test-kernel-parity      L1: Kernel parity vs llama.cpp"
@@ -1426,11 +1440,16 @@ test: $(LIB) test-libs
 	for t in $(PY_TESTS); do \
 	  echo "Running $$t"; \
 	  extra_args=""; \
+	  extra_env=""; \
 	  case "$$t" in \
 	    *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; \
 	    *test_mega_fused_attention.py) extra_args="--correctness";; \
+	    *test_orchestration_layer.py) extra_args="--strict-ref";; \
 	  esac; \
-	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
+	  case "$$t" in \
+	    *test_gemv_kernels_comprehensive.py) extra_env="CK_SKIP_IF_MISSING=1";; \
+	  esac; \
+	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $$extra_env $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
 	@echo ""
@@ -1566,6 +1585,7 @@ tests-list:
 	@echo "  unittest/test_mlp.py               - MLP block forward/backward vs PyTorch"
 	@echo "  unittest/test_swiglu.py            - SwiGLU activation forward/backward"
 	@echo "  unittest/test_attention.py         - Multi-head attention forward vs PyTorch"
+	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
 	@echo "  unittest/test_attention_backward.py - Attention backward (MHA/GQA)"
 	@echo "  unittest/test_kv_cache_attention.py - Flash prefill + KV-cache decode attention"
 	@echo "  unittest/test_kv_cache_layer_decode.py - Layer prefill+decode parity (KV cache)"
@@ -1603,6 +1623,9 @@ $(BUILD_DIR)/bench_gemm_strict.o: src/ckernel_strict.c include/ckernel_engine.h
 
 rope-test: $(LIB) test-libs
 	$(PYTHON) $(PYTHONFLAGS) unittest/test_rope.py
+
+test-attention-sliding: $(LIB) test-libs
+	$(PYTHON) $(PYTHONFLAGS) unittest/test_attention_sliding_contract.py
 
 litmus:
 	$(PYTHON) $(PYTHONFLAGS) unittest/test_lm_head_litmus.py $(ARGS)
@@ -2238,6 +2261,7 @@ version-history:
 	@echo ""
 	@echo "  Parity Testing:"
 	@echo "    make llamacpp-parity    - Compare vs llama.cpp/ggml"
+	@echo "    make test-attention-sliding - Sliding-window kernel contract"
 	@echo "    make layer-parity       - Compare vs PyTorch"
 	@echo ""
 
@@ -2257,7 +2281,32 @@ help:
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make v6.6            Build v6.6 artifacts"
 	@echo "  make v6.6-e2e        Manual E2E sweep (Qwen2/Qwen3/Gemma)"
+	@echo "  make v6.6-validate-contracts   Static tooling contract checks"
+	@echo "  make v6.6-kernel-map-gate      Kernel-map generator/test/registry gate"
+	@echo "  make v6.6-validate-matrix      Dynamic 3-model build matrix (Gemma/Qwen2/Qwen3)"
+	@echo "  make v6.6-validate-matrix-smoke  Matrix + smoke checks"
+	@echo "  make v6.6-validate-parity-matrix  Parity matrix (runtime-optional)"
+	@echo "  make v6.6-validate-parity-matrix-required  Strict parity matrix (runtime-required)"
+	@echo "  make v6.6-validate-longdecode  256-token long-decode stability matrix"
+	@echo "  make v6.6-gate       Required v6.6 release gate"
+	@echo "  make v6.6-memory-signoff  Emit memory_signoff.json (planner + advanced + KV)"
+	@echo "  make v6.6-perf-gate  Perf gate (CK_PROFILE + perf stat + flamegraph + budget checks)"
+	@echo "     budget env knobs: CK_V66_PERF_MIN_DECODE_TOK_S, CK_V66_PERF_MIN_IPC, CK_V66_PERF_MAX_CACHE_MISS_RATE, CK_V66_PERF_MAX_BRANCH_MISS_RATE"
+	@echo "     runtime mode: V66_PERF_RUNTIME=python|cli  (default: cli)"
+	@echo "     chat template: V66_CHAT_TEMPLATE=auto|none|qwen|gemma"
+	@echo "     vtune capture: V66_WITH_VTUNE=1|0  (default: 1)"
+	@echo "     prep/compile: V66_PREP_WITH_PYTHON=1|0, V66_FORCE_COMPILE=1|0  (defaults: 1,1)"
+	@echo "     advanced passthrough: V66_RUN_ARGS='--chat-template none', V66_CLI_ARGS='--no-chat-template'"
 	@echo "  make v6.6-help       Show v6.6 HF URLs + commands"
+	@echo ""
+	@echo "  ┌─────────────────────────────────────────────────────────────────────┐"
+	@echo "  │  V7 TRAINING FOUNDATION                                             │"
+	@echo "  └─────────────────────────────────────────────────────────────────────┘"
+	@echo "  make v7-help         Show v7 commands and scope"
+	@echo "  make v7-validate-contracts  Static v7 contract checks"
+	@echo "  make v7-parity-1tok  Deterministic fp32 1-token parity (C vs PyTorch)"
+	@echo "  make v7-gate         Required v7.0 correctness gate"
+	@echo "  make v7              Alias for v7-gate"
 	@echo ""
 	@echo "  ┌─────────────────────────────────────────────────────────────────────┐"
 	@echo "  │  BUILD                                                              │"
@@ -2270,6 +2319,7 @@ help:
 	@echo "  │  TESTING                                                            │"
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make test             Run core kernel tests"
+	@echo "  make test-attention-sliding  Run sliding-window kernel contract test"
 	@echo "  make test-quant       Run quantization kernel tests"
 	@echo "  make test-bf16        Run BF16 kernel tests"
 	@echo "  make showtests        Show ALL available test targets"
@@ -2986,7 +3036,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-build v6.6 v6.6-full v6.6-ir-visualizer profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-cachegrind profile-v6-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-validate-contracts v7-parity-1tok v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
@@ -3002,6 +3052,20 @@ report-md:
 #   make v6.6-e2e               - Manual E2E sweep (Qwen2/Qwen3/Gemma)
 # ============================================================================
 
+# Default model used by v6.6 convenience targets.
+# Override at invocation time, e.g.:
+#   make v6.6-download V66_MODEL='hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf'
+V66_MODEL ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+V66_CHAT_TEMPLATE ?= auto
+V66_RUN_ARGS ?= $(if $(filter auto,$(V66_CHAT_TEMPLATE)),,--chat-template $(V66_CHAT_TEMPLATE))
+V66_PERF_RUNTIME ?= cli
+V66_CLI_ARGS ?=
+V66_WITH_VTUNE ?= 1
+V66_PREP_WITH_PYTHON ?= 1
+V66_FORCE_COMPILE ?= 1
+V66_FORCE_COMPILE_ARG := $(if $(filter 1,$(V66_FORCE_COMPILE)),--force-compile,)
+V66_CLI_TEMPLATE_ARGS = $(if $(filter none,$(V66_CHAT_TEMPLATE)),--no-chat-template,$(if $(findstring --chat-template none,$(V66_RUN_ARGS)),--no-chat-template,))
+
 v6.6-test-help:
 	@cd version/v6.6/test && make help
 
@@ -3013,6 +3077,12 @@ v6.6-help:
 	@echo ""
 	@echo "Manual E2E sweep (Qwen2/Qwen3/Gemma):"
 	@echo "  make v6.6-e2e"
+	@echo ""
+	@echo "Required release gate:"
+	@echo "  make v6.6-gate"
+	@echo "  (kernel-map gate + contracts + matrix-smoke + parity matrix (runtime-optional) + long decode)"
+	@echo "  make v6.6-validate-parity-matrix-required"
+	@echo "  (strict runtime-required parity matrix for CI/release)"
 	@echo ""
 	@echo "Manual E2E (HF URLs):"
 	@echo "  python3 version/v6.6/scripts/ck_run_v6_6.py run \\"
@@ -3054,18 +3124,53 @@ v6.6-test: v6.6-test-quick
 	@echo "Run 'make v6.6-test-all' for comprehensive testing"
 
 v6.6-download:
-	@cd version/v6.6 && scripts/ck_run_v6_6.py --download-only
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "$(V66_MODEL)" --inspect-only
+
+v6.6-kernel-map-regenerate:
+	@$(PYTHON) version/v6.6/scripts/gen_kernel_registry_from_maps.py
+
+v6.6-kernel-map-gate:
+	@$(PYTHON) version/v6.6/scripts/gen_kernel_registry_from_maps.py --check
+	@$(PYTHON) version/v6.6/kernel_maps/check_kernel_map_sync.py
+	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py
 
 validate-registry:
 	@echo "Validating kernel registry..."
-	@python version/v6.6/scripts/validate_kernel_registry.py
+	@$(PYTHON) version/v6.6/scripts/validate_kernel_registry.py
 	@if [ $$? -ne 0 ]; then \
 		echo "Registry validation failed"; \
 		exit 1; \
 	fi
 
-v6.6-build: validate-registry
-	@python3 version/v6.6/scripts/ck_run_v6_6.py run "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf" --generate-only --force-compile --context-len 128 --max-tokens 1 --prompt "Hello"
+v6.6-validate-contracts:
+	@$(PYTHON) version/v6.6/scripts/validate_tooling_contracts.py --json-out version/v6.6/tools/contract_report_latest.json
+
+v6.6-validate-matrix:
+	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/model_matrix_report_latest.json
+
+v6.6-validate-matrix-smoke:
+	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --with-smoke --require-all --json-out version/v6.6/tools/model_matrix_report_latest.json
+
+# Runtime-optional parity pass for local developer gates.
+# If llama runtime is missing, rows are SKIP and this target still exits 0.
+v6.6-validate-parity-matrix:
+	@$(PYTHON) version/v6.6/scripts/validate_parity_matrix_v6_6.py --allow-download --json-out version/v6.6/tools/parity_matrix_report_latest.json
+
+v6.6-validate-parity-matrix-required:
+	@$(PYTHON) version/v6.6/scripts/validate_parity_matrix_v6_6.py --allow-download --require-runtime --require-all --json-out version/v6.6/tools/parity_matrix_report_latest.json
+
+v6.6-validate-longdecode:
+	@$(PYTHON) version/v6.6/scripts/validate_long_decode_stability_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/long_decode_report_latest.json
+
+v6.6-gate:
+	@$(MAKE) --no-print-directory v6.6-kernel-map-gate
+	@$(PYTHON) version/v6.6/scripts/validate_tooling_contracts.py --strict --json-out version/v6.6/tools/contract_report_latest.json
+	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --with-smoke --require-all --skip-static-contracts --json-out version/v6.6/tools/model_matrix_report_latest.json
+	@$(PYTHON) version/v6.6/scripts/validate_parity_matrix_v6_6.py --allow-download --json-out version/v6.6/tools/parity_matrix_report_latest.json
+	@$(PYTHON) version/v6.6/scripts/validate_long_decode_stability_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/long_decode_report_latest.json
+
+v6.6-build: validate-registry v6.6-gate
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "$(V66_MODEL)" --generate-only $(V66_FORCE_COMPILE_ARG) --context-len 128 --max-tokens 1 --prompt "Hello"
 
 v6.6: v6.6-build
 
@@ -3073,6 +3178,40 @@ v6.6-e2e:
 	@./scripts/e2e_manual_v66.sh
 
 v6.6-full: v6.6-download v6.6-build v6.6-test-all
+
+v7-help:
+	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
+	@echo ""
+	@echo "Targets:"
+	@echo "  make v7-validate-contracts"
+	@echo "  make v7-parity-1tok"
+	@echo "  make v7-train-parity-3"
+	@echo "  make v7-train-parity-5"
+	@echo "  make v7-gate"
+	@echo "  make v7"
+	@echo ""
+	@echo "Notes:"
+	@echo "  - v7.0 scope: deterministic fp32 correctness only"
+	@echo "  - v7.2 scope: bf16, optimization, threaded fast mode"
+	@echo "  - reports written to version/v7/reports/*.json"
+
+v7-validate-contracts:
+	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --json-out version/v7/reports/contract_report_latest.json
+
+v7-parity-1tok:
+	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out version/v7/reports/parity_1token_latest.json
+
+v7-train-parity-3:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py --epochs 3 --json-out version/v7/reports/train_parity_epochs_3_latest.json
+
+v7-train-parity-5:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py --epochs 5 --json-out version/v7/reports/train_parity_epochs_5_latest.json
+
+v7-gate:
+	@$(MAKE) --no-print-directory v7-validate-contracts
+	@$(MAKE) --no-print-directory v7-parity-1tok
+
+v7: v7-gate
 
 v6.6-ir-visualizer:
 	@if command -v python3 >/dev/null 2>&1; then \
@@ -3103,43 +3242,255 @@ vis-%:
 # =============================================================================
 
 PROFILE_V6_SCRIPT := version/v6.6/scripts/ck_run_v6_6.py
+PERF_ARTIFACTS_V6_SCRIPT := version/v6.6/scripts/perf_artifacts_v6_6.py
+VTUNE_ARTIFACTS_V6_SCRIPT := version/v6.6/scripts/vtune_artifacts_v6_6.py
+MEMORY_SIGNOFF_V6_SCRIPT := version/v6.6/scripts/memory_signoff_v6_6.py
+PERF_GATE_V6_SCRIPT := version/v6.6/scripts/perf_gate_v6_6.py
+RESOLVE_MODEL_DIR_V6_SCRIPT := version/v6.6/scripts/resolve_model_dir_v6_6.py
+PROFILE_V6_SUMMARY_SCRIPT := version/v6.6/scripts/generate_profile_summary_v6_6.py
+PROFILE_V6_PERF_DATA ?= build/ck_v6_perf.data
+PROFILE_V6_PERF_FOLDED ?= build/ck_v6_perf.folded
+PROFILE_V6_FLAMEGRAPH_SVG ?= build/flamegraph_v6.svg
+PROFILE_V6_PERF_STAT_TXT ?= build/ck_v6_perf_stat.txt
+PROFILE_V6_DEBUG_CFLAGS ?= -fno-omit-frame-pointer -g
+PROFILE_V6_CALLGRAPH ?= dwarf,16384
+PROFILE_V6_COMPILER ?= gcc
+PROFILE_V6_VTUNE_TEXT ?= build/ck_v6_vtune_hotspots.txt
+PROFILE_V6_VTUNE_CSV ?= build/ck_v6_vtune_hotspots.csv
+
+profile-v6-prepare-runtime:
+	@if [ "$(V66_PREP_WITH_PYTHON)" != "1" ]; then \
+		echo "SKIP: python prep disabled (V66_PREP_WITH_PYTHON=$(V66_PREP_WITH_PYTHON))"; \
+	else \
+		prep_model="$(V66_MODEL)"; \
+		if [ -d "$$prep_model" ]; then \
+			gguf_path="$$(find "$$prep_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+			if [ -n "$$gguf_path" ]; then prep_model="$$gguf_path"; fi; \
+		fi; \
+		echo "Preparing runtime via ck_run_v6_6.py (model=$$prep_model, force_compile=$(V66_FORCE_COMPILE))"; \
+		CK_PROFILE=1 \
+		CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+		CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+		$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+			"$$prep_model" \
+			--generate-only \
+			--profile \
+			$(V66_FORCE_COMPILE_ARG) \
+			--context-len 1024 --prompt "Hello" --max-tokens 1 \
+			$(V66_RUN_ARGS); \
+	fi
 
 profile-v6-decode:
-	CK_PROFILE=1 \
-	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
-		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
-		--profile --force-compile \
-		--prompt "The quick brown fox" --max-tokens 32
+	@if [ "$(V66_PERF_RUNTIME)" = "cli" ]; then \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$(V66_MODEL)" )"; \
+		needs_regen=0; regen_reason=""; \
+		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+		fi; \
+		if [ "$$needs_regen" -eq 0 ]; then \
+			echo "Using existing compiled runtime in $$model_dir"; \
+		else \
+			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+			regen_model="$(V66_MODEL)"; \
+			if [ -d "$$regen_model" ]; then \
+				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+			fi; \
+			CK_PROFILE=1 \
+			CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+			CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V66_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V66_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+		$(MAKE) --no-print-directory ck-cli-v6.6 CFLAGS="$(CFLAGS) $(PROFILE_V6_DEBUG_CFLAGS)"; \
+		CK_PROFILE=1 \
+		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
+		./build/ck-cli-v6.6 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+			--prompt "The quick brown fox" --max-tokens 32 --timing \
+			$(V66_CLI_TEMPLATE_ARGS) $(V66_CLI_ARGS); \
+		$(PYTHON) $(PROFILE_V6_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
+	else \
+		CK_PROFILE=1 \
+		CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+		$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+			"$(V66_MODEL)" \
+			--profile $(V66_FORCE_COMPILE_ARG) \
+			--prompt "The quick brown fox" --max-tokens 32 \
+			$(V66_RUN_ARGS); \
+	fi
 	@echo "Profile data saved in model cache directory"
 
 profile-v6-prefill:
-	CK_PROFILE=1 \
-	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
-		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
-		--profile --force-compile \
-		--prompt "Explain the theory of relativity in simple terms" \
-		--max-tokens 1
+	@if [ "$(V66_PERF_RUNTIME)" = "cli" ]; then \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$(V66_MODEL)" )"; \
+		needs_regen=0; regen_reason=""; \
+		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+		fi; \
+		if [ "$$needs_regen" -eq 0 ]; then \
+			echo "Using existing compiled runtime in $$model_dir"; \
+		else \
+			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+			regen_model="$(V66_MODEL)"; \
+			if [ -d "$$regen_model" ]; then \
+				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+			fi; \
+			CK_PROFILE=1 \
+			CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+			CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V66_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V66_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+		$(MAKE) --no-print-directory ck-cli-v6.6 CFLAGS="$(CFLAGS) $(PROFILE_V6_DEBUG_CFLAGS)"; \
+		CK_PROFILE=1 \
+		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
+		./build/ck-cli-v6.6 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+			--prompt "Explain the theory of relativity in simple terms" --max-tokens 1 --timing \
+			$(V66_CLI_TEMPLATE_ARGS) $(V66_CLI_ARGS); \
+		$(PYTHON) $(PROFILE_V6_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
+	else \
+		CK_PROFILE=1 \
+		CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+		$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+			"$(V66_MODEL)" \
+			--profile $(V66_FORCE_COMPILE_ARG) \
+			--prompt "Explain the theory of relativity in simple terms" \
+			--max-tokens 1 \
+			$(V66_RUN_ARGS); \
+	fi
 	@echo "Profile data saved in model cache directory"
 
 profile-v6-flamegraph:
-	CK_V6_EXTRA_CFLAGS="-fno-omit-frame-pointer -g" \
-	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
-		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
-		--force-compile \
-		--prompt "The quick brown fox" --max-tokens 32
-	perf script -i /tmp/ck_v6_perf.data | \
-		./FlameGraph/stackcollapse-perf.pl | \
-		./FlameGraph/flamegraph.pl --title="CK v6.6 Decode" > build/flamegraph_v6.svg
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: perf not installed"; \
+	elif [ ! -x ./FlameGraph/stackcollapse-perf.pl ] || [ ! -x ./FlameGraph/flamegraph.pl ]; then \
+		echo "SKIP: FlameGraph tools missing (expected ./FlameGraph/stackcollapse-perf.pl and ./FlameGraph/flamegraph.pl)"; \
+	else \
+		mkdir -p build; \
+		if [ "$(V66_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$(V66_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V66_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+				CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V66_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V66_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v6.6 CFLAGS="$(CFLAGS) $(PROFILE_V6_DEBUG_CFLAGS)"; \
+			perf record --all-user -F 999 --call-graph $(PROFILE_V6_CALLGRAPH) -o $(PROFILE_V6_PERF_DATA) -- \
+				./build/ck-cli-v6.6 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V66_CLI_TEMPLATE_ARGS) $(V66_CLI_ARGS); \
+		else \
+			CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+			CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+			perf record --all-user -F 999 --call-graph $(PROFILE_V6_CALLGRAPH) -o $(PROFILE_V6_PERF_DATA) -- \
+			$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+				"$(V66_MODEL)" \
+				$(V66_FORCE_COMPILE_ARG) \
+				--prompt "The quick brown fox" --max-tokens 32 \
+				$(V66_RUN_ARGS); \
+		fi; \
+		perf script -i $(PROFILE_V6_PERF_DATA) | \
+			./FlameGraph/stackcollapse-perf.pl | \
+			tee $(PROFILE_V6_PERF_FOLDED) | \
+			./FlameGraph/flamegraph.pl --title="CK v6.6 Decode" > $(PROFILE_V6_FLAMEGRAPH_SVG); \
+		$(PYTHON) $(PERF_ARTIFACTS_V6_SCRIPT) \
+			--model-input "$(V66_MODEL)" \
+			--perf-data $(PROFILE_V6_PERF_DATA) \
+			--folded $(PROFILE_V6_PERF_FOLDED) \
+			--flamegraph-svg $(PROFILE_V6_FLAMEGRAPH_SVG); \
+	fi
 
 profile-v6-perf-stat:
-	perf stat -e cycles,instructions,cache-references,cache-misses,\
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: perf not installed"; \
+	else \
+		mkdir -p build; \
+		if [ "$(V66_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$(V66_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V66_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+				CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V66_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V66_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v6.6 CFLAGS="$(CFLAGS) $(PROFILE_V6_DEBUG_CFLAGS)"; \
+			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
 LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
 branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
-	$(PYTHON) $(PROFILE_V6_SCRIPT) run \
-		hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
-		--context-len 1024 --prompt "The quick brown fox" --max-tokens 32 \
-		2> /tmp/ck_v6_perf_stat.txt
-	@cat /tmp/ck_v6_perf_stat.txt
+				./build/ck-cli-v6.6 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V66_CLI_TEMPLATE_ARGS) $(V66_CLI_ARGS) \
+				2> $(PROFILE_V6_PERF_STAT_TXT); \
+		else \
+			CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
+LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
+branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+			$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+				"$(V66_MODEL)" \
+				--context-len 1024 --prompt "The quick brown fox" --max-tokens 32 \
+				$(V66_RUN_ARGS) \
+				2> $(PROFILE_V6_PERF_STAT_TXT); \
+		fi; \
+		cat $(PROFILE_V6_PERF_STAT_TXT); \
+		$(PYTHON) $(PERF_ARTIFACTS_V6_SCRIPT) \
+			--model-input "$(V66_MODEL)" \
+			--perf-stat $(PROFILE_V6_PERF_STAT_TXT); \
+	fi
 
 profile-v6-cachegrind:
 	valgrind --tool=cachegrind --cachegrind-out-file=build/cachegrind_v6.out \
@@ -3148,12 +3499,104 @@ profile-v6-cachegrind:
 		--context-len 1024 --prompt "Hello" --max-tokens 4
 	cg_annotate build/cachegrind_v6.out > build/cachegrind_v6_annotated.txt
 
+profile-v6-vtune:
+	@if [ "$(V66_WITH_VTUNE)" != "1" ]; then \
+		echo "SKIP: VTune probe disabled (V66_WITH_VTUNE=$(V66_WITH_VTUNE))"; \
+	elif ! command -v vtune >/dev/null 2>&1; then \
+		echo "SKIP: vtune not installed"; \
+	elif [ -r /proc/sys/kernel/yama/ptrace_scope ] && [ "$$(cat /proc/sys/kernel/yama/ptrace_scope)" -gt 0 ]; then \
+		echo "SKIP: vtune blocked by kernel.yama.ptrace_scope=$$(cat /proc/sys/kernel/yama/ptrace_scope)"; \
+		echo "      run: sudo sysctl -w kernel.yama.ptrace_scope=0"; \
+	else \
+		mkdir -p build; \
+		vtune_result="build/ck_v6_vtune_$$(date +%Y%m%d_%H%M%S)"; \
+		if [ "$(V66_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$(V66_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V66_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+				CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V66_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V66_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V6_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v6.6 CFLAGS="$(CFLAGS) $(PROFILE_V6_DEBUG_CFLAGS)"; \
+			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
+				./build/ck-cli-v6.6 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V66_CLI_TEMPLATE_ARGS) $(V66_CLI_ARGS) || { \
+					echo "SKIP: vtune collect failed for CLI runtime"; \
+					exit 0; \
+				}; \
+		else \
+			CK_V6_COMPILER="$(PROFILE_V6_COMPILER)" \
+			CK_V6_EXTRA_CFLAGS="$(PROFILE_V6_DEBUG_CFLAGS)" \
+			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
+			$(PYTHON) $(PROFILE_V6_SCRIPT) run \
+				"$(V66_MODEL)" \
+				$(V66_FORCE_COMPILE_ARG) \
+				--prompt "The quick brown fox" --max-tokens 32 \
+				$(V66_RUN_ARGS) || { \
+					echo "SKIP: vtune collect failed for python runtime"; \
+					exit 0; \
+				}; \
+		fi; \
+		vtune -report hotspots -result-dir "$$vtune_result" -format text -report-output $(PROFILE_V6_VTUNE_TEXT) >/dev/null 2>&1 || true; \
+		vtune -report hotspots -result-dir "$$vtune_result" -format csv -report-output $(PROFILE_V6_VTUNE_CSV) >/dev/null 2>&1 || true; \
+		$(PYTHON) $(VTUNE_ARTIFACTS_V6_SCRIPT) \
+			--model-input "$(V66_MODEL)" \
+			--result-dir "$$vtune_result" \
+			--report-text $(PROFILE_V6_VTUNE_TEXT) \
+			--report-csv $(PROFILE_V6_VTUNE_CSV); \
+	fi
+
 profile-v6-full:
+	$(MAKE) profile-v6-prepare-runtime
 	$(MAKE) profile-v6-decode
 	$(MAKE) profile-v6-prefill
 	$(MAKE) profile-v6-perf-stat
+	$(MAKE) profile-v6-flamegraph
+	$(MAKE) profile-v6-vtune
 	@echo "=== Open visualizer: version/v6.6/tools/ir_visualizer.html ==="
 	@echo "=== Load folder from model cache to see Profile tab ==="
+
+v6.6-memory-signoff:
+	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "$(V66_MODEL)" --generate-only $(V66_FORCE_COMPILE_ARG) --context-len 128 --max-tokens 1 --prompt "Hello" $(V66_RUN_ARGS)
+	@$(PYTHON) $(MEMORY_SIGNOFF_V6_SCRIPT) --model-input "$(V66_MODEL)"
+
+v6.6-perf-gate:
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: v6.6-perf-gate (perf not installed)"; \
+	elif [ ! -x ./FlameGraph/stackcollapse-perf.pl ] || [ ! -x ./FlameGraph/flamegraph.pl ]; then \
+		echo "SKIP: v6.6-perf-gate (FlameGraph tools missing)"; \
+	else \
+		$(MAKE) --no-print-directory profile-v6-prepare-runtime; \
+		$(MAKE) --no-print-directory profile-v6-decode; \
+		$(MAKE) --no-print-directory profile-v6-perf-stat; \
+		$(MAKE) --no-print-directory profile-v6-flamegraph; \
+		$(MAKE) --no-print-directory profile-v6-vtune || true; \
+		$(MAKE) --no-print-directory v6.6-perf-gate-evaluate; \
+	fi
+
+v6.6-perf-gate-evaluate:
+	@$(PYTHON) $(PERF_GATE_V6_SCRIPT) --model-input "$(V66_MODEL)"
 
 # =============================================================================
 # Thread Pool Tests

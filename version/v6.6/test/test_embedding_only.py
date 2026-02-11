@@ -3,18 +3,34 @@
 Test just the embedding lookup to verify basic functionality.
 """
 
+import argparse
 import ctypes
 import numpy as np
 from pathlib import Path
 
-cache_dir = Path.home() / ".cache/ck-engine-v6.6/models"
-model_dirs = list(cache_dir.glob("*Qwen*")) + list(cache_dir.glob("*qwen*"))
 
-if not model_dirs:
-    print("Error: No Qwen model found in cache")
-    exit(1)
+def resolve_model_dir() -> Path:
+    parser = argparse.ArgumentParser(description="Embedding-only smoke test for a v6.6 model")
+    parser.add_argument(
+        "--model",
+        type=Path,
+        default=None,
+        help="Path to model cache directory (default: first cached Qwen model)",
+    )
+    args = parser.parse_args()
 
-model_dir = model_dirs[0]
+    if args.model is not None:
+        return args.model
+
+    cache_dir = Path.home() / ".cache/ck-engine-v6.6/models"
+    model_dirs = list(cache_dir.glob("*Qwen*")) + list(cache_dir.glob("*qwen*"))
+    if not model_dirs:
+        print("Error: No Qwen model found in cache")
+        exit(1)
+    return model_dirs[0]
+
+
+model_dir = resolve_model_dir()
 lib_path = model_dir / "libmodel.so"
 weights_path = model_dir / "weights.bump"
 
