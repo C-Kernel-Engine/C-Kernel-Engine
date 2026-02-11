@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 440">
+  <defs>
+    <linearGradient id="jwHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <marker id="arrowJw" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="980" height="440" fill="#232323"/>
+
+  <text x="490" y="32" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">IR JSON Walkthrough</text>
+  <text x="490" y="52" font-family="Inter, sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">How values flow from templates into IR and finally into call-ready arguments</text>
+
+  <g transform="translate(40, 90)">
+    <rect width="260" height="130" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="260" height="28" rx="10" fill="url(#jwHeader)"/>
+    <text x="130" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">template.json</text>
+    <text x="20" y="56" font-family="monospace" font-size="9" fill="#a0a0a0">ops: ["attn_norm", "qkv_proj", ...]</text>
+    <text x="20" y="74" font-family="monospace" font-size="9" fill="#a0a0a0">flags: {"use_qk_norm": true}</text>
+    <text x="20" y="92" font-family="monospace" font-size="9" fill="#a0a0a0">family: "llama"</text>
+  </g>
+
+  <g transform="translate(320, 150)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowJw)"/>
+  </g>
+
+  <g transform="translate(390, 90)">
+    <rect width="260" height="130" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="260" height="28" rx="10" fill="url(#jwHeader)"/>
+    <text x="130" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">ir1_decode.json</text>
+    <text x="20" y="56" font-family="monospace" font-size="9" fill="#a0a0a0">op_id: 12, op: "rope_qk"</text>
+    <text x="20" y="74" font-family="monospace" font-size="9" fill="#a0a0a0">dataflow.inputs: { q: 11, k: 11 }</text>
+    <text x="20" y="92" font-family="monospace" font-size="9" fill="#a0a0a0">kernel: "rope"
+    </text>
+  </g>
+
+  <g transform="translate(670, 150)">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowJw)"/>
+  </g>
+
+  <g transform="translate(740, 90)">
+    <rect width="200" height="130" rx="10" fill="#2a2a2a" stroke="#47b475" stroke-width="3"/>
+    <rect width="200" height="28" rx="10" fill="#47b475"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">lowered.json</text>
+    <text x="20" y="56" font-family="monospace" font-size="9" fill="#a0a0a0">args: { q: model->q_scratch,</text>
+    <text x="20" y="74" font-family="monospace" font-size="9" fill="#a0a0a0">k: model->k_scratch, ... }</text>
+    <text x="20" y="92" font-family="monospace" font-size="9" fill="#a0a0a0">seq_len: model->pos+1</text>
+  </g>
+
+  <g transform="translate(40, 250)">
+    <rect width="900" height="150" rx="12" fill="#1f1f1f" stroke="#333" stroke-width="2"/>
+    <text x="30" y="30" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffb400">Key idea</text>
+    <text x="30" y="56" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">The JSON pipeline is explicit: each file is a contract between stages.</text>
+    <text x="30" y="78" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">If a pointer is wrong in C, trace it back: lowered → layout → IR1 → template.</text>
+  </g>
+</svg>

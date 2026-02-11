@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 420">
+  <defs>
+    <linearGradient id="lmHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="980" height="420" fill="#232323"/>
+
+  <text x="490" y="32" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">Logic vs Memory</text>
+  <text x="490" y="52" font-family="Inter, sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">Generated C is deterministic because logic and memory are planned separately</text>
+
+  <g transform="translate(40, 90)">
+    <rect width="420" height="300" rx="12" fill="#2a2a2a" stroke="#454545" stroke-width="2"/>
+    <rect width="420" height="30" rx="12" fill="url(#lmHeader)"/>
+    <text x="210" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">Logic Plan</text>
+
+    <text x="30" y="65" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Which ops run, in what order</text>
+    <text x="30" y="90" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Kernel selection (registry + quant)</text>
+    <text x="30" y="115" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Fusions (optional / IR2)</text>
+
+    <rect x="30" y="145" width="360" height="120" rx="10" fill="#1f1f1f" stroke="#333"/>
+    <text x="210" y="170" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">ops: [attn_norm, qkv_proj, rope, attn, out_proj]</text>
+    <text x="210" y="195" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">kernel: attention_forward_causal_head_major_gqa</text>
+    <text x="210" y="220" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">kernel: gemv_q8_0 (out_proj)</text>
+  </g>
+
+  <g transform="translate(520, 90)">
+    <rect width="420" height="300" rx="12" fill="#2a2a2a" stroke="#47b475" stroke-width="3"/>
+    <rect width="420" height="30" rx="12" fill="#47b475"/>
+    <text x="210" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">Memory Plan</text>
+
+    <text x="30" y="65" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Buffer sizes + offsets</text>
+    <text x="30" y="90" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Scratch vs persistent allocation</text>
+    <text x="30" y="115" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">• Alignment + bump layout</text>
+
+    <rect x="30" y="145" width="360" height="120" rx="10" fill="#1f1f1f" stroke="#333"/>
+    <text x="210" y="170" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">embedded_input @ 20480</text>
+    <text x="210" y="195" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">q_scratch @ 28672</text>
+    <text x="210" y="220" font-family="monospace" font-size="10" fill="#8a8a8a" text-anchor="middle">kv_cache @ 4194304</text>
+  </g>
+</svg>
