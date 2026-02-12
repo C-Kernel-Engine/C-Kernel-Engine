@@ -937,6 +937,17 @@
   </div>
 </div>
 
+<div class="card">
+    <h3 style="margin-top: 0;">Read This Diagram in 30 Seconds</h3>
+    <ul>
+        <li><strong>IR1</strong> validates template logic and resolves kernel IDs</li>
+        <li><strong>IR2</strong> is where producer/consumer wiring, conservative fusion, and parallel-safe scheduling are decided</li>
+        <li><strong>IR3</strong> freezes memory layout (arena offsets + pointer expressions) and emits call-ready arguments</li>
+        <li><strong>Runtime C</strong> executes that fixed plan using thread-pool orchestration and ISA dispatch (scalar/AVX/AVX2/VNNI)</li>
+    </ul>
+    <p style="margin: 0;">If you forget where a bug belongs: dataflow issues usually originate in IR2, offset/alias issues in IR3, and call-order issues in codegen/runtime glue.</p>
+</div>
+
 <h2>Operator Start Here (Snapshot: February 11, 2026)</h2>
 
 <p>If you revisit this page in six months, begin with the gate entrypoint first. It encodes the current v6.6 release contract better than any prose summary.</p>
@@ -2207,7 +2218,7 @@ python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-12</p>
             </div>
         </div>
     </footer>
