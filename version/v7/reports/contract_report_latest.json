@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "layer": "L1",
+      "handoff": "Spec -> IR/Kernel",
+      "contract": "v7 contract docs exist",
+      "status": "PASS",
+      "notes": "contracts-present"
+    },
+    {
+      "layer": "L2",
+      "handoff": "Kernel sources -> v7 gate",
+      "contract": "required fp32 backward-capable symbols",
+      "status": "PASS",
+      "notes": "symbols-present=8"
+    },
+    {
+      "layer": "L3",
+      "handoff": "Kernel API -> PyTorch parity",
+      "contract": "v7 parity harness exists",
+      "status": "PASS",
+      "notes": "script=run_parity_1token_v7.py"
+    },
+    {
+      "layer": "L4",
+      "handoff": "Dev UX -> CI",
+      "contract": "v7 make targets wired",
+      "status": "PASS",
+      "notes": "targets-present"
+    },
+    {
+      "layer": "L5",
+      "handoff": "Kernel maps -> IR2 training lower",
+      "contract": "required training kernel IDs are registered and bound",
+      "status": "PASS",
+      "notes": "covered=13"
+    }
+  ],
+  "summary": {
+    "PASS": 5,
+    "WARN": 0,
+    "FAIL": 0
+  }
+}

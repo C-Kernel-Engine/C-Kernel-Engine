@@ -1,0 +1,42 @@
+{
+  "version": 2,
+  "name": "qwen2",
+  "family": "llama",
+  "flags": {
+    "use_qkv_bias": "from_weights",
+    "activation": "swiglu",
+    "rope": "rope",
+    "tokenizer": "bpe"
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "rmsnorm",
+          "qkv_proj",
+          "rope_qk",
+          "attn",
+          "out_proj",
+          "residual_add",
+          "rmsnorm",
+          "mlp_gate_up",
+          "silu_mul",
+          "mlp_down",
+          "residual_add"
+        ]
+      },
+      "footer": [
+        "rmsnorm",
+        "weight_tying",
+        "logits"
+      ]
+    }
+  }
+}

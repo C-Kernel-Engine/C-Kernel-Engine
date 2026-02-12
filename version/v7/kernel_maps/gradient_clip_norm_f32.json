@@ -1,0 +1,92 @@
+{
+  "id": "gradient_clip_norm_f32",
+  "op": "optimizer",
+  "variant": "fp32_clip_norm",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "grad",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Gradient buffer to clip in-place"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "grad",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Clipped gradient buffer"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "params": [
+    {
+      "name": "max_norm",
+      "dtype": "fp32",
+      "desc": "Maximum L2 norm"
+    }
+  ],
+  "parallelization": {
+    "supported": [
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "notes": "Compute norm and apply in-place scaling when needed."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Returns original gradient norm as scalar return value."
+  },
+  "impl": {
+    "function": "gradient_clip_norm_f32",
+    "c_declaration": "float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);",
+    "sources": [
+      "src/kernels/optimizer_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_optimizer_kernels.py -k clip",
+        "tolerance": "1e-5",
+        "notes": "Clip norm behavior and returned norm."
+      }
+    ]
+  },
+  "notes": "FP32 gradient norm clip kernel."
+}
+

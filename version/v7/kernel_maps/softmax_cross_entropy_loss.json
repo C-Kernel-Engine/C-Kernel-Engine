@@ -1,0 +1,105 @@
+{
+  "id": "softmax_cross_entropy_loss",
+  "op": "softmax",
+  "variant": "fp32_loss_grad",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "V"
+      ],
+      "desc": "Logits [tokens, vocab_size]"
+    },
+    {
+      "name": "targets",
+      "dtype": "int32",
+      "shape": [
+        "T"
+      ],
+      "desc": "Target token ids [tokens]"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_logits",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "V"
+      ],
+      "desc": "Gradient w.r.t. logits"
+    },
+    {
+      "name": "loss_out",
+      "dtype": "fp32",
+      "shape": [
+        "1"
+      ],
+      "desc": "Scalar mean loss output"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "V"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "token"
+    ],
+    "preferred": {
+      "prefill": "token",
+      "decode": "token"
+    },
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "notes": "Per-token cross entropy with reduction to scalar loss."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Entry point loss op for backward graph synthesis."
+  },
+  "impl": {
+    "function": "softmax_cross_entropy_loss",
+    "c_declaration": "void softmax_cross_entropy_loss(const float *logits, const int32_t *targets, int tokens, int vocab_size, float *d_logits, float *loss_out);",
+    "sources": [
+      "src/kernels/loss_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "1e-5",
+        "notes": "Loss and d_logits parity."
+      }
+    ]
+  },
+  "notes": "Softmax cross-entropy forward + dlogits kernel for v7 training."
+}
+

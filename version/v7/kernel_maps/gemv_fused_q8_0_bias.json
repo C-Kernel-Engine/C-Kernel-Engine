@@ -1,0 +1,30 @@
+{
+  "id": "gemv_fused_q8_0_bias",
+  "op": "fused_linear_bias",
+  "variant": "q8_0_w_fp32_a_bias",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32, quantized internally)"},
+    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [M, K] in Q8_0 format"},
+    {"name": "bias", "dtype": "fp32", "shape": ["M"], "optional": true, "desc": "Bias vector [M] (FP32), can be NULL"}
+  ],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] (FP32)"}
+  ],
+  "dims": ["M", "K"],
+  "fuses": [
+    "quantize_row_q8_0",
+    "gemv_q8_0_q8_0",
+    "bias_add"
+  ],
+  "impl": {
+    "function": "gemv_fused_q8_0_bias_dispatch",
+    "header": "gemv_fused_quant_bias.h",
+    "sources": ["src/kernels/fused/gemv_fused_quant_bias.c"]
+  },
+  "notes": "Fused quantize + GEMV (Q8_0 weights) + bias."
+}

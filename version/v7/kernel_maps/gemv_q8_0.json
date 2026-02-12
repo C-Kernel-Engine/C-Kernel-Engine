@@ -1,0 +1,31 @@
+{
+  "id": "gemv_q8_0",
+  "op": "gemv",
+  "variant": "q8_0_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] Q8_0 quantized"}
+  ],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q8_0 uses 32-value blocks; K should be a multiple of 32."
+  },
+  "impl": {
+    "function": "gemv_q8_0",
+    "c_declaration": "void gemv_q8_0(float *y, const void *W, const float *x, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_q8_0.c"]
+  },
+  "notes": "GEMV for Q8_0 weights with FP32 activation input. No activation quantization needed."
+}

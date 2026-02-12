@@ -1,0 +1,36 @@
+{
+  "id": "geglu_forward_bf16",
+  "op": "geglu",
+  "variant": "geglu_bf16",
+  "quant": {
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "bf16", "shape": ["tokens", "2*dim"], "desc": "Input tensor [tokens, 2*dim] in BF16"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "bf16", "shape": ["tokens", "dim"], "desc": "Output tensor [tokens, dim] in BF16"}
+  ],
+  "scratch": [
+    {"name": "geglu_scratch", "dtype": "fp32", "size_bytes": "3 * tokens * dim * 4", "desc": "FP32 scratch buffer: 2*dim for input, dim for output"}
+  ],
+  "dims": ["tokens", "dim"],
+  "params": [],
+  "impl": {
+    "function": "geglu_forward_bf16",
+    "c_declaration": "void geglu_forward_bf16(const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch);",
+    "sources": ["src/kernels/geglu_kernels.c", "src/kernels/bf16_utils.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_geglu.py"],
+    "parity": []
+  },
+  "notes": "BF16 GeGLU activation. Converts to FP32, computes, converts back. Caller provides scratch buffer."
+}

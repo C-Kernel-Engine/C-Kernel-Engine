@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "description": "v7 gradient rules for IR2 backward synthesis. 'ready' rules can lower today; 'todo' rules fail-fast unless partial mode is enabled.",
+  "rules": {
+    "dense_embedding_lookup_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "token_ids",
+        "weight"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "embedding_backward_f32",
+          "reads": [
+            "saved:token_ids",
+            "grad:out"
+          ],
+          "writes": [
+            {
+              "name": "d_token_embeddings",
+              "kind": "tmp_grad_weight",
+              "target_weight": "weight"
+            },
+            {
+              "name": "d_pos_embeddings",
+              "kind": "aux",
+              "tensor": "aux.d_pos_embeddings"
+            }
+          ]
+        }
+      ]
+    },
+    "rmsnorm_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "gamma",
+        "rstd_cache"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "rmsnorm_backward",
+          "reads": [
+            "grad:output",
+            "saved:input",
+            "saved_weight:gamma",
+            "saved:rstd_cache"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "gamma"
+            }
+          ]
+        }
+      ]
+    },
+    "matmul_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "W"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "gemm_backward_f32",
+          "reads": [
+            "grad:y",
+            "saved:input",
+            "saved_weight:W"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "W"
+            },
+            {
+              "name": "d_bias",
+              "kind": "tmp_grad_weight",
+              "target_weight": "bias"
+            }
+          ]
+        }
+      ]
+    },
+    "matmul_no_bias_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "W"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "gemm_backward_f32",
+          "reads": [
+            "grad:y",
+            "saved:input",
+            "saved_weight:W"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "W"
+            },
+            {
+              "name": "d_bias",
+              "kind": "aux",
+              "tensor": "aux.d_bias"
+            }
+          ]
+        }
+      ]
+    },
+    "qk_norm_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k",
+        "q_gamma",
+        "k_gamma"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "qk_norm_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:k",
+            "saved:q",
+            "saved:k",
+            "saved_weight:q_gamma",
+            "saved_weight:k_gamma"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_q_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "q_gamma"
+            },
+            {
+              "name": "d_k_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "k_gamma"
+            }
+          ]
+        }
+      ]
+    },
+    "rope_qk_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "rope_backward_qk_f32",
+          "reads": [
+            "grad:q",
+            "grad:k"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            }
+          ]
+        }
+      ]
+    },
+    "attention_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k",
+        "v"
+      ],
+      "extra_saved": [
+        "attn_weights"
+      ],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "attention_backward_causal_head_major_gqa",
+          "reads": [
+            "grad:out",
+            "saved:q",
+            "saved:k",
+            "saved:v",
+            "saved:attn_weights"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_v",
+              "kind": "grad_activation",
+              "target_input": "v"
+            },
+            {
+              "name": "d_scores",
+              "kind": "aux",
+              "tensor": "aux.d_scores"
+            }
+          ]
+        }
+      ]
+    },
+    "residual_add_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "residual_add_backward_f32",
+          "reads": [
+            "grad:out"
+          ],
+          "writes": [
+            {
+              "name": "d_a",
+              "kind": "grad_activation",
+              "target_input": "a"
+            },
+            {
+              "name": "d_b",
+              "kind": "grad_activation",
+              "target_input": "b"
+            }
+          ]
+        }
+      ]
+    },
+    "swiglu_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "swiglu_backward_exact",
+          "reads": [
+            "grad:out",
+            "saved:input"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            }
+          ]
+        }
+      ]
+    },
+    "cross_entropy_loss": {
+      "status": "ready",
+      "requires_saved": [
+        "logits",
+        "targets"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "softmax_cross_entropy_loss",
+          "reads": [
+            "saved:logits",
+            "saved:targets"
+          ],
+          "writes": [
+            {
+              "name": "d_logits",
+              "kind": "grad_activation",
+              "target_input": "logits"
+            },
+            {
+              "name": "loss_out",
+              "kind": "aux",
+              "tensor": "aux.loss"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "template_op_to_rule": {
+    "bpe_tokenizer": null,
+    "wordpiece_tokenizer": null,
+    "weight_tying": null,
+    "lm_head": null,
+    "dense_embedding_lookup": "dense_embedding_lookup_backward",
+    "rmsnorm": "rmsnorm_backward",
+    "q_proj": "matmul_backward",
+    "k_proj": "matmul_backward",
+    "v_proj": "matmul_backward",
+    "qk_norm": "qk_norm_backward",
+    "rope_qk": "rope_qk_backward",
+    "attn": "attention_backward",
+    "attn_sliding": "attention_backward",
+    "out_proj": "matmul_backward",
+    "residual_add": "residual_add_backward",
+    "mlp_gate_up": "matmul_backward",
+    "silu_mul": "swiglu_backward",
+    "geglu": "swiglu_backward",
+    "mlp_down": "matmul_backward",
+    "logits": "matmul_no_bias_backward"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+  "op": "attention_sliding",
+  "variant": "causal_flash_fp32_sliding",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Query tensor [heads, tokens, head_dim]"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Attention output [heads, tokens, head_dim]"}
+  ],
+  "scratch": [
+    {"name": "qkv_scratch", "dtype": "fp32", "size_bytes": "H * T * D * 4", "desc": "QKV tiles for flash attention"},
+    {"name": "attn_scratch", "dtype": "fp32", "size_bytes": "H * T * T * 4", "desc": "Attention scores [heads, T, T]"}
+  ],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32", "desc": "Stride in tokens for KV cache layout"},
+    {"name": "head_dim", "dtype": "int32", "desc": "Head dimension (unpadded)"},
+    {"name": "aligned_head_dim", "dtype": "int32", "desc": "Aligned head dimension for SIMD"},
+    {"name": "sliding_window", "dtype": "int32", "desc": "Sliding window size (0 = no limit)"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across heads; each thread handles one or more heads."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"D": 64, "T": 32},
+    "notes": "Flash attention uses SIMD paths when available. T should be multiple of 32 for optimal tile sizes."
+  },
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_sliding(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window);",
+    "sources": ["src/kernels/attention_kernels_sliding.c", "src/kernels/softmax_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attention_sliding.py"],
+    "bench": ["scripts/bench_attention.py"],
+    "parity": [
+      {
+        "kind": "llamacpp",
+        "command": "python test_mega_fusion_parity.py",
+        "tolerance": "1e-4",
+        "notes": "Compare against llama.cpp ggml_flash_attn_ext with sliding window"
+      }
+    ]
+  },
+  "notes": "Causal multi-head attention with sliding window. Each token attends to the last W tokens. Uses flash attention algorithm with strided KV cache layout. Supports GQA where H >= KV."
+}

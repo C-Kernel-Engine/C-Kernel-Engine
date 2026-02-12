@@ -414,6 +414,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_gemm_microkernel.py \
             unittest/test_mlp.py \
             unittest/test_rmsnorm.py \
+            unittest/test_qk_norm.py \
             unittest/test_swiglu.py \
             unittest/test_fused_swiglu_decode.py \
             unittest/test_fused_attention_decode.py \
@@ -1443,6 +1444,7 @@ test: $(LIB) test-libs
 	  extra_env=""; \
 	  case "$$t" in \
 	    *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; \
+	    *test_qk_norm.py) extra_args="--quick";; \
 	    *test_mega_fused_attention.py) extra_args="--correctness";; \
 	    *test_orchestration_layer.py) extra_args="--strict-ref";; \
 	  esac; \
@@ -2527,6 +2529,7 @@ CK_CLI_V4 := tools/ck_v4.c
 CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
+CK_CLI_V7 := version/v7/src/ck_cli_v7.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
@@ -2597,6 +2600,22 @@ ck-cli-v6.6: $(BUILD_DIR)/ck-cli-v6.6
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 --model qwen           # Auto-discover from cache"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 --list                 # List available models"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v6.6 <model.so> <weights.bump>"
+	@echo ""
+
+# v7 Native CLI
+$(BUILD_DIR)/ck-cli-v7: $(CK_CLI_V7) $(LIB_TOKENIZER)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V7) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v7: $(BUILD_DIR)/ck-cli-v7
+	@echo ""
+	@echo "  $(C_CYAN)C-Kernel-Engine v7 CLI$(C_RESET)"
+	@echo "  Features: Native runtime profiling path, model discovery, chat templates"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --model qwen"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --list"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v7 <model.so> <weights.bump>"
 	@echo ""
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
@@ -3036,7 +3055,10 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-validate-contracts v7-parity-1tok v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-cachegrind profile-v7-full
+.PHONY: v7-perf-gate v7-perf-gate-evaluate
+.PHONY: v7-grad-fd v7-replay
+.PHONY: ck-cli-v7
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
@@ -3179,21 +3201,90 @@ v6.6-e2e:
 
 v6.6-full: v6.6-download v6.6-build v6.6-test-all
 
+V7_MODEL ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+V7_CHAT_TEMPLATE ?= auto
+V7_WEIGHT_DTYPE ?=
+V7_WEIGHT_DTYPE_ARG := $(if $(strip $(V7_WEIGHT_DTYPE)),--weight-dtype $(V7_WEIGHT_DTYPE),)
+V7_RUN_ARGS ?= $(V7_WEIGHT_DTYPE_ARG) $(if $(filter auto,$(V7_CHAT_TEMPLATE)),,--chat-template $(V7_CHAT_TEMPLATE))
+V7_PERF_RUNTIME ?= cli
+V7_CLI_ARGS ?=
+V7_WITH_VTUNE ?= 1
+V7_PREP_WITH_PYTHON ?= 1
+V7_FORCE_COMPILE ?= 1
+V7_FORCE_COMPILE_ARG := $(if $(filter 1,$(V7_FORCE_COMPILE)),--force-compile,)
+V7_CLI_TEMPLATE_ARGS = $(if $(filter none,$(V7_CHAT_TEMPLATE)),--no-chat-template,$(if $(findstring --chat-template none,$(V7_RUN_ARGS)),--no-chat-template,))
+V7_TRAIN_MANIFEST ?=
+V7_TRAIN_MAX_LAYERS ?= 2
+V7_TRAIN_ALLOW_PARTIAL ?= 0
+V7_TRAIN_STRICT_UNRESOLVED ?= 1
+V7_TRAIN_CHECKPOINT_POLICY ?= none
+V7_TRAIN_CODEGEN_IR2 ?= version/v7/reports/ir2_train_backward_latest.json
+V7_TRAIN_CODEGEN_OUT ?= version/v7/reports/generated_train_runtime_v7.c
+V7_TRAIN_CODEGEN_SUMMARY ?= version/v7/reports/generated_train_runtime_v7_summary.json
+V7_TRAIN_CODEGEN_OBJ ?= version/v7/reports/generated_train_runtime_v7.o
+V7_TINY_OUT_DIR ?= version/v7/runs/tiny_init
+V7_TINY_SEED ?= 42
+V7_TINY_LAYERS ?= 2
+V7_TINY_VOCAB ?= 256
+V7_TINY_EMBED ?= 128
+V7_TINY_HIDDEN ?= 256
+V7_TINY_HEADS ?= 8
+V7_TINY_KV_HEADS ?= 4
+V7_TINY_CTX ?= 128
+
+.PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
+	v7-init-tiny v7-train-codegen v7-train-compile-smoke v7-train-c-smoke
+
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
 	@echo ""
 	@echo "Targets:"
+	@echo "  make v7-sync-inference"
+	@echo "  make v7-infer-run"
+	@echo "  make v7-infer-gate"
+	@echo "  make v7-perf-gate"
+	@echo "  make profile-v7-full"
 	@echo "  make v7-validate-contracts"
 	@echo "  make v7-parity-1tok"
+	@echo "  make v7-qk-norm-backward-parity"
+	@echo "  make v7-qk-norm-backward-parity-isa"
+	@echo "  make v7-qk-norm-backward-parity-isa-strict"
+	@echo "  make v7-train-ir-smoke"
+	@echo "  make v7-train-ir-backward"
+	@echo "  make v7-train-codegen"
+	@echo "  make v7-train-compile-smoke"
+	@echo "  make v7-init-tiny"
+	@echo "  make v7-grad-fd"
+	@echo "  make v7-replay"
 	@echo "  make v7-train-parity-3"
 	@echo "  make v7-train-parity-5"
+	@echo "  make v7-gate-train"
 	@echo "  make v7-gate"
 	@echo "  make v7"
 	@echo ""
 	@echo "Notes:"
+	@echo "  - inference baseline is v7-named under version/v7/"
+	@echo "  - run v7-sync-inference only when intentionally re-syncing from version/v6.6"
 	@echo "  - v7.0 scope: deterministic fp32 correctness only"
 	@echo "  - v7.2 scope: bf16, optimization, threaded fast mode"
 	@echo "  - reports written to version/v7/reports/*.json"
+	@echo "  - v7-train-ir-smoke resolves manifest automatically if V7_TRAIN_MANIFEST is unset"
+	@echo "  - training IR always reads from weights_manifest.json (generated by converter/init script)"
+	@echo "  - v7-train-codegen emits compile-ready C runtime from IR2 backward artifact"
+	@echo "  - default is strict: V7_TRAIN_STRICT_UNRESOLVED=1 and V7_TRAIN_ALLOW_PARTIAL=0"
+	@echo "  - set V7_TRAIN_ALLOW_PARTIAL=1 only while iterating unfinished grad-rules"
+
+v7-sync-inference:
+	@$(PYTHON) version/v7/scripts/sync_v7_inference_baseline.py
+
+v7-infer-run:
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_MODEL)" --force-compile --context-len 1024 --prompt "Hello" --max-tokens 16
+
+v7-infer-gate:
+	@$(PYTHON) version/v7/scripts/gen_kernel_registry_from_maps.py --check
+	@$(PYTHON) version/v7/kernel_maps/check_kernel_map_sync.py
+	@$(PYTHON) version/v7/scripts/validate_kernel_registry.py
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_MODEL)" --generate-only --profile --force-compile --context-len 128 --max-tokens 1 --prompt "Hello"
 
 v7-validate-contracts:
 	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --json-out version/v7/reports/contract_report_latest.json
@@ -3201,11 +3292,103 @@ v7-validate-contracts:
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out version/v7/reports/parity_1token_latest.json
 
+v7-qk-norm-backward-parity:
+	@$(PYTHON) version/v7/scripts/check_qk_norm_backward_parity_v7.py --json-out version/v7/reports/qk_norm_backward_parity_latest.json
+
+v7-qk-norm-backward-parity-isa:
+	@$(PYTHON) version/v7/scripts/check_qk_norm_backward_parity_v7.py --isa-matrix --json-out version/v7/reports/qk_norm_backward_parity_isa_latest.json
+
+v7-qk-norm-backward-parity-isa-strict:
+	@$(PYTHON) version/v7/scripts/check_qk_norm_backward_parity_v7.py --isa-matrix --strict-isa --json-out version/v7/reports/qk_norm_backward_parity_isa_strict_latest.json
+
 v7-train-parity-3:
 	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py --epochs 3 --json-out version/v7/reports/train_parity_epochs_3_latest.json
 
 v7-train-parity-5:
 	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py --epochs 5 --json-out version/v7/reports/train_parity_epochs_5_latest.json
+
+v7-train-ir-smoke:
+	@set -e; \
+	manifest="$$V7_TRAIN_MANIFEST"; \
+	if [ -z "$$manifest" ]; then \
+		manifest="$$( $(PYTHON) version/v7/scripts/resolve_train_manifest_v7.py )" || { \
+			echo "ERROR: could not resolve train manifest. Set V7_TRAIN_MANIFEST=/path/to/weights_manifest.json"; exit 1; }; \
+	fi; \
+	if [ ! -f "$$manifest" ]; then \
+		echo "ERROR: manifest not found: $$manifest"; exit 1; \
+	fi; \
+	model_dir="$$(dirname "$$manifest")"; \
+	model_tag="$$(basename "$$model_dir" | tr ' /' '__')"; \
+	ir1_out="version/v7/reports/ir1_train_forward_$${model_tag}.json"; \
+	ir2_out="version/v7/reports/ir2_train_backward_$${model_tag}.json"; \
+	sum_out="version/v7/reports/ir2_train_summary_$${model_tag}.json"; \
+	inv_out="version/v7/reports/ir_train_invariants_$${model_tag}.json"; \
+	strict_flag=""; \
+	if [ "$(V7_TRAIN_STRICT_UNRESOLVED)" = "1" ]; then strict_flag="--strict"; fi; \
+	partial_flag=""; \
+	if [ "$(V7_TRAIN_ALLOW_PARTIAL)" = "1" ]; then partial_flag="--allow-partial"; fi; \
+	inv_flag=""; \
+	if [ "$(V7_TRAIN_STRICT_UNRESOLVED)" = "1" ]; then inv_flag="--strict-unresolved"; fi; \
+	inv_partial_flag=""; \
+	if [ "$(V7_TRAIN_ALLOW_PARTIAL)" = "1" ]; then inv_partial_flag="--allow-partial"; fi; \
+	echo "Using train manifest: $$manifest"; \
+	$(PYTHON) version/v7/scripts/build_ir_train_v7.py --manifest "$$manifest" --output "$$ir1_out" --max-layers $(V7_TRAIN_MAX_LAYERS) --report-out version/v7/reports/ir1_train_latest.json; \
+	$(PYTHON) version/v7/scripts/lower_ir2_backward_v7.py --ir1 "$$ir1_out" --output "$$ir2_out" --checkpoint-policy "$(V7_TRAIN_CHECKPOINT_POLICY)" $$strict_flag $$partial_flag --summary-out "$$sum_out"; \
+	$(PYTHON) version/v7/scripts/validate_ir_train_invariants_v7.py --ir1 "$$ir1_out" --ir2 "$$ir2_out" --output "$$inv_out" $$inv_flag $$inv_partial_flag; \
+	cp "$$ir1_out" version/v7/reports/ir1_train_forward_latest.json; \
+	cp "$$ir2_out" version/v7/reports/ir2_train_backward_latest.json; \
+	cp "$$sum_out" version/v7/reports/ir2_train_summary_latest.json; \
+	cp "$$inv_out" version/v7/reports/ir_train_invariants_latest.json; \
+	echo "v7 train IR smoke complete: model=$$model_tag"
+
+v7-train-ir-backward: v7-train-ir-smoke
+
+v7-train-codegen: v7-train-ir-smoke
+	@set -e; \
+	manifest="$$V7_TRAIN_MANIFEST"; \
+	if [ -z "$$manifest" ]; then \
+		manifest="$$( $(PYTHON) version/v7/scripts/resolve_train_manifest_v7.py )" || { \
+			echo "ERROR: could not resolve train manifest. Set V7_TRAIN_MANIFEST=/path/to/weights_manifest.json"; exit 1; }; \
+	fi; \
+	$(PYTHON) version/v7/scripts/codegen_train_runtime_v7.py \
+		--ir2 "$(V7_TRAIN_CODEGEN_IR2)" \
+		--manifest "$$manifest" \
+		--output "$(V7_TRAIN_CODEGEN_OUT)" \
+		--summary-out "$(V7_TRAIN_CODEGEN_SUMMARY)"
+
+v7-train-compile-smoke: v7-train-codegen
+	@mkdir -p version/v7/reports
+	@$(CC) -std=c11 -O2 -Iinclude -c "$(V7_TRAIN_CODEGEN_OUT)" -o "$(V7_TRAIN_CODEGEN_OBJ)"
+	@echo "Compiled training runtime object: $(V7_TRAIN_CODEGEN_OBJ)"
+
+v7-train-c-smoke: v7-train-compile-smoke
+
+v7-init-tiny:
+	@$(PYTHON) version/v7/scripts/init_tiny_train_model_v7.py \
+		--output-dir "$(V7_TINY_OUT_DIR)" \
+		--seed $(V7_TINY_SEED) \
+		--layers $(V7_TINY_LAYERS) \
+		--vocab-size $(V7_TINY_VOCAB) \
+		--embed-dim $(V7_TINY_EMBED) \
+		--hidden-dim $(V7_TINY_HIDDEN) \
+		--num-heads $(V7_TINY_HEADS) \
+		--num-kv-heads $(V7_TINY_KV_HEADS) \
+		--context-len $(V7_TINY_CTX)
+
+v7-grad-fd:
+	@$(PYTHON) version/v7/scripts/check_fd_gradients_v7.py --json-out version/v7/reports/fd_gradients_latest.json
+
+v7-replay:
+	@$(PYTHON) version/v7/scripts/check_replay_determinism_v7.py --json-out version/v7/reports/replay_determinism_latest.json
+
+v7-gate-train:
+	@$(MAKE) --no-print-directory v7-validate-contracts
+	@$(MAKE) --no-print-directory v7-train-ir-smoke
+	@$(MAKE) --no-print-directory v7-train-compile-smoke
+	@$(MAKE) --no-print-directory v7-parity-1tok
+	@$(MAKE) --no-print-directory v7-grad-fd
+	@$(MAKE) --no-print-directory v7-train-parity-3
+	@$(MAKE) --no-print-directory v7-replay
 
 v7-gate:
 	@$(MAKE) --no-print-directory v7-validate-contracts
@@ -3257,6 +3440,22 @@ PROFILE_V6_CALLGRAPH ?= dwarf,16384
 PROFILE_V6_COMPILER ?= gcc
 PROFILE_V6_VTUNE_TEXT ?= build/ck_v6_vtune_hotspots.txt
 PROFILE_V6_VTUNE_CSV ?= build/ck_v6_vtune_hotspots.csv
+
+PROFILE_V7_SCRIPT := version/v7/scripts/ck_run_v7.py
+PERF_ARTIFACTS_V7_SCRIPT := version/v7/scripts/perf_artifacts_v7.py
+VTUNE_ARTIFACTS_V7_SCRIPT := version/v7/scripts/vtune_artifacts_v7.py
+PERF_GATE_V7_SCRIPT := version/v7/scripts/perf_gate_v7.py
+RESOLVE_MODEL_DIR_V7_SCRIPT := version/v7/scripts/resolve_model_dir_v7.py
+PROFILE_V7_SUMMARY_SCRIPT := version/v7/scripts/generate_profile_summary_v7.py
+PROFILE_V7_PERF_DATA ?= build/ck_v7_perf.data
+PROFILE_V7_PERF_FOLDED ?= build/ck_v7_perf.folded
+PROFILE_V7_FLAMEGRAPH_SVG ?= build/flamegraph_v7.svg
+PROFILE_V7_PERF_STAT_TXT ?= build/ck_v7_perf_stat.txt
+PROFILE_V7_DEBUG_CFLAGS ?= -fno-omit-frame-pointer -g
+PROFILE_V7_CALLGRAPH ?= dwarf,16384
+PROFILE_V7_COMPILER ?= gcc
+PROFILE_V7_VTUNE_TEXT ?= build/ck_v7_vtune_hotspots.txt
+PROFILE_V7_VTUNE_CSV ?= build/ck_v7_vtune_hotspots.csv
 
 profile-v6-prepare-runtime:
 	@if [ "$(V66_PREP_WITH_PYTHON)" != "1" ]; then \
@@ -3574,7 +3773,325 @@ profile-v6-full:
 	$(MAKE) profile-v6-perf-stat
 	$(MAKE) profile-v6-flamegraph
 	$(MAKE) profile-v6-vtune
-	@echo "=== Open visualizer: version/v6.6/tools/ir_visualizer.html ==="
+
+# v7 native profiling targets.
+profile-v7-prepare-runtime:
+	@if [ "$(V7_PREP_WITH_PYTHON)" != "1" ]; then \
+		echo "SKIP: python prep disabled (V7_PREP_WITH_PYTHON=$(V7_PREP_WITH_PYTHON))"; \
+	else \
+		prep_model="$(V7_MODEL)"; \
+		if [ -d "$$prep_model" ]; then \
+			gguf_path="$$(find "$$prep_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+			if [ -n "$$gguf_path" ]; then prep_model="$$gguf_path"; fi; \
+		fi; \
+		echo "Preparing runtime via ck_run_v7.py (model=$$prep_model, force_compile=$(V7_FORCE_COMPILE))"; \
+		CK_PROFILE=1 \
+		CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+		CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+		$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+			"$$prep_model" \
+			--generate-only \
+			--profile \
+			$(V7_FORCE_COMPILE_ARG) \
+			--context-len 1024 --prompt "Hello" --max-tokens 1 \
+			$(V7_RUN_ARGS); \
+	fi
+
+profile-v7-decode:
+	@if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		needs_regen=0; regen_reason=""; \
+		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+		fi; \
+		if [ "$$needs_regen" -eq 0 ]; then \
+			echo "Using existing compiled runtime in $$model_dir"; \
+		else \
+			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+			regen_model="$(V7_MODEL)"; \
+			if [ -d "$$regen_model" ]; then \
+				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+			fi; \
+			CK_PROFILE=1 \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$$regen_model" \
+				--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+				--context-len 1024 --prompt "Hello" --max-tokens 1 \
+				$(V7_RUN_ARGS); \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+		fi; \
+		$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+		CK_PROFILE=1 \
+		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
+		./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+			--prompt "The quick brown fox" --max-tokens 32 --timing \
+			$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+		$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
+	else \
+		CK_PROFILE=1 \
+		CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+		$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+			"$(V7_MODEL)" \
+			--profile $(V7_FORCE_COMPILE_ARG) \
+			--prompt "The quick brown fox" --max-tokens 32 \
+			$(V7_RUN_ARGS); \
+	fi
+	@echo "Profile data saved in model cache directory"
+
+profile-v7-prefill:
+	@if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		needs_regen=0; regen_reason=""; \
+		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+		fi; \
+		if [ "$$needs_regen" -eq 0 ]; then \
+			echo "Using existing compiled runtime in $$model_dir"; \
+		else \
+			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+			regen_model="$(V7_MODEL)"; \
+			if [ -d "$$regen_model" ]; then \
+				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+			fi; \
+			CK_PROFILE=1 \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$$regen_model" \
+				--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+				--context-len 1024 --prompt "Hello" --max-tokens 1 \
+				$(V7_RUN_ARGS); \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+		fi; \
+		$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+		CK_PROFILE=1 \
+		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
+		./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+			--prompt "Explain the theory of relativity in simple terms" --max-tokens 1 --timing \
+			$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+		$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
+	else \
+		CK_PROFILE=1 \
+		CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+		$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+			"$(V7_MODEL)" \
+			--profile $(V7_FORCE_COMPILE_ARG) \
+			--prompt "Explain the theory of relativity in simple terms" \
+			--max-tokens 1 \
+			$(V7_RUN_ARGS); \
+	fi
+	@echo "Profile data saved in model cache directory"
+
+profile-v7-flamegraph:
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: perf not installed"; \
+	elif [ ! -x ./FlameGraph/stackcollapse-perf.pl ] || [ ! -x ./FlameGraph/flamegraph.pl ]; then \
+		echo "SKIP: FlameGraph tools missing (expected ./FlameGraph/stackcollapse-perf.pl and ./FlameGraph/flamegraph.pl)"; \
+	else \
+		mkdir -p build; \
+		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V7_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V7_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+			perf record --all-user -F 999 --call-graph $(PROFILE_V7_CALLGRAPH) -o $(PROFILE_V7_PERF_DATA) -- \
+				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+		else \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+			perf record --all-user -F 999 --call-graph $(PROFILE_V7_CALLGRAPH) -o $(PROFILE_V7_PERF_DATA) -- \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$(V7_MODEL)" \
+				$(V7_FORCE_COMPILE_ARG) \
+				--prompt "The quick brown fox" --max-tokens 32 \
+				$(V7_RUN_ARGS); \
+		fi; \
+		perf script -i $(PROFILE_V7_PERF_DATA) | \
+			./FlameGraph/stackcollapse-perf.pl | \
+			tee $(PROFILE_V7_PERF_FOLDED) | \
+			./FlameGraph/flamegraph.pl --title="CK v7 Decode" > $(PROFILE_V7_FLAMEGRAPH_SVG); \
+		$(PYTHON) $(PERF_ARTIFACTS_V7_SCRIPT) \
+			--model-input "$(V7_MODEL)" \
+			--perf-data $(PROFILE_V7_PERF_DATA) \
+			--folded $(PROFILE_V7_PERF_FOLDED) \
+			--flamegraph-svg $(PROFILE_V7_FLAMEGRAPH_SVG); \
+	fi
+
+profile-v7-perf-stat:
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: perf not installed"; \
+	else \
+		mkdir -p build; \
+		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V7_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V7_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
+LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
+branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) \
+				2> $(PROFILE_V7_PERF_STAT_TXT); \
+		else \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
+LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
+branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$(V7_MODEL)" \
+				--context-len 1024 --prompt "The quick brown fox" --max-tokens 32 \
+				$(V7_RUN_ARGS) \
+				2> $(PROFILE_V7_PERF_STAT_TXT); \
+		fi; \
+		cat $(PROFILE_V7_PERF_STAT_TXT); \
+		$(PYTHON) $(PERF_ARTIFACTS_V7_SCRIPT) \
+			--model-input "$(V7_MODEL)" \
+			--perf-stat $(PROFILE_V7_PERF_STAT_TXT); \
+	fi
+
+profile-v7-cachegrind:
+	valgrind --tool=cachegrind --cachegrind-out-file=build/cachegrind_v7.out \
+	$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+		"$(V7_MODEL)" \
+		--context-len 1024 --prompt "Hello" --max-tokens 4 $(V7_RUN_ARGS)
+	cg_annotate build/cachegrind_v7.out > build/cachegrind_v7_annotated.txt
+
+profile-v7-vtune:
+	@if [ "$(V7_WITH_VTUNE)" != "1" ]; then \
+		echo "SKIP: VTune probe disabled (V7_WITH_VTUNE=$(V7_WITH_VTUNE))"; \
+	elif ! command -v vtune >/dev/null 2>&1; then \
+		echo "SKIP: vtune not installed"; \
+	elif [ -r /proc/sys/kernel/yama/ptrace_scope ] && [ "$$(cat /proc/sys/kernel/yama/ptrace_scope)" -gt 0 ]; then \
+		echo "SKIP: vtune blocked by kernel.yama.ptrace_scope=$$(cat /proc/sys/kernel/yama/ptrace_scope)"; \
+		echo "      run: sudo sysctl -w kernel.yama.ptrace_scope=0"; \
+	else \
+		mkdir -p build; \
+		vtune_result="build/ck_v7_vtune_$$(date +%Y%m%d_%H%M%S)"; \
+		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$model_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V7_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V7_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
+				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) || { \
+					echo "SKIP: vtune collect failed for CLI runtime"; \
+					exit 0; \
+				}; \
+		else \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$(V7_MODEL)" \
+				$(V7_FORCE_COMPILE_ARG) \
+				--prompt "The quick brown fox" --max-tokens 32 \
+				$(V7_RUN_ARGS) || { \
+					echo "SKIP: vtune collect failed for python runtime"; \
+					exit 0; \
+				}; \
+		fi; \
+		vtune -report hotspots -result-dir "$$vtune_result" -format text -report-output $(PROFILE_V7_VTUNE_TEXT) >/dev/null 2>&1 || true; \
+		vtune -report hotspots -result-dir "$$vtune_result" -format csv -report-output $(PROFILE_V7_VTUNE_CSV) >/dev/null 2>&1 || true; \
+		$(PYTHON) $(VTUNE_ARTIFACTS_V7_SCRIPT) \
+			--model-input "$(V7_MODEL)" \
+			--result-dir "$$vtune_result" \
+			--report-text $(PROFILE_V7_VTUNE_TEXT) \
+			--report-csv $(PROFILE_V7_VTUNE_CSV); \
+	fi
+
+profile-v7-full:
+	@$(MAKE) --no-print-directory profile-v7-prepare-runtime
+	@$(MAKE) --no-print-directory profile-v7-decode
+	@$(MAKE) --no-print-directory profile-v7-prefill
+	@$(MAKE) --no-print-directory profile-v7-perf-stat
+	@$(MAKE) --no-print-directory profile-v7-flamegraph
+	@$(MAKE) --no-print-directory profile-v7-vtune
+	@echo "=== Open visualizer: version/v7/tools/ir_visualizer.html ==="
 	@echo "=== Load folder from model cache to see Profile tab ==="
 
 v6.6-memory-signoff:
@@ -3597,6 +4114,24 @@ v6.6-perf-gate:
 
 v6.6-perf-gate-evaluate:
 	@$(PYTHON) $(PERF_GATE_V6_SCRIPT) --model-input "$(V66_MODEL)"
+
+# v7 perf gate.
+v7-perf-gate:
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: v7-perf-gate (perf not installed)"; \
+	elif [ ! -x ./FlameGraph/stackcollapse-perf.pl ] || [ ! -x ./FlameGraph/flamegraph.pl ]; then \
+		echo "SKIP: v7-perf-gate (FlameGraph tools missing)"; \
+	else \
+		$(MAKE) --no-print-directory profile-v7-prepare-runtime; \
+		$(MAKE) --no-print-directory profile-v7-decode; \
+		$(MAKE) --no-print-directory profile-v7-perf-stat; \
+		$(MAKE) --no-print-directory profile-v7-flamegraph; \
+		$(MAKE) --no-print-directory profile-v7-vtune || true; \
+		$(MAKE) --no-print-directory v7-perf-gate-evaluate; \
+	fi
+
+v7-perf-gate-evaluate:
+	@$(PYTHON) $(PERF_GATE_V7_SCRIPT) --model-input "$(V7_MODEL)"
 
 # =============================================================================
 # Thread Pool Tests

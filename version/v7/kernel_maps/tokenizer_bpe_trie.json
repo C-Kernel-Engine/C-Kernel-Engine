@@ -1,0 +1,94 @@
+{
+  "id": "tokenizer_bpe_trie",
+  "kernel": "tokenizer_bpe_trie",
+  "op": "tokenizer",
+  "description": "BPE tokenizer using trie data structure for UTF-8 text to token ID conversion",
+  "category": "tokenizer",
+  "section": "header",
+
+  "signature": {
+    "init_function": "ck_tokenizer_load_binary",
+    "init_params": [
+      {"name": "tok", "type": "CKTokenizer*", "description": "Tokenizer instance"},
+      {"name": "vocab_size", "type": "int", "description": "Number of tokens in vocabulary"},
+      {"name": "offsets", "type": "const int32_t*", "description": "vocab_offsets from bump"},
+      {"name": "strings", "type": "const char*", "description": "vocab_strings from bump"},
+      {"name": "num_merges", "type": "int", "description": "Number of merge rules"},
+      {"name": "merges", "type": "const int32_t*", "description": "vocab_merges from bump"}
+    ],
+    "encode_function": "ck_tokenizer_encode",
+    "encode_params": [
+      {"name": "tok", "type": "const CKTokenizer*", "description": "Tokenizer instance"},
+      {"name": "text", "type": "const char*", "description": "UTF-8 input text"},
+      {"name": "text_len", "type": "int", "description": "Length of input text in bytes (-1 for strlen)"},
+      {"name": "ids", "type": "int32_t*", "description": "Output token IDs buffer"},
+      {"name": "max_ids", "type": "int", "description": "Maximum tokens to output (context_len)"}
+    ],
+    "return": {"type": "int", "description": "Number of tokens produced"}
+  },
+
+  "inputs": {
+    "text_input": {
+      "type": "activation",
+      "dtype": "u8",
+      "shape": ["text_len"],
+      "description": "UTF-8 encoded input text"
+    }
+  },
+
+  "weights": {
+    "vocab_offsets": {
+      "type": "weight",
+      "dtype": "i32",
+      "shape": ["vocab_size"],
+      "description": "Offset into vocab_strings for each token"
+    },
+    "vocab_strings": {
+      "type": "weight",
+      "dtype": "u8",
+      "shape": ["total_vocab_bytes"],
+      "description": "Packed vocabulary token strings"
+    },
+    "vocab_merges": {
+      "type": "weight",
+      "dtype": "i32",
+      "shape": ["num_merges", 3],
+      "description": "BPE merge rules: [token_a, token_b, merged_token]"
+    }
+  },
+
+  "outputs": {
+    "token_ids": {
+      "type": "activation",
+      "dtype": "i32",
+      "shape": ["num_tokens"],
+      "description": "Output token IDs (num_tokens <= max_tokens)"
+    }
+  },
+
+  "algorithm": {
+    "description": "Trie-based BPE tokenization",
+    "steps": [
+      "1. Build trie from vocab_offsets + vocab_strings (or use prebuilt)",
+      "2. For each position in text_input:",
+      "   a. Walk trie to find longest matching token",
+      "   b. If no match, apply BPE merges or use <unk>",
+      "   c. Output token_id, advance position",
+      "3. Return number of tokens produced"
+    ],
+    "complexity": "O(text_len * max_token_len)"
+  },
+
+  "implementation_notes": [
+    "Trie can be prebuilt at model load time from vocab_offsets/vocab_strings",
+    "BPE merges needed for handling out-of-vocabulary subwords",
+    "Special tokens: <pad>, <unk>, <bos>, <eos> typically at fixed IDs",
+    "UTF-8 aware: must handle multi-byte characters correctly"
+  ],
+
+  "source": {
+    "file": "src/tokenizer/tokenizer.c",
+    "header": "include/tokenizer/tokenizer.h",
+    "dependencies": ["hash_table.c", "murmurhash3.c", "utf8.c"]
+  }
+}

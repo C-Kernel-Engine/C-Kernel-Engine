@@ -1,0 +1,2980 @@
+{
+  "_meta": {
+    "description": "Kernel parameter bindings for data-driven codegen",
+    "version": "v7",
+    "format": {
+      "binding_types": [
+        "weight:<field_name> - Weight from L-><field> or L_HEADER.<field>",
+        "weight_f:<field_name> - Weight as float* (for fp32 weights like gamma)",
+        "activation:<offset> - Activation buffer at offset",
+        "dim:<dim_name> - Dimension constant (embed_dim, num_heads, etc.)",
+        "runtime:<expr_name> - Runtime expression (kv_k, kv_v, rope_cos, rope_sin, pos)",
+        "dtype:<dtype_name> - CKDataType enum value",
+        "dtype_weight:<field_name> - CKDataType from weight dtype",
+        "const:<value> - Literal constant",
+        "null - NULL pointer"
+      ]
+    }
+  },
+  "bindings": {
+    "embedding_forward": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
+    "embedding_forward_q8_0": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
+    "mega_fused_attention_decode": {
+      "params": [
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "residual",
+          "source": "activation:residual",
+          "cast": "const float*"
+        },
+        {
+          "name": "ln1_gamma",
+          "source": "weight_f:ln1_gamma"
+        },
+        {
+          "name": "wq",
+          "source": "weight:wq"
+        },
+        {
+          "name": "bq",
+          "source": "weight_f:bq"
+        },
+        {
+          "name": "wk",
+          "source": "weight:wk"
+        },
+        {
+          "name": "bk",
+          "source": "weight_f:bk"
+        },
+        {
+          "name": "wv",
+          "source": "weight:wv"
+        },
+        {
+          "name": "bv",
+          "source": "weight_f:bv"
+        },
+        {
+          "name": "wo",
+          "source": "weight:wo"
+        },
+        {
+          "name": "bo",
+          "source": "weight_f:bo"
+        },
+        {
+          "name": "kv_cache_k",
+          "source": "runtime:kv_k"
+        },
+        {
+          "name": "kv_cache_v",
+          "source": "runtime:kv_v"
+        },
+        {
+          "name": "rope_cos",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "rope_sin",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "pos",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "mega_fused_attention_prefill": {
+      "note": "Signature: output, input, residual, ln1_gamma, wq, bq, wq_dt, wk, bk, wk_dt, wv, bv, wv_dt, wo, bo, wo_dt, kv_k, kv_v, rope_cos, rope_sin, start_pos, tokens, cache_capacity, embed_dim, aligned_embed_dim, num_heads, num_kv_heads, head_dim, aligned_head_dim, eps, scratch",
+      "params": [
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "residual",
+          "source": "activation:residual",
+          "cast": "const float*"
+        },
+        {
+          "name": "ln1_gamma",
+          "source": "weight_f:ln1_gamma",
+          "cast": "const float*"
+        },
+        {
+          "name": "wq",
+          "source": "weight:wq"
+        },
+        {
+          "name": "bq",
+          "source": "weight_f:bq",
+          "cast": "const float*"
+        },
+        {
+          "name": "wq_dt",
+          "source": "dtype:q5_0"
+        },
+        {
+          "name": "wk",
+          "source": "weight:wk"
+        },
+        {
+          "name": "bk",
+          "source": "weight_f:bk",
+          "cast": "const float*"
+        },
+        {
+          "name": "wk_dt",
+          "source": "dtype:q5_0"
+        },
+        {
+          "name": "wv",
+          "source": "weight:wv"
+        },
+        {
+          "name": "bv",
+          "source": "weight_f:bv",
+          "cast": "const float*"
+        },
+        {
+          "name": "wv_dt",
+          "source": "dtype:q8_0"
+        },
+        {
+          "name": "wo",
+          "source": "weight:wo"
+        },
+        {
+          "name": "bo",
+          "source": "weight_f:bo",
+          "cast": "const float*"
+        },
+        {
+          "name": "wo_dt",
+          "source": "dtype:q5_0"
+        },
+        {
+          "name": "kv_cache_k",
+          "source": "runtime:kv_k",
+          "cast": "float*"
+        },
+        {
+          "name": "kv_cache_v",
+          "source": "runtime:kv_v",
+          "cast": "float*"
+        },
+        {
+          "name": "rope_cos",
+          "source": "runtime:rope_cos",
+          "cast": "const float*"
+        },
+        {
+          "name": "rope_sin",
+          "source": "runtime:rope_sin",
+          "cast": "const float*"
+        },
+        {
+          "name": "start_pos",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "eps",
+          "source": "const:1e-5f"
+        },
+        {
+          "name": "scratch",
+          "source": "scratch:mlp_scratch",
+          "cast": "void*"
+        }
+      ]
+    },
+    "mega_fused_outproj_mlp_prefill": {
+      "params": [
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "attn_out",
+          "source": "activation:attn_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "residual",
+          "source": "activation:residual",
+          "cast": "const float*"
+        },
+        {
+          "name": "ln2_gamma",
+          "source": "weight_f:ln2_gamma"
+        },
+        {
+          "name": "wo",
+          "source": "weight:wo"
+        },
+        {
+          "name": "bo",
+          "source": "weight_f:bo"
+        },
+        {
+          "name": "wo_dt",
+          "source": "dtype:q5_0"
+        },
+        {
+          "name": "w1",
+          "source": "weight:w1"
+        },
+        {
+          "name": "b1",
+          "source": "weight_f:b1"
+        },
+        {
+          "name": "w1_dt",
+          "source": "dtype:q5_0"
+        },
+        {
+          "name": "w2",
+          "source": "weight:w2"
+        },
+        {
+          "name": "b2",
+          "source": "weight_f:b2"
+        },
+        {
+          "name": "w2_dt",
+          "source": "dtype:q6_k"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "intermediate_dim",
+          "source": "dim:intermediate_size"
+        },
+        {
+          "name": "aligned_intermediate_dim",
+          "source": "dim:intermediate_size"
+        },
+        {
+          "name": "eps",
+          "source": "const:1e-5f"
+        },
+        {
+          "name": "scratch",
+          "source": "scratch:mlp_scratch",
+          "cast": "void*"
+        }
+      ]
+    },
+    "rmsnorm_forward": {
+      "note": "gamma source is determined by which weight is present (pre/post norms and final norm)",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:_gamma",
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "post_attention_norm",
+            "post_ffn_norm",
+            "final_ln_weight"
+          ]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "null"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "qk_norm_forward": {
+      "note": "Per-head RMSNorm on Q and K. Wraps rmsnorm_forward twice (Q then K). In-place on scratch buffers.",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "q_gamma",
+          "source": "weight_f:q_norm"
+        },
+        {
+          "name": "k_gamma",
+          "source": "weight_f:k_norm"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "qk_norm_backward_f32": {
+      "note": "v7 training backward for Q/K per-head RMSNorm.",
+      "params": [
+        {
+          "name": "d_q_out",
+          "source": "activation:d_q_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_k_out",
+          "source": "activation:d_k_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "q_in",
+          "source": "activation:q_in",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_in",
+          "source": "activation:k_in",
+          "cast": "const float*"
+        },
+        {
+          "name": "q_gamma",
+          "source": "weight_f:q_gamma",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_gamma",
+          "source": "weight_f:k_gamma",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_q_in",
+          "source": "output:d_q_in",
+          "cast": "float*"
+        },
+        {
+          "name": "d_k_in",
+          "source": "output:d_k_in",
+          "cast": "float*"
+        },
+        {
+          "name": "d_q_gamma",
+          "source": "output:d_q_gamma",
+          "cast": "float*"
+        },
+        {
+          "name": "d_k_gamma",
+          "source": "output:d_k_gamma",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "rope_forward_qk": {
+      "note": "RoPE is typically in-place: input q,k are modified and returned as output q,k",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        }
+      ]
+    },
+    "kv_cache_store": {
+      "note": "Store K,V to KV cache at current position after RoPE",
+      "params": [
+        {
+          "name": "kv_cache_k",
+          "source": "runtime:kv_cache_k_layer",
+          "cast": "float*"
+        },
+        {
+          "name": "kv_cache_v",
+          "source": "runtime:kv_cache_v_layer",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "layer",
+          "source": "runtime:layer"
+        },
+        {
+          "name": "pos",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "max_seq_len",
+          "source": "dim:max_seq_len"
+        }
+      ]
+    },
+    "attention_forward_causal_head_major_gqa_flash_strided": {
+      "note": "Prefill: all tokens process together with causal mask",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
+        }
+      ]
+    },
+    "attention_forward_decode_head_major_gqa_flash": {
+      "note": "Decode: single query token attends to KV cache (positions 0..pos)",
+      "params": [
+        {
+          "name": "q_token",
+          "source": "scratch:q_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_cache",
+          "source": "runtime:kv_cache_k_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "v_cache",
+          "source": "runtime:kv_cache_v_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "out_token",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "kv_tokens",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        }
+      ]
+    },
+    "attention_forward_causal_head_major_gqa_flash_strided_sliding": {
+      "note": "Prefill: sliding window attention with causal mask",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "sliding_window",
+          "source": "dim:sliding_window"
+        }
+      ]
+    },
+    "attention_forward_decode_head_major_gqa_flash_sliding": {
+      "note": "Decode: sliding window attention - single query token attends to last W KV cache entries",
+      "params": [
+        {
+          "name": "q_token",
+          "source": "scratch:q_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_cache",
+          "source": "runtime:kv_cache_k_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "v_cache",
+          "source": "runtime:kv_cache_v_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "out_token",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "kv_tokens",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "sliding_window",
+          "source": "dim:sliding_window"
+        }
+      ]
+    },
+    "geglu_forward_fp32": {
+      "note": "GeGLU: out = GELU(a) * b where x = [a, b] along last dim",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "out",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_size"
+        }
+      ]
+    },
+    "geglu_forward_bf16": {
+      "note": "BF16 GeGLU: converts to FP32, computes, converts back",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const uint16_t*"
+        },
+        {
+          "name": "out",
+          "source": "output:output",
+          "cast": "uint16_t*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_size"
+        },
+        {
+          "name": "scratch",
+          "source": "scratch:geglu_scratch",
+          "cast": "float*"
+        }
+      ]
+    },
+    "ck_qkv_project_head_major_quant": {
+      "note": "Prefill: head-major QKV projection into KV cache",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "wq",
+          "source": "weight:wq"
+        },
+        {
+          "name": "bq",
+          "source": "weight_f:bq",
+          "cast": "const float*"
+        },
+        {
+          "name": "wq_dtype",
+          "source": "dtype_weight:wq"
+        },
+        {
+          "name": "wk",
+          "source": "weight:wk"
+        },
+        {
+          "name": "bk",
+          "source": "weight_f:bk",
+          "cast": "const float*"
+        },
+        {
+          "name": "wk_dtype",
+          "source": "dtype_weight:wk"
+        },
+        {
+          "name": "wv",
+          "source": "weight:wv"
+        },
+        {
+          "name": "bv",
+          "source": "weight_f:bv",
+          "cast": "const float*"
+        },
+        {
+          "name": "wv_dtype",
+          "source": "dtype_weight:wv"
+        },
+        {
+          "name": "q",
+          "source": "output:q",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "output:k",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "output:v",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        }
+      ]
+    },
+    "ck_attention_project_head_major_quant": {
+      "note": "Prefill: head-major attention projection",
+      "params": [
+        {
+          "name": "attn_out",
+          "source": "activation:attn_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "wo",
+          "source": "weight:wo"
+        },
+        {
+          "name": "bo",
+          "source": "weight_f:bo",
+          "cast": "const float*"
+        },
+        {
+          "name": "out",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "scratch",
+          "source": "activation:scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "wo_dtype",
+          "source": "dtype_weight:wo"
+        }
+      ]
+    },
+    "ck_residual_add_token_major": {
+      "note": "a is current output (outproj/mlp_down), b is saved residual",
+      "params": [
+        {
+          "name": "a",
+          "source": "activation:input",
+          "cast": "float*"
+        },
+        {
+          "name": "b",
+          "source": "scratch:residual",
+          "cast": "float*"
+        },
+        {
+          "name": "out",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        }
+      ]
+    },
+    "swiglu_forward": {
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:gate",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_size"
+        }
+      ]
+    },
+    "memcpy": {
+      "params": [
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "cast": "void*"
+        },
+        {
+          "name": "src",
+          "source": "activation:src",
+          "cast": "const void*"
+        },
+        {
+          "name": "size",
+          "source": "dim:_memcpy_bytes"
+        }
+      ]
+    },
+    "kv_cache_batch_copy": {
+      "params": [
+        {
+          "name": "k_dst",
+          "source": "output:k_dst",
+          "cast": "void*"
+        },
+        {
+          "name": "k_src",
+          "source": "activation:k_src",
+          "cast": "const void*"
+        },
+        {
+          "name": "v_dst",
+          "source": "output:v_dst",
+          "cast": "void*"
+        },
+        {
+          "name": "v_src",
+          "source": "activation:v_src",
+          "cast": "const void*"
+        },
+        {
+          "name": "size",
+          "source": "dim:_kv_copy_bytes"
+        }
+      ],
+      "notes": "Emit two memcpy calls: K and V cache batch copy in prefill mode."
+    },
+    "memmove": {
+      "params": [
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "cast": "void*"
+        },
+        {
+          "name": "src",
+          "source": "activation:src",
+          "cast": "const void*"
+        },
+        {
+          "name": "size",
+          "source": "param:_copy_size"
+        }
+      ],
+      "notes": "Memory move for overlapping buffers. Used for copy_last_logits in prefill mode."
+    },
+    "transpose_inplace": {
+      "params": [
+        {
+          "name": "buf",
+          "source": "scratch:buf",
+          "cast": "void*"
+        }
+      ],
+      "notes": "No-op: prefill codegen generates its own transpose loops"
+    },
+    "gemv_q5_0_q8_0": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_0",
+      "notes": "_first_weight is determined from weights dict, _output_dim/_input_dim from weight shape"
+    },
+    "gemv_q5_0": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemv_q4_k": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemv_q6_k": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemv_q5_k": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_K: 5-bit super-block quant with nested scales."
+    },
+    "gemv_q4_k_q8_k": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "gemv_q6_k_q8_k": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "gemv_q5_1": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_1 uses minimum value (m) for better precision."
+    },
+    "gemv_q5_1_q8_1": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Q5_1 with internal FP32->Q8_1 activation contract."
+    },
+    "gemv_q8_0_q8_0": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "gemv_q8_0_q8_0_parallel_omp": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "OpenMP-parallel variant \u2014 same signature as gemv_q8_0_q8_0"
+    },
+    "gemv_q5_0_q8_0_parallel_omp": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x_q8",
+          "source": "activation:x",
+          "cast": "void*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_0",
+      "notes": "OpenMP-parallel variant \u2014 same signature as gemv_q5_0_q8_0"
+    },
+    "gemv_fused_q5_0_bias_parallel_omp": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "OpenMP-parallel variant \u2014 same signature as gemv_fused_q5_0_bias_dispatch"
+    },
+    "gemv_fused_q5_0_bias_dispatch": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Fused quantize + GEMV (Q5_0 weights) + bias add. FP32 input, quantized internally."
+    },
+    "gemv_fused_q8_0_bias_dispatch": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Fused quantize + GEMV (Q8_0 weights) + bias add. FP32 input, quantized internally."
+    },
+    "gemm_nt_q5_0": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemm_nt_q4_k": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemm_nt_q6_k": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemm_nt_q5_k": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_K: 5-bit super-block quant with nested scales."
+    },
+    "gemm_nt_q5_1": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed. Q5_1 uses minimum value (m) for better precision."
+    },
+    "gemm_nt_q5_1_q8_1": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Q5_1 with internal FP32->Q8_1 activation contract."
+    },
+    "gemm_blocked_serial": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 fallback GEMM (blocked serial)"
+    },
+    "gemm_nt_q8_0": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemm_nt_q8_0_q8_0_contract": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Q8_0 contract path with internal activation quantization."
+    },
+    "gemm_nt_q5_0_q8_0": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const void*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_0",
+      "notes": "Q8_0 activation version - requires quantize_row_q8_0 before call"
+    },
+    "gemm_nt_q6_k_q8_k": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const void*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_k",
+      "notes": "Q8_K activation version - requires quantize_row_q8_k before call"
+    },
+    "gemm_nt_q8_0_q8_0": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const void*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_0",
+      "notes": "Q8_0 activation version for weight Q8_0"
+    },
+    "gemm_nt_q4_k_q8_k": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const void*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "requires_quantized_activation": "q8_k",
+      "notes": "Q8_K activation version for weight Q4_K"
+    },
+    "gemv_q8_0": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation version - no quantization needed"
+    },
+    "gemv_q8_0_q8_0_contract": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Q8_0 contract path with internal activation quantization."
+    },
+    "gemv_q4_0": {
+      "params": [
+        {
+          "name": "y",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "W",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "x",
+          "source": "activation:x",
+          "cast": "const float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation with Q4_0 weight - no quantization needed"
+    },
+    "gemm_nt_q4_0": {
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "FP32 activation with Q4_0 weight - no quantization needed"
+    },
+    "dense_embedding_lookup": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ],
+      "notes": "Token embedding lookup - fp16 weights dequantized to fp32 at load time"
+    },
+    "add_inplace_f32": {
+      "params": [
+        {
+          "name": "a",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "b",
+          "source": "weight_f:_bias",
+          "cast": "const float*"
+        },
+        {
+          "name": "n",
+          "source": "dim:_output_dim"
+        }
+      ],
+      "notes": "In-place bias add: y += bias"
+    },
+    "quantize_row_q8_0": {
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "y",
+          "source": "output:output",
+          "cast": "void*"
+        },
+        {
+          "name": "k",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Quantize FP32 activation to Q8_0 format. Output buffer must be sized for Q8_0 blocks."
+    },
+    "quantize_row_q8_k": {
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "y",
+          "source": "output:output",
+          "cast": "void*"
+        },
+        {
+          "name": "k",
+          "source": "dim:_input_dim"
+        }
+      ],
+      "notes": "Quantize FP32 activation to Q8_K format. Output buffer must be sized for Q8_K blocks."
+    },
+    "logits_copy_to_position": {
+      "params": [
+        {
+          "name": "src",
+          "source": "activation:src",
+          "cast": "const float*"
+        },
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "cast": "float*"
+        },
+        {
+          "name": "position",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        }
+      ],
+      "notes": "Copy logits from scratch to position-indexed location. Used in decode mode."
+    },
+    "rope_precompute_cache": {
+      "params": [
+        {
+          "name": "cos_cache",
+          "source": "output:rope_cos",
+          "cast": "float*"
+        },
+        {
+          "name": "sin_cache",
+          "source": "output:rope_sin",
+          "cast": "float*"
+        },
+        {
+          "name": "max_seq_len",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "base",
+          "source": "dim:rope_theta",
+          "cast": "float"
+        }
+      ],
+      "notes": "Precompute RoPE cos/sin cache. Called ONCE at model init with rope_theta from config. Different models use different theta: Llama2=10000, Llama3=500000, Qwen2=1000000."
+    },
+    "rope_forward_qk_with_rotary_dim": {
+      "note": "RoPE is typically in-place: input q,k are modified and returned as output q,k",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "rotary_dim",
+          "source": "dim:rotary_dim"
+        }
+      ]
+    },
+    "rope_forward_qk_split": {
+      "note": "Legacy split-cache RoPE (head_dim/2 cache layout)",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        }
+      ]
+    },
+    "rope_precompute_cache_split": {
+      "note": "Legacy split-cache RoPE init (head_dim/2 cache layout)",
+      "params": [
+        {
+          "name": "cos_cache",
+          "source": "output:rope_cos",
+          "cast": "float*"
+        },
+        {
+          "name": "sin_cache",
+          "source": "output:rope_sin",
+          "cast": "float*"
+        },
+        {
+          "name": "max_seq_len",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "base",
+          "source": "config:rope_theta"
+        }
+      ]
+    },
+    "rmsnorm_backward": {
+      "note": "v7 training backward: d_input + d_gamma",
+      "params": [
+        {
+          "name": "d_output",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "cast": "const float*"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "activation:rstd_cache",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_input",
+          "source": "output:d_input",
+          "cast": "float*"
+        },
+        {
+          "name": "d_gamma",
+          "source": "output:d_gamma",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:aligned_embed_dim"
+        }
+      ]
+    },
+    "gemm_backward_f32": {
+      "note": "v7 training backward: generic linear/matmul backward",
+      "params": [
+        {
+          "name": "d_output",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "fc2_input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "W_fc2",
+          "source": "weight_f:W",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_input",
+          "source": "output:d_input",
+          "cast": "float*"
+        },
+        {
+          "name": "d_W_fc2",
+          "source": "output:d_weight",
+          "cast": "float*"
+        },
+        {
+          "name": "d_b_fc2",
+          "source": "output:d_bias",
+          "cast": "float*"
+        },
+        {
+          "name": "T",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "aligned_in",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_out",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_threads",
+          "source": "runtime:num_threads"
+        }
+      ]
+    },
+    "residual_add_backward_f32": {
+      "note": "v7 training backward: residual split gradient",
+      "params": [
+        {
+          "name": "d_out",
+          "source": "activation:d_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_a",
+          "source": "output:d_a",
+          "cast": "float*"
+        },
+        {
+          "name": "d_b",
+          "source": "output:d_b",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        }
+      ]
+    },
+    "rope_backward_qk_f32": {
+      "note": "v7 training backward: inverse RoPE for q/k",
+      "params": [
+        {
+          "name": "d_q_out",
+          "source": "activation:d_q_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_k_out",
+          "source": "activation:d_k_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_q",
+          "source": "output:d_q",
+          "cast": "float*"
+        },
+        {
+          "name": "d_k",
+          "source": "output:d_k",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos",
+          "cast": "const float*"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin",
+          "cast": "const float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:aligned_head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        }
+      ]
+    },
+    "embedding_backward_f32": {
+      "note": "v7 training backward: embedding table scatter-add",
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:token_ids",
+          "cast": "const int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_output",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_token_embeddings",
+          "source": "output:d_token_embeddings",
+          "cast": "float*"
+        },
+        {
+          "name": "d_pos_embeddings",
+          "source": "output:d_pos_embeddings",
+          "cast": "float*"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:aligned_embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
+    "swiglu_backward_exact": {
+      "note": "v7 training backward: exact swiglu gradient",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_output",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_input",
+          "source": "output:d_input",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_dim"
+        }
+      ]
+    },
+    "softmax_cross_entropy_loss": {
+      "note": "v7 training loss kernel (loss + d_logits)",
+      "params": [
+        {
+          "name": "logits",
+          "source": "activation:logits",
+          "cast": "const float*"
+        },
+        {
+          "name": "targets",
+          "source": "activation:targets",
+          "cast": "const int32_t*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "d_logits",
+          "source": "output:d_logits",
+          "cast": "float*"
+        },
+        {
+          "name": "loss_out",
+          "source": "output:loss_out",
+          "cast": "float*"
+        }
+      ]
+    },
+    "attention_backward_causal_head_major_gqa": {
+      "note": "v7 training attention backward reference path",
+      "params": [
+        {
+          "name": "d_output",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "q",
+          "source": "activation:q",
+          "cast": "const float*"
+        },
+        {
+          "name": "k",
+          "source": "activation:k",
+          "cast": "const float*"
+        },
+        {
+          "name": "v",
+          "source": "activation:v",
+          "cast": "const float*"
+        },
+        {
+          "name": "attn_weights",
+          "source": "activation:attn_weights",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_q",
+          "source": "output:d_q",
+          "cast": "float*"
+        },
+        {
+          "name": "d_k",
+          "source": "output:d_k",
+          "cast": "float*"
+        },
+        {
+          "name": "d_v",
+          "source": "output:d_v",
+          "cast": "float*"
+        },
+        {
+          "name": "d_scores",
+          "source": "output:d_scores",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:aligned_head_dim"
+        },
+        {
+          "name": "aligned_context_window",
+          "source": "dim:aligned_context_window"
+        }
+      ]
+    },
+    "gradient_accumulate_f32": {
+      "note": "v7 gradient accumulation",
+      "params": [
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "cast": "float*"
+        },
+        {
+          "name": "src",
+          "source": "activation:src",
+          "cast": "const float*"
+        },
+        {
+          "name": "numel",
+          "source": "dim:numel"
+        }
+      ]
+    },
+    "gradient_scale_f32": {
+      "note": "v7 gradient scaling",
+      "params": [
+        {
+          "name": "grad",
+          "source": "output:grad",
+          "cast": "float*"
+        },
+        {
+          "name": "numel",
+          "source": "dim:numel"
+        },
+        {
+          "name": "scale",
+          "source": "runtime:grad_scale"
+        }
+      ]
+    },
+    "gradient_clip_norm_f32": {
+      "note": "v7 gradient clipping by global norm",
+      "params": [
+        {
+          "name": "grad",
+          "source": "output:grad",
+          "cast": "float*"
+        },
+        {
+          "name": "numel",
+          "source": "dim:numel"
+        },
+        {
+          "name": "max_norm",
+          "source": "runtime:max_grad_norm"
+        }
+      ]
+    },
+    "adamw_update_f32": {
+      "note": "v7 fp32 AdamW update",
+      "params": [
+        {
+          "name": "grad",
+          "source": "activation:grad",
+          "cast": "const float*"
+        },
+        {
+          "name": "weight",
+          "source": "output:weight",
+          "cast": "float*"
+        },
+        {
+          "name": "m",
+          "source": "output:m",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "output:v",
+          "cast": "float*"
+        },
+        {
+          "name": "numel",
+          "source": "dim:numel"
+        },
+        {
+          "name": "lr",
+          "source": "runtime:lr"
+        },
+        {
+          "name": "beta1",
+          "source": "runtime:beta1"
+        },
+        {
+          "name": "beta2",
+          "source": "runtime:beta2"
+        },
+        {
+          "name": "eps",
+          "source": "runtime:eps"
+        },
+        {
+          "name": "weight_decay",
+          "source": "runtime:weight_decay"
+        },
+        {
+          "name": "step",
+          "source": "runtime:optimizer_step"
+        }
+      ]
+    }
+  }
+}

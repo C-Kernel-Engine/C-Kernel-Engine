@@ -1,0 +1,165 @@
+{
+  "id": "attention_backward_causal_head_major_gqa",
+  "op": "attention",
+  "variant": "causal_gqa_backward_fp32_ref",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "desc": "Gradient from output projection path"
+    },
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "desc": "Forward query tensor"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Forward key tensor"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Forward value tensor"
+    },
+    {
+      "name": "attn_weights",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "S"
+      ],
+      "desc": "Saved attention weights from forward"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_q",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "desc": "Gradient w.r.t. q"
+    },
+    {
+      "name": "d_k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Gradient w.r.t. k"
+    },
+    {
+      "name": "d_v",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Gradient w.r.t. v"
+    },
+    {
+      "name": "d_scores",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "S"
+      ],
+      "desc": "Gradient in attention score domain"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "H",
+    "KV",
+    "T",
+    "D",
+    "AD",
+    "S"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "head"
+    ],
+    "preferred": {
+      "prefill": "head",
+      "decode": "head"
+    },
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Reference head-parallel attention backward."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Reference-first non-fused backward kernel for v7.0."
+  },
+  "impl": {
+    "function": "attention_backward_causal_head_major_gqa",
+    "c_declaration": "void attention_backward_causal_head_major_gqa(const float *d_output, const float *q, const float *k, const float *v, const float *attn_weights, float *d_q, float *d_k, float *d_v, float *d_scores, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window);",
+    "sources": [
+      "src/kernels/attention_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "1e-4",
+        "notes": "Attention backward parity."
+      }
+    ]
+  },
+  "notes": "GQA-aware causal attention backward reference kernel."
+}
+

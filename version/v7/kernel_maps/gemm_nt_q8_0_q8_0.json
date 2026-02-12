@@ -1,0 +1,73 @@
+{
+  "id": "gemm_nt_q8_0_q8_0",
+  "op": "gemm",
+  "variant": "q8_0_w_q8_0_a",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "q8_0",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (Q8_0 quantized)"},
+    {"name": "B", "dtype": "q8_0", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [
+    {"name": "temp", "dtype": "fp32", "size_bytes": "M * N * 4", "desc": "Temporary accumulation buffer"}
+  ],
+  "dims": ["M", "N", "K"],
+  "params": [],
+  "parallelization": {
+    "supported": ["token", "feature"],
+    "preferred": {"prefill": "token", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "M",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Split by rows (tokens); good for prefill with many tokens."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "range": {"min_chunk": 16, "align_bytes": 64, "allow_tail": true},
+        "notes": "Split by output features; good for decode."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q8_0 requires K dimension multiple of 32 for dequantization. B is transposed (nt = A * B^T)."
+  },
+  "impl": {
+    "function": "gemm_nt_q8_0_q8_0",
+    "sources": ["src/kernels/gemm_kernels_q8_0.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm.py"],
+    "bench": ["scripts/bench_gemm.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemm.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against numpy matmul"
+      },
+      {
+        "kind": "llamacpp",
+        "command": "make llamacpp-parity-gemm",
+        "tolerance": "1e-4",
+        "notes": "Compare against llama.cpp ggml_gemm"
+      }
+    ]
+  },
+  "notes": "General matrix multiplication with Q8_0 weights and Q8_0 activations. Used for Wv projection in prefill."
+}

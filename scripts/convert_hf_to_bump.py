@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""
+LEGACY CONVERTER HELPER MODULE.
+
+v6.6+ versioned pipelines should use the version-local copies instead:
+  - version/v6.6/scripts/convert_hf_to_bump.py
+  - version/v7/scripts/convert_hf_to_bump.py
+
+This top-level file is kept for older root-level scripts and backward compatibility.
+"""
+
 import argparse
 import hashlib
 import json
@@ -225,19 +235,88 @@ def require_transformers():
         from transformers import AutoModelForCausalLM  # noqa: F401
         return AutoModelForCausalLM
     except ImportError as exc:
-        raise SystemExit("transformers is required to convert HF weights") from exc
+        raise SystemExit(
+            "transformers is not installed. "
+            "Install with: .venv/bin/pip install transformers safetensors"
+        ) from exc
+
+
+def require_safetensors():
+    try:
+        from safetensors.torch import load_file  # noqa: F401
+        return load_file
+    except ImportError as exc:
+        raise SystemExit(
+            "safetensors is required to read HF safetensors checkpoints. "
+            "Install with: .venv/bin/pip install safetensors"
+        ) from exc
+
+
+class _DictConfig:
+    """Tiny config wrapper compatible with HF config usage in callers."""
+
+    def __init__(self, data):
+        self._data = dict(data)
+
+    def to_dict(self):
+        return dict(self._data)
+
+
+def _load_state_dict_from_safetensors(checkpoint):
+    load_file = require_safetensors()
+    checkpoint = os.path.abspath(checkpoint)
+    index_path = os.path.join(checkpoint, "model.safetensors.index.json")
+    state = {}
+
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            index = json.load(f)
+        weight_map = index.get("weight_map", {})
+        if not isinstance(weight_map, dict) or not weight_map:
+            raise SystemExit(f"Invalid safetensors index: {index_path}")
+        filenames = sorted(set(weight_map.values()))
+        for rel_name in filenames:
+            path = os.path.join(checkpoint, rel_name)
+            if not os.path.exists(path):
+                raise SystemExit(f"Missing safetensors shard: {path}")
+            shard = load_file(path, device="cpu")
+            state.update(shard)
+    else:
+        # Single-file fallback.
+        candidates = [f for f in os.listdir(checkpoint) if f.endswith(".safetensors")]
+        if len(candidates) != 1:
+            raise SystemExit(
+                "Expected one *.safetensors file or model.safetensors.index.json in checkpoint dir"
+            )
+        path = os.path.join(checkpoint, candidates[0])
+        state = load_file(path, device="cpu")
+
+    cfg_path = os.path.join(checkpoint, "config.json")
+    if not os.path.exists(cfg_path):
+        raise SystemExit(f"Missing config.json in checkpoint directory: {checkpoint}")
+    cfg = load_config(cfg_path)
+    return state, _DictConfig(cfg)
 
 
 def get_state_dict(checkpoint, torch_dtype):
     torch = require_torch()
-    AutoModelForCausalLM = require_transformers()
-    model = AutoModelForCausalLM.from_pretrained(
-        checkpoint,
-        torch_dtype=torch_dtype,
-        low_cpu_mem_usage=True,
-        local_files_only=True,
-    )
-    return model.state_dict(), model.config
+    try:
+        AutoModelForCausalLM = require_transformers()
+    except SystemExit:
+        # Minimal path: load tensors directly from safetensors + config.json.
+        return _load_state_dict_from_safetensors(checkpoint)
+
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            checkpoint,
+            torch_dtype=torch_dtype,
+            low_cpu_mem_usage=True,
+            local_files_only=True,
+        )
+        return model.state_dict(), model.config
+    except Exception:
+        # Fallback for repos/environments where full HF model loading is unavailable.
+        return _load_state_dict_from_safetensors(checkpoint)
 
 
 def get_tensor(state, key, alt_keys=()):

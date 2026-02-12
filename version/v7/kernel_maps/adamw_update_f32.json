@@ -1,0 +1,157 @@
+{
+  "id": "adamw_update_f32",
+  "op": "optimizer",
+  "variant": "fp32_adamw",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": false
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "grad",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Gradient tensor"
+    },
+    {
+      "name": "weight",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Weights (updated in-place)"
+    },
+    {
+      "name": "m",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "First moment buffer (in-place)"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Second moment buffer (in-place)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "weight",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Updated weights"
+    },
+    {
+      "name": "m",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Updated first moment"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Updated second moment"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "params": [
+    {
+      "name": "lr",
+      "dtype": "fp32",
+      "desc": "Learning rate"
+    },
+    {
+      "name": "beta1",
+      "dtype": "fp32",
+      "desc": "First moment decay"
+    },
+    {
+      "name": "beta2",
+      "dtype": "fp32",
+      "desc": "Second moment decay"
+    },
+    {
+      "name": "eps",
+      "dtype": "fp32",
+      "desc": "Numerical stability epsilon"
+    },
+    {
+      "name": "weight_decay",
+      "dtype": "fp32",
+      "desc": "Weight decay coefficient"
+    },
+    {
+      "name": "step",
+      "dtype": "int32",
+      "desc": "1-indexed optimizer step"
+    }
+  ],
+  "parallelization": {
+    "supported": [
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "notes": "Per-parameter update is elementwise once moments are local."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Canonical fp32 optimizer path for v7.0."
+  },
+  "impl": {
+    "function": "adamw_update_f32",
+    "c_declaration": "void adamw_update_f32(const float *grad, float *weight, float *m, float *v, size_t numel, float lr, float beta1, float beta2, float eps, float weight_decay, int step);",
+    "sources": [
+      "src/kernels/optimizer_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "python version/v7/scripts/train_parity_epochs_v7.py --epochs 3",
+        "tolerance": "1e-5",
+        "notes": "Parameter trajectory parity check."
+      }
+    ]
+  },
+  "notes": "FP32 AdamW parameter update kernel."
+}
+

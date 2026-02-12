@@ -1,0 +1,82 @@
+{
+  "id": "dense_embedding_lookup",
+  "kernel": "dense_embedding_lookup",
+  "op": "embedding",
+  "description": "Lookup dense embeddings from token IDs using embedding weight matrix",
+  "category": "embedding",
+  "section": "header",
+
+  "signature": {
+    "function": "embedding_forward_q8_0",
+    "params": [
+      {"name": "token_ids", "type": "const int32_t*", "description": "Input token IDs"},
+      {"name": "num_tokens", "type": "int32_t", "description": "Number of tokens to embed"},
+      {"name": "vocab_size", "type": "int32_t", "description": "Vocabulary size"},
+      {"name": "token_emb", "type": "const void*", "description": "Embedding weight matrix (quantized)"},
+      {"name": "pos_emb", "type": "const float*", "description": "Position embeddings (NULL if using RoPE)"},
+      {"name": "output", "type": "float*", "description": "Output embeddings"},
+      {"name": "embed_dim", "type": "int32_t", "description": "Embedding dimension"},
+      {"name": "aligned_embed_dim", "type": "int32_t", "description": "Aligned embedding dimension"},
+      {"name": "context_len", "type": "int32_t", "description": "Maximum context length"},
+      {"name": "add_pos", "type": "int32_t", "description": "Whether to add position embeddings (0 or 1)"}
+    ],
+    "return": {"type": "void"}
+  },
+
+  "inputs": {
+    "token_ids": {
+      "type": "activation",
+      "dtype": "i32",
+      "shape": ["num_tokens"],
+      "description": "Token IDs from tokenizer"
+    }
+  },
+
+  "weights": {
+    "token_emb": {
+      "type": "weight",
+      "dtype": "quant",
+      "shape": ["vocab_size", "embed_dim"],
+      "description": "Token embedding matrix (may be quantized q8_0, q4_k, etc.)"
+    },
+    "pos_emb": {
+      "type": "weight",
+      "dtype": "fp32",
+      "shape": ["context_len", "embed_dim"],
+      "optional": true,
+      "description": "Position embeddings (not used if model uses RoPE)"
+    }
+  },
+
+  "outputs": {
+    "output": {
+      "type": "activation",
+      "dtype": "fp32",
+      "shape": ["num_tokens", "embed_dim"],
+      "description": "Dense embedding output"
+    }
+  },
+
+  "algorithm": {
+    "description": "Table lookup with optional dequantization",
+    "steps": [
+      "1. For each token_id in token_ids:",
+      "   a. Read row token_emb[token_id] (dequantize if needed)",
+      "   b. Optionally add pos_emb[position]",
+      "   c. Write to output[position]"
+    ],
+    "complexity": "O(num_tokens * embed_dim)"
+  },
+
+  "variants": {
+    "embedding_forward_fp32": "Float32 weights, no dequantization",
+    "embedding_forward_q8_0": "Q8_0 quantized weights",
+    "embedding_forward_q4_k": "Q4_K quantized weights"
+  },
+
+  "implementation_notes": [
+    "Memory bound operation - optimize for cache efficiency",
+    "Qwen2 uses RoPE, so pos_emb is NULL and add_pos=0",
+    "Output is always fp32 for downstream computation"
+  ]
+}

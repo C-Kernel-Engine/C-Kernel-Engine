@@ -46,6 +46,18 @@ void ck_set_num_threads(int num_threads);
 int ck_get_num_threads(void);
 int ck_get_physical_cores(void);
 
+// Residual kernels used by IR/codegen runtime paths.
+void ck_residual_add_token_major(const float *a,
+                                 const float *b,
+                                 float *out,
+                                 int tokens,
+                                 int aligned_embed_dim);
+void ck_residual_add_backward(const float *d_out,
+                              float *d_a,
+                              float *d_b,
+                              int tokens,
+                              int aligned_embed_dim);
+
 // Expose the individual GEMM kernels copied from C-Transformer.
 void gemm_naive_parallel(const float *A,
                          const float *B,
@@ -715,6 +727,36 @@ void rmsnorm_backward(const float *d_output,
                       int tokens,
                       int d_model,
                       int aligned_embed_dim);
+
+/* QK norm kernels (Qwen-style per-head RMSNorm before RoPE). */
+void qk_norm_forward(float *q,
+                     float *k,
+                     const float *q_gamma,
+                     const float *k_gamma,
+                     int num_heads,
+                     int num_kv_heads,
+                     int num_tokens,
+                     int head_dim,
+                     float eps);
+
+void qk_norm_backward(const float *d_q_out,
+                      const float *d_k_out,
+                      const float *q_in,
+                      const float *k_in,
+                      const float *q_gamma,
+                      const float *k_gamma,
+                      float *d_q_in,
+                      float *d_k_in,
+                      float *d_q_gamma,
+                      float *d_k_gamma,
+                      int num_heads,
+                      int num_kv_heads,
+                      int num_tokens,
+                      int head_dim,
+                      float eps);
+
+/* Last selected qk_norm_backward ISA: scalar=0, avx=1, avx2=2, avx_vnni=3. */
+int qk_norm_backward_last_isa(void);
 
 void rmsnorm_forward_bf16(const uint16_t *input,
                           const float *gamma,

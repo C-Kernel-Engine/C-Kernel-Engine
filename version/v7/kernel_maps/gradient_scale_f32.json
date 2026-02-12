@@ -1,0 +1,92 @@
+{
+  "id": "gradient_scale_f32",
+  "op": "optimizer",
+  "variant": "fp32_scale",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "grad",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Gradient buffer to scale (in-place)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "grad",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Scaled gradient buffer"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "params": [
+    {
+      "name": "scale",
+      "dtype": "fp32",
+      "desc": "Scaling factor (e.g. 1/grad_accum_steps)"
+    }
+  ],
+  "parallelization": {
+    "supported": [
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "notes": "In-place vector scaling."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Reference gradient scaling kernel."
+  },
+  "impl": {
+    "function": "gradient_scale_f32",
+    "c_declaration": "void gradient_scale_f32(float *grad, size_t numel, float scale);",
+    "sources": [
+      "src/kernels/optimizer_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_optimizer_kernels.py -k scale",
+        "tolerance": "1e-6",
+        "notes": "Vector scaling correctness."
+      }
+    ]
+  },
+  "notes": "FP32 in-place gradient scale kernel."
+}
+

@@ -1,0 +1,131 @@
+{
+  "id": "gemm_backward_f32",
+  "op": "gemm_backward",
+  "variant": "fp32_reference",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "O"
+      ],
+      "desc": "Upstream gradient for linear output"
+    },
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "I"
+      ],
+      "desc": "Forward linear input activation"
+    },
+    {
+      "name": "weight",
+      "dtype": "fp32",
+      "shape": [
+        "O",
+        "I"
+      ],
+      "desc": "Forward linear weight"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "I"
+      ],
+      "desc": "Gradient w.r.t. input activation"
+    },
+    {
+      "name": "d_weight",
+      "dtype": "fp32",
+      "shape": [
+        "O",
+        "I"
+      ],
+      "desc": "Gradient w.r.t. weight"
+    },
+    {
+      "name": "d_bias",
+      "dtype": "fp32",
+      "shape": [
+        "O"
+      ],
+      "desc": "Gradient w.r.t. bias"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "I",
+    "O"
+  ],
+  "params": [
+    {
+      "name": "num_threads",
+      "dtype": "int32",
+      "desc": "Thread count hint (reference path accepts it)"
+    }
+  ],
+  "parallelization": {
+    "supported": [
+      "token",
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "O",
+        "param_style": "range",
+        "notes": "Reference-first path uses shared GEMM kernels internally."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Reference matmul backward for v7.0 correctness path."
+  },
+  "impl": {
+    "function": "fc2_backward_kernel",
+    "c_declaration": "void fc2_backward_kernel(const float *d_output, const float *fc2_input, const float *W_fc2, float *d_input, float *d_W_fc2, float *d_b_fc2, int T, int aligned_in, int aligned_out, int num_threads);",
+    "sources": [
+      "src/kernels/mlp_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "1e-4",
+        "notes": "Used by training IR for linear backward expansion."
+      }
+    ]
+  },
+  "notes": "Generic fp32 GEMM backward binding used by v7 matmul grad-rule."
+}

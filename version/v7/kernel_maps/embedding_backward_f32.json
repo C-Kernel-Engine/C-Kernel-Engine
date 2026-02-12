@@ -1,0 +1,112 @@
+{
+  "id": "embedding_backward_f32",
+  "op": "embedding_backward",
+  "variant": "fp32",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "token_ids",
+      "dtype": "int32",
+      "shape": [
+        "T"
+      ],
+      "desc": "Input token ids"
+    },
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient on embedding output"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_token_embeddings",
+      "dtype": "fp32",
+      "shape": [
+        "V",
+        "E"
+      ],
+      "desc": "Gradient accumulation for token embedding table"
+    },
+    {
+      "name": "d_pos_embeddings",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Optional positional embedding gradients"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "V",
+    "E"
+  ],
+  "params": [
+    {
+      "name": "add_pos",
+      "dtype": "int32",
+      "desc": "Whether positional embeddings are active"
+    }
+  ],
+  "parallelization": {
+    "supported": [
+      "token"
+    ],
+    "preferred": {
+      "prefill": "token",
+      "decode": "token"
+    },
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "notes": "Scatter-add by token id."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "d_token_embeddings must be zeroed before accumulation."
+  },
+  "impl": {
+    "function": "embedding_backward",
+    "c_declaration": "void embedding_backward(const int32_t *token_ids, int token_count, const float *d_output, float *d_token_embeddings, float *d_pos_embeddings, int vocab_size, int embed_dim, int aligned_embed_dim, int context_window, int add_pos);",
+    "sources": [
+      "src/kernels/embedding_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "python unittest/test_embedding.py",
+        "tolerance": "1e-6",
+        "notes": "Embedding backward scatter-add parity."
+      }
+    ]
+  },
+  "notes": "Embedding backward kernel map for v7 training IR."
+}

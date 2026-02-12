@@ -1,0 +1,129 @@
+{
+  "id": "qk_norm_backward_f32",
+  "op": "qk_norm_backward",
+  "variant": "fp32_reference",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_q_out",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "desc": "Gradient of normalized Q output"
+    },
+    {
+      "name": "d_k_out",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "desc": "Gradient of normalized K output"
+    },
+    {
+      "name": "q_in",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "desc": "Saved pre-norm Q input"
+    },
+    {
+      "name": "k_in",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "desc": "Saved pre-norm K input"
+    },
+    {
+      "name": "q_gamma",
+      "dtype": "fp32",
+      "shape": ["D"],
+      "desc": "Q norm gamma weights"
+    },
+    {
+      "name": "k_gamma",
+      "dtype": "fp32",
+      "shape": ["D"],
+      "desc": "K norm gamma weights"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_q_in",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "desc": "Gradient w.r.t. pre-norm Q input"
+    },
+    {
+      "name": "d_k_in",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "desc": "Gradient w.r.t. pre-norm K input"
+    },
+    {
+      "name": "d_q_gamma",
+      "dtype": "fp32",
+      "shape": ["D"],
+      "desc": "Gradient w.r.t. q_gamma"
+    },
+    {
+      "name": "d_k_gamma",
+      "dtype": "fp32",
+      "shape": ["D"],
+      "desc": "Gradient w.r.t. k_gamma"
+    }
+  ],
+  "scratch": [],
+  "dims": ["H", "KV", "T", "D"],
+  "params": [
+    {
+      "name": "eps",
+      "dtype": "fp32",
+      "desc": "RMSNorm epsilon"
+    }
+  ],
+  "parallelization": {
+    "supported": ["head", "token"],
+    "preferred": {
+      "prefill": "head",
+      "decode": "head"
+    },
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "range",
+        "notes": "Reference path; deterministic first."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Reference backward for qk_norm in v7 fp32 mode."
+  },
+  "impl": {
+    "function": "qk_norm_backward",
+    "c_declaration": "void qk_norm_backward(const float *d_q_out, const float *d_k_out, const float *q_in, const float *k_in, const float *q_gamma, const float *k_gamma, float *d_q_in, float *d_k_in, float *d_q_gamma, float *d_k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+    "sources": ["src/kernels/qk_norm_kernels.c"],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "python version/v7/scripts/check_qk_norm_backward_parity_v7.py --isa-matrix",
+        "tolerance": "1e-4",
+        "notes": "Dedicated backward parity for d_q/d_k and d_gamma under scalar/AVX/AVX2/AVX-VNNI modes."
+      }
+    ]
+  },
+  "notes": "v7 training backward map for qk_norm."
+}
