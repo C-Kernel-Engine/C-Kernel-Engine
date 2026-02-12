@@ -10,7 +10,10 @@ var tokenizer_8h =
     [ "CKSpacePrefixStyle", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6", [
       [ "CK_SPACE_PREFIX_AUTO", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
       [ "CK_SPACE_PREFIX_GPT2", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
-      [ "CK_SPACE_PREFIX_SPM", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ]
+      [ "CK_SPACE_PREFIX_SPM", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ],
+      [ "CK_SPACE_PREFIX_AUTO", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
+      [ "CK_SPACE_PREFIX_GPT2", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
+      [ "CK_SPACE_PREFIX_SPM", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ]
     ] ],
     [ "CKSpmMode", "tokenizer_8h.html#a8a61458f294240972a499c24a5a47488", [
       [ "CK_SPM_MODE_UNIGRAM", "tokenizer_8h.html#a8a61458f294240972a499c24a5a47488a94f29df13784ecd1dbb820f1e9671497", null ],
@@ -25,9 +28,9 @@ var tokenizer_8h =
     [ "ck_tokenizer_add_merge", "tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58", null ],
     [ "ck_tokenizer_add_special_token", "tokenizer_8h.html#ad6c5fe6b7a2df85a99504e702348a0bb", null ],
     [ "ck_tokenizer_add_token", "tokenizer_8h.html#a276dfd23dea6a3a888d21be343086124", null ],
-    [ "ck_tokenizer_create_bpe", "tokenizer_8h.html#acf24f5aad70b6eec0a05064b5f95538d", null ],
-    [ "ck_tokenizer_create_spm", "tokenizer_8h.html#ac113f9561eb6088f8142823cc33f2816", null ],
-    [ "ck_tokenizer_create_wordpiece", "tokenizer_8h.html#a3475cdbc43fd39c22e180c04fd8a9218", null ],
+    [ "ck_tokenizer_create_bpe", "tokenizer_8h.html#a1316fac313501041f81122a1c326089c", null ],
+    [ "ck_tokenizer_create_spm", "tokenizer_8h.html#a908a3fffd604c50089de5165d31cd6b5", null ],
+    [ "ck_tokenizer_create_wordpiece", "tokenizer_8h.html#a66512c0113114e417fb751e0f14f5c0a", null ],
     [ "ck_tokenizer_decode", "tokenizer_8h.html#a25fd8f38cf8e62b1e19e347e53225e8c", null ],
     [ "ck_tokenizer_encode", "tokenizer_8h.html#aad7d008ac73952c45a288cbb69806835", null ],
     [ "ck_tokenizer_encode_tokens", "tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91", null ],
