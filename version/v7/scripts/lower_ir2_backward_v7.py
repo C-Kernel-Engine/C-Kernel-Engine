@@ -445,6 +445,12 @@ def synthesize_ir2_backward(
                     target_weight = str(w.get("target_weight", ""))
                     weight_ref = fwd_weights.get(target_weight)
                     if not isinstance(weight_ref, dict):
+                        # Some grad rules expose optional targets (for example d_bias on
+                        # projection kernels where a model may not have an actual bias tensor).
+                        # If the target is marked optional, skip emission without flagging
+                        # unresolved coverage.
+                        if bool(w.get("optional_target_weight", False)):
+                            continue
                         unresolved.append(
                             {
                                 "forward_op_id": fwd.get("op_id"),

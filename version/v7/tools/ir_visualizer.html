@@ -279,6 +279,21 @@
             letter-spacing: 0.5px;
         }
 
+
+        th.sortable-th {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable-th:hover {
+            color: #ffd27d;
+        }
+
+        th.sortable-th.sort-active {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
         td {
             padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--grey);
@@ -1487,6 +1502,61 @@
             font-weight: 600;
         }
 
+        .profile-howto-block-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .profile-copy-btn {
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            background: var(--dark);
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            padding: 0.2rem 0.48rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: var(--transition);
+        }
+
+        .profile-copy-btn:hover {
+            color: var(--orange);
+            border-color: var(--orange);
+        }
+
+        .profile-copy-btn.copied {
+            color: #a7f4cc;
+            border-color: rgba(36, 179, 113, 0.55);
+            background: rgba(36, 179, 113, 0.16);
+        }
+
+        .profile-path-context {
+            margin: 0 0 0.7rem;
+            border: 1px solid var(--grey);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.24);
+            padding: 0.55rem;
+        }
+
+        .profile-path-context pre {
+            margin: 0;
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.32);
+            color: #d6d6d6;
+            font-size: 0.72rem;
+            line-height: 1.42;
+            padding: 0.55rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            white-space: pre;
+        }
+
         .profile-howto-block pre {
             margin: 0;
             border: 1px solid var(--grey);
@@ -1748,6 +1818,21 @@ make v7-test-quick</pre>
 
             <div id="graphContainer" style="width: 100%; height: 600px; border: 1px solid var(--grey); border-radius: 8px; background: var(--dark); overflow: hidden;"></div>
             <div id="kernelFlow"></div>
+            <div id="perfPanel" class="perf-panel" style="display: none;">
+                <h4 style="color: var(--orange); margin-bottom: 0.75rem;">Performance Estimate</h4>
+                <div class="detail-row"><span class="detail-label">Total FLOPs:</span><span class="detail-value" id="perfFlops">-</span></div>
+                <div class="detail-row"><span class="detail-label">Memory Read:</span><span class="detail-value" id="perfMemRead">-</span></div>
+                <div class="detail-row"><span class="detail-label">Memory Write:</span><span class="detail-value" id="perfMemWrite">-</span></div>
+                <div class="perf-bar">
+                    <div class="perf-fill" id="perfAttention" style="width: 0%; background: var(--orange);">Attention</div>
+                </div>
+                <div class="perf-bar">
+                    <div class="perf-fill" id="perfMLP" style="width: 0%; background: var(--blue);">MLP</div>
+                </div>
+                <div class="perf-bar">
+                    <div class="perf-fill" id="perfOther" style="width: 0%; background: var(--green);">Other</div>
+                </div>
+            </div>
         </div>
 
         <!-- Interpretability Panel -->
@@ -2422,6 +2507,19 @@ python test_gemv_q8_0_q8_0.py</pre>
             </div>
 
             <div class="parity-section" style="margin-top: 1rem;">
+                <h3><span class="badge badge-blue">Backward Dataflow</span> IR2 Backward Topology + Forward Links</h3>
+                <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin:0.55rem 0 0.75rem;">
+                    <label style="color:var(--text-secondary);font-size:0.8rem;">Layer:</label>
+                    <select id="trainingLayerFilter" onchange="renderTrainingBackwardGraph()" style="padding:0.4rem 0.55rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:4px;min-width:120px;">
+                        <option value="all">All Layers</option>
+                    </select>
+                    <span id="trainingGraphStats" style="color:var(--text-muted);font-size:0.78rem;">No backward graph loaded.</span>
+                </div>
+                <div id="trainingBackwardGraph" style="width:100%;height:430px;border:1px solid var(--grey);border-radius:8px;background:var(--dark);overflow:hidden;"></div>
+                <div id="trainingLinkedDetails" style="margin-top:0.65rem;color:var(--text-muted);font-size:0.8rem;">Click a backward node or table row to inspect and jump to its forward op.</div>
+            </div>
+
+            <div class="parity-section" style="margin-top: 1rem;">
                 <h3><span class="badge badge-blue">Backward Ops</span> IR2 Backward Kernel Chain</h3>
                 <div id="trainingBackwardTableWrap" style="overflow:auto;">
                     <table id="trainingBackwardTable">
@@ -2518,23 +2616,6 @@ python test_gemv_q8_0_q8_0.py</pre>
         <div id="nodeDetailsContent"></div>
     </div>
 
-    <!-- Performance Metrics Panel -->
-    <div id="perfPanel" class="perf-panel" style="display: none;">
-        <h4 style="color: var(--orange); margin-bottom: 0.75rem;">Performance Estimate</h4>
-        <div class="detail-row"><span class="detail-label">Total FLOPs:</span><span class="detail-value" id="perfFlops">-</span></div>
-        <div class="detail-row"><span class="detail-label">Memory Read:</span><span class="detail-value" id="perfMemRead">-</span></div>
-        <div class="detail-row"><span class="detail-label">Memory Write:</span><span class="detail-value" id="perfMemWrite">-</span></div>
-        <div class="perf-bar">
-            <div class="perf-fill" id="perfAttention" style="width: 0%; background: var(--orange);">Attention</div>
-        </div>
-        <div class="perf-bar">
-            <div class="perf-fill" id="perfMLP" style="width: 0%; background: var(--blue);">MLP</div>
-        </div>
-        <div class="perf-bar">
-            <div class="perf-fill" id="perfOther" style="width: 0%; background: var(--green);">Other</div>
-        </div>
-    </div>
-
     <script>
         let layoutData = null;
         let loweredData = null;
@@ -2570,6 +2651,15 @@ python test_gemv_q8_0_q8_0.py</pre>
         let embeddedMeta = null;
         let embeddedBootstrapped = false;
         let currentQuantView = 'summary';
+        const memoryTableSortState = {
+            weights: { key: 'name', dir: 'asc' },
+            activations: { key: 'name', dir: 'asc' },
+        };
+        const trainingGraphState = {
+            layerFilter: 'all',
+            selectedBackwardOpId: null,
+            selectedForwardRef: null,
+        };
 
         function formatBytes(bytes) {
             if (bytes >= 1024*1024*1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
@@ -2726,8 +2816,14 @@ python test_gemv_q8_0_q8_0.py</pre>
             let modelDir = '';
 
             if (metaPath) {
-                if (metaPath.endsWith('/ck_build')) {
+                if (metaPath.endsWith('/.ck_build')) {
+                    modelDir = metaPath.slice(0, -10);
+                } else if (metaPath.endsWith('/ck_build')) {
                     modelDir = metaPath.slice(0, -9);
+                } else if (metaPath.includes('/.ck_build/')) {
+                    const idx = metaPath.indexOf('/.ck_build/');
+                    modelDir = metaPath.slice(0, idx);
+                    ckBuildDir = metaPath.slice(0, idx + 10);
                 } else if (metaPath.includes('/ck_build/')) {
                     const idx = metaPath.indexOf('/ck_build/');
                     modelDir = metaPath.slice(0, idx);
@@ -2752,7 +2848,9 @@ python test_gemv_q8_0_q8_0.py</pre>
                         ckBuildDir = p.replace(/\/(layout|ir1|lowered).*$/, '');
                     }
                     if (!modelDir) {
-                        if (ckBuildDir.endsWith('/ck_build')) {
+                        if (ckBuildDir.endsWith('/.ck_build')) {
+                            modelDir = ckBuildDir.slice(0, -10);
+                        } else if (ckBuildDir.endsWith('/ck_build')) {
                             modelDir = ckBuildDir.slice(0, -9);
                         } else {
                             modelDir = ckBuildDir;
@@ -3228,6 +3326,13 @@ python test_gemv_q8_0_q8_0.py</pre>
             const panelEl = document.getElementById(tabId);
             if (panelEl) panelEl.classList.add('active');
 
+            if (tabId !== 'kernels') {
+                const perfPanel = document.getElementById('perfPanel');
+                if (perfPanel) perfPanel.style.display = 'none';
+                hideNodeTooltip();
+                closeNodeDetails();
+            }
+
             // Render specific tabs when shown
             if (tabId === 'quantization') {
                 renderQuantizationAudit();
@@ -3298,10 +3403,10 @@ python test_gemv_q8_0_q8_0.py</pre>
             const mode = normalizeMode(select ? select.value : currentMode);
 
             const fileCandidates = [
-                { kind: 'layout', paths: [`layout_${mode}.json`, `ck_build/layout_${mode}.json`] },
-                { kind: 'call', paths: [`lowered_${mode}_call.json`, `ck_build/lowered_${mode}_call.json`] },
-                { kind: 'lowered', paths: [`lowered_${mode}.json`, `ck_build/lowered_${mode}.json`] },
-                { kind: 'ir1', paths: [`ir1_${mode}.json`, `ck_build/ir1_${mode}.json`] },
+                { kind: 'layout', paths: [`layout_${mode}.json`, `.ck_build/layout_${mode}.json`, `ck_build/layout_${mode}.json`] },
+                { kind: 'call', paths: [`lowered_${mode}_call.json`, `.ck_build/lowered_${mode}_call.json`, `ck_build/lowered_${mode}_call.json`] },
+                { kind: 'lowered', paths: [`lowered_${mode}.json`, `.ck_build/lowered_${mode}.json`, `ck_build/lowered_${mode}.json`] },
+                { kind: 'ir1', paths: [`ir1_${mode}.json`, `.ck_build/ir1_${mode}.json`, `ck_build/ir1_${mode}.json`] },
             ];
 
             let loadedCount = 0;
@@ -3318,6 +3423,7 @@ python test_gemv_q8_0_q8_0.py</pre>
 
             if (!manifestData) {
                 const manifest = await tryFetchJson('weights_manifest.json') ||
+                    await tryFetchJson('.ck_build/weights_manifest.json') ||
                     await tryFetchJson('ck_build/weights_manifest.json');
                 if (manifest) {
                     manifestData = manifest;
@@ -3327,27 +3433,33 @@ python test_gemv_q8_0_q8_0.py</pre>
 
             if (!profileData) {
                 const profile = await tryFetchJson('profile_summary.json') ||
+                    await tryFetchJson('.ck_build/profile_summary.json') ||
                     await tryFetchJson('ck_build/profile_summary.json');
                 if (profile) profileData = profile;
             }
             if (!perfStatData) {
                 perfStatData = await tryFetchJson('perf_stat_summary.json') ||
+                    await tryFetchJson('.ck_build/perf_stat_summary.json') ||
                     await tryFetchJson('ck_build/perf_stat_summary.json');
             }
             if (!flamegraphManifestData) {
                 flamegraphManifestData = await tryFetchJson('flamegraph_manifest.json') ||
+                    await tryFetchJson('.ck_build/flamegraph_manifest.json') ||
                     await tryFetchJson('ck_build/flamegraph_manifest.json');
             }
             if (!vtuneSummaryData) {
                 vtuneSummaryData = await tryFetchJson('vtune_summary.json') ||
+                    await tryFetchJson('.ck_build/vtune_summary.json') ||
                     await tryFetchJson('ck_build/vtune_summary.json');
             }
             if (!memorySignoffData) {
                 memorySignoffData = await tryFetchJson('memory_signoff.json') ||
+                    await tryFetchJson('.ck_build/memory_signoff.json') ||
                     await tryFetchJson('ck_build/memory_signoff.json');
             }
             if (!perfGateData) {
                 perfGateData = await tryFetchJson('perf_gate_report.json') ||
+                    await tryFetchJson('.ck_build/perf_gate_report.json') ||
                     await tryFetchJson('ck_build/perf_gate_report.json');
             }
 
@@ -3480,6 +3592,9 @@ python test_gemv_q8_0_q8_0.py</pre>
             trainParityEpoch3Data = files.train_parity_epochs_3 || trainParityEpoch3Data;
             trainParityEpoch5Data = files.train_parity_epochs_5 || trainParityEpoch5Data;
             trainReplayData = files.replay_determinism || trainReplayData;
+
+            window.__ckAnalysisCheckpoints = files.analysis_checkpoints || null;
+            window.__ckTrainE2E = files.train_e2e || null;
 
             loadedFiles = {};
             Object.entries(files).forEach(([key, value]) => {
@@ -4040,6 +4155,98 @@ python test_gemv_q8_0_q8_0.py</pre>
             return [...new Set(fragments)];
         }
 
+
+        function naturalTextCompare(a, b) {
+            return String(a ?? '').localeCompare(String(b ?? ''), undefined, {
+                numeric: true,
+                sensitivity: 'base',
+            });
+        }
+
+        function parseNumericOffset(value) {
+            const n = Number(value);
+            if (Number.isFinite(n)) return n;
+            const parsed = parseInt(String(value || '').trim(), 0);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function toggleMemorySort(tableKey, sortKey) {
+            const state = memoryTableSortState[tableKey];
+            if (!state) return;
+            if (state.key === sortKey) {
+                state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.key = sortKey;
+                state.dir = (sortKey === 'size' || sortKey === 'offset') ? 'desc' : 'asc';
+            }
+        }
+
+        function setupMemoryTableSorting() {
+            const bindHeader = (tableId, tableKey, columns) => {
+                const headers = document.querySelectorAll(`#${tableId} thead th`);
+                headers.forEach((th, idx) => {
+                    const sortKey = columns[idx];
+                    if (!sortKey) return;
+                    th.classList.add('sortable-th');
+                    th.dataset.sortTable = tableKey;
+                    th.dataset.sortKey = sortKey;
+                    if (!th.dataset.sortLabel) {
+                        th.dataset.sortLabel = (th.textContent || '').trim();
+                    }
+                    if (th.dataset.sortBound !== '1') {
+                        th.addEventListener('click', () => {
+                            toggleMemorySort(tableKey, sortKey);
+                            renderMemory();
+                        });
+                        th.dataset.sortBound = '1';
+                    }
+                });
+            };
+
+            bindHeader('weightsTable', 'weights', ['name', 'offset', 'size', 'dtype', 'shape']);
+            bindHeader('activationsTable', 'activations', ['name', 'offset', 'size', 'shape', 'usage']);
+        }
+
+        function updateMemoryTableHeaderUI(tableId, tableKey, columns) {
+            const headers = document.querySelectorAll(`#${tableId} thead th`);
+            const state = memoryTableSortState[tableKey];
+            headers.forEach((th, idx) => {
+                const sortKey = columns[idx];
+                if (!sortKey) return;
+                const label = th.dataset.sortLabel || (th.textContent || '').trim();
+                const active = state && state.key === sortKey;
+                const arrow = active ? (state.dir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+                th.textContent = `${label}${arrow}`;
+                th.classList.toggle('sort-active', Boolean(active));
+                th.setAttribute('aria-sort', active ? (state.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+            });
+        }
+
+        function sortMemoryRows(rows, tableKey) {
+            const state = memoryTableSortState[tableKey] || { key: 'name', dir: 'asc' };
+            const comparators = tableKey === 'weights'
+                ? {
+                    name: (a, b) => naturalTextCompare(a.name, b.name),
+                    offset: (a, b) => a.offset - b.offset,
+                    size: (a, b) => a.size - b.size,
+                    dtype: (a, b) => naturalTextCompare(a.dtype, b.dtype),
+                    shape: (a, b) => naturalTextCompare(a.shapeStr, b.shapeStr),
+                }
+                : {
+                    name: (a, b) => naturalTextCompare(a.name, b.name),
+                    offset: (a, b) => a.offset - b.offset,
+                    size: (a, b) => a.size - b.size,
+                    shape: (a, b) => naturalTextCompare(a.shapeStr, b.shapeStr),
+                    usage: (a, b) => naturalTextCompare(a.usage, b.usage),
+                };
+            const comparator = comparators[state.key] || comparators.name;
+            rows.sort((a, b) => {
+                const delta = comparator(a, b);
+                if (delta !== 0) return state.dir === 'asc' ? delta : -delta;
+                return a._idx - b._idx;
+            });
+        }
+
         function renderMemory() {
             if (!layoutData) return;
 
@@ -4053,6 +4260,9 @@ python test_gemv_q8_0_q8_0.py</pre>
             const weightsEntries = weights.entries || [];
             const weightsBody = document.querySelector('#weightsTable tbody');
             weightsBody.innerHTML = '';
+
+            setupMemoryTableSorting();
+            updateMemoryTableHeaderUI('weightsTable', 'weights', ['name', 'offset', 'size', 'dtype', 'shape']);
 
             // Get config for shape inference
             const config = layoutData.config || {};
@@ -4142,7 +4352,7 @@ python test_gemv_q8_0_q8_0.py</pre>
                 return formatShapeDisplay(shape, ' × ');
             }
 
-            weightsEntries.forEach(w => {
+            const weightRows = weightsEntries.map((w, idx) => {
                 const size = parseInt(w.size) || 0;
                 totalWeightSize += size;
                 let shapeStr = formatShape(w.shape);
@@ -4155,13 +4365,29 @@ python test_gemv_q8_0_q8_0.py</pre>
                     }
                 }
 
+                const name = w.name || w.key || '-';
+                const offset = parseNumericOffset(w.offset);
+                const dtype = w.dtype || '-';
+                return {
+                    _idx: idx,
+                    name,
+                    offset,
+                    size,
+                    dtype,
+                    shapeStr,
+                };
+            });
+
+            sortMemoryRows(weightRows, 'weights');
+
+            weightRows.forEach((w) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${w.name || w.key || '-'}</td>
-                    <td class="offset">0x${(parseInt(w.offset) || 0).toString(16)}</td>
-                    <td class="size">${formatBytes(size)}</td>
+                    <td>${w.name}</td>
+                    <td class="offset">0x${w.offset.toString(16)}</td>
+                    <td class="size">${formatBytes(w.size)}</td>
                     <td><span class="dtype dtype-${(w.dtype || 'unknown').replace('_', '_')}">${w.dtype || '-'}</span></td>
-                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${shapeStr}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${w.shapeStr}</td>
                 `;
                 weightsBody.appendChild(row);
             });
@@ -4170,7 +4396,9 @@ python test_gemv_q8_0_q8_0.py</pre>
             const activationsBody = document.querySelector('#activationsTable tbody');
             activationsBody.innerHTML = '';
 
-            activationBuffers.forEach(a => {
+            updateMemoryTableHeaderUI('activationsTable', 'activations', ['name', 'offset', 'size', 'shape', 'usage']);
+
+            const activationRows = activationBuffers.map((a, idx) => {
                 const size = parseInt(a.size) || 0;
                 totalActivationSize += size;
 
@@ -4181,13 +4409,26 @@ python test_gemv_q8_0_q8_0.py</pre>
                     if (inferred) shapeStr = formatShape(inferred);
                 }
 
+                return {
+                    _idx: idx,
+                    name: a.name || '-',
+                    offset: parseNumericOffset(a.offset),
+                    size,
+                    shapeStr,
+                    usage: a.usage || '-',
+                };
+            });
+
+            sortMemoryRows(activationRows, 'activations');
+
+            activationRows.forEach((a) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${a.name || '-'}</td>
-                    <td class="offset">0x${(parseInt(a.offset) || 0).toString(16)}</td>
-                    <td class="size">${formatBytes(size)}</td>
-                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${shapeStr}</td>
-                    <td>${a.usage || '-'}</td>
+                    <td>${a.name}</td>
+                    <td class="offset">0x${a.offset.toString(16)}</td>
+                    <td class="size">${formatBytes(a.size)}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--blue);">${a.shapeStr}</td>
+                    <td>${a.usage}</td>
                 `;
                 activationsBody.appendChild(row);
             });
@@ -4606,244 +4847,578 @@ python test_gemv_q8_0_q8_0.py</pre>
                 });
         }
 
-        function renderTraining() {
-            const statsGrid = document.getElementById('trainingStatsGrid');
-            const coveragePanel = document.getElementById('trainingCoveragePanel');
-            const tableBody = document.querySelector('#trainingBackwardTable tbody');
-            const gradSummary = document.getElementById('trainingGradSummary');
-            const runGatePanel = document.getElementById('trainingRunGatePanel');
-            const gradChecksPanel = document.getElementById('trainingGradChecksPanel');
-            if (!statsGrid || !coveragePanel || !tableBody || !gradSummary || !runGatePanel || !gradChecksPanel) return;
 
-            const ir1 = ir1TrainData || null;
-            const ir2 = ir2TrainData || null;
-            const inv = irTrainInvariantsData || null;
-            const summary = ir2TrainSummaryData || null;
+function getTrainingBackwardList() {
+    if (Array.isArray(ir2TrainData?.backward)) return ir2TrainData.backward;
+    return [];
+}
 
-            const hasTrainGraph = !!(ir1 || ir2 || inv || summary);
-            const hasTrainGates = !!(
-                trainContractData ||
-                trainParity1TokenData ||
-                trainQkNormParityData ||
-                trainFdGradData ||
-                trainParityEpoch3Data ||
-                trainParityEpoch5Data ||
-                trainReplayData
-            );
+function getTrainingForwardOpById(forwardRef) {
+    const ref = Number(forwardRef);
+    if (!Number.isFinite(ref)) return null;
+    const ops = Array.isArray(ir1TrainData?.ops) ? ir1TrainData.ops : [];
+    return ops.find(op => Number(op?.op_id) === ref) || null;
+}
 
-            if (!hasTrainGraph && !hasTrainGates) {
-                statsGrid.innerHTML = `
-                    <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Forward Ops</div></div>
-                    <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Backward Ops</div></div>
-                    <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Grad Weights</div></div>
-                    <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Unresolved</div></div>
-                `;
-                coveragePanel.innerHTML = '<span style="color: var(--text-muted);">No train IR artifacts loaded.</span>';
-                tableBody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted);">No backward graph loaded.</td></tr>';
-                gradSummary.innerHTML = '<span style="color: var(--text-muted);">No gradient summary available.</span>';
-                runGatePanel.innerHTML = '<span style="color: var(--text-muted);">No train gate summaries loaded.</span>';
-                gradChecksPanel.innerHTML = '<span style="color: var(--text-muted);">No gradient checks loaded.</span>';
-                return;
-            }
+function populateTrainingLayerFilter(backwardList) {
+    const select = document.getElementById('trainingLayerFilter');
+    if (!select) return;
+    const prev = String(trainingGraphState.layerFilter || 'all');
+    const layers = [...new Set((backwardList || []).map(op => Number(op?.layer)).filter(v => Number.isFinite(v) && v >= 0))]
+        .sort((a, b) => a - b);
+    select.innerHTML = '<option value="all">All Layers</option>' +
+        layers.map(layer => `<option value="${layer}">Layer ${layer}</option>`).join('');
+    const next = layers.includes(Number(prev)) ? prev : 'all';
+    trainingGraphState.layerFilter = next;
+    select.value = next;
+}
 
-            const ir1Forward = Array.isArray(ir1?.ops) ? ir1.ops.filter(op => op && op.phase === 'forward').length : 0;
-            const ir2Forward = Array.isArray(ir2?.forward) ? ir2.forward.length : 0;
-            const forwardOps = ir1Forward || ir2Forward || 0;
-            const backwardOps = Array.isArray(ir2?.backward) ? ir2.backward.length : (summary?.stats?.backward_ops || 0);
-            const unresolvedCount = (Array.isArray(ir2?.unresolved) ? ir2.unresolved.length : 0) || (summary?.stats?.unresolved || 0);
+function trainingBackwardNodeColor(op) {
+    const role = String(op?.role || op?.op || '').toLowerCase();
+    if (role.includes('dw_accum') || role.includes('grad_weight')) return '#47b475';
+    if (role.includes('dact_accum') || role.includes('grad_activation')) return '#07adf8';
+    return '#f39c12';
+}
 
-            const gradWeightTensors = Array.isArray(ir2?.gradient_summary?.grad_weight_tensors)
-                ? ir2.gradient_summary.grad_weight_tensors.length
-                : (summary?.gradient_summary?.grad_weight_tensors || []).length;
-            const gradActivationTensors = Array.isArray(ir2?.gradient_summary?.grad_activation_tensors)
-                ? ir2.gradient_summary.grad_activation_tensors.length
-                : (summary?.gradient_summary?.grad_activation_tensors || []).length;
+function refreshTrainingSelectionUI(backwardList) {
+    const linked = document.getElementById('trainingLinkedDetails');
+    const selectedId = trainingGraphState.selectedBackwardOpId;
+    const selectedForward = trainingGraphState.selectedForwardRef;
 
-            const invPass = inv?.passed === true;
-            const invStatus = inv ? (invPass ? 'PASS' : 'FAIL') : '-';
-            const invColor = inv ? (invPass ? 'var(--green)' : '#e74c3c') : 'var(--text-primary)';
-
-            const gateStatuses = [
-                { label: 'Contracts', pass: trainContractData?.summary?.fail === 0 && trainContractData?.summary?.pass > 0 },
-                { label: '1-token Parity', pass: trainParity1TokenData?.overall_pass === true },
-                { label: 'FD Gradients', pass: trainFdGradData?.passed === true },
-                { label: 'Epoch-3 Parity', pass: trainParityEpoch3Data?.pass_parity === true },
-                { label: 'Replay Determinism', pass: trainReplayData?.passed === true },
-            ];
-            const gatePassCount = gateStatuses.filter(s => s.pass === true).length;
-            const gateSeenCount = gateStatuses.filter(s => s.pass !== undefined).length;
-
-            statsGrid.innerHTML = `
-                <div class="stat-card"><div class="stat-value">${forwardOps}</div><div class="stat-label">Forward Ops (IR1)</div></div>
-                <div class="stat-card"><div class="stat-value">${backwardOps}</div><div class="stat-label">Backward Ops (IR2)</div></div>
-                <div class="stat-card"><div class="stat-value">${gradWeightTensors}</div><div class="stat-label">Grad Weight Tensors</div></div>
-                <div class="stat-card"><div class="stat-value">${gradActivationTensors}</div><div class="stat-label">Grad Activation Tensors</div></div>
-                <div class="stat-card"><div class="stat-value">${unresolvedCount}</div><div class="stat-label">Unresolved Coverage</div></div>
-                <div class="stat-card"><div class="stat-value" style="color:${invColor}">${invStatus}</div><div class="stat-label">Invariant Gate</div></div>
-                <div class="stat-card"><div class="stat-value">${gatePassCount}/${gateSeenCount || gateStatuses.length}</div><div class="stat-label">Gate Checks Passing</div></div>
-                <div class="stat-card"><div class="stat-value">${trainParityEpoch3Data?.steps ?? '-'}</div><div class="stat-label">Optimizer Steps (E3)</div></div>
-            `;
-
-            const unresolvedRows = (ir2?.unresolved || summary?.unresolved || []).slice(0, 12).map(item => `
-                <tr>
-                    <td>${escapeHtml(String(item.forward_op_id ?? '-'))}</td>
-                    <td>${escapeHtml(String(item.op ?? '-'))}</td>
-                    <td>${escapeHtml(String(item.grad_rule ?? '-'))}</td>
-                    <td>${escapeHtml(String(item.reason ?? '-'))}</td>
-                </tr>
-            `).join('');
-
-            const invRows = Array.isArray(inv?.checks) ? inv.checks.map(c => `
-                <tr>
-                    <td>${escapeHtml(String(c.name || '-'))}</td>
-                    <td>${escapeHtml(String(c.status || '-'))}</td>
-                </tr>
-            `).join('') : '';
-
-            coveragePanel.innerHTML = `
-                <div style="display:grid;gap:0.8rem;">
-                    <div>
-                        <strong>Invariant Checks:</strong>
-                        ${invRows
-                            ? `<table><thead><tr><th>Check</th><th>Status</th></tr></thead><tbody>${invRows}</tbody></table>`
-                            : '<div style="color:var(--text-muted);">No invariant report loaded.</div>'
-                        }
-                    </div>
-                    <div>
-                        <strong>Unresolved Backward Rules:</strong>
-                        ${unresolvedRows
-                            ? `<table><thead><tr><th>Forward Op</th><th>Op</th><th>Rule</th><th>Reason</th></tr></thead><tbody>${unresolvedRows}</tbody></table>`
-                            : '<div style="color:var(--green);">No unresolved entries.</div>'
-                        }
-                    </div>
-                </div>
-            `;
-
-            const backwardList = Array.isArray(ir2?.backward) ? ir2.backward : [];
-            tableBody.innerHTML = '';
-            if (backwardList.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted);">No backward graph loaded.</td></tr>';
-            } else {
-                backwardList
-                    .slice()
-                    .sort((a, b) => (a.op_id || 0) - (b.op_id || 0))
-                    .forEach(op => {
-                        const outputs = op?.dataflow?.outputs || {};
-                        const outNames = Object.keys(outputs);
-                        const outDisplay = outNames.slice(0, 3).map(name => {
-                            const t = outputs[name]?.tensor;
-                            return `${name}:${t || '-'}`;
-                        }).join(', ');
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${escapeHtml(String(op.op_id ?? '-'))}</td>
-                            <td><code>${escapeHtml(String(op.kernel_id || '-'))}</code></td>
-                            <td>${escapeHtml(String(op.forward_ref ?? '-'))}</td>
-                            <td>${escapeHtml(String(op.layer ?? '-'))}</td>
-                            <td>${escapeHtml(String(op.role || '-'))}</td>
-                            <td style="font-size:0.78rem;">${escapeHtml(outDisplay)}</td>
-                        `;
-                        tableBody.appendChild(row);
-                    });
-            }
-
-            const gradientDetails = [];
-            if (ir2?.gradient_summary?.grad_weight_tensors) {
-                gradientDetails.push(`<div><strong>grad.weight:</strong> ${ir2.gradient_summary.grad_weight_tensors.length} tensors</div>`);
-            }
-            if (ir2?.gradient_summary?.grad_activation_tensors) {
-                gradientDetails.push(`<div><strong>grad.act:</strong> ${ir2.gradient_summary.grad_activation_tensors.length} tensors</div>`);
-            }
-            if (trainParityEpoch3Data) {
-                gradientDetails.push(
-                    `<div><strong>Epoch-3 parity:</strong> max |loss_ck-loss_torch| = ${Number(trainParityEpoch3Data.max_loss_abs_diff || 0).toExponential(3)}, final |param| max diff = ${Number(trainParityEpoch3Data.final_param_max_abs_diff || 0).toExponential(3)}</div>`
-                );
-            }
-            if (trainParityEpoch5Data) {
-                gradientDetails.push(
-                    `<div><strong>Epoch-5 parity:</strong> max |loss_ck-loss_torch| = ${Number(trainParityEpoch5Data.max_loss_abs_diff || 0).toExponential(3)}, final |param| max diff = ${Number(trainParityEpoch5Data.final_param_max_abs_diff || 0).toExponential(3)}</div>`
-                );
-            }
-            const invWarnings = Array.isArray(inv?.warnings) ? inv.warnings : [];
-            if (invWarnings.length > 0) {
-                gradientDetails.push(`<div style="color:#ffc66d;"><strong>Warnings:</strong> ${escapeHtml(invWarnings.slice(0, 5).join(' | '))}</div>`);
-            }
-            gradSummary.innerHTML = gradientDetails.length > 0
-                ? gradientDetails.join('')
-                : '<span style="color: var(--text-muted);">No gradient summary available.</span>';
-
-            const statusBadge = (pass) => {
-                if (pass === true) return '<span class="badge badge-green">PASS</span>';
-                if (pass === false) return '<span class="badge badge-red">FAIL</span>';
-                return '<span class="badge badge-orange">N/A</span>';
-            };
-
-            runGatePanel.innerHTML = `
-                <table>
-                    <thead><tr><th>Gate</th><th>Status</th><th>Key Metric</th></tr></thead>
-                    <tbody>
-                        <tr>
-                            <td>Contracts</td>
-                            <td>${statusBadge(trainContractData ? (trainContractData.summary?.fail === 0) : undefined)}</td>
-                            <td>${trainContractData ? `PASS=${trainContractData.summary?.pass || 0} WARN=${trainContractData.summary?.warn || 0} FAIL=${trainContractData.summary?.fail || 0}` : '-'}</td>
-                        </tr>
-                        <tr>
-                            <td>1-token parity</td>
-                            <td>${statusBadge(trainParity1TokenData ? (trainParity1TokenData.overall_pass === true) : undefined)}</td>
-                            <td>${trainParity1TokenData ? `groups=${Array.isArray(trainParity1TokenData.reports) ? trainParity1TokenData.reports.length : 0}` : '-'}</td>
-                        </tr>
-                        <tr>
-                            <td>Epoch-3 parity</td>
-                            <td>${statusBadge(trainParityEpoch3Data ? (trainParityEpoch3Data.pass_parity === true) : undefined)}</td>
-                            <td>${trainParityEpoch3Data ? `max_loss_diff=${Number(trainParityEpoch3Data.max_loss_abs_diff || 0).toExponential(3)}` : '-'}</td>
-                        </tr>
-                        <tr>
-                            <td>Replay determinism</td>
-                            <td>${statusBadge(trainReplayData ? (trainReplayData.passed === true) : undefined)}</td>
-                            <td>${trainReplayData ? `max replay diff=${Math.max(...Object.values(trainReplayData.abs_diffs || {x: 0})).toExponential(3)}` : '-'}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-
-            const fdChecks = Array.isArray(trainFdGradData?.checks) ? trainFdGradData.checks : [];
-            const fdRows = fdChecks.slice(0, 8).map(ch => `
-                <tr>
-                    <td>${escapeHtml(String(ch.param || '-'))}</td>
-                    <td>${escapeHtml(JSON.stringify(ch.index || []))}</td>
-                    <td>${Number(ch.abs_err || 0).toExponential(3)}</td>
-                    <td>${Number(ch.rel_err || 0).toExponential(3)}</td>
-                    <td>${ch.passed ? '<span class="badge badge-green">PASS</span>' : '<span class="badge badge-red">FAIL</span>'}</td>
-                </tr>
-            `).join('');
-
-            const qkPass = trainQkNormParityData?.passed === true;
-            const qkMax = trainQkNormParityData?.max_diff;
-            gradChecksPanel.innerHTML = `
-                <div style="display:grid;gap:0.8rem;">
-                    <div>
-                        <strong>Finite-Difference Gradient Check:</strong>
-                        ${trainFdGradData
-                            ? ` ${statusBadge(trainFdGradData.passed === true)} max_abs_err=${Number(trainFdGradData.max_abs_err || 0).toExponential(3)} tol=${Number(trainFdGradData.tolerance || 0).toExponential(3)}`
-                            : ' <span style="color:var(--text-muted);">not loaded</span>'
-                        }
-                    </div>
-                    <div>
-                        <strong>QK-Norm Backward Kernel Parity:</strong>
-                        ${trainQkNormParityData
-                            ? ` ${statusBadge(qkPass)} max_diff=${Number(qkMax || 0).toExponential(3)} tol=${Number(trainQkNormParityData.tolerance || 0).toExponential(3)}`
-                            : ' <span style="color:var(--text-muted);">not loaded</span>'
-                        }
-                    </div>
-                    <div>
-                        ${fdRows
-                            ? `<table><thead><tr><th>Param</th><th>Index</th><th>Abs Err</th><th>Rel Err</th><th>Status</th></tr></thead><tbody>${fdRows}</tbody></table>`
-                            : '<span style="color: var(--text-muted);">No FD gradient rows loaded.</span>'
-                        }
-                    </div>
-                </div>
-            `;
+    document.querySelectorAll('#trainingBackwardTable tbody tr').forEach((row) => {
+        const rowOp = Number(row.dataset.backwardOpId);
+        const rowForward = Number(row.dataset.forwardRef);
+        row.style.background = '';
+        row.style.outline = '';
+        if (Number.isFinite(selectedId) && rowOp === selectedId) {
+            row.style.background = 'rgba(255, 180, 0, 0.16)';
+            row.style.outline = '1px solid rgba(255,180,0,0.55)';
+        } else if (Number.isFinite(selectedForward) && rowForward === selectedForward) {
+            row.style.background = 'rgba(7, 173, 248, 0.12)';
         }
+    });
+
+    if (!linked) return;
+    if (!Array.isArray(backwardList) || backwardList.length === 0) {
+        linked.textContent = 'No backward graph loaded.';
+        return;
+    }
+
+    const selectedOp = Number.isFinite(selectedId)
+        ? backwardList.find(op => Number(op?.op_id) === Number(selectedId))
+        : null;
+
+    if (selectedOp) {
+        const fwdRef = Number(selectedOp?.forward_ref);
+        const fwdOp = getTrainingForwardOpById(fwdRef);
+        const outKeys = Object.keys(selectedOp?.dataflow?.outputs || {});
+        const outputSummary = outKeys.slice(0, 4).map(k => {
+            const t = selectedOp?.dataflow?.outputs?.[k]?.tensor || '-';
+            return `${k}:${t}`;
+        }).join(', ');
+        linked.innerHTML = `
+            <div><strong>Backward op #${escapeHtml(String(selectedOp?.op_id ?? '-'))}</strong> • ${escapeHtml(String(selectedOp?.kernel_id || '-'))}</div>
+            <div style="margin-top:0.25rem;">role=${escapeHtml(String(selectedOp?.role || '-'))}, layer=${escapeHtml(String(selectedOp?.layer ?? '-'))}</div>
+            <div style="margin-top:0.25rem;">outputs: <code>${escapeHtml(outputSummary || '-')}</code></div>
+            <div style="margin-top:0.4rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                <span>forward_ref=${Number.isFinite(fwdRef) ? fwdRef : '-'}</span>
+                ${Number.isFinite(fwdRef) ? `<button type="button" class="graph-chip" onclick="jumpToForwardTrainingRef(${fwdRef})">Open Forward Op</button>` : ''}
+                ${fwdOp ? `<span style="color:var(--text-secondary);">(${escapeHtml(String(fwdOp?.op || fwdOp?.kernel || '-'))})</span>` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    if (Number.isFinite(selectedForward)) {
+        const matchCount = backwardList.filter(op => Number(op?.forward_ref) === Number(selectedForward)).length;
+        const fwdOp = getTrainingForwardOpById(selectedForward);
+        linked.innerHTML = `
+            <div><strong>Forward op #${selectedForward}</strong> selected</div>
+            <div style="margin-top:0.25rem;">Matched backward ops: ${matchCount}</div>
+            <div style="margin-top:0.35rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="graph-chip" onclick="jumpToForwardTrainingRef(${selectedForward})">Open In Kernel Flow</button>
+                ${fwdOp ? `<span style="color:var(--text-secondary);">${escapeHtml(String(fwdOp?.op || fwdOp?.kernel || '-'))}</span>` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    linked.textContent = 'Click a backward node or table row to inspect and jump to its forward op.';
+}
+
+function selectTrainingBackwardOp(opId) {
+    const id = Number(opId);
+    if (!Number.isFinite(id)) return;
+    const backwardList = getTrainingBackwardList();
+    const op = backwardList.find(x => Number(x?.op_id) === id);
+    trainingGraphState.selectedBackwardOpId = id;
+    const fwd = Number(op?.forward_ref);
+    trainingGraphState.selectedForwardRef = Number.isFinite(fwd) ? fwd : null;
+    renderTrainingBackwardGraph();
+    refreshTrainingSelectionUI(backwardList);
+}
+
+function focusTrainingByForwardRef(forwardRef) {
+    const ref = Number(forwardRef);
+    if (!Number.isFinite(ref)) return;
+    showTab('training');
+    const backwardList = getTrainingBackwardList();
+    trainingGraphState.selectedForwardRef = ref;
+    const first = backwardList.find(op => Number(op?.forward_ref) === ref);
+    trainingGraphState.selectedBackwardOpId = first ? Number(first?.op_id) : null;
+    renderTrainingBackwardGraph();
+    refreshTrainingSelectionUI(backwardList);
+    if (first) {
+        const row = document.querySelector(`#trainingBackwardTable tbody tr[data-backward-op-id="${Number(first?.op_id)}"]`);
+        if (row && typeof row.scrollIntoView === 'function') {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+function jumpToForwardTrainingRef(forwardRef) {
+    const ref = Number(forwardRef);
+    if (!Number.isFinite(ref)) return;
+    const fwdOp = getTrainingForwardOpById(ref);
+    showTab('kernels');
+    if (currentGraphMode !== 'graph') {
+        renderGraphView();
+    }
+
+    const query = String(fwdOp?.op || fwdOp?.kernel || fwdOp?.kernel_id || '').trim();
+    if (query) {
+        const input = document.getElementById('graphSearch');
+        if (input) input.value = query;
+        filterGraph(query);
+    }
+
+    if (Number.isFinite(Number(fwdOp?.layer)) && Number(fwdOp?.layer) >= 0) {
+        const layer = String(Number(fwdOp.layer));
+        const layerFilter = document.getElementById('layerFilter');
+        if (layerFilter) layerFilter.value = layer;
+        filterGraphByLayer(layer);
+    }
+
+    const focus = document.getElementById('graphFocusSummary');
+    if (focus) {
+        focus.textContent = `focus forward_ref ${ref}: ${query || 'op'}`;
+    }
+}
+
+function renderTrainingBackwardGraph() {
+    const container = document.getElementById('trainingBackwardGraph');
+    const stats = document.getElementById('trainingGraphStats');
+    const select = document.getElementById('trainingLayerFilter');
+    const backwardListRaw = getTrainingBackwardList();
+    const backwardList = backwardListRaw.slice().sort((a, b) => Number(a?.op_id || 0) - Number(b?.op_id || 0));
+
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (select) {
+        trainingGraphState.layerFilter = String(select.value || trainingGraphState.layerFilter || 'all');
+    }
+    const layerFilter = String(trainingGraphState.layerFilter || 'all');
+    const filteredOps = layerFilter === 'all'
+        ? backwardList
+        : backwardList.filter(op => String(op?.layer) === layerFilter);
+
+    if (filteredOps.length === 0) {
+        if (stats) stats.textContent = 'No backward ops for selected layer.';
+        refreshTrainingSelectionUI(backwardList);
+        return;
+    }
+
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<div style="padding:0.8rem;color:var(--text-muted);">D3 unavailable: cannot render backward graph.</div>';
+        return;
+    }
+
+    const nodeMap = new Map();
+    const nodes = filteredOps.map((op) => {
+        const id = Number(op?.op_id);
+        const node = {
+            id,
+            op,
+            label: String(op?.op || op?.kernel_id || `op_${id}`),
+            role: String(op?.role || ''),
+            layer: Number(op?.layer),
+        };
+        nodeMap.set(id, node);
+        return node;
+    });
+
+    const linkSet = new Set();
+    const links = [];
+    const addLink = (src, dst, type) => {
+        if (!Number.isFinite(src) || !Number.isFinite(dst) || src === dst) return;
+        if (!nodeMap.has(src) || !nodeMap.has(dst)) return;
+        const key = `${src}->${dst}:${type}`;
+        if (linkSet.has(key)) return;
+        linkSet.add(key);
+        links.push({ source: src, target: dst, type });
+    };
+
+    for (let i = 0; i < filteredOps.length - 1; i++) {
+        addLink(Number(filteredOps[i]?.op_id), Number(filteredOps[i + 1]?.op_id), 'seq');
+    }
+
+    filteredOps.forEach((op) => {
+        const dst = Number(op?.op_id);
+        const inputs = op?.dataflow?.inputs || {};
+        Object.values(inputs).forEach((info) => {
+            const src = Number(info?.from_op);
+            addLink(src, dst, 'data');
+        });
+    });
+
+    const width = container.clientWidth || 980;
+    const height = container.clientHeight || 430;
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('background', 'var(--dark)');
+
+    const g = svg.append('g');
+    svg.call(
+        d3.zoom().scaleExtent([0.35, 3]).on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        })
+    );
+
+    const link = g.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter().append('line')
+        .attr('stroke', d => d.type === 'data' ? '#ffb400' : '#535353')
+        .attr('stroke-width', d => d.type === 'data' ? 1.9 : 1.1)
+        .attr('stroke-opacity', d => d.type === 'data' ? 0.85 : 0.45);
+
+    const node = g.append('g')
+        .selectAll('g')
+        .data(nodes)
+        .enter().append('g')
+        .style('cursor', 'pointer')
+        .on('click', (_evt, d) => {
+            selectTrainingBackwardOp(d.id);
+        })
+        .call(d3.drag()
+            .on('start', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0.25).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            })
+            .on('drag', (event, d) => {
+                d.fx = event.x;
+                d.fy = event.y;
+            })
+            .on('end', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            })
+        );
+
+    node.append('circle')
+        .attr('r', 11)
+        .attr('fill', d => trainingBackwardNodeColor(d.op))
+        .attr('stroke', d => Number(trainingGraphState.selectedBackwardOpId) === Number(d.id) ? '#ffffff' : 'rgba(255,255,255,0.55)')
+        .attr('stroke-width', d => Number(trainingGraphState.selectedBackwardOpId) === Number(d.id) ? 2.3 : 1.2);
+
+    node.append('text')
+        .attr('x', 14)
+        .attr('y', 3)
+        .attr('fill', '#d6d6d6')
+        .attr('font-size', '10.2px')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .text(d => `${d.id}:${shortenLabel(d.label, 18)}`);
+
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(d => d.type === 'data' ? 72 : 46).strength(d => d.type === 'data' ? 0.45 : 0.25))
+        .force('charge', d3.forceManyBody().strength(-130))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(18))
+        .on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+    if (stats) {
+        stats.textContent = `nodes: ${nodes.length} | links: ${links.length} | layer filter: ${layerFilter === 'all' ? 'all' : `L${layerFilter}`}`;
+    }
+
+    refreshTrainingSelectionUI(backwardList);
+}
+
+function renderTraining() {
+    const statsGrid = document.getElementById('trainingStatsGrid');
+    const coveragePanel = document.getElementById('trainingCoveragePanel');
+    const tableBody = document.querySelector('#trainingBackwardTable tbody');
+    const gradSummary = document.getElementById('trainingGradSummary');
+    const runGatePanel = document.getElementById('trainingRunGatePanel');
+    const gradChecksPanel = document.getElementById('trainingGradChecksPanel');
+    const trainingGraphContainer = document.getElementById('trainingBackwardGraph');
+    const trainingLayerFilter = document.getElementById('trainingLayerFilter');
+    const trainingGraphStats = document.getElementById('trainingGraphStats');
+    const trainingLinkedDetails = document.getElementById('trainingLinkedDetails');
+    if (!statsGrid || !coveragePanel || !tableBody || !gradSummary || !runGatePanel || !gradChecksPanel || !trainingGraphContainer || !trainingLayerFilter || !trainingGraphStats || !trainingLinkedDetails) return;
+
+    const ir1 = ir1TrainData || null;
+    const ir2 = ir2TrainData || null;
+    const inv = irTrainInvariantsData || null;
+    const summary = ir2TrainSummaryData || null;
+
+    const hasTrainGraph = !!(ir1 || ir2 || inv || summary);
+    const hasTrainGates = !!(
+        trainContractData ||
+        trainParity1TokenData ||
+        trainQkNormParityData ||
+        trainFdGradData ||
+        trainParityEpoch3Data ||
+        trainParityEpoch5Data ||
+        trainReplayData
+    );
+
+    if (!hasTrainGraph && !hasTrainGates) {
+        statsGrid.innerHTML = `
+            <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Forward Ops</div></div>
+            <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Backward Ops</div></div>
+            <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Grad Weights</div></div>
+            <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Unresolved</div></div>
+        `;
+        coveragePanel.innerHTML = '<span style="color: var(--text-muted);">No train IR artifacts loaded.</span>';
+        tableBody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted);">No backward graph loaded.</td></tr>';
+        gradSummary.innerHTML = '<span style="color: var(--text-muted);">No gradient summary available.</span>';
+        runGatePanel.innerHTML = '<span style="color: var(--text-muted);">No train gate summaries loaded.</span>';
+        gradChecksPanel.innerHTML = '<span style="color: var(--text-muted);">No gradient checks loaded.</span>';
+        trainingGraphContainer.innerHTML = '';
+        trainingGraphStats.textContent = 'No backward graph loaded.';
+        trainingLinkedDetails.textContent = 'No backward graph loaded.';
+        return;
+    }
+
+    const ir1Forward = Array.isArray(ir1?.ops) ? ir1.ops.filter(op => op && op.phase === 'forward').length : 0;
+    const ir2Forward = Array.isArray(ir2?.forward) ? ir2.forward.length : 0;
+    const forwardOps = ir1Forward || ir2Forward || 0;
+    const backwardOps = Array.isArray(ir2?.backward) ? ir2.backward.length : (summary?.stats?.backward_ops || 0);
+    const unresolvedCount = (Array.isArray(ir2?.unresolved) ? ir2.unresolved.length : 0) || (summary?.stats?.unresolved || 0);
+
+    const gradWeightTensors = Array.isArray(ir2?.gradient_summary?.grad_weight_tensors)
+        ? ir2.gradient_summary.grad_weight_tensors.length
+        : (summary?.gradient_summary?.grad_weight_tensors || []).length;
+    const gradActivationTensors = Array.isArray(ir2?.gradient_summary?.grad_activation_tensors)
+        ? ir2.gradient_summary.grad_activation_tensors.length
+        : (summary?.gradient_summary?.grad_activation_tensors || []).length;
+
+    const invPass = inv?.passed === true;
+    const invStatus = inv ? (invPass ? 'PASS' : 'FAIL') : '-';
+    const invColor = inv ? (invPass ? 'var(--green)' : '#e74c3c') : 'var(--text-primary)';
+
+    const gateStatuses = [
+        { label: 'Contracts', pass: trainContractData?.summary?.fail === 0 && trainContractData?.summary?.pass > 0 },
+        { label: '1-token Parity', pass: trainParity1TokenData?.overall_pass === true },
+        { label: 'FD Gradients', pass: trainFdGradData?.passed === true },
+        { label: 'Epoch-3 Parity', pass: trainParityEpoch3Data?.pass_parity === true },
+        { label: 'Replay Determinism', pass: trainReplayData?.passed === true },
+    ];
+    const gatePassCount = gateStatuses.filter(s => s.pass === true).length;
+    const gateSeenCount = gateStatuses.filter(s => s.pass !== undefined).length;
+
+    statsGrid.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${forwardOps}</div><div class="stat-label">Forward Ops (IR1)</div></div>
+        <div class="stat-card"><div class="stat-value">${backwardOps}</div><div class="stat-label">Backward Ops (IR2)</div></div>
+        <div class="stat-card"><div class="stat-value">${gradWeightTensors}</div><div class="stat-label">Grad Weight Tensors</div></div>
+        <div class="stat-card"><div class="stat-value">${gradActivationTensors}</div><div class="stat-label">Grad Activation Tensors</div></div>
+        <div class="stat-card"><div class="stat-value">${unresolvedCount}</div><div class="stat-label">Unresolved Coverage</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:${invColor}">${invStatus}</div><div class="stat-label">Invariant Gate</div></div>
+        <div class="stat-card"><div class="stat-value">${gatePassCount}/${gateSeenCount || gateStatuses.length}</div><div class="stat-label">Gate Checks Passing</div></div>
+        <div class="stat-card"><div class="stat-value">${trainParityEpoch3Data?.steps ?? '-'}</div><div class="stat-label">Optimizer Steps (E3)</div></div>
+    `;
+
+    const unresolvedRows = (ir2?.unresolved || summary?.unresolved || []).slice(0, 12).map(item => `
+        <tr>
+            <td>${escapeHtml(String(item.forward_op_id ?? '-'))}</td>
+            <td>${escapeHtml(String(item.op ?? '-'))}</td>
+            <td>${escapeHtml(String(item.grad_rule ?? '-'))}</td>
+            <td>${escapeHtml(String(item.reason ?? '-'))}</td>
+        </tr>
+    `).join('');
+
+    const invRows = Array.isArray(inv?.checks) ? inv.checks.map(c => `
+        <tr>
+            <td>${escapeHtml(String(c.name || '-'))}</td>
+            <td>${escapeHtml(String(c.status || '-'))}</td>
+        </tr>
+    `).join('') : '';
+
+    coveragePanel.innerHTML = `
+        <div style="display:grid;gap:0.8rem;">
+            <div>
+                <strong>Invariant Checks:</strong>
+                ${invRows
+                    ? `<table><thead><tr><th>Check</th><th>Status</th></tr></thead><tbody>${invRows}</tbody></table>`
+                    : '<div style="color:var(--text-muted);">No invariant report loaded.</div>'
+                }
+            </div>
+            <div>
+                <strong>Unresolved Backward Rules:</strong>
+                ${unresolvedRows
+                    ? `<table><thead><tr><th>Forward Op</th><th>Op</th><th>Rule</th><th>Reason</th></tr></thead><tbody>${unresolvedRows}</tbody></table>`
+                    : '<div style="color:var(--green);">No unresolved entries.</div>'
+                }
+            </div>
+        </div>
+    `;
+
+    const backwardList = getTrainingBackwardList();
+    populateTrainingLayerFilter(backwardList);
+
+    tableBody.innerHTML = '';
+    if (backwardList.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted);">No backward graph loaded.</td></tr>';
+    } else {
+        backwardList
+            .slice()
+            .sort((a, b) => (a.op_id || 0) - (b.op_id || 0))
+            .forEach(op => {
+                const outputs = op?.dataflow?.outputs || {};
+                const outNames = Object.keys(outputs);
+                const outDisplay = outNames.slice(0, 3).map(name => {
+                    const t = outputs[name]?.tensor;
+                    return `${name}:${t || '-'}`;
+                }).join(', ');
+                const opId = Number(op.op_id);
+                const forwardRef = Number(op.forward_ref);
+                const row = document.createElement('tr');
+                row.dataset.backwardOpId = Number.isFinite(opId) ? String(opId) : '';
+                row.dataset.forwardRef = Number.isFinite(forwardRef) ? String(forwardRef) : '';
+                row.style.cursor = 'pointer';
+                row.innerHTML = `
+                    <td>${escapeHtml(String(op.op_id ?? '-'))}</td>
+                    <td><code>${escapeHtml(String(op.kernel_id || '-'))}</code></td>
+                    <td>${Number.isFinite(forwardRef) ? `<button type="button" class="graph-chip" style="padding:0.12rem 0.48rem;font-size:0.72rem;" onclick="event.stopPropagation();jumpToForwardTrainingRef(${forwardRef})">${forwardRef}</button>` : '-'}</td>
+                    <td>${escapeHtml(String(op.layer ?? '-'))}</td>
+                    <td>${escapeHtml(String(op.role || '-'))}</td>
+                    <td style="font-size:0.78rem;">${escapeHtml(outDisplay)}</td>
+                `;
+                row.addEventListener('click', () => {
+                    if (Number.isFinite(opId)) selectTrainingBackwardOp(opId);
+                });
+                tableBody.appendChild(row);
+            });
+    }
+
+    const gradientDetails = [];
+    if (ir2?.gradient_summary?.grad_weight_tensors) {
+        gradientDetails.push(`<div><strong>grad.weight:</strong> ${ir2.gradient_summary.grad_weight_tensors.length} tensors</div>`);
+    }
+    if (ir2?.gradient_summary?.grad_activation_tensors) {
+        gradientDetails.push(`<div><strong>grad.act:</strong> ${ir2.gradient_summary.grad_activation_tensors.length} tensors</div>`);
+    }
+    if (trainParityEpoch3Data) {
+        gradientDetails.push(
+            `<div><strong>Epoch-3 parity:</strong> max |loss_ck-loss_torch| = ${Number(trainParityEpoch3Data.max_loss_abs_diff || 0).toExponential(3)}, final |param| max diff = ${Number(trainParityEpoch3Data.final_param_max_abs_diff || 0).toExponential(3)}</div>`
+        );
+    }
+    if (trainParityEpoch5Data) {
+        gradientDetails.push(
+            `<div><strong>Epoch-5 parity:</strong> max |loss_ck-loss_torch| = ${Number(trainParityEpoch5Data.max_loss_abs_diff || 0).toExponential(3)}, final |param| max diff = ${Number(trainParityEpoch5Data.final_param_max_abs_diff || 0).toExponential(3)}</div>`
+        );
+    }
+    const invWarnings = Array.isArray(inv?.warnings) ? inv.warnings : [];
+    if (invWarnings.length > 0) {
+        gradientDetails.push(`<div style="color:#ffc66d;"><strong>Warnings:</strong> ${escapeHtml(invWarnings.slice(0, 5).join(' | '))}</div>`);
+    }
+    gradSummary.innerHTML = gradientDetails.length > 0
+        ? gradientDetails.join('')
+        : '<span style="color: var(--text-muted);">No gradient summary available.</span>';
+
+    const statusBadge = (pass) => {
+        if (pass === true) return '<span class="badge badge-green">PASS</span>';
+        if (pass === false) return '<span class="badge badge-red">FAIL</span>';
+        return '<span class="badge badge-orange">N/A</span>';
+    };
+
+    runGatePanel.innerHTML = `
+        <table>
+            <thead><tr><th>Gate</th><th>Status</th><th>Key Metric</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>Contracts</td>
+                    <td>${statusBadge(trainContractData ? (trainContractData.summary?.fail === 0) : undefined)}</td>
+                    <td>${trainContractData ? `PASS=${trainContractData.summary?.pass || 0} WARN=${trainContractData.summary?.warn || 0} FAIL=${trainContractData.summary?.fail || 0}` : '-'}</td>
+                </tr>
+                <tr>
+                    <td>1-token parity</td>
+                    <td>${statusBadge(trainParity1TokenData ? (trainParity1TokenData.overall_pass === true) : undefined)}</td>
+                    <td>${trainParity1TokenData ? `groups=${Array.isArray(trainParity1TokenData.reports) ? trainParity1TokenData.reports.length : 0}` : '-'}</td>
+                </tr>
+                <tr>
+                    <td>Epoch-3 parity</td>
+                    <td>${statusBadge(trainParityEpoch3Data ? (trainParityEpoch3Data.pass_parity === true) : undefined)}</td>
+                    <td>${trainParityEpoch3Data ? `max_loss_diff=${Number(trainParityEpoch3Data.max_loss_abs_diff || 0).toExponential(3)}` : '-'}</td>
+                </tr>
+                <tr>
+                    <td>Replay determinism</td>
+                    <td>${statusBadge(trainReplayData ? (trainReplayData.passed === true) : undefined)}</td>
+                    <td>${trainReplayData ? `max replay diff=${Math.max(...Object.values(trainReplayData.abs_diffs || {x: 0})).toExponential(3)}` : '-'}</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    const fdChecks = Array.isArray(trainFdGradData?.checks) ? trainFdGradData.checks : [];
+    const fdRows = fdChecks.slice(0, 8).map(ch => `
+        <tr>
+            <td>${escapeHtml(String(ch.param || '-'))}</td>
+            <td>${escapeHtml(JSON.stringify(ch.index || []))}</td>
+            <td>${Number(ch.abs_err || 0).toExponential(3)}</td>
+            <td>${Number(ch.rel_err || 0).toExponential(3)}</td>
+            <td>${ch.passed ? '<span class="badge badge-green">PASS</span>' : '<span class="badge badge-red">FAIL</span>'}</td>
+        </tr>
+    `).join('');
+
+    const qkPass = trainQkNormParityData?.passed === true;
+    const qkMax = trainQkNormParityData?.max_diff;
+    gradChecksPanel.innerHTML = `
+        <div style="display:grid;gap:0.8rem;">
+            <div>
+                <strong>Finite-Difference Gradient Check:</strong>
+                ${trainFdGradData
+                    ? ` ${statusBadge(trainFdGradData.passed === true)} max_abs_err=${Number(trainFdGradData.max_abs_err || 0).toExponential(3)} tol=${Number(trainFdGradData.tolerance || 0).toExponential(3)}`
+                    : ' <span style="color:var(--text-muted);">not loaded</span>'
+                }
+            </div>
+            <div>
+                <strong>QK-Norm Backward Kernel Parity:</strong>
+                ${trainQkNormParityData
+                    ? ` ${statusBadge(qkPass)} max_diff=${Number(qkMax || 0).toExponential(3)} tol=${Number(trainQkNormParityData.tolerance || 0).toExponential(3)}`
+                    : ' <span style="color:var(--text-muted);">not loaded</span>'
+                }
+            </div>
+            <div>
+                ${fdRows
+                    ? `<table><thead><tr><th>Param</th><th>Index</th><th>Abs Err</th><th>Rel Err</th><th>Status</th></tr></thead><tbody>${fdRows}</tbody></table>`
+                    : '<span style="color: var(--text-muted);">No FD gradient rows loaded.</span>'
+                }
+            </div>
+        </div>
+    `;
+
+    if (!Number.isFinite(Number(trainingGraphState.selectedBackwardOpId))) {
+        trainingGraphState.selectedBackwardOpId = null;
+    }
+    renderTrainingBackwardGraph();
+    refreshTrainingSelectionUI(backwardList);
+}
 
         function filterKernels(query) {
             const nodes = document.querySelectorAll('.kernel-node');
@@ -5151,6 +5726,8 @@ python test_gemv_q8_0_q8_0.py</pre>
             document.getElementById('graphLegend').style.display = 'none';
             document.getElementById('graphGuide').classList.remove('visible');
             document.getElementById('perfPanel').style.display = 'none';
+            hideNodeTooltip();
+            closeNodeDetails();
         }
 
         function renderGraphView() {
@@ -5761,6 +6338,26 @@ python test_gemv_q8_0_q8_0.py</pre>
                         <div class="detail-row">
                             <span class="detail-label">Est. FLOPs:</span>
                             <span class="detail-value">${formatNumber(flops)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const forwardCandidates = [...new Set([
+                Number(d?.id),
+                Number(d?.fullOp?.op_id),
+            ].filter(v => Number.isFinite(v)))];
+            const matchedBackward = getTrainingBackwardList().filter(op => forwardCandidates.includes(Number(op?.forward_ref)));
+            if (matchedBackward.length > 0) {
+                const ref = Number(matchedBackward[0]?.forward_ref);
+                detailsHtml += `
+                    <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--grey);">
+                        <div class="detail-row">
+                            <span class="detail-label">Backward links:</span>
+                            <span class="detail-value">${matchedBackward.length}</span>
+                        </div>
+                        <div style="margin-top:0.35rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+                            <button type="button" class="graph-chip" onclick="focusTrainingByForwardRef(${Number.isFinite(ref) ? ref : -1})">Open Backward IR Links</button>
                         </div>
                     </div>
                 `;
@@ -7267,7 +7864,15 @@ python test_gemv_q8_0_q8_0.py</pre>
         }
 
         function normalizeHotspots(vtune) {
-            const hot = vtune?.hotspots || vtune?.top_hotspots || [];
+            let hot = vtune?.hotspots || vtune?.top_hotspots || [];
+            if (!Array.isArray(hot) || hot.length === 0) {
+                const analyses = Array.isArray(vtune?.analyses) ? vtune.analyses : [];
+                const hotspotAnalysis = analyses.find((a) => {
+                    const name = String(a?.name || '').toLowerCase();
+                    return name.includes('hotspot') || name === 'hotspots';
+                });
+                hot = hotspotAnalysis?.hotspots || hotspotAnalysis?.top_hotspots || [];
+            }
             if (!Array.isArray(hot)) return [];
             return hot.slice(0, 12).map((row) => {
                 if (typeof row === 'string') {
@@ -7289,7 +7894,7 @@ python test_gemv_q8_0_q8_0.py</pre>
                     chatTemplate: 'none',
                 };
             }
-            if (modelName.includes('qwen3-0.6b-q8_0') || modelName.includes('qwen3-0.6b-gguf')) {
+            if (modelName.includes('qwen--qwen3-0.6b') || modelName.includes('qwen3-0.6b-q8_0') || modelName.includes('qwen3-0.6b-gguf') || modelName.includes('qwen3-0.6b')) {
                 return {
                     runModel: 'hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf',
                     chatTemplate: 'auto',
@@ -7310,7 +7915,8 @@ python test_gemv_q8_0_q8_0.py</pre>
         function resolveReportModelDirHint() {
             const metaPath = embeddedMeta?.path;
             if (typeof metaPath === 'string' && metaPath.trim()) {
-                if (metaPath.endsWith('/ck_build')) return metaPath.slice(0, -9);
+                if (metaPath.endsWith('/.ck_build')) return metaPath.slice(0, -10);
+            if (metaPath.endsWith('/ck_build')) return metaPath.slice(0, -9);
                 return metaPath;
             }
             const modelName = embeddedMeta?.model;
@@ -7320,96 +7926,192 @@ python test_gemv_q8_0_q8_0.py</pre>
             return '/path/to/model_dir';
         }
 
-        function renderProfileHowTo() {
-            const root = document.getElementById('profileHowTo');
-            if (!root) return;
 
-            const reportModelName = embeddedMeta?.model || '<model-name>';
-            const reportModelDir = resolveReportModelDirHint();
-            const hint = inferRunModelHint();
-            const runModel = hint.runModel;
-            const chatTemplate = hint.chatTemplate;
-            const chatRunArg = chatTemplate !== 'auto' ? `--chat-template ${chatTemplate}` : '';
-            const makeChatArg = chatTemplate !== 'auto' ? `V7_CHAT_TEMPLATE=${chatTemplate}` : '';
-            const makeCliArg = chatTemplate === 'none' ? `V7_CLI_ARGS='--no-chat-template'` : '';
+function copyProfileRunbookCommand(button) {
+    if (!button) return;
+    const encoded = button.dataset.command || '';
+    if (!encoded) return;
+    let command = encoded;
+    try {
+        command = decodeURIComponent(encoded);
+    } catch (_err) {
+        command = encoded;
+    }
 
-            const depChips = [
-                { name: 'profile_summary.json', ok: Boolean(profileData) },
-                { name: 'perf_stat_summary.json', ok: Boolean(perfStatData) },
-                { name: 'flamegraph_manifest.json', ok: Boolean(flamegraphManifestData) },
-                { name: 'perf_gate_report.json', ok: Boolean(perfGateData) },
-                { name: 'vtune_summary.json', ok: Boolean(vtuneSummaryData) },
-            ];
+    const markCopied = () => {
+        const prev = button.textContent;
+        button.textContent = 'Copied';
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.textContent = prev || 'Copy';
+            button.classList.remove('copied');
+        }, 1200);
+    };
 
-            const depsCmd = `sudo apt-get update
-sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-$(uname -r) perl git
-git clone https://github.com/brendangregg/FlameGraph.git
-chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl
-sudo sh -c 'printf "kernel.perf_event_paranoid=1\\nkernel.kptr_restrict=0\\n" > /etc/sysctl.d/99-perf.conf'
-sudo sysctl -p /etc/sysctl.d/99-perf.conf
-# VTune on Linux may require:
-sudo sysctl -w kernel.yama.ptrace_scope=0`;
-
-            const makeCmd = `make v7-perf-gate \\
-  V7_MODEL="${runModel}" \\
-  V7_PERF_RUNTIME=cli \\
-  V7_WITH_VTUNE=1 \\
-  ${makeChatArg || '# optional: V7_CHAT_TEMPLATE=none|qwen|gemma'} \\
-  ${makeCliArg || '# optional: V7_CLI_ARGS=...'} \\
-  # optional: PROFILE_V7_COMPILER=gcc
-`;
-
-            const oneShotCmd = `python version/v7/tools/open_ir_visualizer.py \\
-  --generate "${reportModelName}" \\
-  --with-probes --force-compile \\
-  --output "${reportModelDir}/ir_report.html"
-# optional: --no-vtune`;
-            const oneShotOverrideCmd = `python version/v7/tools/open_ir_visualizer.py \\
-  --generate "${reportModelName}" \\
-  --with-probes --force-compile \\
-  --run-model "${runModel}" \\
-  ${chatRunArg ? `${chatRunArg} \\` : ''}--output "${reportModelDir}/ir_report.html"`;
-
-            const vtuneCmd = `python version/v7/scripts/perf_artifacts_v7.py \\
-  --model-dir "${reportModelDir}" \\
-  --vtune-summary /path/to/vtune_summary.json
-
-python version/v7/tools/open_ir_visualizer.py \\
-  --generate "${reportModelName}" \\
-  --output "${reportModelDir}/ir_report.html"`;
-
-            root.innerHTML = `
-                <div class="profile-howto-card">
-                    <h3 class="profile-howto-head">Operator Runbook: Generate Full Profile View</h3>
-                    <p class="profile-howto-sub">Use these commands to populate all Profile tab artifacts (perf stat, flamegraph, perf gate, VTune). Missing artifacts appear as amber chips.</p>
-                    <div class="profile-dep-grid">
-                        ${depChips.map(d => `<div class="profile-dep-chip ${d.ok ? 'ok' : 'missing'}">${escapeHtml(d.name)}: ${d.ok ? 'loaded' : 'missing'}</div>`).join('')}
-                    </div>
-                    <div class="profile-howto-grid">
-                        <div class="profile-howto-block">
-                            <h4>1) Install Dependencies (once)</h4>
-                            <pre>${escapeHtml(depsCmd)}</pre>
-                        </div>
-                        <div class="profile-howto-block">
-                            <h4>2) Generate Perf Artifacts (manual)</h4>
-                            <pre>${escapeHtml(makeCmd)}</pre>
-                        </div>
-                        <div class="profile-howto-block">
-                            <h4>3) One-Command Rich Report (auto model inference)</h4>
-                            <pre>${escapeHtml(oneShotCmd)}</pre>
-                        </div>
-                        <div class="profile-howto-block">
-                            <h4>4) One-Command with Explicit Runtime Model (optional)</h4>
-                            <pre>${escapeHtml(oneShotOverrideCmd)}</pre>
-                        </div>
-                        <div class="profile-howto-block">
-                            <h4>5) Add VTune Summary Artifacts</h4>
-                            <pre>${escapeHtml(vtuneCmd)}</pre>
-                        </div>
-                    </div>
-                </div>
-            `;
+    const fallbackCopy = () => {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = command;
+            ta.setAttribute('readonly', 'readonly');
+            ta.style.position = 'fixed';
+            ta.style.left = '-10000px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            markCopied();
+        } catch (_err) {
+            // no-op
         }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(command).then(markCopied).catch(fallbackCopy);
+    } else {
+        fallbackCopy();
+    }
+}
+
+function renderProfileHowTo() {
+    const root = document.getElementById('profileHowTo');
+    if (!root) return;
+
+    const reportModelName = embeddedMeta?.model || '<model-name>';
+    const paths = getBestCommandPaths();
+    const reportModelDir = paths.modelDir;
+    const reportCkBuildDir = paths.ckBuildDir;
+    const reportRunDir = (typeof embeddedMeta?.run_dir === 'string' && embeddedMeta.run_dir.trim())
+        ? embeddedMeta.run_dir
+        : reportModelDir;
+    const reportHtmlPath = reportRunDir.endsWith('/ir_report.html') ? reportRunDir : `${reportRunDir}/ir_report.html`;
+
+    const hint = inferRunModelHint();
+    const hintedRunModel = (hint.runModel && !hint.runModel.startsWith('/absolute/path/')) ? hint.runModel : '';
+    // Always default profiling commands to the already-generated local model dir.
+    // This avoids accidentally re-downloading a different HF variant (e.g., quantized GGUF).
+    const runModel = reportModelDir;
+    const chatTemplate = hint.chatTemplate;
+    const chatRunArg = chatTemplate !== 'auto' ? ` --chat-template ${chatTemplate}` : '';
+    const makeChatArg = chatTemplate !== 'auto' ? ` V7_CHAT_TEMPLATE=${chatTemplate}` : '';
+    const makeCliArg = chatTemplate === 'none' ? ' V7_CLI_ARGS=--no-chat-template' : '';
+
+    const depChips = [
+        { name: 'profile_summary.json', ok: Boolean(profileData) },
+        { name: 'perf_stat_summary.json', ok: Boolean(perfStatData) },
+        { name: 'flamegraph_manifest.json', ok: Boolean(flamegraphManifestData) },
+        { name: 'perf_gate_report.json', ok: Boolean(perfGateData) },
+        { name: 'vtune_summary.json', ok: Boolean(vtuneSummaryData) },
+    ];
+
+    const missingDeps = depChips.filter((d) => !d.ok).map((d) => d.name);
+
+    const depsCmd = [
+        'sudo apt-get update',
+        'sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-$(uname -r) perl git',
+        'git clone https://github.com/brendangregg/FlameGraph.git',
+        'chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl',
+        'printf "kernel.perf_event_paranoid=1\\nkernel.kptr_restrict=0\\n" | sudo tee /etc/sysctl.d/99-perf.conf',
+        'sudo sysctl -p /etc/sysctl.d/99-perf.conf',
+        '# VTune on Linux may require:',
+        'sudo sysctl -w kernel.yama.ptrace_scope=0',
+    ].join('\n');
+
+    const profileDecodeCmd = `make profile-v7-decode V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
+    const perfStatCmd = `make profile-v7-perf-stat V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
+    const flamegraphCmd = `make profile-v7-flamegraph V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
+    const perfGateEvalCmd = `make v7-perf-gate-evaluate V7_MODEL=${quoteShell(runModel)}`;
+    const fullPerfCmd = [profileDecodeCmd, perfStatCmd, flamegraphCmd, perfGateEvalCmd].join('\n');
+
+    const oneShotCmd = `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --with-probes --force-compile --run-model ${quoteShell(reportModelDir)} --perf-runtime cli${chatRunArg} --output ${quoteShell(reportHtmlPath)}`;
+
+    const sourceCmd = hintedRunModel
+        ? `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --with-probes --force-compile --run-model ${quoteShell(hintedRunModel)} --perf-runtime cli${chatRunArg} --output ${quoteShell(reportHtmlPath)}`
+        : '# No source checkpoint hint found for this model.\n# Use: --run-model hf://<repo>/<file>.gguf (or local .gguf/.safetensors dir)';
+
+    const vtuneCmd = [
+        `make profile-v7-vtune V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0 V7_WITH_VTUNE=1 V7_VTUNE_DEEP=1${makeChatArg}${makeCliArg}`,
+        `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
+    ].join('\n');
+
+    const artifactHelp = {
+        'profile_summary.json': {
+            why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown).',
+            cmd: profileDecodeCmd,
+        },
+        'perf_stat_summary.json': {
+            why: 'CPU counters (IPC, cache miss, branch miss) parsed from perf stat.',
+            cmd: perfStatCmd,
+        },
+        'flamegraph_manifest.json': {
+            why: 'Flamegraph index linking folded stacks and SVG hotspot view.',
+            cmd: flamegraphCmd,
+        },
+        'perf_gate_report.json': {
+            why: 'Budget gate evaluation (tok/s, IPC, cache/branch thresholds).',
+            cmd: perfGateEvalCmd,
+        },
+        'vtune_summary.json': {
+            why: 'VTune hotspot summary and optional media artifacts for advanced profiling.',
+            cmd: vtuneCmd,
+        },
+    };
+
+    const missingHelpHtml = missingDeps.length
+        ? `
+            <div class="parity-section" style="margin-top:0.7rem;">
+                <h4 style="margin:0 0 0.45rem;"><span class="badge badge-orange">Hints</span> Missing Artifact Commands</h4>
+                <div style="display:grid;gap:0.55rem;">
+                    ${missingDeps.map((name, idx) => {
+                        const h = artifactHelp[name] || { why: 'Run targeted command and refresh report.', cmd: fullPerfCmd };
+                        const encoded = encodeURIComponent(h.cmd || '');
+                        return `
+                            <div style="border:1px solid var(--grey);border-radius:10px;padding:0.55rem;">
+                                <div style="font-weight:700;margin-bottom:0.25rem;color:var(--text-primary);">${escapeHtml(name)}</div>
+                                <div style="color:var(--text-muted);font-size:0.84rem;margin-bottom:0.4rem;">${escapeHtml(h.why)}</div>
+                                <div class="profile-howto-block-head" style="margin-bottom:0.35rem;">
+                                    <span style="color:var(--text-secondary);font-size:0.78rem;">Command</span>
+                                    <button type="button" class="profile-copy-btn" data-command="${encoded}" onclick="copyProfileRunbookCommand(this)">Copy</button>
+                                </div>
+                                <pre style="margin:0;">${escapeHtml(h.cmd || '')}</pre>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `
+        : '';
+
+    const renderHowToBlock = (title, cmdText) => {
+        const encoded = encodeURIComponent(cmdText);
+        return `
+            <div class="profile-howto-block">
+                <div class="profile-howto-block-head">
+                    <h4>${escapeHtml(title)}</h4>
+                    <button type="button" class="profile-copy-btn" data-command="${encoded}" onclick="copyProfileRunbookCommand(this)">Copy</button>
+                </div>
+                <pre>${escapeHtml(cmdText)}</pre>
+            </div>
+        `;
+    };
+
+    root.innerHTML = `
+        <div class="profile-howto-card">
+            <h3 class="profile-howto-head">Operator Runbook: Generate Full Profile View</h3>
+            <p class="profile-howto-sub">Commands below are pre-filled with this report's exact run/model/build paths. Copy any block and run from repo root.</p>\n            <pre style="margin:0 0 0.6rem;">run_dir: ${escapeHtml(reportRunDir)}\nmodel_dir: ${escapeHtml(reportModelDir)}\nck_build: ${escapeHtml(reportCkBuildDir)}</pre>
+            <div class="profile-dep-grid">
+                ${depChips.map(d => `<div class="profile-dep-chip ${d.ok ? 'ok' : 'missing'}">${escapeHtml(d.name)}: ${d.ok ? 'loaded' : 'missing'}</div>`).join('')}
+            </div>
+            ${missingHelpHtml}
+            <div class="profile-howto-grid">
+                ${renderHowToBlock('1) Install Dependencies (once)', depsCmd)}
+                ${renderHowToBlock('2) Generate Perf Artifacts (exact local model path)', fullPerfCmd)}
+                ${renderHowToBlock('3) One-Command Rich Report (exact local model path)', oneShotCmd)}
+                ${renderHowToBlock('4) One-Command with Explicit Source Model (optional)', sourceCmd)}
+                ${renderHowToBlock('5) VTune Capture + Refresh Report', vtuneCmd)}
+            </div>
+        </div>
+    `;
+}
 
         function renderProfileExternalArtifacts(profileSummaryForMode) {
             const summaryEl = document.getElementById('profileExternalSummary');
@@ -7646,6 +8348,38 @@ python version/v7/tools/open_ir_visualizer.py \\
 
             if (vtuneSummaryData) {
                 links.push('VTune summary loaded');
+
+                const analyses = Array.isArray(vtuneSummaryData?.analyses) ? vtuneSummaryData.analyses : [];
+                const analysisChips = analyses.length > 0
+                    ? `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin:0.4rem 0 0.8rem;">${analyses.map((a) => {
+                        const n = escapeHtml(String(a?.name || 'analysis'));
+                        return `<span style="padding:0.18rem 0.5rem;border:1px solid var(--grey);border-radius:999px;color:var(--text-secondary);font-size:0.72rem;">${n}</span>`;
+                    }).join('')}</div>`
+                    : '';
+
+                const analysisMetricsHtml = analyses.map((a) => {
+                    const name = escapeHtml(String(a?.name || 'analysis'));
+                    const metrics = (a && typeof a === 'object' && a.summary_metrics && typeof a.summary_metrics === 'object')
+                        ? a.summary_metrics
+                        : {};
+                    const rows = Object.entries(metrics).slice(0, 12).map(([k, v]) => {
+                        const n = Number(v);
+                        const value = Number.isFinite(n) ? (Math.abs(n) >= 100 ? n.toFixed(1) : n.toFixed(2)) : String(v);
+                        const suffix = String(k).includes('GB/s') ? '' : '%';
+                        return `<tr><td>${escapeHtml(String(k))}</td><td>${escapeHtml(value)}${suffix}</td></tr>`;
+                    }).join('');
+                    if (!rows) return '';
+                    return `
+                        <div class="parity-section" style="margin-bottom:0.7rem;">
+                            <h4 style="margin:0 0 0.35rem;"><span class="badge badge-blue">${name}</span> Summary Metrics</h4>
+                            <table class="profile-hotspot-table">
+                                <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    `;
+                }).join('');
+
                 const candidates = [];
                 const vtunePathKeys = ['svg_path', 'hotspots_svg', 'png_path', 'hotspots_png', 'image_path'];
                 vtunePathKeys.forEach((k) => {
@@ -7657,6 +8391,7 @@ python version/v7/tools/open_ir_visualizer.py \\
                         candidates.push({ type: 'path', payload: vtuneSummaryData[`${k}_resolved`], label: k });
                     }
                 });
+
                 const art = Array.isArray(vtuneSummaryData?.artifacts) ? vtuneSummaryData.artifacts : [];
                 art.forEach((a) => {
                     if (!a || typeof a !== 'object') return;
@@ -7692,7 +8427,9 @@ python version/v7/tools/open_ir_visualizer.py \\
 
                 vtuneEl.innerHTML = `
                     <div class="profile-artifact-panel">
-                        <h3><span class="badge badge-blue">VTune</span> Hotspots + Top Functions</h3>
+                        <h3><span class="badge badge-blue">VTune</span> Multi-Analysis View</h3>
+                        ${analysisChips}
+                        ${analysisMetricsHtml}
                         <div class="profile-vtune-grid">
                             <div class="profile-vtune-media">${mediaHtml}</div>
                             <div>
@@ -8079,6 +8816,7 @@ python version/v7/tools/open_ir_visualizer.py \\
         });
     </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
     <!-- CK_V7_MODULE_BUNDLE_START -->
 <script type="module">
 /* GENERATED FILE: do not edit by hand.
@@ -8272,6 +9010,18 @@ function healthAlerts(lossSteps, parityRows) {
     return alerts;
 }
 
+function getRunContext() {
+    const embedded = window.EMBEDDED_IR_DATA || {};
+    const meta = embedded.meta || {};
+    const runDir = typeof meta.run_dir === 'string' && meta.run_dir.trim()
+        ? meta.run_dir
+        : null;
+    const modelPath = typeof meta.path === 'string' && meta.path.trim()
+        ? meta.path
+        : null;
+    return { runDir, modelPath };
+}
+
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -8282,9 +9032,22 @@ function renderTrainingDashboard(files) {
     const lossSteps = parseLossSteps(files.training_loss_curve);
     const parityRows = parseParityRows(files.training_parity);
     const profile = files.training_step_profile || {};
+    const sweep = files.training_epoch_sweep || {};
+    const sweepRows = Array.isArray(sweep.runs) ? sweep.runs : [];
+    const sweepProfile = sweep && typeof sweep === 'object' ? sweep.profile_run : null;
     const finalStep = lossSteps[lossSteps.length - 1] || null;
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
     const decodeTokS = toNum(profile.decode_tok_s, NaN);
+    const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
+    const trainE2E = files.train_e2e || {};
+    const runCtx = getRunContext();
+
+    const reportCmd = runCtx.runDir
+        ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
+        : 'python3 version/v7/tools/open_ir_visualizer.py --generate <model> --html-only';
+    const suiteCmd = runCtx.runDir
+        ? `version/v7/scripts/cks-v7-run train-suite --run ${runCtx.runDir} --profile-train perf --profile-epoch 3`
+        : 'version/v7/scripts/cks-v7-run train-suite --run ./version/v7/runs/exp1 --profile-train perf --profile-epoch 3';
 
     if (lossSteps.length === 0) {
         root.innerHTML = `
@@ -8293,8 +9056,7 @@ function renderTrainingDashboard(files) {
                 <p style="color: var(--text-muted);">
                     Generate training artifacts first, then reload this report.
                 </p>
-                <pre style="font-size:0.8rem;">make v7-gate-train
-python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre>
+                <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
             </div>
         `;
         return;
@@ -8306,6 +9068,8 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
             <div class="stat-card"><div class="stat-value">${finalStep && Number.isFinite(finalStep.grad_norm) ? fmtExp(finalStep.grad_norm, 2) : '-'}</div><div class="stat-label">Grad Norm</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
+            <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -8325,6 +9089,16 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
             <div id="trainAlertList"></div>
         </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Sweep</span> Epoch Stability Summary</h3>
+            <div id="trainSweepTable"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-orange">Runbook</span> Operator Commands (Copy/Paste)</h3>
+            <p style="color:var(--text-muted);margin-bottom:0.6rem;">Producer = CLI writes run_dir artifacts, viewer consumes run_dir.</p>
+            <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
+            <pre style="font-size:0.8rem;white-space:pre-wrap;">${suiteCmd}</pre>
+        </div>
     `;
 
     drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt');
@@ -8336,11 +9110,49 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
     if (!alertsEl) return;
     if (alerts.length === 0) {
         alertsEl.innerHTML = '<div class="alert-item info">No health alerts. Training telemetry looks stable.</div>';
+    } else {
+        alertsEl.innerHTML = alerts.map((a) =>
+            `<div class="alert-item ${a.level}">${a.text}</div>`
+        ).join('');
+    }
+
+    const sweepEl = document.getElementById('trainSweepTable');
+    if (!sweepEl) return;
+    if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
+        sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         return;
     }
-    alertsEl.innerHTML = alerts.map((a) =>
-        `<div class="alert-item ${a.level}">${a.text}</div>`
-    ).join('');
+
+    const rows = [...sweepRows]
+        .sort((a, b) => toNum(a.epoch, 0) - toNum(b.epoch, 0))
+        .map((r) => {
+            const ok = r.pass_parity === true;
+            const badge = ok
+                ? '<span class="badge badge-green">PASS</span>'
+                : '<span class="badge badge-orange">FAIL</span>';
+            return `
+                <tr>
+                    <td>${toNum(r.epoch, 0)}</td>
+                    <td>${badge}</td>
+                    <td>${fmt(toNum(r.final_ck_loss, NaN), 4)}</td>
+                    <td>${fmtExp(toNum(r.max_loss_abs_diff, NaN), 2)}</td>
+                    <td>${fmtExp(toNum(r.final_param_max_abs_diff, NaN), 2)}</td>
+                    <td>${Number.isFinite(toNum(r.train_tok_s, NaN)) ? fmt(toNum(r.train_tok_s, NaN), 1) : '-'}</td>
+                </tr>`;
+        })
+        .join('');
+
+    const profileMeta = sweepProfile && typeof sweepProfile === 'object'
+        ? `<div style="color:var(--text-muted);margin-bottom:0.5rem;">Spot profile: epoch ${toNum(sweepProfile.epoch, 0)} (${String(sweepProfile.mode || 'none')})</div>`
+        : '';
+
+    sweepEl.innerHTML = `
+        ${profileMeta}
+        <table>
+            <thead><tr><th>Epoch</th><th>Parity</th><th>Final Loss</th><th>Max Loss Diff</th><th>Max Param Diff</th><th>Train tok/s</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
 }
 
 /* ===== training_tabs.js ===== */
@@ -8433,11 +9245,996 @@ function renderTrainingExtensionTab(tabId, files) {
     }
 }
 
+/* ===== gradient_flow.js ===== */
+
+function getCheckpoints(files) {
+    const cps = files && files.analysis_checkpoints && Array.isArray(files.analysis_checkpoints.checkpoints)
+        ? files.analysis_checkpoints.checkpoints
+        : [];
+    return [...cps].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0));
+}
+
+function layerFromParam(name) {
+    const m = String(name || '').match(/layer\.(\d+)\./);
+    return m ? Number(m[1]) : null;
+}
+
+function kindFromParam(name) {
+    const n = String(name || '').toLowerCase();
+    if (n.includes('.wq') || n.includes('.wk') || n.includes('.wv') || n.includes('.wo') || n.includes('attn')) {
+        return 'attention';
+    }
+    if (n.includes('.w1') || n.includes('.w2') || n.includes('.w3') || n.includes('mlp')) {
+        return 'mlp';
+    }
+    if (n.includes('norm') || n.includes('gamma') || n.includes('ln')) {
+        return 'norm';
+    }
+    return 'other';
+}
+
+function aggregateLayerGradients(checkpoint) {
+    const gradients = checkpoint && checkpoint.gradients && typeof checkpoint.gradients === 'object'
+        ? checkpoint.gradients
+        : {};
+    const rows = new Map();
+
+    Object.entries(gradients).forEach(([param, payload]) => {
+        const layer = layerFromParam(param);
+        if (layer === null) return;
+        const norm = toNum(payload && payload.norm, NaN);
+        if (!Number.isFinite(norm)) return;
+        if (!rows.has(layer)) {
+            rows.set(layer, { layer, attention: 0, mlp: 0, norm: 0, other: 0, total: 0 });
+        }
+        const r = rows.get(layer);
+        const kind = kindFromParam(param);
+        r[kind] += norm;
+        r.total += norm;
+    });
+
+    return Array.from(rows.values()).sort((a, b) => a.layer - b.layer);
+}
+
+function renderWaterfall(svgEl, rows) {
+    if (!svgEl || !window.d3 || !Array.isArray(rows) || rows.length === 0) return;
+    const d3 = window.d3;
+
+    const width = Math.max(svgEl.clientWidth || 680, rows.length * 36 + 140);
+    const height = 220;
+    const margin = { top: 12, right: 16, bottom: 34, left: 58 };
+    const kinds = ['attention', 'mlp', 'norm'];
+    const colors = { attention: '#3b82f6', mlp: '#10b981', norm: '#8b5cf6' };
+
+    const minPositive = d3.min(rows.flatMap((r) => kinds.map((k) => r[k]).filter((v) => v > 0))) || 1e-9;
+    const maxValue = d3.max(rows.flatMap((r) => kinds.map((k) => r[k]))) || 1;
+
+    const x = d3.scaleBand().domain(rows.map((r) => String(r.layer))).range([margin.left, width - margin.right]).padding(0.16);
+    const xInner = d3.scaleBand().domain(kinds).range([0, x.bandwidth()]).padding(0.08);
+    const y = d3.scaleLog().domain([Math.max(minPositive * 0.9, 1e-12), maxValue * 1.2]).range([height - margin.bottom, margin.top]);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickValues(rows.map((r) => String(r.layer)).filter((_, i) => i % Math.ceil(rows.length / 14) === 0)))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(4, '.1e'))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    const layer = svg.append('g');
+    rows.forEach((r) => {
+        kinds.forEach((k) => {
+            const v = toNum(r[k], 0);
+            if (!Number.isFinite(v) || v <= 0) return;
+            layer.append('rect')
+                .attr('x', x(String(r.layer)) + xInner(k))
+                .attr('y', y(v))
+                .attr('width', xInner.bandwidth())
+                .attr('height', Math.max(1, y(Math.max(minPositive, 1e-12)) - y(v)))
+                .attr('rx', 1.5)
+                .attr('fill', colors[k])
+                .append('title')
+                .text(`L${r.layer} ${k}: ${fmtExp(v, 2)}`);
+        });
+    });
+}
+
+function renderRatio(svgEl, rows) {
+    if (!svgEl || !window.d3 || !Array.isArray(rows) || rows.length < 2) return;
+    const d3 = window.d3;
+
+    const ratioRows = rows.slice(0, -1).map((row, idx) => {
+        const next = rows[idx + 1];
+        const ratio = next.total > 0 ? row.total / next.total : NaN;
+        return { layer: row.layer, ratio };
+    }).filter((r) => Number.isFinite(r.ratio));
+
+    if (ratioRows.length === 0) return;
+
+    const width = Math.max(svgEl.clientWidth || 680, ratioRows.length * 26 + 120);
+    const height = 180;
+    const margin = { top: 12, right: 16, bottom: 30, left: 50 };
+
+    const x = d3.scaleBand().domain(ratioRows.map((r) => String(r.layer))).range([margin.left, width - margin.right]).padding(0.15);
+    const yMax = d3.max(ratioRows, (r) => r.ratio) || 1;
+    const y = d3.scaleLinear().domain([0, Math.max(2.2, yMax * 1.1)]).range([height - margin.bottom, margin.top]);
+
+    const color = (v) => (v > 2 ? '#ef4444' : (v < 0.5 ? '#fbbf24' : '#22c55e'));
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    svg.append('line')
+        .attr('x1', margin.left)
+        .attr('x2', width - margin.right)
+        .attr('y1', y(1))
+        .attr('y2', y(1))
+        .attr('stroke', '#9ca3af')
+        .attr('stroke-dasharray', '4,4');
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickValues(ratioRows.map((r) => String(r.layer)).filter((_, i) => i % Math.ceil(ratioRows.length / 16) === 0)))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(4))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .selectAll('rect')
+        .data(ratioRows)
+        .enter()
+        .append('rect')
+        .attr('x', (d) => x(String(d.layer)))
+        .attr('y', (d) => y(d.ratio))
+        .attr('width', x.bandwidth())
+        .attr('height', (d) => height - margin.bottom - y(d.ratio))
+        .attr('fill', (d) => color(d.ratio))
+        .attr('rx', 2)
+        .append('title')
+        .text((d) => `L${d.layer} ratio=${d.ratio.toFixed(3)}`);
+}
+
+function renderHeatmap(svgEl, checkpoints) {
+    if (!svgEl || !window.d3 || !Array.isArray(checkpoints) || checkpoints.length === 0) return;
+    const d3 = window.d3;
+
+    const matrix = [];
+    checkpoints.forEach((cp) => {
+        const rows = aggregateLayerGradients(cp);
+        for (let i = 0; i < rows.length - 1; i += 1) {
+            const denom = rows[i + 1].total;
+            if (!(denom > 0) || !(rows[i].total > 0)) continue;
+            const ratio = rows[i].total / denom;
+            const logRatio = Math.log10(ratio);
+            matrix.push({
+                step: toNum(cp.step, 0),
+                layer: rows[i].layer,
+                value: Math.max(-1, Math.min(1, logRatio)),
+                ratio,
+            });
+        }
+    });
+
+    if (matrix.length === 0) return;
+
+    const steps = Array.from(new Set(matrix.map((m) => m.step))).sort((a, b) => a - b);
+    const layers = Array.from(new Set(matrix.map((m) => m.layer))).sort((a, b) => a - b);
+
+    const width = Math.max(svgEl.clientWidth || 680, steps.length * 28 + 120);
+    const height = Math.max(220, layers.length * 18 + 54);
+    const margin = { top: 14, right: 16, bottom: 34, left: 54 };
+
+    const x = d3.scaleBand().domain(steps.map(String)).range([margin.left, width - margin.right]).padding(0.05);
+    const y = d3.scaleBand().domain(layers.map(String)).range([margin.top, height - margin.bottom]).padding(0.05);
+    const c = d3.scaleSequential(d3.interpolateRdYlGn).domain([-1, 1]);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    svg.append('g')
+        .selectAll('rect')
+        .data(matrix)
+        .enter()
+        .append('rect')
+        .attr('x', (d) => x(String(d.step)))
+        .attr('y', (d) => y(String(d.layer)))
+        .attr('width', x.bandwidth())
+        .attr('height', y.bandwidth())
+        .attr('fill', (d) => c(d.value))
+        .append('title')
+        .text((d) => `step=${d.step}, L${d.layer}, ratio=${d.ratio.toFixed(3)}`);
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickValues(steps.filter((_, i) => i % Math.ceil(steps.length / 10) === 0).map(String)))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).tickValues(layers.filter((_, i) => i % Math.ceil(layers.length / 14) === 0).map(String)))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+}
+
+function renderGradientFlow(files) {
+    const root = document.getElementById('trainGradFlowRoot');
+    if (!root) return;
+    clear(root);
+
+    const checkpoints = getCheckpoints(files);
+    if (checkpoints.length === 0) {
+        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        return;
+    }
+
+    root.innerHTML = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Gradient Flow</span> Are Gradients Reaching Every Layer?</h3>
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin:0.5rem 0 0.8rem;">
+                <label class="step-label">Checkpoint</label>
+                <select id="gradFlowStepSelect" class="param-select"></select>
+                <span class="step-label">components: attention / mlp / norm</span>
+            </div>
+            <svg id="gradFlowWaterfall" style="width:100%;height:230px;"></svg>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Flow Ratio</span> grad[L] / grad[L+1]</h3>
+            <svg id="gradFlowRatio" style="width:100%;height:190px;"></svg>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Layer × Step</span> Gradient Propagation Heatmap</h3>
+            <svg id="gradFlowHeatmap" style="width:100%;height:280px;"></svg>
+        </div>
+    `;
+
+    const select = document.getElementById('gradFlowStepSelect');
+    const steps = checkpoints.map((c) => toNum(c.step, 0));
+    if (select) {
+        select.innerHTML = checkpoints
+            .map((cp, idx) => `<option value="${idx}">step ${toNum(cp.step, 0)}</option>`)
+            .join('');
+        select.value = String(checkpoints.length - 1);
+
+        const draw = () => {
+            const idx = Math.max(0, Math.min(checkpoints.length - 1, toNum(select.value, checkpoints.length - 1)));
+            const rows = aggregateLayerGradients(checkpoints[idx]);
+            renderWaterfall(document.getElementById('gradFlowWaterfall'), rows);
+            renderRatio(document.getElementById('gradFlowRatio'), rows);
+        };
+        select.addEventListener('change', draw);
+        draw();
+    }
+
+    renderHeatmap(document.getElementById('gradFlowHeatmap'), checkpoints);
+}
+
+/* ===== weight_activation.js ===== */
+
+function getCheckpoints(files) {
+    const cps = files && files.analysis_checkpoints && Array.isArray(files.analysis_checkpoints.checkpoints)
+        ? files.analysis_checkpoints.checkpoints
+        : [];
+    return [...cps].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0));
+}
+
+function flattenGrid(grid) {
+    if (!Array.isArray(grid)) return [];
+    const out = [];
+    grid.forEach((row) => {
+        if (Array.isArray(row)) row.forEach((v) => out.push(toNum(v, 0)));
+    });
+    return out;
+}
+
+function renderWeightGrid(root, grid) {
+    if (!root) return;
+    root.innerHTML = '';
+    if (!Array.isArray(grid) || grid.length === 0) {
+        root.innerHTML = '<div style="color:var(--text-muted);">No sampled_grid_32x32 available for this weight.</div>';
+        return;
+    }
+    const values = flattenGrid(grid);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = Math.max(Math.abs(min), Math.abs(max), 1e-9);
+
+    const matrix = document.createElement('div');
+    matrix.className = 'weight-matrix';
+    matrix.style.gridTemplateColumns = `repeat(${grid[0].length || 32}, 1fr)`;
+
+    grid.forEach((row) => {
+        row.forEach((valueRaw) => {
+            const value = toNum(valueRaw, 0);
+            const n = Math.max(-1, Math.min(1, value / span));
+            const hue = n >= 0 ? 220 : 10;
+            const sat = 72;
+            const light = 50 - Math.abs(n) * 28;
+
+            const cell = document.createElement('div');
+            cell.className = 'weight-cell';
+            cell.style.background = `hsl(${hue} ${sat}% ${light}%)`;
+            cell.title = value.toExponential(3);
+            matrix.appendChild(cell);
+        });
+    });
+
+    root.appendChild(matrix);
+}
+
+function renderHistogram(root, hist, label) {
+    if (!root) return;
+    root.innerHTML = '';
+    const counts = Array.isArray(hist && hist.counts) ? hist.counts.map((x) => toNum(x, 0)) : [];
+    const bins = Array.isArray(hist && hist.bins) ? hist.bins : [];
+    if (counts.length === 0) {
+        root.innerHTML = `<div style="color:var(--text-muted);">No histogram for ${label}.</div>`;
+        return;
+    }
+
+    const max = Math.max(...counts, 1);
+    const histEl = document.createElement('div');
+    histEl.className = 'act-histogram';
+
+    counts.forEach((c, idx) => {
+        const bar = document.createElement('div');
+        bar.className = 'hist-bar';
+        bar.style.height = `${Math.max(2, (c / max) * 100)}%`;
+        const binMid = bins[idx] !== undefined ? bins[idx] : idx;
+        const nearZero = Math.abs(toNum(binMid, 1)) < 1e-8;
+        bar.style.background = nearZero ? '#ef4444' : '#f59e0b';
+        bar.title = `bin=${binMid} count=${c}`;
+        histEl.appendChild(bar);
+    });
+
+    root.appendChild(histEl);
+}
+
+function paramMovement(checkpoints) {
+    const first = checkpoints[0] || {};
+    const last = checkpoints[checkpoints.length - 1] || {};
+    const firstW = first.weights && typeof first.weights === 'object' ? first.weights : {};
+    const lastW = last.weights && typeof last.weights === 'object' ? last.weights : {};
+    const deltas = last.weight_deltas && typeof last.weight_deltas === 'object' ? last.weight_deltas : {};
+
+    const names = Array.from(new Set([...Object.keys(firstW), ...Object.keys(lastW), ...Object.keys(deltas)]));
+    const rows = names.map((name) => {
+        const fw = firstW[name] || {};
+        const lw = lastW[name] || {};
+        const d = deltas[name] || {};
+        const firstNorm = toNum(fw.frobenius_norm, NaN);
+        const lastNorm = toNum(lw.frobenius_norm, NaN);
+        const deltaNorm = toNum(d.norm, Number.isFinite(firstNorm) && Number.isFinite(lastNorm) ? Math.abs(lastNorm - firstNorm) : NaN);
+        const rel = toNum(d.relative, Number.isFinite(firstNorm) && firstNorm > 0 ? deltaNorm / firstNorm : NaN);
+        return { name, rel, deltaNorm, lastNorm };
+    }).filter((r) => Number.isFinite(r.rel) || Number.isFinite(r.deltaNorm));
+
+    return rows.sort((a, b) => toNum(b.rel, -Infinity) - toNum(a.rel, -Infinity));
+}
+
+function renderWeightActivation(files) {
+    const root = document.getElementById('trainWeightsRoot');
+    if (!root) return;
+    clear(root);
+
+    const checkpoints = getCheckpoints(files);
+    if (checkpoints.length === 0) {
+        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        return;
+    }
+
+    const last = checkpoints[checkpoints.length - 1];
+    const weights = last.weights && typeof last.weights === 'object' ? last.weights : {};
+    const activations = last.activations && typeof last.activations === 'object' ? last.activations : {};
+    const gradients = last.gradients && typeof last.gradients === 'object' ? last.gradients : {};
+
+    const weightNames = Object.keys(weights).sort();
+    const activationNames = Object.keys(activations).sort();
+
+    root.innerHTML = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Weight Movement</span> What Is Changing?</h3>
+            <div id="weightMovementTable"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Weight Heatmap</span> sampled 32×32</h3>
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.6rem;">
+                <label class="step-label">Weight</label>
+                <select id="weightParamSelect" class="param-select"></select>
+            </div>
+            <div id="weightGridRoot"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.8rem;">
+            <div>
+                <h3><span class="badge badge-green">Activations</span> Histogram</h3>
+                <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+                    <label class="step-label">Tensor</label>
+                    <select id="activationSelect" class="param-select"></select>
+                </div>
+                <div id="activationHistRoot"></div>
+            </div>
+            <div>
+                <h3><span class="badge badge-orange">Gradients</span> Histogram</h3>
+                <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+                    <label class="step-label">Tensor</label>
+                    <select id="gradientSelect" class="param-select"></select>
+                </div>
+                <div id="gradientHistRoot"></div>
+            </div>
+        </div>
+    `;
+
+    const movementRows = paramMovement(checkpoints).slice(0, 120);
+    const movementEl = document.getElementById('weightMovementTable');
+    if (movementEl) {
+        movementEl.innerHTML = movementRows.length === 0
+            ? '<div style="color:var(--text-muted);">No weight movement stats available yet.</div>'
+            : `<table>
+                <thead><tr><th>Parameter</th><th>Relative Movement</th><th>Delta Norm</th><th>Latest Norm</th></tr></thead>
+                <tbody>
+                    ${movementRows.map((r) => `<tr><td>${r.name}</td><td>${fmtExp(r.rel, 2)}</td><td>${fmtExp(r.deltaNorm, 2)}</td><td>${fmtExp(r.lastNorm, 2)}</td></tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    const weightSel = document.getElementById('weightParamSelect');
+    const gridRoot = document.getElementById('weightGridRoot');
+    if (weightSel) {
+        weightSel.innerHTML = weightNames.map((n) => `<option value="${n}">${n}</option>`).join('');
+        const defaultWeight = weightNames.find((n) => n.includes('.wq') || n.includes('.w1')) || weightNames[0] || '';
+        if (defaultWeight) weightSel.value = defaultWeight;
+        const draw = () => {
+            const payload = weights[weightSel.value] || {};
+            renderWeightGrid(gridRoot, payload.sampled_grid_32x32);
+        };
+        weightSel.addEventListener('change', draw);
+        draw();
+    }
+
+    const actSel = document.getElementById('activationSelect');
+    const actRoot = document.getElementById('activationHistRoot');
+    if (actSel) {
+        actSel.innerHTML = activationNames.map((n) => `<option value="${n}">${n}</option>`).join('');
+        if (activationNames[0]) actSel.value = activationNames[0];
+        const draw = () => renderHistogram(actRoot, (activations[actSel.value] || {}).histogram, actSel.value || 'activation');
+        actSel.addEventListener('change', draw);
+        draw();
+    }
+
+    const gradSel = document.getElementById('gradientSelect');
+    const gradRoot = document.getElementById('gradientHistRoot');
+    const gradientNames = Object.keys(gradients).sort();
+    if (gradSel) {
+        gradSel.innerHTML = gradientNames.map((n) => `<option value="${n}">${n}</option>`).join('');
+        if (gradientNames[0]) gradSel.value = gradientNames[0];
+        const draw = () => renderHistogram(gradRoot, (gradients[gradSel.value] || {}).histogram, gradSel.value || 'gradient');
+        gradSel.addEventListener('change', draw);
+        draw();
+    }
+}
+
+/* ===== attention_inspector.js ===== */
+
+function getCheckpoints(files) {
+    const cps = files && files.analysis_checkpoints && Array.isArray(files.analysis_checkpoints.checkpoints)
+        ? files.analysis_checkpoints.checkpoints
+        : [];
+    return [...cps].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0));
+}
+
+function flattenGrid(grid) {
+    const out = [];
+    if (!Array.isArray(grid)) return out;
+    grid.forEach((row) => {
+        if (Array.isArray(row)) row.forEach((v) => out.push(toNum(v, 0)));
+    });
+    return out;
+}
+
+function cosineSimilarity(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || b.length === 0 || a.length !== b.length) return NaN;
+    let dot = 0;
+    let na = 0;
+    let nb = 0;
+    for (let i = 0; i < a.length; i += 1) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+    }
+    if (na <= 0 || nb <= 0) return NaN;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+function drawHeatmap(svgEl, grid) {
+    if (!svgEl || !window.d3 || !Array.isArray(grid) || grid.length === 0) return;
+    const d3 = window.d3;
+    const rows = grid.length;
+    const cols = Array.isArray(grid[0]) ? grid[0].length : 0;
+    if (cols === 0) return;
+
+    const width = Math.max(svgEl.clientWidth || 420, 380);
+    const height = Math.max(svgEl.clientHeight || 320, 280);
+    const margin = { top: 12, right: 12, bottom: 28, left: 34 };
+
+    const vals = flattenGrid(grid);
+    const min = d3.min(vals) ?? 0;
+    const max = d3.max(vals) ?? 1;
+
+    const x = d3.scaleBand().domain(d3.range(cols).map(String)).range([margin.left, width - margin.right]).padding(0);
+    const y = d3.scaleBand().domain(d3.range(rows).map(String)).range([margin.top, height - margin.bottom]).padding(0);
+    const c = d3.scaleSequential(d3.interpolateViridis).domain([min, max]);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    const cells = [];
+    for (let r = 0; r < rows; r += 1) {
+        for (let k = 0; k < cols; k += 1) {
+            cells.push({ r, k, v: toNum(grid[r][k], 0) });
+        }
+    }
+
+    svg.append('g')
+        .selectAll('rect')
+        .data(cells)
+        .enter()
+        .append('rect')
+        .attr('x', (d) => x(String(d.k)))
+        .attr('y', (d) => y(String(d.r)))
+        .attr('width', x.bandwidth())
+        .attr('height', y.bandwidth())
+        .attr('fill', (d) => c(d.v))
+        .append('title')
+        .text((d) => `q=${d.r} k=${d.k} v=${d.v.toExponential(3)}`);
+}
+
+function drawEntropyTimeline(svgEl, checkpoints, layerName, headIndex) {
+    if (!svgEl || !window.d3 || !Array.isArray(checkpoints) || checkpoints.length === 0) return;
+    const d3 = window.d3;
+
+    const rows = checkpoints.map((cp) => {
+        const attnLayer = cp.attention && cp.attention[layerName];
+        const entropy = Array.isArray(attnLayer && attnLayer.entropy_per_head) ? attnLayer.entropy_per_head : [];
+        return {
+            step: toNum(cp.step, 0),
+            selected: toNum(entropy[headIndex], NaN),
+            min: entropy.length ? Math.min(...entropy.map((v) => toNum(v, 0))) : NaN,
+            max: entropy.length ? Math.max(...entropy.map((v) => toNum(v, 0))) : NaN,
+        };
+    }).filter((r) => Number.isFinite(r.step));
+
+    if (rows.length === 0) return;
+
+    const width = Math.max(svgEl.clientWidth || 640, 460);
+    const height = 220;
+    const margin = { top: 12, right: 12, bottom: 30, left: 44 };
+
+    const yVals = rows.flatMap((r) => [r.min, r.max, r.selected]).filter(Number.isFinite);
+    if (yVals.length === 0) return;
+
+    const x = d3.scaleLinear().domain(d3.extent(rows, (d) => d.step)).range([margin.left, width - margin.right]);
+    const y = d3.scaleLinear().domain([Math.min(...yVals), Math.max(...yVals)]).nice().range([height - margin.bottom, margin.top]);
+
+    const area = d3.area()
+        .x((d) => x(d.step))
+        .y0((d) => y(d.min))
+        .y1((d) => y(d.max))
+        .curve(d3.curveMonotoneX);
+
+    const line = d3.line()
+        .x((d) => x(d.step))
+        .y((d) => y(d.selected))
+        .curve(d3.curveMonotoneX);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    svg.append('path').datum(rows).attr('fill', 'rgba(59,130,246,0.22)').attr('d', area);
+    svg.append('path').datum(rows.filter((r) => Number.isFinite(r.selected))).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2).attr('d', line);
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(6))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(5))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+}
+
+function renderRedundancy(root, headGrids) {
+    if (!root || !window.d3 || !Array.isArray(headGrids) || headGrids.length === 0) {
+        if (root) root.innerHTML = '<div style="color:var(--text-muted);">No head grids available.</div>';
+        return;
+    }
+    const d3 = window.d3;
+    root.innerHTML = '<svg id="attentionRedundancySvg" style="width:100%;height:280px;"></svg>';
+    const svgEl = document.getElementById('attentionRedundancySvg');
+    if (!svgEl) return;
+
+    const vectors = headGrids.map((g) => flattenGrid(g));
+    const n = vectors.length;
+    const cells = [];
+    for (let i = 0; i < n; i += 1) {
+        for (let j = 0; j < n; j += 1) {
+            cells.push({ i, j, v: cosineSimilarity(vectors[i], vectors[j]) });
+        }
+    }
+
+    const width = Math.max(svgEl.clientWidth || 420, 320);
+    const height = 280;
+    const margin = { top: 14, right: 16, bottom: 32, left: 34 };
+    const x = d3.scaleBand().domain(d3.range(n).map(String)).range([margin.left, width - margin.right]).padding(0.03);
+    const y = d3.scaleBand().domain(d3.range(n).map(String)).range([margin.top, height - margin.bottom]).padding(0.03);
+    const c = d3.scaleSequential(d3.interpolateRdYlGn).domain([0.5, 1]);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    svg.append('g')
+        .selectAll('rect')
+        .data(cells)
+        .enter()
+        .append('rect')
+        .attr('x', (d) => x(String(d.j)))
+        .attr('y', (d) => y(String(d.i)))
+        .attr('width', x.bandwidth())
+        .attr('height', y.bandwidth())
+        .attr('fill', (d) => c(Number.isFinite(d.v) ? d.v : 0.5))
+        .append('title')
+        .text((d) => `head ${d.i} vs ${d.j}: ${Number.isFinite(d.v) ? d.v.toFixed(4) : 'NA'}`);
+}
+
+function renderAttentionInspector(files) {
+    const root = document.getElementById('trainAttentionRoot');
+    if (!root) return;
+    clear(root);
+
+    const checkpoints = getCheckpoints(files);
+    if (checkpoints.length === 0) {
+        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        return;
+    }
+
+    const layers = Array.from(new Set(checkpoints.flatMap((cp) => Object.keys((cp && cp.attention) || {})))).sort();
+    if (layers.length === 0) {
+        root.innerHTML = '<p style="color:var(--text-muted);">No attention section found in analysis checkpoints.</p>';
+        return;
+    }
+
+    root.innerHTML = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Attention</span> What Is It Attending To?</h3>
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.7rem;">
+                <label class="step-label">Step</label>
+                <select id="attnStepSelect" class="param-select"></select>
+                <label class="step-label">Layer</label>
+                <select id="attnLayerSelect" class="param-select"></select>
+                <label class="step-label">Head</label>
+                <select id="attnHeadSelect" class="param-select"></select>
+            </div>
+            <svg id="attnMainHeatmap" style="width:100%;height:330px;"></svg>
+            <div id="attnMiniGrid" class="mini-head-grid" style="margin-top:0.8rem;"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Entropy</span> Timeline</h3>
+            <svg id="attnEntropyTimeline" style="width:100%;height:230px;"></svg>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Head Redundancy</span> Cosine Similarity</h3>
+            <div id="attnRedundancyRoot"></div>
+        </div>
+    `;
+
+    const stepSel = document.getElementById('attnStepSelect');
+    const layerSel = document.getElementById('attnLayerSelect');
+    const headSel = document.getElementById('attnHeadSelect');
+    const mainSvg = document.getElementById('attnMainHeatmap');
+    const miniRoot = document.getElementById('attnMiniGrid');
+
+    if (!stepSel || !layerSel || !headSel || !mainSvg || !miniRoot) return;
+
+    stepSel.innerHTML = checkpoints.map((cp, idx) => `<option value="${idx}">step ${toNum(cp.step, 0)}</option>`).join('');
+    layerSel.innerHTML = layers.map((l) => `<option value="${l}">${l}</option>`).join('');
+    stepSel.value = String(checkpoints.length - 1);
+    layerSel.value = layers[0];
+
+    function drawMiniGrid(headGrids) {
+        miniRoot.innerHTML = '';
+        headGrids.forEach((grid, idx) => {
+            const host = document.createElement('div');
+            host.className = `mini-heatmap${toNum(headSel.value, 0) === idx ? ' selected' : ''}`;
+            host.style.padding = '4px';
+            host.style.borderRadius = '6px';
+            host.style.background = 'rgba(255,255,255,0.02)';
+            host.innerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">H${idx}</div><svg style="width:100%;height:90px;"></svg>`;
+            const svg = host.querySelector('svg');
+            drawHeatmap(svg, grid);
+            host.addEventListener('click', () => {
+                headSel.value = String(idx);
+                draw();
+            });
+            miniRoot.appendChild(host);
+        });
+    }
+
+    function syncHeads() {
+        const cp = checkpoints[toNum(stepSel.value, checkpoints.length - 1)] || {};
+        const layer = layerSel.value;
+        const entry = cp.attention && cp.attention[layer] ? cp.attention[layer] : {};
+        const grids = Array.isArray(entry.sampled_qk_grid_32x32) ? entry.sampled_qk_grid_32x32 : [];
+        const headCount = grids.length;
+        const prev = toNum(headSel.value, 0);
+        headSel.innerHTML = Array.from({ length: headCount }, (_, i) => `<option value="${i}">head ${i}</option>`).join('');
+        headSel.value = String(Math.max(0, Math.min(headCount - 1, prev)));
+    }
+
+    function draw() {
+        const cp = checkpoints[toNum(stepSel.value, checkpoints.length - 1)] || {};
+        const layer = layerSel.value;
+        const entry = cp.attention && cp.attention[layer] ? cp.attention[layer] : {};
+        const grids = Array.isArray(entry.sampled_qk_grid_32x32) ? entry.sampled_qk_grid_32x32 : [];
+        const headIndex = toNum(headSel.value, 0);
+
+        if (grids[headIndex]) {
+            drawHeatmap(mainSvg, grids[headIndex]);
+        }
+        drawMiniGrid(grids);
+        drawEntropyTimeline(document.getElementById('attnEntropyTimeline'), checkpoints, layer, headIndex);
+        renderRedundancy(document.getElementById('attnRedundancyRoot'), grids);
+    }
+
+    stepSel.addEventListener('change', () => { syncHeads(); draw(); });
+    layerSel.addEventListener('change', () => { syncHeads(); draw(); });
+    headSel.addEventListener('change', draw);
+
+    syncHeads();
+    draw();
+}
+
+/* ===== run_compare.js ===== */
+
+function parseBaselineJson(obj) {
+    if (!obj || typeof obj !== 'object') return { steps: [] };
+    if (Array.isArray(obj.steps)) return { steps: obj.steps };
+    if (obj.training_loss_curve && Array.isArray(obj.training_loss_curve.steps)) {
+        return { steps: obj.training_loss_curve.steps };
+    }
+    return { steps: [] };
+}
+
+function drawOverlay(svgEl, primary, baseline, key, colorPrimary, colorBaseline) {
+    if (!svgEl || !window.d3) return;
+    const d3 = window.d3;
+    const pRows = primary.filter((r) => Number.isFinite(r.step) && Number.isFinite(r[key]));
+    const bRows = baseline.filter((r) => Number.isFinite(r.step) && Number.isFinite(r[key]));
+    if (pRows.length === 0 && bRows.length === 0) return;
+
+    const width = svgEl.clientWidth || 520;
+    const height = 210;
+    const margin = { top: 12, right: 12, bottom: 28, left: 44 };
+
+    const all = [...pRows, ...bRows];
+    const x = d3.scaleLinear().domain(d3.extent(all, (d) => d.step)).range([margin.left, width - margin.right]);
+    const y = d3.scaleLinear().domain(d3.extent(all, (d) => d[key])).nice().range([height - margin.bottom, margin.top]);
+
+    const line = d3.line().x((d) => x(d.step)).y((d) => y(d[key])).curve(d3.curveMonotoneX);
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+    if (pRows.length) {
+        svg.append('path').datum(pRows).attr('fill', 'none').attr('stroke', colorPrimary).attr('stroke-width', 2).attr('d', line);
+    }
+    if (bRows.length) {
+        svg.append('path').datum(bRows).attr('fill', 'none').attr('stroke', colorBaseline).attr('stroke-width', 2).attr('stroke-dasharray', '6,4').attr('d', line);
+    }
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(6))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(5))
+        .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
+        .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
+}
+
+function renderRunCompare(files) {
+    const root = document.getElementById('trainCompareRoot');
+    if (!root) return;
+    clear(root);
+
+    const primary = parseLossSteps(files.training_loss_curve);
+
+    root.innerHTML = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Run Compare</span> How Does This Compare?</h3>
+            <div id="trainCompareDrop" class="drop-zone">
+                Drop baseline JSON here (training_loss_curve.json or train_e2e_latest.json),
+                or <input id="trainCompareFile" type="file" accept=".json" style="margin-left:6px;" />
+            </div>
+            <div id="trainCompareMeta" style="margin-top:0.55rem;color:var(--text-muted);"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Loss Overlay</span> current vs baseline</h3>
+            <svg id="trainCompareLoss" style="width:100%;height:220px;"></svg>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Grad Norm Overlay</span> current vs baseline</h3>
+            <svg id="trainCompareGrad" style="width:100%;height:220px;"></svg>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-orange">Pointwise Delta</span> nearest-step comparison</h3>
+            <div id="trainCompareDelta"></div>
+        </div>
+    `;
+
+    const drop = document.getElementById('trainCompareDrop');
+    const fileInput = document.getElementById('trainCompareFile');
+    const meta = document.getElementById('trainCompareMeta');
+
+    let baselineSteps = [];
+
+    function render() {
+        drawOverlay(document.getElementById('trainCompareLoss'), primary, baselineSteps, 'loss_ck', '#f59e0b', '#60a5fa');
+        drawOverlay(document.getElementById('trainCompareGrad'), primary, baselineSteps, 'grad_norm', '#10b981', '#a78bfa');
+
+        const deltaEl = document.getElementById('trainCompareDelta');
+        if (!deltaEl) return;
+        if (baselineSteps.length === 0 || primary.length === 0) {
+            deltaEl.innerHTML = '<div style="color:var(--text-muted);">Load a baseline run to see deltas.</div>';
+            return;
+        }
+
+        const paired = primary.slice(0, Math.min(primary.length, baselineSteps.length)).map((p, i) => {
+            const b = baselineSteps[i];
+            return {
+                step: p.step,
+                loss_delta: toNum(p.loss_ck, NaN) - toNum(b.loss_ck, NaN),
+                grad_delta: toNum(p.grad_norm, NaN) - toNum(b.grad_norm, NaN),
+            };
+        }).filter((r) => Number.isFinite(r.loss_delta) || Number.isFinite(r.grad_delta));
+
+        const latest = paired[paired.length - 1] || null;
+        const maxAbsLoss = paired.reduce((m, r) => Math.max(m, Math.abs(toNum(r.loss_delta, 0))), 0);
+        const maxAbsGrad = paired.reduce((m, r) => Math.max(m, Math.abs(toNum(r.grad_delta, 0))), 0);
+
+        deltaEl.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value">${latest ? fmtExp(latest.loss_delta, 2) : '-'}</div><div class="stat-label">Latest Loss Delta</div></div>
+                <div class="stat-card"><div class="stat-value">${latest ? fmtExp(latest.grad_delta, 2) : '-'}</div><div class="stat-label">Latest Grad Delta</div></div>
+                <div class="stat-card"><div class="stat-value">${fmtExp(maxAbsLoss, 2)}</div><div class="stat-label">Max |Loss Delta|</div></div>
+                <div class="stat-card"><div class="stat-value">${fmtExp(maxAbsGrad, 2)}</div><div class="stat-label">Max |Grad Delta|</div></div>
+            </div>
+        `;
+    }
+
+    function loadJsonText(text, sourceLabel) {
+        try {
+            const parsed = JSON.parse(text);
+            baselineSteps = parseLossSteps(parseBaselineJson(parsed));
+            if (meta) {
+                meta.textContent = baselineSteps.length
+                    ? `Loaded baseline (${sourceLabel}) with ${baselineSteps.length} points.`
+                    : `Loaded ${sourceLabel}, but no step series found.`;
+            }
+            render();
+        } catch (err) {
+            if (meta) meta.textContent = `Failed to parse baseline JSON: ${err}`;
+        }
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', (ev) => {
+            const file = ev.target && ev.target.files && ev.target.files[0];
+            if (!file) return;
+            file.text().then((txt) => loadJsonText(txt, file.name));
+        });
+    }
+
+    if (drop) {
+        drop.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+            drop.classList.add('drag-over');
+        });
+        drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+        drop.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            drop.classList.remove('drag-over');
+            const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+            if (!file) return;
+            file.text().then((txt) => loadJsonText(txt, file.name));
+        });
+    }
+
+    render();
+}
+
+/* ===== question_headers.js ===== */
+const QUESTION_TABS = {
+    'train-dashboard': {
+        label: 'Is It Training?',
+        title: 'Loss, gradients, learning rate and run health overview.',
+    },
+    'training': {
+        label: 'How Does the Graph Flow?',
+        title: 'Forward/backward IR topology, invariants and gate status.',
+    },
+    'train-gradient': {
+        label: 'Are Gradients Healthy?',
+        title: 'Per-parameter gradient norms and stability status.',
+    },
+    'train-parity': {
+        label: 'Does It Match PyTorch?',
+        title: 'Step-level numerical drift between CK and PyTorch.',
+    },
+    'train-grad-flow': {
+        label: 'Are Gradients Reaching Every Layer?',
+        title: 'Layer waterfall, ratios and propagation heatmap.',
+    },
+    'train-weights': {
+        label: 'What Is Changing?',
+        title: 'Weight movement ranking, heatmaps and activation distributions.',
+    },
+    'train-attention': {
+        label: 'What Is It Attending To?',
+        title: 'Q×K attention structure, entropy and head redundancy.',
+    },
+    'train-compare': {
+        label: 'How Does This Compare?',
+        title: 'Overlay baseline vs current run and inspect deltas.',
+    },
+};
+
+function applyQuestionHeaders() {
+    Object.entries(QUESTION_TABS).forEach(([tabId, spec]) => {
+        const tab = document.querySelector(`.tabs .tab[data-tab="${tabId}"]`);
+        if (!tab) return;
+        tab.textContent = spec.label;
+        tab.title = spec.title;
+    });
+}
+
 /* ===== mode_ui.js ===== */
 
 const SHARED_TABS = ['memory', 'kernels', 'profile'];
 const INFERENCE_ONLY = ['interpretability', 'quantization', 'parity', 'dataflow', 'tests', 'stats'];
-const TRAINING_TABS = ['train-dashboard', 'training', 'train-gradient', 'train-parity'];
+const TRAINING_TABS = [
+    'train-dashboard',
+    'training',
+    'train-gradient',
+    'train-parity',
+    'train-grad-flow',
+    'train-weights',
+    'train-attention',
+    'train-compare',
+];
 
 function injectStyles() {
     if (document.getElementById('ck-v7-train-style')) return;
@@ -8474,6 +10271,7 @@ function injectStyles() {
         .alert-item.critical { border-color: #ef4444; }
         .alert-item.warning { border-color: #f59e0b; }
         .alert-item.info { border-color: #3b82f6; }
+
         .grad-healthy, .grad-warning, .grad-danger, .grad-dead {
             padding: 2px 8px;
             border-radius: 4px;
@@ -8485,6 +10283,46 @@ function injectStyles() {
         .grad-warning { background: #78350f; color: #fcd34d; }
         .grad-danger  { background: #7f1d1d; color: #fca5a5; }
         .grad-dead    { background: #374151; color: #9ca3af; }
+
+        .weight-matrix { display: grid; grid-template-columns: repeat(32, 1fr); gap: 1px; }
+        .weight-cell { aspect-ratio: 1; min-width: 3px; border-radius: 1px; }
+
+        .act-histogram { display: flex; align-items: flex-end; height: 150px; gap: 2px; }
+        .hist-bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 4px; }
+
+        .mini-head-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; }
+        .mini-heatmap { cursor: pointer; border: 2px solid transparent; border-radius: 4px; }
+        .mini-heatmap.selected { border-color: var(--orange); }
+
+        .step-slider { width: 100%; accent-color: var(--orange); }
+        .step-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .param-select, .layer-select, .head-select {
+            background: var(--dark-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--grey);
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.82rem;
+            min-width: 180px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--grey);
+            border-radius: 8px;
+            padding: 1.2rem;
+            text-align: center;
+            color: var(--text-muted);
+            transition: var(--transition);
+        }
+        .drop-zone.drag-over {
+            border-color: var(--orange);
+            background: rgba(255, 180, 0, 0.05);
+        }
     `;
     document.head.appendChild(style);
 }
@@ -8516,6 +10354,10 @@ function appendTrainingTabs() {
         { id: 'train-dashboard', label: 'Train Dashboard' },
         { id: 'train-gradient', label: 'Gradient Health' },
         { id: 'train-parity', label: 'Parity Tracker' },
+        { id: 'train-grad-flow', label: 'Gradient Flow' },
+        { id: 'train-weights', label: 'Weights & Activations' },
+        { id: 'train-attention', label: 'Attention' },
+        { id: 'train-compare', label: 'Run Compare' },
     ];
     specs.forEach((spec) => {
         const tab = document.createElement('div');
@@ -8528,39 +10370,59 @@ function appendTrainingTabs() {
     });
 }
 
+function ensurePanelRoot(panelId, rootId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    if (panel.querySelector(`#${rootId}`)) return;
+    const root = document.createElement('div');
+    root.id = rootId;
+    panel.appendChild(root);
+}
+
 function ensureTrainingPanels() {
-    const dashboard = ensurePanel(
+    ensurePanel(
         'train-dashboard',
         'Training Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
     );
-    if (dashboard && !dashboard.querySelector('#trainDashboardRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainDashboardRoot';
-        dashboard.appendChild(root);
-    }
-
-    const gradient = ensurePanel(
+    ensurePanel(
         'train-gradient',
         'Gradient Health',
         'Per-parameter gradient norms and health buckets.'
     );
-    if (gradient && !gradient.querySelector('#trainGradientRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainGradientRoot';
-        gradient.appendChild(root);
-    }
-
-    const parity = ensurePanel(
+    ensurePanel(
         'train-parity',
         'Training Parity Tracker',
         'Step-level CK vs PyTorch numerical drift summary.'
     );
-    if (parity && !parity.querySelector('#trainParityRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainParityRoot';
-        parity.appendChild(root);
-    }
+    ensurePanel(
+        'train-grad-flow',
+        'Gradient Flow',
+        'Layer-wise gradient propagation (waterfall, ratio, heatmap).'
+    );
+    ensurePanel(
+        'train-weights',
+        'Weights & Activations',
+        'Weight movement and activation/gradient distribution snapshots.'
+    );
+    ensurePanel(
+        'train-attention',
+        'Attention Inspector',
+        'Q×K patterns, entropy timeline, and head redundancy.'
+    );
+    ensurePanel(
+        'train-compare',
+        'Run Compare',
+        'Overlay current run vs baseline artifacts.'
+    );
+
+    ensurePanelRoot('train-dashboard', 'trainDashboardRoot');
+    ensurePanelRoot('train-gradient', 'trainGradientRoot');
+    ensurePanelRoot('train-parity', 'trainParityRoot');
+    ensurePanelRoot('train-grad-flow', 'trainGradFlowRoot');
+    ensurePanelRoot('train-weights', 'trainWeightsRoot');
+    ensurePanelRoot('train-attention', 'trainAttentionRoot');
+    ensurePanelRoot('train-compare', 'trainCompareRoot');
 }
 
 function installModeToggle() {
@@ -8647,6 +10509,22 @@ function renderTrainingTab(tabId) {
         renderTrainingDashboard(files);
         return;
     }
+    if (tabId === 'train-grad-flow') {
+        renderGradientFlow(files);
+        return;
+    }
+    if (tabId === 'train-weights') {
+        renderWeightActivation(files);
+        return;
+    }
+    if (tabId === 'train-attention') {
+        renderAttentionInspector(files);
+        return;
+    }
+    if (tabId === 'train-compare') {
+        renderRunCompare(files);
+        return;
+    }
     renderTrainingExtensionTab(tabId, files);
 }
 
@@ -8685,6 +10563,7 @@ function installListeners() {
 
 function init() {
     initModeUI();
+    applyQuestionHeaders();
     patchShowTab();
     installListeners();
 

@@ -215,23 +215,99 @@ class GGUFTokenizer:
 
     @classmethod
     def from_json(cls, json_path: str) -> "GGUFTokenizer":
-        """Create tokenizer from extracted vocab JSON."""
+        """Create tokenizer from extracted vocab JSON.
+
+        Supports three common formats:
+          1) Legacy exported format with keys: tokens/scores/special_tokens
+          2) HuggingFace tokenizer.json with model.vocab
+          3) Plain vocab.json map: {"token": id, ...}
+        """
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Convert JSON format to internal format
-        vocab_data = {
-            "tokenizer.ggml.tokens": data.get("tokens", []),
-            "tokenizer.ggml.scores": data.get("scores", []),
-            "tokenizer.ggml.model": data.get("model", "unknown"),
-            "tokenizer.ggml.bos_token_id": data.get("special_tokens", {}).get("bos", 1),
-            "tokenizer.ggml.eos_token_id": data.get("special_tokens", {}).get("eos", 2),
-            "tokenizer.ggml.unknown_token_id": data.get("special_tokens", {}).get("unk", 0),
-            "tokenizer.ggml.padding_token_id": data.get("special_tokens", {}).get("pad", 0),
-            "tokenizer.ggml.add_bos_token": data.get("add_special", {}).get("bos", True),
-            "tokenizer.ggml.add_eos_token": data.get("add_special", {}).get("eos", False),
-        }
-        return cls(vocab_data)
+        # 1) Legacy internal format
+        if isinstance(data, dict) and isinstance(data.get("tokens"), list):
+            vocab_data = {
+                "tokenizer.ggml.tokens": data.get("tokens", []),
+                "tokenizer.ggml.scores": data.get("scores", []),
+                "tokenizer.ggml.model": data.get("model", "unknown"),
+                "tokenizer.ggml.bos_token_id": data.get("special_tokens", {}).get("bos", 1),
+                "tokenizer.ggml.eos_token_id": data.get("special_tokens", {}).get("eos", 2),
+                "tokenizer.ggml.unknown_token_id": data.get("special_tokens", {}).get("unk", 0),
+                "tokenizer.ggml.padding_token_id": data.get("special_tokens", {}).get("pad", 0),
+                "tokenizer.ggml.add_bos_token": data.get("add_special", {}).get("bos", True),
+                "tokenizer.ggml.add_eos_token": data.get("add_special", {}).get("eos", False),
+            }
+            return cls(vocab_data)
+
+        vocab_map = None
+        model_type = "unknown"
+        bos_id, eos_id, unk_id, pad_id = 1, 2, 0, 0
+        add_bos, add_eos = True, False
+
+        # 2) HuggingFace tokenizer.json (tokenizers format)
+        if isinstance(data, dict) and isinstance(data.get("model"), dict):
+            model = data.get("model", {})
+            maybe_vocab = model.get("vocab")
+            if isinstance(maybe_vocab, dict):
+                vocab_map = maybe_vocab
+                model_type = str(model.get("type", "unknown"))
+                unk_tok = model.get("unk_token")
+                if isinstance(unk_tok, str) and unk_tok in vocab_map:
+                    unk_id = int(vocab_map[unk_tok])
+
+            # Best-effort special-token extraction from added_tokens.
+            added = data.get("added_tokens")
+            if isinstance(added, list):
+                for item in added:
+                    if not isinstance(item, dict):
+                        continue
+                    content = item.get("content")
+                    tid = item.get("id")
+                    if not isinstance(content, str) or not isinstance(tid, int):
+                        continue
+                    c = content.lower()
+                    if c in {"<s>", "<|im_start|>", "<|bos|>", "<bos>"}:
+                        bos_id = tid
+                    elif c in {"</s>", "<|im_end|>", "<|endoftext|>", "<eos>", "<|eot_id|>"}:
+                        eos_id = tid
+                    elif "unk" in c:
+                        unk_id = tid
+                    elif "pad" in c:
+                        pad_id = tid
+
+        # 3) Plain vocab map file (token -> id)
+        if vocab_map is None and isinstance(data, dict):
+            # Heuristic: most values are integers, and keys are token strings.
+            sample_items = list(data.items())[:64]
+            if sample_items and all(isinstance(k, str) and isinstance(v, int) for k, v in sample_items):
+                vocab_map = data
+                model_type = "bpe"
+
+        if isinstance(vocab_map, dict):
+            if vocab_map:
+                max_id = max(int(v) for v in vocab_map.values())
+                tokens = [f"<|ck_missing_{i}|>" for i in range(max_id + 1)]
+                for tok, tid in vocab_map.items():
+                    if isinstance(tok, str) and isinstance(tid, int) and 0 <= tid <= max_id:
+                        tokens[tid] = tok
+            else:
+                tokens = []
+
+            vocab_data = {
+                "tokenizer.ggml.tokens": tokens,
+                "tokenizer.ggml.scores": [0.0] * len(tokens),
+                "tokenizer.ggml.model": model_type,
+                "tokenizer.ggml.bos_token_id": bos_id,
+                "tokenizer.ggml.eos_token_id": eos_id,
+                "tokenizer.ggml.unknown_token_id": unk_id,
+                "tokenizer.ggml.padding_token_id": pad_id,
+                "tokenizer.ggml.add_bos_token": add_bos,
+                "tokenizer.ggml.add_eos_token": add_eos,
+            }
+            return cls(vocab_data)
+
+        raise ValueError(f"Unsupported tokenizer JSON format: {json_path}")
 
     def _byte_to_token(self, b: int) -> str:
         """Convert a byte to its token representation."""

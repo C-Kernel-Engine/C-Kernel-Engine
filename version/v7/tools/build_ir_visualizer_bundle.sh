@@ -18,6 +18,11 @@ FILES=(
   "utils.js"
   "training_dashboard.js"
   "training_tabs.js"
+  "gradient_flow.js"
+  "weight_activation.js"
+  "attention_inspector.js"
+  "run_compare.js"
+  "question_headers.js"
   "mode_ui.js"
   "main.js"
 )

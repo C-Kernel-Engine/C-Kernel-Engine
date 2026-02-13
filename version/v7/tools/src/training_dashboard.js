@@ -99,6 +99,18 @@ function healthAlerts(lossSteps, parityRows) {
     return alerts;
 }
 
+function getRunContext() {
+    const embedded = window.EMBEDDED_IR_DATA || {};
+    const meta = embedded.meta || {};
+    const runDir = typeof meta.run_dir === 'string' && meta.run_dir.trim()
+        ? meta.run_dir
+        : null;
+    const modelPath = typeof meta.path === 'string' && meta.path.trim()
+        ? meta.path
+        : null;
+    return { runDir, modelPath };
+}
+
 export function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -109,9 +121,22 @@ export function renderTrainingDashboard(files) {
     const lossSteps = parseLossSteps(files.training_loss_curve);
     const parityRows = parseParityRows(files.training_parity);
     const profile = files.training_step_profile || {};
+    const sweep = files.training_epoch_sweep || {};
+    const sweepRows = Array.isArray(sweep.runs) ? sweep.runs : [];
+    const sweepProfile = sweep && typeof sweep === 'object' ? sweep.profile_run : null;
     const finalStep = lossSteps[lossSteps.length - 1] || null;
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
     const decodeTokS = toNum(profile.decode_tok_s, NaN);
+    const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
+    const trainE2E = files.train_e2e || {};
+    const runCtx = getRunContext();
+
+    const reportCmd = runCtx.runDir
+        ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
+        : 'python3 version/v7/tools/open_ir_visualizer.py --generate <model> --html-only';
+    const suiteCmd = runCtx.runDir
+        ? `version/v7/scripts/cks-v7-run train-suite --run ${runCtx.runDir} --profile-train perf --profile-epoch 3`
+        : 'version/v7/scripts/cks-v7-run train-suite --run ./version/v7/runs/exp1 --profile-train perf --profile-epoch 3';
 
     if (lossSteps.length === 0) {
         root.innerHTML = `
@@ -120,8 +145,7 @@ export function renderTrainingDashboard(files) {
                 <p style="color: var(--text-muted);">
                     Generate training artifacts first, then reload this report.
                 </p>
-                <pre style="font-size:0.8rem;">make v7-gate-train
-python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre>
+                <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
             </div>
         `;
         return;
@@ -133,6 +157,8 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
             <div class="stat-card"><div class="stat-value">${finalStep && Number.isFinite(finalStep.grad_norm) ? fmtExp(finalStep.grad_norm, 2) : '-'}</div><div class="stat-label">Grad Norm</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
+            <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -152,6 +178,16 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
             <div id="trainAlertList"></div>
         </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Sweep</span> Epoch Stability Summary</h3>
+            <div id="trainSweepTable"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-orange">Runbook</span> Operator Commands (Copy/Paste)</h3>
+            <p style="color:var(--text-muted);margin-bottom:0.6rem;">Producer = CLI writes run_dir artifacts, viewer consumes run_dir.</p>
+            <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
+            <pre style="font-size:0.8rem;white-space:pre-wrap;">${suiteCmd}</pre>
+        </div>
     `;
 
     drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt');
@@ -163,9 +199,47 @@ python version/v7/tools/open_ir_visualizer.py --generate MODEL --mode train</pre
     if (!alertsEl) return;
     if (alerts.length === 0) {
         alertsEl.innerHTML = '<div class="alert-item info">No health alerts. Training telemetry looks stable.</div>';
+    } else {
+        alertsEl.innerHTML = alerts.map((a) =>
+            `<div class="alert-item ${a.level}">${a.text}</div>`
+        ).join('');
+    }
+
+    const sweepEl = document.getElementById('trainSweepTable');
+    if (!sweepEl) return;
+    if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
+        sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         return;
     }
-    alertsEl.innerHTML = alerts.map((a) =>
-        `<div class="alert-item ${a.level}">${a.text}</div>`
-    ).join('');
+
+    const rows = [...sweepRows]
+        .sort((a, b) => toNum(a.epoch, 0) - toNum(b.epoch, 0))
+        .map((r) => {
+            const ok = r.pass_parity === true;
+            const badge = ok
+                ? '<span class="badge badge-green">PASS</span>'
+                : '<span class="badge badge-orange">FAIL</span>';
+            return `
+                <tr>
+                    <td>${toNum(r.epoch, 0)}</td>
+                    <td>${badge}</td>
+                    <td>${fmt(toNum(r.final_ck_loss, NaN), 4)}</td>
+                    <td>${fmtExp(toNum(r.max_loss_abs_diff, NaN), 2)}</td>
+                    <td>${fmtExp(toNum(r.final_param_max_abs_diff, NaN), 2)}</td>
+                    <td>${Number.isFinite(toNum(r.train_tok_s, NaN)) ? fmt(toNum(r.train_tok_s, NaN), 1) : '-'}</td>
+                </tr>`;
+        })
+        .join('');
+
+    const profileMeta = sweepProfile && typeof sweepProfile === 'object'
+        ? `<div style="color:var(--text-muted);margin-bottom:0.5rem;">Spot profile: epoch ${toNum(sweepProfile.epoch, 0)} (${String(sweepProfile.mode || 'none')})</div>`
+        : '';
+
+    sweepEl.innerHTML = `
+        ${profileMeta}
+        <table>
+            <thead><tr><th>Epoch</th><th>Parity</th><th>Final Loss</th><th>Max Loss Diff</th><th>Max Param Diff</th><th>Train tok/s</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
 }

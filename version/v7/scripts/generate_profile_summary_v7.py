@@ -56,6 +56,20 @@ def build_summary(entries: List[Dict[str, str]]) -> Dict[str, object]:
     }
 
 
+def _candidate_paths(work_dir: Path, name: str) -> List[Path]:
+    return [
+        work_dir / name,
+        work_dir / ".ck_build" / name,
+    ]
+
+
+def _first_existing(paths: List[Path]) -> Path | None:
+    for p in paths:
+        if p.exists():
+            return p
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate v7 profile summary JSON from CSV")
     parser.add_argument("--work-dir", required=True, type=Path, help="Model directory containing profile_decode.csv")
@@ -64,7 +78,16 @@ def main() -> int:
     args = parser.parse_args()
 
     work_dir = args.work_dir
-    csv_path = args.csv or (work_dir / "profile_decode.csv")
+    if args.csv:
+        csv_path = args.csv
+    else:
+        csv_path = _first_existing(_candidate_paths(work_dir, "profile_decode.csv"))
+        if csv_path is None:
+            raise FileNotFoundError(
+                "profile CSV not found in either path: "
+                f"{work_dir / 'profile_decode.csv'} or {work_dir / '.ck_build' / 'profile_decode.csv'}"
+            )
+
     out_path = args.out or (work_dir / "profile_summary.json")
 
     if not csv_path.exists():
@@ -79,6 +102,15 @@ def main() -> int:
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
 
+    # Keep both legacy(root) and .ck_build locations in sync so downstream
+    # tools can read either path during transition.
+    for mirror in _candidate_paths(work_dir, "profile_summary.json"):
+        if mirror.resolve() == out_path.resolve():
+            continue
+        mirror.parent.mkdir(parents=True, exist_ok=True)
+        with open(mirror, "w") as f:
+            json.dump(summary, f, indent=2)
+
     total_ms = float(summary["total_ms"])
     print(f"Wrote {out_path}")
     print(f"Total (token_id=0 view): {total_ms:.2f} ms")
@@ -87,4 +119,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

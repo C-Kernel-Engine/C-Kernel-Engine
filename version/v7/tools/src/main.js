@@ -2,6 +2,11 @@ import { getEmbeddedFiles } from './utils.js';
 import { initModeUI, trainingTabIds } from './mode_ui.js';
 import { renderTrainingDashboard } from './training_dashboard.js';
 import { renderTrainingExtensionTab } from './training_tabs.js';
+import { renderGradientFlow } from './gradient_flow.js';
+import { renderWeightActivation } from './weight_activation.js';
+import { renderAttentionInspector } from './attention_inspector.js';
+import { renderRunCompare } from './run_compare.js';
+import { applyQuestionHeaders } from './question_headers.js';
 
 function currentFiles() {
     return getEmbeddedFiles();
@@ -11,6 +16,22 @@ function renderTrainingTab(tabId) {
     const files = currentFiles();
     if (tabId === 'train-dashboard') {
         renderTrainingDashboard(files);
+        return;
+    }
+    if (tabId === 'train-grad-flow') {
+        renderGradientFlow(files);
+        return;
+    }
+    if (tabId === 'train-weights') {
+        renderWeightActivation(files);
+        return;
+    }
+    if (tabId === 'train-attention') {
+        renderAttentionInspector(files);
+        return;
+    }
+    if (tabId === 'train-compare') {
+        renderRunCompare(files);
         return;
     }
     renderTrainingExtensionTab(tabId, files);
@@ -51,6 +72,7 @@ function installListeners() {
 
 function init() {
     initModeUI();
+    applyQuestionHeaders();
     patchShowTab();
     installListeners();
 

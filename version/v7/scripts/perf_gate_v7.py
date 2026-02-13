@@ -34,10 +34,28 @@ def detect_model_dir_from_input(model_input: str) -> Optional[Path]:
     if input_type == "gguf":
         return CACHE_DIR / info["path"].stem
     if input_type == "local_dir":
-        return Path(info["path"]) / ".ck_build"
+        local = Path(info["path"]).resolve()
+        return local.parent if local.name == ".ck_build" else local
     if input_type == "local_config":
-        return Path(info["path"]).parent / ".ck_build"
+        cfg_parent = Path(info["path"]).resolve().parent
+        return cfg_parent.parent if cfg_parent.name == ".ck_build" else cfg_parent
     return None
+
+
+def _artifact_candidates(model_dir: Path, name: str) -> list[Path]:
+    return [
+        model_dir / name,
+        model_dir / ".ck_build" / name,
+    ]
+
+
+def _resolve_artifact_path(model_dir: Path, name: str, explicit: Optional[Path] = None) -> Path:
+    if explicit is not None:
+        return explicit
+    for candidate in _artifact_candidates(model_dir, name):
+        if candidate.exists():
+            return candidate
+    return model_dir / name
 
 
 def load_json(path: Path) -> Dict:
@@ -193,8 +211,8 @@ def main() -> int:
         parser.error("Provide --model-dir or --model-input")
     model_dir = model_dir.resolve()
 
-    profile_json = args.profile_json or (model_dir / "profile_summary.json")
-    perf_stat_json = args.perf_stat_json or (model_dir / "perf_stat_summary.json")
+    profile_json = _resolve_artifact_path(model_dir, "profile_summary.json", args.profile_json)
+    perf_stat_json = _resolve_artifact_path(model_dir, "perf_stat_summary.json", args.perf_stat_json)
     if not profile_json.exists():
         print(f"[perf-gate] missing profile summary: {profile_json}")
         return 2
@@ -283,6 +301,14 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
+
+    # Keep root and .ck_build copies in sync for mixed legacy/new readers.
+    for mirror in _artifact_candidates(model_dir, "perf_gate_report.json"):
+        if mirror.resolve() == out_path.resolve():
+            continue
+        mirror.parent.mkdir(parents=True, exist_ok=True)
+        with open(mirror, "w") as f:
+            json.dump(report, f, indent=2)
 
     print(f"[perf-gate] model={model_dir.name} family={family}")
     print(f"[perf-gate] decode_tok_s={decode_tok_s if decode_tok_s is not None else 'NA'}")

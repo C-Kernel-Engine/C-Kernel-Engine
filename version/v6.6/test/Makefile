@@ -11,7 +11,7 @@
 MODEL ?=
 
 # Python interpreter
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard ../../.venv/bin/python),../../.venv/bin/python,python3)
 
 # Directory wiring
 TEST_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))

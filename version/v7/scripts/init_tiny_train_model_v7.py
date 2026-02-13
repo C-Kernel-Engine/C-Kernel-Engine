@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -50,13 +51,44 @@ def _append_tensor(
     )
 
 
-def _randn(rng: np.random.Generator, shape: Tuple[int, ...], scale: float = 0.02) -> np.ndarray:
-    return (rng.standard_normal(shape).astype(np.float32) * np.float32(scale)).astype(np.float32)
+def _fan_in_out(shape: Tuple[int, ...]) -> Tuple[int, int]:
+    if len(shape) == 0:
+        return 1, 1
+    if len(shape) == 1:
+        n = int(shape[0]) if int(shape[0]) > 0 else 1
+        return n, n
+    fan_in = int(shape[-2]) if int(shape[-2]) > 0 else 1
+    fan_out = int(shape[-1]) if int(shape[-1]) > 0 else 1
+    return fan_in, fan_out
+
+
+def _init_weight(
+    rng: np.random.Generator,
+    shape: Tuple[int, ...],
+    init: str,
+) -> np.ndarray:
+    init = str(init or "normal_0p02").lower()
+    fan_in, fan_out = _fan_in_out(shape)
+
+    if init == "zeros":
+        return np.zeros(shape, dtype=np.float32)
+    if init == "xavier_uniform":
+        limit = math.sqrt(6.0 / float(fan_in + fan_out))
+        return rng.uniform(-limit, limit, size=shape).astype(np.float32)
+    if init == "xavier_normal":
+        std = math.sqrt(2.0 / float(fan_in + fan_out))
+        return (rng.standard_normal(shape).astype(np.float32) * np.float32(std)).astype(np.float32)
+    if init == "kaiming_uniform":
+        limit = math.sqrt(6.0 / float(fan_in))
+        return rng.uniform(-limit, limit, size=shape).astype(np.float32)
+    # default: "normal_0p02"
+    return (rng.standard_normal(shape).astype(np.float32) * np.float32(0.02)).astype(np.float32)
 
 
 def build_tiny_model(
     out_dir: Path,
     seed: int,
+    init: str,
     n_layers: int,
     vocab_size: int,
     embed_dim: int,
@@ -80,19 +112,28 @@ def build_tiny_model(
     entries: List[Dict] = []
 
     # Global tensors
-    _append_tensor(blob, entries, "token_emb", _randn(rng, (vocab_size, embed_dim)))
+    _append_tensor(blob, entries, "token_emb", _init_weight(rng, (vocab_size, embed_dim), init))
     _append_tensor(blob, entries, "final_ln_weight", np.ones((embed_dim,), dtype=np.float32))
-    _append_tensor(blob, entries, "output.weight", _randn(rng, (vocab_size, embed_dim)))
+    _append_tensor(blob, entries, "output.weight", _init_weight(rng, (vocab_size, embed_dim), init))
+
+    # Tiny parity-harness tensors: these map 1:1 to TinyCKModel/TinyTorchModel state_dict keys.
+    # They allow deterministic init replay from weights.bump during `cks-v7-run train/sanity/parity`.
+    _append_tensor(blob, entries, "tiny.embedding.weight", _init_weight(rng, (vocab_size, embed_dim), init))
+    _append_tensor(blob, entries, "tiny.rms_gamma", np.ones((embed_dim,), dtype=np.float32))
+    _append_tensor(blob, entries, "tiny.fc1.weight", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
+    _append_tensor(blob, entries, "tiny.fc1.bias", np.zeros((2 * hidden_dim,), dtype=np.float32))
+    _append_tensor(blob, entries, "tiny.fc2.weight", _init_weight(rng, (vocab_size, hidden_dim), init))
+    _append_tensor(blob, entries, "tiny.fc2.bias", np.zeros((vocab_size,), dtype=np.float32))
 
     for l in range(n_layers):
         prefix = f"layer.{l}"
         _append_tensor(blob, entries, f"{prefix}.ln1_gamma", np.ones((embed_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.ln2_gamma", np.ones((embed_dim,), dtype=np.float32))
 
-        _append_tensor(blob, entries, f"{prefix}.wq", _randn(rng, (embed_dim, embed_dim)))
-        _append_tensor(blob, entries, f"{prefix}.wk", _randn(rng, (embed_dim, embed_dim)))
-        _append_tensor(blob, entries, f"{prefix}.wv", _randn(rng, (embed_dim, embed_dim)))
-        _append_tensor(blob, entries, f"{prefix}.wo", _randn(rng, (embed_dim, embed_dim)))
+        _append_tensor(blob, entries, f"{prefix}.wq", _init_weight(rng, (embed_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (embed_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (embed_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.wo", _init_weight(rng, (embed_dim, embed_dim), init))
         _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((embed_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((embed_dim,), dtype=np.float32))
@@ -102,8 +143,8 @@ def build_tiny_model(
         _append_tensor(blob, entries, f"{prefix}.k_norm", np.ones((head_dim,), dtype=np.float32))
 
         # SwiGLU path: w1 emits 2*hidden, w2 projects hidden -> embed
-        _append_tensor(blob, entries, f"{prefix}.w1", _randn(rng, (embed_dim, 2 * hidden_dim)))
-        _append_tensor(blob, entries, f"{prefix}.w2", _randn(rng, (hidden_dim, embed_dim)))
+        _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (embed_dim, 2 * hidden_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (hidden_dim, embed_dim), init))
         _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
 
@@ -124,6 +165,20 @@ def build_tiny_model(
             "enabled": True,
             "kernel_policy": kernel_policy,
             "precision_policy": "fp32_only",
+            "tiny_parity": {
+                "enabled": True,
+                "state_tensors": {
+                    "embedding.weight": "tiny.embedding.weight",
+                    "rms_gamma": "tiny.rms_gamma",
+                    "fc1.weight": "tiny.fc1.weight",
+                    "fc1.bias": "tiny.fc1.bias",
+                    "fc2.weight": "tiny.fc2.weight",
+                    "fc2.bias": "tiny.fc2.bias",
+                },
+                "vocab": vocab_size,
+                "d_model": embed_dim,
+                "hidden": hidden_dim,
+            },
         },
     }
 
@@ -136,6 +191,7 @@ def build_tiny_model(
 
     run_cfg = {
         "seed": seed,
+        "init": init,
         "kernel_policy": kernel_policy,
         "architecture": {
             "family": "qwen3-like",
@@ -151,6 +207,19 @@ def build_tiny_model(
         "artifacts": {
             "weights_bump": "weights.bump",
             "weights_manifest": "weights_manifest.json",
+        },
+        "tiny_parity": {
+            "vocab": vocab_size,
+            "d_model": embed_dim,
+            "hidden": hidden_dim,
+            "state_tensors": {
+                "embedding.weight": "tiny.embedding.weight",
+                "rms_gamma": "tiny.rms_gamma",
+                "fc1.weight": "tiny.fc1.weight",
+                "fc1.bias": "tiny.fc1.bias",
+                "fc2.weight": "tiny.fc2.weight",
+                "fc2.bias": "tiny.fc2.bias",
+            },
         },
     }
 
@@ -169,6 +238,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Initialize tiny fp32 v7 training weights.bump + manifest.")
     ap.add_argument("--output-dir", type=Path, required=True)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument(
+        "--init",
+        type=str,
+        default="normal_0p02",
+        choices=["normal_0p02", "xavier_uniform", "xavier_normal", "kaiming_uniform", "zeros"],
+        help="Weight initialization policy (default: normal_0p02)",
+    )
     ap.add_argument("--layers", type=int, default=2)
     ap.add_argument("--vocab-size", type=int, default=256)
     ap.add_argument("--embed-dim", type=int, default=128)
@@ -183,6 +259,7 @@ def main() -> int:
     build_tiny_model(
         out_dir=args.output_dir,
         seed=int(args.seed),
+        init=str(args.init),
         n_layers=int(args.layers),
         vocab_size=int(args.vocab_size),
         embed_dim=int(args.embed_dim),
@@ -198,4 +275,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

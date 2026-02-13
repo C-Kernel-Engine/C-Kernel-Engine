@@ -79,5 +79,6 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `v7-train-compile-smoke` compiles that generated C to an object as an operator gate.
 - `v7-init-tiny` provides from-scratch tiny-model initialization (`weights.bump` + `weights_manifest.json`).
 - `v7-parity-1tok` now includes `qk_norm_backward` parity in addition to RMSNorm, SwiGLU, and CE.
+- `profile-v7-vtune` now supports deep capture (`V7_VTUNE_DEEP=1`): hotspots + memory-access + uarch-exploration, exported to `vtune_summary.json` for the IR viewer.
 - Inference baseline is synced from `version/v6.6` into `version/v7` so inference and
   backprop can evolve together in one track.

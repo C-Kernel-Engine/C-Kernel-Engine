@@ -402,7 +402,7 @@ SMOLLM_BUMP ?= $(BUILD_DIR)/smollm_weights.bin
 SMOLLM_OUT_WEIGHTS ?= $(BUILD_DIR)/smollm_weights_after.bin
 SMOLLM_MAX_LAYERS ?=
 
-PYTHON  ?= python3
+PYTHON  ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 PYTHONFLAGS ?= -B
 PY_TESTS := unittest/test_layernorm.py \
             unittest/test_gelu.py \
@@ -3209,6 +3209,7 @@ V7_RUN_ARGS ?= $(V7_WEIGHT_DTYPE_ARG) $(if $(filter auto,$(V7_CHAT_TEMPLATE)),,-
 V7_PERF_RUNTIME ?= cli
 V7_CLI_ARGS ?=
 V7_WITH_VTUNE ?= 1
+V7_VTUNE_DEEP ?= 1
 V7_PREP_WITH_PYTHON ?= 1
 V7_FORCE_COMPILE ?= 1
 V7_FORCE_COMPILE_ARG := $(if $(filter 1,$(V7_FORCE_COMPILE)),--force-compile,)
@@ -3456,6 +3457,10 @@ PROFILE_V7_CALLGRAPH ?= dwarf,16384
 PROFILE_V7_COMPILER ?= gcc
 PROFILE_V7_VTUNE_TEXT ?= build/ck_v7_vtune_hotspots.txt
 PROFILE_V7_VTUNE_CSV ?= build/ck_v7_vtune_hotspots.csv
+PROFILE_V7_VTUNE_MEMORY_TEXT ?= build/ck_v7_vtune_memory_summary.txt
+PROFILE_V7_VTUNE_MEMORY_CSV ?= build/ck_v7_vtune_memory_summary.csv
+PROFILE_V7_VTUNE_UARCH_TEXT ?= build/ck_v7_vtune_uarch_summary.txt
+PROFILE_V7_VTUNE_UARCH_CSV ?= build/ck_v7_vtune_uarch_summary.csv
 
 profile-v6-prepare-runtime:
 	@if [ "$(V66_PREP_WITH_PYTHON)" != "1" ]; then \
@@ -3800,14 +3805,18 @@ profile-v7-prepare-runtime:
 profile-v7-decode:
 	@if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		runtime_dir="$$model_dir"; \
+		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+			runtime_dir="$$model_dir/.ck_build"; \
+		fi; \
 		needs_regen=0; regen_reason=""; \
-		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+		if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+		elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
 			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
 		fi; \
 		if [ "$$needs_regen" -eq 0 ]; then \
-			echo "Using existing compiled runtime in $$model_dir"; \
+			echo "Using existing compiled runtime in $$runtime_dir"; \
 		else \
 			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 			regen_model="$(V7_MODEL)"; \
@@ -3824,14 +3833,18 @@ profile-v7-decode:
 				--context-len 1024 --prompt "Hello" --max-tokens 1 \
 				$(V7_RUN_ARGS); \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
 		fi; \
 		$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
 		CK_PROFILE=1 \
-		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
-		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
-		./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
-			--prompt "The quick brown fox" --max-tokens 32 --timing \
-			$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+		CK_PROFILE_CSV="$$runtime_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$runtime_dir/profile_decode.json" \
+		./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+			--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null 2>&1; \
 		$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
 	else \
 		CK_PROFILE=1 \
@@ -3847,14 +3860,18 @@ profile-v7-decode:
 profile-v7-prefill:
 	@if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		runtime_dir="$$model_dir"; \
+		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+			runtime_dir="$$model_dir/.ck_build"; \
+		fi; \
 		needs_regen=0; regen_reason=""; \
-		if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+		if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-		elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+		elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
 			needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
 		fi; \
 		if [ "$$needs_regen" -eq 0 ]; then \
-			echo "Using existing compiled runtime in $$model_dir"; \
+			echo "Using existing compiled runtime in $$runtime_dir"; \
 		else \
 			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 			regen_model="$(V7_MODEL)"; \
@@ -3871,14 +3888,18 @@ profile-v7-prefill:
 				--context-len 1024 --prompt "Hello" --max-tokens 1 \
 				$(V7_RUN_ARGS); \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
 		fi; \
 		$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
 		CK_PROFILE=1 \
-		CK_PROFILE_CSV="$$model_dir/profile_decode.csv" \
-		CK_PROFILE_JSON="$$model_dir/profile_decode.json" \
-		./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
-			--prompt "Explain the theory of relativity in simple terms" --max-tokens 1 --timing \
-			$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+		CK_PROFILE_CSV="$$runtime_dir/profile_decode.csv" \
+		CK_PROFILE_JSON="$$runtime_dir/profile_decode.json" \
+		./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+			--prompt "Explain the theory of relativity in simple terms" --max-tokens 1 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null 2>&1; \
 		$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
 	else \
 		CK_PROFILE=1 \
@@ -3901,14 +3922,18 @@ profile-v7-flamegraph:
 		mkdir -p build; \
 		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		runtime_dir="$$model_dir"; \
+		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+			runtime_dir="$$model_dir/.ck_build"; \
+		fi; \
 			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
 				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
 			fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
-				echo "Using existing compiled runtime in $$model_dir"; \
+				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
@@ -3925,12 +3950,16 @@ profile-v7-flamegraph:
 					--context-len 1024 --prompt "Hello" --max-tokens 1 \
 					$(V7_RUN_ARGS); \
 				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
 			fi; \
 			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
 			perf record --all-user -F 999 --call-graph $(PROFILE_V7_CALLGRAPH) -o $(PROFILE_V7_PERF_DATA) -- \
-				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
-				--prompt "The quick brown fox" --max-tokens 32 --timing \
-				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS); \
+				./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null; \
 		else \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -3959,14 +3988,18 @@ profile-v7-perf-stat:
 		mkdir -p build; \
 		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		runtime_dir="$$model_dir"; \
+		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+			runtime_dir="$$model_dir/.ck_build"; \
+		fi; \
 			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
 				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
 			fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
-				echo "Using existing compiled runtime in $$model_dir"; \
+				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
@@ -3983,14 +4016,18 @@ profile-v7-perf-stat:
 					--context-len 1024 --prompt "Hello" --max-tokens 1 \
 					$(V7_RUN_ARGS); \
 				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
 			fi; \
 			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
 			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
 LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
 branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
-				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
-				--prompt "The quick brown fox" --max-tokens 32 --timing \
-				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) \
+				./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null \
 				2> $(PROFILE_V7_PERF_STAT_TXT); \
 		else \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
@@ -4016,6 +4053,7 @@ profile-v7-cachegrind:
 		--context-len 1024 --prompt "Hello" --max-tokens 4 $(V7_RUN_ARGS)
 	cg_annotate build/cachegrind_v7.out > build/cachegrind_v7_annotated.txt
 
+
 profile-v7-vtune:
 	@if [ "$(V7_WITH_VTUNE)" != "1" ]; then \
 		echo "SKIP: VTune probe disabled (V7_WITH_VTUNE=$(V7_WITH_VTUNE))"; \
@@ -4026,17 +4064,23 @@ profile-v7-vtune:
 		echo "      run: sudo sysctl -w kernel.yama.ptrace_scope=0"; \
 	else \
 		mkdir -p build; \
-		vtune_result="build/ck_v7_vtune_$$(date +%Y%m%d_%H%M%S)"; \
+		vtune_hot_result="build/ck_v7_vtune_hotspots_$$(date +%Y%m%d_%H%M%S)"; \
+		vtune_mem_result=""; \
+		vtune_uarch_result=""; \
 		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		runtime_dir="$$model_dir"; \
+		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+			runtime_dir="$$model_dir/.ck_build"; \
+		fi; \
 			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$model_dir/libmodel.so" ] || [ ! -f "$$model_dir/weights.bump" ]; then \
+			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$model_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
 				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
 			fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
-				echo "Using existing compiled runtime in $$model_dir"; \
+				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
@@ -4053,19 +4097,41 @@ profile-v7-vtune:
 					--context-len 1024 --prompt "Hello" --max-tokens 1 \
 					$(V7_RUN_ARGS); \
 				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
 			fi; \
 			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
-			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
-				./build/ck-cli-v7 "$$model_dir/libmodel.so" "$$model_dir/weights.bump" \
-				--prompt "The quick brown fox" --max-tokens 32 --timing \
-				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) || { \
+			vtune -collect hotspots -result-dir "$$vtune_hot_result" -quiet -- \
+				./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null || { \
 					echo "SKIP: vtune collect failed for CLI runtime"; \
 					exit 0; \
 				}; \
+			if [ "$(V7_VTUNE_DEEP)" = "1" ]; then \
+				vtune_mem_result="build/ck_v7_vtune_memory_$$(date +%Y%m%d_%H%M%S)"; \
+				vtune -collect memory-access -result-dir "$$vtune_mem_result" -quiet -- \
+					./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+					--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null || { \
+						echo "WARN: vtune memory-access collect failed"; \
+						vtune_mem_result=""; \
+					}; \
+				vtune_uarch_result="build/ck_v7_vtune_uarch_$$(date +%Y%m%d_%H%M%S)"; \
+				vtune -collect uarch-exploration -result-dir "$$vtune_uarch_result" -quiet -- \
+					./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+					--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null || { \
+						echo "WARN: vtune uarch-exploration collect failed"; \
+						vtune_uarch_result=""; \
+					}; \
+			fi; \
 		else \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
-			vtune -collect hotspots -result-dir "$$vtune_result" -quiet -- \
+			vtune -collect hotspots -result-dir "$$vtune_hot_result" -quiet -- \
 			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
 				"$(V7_MODEL)" \
 				$(V7_FORCE_COMPILE_ARG) \
@@ -4074,16 +4140,49 @@ profile-v7-vtune:
 					echo "SKIP: vtune collect failed for python runtime"; \
 					exit 0; \
 				}; \
+			if [ "$(V7_VTUNE_DEEP)" = "1" ]; then \
+				vtune_mem_result="build/ck_v7_vtune_memory_$$(date +%Y%m%d_%H%M%S)"; \
+				vtune -collect memory-access -result-dir "$$vtune_mem_result" -quiet -- \
+					$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$(V7_MODEL)" \
+					$(V7_FORCE_COMPILE_ARG) \
+					--prompt "The quick brown fox" --max-tokens 32 \
+					$(V7_RUN_ARGS) || { \
+						echo "WARN: vtune memory-access collect failed"; \
+						vtune_mem_result=""; \
+					}; \
+				vtune_uarch_result="build/ck_v7_vtune_uarch_$$(date +%Y%m%d_%H%M%S)"; \
+				vtune -collect uarch-exploration -result-dir "$$vtune_uarch_result" -quiet -- \
+					$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$(V7_MODEL)" \
+					$(V7_FORCE_COMPILE_ARG) \
+					--prompt "The quick brown fox" --max-tokens 32 \
+					$(V7_RUN_ARGS) || { \
+						echo "WARN: vtune uarch-exploration collect failed"; \
+						vtune_uarch_result=""; \
+					}; \
+			fi; \
 		fi; \
-		vtune -report hotspots -result-dir "$$vtune_result" -format text -report-output $(PROFILE_V7_VTUNE_TEXT) >/dev/null 2>&1 || true; \
-		vtune -report hotspots -result-dir "$$vtune_result" -format csv -report-output $(PROFILE_V7_VTUNE_CSV) >/dev/null 2>&1 || true; \
+		vtune -report hotspots -result-dir "$$vtune_hot_result" -format text -report-output $(PROFILE_V7_VTUNE_TEXT) >/dev/null 2>&1 || true; \
+		vtune -report hotspots -result-dir "$$vtune_hot_result" -format csv -report-output $(PROFILE_V7_VTUNE_CSV) >/dev/null 2>&1 || true; \
+		extra_args=""; \
+		if [ -n "$$vtune_mem_result" ]; then \
+			vtune -report summary -result-dir "$$vtune_mem_result" -format text -report-output $(PROFILE_V7_VTUNE_MEMORY_TEXT) >/dev/null 2>&1 || true; \
+			vtune -report summary -result-dir "$$vtune_mem_result" -format csv -report-output $(PROFILE_V7_VTUNE_MEMORY_CSV) >/dev/null 2>&1 || true; \
+			extra_args="$$extra_args --analysis-name memory-access --analysis-result-dir $$vtune_mem_result --analysis-report-text $(PROFILE_V7_VTUNE_MEMORY_TEXT) --analysis-report-csv $(PROFILE_V7_VTUNE_MEMORY_CSV)"; \
+		fi; \
+		if [ -n "$$vtune_uarch_result" ]; then \
+			vtune -report summary -result-dir "$$vtune_uarch_result" -format text -report-output $(PROFILE_V7_VTUNE_UARCH_TEXT) >/dev/null 2>&1 || true; \
+			vtune -report summary -result-dir "$$vtune_uarch_result" -format csv -report-output $(PROFILE_V7_VTUNE_UARCH_CSV) >/dev/null 2>&1 || true; \
+			extra_args="$$extra_args --analysis-name uarch-exploration --analysis-result-dir $$vtune_uarch_result --analysis-report-text $(PROFILE_V7_VTUNE_UARCH_TEXT) --analysis-report-csv $(PROFILE_V7_VTUNE_UARCH_CSV)"; \
+		fi; \
 		$(PYTHON) $(VTUNE_ARTIFACTS_V7_SCRIPT) \
 			--model-input "$(V7_MODEL)" \
-			--result-dir "$$vtune_result" \
+			--result-dir "$$vtune_hot_result" \
 			--report-text $(PROFILE_V7_VTUNE_TEXT) \
-			--report-csv $(PROFILE_V7_VTUNE_CSV); \
+			--report-csv $(PROFILE_V7_VTUNE_CSV) \
+			$$extra_args; \
 	fi
-
 profile-v7-full:
 	@$(MAKE) --no-print-directory profile-v7-prepare-runtime
 	@$(MAKE) --no-print-directory profile-v7-decode

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Generate vtune_summary.json for IR visualizer.
+
+Primary compatibility payload stays intact (hotspots fields), and richer
+multi-analysis data is exposed under `analyses`.
 """
 
 from __future__ import annotations
@@ -8,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -35,6 +39,12 @@ def detect_model_dir_from_input(model_input: str) -> Optional[Path]:
     if input_type == "local_config":
         return Path(info["path"]).resolve().parent
     return None
+
+
+def truncate_text(text: str, limit: int = 120_000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n...[truncated]..."
 
 
 def parse_number(text: str) -> Optional[float]:
@@ -140,6 +150,83 @@ def parse_hotspots_csv(path: Path, top_k: int = 25) -> List[Dict[str, object]]:
     return rows[:top_k]
 
 
+def parse_summary_metrics(raw_text: str, analysis_name: str) -> Dict[str, float]:
+    if not raw_text:
+        return {}
+
+    def find_pct(label: str) -> Optional[float]:
+        pat = re.compile(rf"{re.escape(label)}[^\n\r%]*?([-+]?[0-9]*\.?[0-9]+)\s*%", re.IGNORECASE)
+        m = pat.search(raw_text)
+        if not m:
+            return None
+        try:
+            return float(m.group(1))
+        except ValueError:
+            return None
+
+    def find_gbs(label: str) -> Optional[float]:
+        pat = re.compile(rf"{re.escape(label)}[^\n\r]*?([-+]?[0-9]*\.?[0-9]+)\s*GB/s", re.IGNORECASE)
+        m = pat.search(raw_text)
+        if not m:
+            return None
+        try:
+            return float(m.group(1))
+        except ValueError:
+            return None
+
+    metrics: Dict[str, float] = {}
+    analysis_key = analysis_name.lower()
+
+    common_pct = [
+        "Memory Bound",
+        "Core Bound",
+        "Retiring",
+        "Frontend Bound",
+        "Backend Bound",
+        "Bad Speculation",
+    ]
+    mem_pct = ["DRAM Bound", "L1 Bound", "L2 Bound", "L3 Bound", "Store Bound"]
+
+    keys = list(common_pct)
+    if "memory" in analysis_key:
+        keys += mem_pct
+
+    for key in keys:
+        val = find_pct(key)
+        if val is not None:
+            metrics[key] = val
+
+    bw = find_gbs("Bandwidth")
+    if bw is not None:
+        metrics["Bandwidth GB/s"] = bw
+
+    return metrics
+
+
+def build_analysis_entry(
+    name: str,
+    result_dir: Optional[Path],
+    report_text: Optional[Path],
+    report_csv: Optional[Path],
+) -> Dict[str, object]:
+    raw_text = ""
+    if report_text and report_text.exists():
+        raw_text = truncate_text(report_text.read_text(errors="ignore"))
+
+    hotspots = parse_hotspots_csv(report_csv) if report_csv and report_csv.exists() else []
+
+    return {
+        "name": name,
+        "result_dir": str(result_dir) if result_dir else None,
+        "report_text": str(report_text) if report_text else None,
+        "report_csv": str(report_csv) if report_csv else None,
+        "hotspots": hotspots,
+        "top_hotspots": hotspots,
+        "raw_text": raw_text,
+        "summary_metrics": parse_summary_metrics(raw_text, name),
+    }
+
+
 def write_json(path: Path, payload: Dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -154,6 +241,33 @@ def main() -> int:
     parser.add_argument("--result-dir", type=Path, required=True, help="VTune result directory")
     parser.add_argument("--report-text", type=Path, help="VTune hotspots text report")
     parser.add_argument("--report-csv", type=Path, help="VTune hotspots CSV report")
+    parser.add_argument(
+        "--analysis-name",
+        action="append",
+        default=[],
+        help="Optional extra VTune analysis name (repeatable), e.g. memory-access",
+    )
+    parser.add_argument(
+        "--analysis-result-dir",
+        action="append",
+        type=Path,
+        default=[],
+        help="Optional extra VTune analysis result dir (repeatable)",
+    )
+    parser.add_argument(
+        "--analysis-report-text",
+        action="append",
+        type=Path,
+        default=[],
+        help="Optional extra VTune analysis text report (repeatable)",
+    )
+    parser.add_argument(
+        "--analysis-report-csv",
+        action="append",
+        type=Path,
+        default=[],
+        help="Optional extra VTune analysis CSV report (repeatable)",
+    )
     args = parser.parse_args()
 
     model_dir = args.model_dir
@@ -163,31 +277,51 @@ def main() -> int:
     if out_dir is None:
         parser.error("Provide --out-dir or one of --model-dir/--model-input")
 
-    hotspots = parse_hotspots_csv(args.report_csv) if args.report_csv else []
-    raw_text = ""
-    if args.report_text and args.report_text.exists():
-        raw_text = args.report_text.read_text(errors="ignore")
-        # Keep payload reasonably small for embedding.
-        if len(raw_text) > 120_000:
-            raw_text = raw_text[:120_000] + "\n...[truncated]..."
+    primary = build_analysis_entry("hotspots", args.result_dir, args.report_text, args.report_csv)
+
+    analyses: List[Dict[str, object]] = [primary]
+    extra_count = max(
+        len(args.analysis_name),
+        len(args.analysis_result_dir),
+        len(args.analysis_report_text),
+        len(args.analysis_report_csv),
+    )
+    for idx in range(extra_count):
+        name = args.analysis_name[idx] if idx < len(args.analysis_name) else f"analysis_{idx + 1}"
+        result_dir = args.analysis_result_dir[idx] if idx < len(args.analysis_result_dir) else None
+        report_text = args.analysis_report_text[idx] if idx < len(args.analysis_report_text) else None
+        report_csv = args.analysis_report_csv[idx] if idx < len(args.analysis_report_csv) else None
+        analyses.append(build_analysis_entry(name, result_dir, report_text, report_csv))
+
+    artifacts: List[Dict[str, object]] = []
+    for entry in analyses:
+        name = str(entry.get("name") or "analysis")
+        result_dir = entry.get("result_dir")
+        report_text = entry.get("report_text")
+        report_csv = entry.get("report_csv")
+        if result_dir:
+            artifacts.append({"label": f"VTune {name} result", "path": str(result_dir)})
+        if report_text:
+            artifacts.append({"label": f"VTune {name} report (text)", "path": str(report_text)})
+        if report_csv:
+            artifacts.append({"label": f"VTune {name} report (csv)", "path": str(report_csv)})
 
     payload: Dict[str, object] = {
         "generated_at": utc_now_iso(),
         "analysis": "hotspots",
-        "result_dir": str(args.result_dir),
-        "report_path": str(args.report_text) if args.report_text else None,
-        "csv_path": str(args.report_csv) if args.report_csv else None,
-        "top_hotspots": hotspots,
-        "hotspots": hotspots,
-        "raw_text": raw_text,
-        "artifacts": [
-            {"label": "VTune Result Directory", "path": str(args.result_dir)},
-        ],
+        "result_dir": primary.get("result_dir"),
+        "report_path": primary.get("report_text"),
+        "csv_path": primary.get("report_csv"),
+        "top_hotspots": primary.get("top_hotspots", []),
+        "hotspots": primary.get("hotspots", []),
+        "raw_text": primary.get("raw_text", ""),
+        "analyses": analyses,
+        "analysis_metrics": {
+            str(entry.get("name") or f"analysis_{i}"): entry.get("summary_metrics", {})
+            for i, entry in enumerate(analyses)
+        },
+        "artifacts": artifacts,
     }
-    if args.report_text:
-        payload["artifacts"].append({"label": "VTune Hotspots (text)", "path": str(args.report_text)})
-    if args.report_csv:
-        payload["artifacts"].append({"label": "VTune Hotspots (csv)", "path": str(args.report_csv)})
 
     out_path = Path(out_dir) / "vtune_summary.json"
     write_json(out_path, payload)

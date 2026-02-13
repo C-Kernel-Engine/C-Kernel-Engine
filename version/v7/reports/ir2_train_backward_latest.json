@@ -4,28 +4,16 @@
   "checkpoint_policy": "none",
   "config": {
     "model": "qwen3",
-    "embed_dim": 1024,
-    "attn_out_dim": 2048,
     "num_layers": 28,
+    "embed_dim": 1024,
     "num_heads": 16,
     "num_kv_heads": 8,
     "head_dim": 128,
     "intermediate_size": 3072,
     "context_length": 40960,
-    "rope_theta": 1000000.0,
-    "rotary_dim": 128,
-    "rope_scaling_type": "none",
-    "rope_scaling_factor": 1.0,
-    "rope_layout": "split",
-    "rope_original_context_length": 40960,
-    "rope_beta_fast": 0.0,
-    "rope_beta_slow": 0.0,
-    "rope_attn_factor": 1.0,
+    "rope_theta": 10000.0,
     "vocab_size": 151936,
-    "rms_eps": 9.999999974752427e-07,
-    "chat_template": "{%- if tools %}\n    {{- '<|im_start|>system\\n' }}\n    {%- if messages[0].role == 'system' %}\n        {{- messages[0].content + '\\n\\n' }}\n    {%- endif %}\n    {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n    {%- for tool in tools %}\n        {{- \"\\n\" }}\n        {{- tool | tojson }}\n    {%- endfor %}\n    {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n    {%- if messages[0].role == 'system' %}\n        {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n    {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for index in range(ns.last_query_index, -1, -1) %}\n    {%- set message = messages[index] %}\n    {%- if ns.multi_step_tool and message.role == \"user\" and not('<tool_response>' in message.content and '</tool_response>' in message.content) %}\n        {%- set ns.multi_step_tool = false %}\n        {%- set ns.last_query_index = index %}\n    {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n    {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n        {{- '<|im_start|>' + message.role + '\\n' + message.content + '<|im_end|>' + '\\n' }}\n    {%- elif message.role == \"assistant\" %}\n        {%- set content = message.content %}\n        {%- set reasoning_content = '' %}\n        {%- if message.reasoning_content is defined and message.reasoning_content is not none %}\n            {%- set reasoning_content = message.reasoning_content %}\n        {%- else %}\n            {%- if '</think>' in message.content %}\n                {%- set content = message.content.split('</think>')[-1].lstrip('\\n') %}\n                {%- set reasoning_content = message.content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n            {%- endif %}\n        {%- endif %}\n        {%- if loop.index0 > ns.last_query_index %}\n            {%- if loop.last or (not loop.last and reasoning_content) %}\n                {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip('\\n') + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n            {%- else %}\n                {{- '<|im_start|>' + message.role + '\\n' + content }}\n            {%- endif %}\n        {%- else %}\n            {{- '<|im_start|>' + message.role + '\\n' + content }}\n        {%- endif %}\n        {%- if message.tool_calls %}\n            {%- for tool_call in message.tool_calls %}\n                {%- if (loop.first and content) or (not loop.first) %}\n                    {{- '\\n' }}\n                {%- endif %}\n                {%- if tool_call.function %}\n                    {%- set tool_call = tool_call.function %}\n                {%- endif %}\n                {{- '<tool_call>\\n{\"name\": \"' }}\n                {{- tool_call.name }}\n                {{- '\", \"arguments\": ' }}\n                {%- if tool_call.arguments is string %}\n                    {{- tool_call.arguments }}\n                {%- else %}\n                    {{- tool_call.arguments | tojson }}\n                {%- endif %}\n                {{- '}\\n</tool_call>' }}\n            {%- endfor %}\n        {%- endif %}\n        {{- '<|im_end|>\\n' }}\n    {%- elif message.role == \"tool\" %}\n        {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}\n            {{- '<|im_start|>user' }}\n        {%- endif %}\n        {{- '\\n<tool_response>\\n' }}\n        {{- message.content }}\n        {{- '\\n</tool_response>' }}\n        {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}\n            {{- '<|im_end|>\\n' }}\n        {%- endif %}\n    {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n    {{- '<|im_start|>assistant\\n' }}\n    {%- if enable_thinking is defined and enable_thinking is false %}\n        {{- '<think>\\n\\n</think>\\n\\n' }}\n    {%- endif %}\n{%- endif %}",
-    "finetune": "Instruct",
-    "model_name": "Qwen3 0.6B Instruct"
+    "rms_eps": 1e-05
   },
   "template_name": "qwen3",
   "num_layers": 2,
@@ -78,9 +66,9 @@
         "weight": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true
         }
@@ -194,15 +182,6 @@
         "W": {
           "name": "layer.0.wq",
           "tensor": "weight.layer.0.wq",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bq",
-          "tensor": "weight.layer.0.bq",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -257,15 +236,6 @@
         "W": {
           "name": "layer.0.wk",
           "tensor": "weight.layer.0.wk",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bk",
-          "tensor": "weight.layer.0.bk",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -320,15 +290,6 @@
         "W": {
           "name": "layer.0.wv",
           "tensor": "weight.layer.0.wv",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bv",
-          "tensor": "weight.layer.0.bv",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -590,15 +551,6 @@
         "W": {
           "name": "layer.0.wo",
           "tensor": "weight.layer.0.wo",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bo",
-          "tensor": "weight.layer.0.bo",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -758,15 +710,6 @@
         "W": {
           "name": "layer.0.w1",
           "tensor": "weight.layer.0.w1",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.b1",
-          "tensor": "weight.layer.0.b1",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -861,15 +804,6 @@
         "W": {
           "name": "layer.0.w2",
           "tensor": "weight.layer.0.w2",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.b2",
-          "tensor": "weight.layer.0.b2",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1029,15 +963,6 @@
         "W": {
           "name": "layer.1.wq",
           "tensor": "weight.layer.1.wq",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bq",
-          "tensor": "weight.layer.1.bq",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1092,15 +1017,6 @@
         "W": {
           "name": "layer.1.wk",
           "tensor": "weight.layer.1.wk",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bk",
-          "tensor": "weight.layer.1.bk",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1155,15 +1071,6 @@
         "W": {
           "name": "layer.1.wv",
           "tensor": "weight.layer.1.wv",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bv",
-          "tensor": "weight.layer.1.bv",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1425,15 +1332,6 @@
         "W": {
           "name": "layer.1.wo",
           "tensor": "weight.layer.1.wo",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bo",
-          "tensor": "weight.layer.1.bo",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1593,15 +1491,6 @@
         "W": {
           "name": "layer.1.w1",
           "tensor": "weight.layer.1.w1",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.b1",
-          "tensor": "weight.layer.1.b1",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1696,15 +1585,6 @@
         "W": {
           "name": "layer.1.w2",
           "tensor": "weight.layer.1.w2",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.b2",
-          "tensor": "weight.layer.1.b2",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1881,18 +1761,18 @@
         "W_tied": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true
         },
         "W": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true,
           "alias_of": "W_tied"
@@ -2305,12 +2185,6 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.w2"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op28.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.b2"
           }
         }
       },
@@ -2380,37 +2254,6 @@
     },
     {
       "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 28,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.b2",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.b2",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op28.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.b2",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 46
-    },
-    {
-      "phase": "backward",
       "op": "silu_mul_backward_core",
       "kernel_id": "swiglu_backward_exact",
       "forward_ref": 27,
@@ -2440,7 +2283,7 @@
           }
         }
       },
-      "op_id": 47
+      "op_id": 46
     },
     {
       "phase": "backward",
@@ -2471,7 +2314,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 48
+      "op_id": 47
     },
     {
       "phase": "backward",
@@ -2513,16 +2356,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.w1"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op26.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.b1"
           }
         }
       },
-      "op_id": 49
+      "op_id": 48
     },
     {
       "phase": "backward",
@@ -2553,7 +2390,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 50
+      "op_id": 49
     },
     {
       "phase": "backward",
@@ -2584,38 +2421,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 51
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 26,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.b1",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.b1",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op26.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.b1",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 52
+      "op_id": 50
     },
     {
       "phase": "backward",
@@ -2665,7 +2471,7 @@
           }
         }
       },
-      "op_id": 53
+      "op_id": 51
     },
     {
       "phase": "backward",
@@ -2696,7 +2502,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 54
+      "op_id": 52
     },
     {
       "phase": "backward",
@@ -2727,7 +2533,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 55
+      "op_id": 53
     },
     {
       "phase": "backward",
@@ -2761,7 +2567,7 @@
           }
         }
       },
-      "op_id": 56
+      "op_id": 54
     },
     {
       "phase": "backward",
@@ -2792,7 +2598,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 57
+      "op_id": 55
     },
     {
       "phase": "backward",
@@ -2823,7 +2629,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 58
+      "op_id": 56
     },
     {
       "phase": "backward",
@@ -2865,16 +2671,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.wo"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op23.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.bo"
           }
         }
       },
-      "op_id": 59
+      "op_id": 57
     },
     {
       "phase": "backward",
@@ -2905,7 +2705,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 60
+      "op_id": 58
     },
     {
       "phase": "backward",
@@ -2936,38 +2736,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 61
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 23,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.bo",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bo",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op23.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bo",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 62
+      "op_id": 59
     },
     {
       "phase": "backward",
@@ -3031,7 +2800,7 @@
           }
         }
       },
-      "op_id": 63
+      "op_id": 60
     },
     {
       "phase": "backward",
@@ -3062,7 +2831,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 64
+      "op_id": 61
     },
     {
       "phase": "backward",
@@ -3093,7 +2862,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 65
+      "op_id": 62
     },
     {
       "phase": "backward",
@@ -3124,7 +2893,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 66
+      "op_id": 63
     },
     {
       "phase": "backward",
@@ -3163,7 +2932,7 @@
           }
         }
       },
-      "op_id": 67
+      "op_id": 64
     },
     {
       "phase": "backward",
@@ -3194,7 +2963,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 68
+      "op_id": 65
     },
     {
       "phase": "backward",
@@ -3225,7 +2994,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 69
+      "op_id": 66
     },
     {
       "phase": "backward",
@@ -3298,7 +3067,7 @@
           }
         }
       },
-      "op_id": 70
+      "op_id": 67
     },
     {
       "phase": "backward",
@@ -3329,7 +3098,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 71
+      "op_id": 68
     },
     {
       "phase": "backward",
@@ -3360,7 +3129,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 72
+      "op_id": 69
     },
     {
       "phase": "backward",
@@ -3391,7 +3160,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 73
+      "op_id": 70
     },
     {
       "phase": "backward",
@@ -3422,7 +3191,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 74
+      "op_id": 71
     },
     {
       "phase": "backward",
@@ -3464,16 +3233,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.wv"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op19.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.bv"
           }
         }
       },
-      "op_id": 75
+      "op_id": 72
     },
     {
       "phase": "backward",
@@ -3504,7 +3267,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 76
+      "op_id": 73
     },
     {
       "phase": "backward",
@@ -3535,38 +3298,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 77
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 19,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.bv",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bv",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op19.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bv",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 78
+      "op_id": 74
     },
     {
       "phase": "backward",
@@ -3608,16 +3340,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.wk"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op18.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.bk"
           }
         }
       },
-      "op_id": 79
+      "op_id": 75
     },
     {
       "phase": "backward",
@@ -3648,7 +3374,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 80
+      "op_id": 76
     },
     {
       "phase": "backward",
@@ -3679,38 +3405,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 81
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 18,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.bk",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bk",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op18.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bk",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 82
+      "op_id": 77
     },
     {
       "phase": "backward",
@@ -3752,16 +3447,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.1.wq"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op17.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.1.bq"
           }
         }
       },
-      "op_id": 83
+      "op_id": 78
     },
     {
       "phase": "backward",
@@ -3792,7 +3481,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 84
+      "op_id": 79
     },
     {
       "phase": "backward",
@@ -3823,38 +3512,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 85
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 17,
-      "layer": 1,
-      "role": "weight",
-      "target_param": "layer.1.bq",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bq",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op17.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.1.bq",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 86
+      "op_id": 80
     },
     {
       "phase": "backward",
@@ -3904,7 +3562,7 @@
           }
         }
       },
-      "op_id": 87
+      "op_id": 81
     },
     {
       "phase": "backward",
@@ -3935,7 +3593,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 88
+      "op_id": 82
     },
     {
       "phase": "backward",
@@ -3966,7 +3624,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 89
+      "op_id": 83
     },
     {
       "phase": "backward",
@@ -4000,7 +3658,7 @@
           }
         }
       },
-      "op_id": 90
+      "op_id": 84
     },
     {
       "phase": "backward",
@@ -4031,7 +3689,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 91
+      "op_id": 85
     },
     {
       "phase": "backward",
@@ -4062,7 +3720,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 92
+      "op_id": 86
     },
     {
       "phase": "backward",
@@ -4104,16 +3762,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.w2"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op14.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.b2"
           }
         }
       },
-      "op_id": 93
+      "op_id": 87
     },
     {
       "phase": "backward",
@@ -4144,7 +3796,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 94
+      "op_id": 88
     },
     {
       "phase": "backward",
@@ -4175,38 +3827,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 95
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 14,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.b2",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.b2",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op14.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.b2",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 96
+      "op_id": 89
     },
     {
       "phase": "backward",
@@ -4239,7 +3860,7 @@
           }
         }
       },
-      "op_id": 97
+      "op_id": 90
     },
     {
       "phase": "backward",
@@ -4270,7 +3891,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 98
+      "op_id": 91
     },
     {
       "phase": "backward",
@@ -4312,16 +3933,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.w1"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op12.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.b1"
           }
         }
       },
-      "op_id": 99
+      "op_id": 92
     },
     {
       "phase": "backward",
@@ -4352,7 +3967,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 100
+      "op_id": 93
     },
     {
       "phase": "backward",
@@ -4383,38 +3998,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 101
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 12,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.b1",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.b1",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op12.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.b1",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 102
+      "op_id": 94
     },
     {
       "phase": "backward",
@@ -4464,7 +4048,7 @@
           }
         }
       },
-      "op_id": 103
+      "op_id": 95
     },
     {
       "phase": "backward",
@@ -4495,7 +4079,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 104
+      "op_id": 96
     },
     {
       "phase": "backward",
@@ -4526,7 +4110,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 105
+      "op_id": 97
     },
     {
       "phase": "backward",
@@ -4560,7 +4144,7 @@
           }
         }
       },
-      "op_id": 106
+      "op_id": 98
     },
     {
       "phase": "backward",
@@ -4591,7 +4175,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 107
+      "op_id": 99
     },
     {
       "phase": "backward",
@@ -4622,7 +4206,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 108
+      "op_id": 100
     },
     {
       "phase": "backward",
@@ -4664,16 +4248,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.wo"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op9.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.bo"
           }
         }
       },
-      "op_id": 109
+      "op_id": 101
     },
     {
       "phase": "backward",
@@ -4704,7 +4282,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 110
+      "op_id": 102
     },
     {
       "phase": "backward",
@@ -4735,38 +4313,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 111
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 9,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.bo",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bo",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op9.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bo",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 112
+      "op_id": 103
     },
     {
       "phase": "backward",
@@ -4830,7 +4377,7 @@
           }
         }
       },
-      "op_id": 113
+      "op_id": 104
     },
     {
       "phase": "backward",
@@ -4861,7 +4408,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 114
+      "op_id": 105
     },
     {
       "phase": "backward",
@@ -4892,7 +4439,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 115
+      "op_id": 106
     },
     {
       "phase": "backward",
@@ -4923,7 +4470,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 116
+      "op_id": 107
     },
     {
       "phase": "backward",
@@ -4962,7 +4509,7 @@
           }
         }
       },
-      "op_id": 117
+      "op_id": 108
     },
     {
       "phase": "backward",
@@ -4993,7 +4540,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 118
+      "op_id": 109
     },
     {
       "phase": "backward",
@@ -5024,7 +4571,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 119
+      "op_id": 110
     },
     {
       "phase": "backward",
@@ -5097,7 +4644,7 @@
           }
         }
       },
-      "op_id": 120
+      "op_id": 111
     },
     {
       "phase": "backward",
@@ -5128,7 +4675,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 121
+      "op_id": 112
     },
     {
       "phase": "backward",
@@ -5159,7 +4706,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 122
+      "op_id": 113
     },
     {
       "phase": "backward",
@@ -5190,7 +4737,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 123
+      "op_id": 114
     },
     {
       "phase": "backward",
@@ -5221,7 +4768,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 124
+      "op_id": 115
     },
     {
       "phase": "backward",
@@ -5263,16 +4810,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.wv"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op5.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.bv"
           }
         }
       },
-      "op_id": 125
+      "op_id": 116
     },
     {
       "phase": "backward",
@@ -5303,7 +4844,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 126
+      "op_id": 117
     },
     {
       "phase": "backward",
@@ -5334,38 +4875,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 127
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 5,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.bv",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bv",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op5.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bv",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 128
+      "op_id": 118
     },
     {
       "phase": "backward",
@@ -5407,16 +4917,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.wk"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op4.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.bk"
           }
         }
       },
-      "op_id": 129
+      "op_id": 119
     },
     {
       "phase": "backward",
@@ -5447,7 +4951,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 130
+      "op_id": 120
     },
     {
       "phase": "backward",
@@ -5478,38 +4982,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 131
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 4,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.bk",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bk",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op4.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bk",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 132
+      "op_id": 121
     },
     {
       "phase": "backward",
@@ -5551,16 +5024,10 @@
             "kind": "tmp_grad_weight",
             "target_weight": "W",
             "param_name": "layer.0.wq"
-          },
-          "d_bias": {
-            "tensor": "tmp.grad.weight.op3.bias",
-            "kind": "tmp_grad_weight",
-            "target_weight": "bias",
-            "param_name": "layer.0.bq"
           }
         }
       },
-      "op_id": 133
+      "op_id": 122
     },
     {
       "phase": "backward",
@@ -5591,7 +5058,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 134
+      "op_id": 123
     },
     {
       "phase": "backward",
@@ -5622,38 +5089,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 135
-    },
-    {
-      "phase": "backward",
-      "op": "grad_accumulate",
-      "kernel_id": "gradient_accumulate_f32",
-      "forward_ref": 3,
-      "layer": 0,
-      "role": "weight",
-      "target_param": "layer.0.bq",
-      "dataflow": {
-        "inputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bq",
-            "kind": "grad_accumulator"
-          },
-          "src": {
-            "tensor": "tmp.grad.weight.op3.bias",
-            "kind": "tmp_grad"
-          }
-        },
-        "outputs": {
-          "dst": {
-            "tensor": "grad.weight.layer.0.bq",
-            "kind": "grad_accumulator"
-          }
-        }
-      },
-      "attrs": {
-        "semantics": "dst += src"
-      },
-      "op_id": 136
+      "op_id": 124
     },
     {
       "phase": "backward",
@@ -5703,7 +5139,7 @@
           }
         }
       },
-      "op_id": 137
+      "op_id": 125
     },
     {
       "phase": "backward",
@@ -5734,7 +5170,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 138
+      "op_id": 126
     },
     {
       "phase": "backward",
@@ -5765,7 +5201,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 139
+      "op_id": 127
     },
     {
       "phase": "backward",
@@ -5802,7 +5238,7 @@
           }
         }
       },
-      "op_id": 140
+      "op_id": 128
     },
     {
       "phase": "backward",
@@ -5833,7 +5269,7 @@
       "attrs": {
         "semantics": "dst += src"
       },
-      "op_id": 141
+      "op_id": 129
     }
   ],
   "tensors": {
@@ -5852,9 +5288,9 @@
       "producer": null
     },
     "weight.token_emb": {
-      "dtype": "q8_0",
+      "dtype": "fp32",
       "kind": "weight",
-      "requires_grad": false,
+      "requires_grad": true,
       "persistent": true,
       "producer": null
     },
@@ -5896,13 +5332,6 @@
       }
     },
     "weight.layer.0.wq": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bq": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -5920,13 +5349,6 @@
       }
     },
     "weight.layer.0.wk": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bk": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -5944,13 +5366,6 @@
       }
     },
     "weight.layer.0.wv": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bv": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6042,13 +5457,6 @@
       }
     },
     "weight.layer.0.wo": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bo": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6103,13 +5511,6 @@
       }
     },
     "weight.layer.0.w1": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.b1": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6137,13 +5538,6 @@
       }
     },
     "weight.layer.0.w2": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.b2": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6198,13 +5592,6 @@
       }
     },
     "weight.layer.1.wq": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bq": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6222,13 +5609,6 @@
       }
     },
     "weight.layer.1.wk": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bk": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6246,13 +5626,6 @@
       }
     },
     "weight.layer.1.wv": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bv": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6344,13 +5717,6 @@
       }
     },
     "weight.layer.1.wo": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bo": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6405,13 +5771,6 @@
       }
     },
     "weight.layer.1.w1": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.b1": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6439,13 +5798,6 @@
       }
     },
     "weight.layer.1.w2": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.b2": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -6658,16 +6010,6 @@
         "output_name": "d_weight"
       }
     },
-    "tmp.grad.weight.op28.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 43,
-        "output_name": "d_bias"
-      }
-    },
     "grad.act.act.L1.silu_mul.0.out": {
       "dtype": "fp32",
       "kind": "grad_activation",
@@ -6682,20 +6024,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.1.b2": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op27.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 47,
+        "op_id": 46,
         "output_name": "d_input"
       }
     },
@@ -6712,7 +6047,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 49,
+        "op_id": 48,
         "output_name": "d_input"
       }
     },
@@ -6722,18 +6057,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 49,
+        "op_id": 48,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op26.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 49,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L1.rmsnorm.1.output": {
@@ -6750,20 +6075,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.1.b1": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op25.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 53,
+        "op_id": 51,
         "output_name": "d_input"
       }
     },
@@ -6773,7 +6091,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 53,
+        "op_id": 51,
         "output_name": "d_gamma"
       }
     },
@@ -6790,7 +6108,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 56,
+        "op_id": 54,
         "output_name": "d_a"
       }
     },
@@ -6800,7 +6118,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 56,
+        "op_id": 54,
         "output_name": "d_b"
       }
     },
@@ -6824,7 +6142,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 59,
+        "op_id": 57,
         "output_name": "d_input"
       }
     },
@@ -6834,18 +6152,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 59,
+        "op_id": 57,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op23.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 59,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L1.attn.0.out": {
@@ -6862,20 +6170,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.1.bo": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op22.q": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 63,
+        "op_id": 60,
         "output_name": "d_q"
       }
     },
@@ -6885,7 +6186,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 63,
+        "op_id": 60,
         "output_name": "d_k"
       }
     },
@@ -6895,7 +6196,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 63,
+        "op_id": 60,
         "output_name": "d_v"
       }
     },
@@ -6905,7 +6206,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 63,
+        "op_id": 60,
         "output_name": "d_scores"
       }
     },
@@ -6936,7 +6237,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 67,
+        "op_id": 64,
         "output_name": "d_q"
       }
     },
@@ -6946,7 +6247,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 67,
+        "op_id": 64,
         "output_name": "d_k"
       }
     },
@@ -6970,7 +6271,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 70,
+        "op_id": 67,
         "output_name": "d_q"
       }
     },
@@ -6980,7 +6281,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 70,
+        "op_id": 67,
         "output_name": "d_k"
       }
     },
@@ -6990,7 +6291,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 70,
+        "op_id": 67,
         "output_name": "d_q_gamma"
       }
     },
@@ -7000,7 +6301,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 70,
+        "op_id": 67,
         "output_name": "d_k_gamma"
       }
     },
@@ -7038,7 +6339,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 75,
+        "op_id": 72,
         "output_name": "d_input"
       }
     },
@@ -7048,18 +6349,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 75,
+        "op_id": 72,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op19.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 75,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L1.rmsnorm.0.output": {
@@ -7076,20 +6367,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.1.bv": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op18.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 79,
+        "op_id": 75,
         "output_name": "d_input"
       }
     },
@@ -7099,28 +6383,11 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 79,
+        "op_id": 75,
         "output_name": "d_weight"
       }
     },
-    "tmp.grad.weight.op18.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 79,
-        "output_name": "d_bias"
-      }
-    },
     "grad.weight.layer.1.wk": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "grad.weight.layer.1.bk": {
       "dtype": "fp32",
       "kind": "grad_weight",
       "requires_grad": false,
@@ -7133,7 +6400,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 83,
+        "op_id": 78,
         "output_name": "d_input"
       }
     },
@@ -7143,28 +6410,11 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 83,
+        "op_id": 78,
         "output_name": "d_weight"
       }
     },
-    "tmp.grad.weight.op17.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 83,
-        "output_name": "d_bias"
-      }
-    },
     "grad.weight.layer.1.wq": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "grad.weight.layer.1.bq": {
       "dtype": "fp32",
       "kind": "grad_weight",
       "requires_grad": false,
@@ -7177,7 +6427,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 87,
+        "op_id": 81,
         "output_name": "d_input"
       }
     },
@@ -7187,7 +6437,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 87,
+        "op_id": 81,
         "output_name": "d_gamma"
       }
     },
@@ -7204,7 +6454,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 90,
+        "op_id": 84,
         "output_name": "d_a"
       }
     },
@@ -7214,7 +6464,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 90,
+        "op_id": 84,
         "output_name": "d_b"
       }
     },
@@ -7238,7 +6488,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 93,
+        "op_id": 87,
         "output_name": "d_input"
       }
     },
@@ -7248,18 +6498,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 93,
+        "op_id": 87,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op14.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 93,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L0.silu_mul.0.out": {
@@ -7276,20 +6516,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.0.b2": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op13.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 97,
+        "op_id": 90,
         "output_name": "d_input"
       }
     },
@@ -7306,7 +6539,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 99,
+        "op_id": 92,
         "output_name": "d_input"
       }
     },
@@ -7316,18 +6549,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 99,
+        "op_id": 92,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op12.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 99,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L0.rmsnorm.1.output": {
@@ -7344,20 +6567,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.0.b1": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op11.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 103,
+        "op_id": 95,
         "output_name": "d_input"
       }
     },
@@ -7367,7 +6583,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 103,
+        "op_id": 95,
         "output_name": "d_gamma"
       }
     },
@@ -7384,7 +6600,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 106,
+        "op_id": 98,
         "output_name": "d_a"
       }
     },
@@ -7394,7 +6610,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 106,
+        "op_id": 98,
         "output_name": "d_b"
       }
     },
@@ -7418,7 +6634,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 109,
+        "op_id": 101,
         "output_name": "d_input"
       }
     },
@@ -7428,18 +6644,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 109,
+        "op_id": 101,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op9.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 109,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L0.attn.0.out": {
@@ -7456,20 +6662,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.0.bo": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op8.q": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 113,
+        "op_id": 104,
         "output_name": "d_q"
       }
     },
@@ -7479,7 +6678,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 113,
+        "op_id": 104,
         "output_name": "d_k"
       }
     },
@@ -7489,7 +6688,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 113,
+        "op_id": 104,
         "output_name": "d_v"
       }
     },
@@ -7520,7 +6719,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 117,
+        "op_id": 108,
         "output_name": "d_q"
       }
     },
@@ -7530,7 +6729,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 117,
+        "op_id": 108,
         "output_name": "d_k"
       }
     },
@@ -7554,7 +6753,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 120,
+        "op_id": 111,
         "output_name": "d_q"
       }
     },
@@ -7564,7 +6763,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 120,
+        "op_id": 111,
         "output_name": "d_k"
       }
     },
@@ -7574,7 +6773,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 120,
+        "op_id": 111,
         "output_name": "d_q_gamma"
       }
     },
@@ -7584,7 +6783,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 120,
+        "op_id": 111,
         "output_name": "d_k_gamma"
       }
     },
@@ -7622,7 +6821,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 125,
+        "op_id": 116,
         "output_name": "d_input"
       }
     },
@@ -7632,18 +6831,8 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 125,
+        "op_id": 116,
         "output_name": "d_weight"
-      }
-    },
-    "tmp.grad.weight.op5.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 125,
-        "output_name": "d_bias"
       }
     },
     "grad.act.act.L0.rmsnorm.0.output": {
@@ -7660,20 +6849,13 @@
       "persistent": true,
       "producer": null
     },
-    "grad.weight.layer.0.bv": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
     "tmp.grad.act.op4.input": {
       "dtype": "fp32",
       "kind": "tmp_grad_activation",
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 129,
+        "op_id": 119,
         "output_name": "d_input"
       }
     },
@@ -7683,28 +6865,11 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 129,
+        "op_id": 119,
         "output_name": "d_weight"
       }
     },
-    "tmp.grad.weight.op4.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 129,
-        "output_name": "d_bias"
-      }
-    },
     "grad.weight.layer.0.wk": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "grad.weight.layer.0.bk": {
       "dtype": "fp32",
       "kind": "grad_weight",
       "requires_grad": false,
@@ -7717,7 +6882,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 133,
+        "op_id": 122,
         "output_name": "d_input"
       }
     },
@@ -7727,28 +6892,11 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 133,
+        "op_id": 122,
         "output_name": "d_weight"
       }
     },
-    "tmp.grad.weight.op3.bias": {
-      "dtype": "fp32",
-      "kind": "tmp_grad_weight",
-      "requires_grad": false,
-      "persistent": false,
-      "producer": {
-        "op_id": 133,
-        "output_name": "d_bias"
-      }
-    },
     "grad.weight.layer.0.wq": {
-      "dtype": "fp32",
-      "kind": "grad_weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "grad.weight.layer.0.bq": {
       "dtype": "fp32",
       "kind": "grad_weight",
       "requires_grad": false,
@@ -7761,7 +6909,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 137,
+        "op_id": 125,
         "output_name": "d_input"
       }
     },
@@ -7771,7 +6919,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 137,
+        "op_id": 125,
         "output_name": "d_gamma"
       }
     },
@@ -7788,7 +6936,7 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 140,
+        "op_id": 128,
         "output_name": "d_token_embeddings"
       }
     },
@@ -7798,18 +6946,18 @@
       "requires_grad": false,
       "persistent": false,
       "producer": {
-        "op_id": 140,
+        "op_id": 128,
         "output_name": "d_pos_embeddings"
       }
     }
   },
   "stats": {
     "forward_ops": 33,
-    "backward_ops": 109,
+    "backward_ops": 97,
     "backward_kernel_ops": 32,
-    "accumulate_ops": 77,
+    "accumulate_ops": 65,
     "grad_activation_tensors": 35,
-    "grad_weight_tensors": 34,
+    "grad_weight_tensors": 22,
     "issues": 0,
     "warnings": 0,
     "unresolved": 0
@@ -7817,12 +6965,6 @@
   "gradient_summary": {
     "grad_weight_tensors": [
       "grad.weight.final_ln_weight",
-      "grad.weight.layer.0.b1",
-      "grad.weight.layer.0.b2",
-      "grad.weight.layer.0.bk",
-      "grad.weight.layer.0.bo",
-      "grad.weight.layer.0.bq",
-      "grad.weight.layer.0.bv",
       "grad.weight.layer.0.k_norm",
       "grad.weight.layer.0.ln1_gamma",
       "grad.weight.layer.0.ln2_gamma",
@@ -7833,12 +6975,6 @@
       "grad.weight.layer.0.wo",
       "grad.weight.layer.0.wq",
       "grad.weight.layer.0.wv",
-      "grad.weight.layer.1.b1",
-      "grad.weight.layer.1.b2",
-      "grad.weight.layer.1.bk",
-      "grad.weight.layer.1.bo",
-      "grad.weight.layer.1.bq",
-      "grad.weight.layer.1.bv",
       "grad.weight.layer.1.k_norm",
       "grad.weight.layer.1.ln1_gamma",
       "grad.weight.layer.1.ln2_gamma",
@@ -7897,7 +7033,7 @@
       ],
       "grad.weight.token_emb": [
         36,
-        141
+        129
       ],
       "grad.act.act.L1.residual_add.1.out": [
         38
@@ -7910,7 +7046,7 @@
       ],
       "grad.act.act.L1.residual_add.0.out": [
         42,
-        54
+        52
       ],
       "grad.act.act.L1.silu_mul.0.out": [
         44
@@ -7918,192 +7054,156 @@
       "grad.weight.layer.1.w2": [
         45
       ],
-      "grad.weight.layer.1.b2": [
-        46
-      ],
       "grad.act.act.L1.mlp_gate_up.0.y": [
-        48
+        47
       ],
       "grad.act.act.L1.rmsnorm.1.output": [
-        50
+        49
       ],
       "grad.weight.layer.1.w1": [
-        51
-      ],
-      "grad.weight.layer.1.b1": [
-        52
+        50
       ],
       "grad.weight.layer.1.ln2_gamma": [
-        55
+        53
       ],
       "grad.act.act.L1.out_proj.0.y": [
-        57
+        55
       ],
       "grad.act.act.L0.residual_add.1.out": [
-        58,
-        88
-      ],
-      "grad.act.act.L1.attn.0.out": [
-        60
-      ],
-      "grad.weight.layer.1.wo": [
-        61
-      ],
-      "grad.weight.layer.1.bo": [
-        62
-      ],
-      "grad.act.act.L1.rope_qk.0.q": [
-        64
-      ],
-      "grad.act.act.L1.rope_qk.0.k": [
-        65
-      ],
-      "grad.act.act.L1.v_proj.0.y": [
-        66
-      ],
-      "grad.act.act.L1.qk_norm.0.q": [
-        68
-      ],
-      "grad.act.act.L1.qk_norm.0.k": [
-        69
-      ],
-      "grad.act.act.L1.q_proj.0.y": [
-        71
-      ],
-      "grad.act.act.L1.k_proj.0.y": [
-        72
-      ],
-      "grad.weight.layer.1.q_norm": [
-        73
-      ],
-      "grad.weight.layer.1.k_norm": [
-        74
-      ],
-      "grad.act.act.L1.rmsnorm.0.output": [
-        76,
-        80,
-        84
-      ],
-      "grad.weight.layer.1.wv": [
-        77
-      ],
-      "grad.weight.layer.1.bv": [
-        78
-      ],
-      "grad.weight.layer.1.wk": [
-        81
-      ],
-      "grad.weight.layer.1.bk": [
+        56,
         82
       ],
-      "grad.weight.layer.1.wq": [
-        85
+      "grad.act.act.L1.attn.0.out": [
+        58
       ],
-      "grad.weight.layer.1.bq": [
-        86
+      "grad.weight.layer.1.wo": [
+        59
+      ],
+      "grad.act.act.L1.rope_qk.0.q": [
+        61
+      ],
+      "grad.act.act.L1.rope_qk.0.k": [
+        62
+      ],
+      "grad.act.act.L1.v_proj.0.y": [
+        63
+      ],
+      "grad.act.act.L1.qk_norm.0.q": [
+        65
+      ],
+      "grad.act.act.L1.qk_norm.0.k": [
+        66
+      ],
+      "grad.act.act.L1.q_proj.0.y": [
+        68
+      ],
+      "grad.act.act.L1.k_proj.0.y": [
+        69
+      ],
+      "grad.weight.layer.1.q_norm": [
+        70
+      ],
+      "grad.weight.layer.1.k_norm": [
+        71
+      ],
+      "grad.act.act.L1.rmsnorm.0.output": [
+        73,
+        76,
+        79
+      ],
+      "grad.weight.layer.1.wv": [
+        74
+      ],
+      "grad.weight.layer.1.wk": [
+        77
+      ],
+      "grad.weight.layer.1.wq": [
+        80
       ],
       "grad.weight.layer.1.ln1_gamma": [
-        89
+        83
       ],
       "grad.act.act.L0.mlp_down.0.y": [
-        91
+        85
       ],
       "grad.act.act.L0.residual_add.0.out": [
-        92,
-        104
-      ],
-      "grad.act.act.L0.silu_mul.0.out": [
-        94
-      ],
-      "grad.weight.layer.0.w2": [
-        95
-      ],
-      "grad.weight.layer.0.b2": [
+        86,
         96
       ],
+      "grad.act.act.L0.silu_mul.0.out": [
+        88
+      ],
+      "grad.weight.layer.0.w2": [
+        89
+      ],
       "grad.act.act.L0.mlp_gate_up.0.y": [
-        98
+        91
       ],
       "grad.act.act.L0.rmsnorm.1.output": [
-        100
+        93
       ],
       "grad.weight.layer.0.w1": [
-        101
-      ],
-      "grad.weight.layer.0.b1": [
-        102
+        94
       ],
       "grad.weight.layer.0.ln2_gamma": [
-        105
+        97
       ],
       "grad.act.act.L0.out_proj.0.y": [
-        107
+        99
       ],
       "grad.act.act.Sheader.dense_embedding_lookup.0.out": [
-        108,
-        138
+        100,
+        126
       ],
       "grad.act.act.L0.attn.0.out": [
-        110
+        102
       ],
       "grad.weight.layer.0.wo": [
-        111
-      ],
-      "grad.weight.layer.0.bo": [
-        112
+        103
       ],
       "grad.act.act.L0.rope_qk.0.q": [
-        114
+        105
       ],
       "grad.act.act.L0.rope_qk.0.k": [
-        115
+        106
       ],
       "grad.act.act.L0.v_proj.0.y": [
-        116
+        107
       ],
       "grad.act.act.L0.qk_norm.0.q": [
-        118
+        109
       ],
       "grad.act.act.L0.qk_norm.0.k": [
-        119
+        110
       ],
       "grad.act.act.L0.q_proj.0.y": [
-        121
+        112
       ],
       "grad.act.act.L0.k_proj.0.y": [
-        122
+        113
       ],
       "grad.weight.layer.0.q_norm": [
-        123
+        114
       ],
       "grad.weight.layer.0.k_norm": [
-        124
+        115
       ],
       "grad.act.act.L0.rmsnorm.0.output": [
-        126,
-        130,
-        134
+        117,
+        120,
+        123
       ],
       "grad.weight.layer.0.wv": [
-        127
-      ],
-      "grad.weight.layer.0.bv": [
-        128
+        118
       ],
       "grad.weight.layer.0.wk": [
-        131
-      ],
-      "grad.weight.layer.0.bk": [
-        132
+        121
       ],
       "grad.weight.layer.0.wq": [
-        135
-      ],
-      "grad.weight.layer.0.bq": [
-        136
+        124
       ],
       "grad.weight.layer.0.ln1_gamma": [
-        139
+        127
       ]
     }
   },

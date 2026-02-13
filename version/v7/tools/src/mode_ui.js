@@ -2,7 +2,16 @@ import { ensurePanel, tabIdForElement } from './utils.js';
 
 const SHARED_TABS = ['memory', 'kernels', 'profile'];
 const INFERENCE_ONLY = ['interpretability', 'quantization', 'parity', 'dataflow', 'tests', 'stats'];
-const TRAINING_TABS = ['train-dashboard', 'training', 'train-gradient', 'train-parity'];
+const TRAINING_TABS = [
+    'train-dashboard',
+    'training',
+    'train-gradient',
+    'train-parity',
+    'train-grad-flow',
+    'train-weights',
+    'train-attention',
+    'train-compare',
+];
 
 function injectStyles() {
     if (document.getElementById('ck-v7-train-style')) return;
@@ -39,6 +48,7 @@ function injectStyles() {
         .alert-item.critical { border-color: #ef4444; }
         .alert-item.warning { border-color: #f59e0b; }
         .alert-item.info { border-color: #3b82f6; }
+
         .grad-healthy, .grad-warning, .grad-danger, .grad-dead {
             padding: 2px 8px;
             border-radius: 4px;
@@ -50,6 +60,46 @@ function injectStyles() {
         .grad-warning { background: #78350f; color: #fcd34d; }
         .grad-danger  { background: #7f1d1d; color: #fca5a5; }
         .grad-dead    { background: #374151; color: #9ca3af; }
+
+        .weight-matrix { display: grid; grid-template-columns: repeat(32, 1fr); gap: 1px; }
+        .weight-cell { aspect-ratio: 1; min-width: 3px; border-radius: 1px; }
+
+        .act-histogram { display: flex; align-items: flex-end; height: 150px; gap: 2px; }
+        .hist-bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 4px; }
+
+        .mini-head-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; }
+        .mini-heatmap { cursor: pointer; border: 2px solid transparent; border-radius: 4px; }
+        .mini-heatmap.selected { border-color: var(--orange); }
+
+        .step-slider { width: 100%; accent-color: var(--orange); }
+        .step-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .param-select, .layer-select, .head-select {
+            background: var(--dark-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--grey);
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.82rem;
+            min-width: 180px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--grey);
+            border-radius: 8px;
+            padding: 1.2rem;
+            text-align: center;
+            color: var(--text-muted);
+            transition: var(--transition);
+        }
+        .drop-zone.drag-over {
+            border-color: var(--orange);
+            background: rgba(255, 180, 0, 0.05);
+        }
     `;
     document.head.appendChild(style);
 }
@@ -81,6 +131,10 @@ function appendTrainingTabs() {
         { id: 'train-dashboard', label: 'Train Dashboard' },
         { id: 'train-gradient', label: 'Gradient Health' },
         { id: 'train-parity', label: 'Parity Tracker' },
+        { id: 'train-grad-flow', label: 'Gradient Flow' },
+        { id: 'train-weights', label: 'Weights & Activations' },
+        { id: 'train-attention', label: 'Attention' },
+        { id: 'train-compare', label: 'Run Compare' },
     ];
     specs.forEach((spec) => {
         const tab = document.createElement('div');
@@ -93,39 +147,59 @@ function appendTrainingTabs() {
     });
 }
 
+function ensurePanelRoot(panelId, rootId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    if (panel.querySelector(`#${rootId}`)) return;
+    const root = document.createElement('div');
+    root.id = rootId;
+    panel.appendChild(root);
+}
+
 function ensureTrainingPanels() {
-    const dashboard = ensurePanel(
+    ensurePanel(
         'train-dashboard',
         'Training Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
     );
-    if (dashboard && !dashboard.querySelector('#trainDashboardRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainDashboardRoot';
-        dashboard.appendChild(root);
-    }
-
-    const gradient = ensurePanel(
+    ensurePanel(
         'train-gradient',
         'Gradient Health',
         'Per-parameter gradient norms and health buckets.'
     );
-    if (gradient && !gradient.querySelector('#trainGradientRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainGradientRoot';
-        gradient.appendChild(root);
-    }
-
-    const parity = ensurePanel(
+    ensurePanel(
         'train-parity',
         'Training Parity Tracker',
         'Step-level CK vs PyTorch numerical drift summary.'
     );
-    if (parity && !parity.querySelector('#trainParityRoot')) {
-        const root = document.createElement('div');
-        root.id = 'trainParityRoot';
-        parity.appendChild(root);
-    }
+    ensurePanel(
+        'train-grad-flow',
+        'Gradient Flow',
+        'Layer-wise gradient propagation (waterfall, ratio, heatmap).'
+    );
+    ensurePanel(
+        'train-weights',
+        'Weights & Activations',
+        'Weight movement and activation/gradient distribution snapshots.'
+    );
+    ensurePanel(
+        'train-attention',
+        'Attention Inspector',
+        'Q×K patterns, entropy timeline, and head redundancy.'
+    );
+    ensurePanel(
+        'train-compare',
+        'Run Compare',
+        'Overlay current run vs baseline artifacts.'
+    );
+
+    ensurePanelRoot('train-dashboard', 'trainDashboardRoot');
+    ensurePanelRoot('train-gradient', 'trainGradientRoot');
+    ensurePanelRoot('train-parity', 'trainParityRoot');
+    ensurePanelRoot('train-grad-flow', 'trainGradFlowRoot');
+    ensurePanelRoot('train-weights', 'trainWeightsRoot');
+    ensurePanelRoot('train-attention', 'trainAttentionRoot');
+    ensurePanelRoot('train-compare', 'trainCompareRoot');
 }
 
 function installModeToggle() {

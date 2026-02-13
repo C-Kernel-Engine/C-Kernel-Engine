@@ -174,9 +174,11 @@ def detect_model_dir_from_input(model_input: str) -> Optional[Path]:
     if input_type == "gguf":
         return CACHE_DIR / info["path"].stem
     if input_type == "local_dir":
-        return Path(info["path"]) / ".ck_build"
+        local = Path(info["path"]).resolve()
+        return local.parent if local.name == ".ck_build" else local
     if input_type == "local_config":
-        return Path(info["path"]).parent / ".ck_build"
+        cfg_parent = Path(info["path"]).resolve().parent
+        return cfg_parent.parent if cfg_parent.name == ".ck_build" else cfg_parent
     return None
 
 

@@ -3,28 +3,16 @@
   "version": 1,
   "config": {
     "model": "qwen3",
-    "embed_dim": 1024,
-    "attn_out_dim": 2048,
     "num_layers": 28,
+    "embed_dim": 1024,
     "num_heads": 16,
     "num_kv_heads": 8,
     "head_dim": 128,
     "intermediate_size": 3072,
     "context_length": 40960,
-    "rope_theta": 1000000.0,
-    "rotary_dim": 128,
-    "rope_scaling_type": "none",
-    "rope_scaling_factor": 1.0,
-    "rope_layout": "split",
-    "rope_original_context_length": 40960,
-    "rope_beta_fast": 0.0,
-    "rope_beta_slow": 0.0,
-    "rope_attn_factor": 1.0,
+    "rope_theta": 10000.0,
     "vocab_size": 151936,
-    "rms_eps": 9.999999974752427e-07,
-    "chat_template": "{%- if tools %}\n    {{- '<|im_start|>system\\n' }}\n    {%- if messages[0].role == 'system' %}\n        {{- messages[0].content + '\\n\\n' }}\n    {%- endif %}\n    {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n    {%- for tool in tools %}\n        {{- \"\\n\" }}\n        {{- tool | tojson }}\n    {%- endfor %}\n    {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n    {%- if messages[0].role == 'system' %}\n        {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n    {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for index in range(ns.last_query_index, -1, -1) %}\n    {%- set message = messages[index] %}\n    {%- if ns.multi_step_tool and message.role == \"user\" and not('<tool_response>' in message.content and '</tool_response>' in message.content) %}\n        {%- set ns.multi_step_tool = false %}\n        {%- set ns.last_query_index = index %}\n    {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n    {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n        {{- '<|im_start|>' + message.role + '\\n' + message.content + '<|im_end|>' + '\\n' }}\n    {%- elif message.role == \"assistant\" %}\n        {%- set content = message.content %}\n        {%- set reasoning_content = '' %}\n        {%- if message.reasoning_content is defined and message.reasoning_content is not none %}\n            {%- set reasoning_content = message.reasoning_content %}\n        {%- else %}\n            {%- if '</think>' in message.content %}\n                {%- set content = message.content.split('</think>')[-1].lstrip('\\n') %}\n                {%- set reasoning_content = message.content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n            {%- endif %}\n        {%- endif %}\n        {%- if loop.index0 > ns.last_query_index %}\n            {%- if loop.last or (not loop.last and reasoning_content) %}\n                {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip('\\n') + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n            {%- else %}\n                {{- '<|im_start|>' + message.role + '\\n' + content }}\n            {%- endif %}\n        {%- else %}\n            {{- '<|im_start|>' + message.role + '\\n' + content }}\n        {%- endif %}\n        {%- if message.tool_calls %}\n            {%- for tool_call in message.tool_calls %}\n                {%- if (loop.first and content) or (not loop.first) %}\n                    {{- '\\n' }}\n                {%- endif %}\n                {%- if tool_call.function %}\n                    {%- set tool_call = tool_call.function %}\n                {%- endif %}\n                {{- '<tool_call>\\n{\"name\": \"' }}\n                {{- tool_call.name }}\n                {{- '\", \"arguments\": ' }}\n                {%- if tool_call.arguments is string %}\n                    {{- tool_call.arguments }}\n                {%- else %}\n                    {{- tool_call.arguments | tojson }}\n                {%- endif %}\n                {{- '}\\n</tool_call>' }}\n            {%- endfor %}\n        {%- endif %}\n        {{- '<|im_end|>\\n' }}\n    {%- elif message.role == \"tool\" %}\n        {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}\n            {{- '<|im_start|>user' }}\n        {%- endif %}\n        {{- '\\n<tool_response>\\n' }}\n        {{- message.content }}\n        {{- '\\n</tool_response>' }}\n        {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}\n            {{- '<|im_end|>\\n' }}\n        {%- endif %}\n    {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n    {{- '<|im_start|>assistant\\n' }}\n    {%- if enable_thinking is defined and enable_thinking is false %}\n        {{- '<think>\\n\\n</think>\\n\\n' }}\n    {%- endif %}\n{%- endif %}",
-    "finetune": "Instruct",
-    "model_name": "Qwen3 0.6B Instruct"
+    "rms_eps": 1e-05
   },
   "template_name": "qwen3",
   "num_layers": 2,
@@ -77,9 +65,9 @@
         "weight": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true
         }
@@ -193,15 +181,6 @@
         "W": {
           "name": "layer.0.wq",
           "tensor": "weight.layer.0.wq",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bq",
-          "tensor": "weight.layer.0.bq",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -256,15 +235,6 @@
         "W": {
           "name": "layer.0.wk",
           "tensor": "weight.layer.0.wk",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bk",
-          "tensor": "weight.layer.0.bk",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -319,15 +289,6 @@
         "W": {
           "name": "layer.0.wv",
           "tensor": "weight.layer.0.wv",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bv",
-          "tensor": "weight.layer.0.bv",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -589,15 +550,6 @@
         "W": {
           "name": "layer.0.wo",
           "tensor": "weight.layer.0.wo",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.bo",
-          "tensor": "weight.layer.0.bo",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -757,15 +709,6 @@
         "W": {
           "name": "layer.0.w1",
           "tensor": "weight.layer.0.w1",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.b1",
-          "tensor": "weight.layer.0.b1",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -860,15 +803,6 @@
         "W": {
           "name": "layer.0.w2",
           "tensor": "weight.layer.0.w2",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.0.b2",
-          "tensor": "weight.layer.0.b2",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1028,15 +962,6 @@
         "W": {
           "name": "layer.1.wq",
           "tensor": "weight.layer.1.wq",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bq",
-          "tensor": "weight.layer.1.bq",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1091,15 +1016,6 @@
         "W": {
           "name": "layer.1.wk",
           "tensor": "weight.layer.1.wk",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bk",
-          "tensor": "weight.layer.1.bk",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1154,15 +1070,6 @@
         "W": {
           "name": "layer.1.wv",
           "tensor": "weight.layer.1.wv",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bv",
-          "tensor": "weight.layer.1.bv",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1424,15 +1331,6 @@
         "W": {
           "name": "layer.1.wo",
           "tensor": "weight.layer.1.wo",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.bo",
-          "tensor": "weight.layer.1.bo",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1592,15 +1490,6 @@
         "W": {
           "name": "layer.1.w1",
           "tensor": "weight.layer.1.w1",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.b1",
-          "tensor": "weight.layer.1.b1",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1695,15 +1584,6 @@
         "W": {
           "name": "layer.1.w2",
           "tensor": "weight.layer.1.w2",
-          "dtype": "q8_0",
-          "kind": "weight",
-          "requires_grad": false,
-          "persistent": true,
-          "from_manifest": true
-        },
-        "bias": {
-          "name": "layer.1.b2",
-          "tensor": "weight.layer.1.b2",
           "dtype": "fp32",
           "kind": "weight",
           "requires_grad": true,
@@ -1880,18 +1760,18 @@
         "W_tied": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true
         },
         "W": {
           "name": "token_emb",
           "tensor": "weight.token_emb",
-          "dtype": "q8_0",
+          "dtype": "fp32",
           "kind": "weight",
-          "requires_grad": false,
+          "requires_grad": true,
           "persistent": true,
           "from_manifest": true,
           "alias_of": "W_tied"
@@ -1929,9 +1809,9 @@
       "producer": null
     },
     "weight.token_emb": {
-      "dtype": "q8_0",
+      "dtype": "fp32",
       "kind": "weight",
-      "requires_grad": false,
+      "requires_grad": true,
       "persistent": true,
       "producer": null
     },
@@ -1973,13 +1853,6 @@
       }
     },
     "weight.layer.0.wq": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bq": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -1997,13 +1870,6 @@
       }
     },
     "weight.layer.0.wk": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bk": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2021,13 +1887,6 @@
       }
     },
     "weight.layer.0.wv": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bv": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2119,13 +1978,6 @@
       }
     },
     "weight.layer.0.wo": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.bo": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2180,13 +2032,6 @@
       }
     },
     "weight.layer.0.w1": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.b1": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2214,13 +2059,6 @@
       }
     },
     "weight.layer.0.w2": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.0.b2": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2275,13 +2113,6 @@
       }
     },
     "weight.layer.1.wq": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bq": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2299,13 +2130,6 @@
       }
     },
     "weight.layer.1.wk": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bk": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2323,13 +2147,6 @@
       }
     },
     "weight.layer.1.wv": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bv": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2421,13 +2238,6 @@
       }
     },
     "weight.layer.1.wo": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.bo": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2482,13 +2292,6 @@
       }
     },
     "weight.layer.1.w1": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.b1": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2516,13 +2319,6 @@
       }
     },
     "weight.layer.1.w2": {
-      "dtype": "q8_0",
-      "kind": "weight",
-      "requires_grad": false,
-      "persistent": true,
-      "producer": null
-    },
-    "weight.layer.1.b2": {
       "dtype": "fp32",
       "kind": "weight",
       "requires_grad": true,
@@ -2590,8 +2386,8 @@
   "stats": {
     "forward_ops": 33,
     "metadata_ops": 2,
-    "tensors": 78,
-    "weights": 34,
+    "tensors": 66,
+    "weights": 22,
     "saved_tensors": 2,
     "issues": 0,
     "warnings": 0

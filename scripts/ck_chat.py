@@ -228,17 +228,26 @@ class CKModel:
                 print(f"Forcing Python tokenizer (--python-tokenizer flag)")
             # Fall back to Python tokenizer
             self.use_c_tokenizer = False
-            tokenizer_json = self.model_dir / "tokenizer.json"
-            vocab_json = self.model_dir / "vocab.json"
+            # Tokenizer files may live either in model root or .ck_build output dir.
+            model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
+            tokenizer_candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
+            vocab_candidates = [self.model_dir / "vocab.json", model_root / "vocab.json"]
+
+            tokenizer_json = next((p for p in tokenizer_candidates if p.exists()), tokenizer_candidates[0])
+            vocab_json = next((p for p in vocab_candidates if p.exists()), vocab_candidates[0])
 
             if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
                 # Use HuggingFace tokenizer if available
                 self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
                 print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
             elif vocab_json.exists():
-                # Use extracted vocab JSON
+                # Use GGUF-compatible wrapper (now supports plain vocab maps too)
                 self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
                 print(f"Loaded GGUF tokenizer from {vocab_json}")
+            elif tokenizer_json.exists():
+                # Fallback: parse tokenizer.json via GGUF wrapper if tokenizers package is missing.
+                self.tokenizer = GGUFTokenizerWrapper.from_file(str(tokenizer_json))
+                print(f"Loaded tokenizer via GGUF wrapper from {tokenizer_json}")
             elif gguf_path and Path(gguf_path).exists():
                 # Extract directly from GGUF
                 print(f"Extracting tokenizer from GGUF: {gguf_path}")

@@ -2,11 +2,11 @@
   "format": "ir2-train-v7",
   "stats": {
     "forward_ops": 33,
-    "backward_ops": 109,
+    "backward_ops": 97,
     "backward_kernel_ops": 32,
-    "accumulate_ops": 77,
+    "accumulate_ops": 65,
     "grad_activation_tensors": 35,
-    "grad_weight_tensors": 34,
+    "grad_weight_tensors": 22,
     "issues": 0,
     "warnings": 0,
     "unresolved": 0
@@ -17,12 +17,6 @@
   "gradient_summary": {
     "grad_weight_tensors": [
       "grad.weight.final_ln_weight",
-      "grad.weight.layer.0.b1",
-      "grad.weight.layer.0.b2",
-      "grad.weight.layer.0.bk",
-      "grad.weight.layer.0.bo",
-      "grad.weight.layer.0.bq",
-      "grad.weight.layer.0.bv",
       "grad.weight.layer.0.k_norm",
       "grad.weight.layer.0.ln1_gamma",
       "grad.weight.layer.0.ln2_gamma",
@@ -33,12 +27,6 @@
       "grad.weight.layer.0.wo",
       "grad.weight.layer.0.wq",
       "grad.weight.layer.0.wv",
-      "grad.weight.layer.1.b1",
-      "grad.weight.layer.1.b2",
-      "grad.weight.layer.1.bk",
-      "grad.weight.layer.1.bo",
-      "grad.weight.layer.1.bq",
-      "grad.weight.layer.1.bv",
       "grad.weight.layer.1.k_norm",
       "grad.weight.layer.1.ln1_gamma",
       "grad.weight.layer.1.ln2_gamma",
@@ -97,7 +85,7 @@
       ],
       "grad.weight.token_emb": [
         36,
-        141
+        129
       ],
       "grad.act.act.L1.residual_add.1.out": [
         38
@@ -110,7 +98,7 @@
       ],
       "grad.act.act.L1.residual_add.0.out": [
         42,
-        54
+        52
       ],
       "grad.act.act.L1.silu_mul.0.out": [
         44
@@ -118,192 +106,156 @@
       "grad.weight.layer.1.w2": [
         45
       ],
-      "grad.weight.layer.1.b2": [
-        46
-      ],
       "grad.act.act.L1.mlp_gate_up.0.y": [
-        48
+        47
       ],
       "grad.act.act.L1.rmsnorm.1.output": [
-        50
+        49
       ],
       "grad.weight.layer.1.w1": [
-        51
-      ],
-      "grad.weight.layer.1.b1": [
-        52
+        50
       ],
       "grad.weight.layer.1.ln2_gamma": [
-        55
+        53
       ],
       "grad.act.act.L1.out_proj.0.y": [
-        57
+        55
       ],
       "grad.act.act.L0.residual_add.1.out": [
-        58,
-        88
-      ],
-      "grad.act.act.L1.attn.0.out": [
-        60
-      ],
-      "grad.weight.layer.1.wo": [
-        61
-      ],
-      "grad.weight.layer.1.bo": [
-        62
-      ],
-      "grad.act.act.L1.rope_qk.0.q": [
-        64
-      ],
-      "grad.act.act.L1.rope_qk.0.k": [
-        65
-      ],
-      "grad.act.act.L1.v_proj.0.y": [
-        66
-      ],
-      "grad.act.act.L1.qk_norm.0.q": [
-        68
-      ],
-      "grad.act.act.L1.qk_norm.0.k": [
-        69
-      ],
-      "grad.act.act.L1.q_proj.0.y": [
-        71
-      ],
-      "grad.act.act.L1.k_proj.0.y": [
-        72
-      ],
-      "grad.weight.layer.1.q_norm": [
-        73
-      ],
-      "grad.weight.layer.1.k_norm": [
-        74
-      ],
-      "grad.act.act.L1.rmsnorm.0.output": [
-        76,
-        80,
-        84
-      ],
-      "grad.weight.layer.1.wv": [
-        77
-      ],
-      "grad.weight.layer.1.bv": [
-        78
-      ],
-      "grad.weight.layer.1.wk": [
-        81
-      ],
-      "grad.weight.layer.1.bk": [
+        56,
         82
       ],
-      "grad.weight.layer.1.wq": [
-        85
+      "grad.act.act.L1.attn.0.out": [
+        58
       ],
-      "grad.weight.layer.1.bq": [
-        86
+      "grad.weight.layer.1.wo": [
+        59
+      ],
+      "grad.act.act.L1.rope_qk.0.q": [
+        61
+      ],
+      "grad.act.act.L1.rope_qk.0.k": [
+        62
+      ],
+      "grad.act.act.L1.v_proj.0.y": [
+        63
+      ],
+      "grad.act.act.L1.qk_norm.0.q": [
+        65
+      ],
+      "grad.act.act.L1.qk_norm.0.k": [
+        66
+      ],
+      "grad.act.act.L1.q_proj.0.y": [
+        68
+      ],
+      "grad.act.act.L1.k_proj.0.y": [
+        69
+      ],
+      "grad.weight.layer.1.q_norm": [
+        70
+      ],
+      "grad.weight.layer.1.k_norm": [
+        71
+      ],
+      "grad.act.act.L1.rmsnorm.0.output": [
+        73,
+        76,
+        79
+      ],
+      "grad.weight.layer.1.wv": [
+        74
+      ],
+      "grad.weight.layer.1.wk": [
+        77
+      ],
+      "grad.weight.layer.1.wq": [
+        80
       ],
       "grad.weight.layer.1.ln1_gamma": [
-        89
+        83
       ],
       "grad.act.act.L0.mlp_down.0.y": [
-        91
+        85
       ],
       "grad.act.act.L0.residual_add.0.out": [
-        92,
-        104
-      ],
-      "grad.act.act.L0.silu_mul.0.out": [
-        94
-      ],
-      "grad.weight.layer.0.w2": [
-        95
-      ],
-      "grad.weight.layer.0.b2": [
+        86,
         96
       ],
+      "grad.act.act.L0.silu_mul.0.out": [
+        88
+      ],
+      "grad.weight.layer.0.w2": [
+        89
+      ],
       "grad.act.act.L0.mlp_gate_up.0.y": [
-        98
+        91
       ],
       "grad.act.act.L0.rmsnorm.1.output": [
-        100
+        93
       ],
       "grad.weight.layer.0.w1": [
-        101
-      ],
-      "grad.weight.layer.0.b1": [
-        102
+        94
       ],
       "grad.weight.layer.0.ln2_gamma": [
-        105
+        97
       ],
       "grad.act.act.L0.out_proj.0.y": [
-        107
+        99
       ],
       "grad.act.act.Sheader.dense_embedding_lookup.0.out": [
-        108,
-        138
+        100,
+        126
       ],
       "grad.act.act.L0.attn.0.out": [
-        110
+        102
       ],
       "grad.weight.layer.0.wo": [
-        111
-      ],
-      "grad.weight.layer.0.bo": [
-        112
+        103
       ],
       "grad.act.act.L0.rope_qk.0.q": [
-        114
+        105
       ],
       "grad.act.act.L0.rope_qk.0.k": [
-        115
+        106
       ],
       "grad.act.act.L0.v_proj.0.y": [
-        116
+        107
       ],
       "grad.act.act.L0.qk_norm.0.q": [
-        118
+        109
       ],
       "grad.act.act.L0.qk_norm.0.k": [
-        119
+        110
       ],
       "grad.act.act.L0.q_proj.0.y": [
-        121
+        112
       ],
       "grad.act.act.L0.k_proj.0.y": [
-        122
+        113
       ],
       "grad.weight.layer.0.q_norm": [
-        123
+        114
       ],
       "grad.weight.layer.0.k_norm": [
-        124
+        115
       ],
       "grad.act.act.L0.rmsnorm.0.output": [
-        126,
-        130,
-        134
+        117,
+        120,
+        123
       ],
       "grad.weight.layer.0.wv": [
-        127
-      ],
-      "grad.weight.layer.0.bv": [
-        128
+        118
       ],
       "grad.weight.layer.0.wk": [
-        131
-      ],
-      "grad.weight.layer.0.bk": [
-        132
+        121
       ],
       "grad.weight.layer.0.wq": [
-        135
-      ],
-      "grad.weight.layer.0.bq": [
-        136
+        124
       ],
       "grad.weight.layer.0.ln1_gamma": [
-        139
+        127
       ]
     }
   }

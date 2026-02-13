@@ -24,6 +24,7 @@ import re
 import shlex
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -92,6 +93,10 @@ def log_step(step: int, msg: str):
 def log_error(msg: str):
     """Print error message."""
     print(f"{C_RED}Error:{C_RESET} {msg}", file=sys.stderr)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.CompletedProcess:
@@ -1232,6 +1237,757 @@ def run_parity_tests() -> None:
         sys.exit(1)
 
 
+def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict] = None) -> None:
+    if not summary_json.exists():
+        return
+    with summary_json.open("r", encoding="utf-8") as f:
+        s = json.load(f)
+
+    report_dir = V7_ROOT / "reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    step = int(s.get("steps", 0) or 0)
+    loss_ck = float(s.get("final_ck_loss", 0.0) or 0.0)
+    loss_pt = float(s.get("final_torch_loss", 0.0) or 0.0)
+    lr = float(s.get("lr", 0.0) or 0.0)
+    max_loss = float(s.get("max_loss_abs_diff", 0.0) or 0.0)
+    max_param = float(s.get("final_param_max_abs_diff", 0.0) or 0.0)
+
+    raw_curve = s.get("loss_curve") if isinstance(s, dict) else None
+    if isinstance(raw_curve, list) and raw_curve:
+        training_loss_curve = {
+            "steps": raw_curve,
+            "source": "train_e2e_detailed",
+        }
+    else:
+        training_loss_curve = {
+            "steps": [
+                {"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}
+            ],
+            "source": "train_e2e_summary",
+        }
+
+    raw_parity = s.get("parity_steps") if isinstance(s, dict) else None
+    if isinstance(raw_parity, list) and raw_parity:
+        training_parity = {
+            "steps": raw_parity,
+            "source": "train_e2e_detailed",
+        }
+    else:
+        training_parity = {
+            "steps": [
+                {"step": step, "loss_diff": max_loss, "max_param_diff": max_param, "worst_param": "aggregate"}
+            ],
+            "source": "train_e2e_summary",
+        }
+
+    grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    training_grad_norms = {
+        "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
+        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "params": grad_series.get("params", {}),
+        "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
+    }
+
+    step_profile = s.get("step_profile") if isinstance(s.get("step_profile"), dict) else {}
+    train_tok_s = step_profile.get("train_tok_s")
+    decode_tok_s = step_profile.get("decode_tok_s", train_tok_s)
+    training_step_profile = {
+        "steps": int(step_profile.get("steps", step) or step),
+        "micro_steps": int(step_profile.get("micro_steps", s.get("micro_steps", 0)) or 0),
+        "tokens_per_update": int(step_profile.get("tokens_per_update", s.get("tokens_per_update", 0)) or 0),
+        "processed_tokens": int(step_profile.get("processed_tokens", 0) or 0),
+        "ck_total_ms": float(step_profile.get("ck_total_ms", 0.0) or 0.0),
+        "torch_total_ms": float(step_profile.get("torch_total_ms", 0.0) or 0.0),
+        "ck_avg_step_ms": float(step_profile.get("ck_avg_step_ms", 0.0) or 0.0),
+        "torch_avg_step_ms": float(step_profile.get("torch_avg_step_ms", 0.0) or 0.0),
+        "train_tok_s": float(train_tok_s or 0.0) if train_tok_s is not None else None,
+        "decode_tok_s": float(decode_tok_s or 0.0) if decode_tok_s is not None else None,
+        "external_profiles": profile_meta or {},
+    }
+
+    training_checkpoint_policy = {
+        "policy": "none",
+        "source": "train_e2e",
+        "checkpointing": False,
+    }
+
+    payloads = {
+        "training_loss_curve_latest.json": training_loss_curve,
+        "training_parity_latest.json": training_parity,
+        "training_grad_norms_latest.json": training_grad_norms,
+        "training_step_profile_latest.json": training_step_profile,
+        "training_checkpoint_policy_latest.json": training_checkpoint_policy,
+    }
+    for name, payload in payloads.items():
+        with (report_dir / name).open("w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
+
+def _resolve_train_text(args: argparse.Namespace) -> Optional[str]:
+    """Resolve training text from data file, explicit text, or prompt."""
+    train_data = getattr(args, "train_data", None)
+    if train_data:
+        data_path = Path(train_data)
+        if not data_path.exists():
+            log_error(f"Training data file not found: {data_path}")
+            sys.exit(2)
+        try:
+            data = data_path.read_text(encoding="utf-8")
+        except Exception as e:
+            log_error(f"Failed to read training data from {data_path}: {e}")
+            sys.exit(2)
+        if not data.strip():
+            log_error(f"Training data file is empty: {data_path}")
+            sys.exit(2)
+        return data
+
+    train_text = getattr(args, "train_text", None)
+    if train_text:
+        return str(train_text)
+
+    prompt = getattr(args, "prompt", None)
+    return str(prompt) if prompt else None
+
+
+def _resolve_train_mode(args: argparse.Namespace) -> str:
+    mode = str(getattr(args, "train_mode", "pretrain") or "pretrain").lower()
+    if getattr(args, "pretraining", False):
+        mode = "pretrain"
+    if mode not in ("pretrain", "sft"):
+        log_error(f"Unsupported train mode: {mode}")
+        sys.exit(2)
+    return mode
+
+
+def _resolve_train_backend(args: argparse.Namespace) -> str:
+    backend = str(getattr(args, "train_backend", "both") or "both").lower()
+    if backend not in ("ck", "pytorch", "both"):
+        log_error(f"Unsupported train backend: {backend}")
+        sys.exit(2)
+    if backend != "both":
+        log("  Note: v7 tiny harness currently runs CK+PyTorch parity; backend override is recorded only", C_DIM)
+    return backend
+
+
+def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> None:
+    """Write viewer-friendly training telemetry files into run_dir."""
+    if not summary_json.exists():
+        return
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    with summary_json.open("r", encoding="utf-8") as f:
+        s = json.load(f)
+
+    step = int(s.get("steps", 0) or 0)
+    loss_ck = float(s.get("final_ck_loss", 0.0) or 0.0)
+    loss_pt = float(s.get("final_torch_loss", 0.0) or 0.0)
+    lr = float(s.get("lr", 0.0) or 0.0)
+    max_loss = float(s.get("max_loss_abs_diff", 0.0) or 0.0)
+    max_param = float(s.get("final_param_max_abs_diff", 0.0) or 0.0)
+
+    raw_curve = s.get("loss_curve") if isinstance(s, dict) else None
+    if isinstance(raw_curve, list) and raw_curve:
+        training_loss_curve = {"steps": raw_curve, "source": "train_e2e_detailed"}
+    else:
+        training_loss_curve = {
+            "steps": [{"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}],
+            "source": "train_e2e_summary",
+        }
+
+    raw_parity = s.get("parity_steps") if isinstance(s, dict) else None
+    if isinstance(raw_parity, list) and raw_parity:
+        training_parity = {"steps": raw_parity, "source": "train_e2e_detailed"}
+    else:
+        training_parity = {
+            "steps": [{"step": step, "loss_diff": max_loss, "max_param_diff": max_param, "worst_param": "aggregate"}],
+            "source": "train_e2e_summary",
+        }
+
+    grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    training_grad_norms = {
+        "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
+        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "params": grad_series.get("params", {}),
+        "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
+    }
+
+    step_profile = s.get("step_profile") if isinstance(s.get("step_profile"), dict) else {}
+    training_step_profile = {
+        "steps": int(step_profile.get("steps", step) or step),
+        "micro_steps": int(step_profile.get("micro_steps", s.get("micro_steps", 0)) or 0),
+        "tokens_per_update": int(step_profile.get("tokens_per_update", s.get("tokens_per_update", 0)) or 0),
+        "processed_tokens": int(step_profile.get("processed_tokens", 0) or 0),
+        "ck_total_ms": float(step_profile.get("ck_total_ms", 0.0) or 0.0),
+        "torch_total_ms": float(step_profile.get("torch_total_ms", 0.0) or 0.0),
+        "ck_avg_step_ms": float(step_profile.get("ck_avg_step_ms", 0.0) or 0.0),
+        "torch_avg_step_ms": float(step_profile.get("torch_avg_step_ms", 0.0) or 0.0),
+        "train_tok_s": float(step_profile.get("train_tok_s", 0.0) or 0.0),
+        "decode_tok_s": float(step_profile.get("decode_tok_s", step_profile.get("train_tok_s", 0.0)) or 0.0),
+    }
+
+    payloads = {
+        "training_loss_curve.json": training_loss_curve,
+        "training_parity.json": training_parity,
+        "training_grad_norms.json": training_grad_norms,
+        "training_step_profile.json": training_step_profile,
+    }
+    for name, payload in payloads.items():
+        (run_dir / name).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    dst = run_dir / "train_e2e_latest.json"
+    try:
+        same = summary_json.resolve() == dst.resolve()
+    except Exception:
+        same = str(summary_json) == str(dst)
+    if not same:
+        shutil.copy2(summary_json, dst)
+
+
+def step_run_train_e2e(args: argparse.Namespace) -> Path:
+    """Run tiny v7 training parity (CK vs PyTorch) as an operator E2E check."""
+    log_step(1, "Running train E2E parity (CK vs PyTorch)")
+
+    train_script = SCRIPTS_DIR / "train_parity_epochs_v7.py"
+    if not train_script.exists():
+        log_error(f"Training parity script not found: {train_script}")
+        sys.exit(1)
+
+    train_text = _resolve_train_text(args)
+    train_mode = _resolve_train_mode(args)
+    train_backend = _resolve_train_backend(args)
+
+    run_dir_arg = getattr(args, "run_dir", None)
+    run_dir = Path(run_dir_arg) if run_dir_arg else None
+    if run_dir is not None:
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+    json_out = getattr(args, "train_json_out", None)
+    if not json_out:
+        if run_dir is not None:
+            json_out = run_dir / "train_e2e_latest.json"
+        else:
+            json_out = V7_ROOT / "reports" / "train_e2e_latest.json"
+    else:
+        json_out = Path(json_out)
+
+    parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exec = str(parity_python) if parity_python.exists() else sys.executable
+
+    train_vocab = int(getattr(args, "train_vocab", 256) or 256)
+    train_d_model = int(getattr(args, "train_d_model", 64) or 64)
+    train_hidden = int(getattr(args, "train_hidden", 128) or 128)
+    train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
+    train_param_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
+
+    cmd = [
+        python_exec,
+        str(train_script),
+        "--epochs", str(getattr(args, "train_epochs", 3)),
+        "--seq-len", str(getattr(args, "train_seq_len", 16)),
+        "--total-tokens", str(getattr(args, "train_total_tokens", 1024)),
+        "--grad-accum", str(getattr(args, "train_grad_accum", 8)),
+        "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
+        "--lr", str(getattr(args, "train_lr", 1e-3)),
+        "--seed", str(getattr(args, "train_seed", 42)),
+        "--vocab", str(train_vocab),
+        "--d-model", str(train_d_model),
+        "--hidden", str(train_hidden),
+        "--loss-tol", str(train_loss_tol),
+        "--param-tol", str(train_param_tol),
+        "--json-out", str(json_out),
+    ]
+
+    if run_dir is not None and bool(getattr(args, "train_use_init_bump", True)):
+        bump_path = run_dir / "weights.bump"
+        manifest_path = run_dir / "weights_manifest.json"
+        if bump_path.exists() and manifest_path.exists():
+            cmd.extend(["--weights-bump", str(bump_path), "--weights-manifest", str(manifest_path)])
+            log(f"  init weights: {bump_path.name} + {manifest_path.name}", C_DIM)
+
+    if train_text:
+        cmd.extend(["--train-text", train_text])
+
+    log(
+        f"  mode={train_mode} backend={train_backend} epochs={getattr(args, 'train_epochs', 3)} "
+        f"seq_len={getattr(args, 'train_seq_len', 16)} total_tokens={getattr(args, 'train_total_tokens', 1024)}",
+        C_DIM,
+    )
+    log(
+        f"  d_model={train_d_model} hidden={train_hidden} vocab={train_vocab} "
+        f"grad_accum={getattr(args, 'train_grad_accum', 8)} optimizer={getattr(args, 'train_optimizer', 'adamw')}",
+        C_DIM,
+    )
+    if train_text:
+        short = train_text if len(train_text) <= 64 else train_text[:61] + "..."
+        log(f"  train_text={short}", C_DIM)
+
+    profile_mode = str(getattr(args, "profile_train", "none") or "none").lower()
+    profile_dir_arg = getattr(args, "train_profile_dir", None)
+    if profile_dir_arg:
+        profile_dir = Path(profile_dir_arg)
+    elif run_dir is not None:
+        profile_dir = run_dir / "profile_train_latest"
+    else:
+        profile_dir = V7_ROOT / "reports" / "profile_train_latest"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    profile_meta = {
+        "mode": profile_mode,
+        "train_mode": train_mode,
+        "backend": train_backend,
+        "artifacts": [],
+    }
+
+    def _note_artifact(label: str, path: Path) -> None:
+        profile_meta["artifacts"].append({"label": label, "path": str(path)})
+
+    if profile_mode == "perf":
+        perf_bin = shutil.which("perf")
+        if perf_bin:
+            perf_stat = profile_dir / "perf_train.stat.txt"
+            log(f"  Profiling training with perf stat -> {perf_stat}", C_DIM)
+            perf_cmd = [perf_bin, "stat", "-d", "-d", "-d", "-o", str(perf_stat), "--"] + cmd
+            prof = run_cmd_allow_fail(perf_cmd, cwd=PROJECT_ROOT)
+            if prof.returncode != 0:
+                log(f"  Warning: perf profiling failed ({prof.returncode}); running train-e2e without external profiler", C_ORANGE)
+                run_cmd(cmd, cwd=PROJECT_ROOT)
+            else:
+                _note_artifact("perf_stat", perf_stat)
+                perf_artifacts_script = SCRIPTS_DIR / "perf_artifacts_v7.py"
+                run_cmd_allow_fail([
+                    python_exec,
+                    str(perf_artifacts_script),
+                    "--out-dir", str(V7_ROOT / "reports"),
+                    "--perf-stat", str(perf_stat),
+                ], cwd=PROJECT_ROOT)
+        else:
+            log("  Warning: perf not found; running without external profiler", C_ORANGE)
+            run_cmd(cmd, cwd=PROJECT_ROOT)
+    elif profile_mode == "vtune":
+        vtune_bin = shutil.which("vtune")
+        if vtune_bin:
+            result_dir = profile_dir / "vtune_hotspots"
+            text_out = profile_dir / "vtune_hotspots.txt"
+            csv_out = profile_dir / "vtune_hotspots.csv"
+            log(f"  Profiling training with VTune hotspots -> {result_dir}", C_DIM)
+            vtune_cmd = [vtune_bin, "-collect", "hotspots", "-result-dir", str(result_dir), "--"] + cmd
+            prof = run_cmd_allow_fail(vtune_cmd, cwd=PROJECT_ROOT)
+            if prof.returncode != 0:
+                log(f"  Warning: VTune profiling failed ({prof.returncode}); running train-e2e without external profiler", C_ORANGE)
+                run_cmd(cmd, cwd=PROJECT_ROOT)
+            else:
+                run_cmd_allow_fail([vtune_bin, "-report", "hotspots", "-r", str(result_dir), "-format", "text", "-report-output", str(text_out)], cwd=PROJECT_ROOT)
+                run_cmd_allow_fail([vtune_bin, "-report", "hotspots", "-r", str(result_dir), "-format", "csv", "-report-output", str(csv_out)], cwd=PROJECT_ROOT)
+                _note_artifact("vtune_result_dir", result_dir)
+                _note_artifact("vtune_hotspots_text", text_out)
+                _note_artifact("vtune_hotspots_csv", csv_out)
+                vtune_artifacts_script = SCRIPTS_DIR / "vtune_artifacts_v7.py"
+                run_cmd_allow_fail([
+                    python_exec,
+                    str(vtune_artifacts_script),
+                    "--out-dir", str(V7_ROOT / "reports"),
+                    "--result-dir", str(result_dir),
+                    "--report-text", str(text_out),
+                    "--report-csv", str(csv_out),
+                ], cwd=PROJECT_ROOT)
+        else:
+            log("  Warning: vtune not found; running without external profiler", C_ORANGE)
+            run_cmd(cmd, cwd=PROJECT_ROOT)
+    else:
+        if profile_mode not in ("none", ""):
+            log(f"  Warning: unknown --profile-train mode '{profile_mode}', using none", C_ORANGE)
+        run_cmd(cmd, cwd=PROJECT_ROOT)
+
+    try:
+        _materialize_train_telemetry(Path(json_out), profile_meta=profile_meta)
+    except Exception as e:
+        log(f"  Warning: telemetry materialization failed: {e}", C_ORANGE)
+    if run_dir is not None:
+        try:
+            _export_train_telemetry_to_run_dir(Path(json_out), run_dir)
+        except Exception as e:
+            log(f"  Warning: run_dir telemetry export failed: {e}", C_ORANGE)
+    log(f"  Train parity report: {json_out}", C_GREEN)
+    return Path(json_out)
+
+
+def step_run_train_init(args: argparse.Namespace) -> None:
+    """Initialize a tiny v7 training run directory (weights.bump + manifest)."""
+    log_step(1, "Initializing tiny v7 training run")
+
+    init_script = SCRIPTS_DIR / "init_tiny_train_model_v7.py"
+    if not init_script.exists():
+        log_error(f"Init script not found: {init_script}")
+        sys.exit(1)
+
+    parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exec = str(parity_python) if parity_python.exists() else sys.executable
+
+    run_name = str(getattr(args, "run_name", "tiny_init") or "tiny_init").strip()
+    out_dir_arg = getattr(args, "output_dir", None)
+    out_dir = Path(out_dir_arg) if out_dir_arg else (V7_ROOT / "runs" / run_name)
+
+    cmd = [
+        python_exec,
+        str(init_script),
+        "--output-dir", str(out_dir),
+        "--seed", str(getattr(args, "train_seed", 42)),
+        "--init", str(getattr(args, "init", "normal_0p02")),
+        "--layers", str(getattr(args, "layers", 2)),
+        "--vocab-size", str(getattr(args, "vocab_size", 256)),
+        "--embed-dim", str(getattr(args, "embed_dim", 128)),
+        "--hidden-dim", str(getattr(args, "hidden_dim", 256)),
+        "--num-heads", str(getattr(args, "num_heads", 8)),
+        "--num-kv-heads", str(getattr(args, "num_kv_heads", 4)),
+        "--context-len", str(getattr(args, "context_len", 128)),
+        "--rope-theta", str(getattr(args, "rope_theta", 1_000_000.0)),
+        "--kernel-policy", str(getattr(args, "kernel_policy", "fp32_reference_first")),
+    ]
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+
+    # Run-dir aliases for operator workflows.
+    try:
+        bump = out_dir / "weights.bump"
+        bump_alias = out_dir / "weights_init.bump"
+        if bump.exists() and not bump_alias.exists():
+            shutil.copy2(bump, bump_alias)
+
+        cfg_src = out_dir / "train_init_config.json"
+        cfg_alias = out_dir / "config.json"
+        if cfg_src.exists() and not cfg_alias.exists():
+            shutil.copy2(cfg_src, cfg_alias)
+    except Exception as e:
+        log(f"  Warning: failed to create run-dir aliases: {e}", C_ORANGE)
+
+    if getattr(args, "generate_ir", False):
+        manifest_path = out_dir / "weights_manifest.json"
+
+        ir1_script = SCRIPTS_DIR / "build_ir_train_v7.py"
+        ir1_out = out_dir / "ir1_train_forward.json"
+        ir1_report = out_dir / "ir1_train_report.json"
+        ir1_cmd = [
+            python_exec,
+            str(ir1_script),
+            "--manifest", str(manifest_path),
+            "--output", str(ir1_out),
+            "--report-out", str(ir1_report),
+        ]
+        if getattr(args, "strict", False):
+            ir1_cmd.append("--strict")
+        run_cmd(ir1_cmd, cwd=PROJECT_ROOT)
+
+        ir2_script = SCRIPTS_DIR / "lower_ir2_backward_v7.py"
+        ir2_out = out_dir / "ir2_train_backward.json"
+        ir2_summary = out_dir / "ir2_train_summary.json"
+        ir2_cmd = [
+            python_exec,
+            str(ir2_script),
+            "--ir1", str(ir1_out),
+            "--output", str(ir2_out),
+            "--summary-out", str(ir2_summary),
+        ]
+        if getattr(args, "strict", False):
+            ir2_cmd.append("--strict")
+        else:
+            ir2_cmd.append("--allow-partial")
+        run_cmd(ir2_cmd, cwd=PROJECT_ROOT)
+
+        inv_script = SCRIPTS_DIR / "validate_ir_train_invariants_v7.py"
+        inv_out = out_dir / "ir_train_invariants.json"
+        inv_cmd = [
+            python_exec,
+            str(inv_script),
+            "--ir1", str(ir1_out),
+            "--ir2", str(ir2_out),
+            "--output", str(inv_out),
+        ]
+        if getattr(args, "strict", False):
+            inv_cmd.append("--strict-unresolved")
+        else:
+            inv_cmd.append("--allow-partial")
+        run_cmd(inv_cmd, cwd=PROJECT_ROOT)
+
+        if getattr(args, "generate_runtime", False):
+            rt_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
+            rt_out = out_dir / "generated_train_runtime_v7.c"
+            rt_summary = out_dir / "generated_train_runtime_summary_v7.json"
+            rt_cmd = [
+                python_exec,
+                str(rt_script),
+                "--ir2", str(ir2_out),
+                "--manifest", str(manifest_path),
+                "--output", str(rt_out),
+                "--summary-out", str(rt_summary),
+            ]
+            run_cmd(rt_cmd, cwd=PROJECT_ROOT)
+
+        log(f"  Generated train IR: {ir1_out}", C_GREEN)
+        log(f"  Generated backward IR: {ir2_out}", C_GREEN)
+
+    mode = "pretrain" if getattr(args, "pretraining", False) else str(getattr(args, "train_mode", "pretrain"))
+    meta = {
+        "generated_at": _utc_now_iso(),
+        "mode": mode,
+        "init": str(getattr(args, "init", "normal_0p02")),
+        "paths": {
+            "run_dir": str(out_dir),
+            "weights": str(out_dir / "weights.bump"),
+            "weights_init": str(out_dir / "weights_init.bump"),
+            "manifest": str(out_dir / "weights_manifest.json"),
+            "config": str(out_dir / "config.json"),
+        },
+    }
+    (out_dir / "operator_train_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    log(f"  Run directory: {out_dir}", C_GREEN)
+
+
+def step_run_train_sanity(args: argparse.Namespace) -> None:
+    """Quick sanity gate: tiny train parity + optional loss-drop assertion."""
+    log_step(1, "Running v7 training sanity gate")
+
+    if not getattr(args, "train_json_out", None):
+        if getattr(args, "run_dir", None):
+            args.train_json_out = str(Path(getattr(args, "run_dir")) / "train_sanity_latest.json")
+        else:
+            args.train_json_out = str(V7_ROOT / "reports" / "train_sanity_latest.json")
+
+    json_out = step_run_train_e2e(args)
+    payload = json.loads(Path(json_out).read_text(encoding="utf-8"))
+
+    pass_parity = bool(payload.get("pass_parity", False))
+    loss_curve = payload.get("loss_curve") if isinstance(payload.get("loss_curve"), list) else []
+    min_loss_drop = float(getattr(args, "min_loss_drop", 0.0) or 0.0)
+
+    loss_drop_ok = True
+    observed_drop = 0.0
+    if loss_curve and len(loss_curve) >= 2:
+        try:
+            first_loss = float(loss_curve[0].get("loss_ck", 0.0))
+            last_loss = float(loss_curve[-1].get("loss_ck", 0.0))
+            observed_drop = first_loss - last_loss
+        except Exception:
+            observed_drop = 0.0
+    if min_loss_drop > 0.0:
+        loss_drop_ok = observed_drop >= min_loss_drop
+
+    summary = {
+        "generated_at": _utc_now_iso(),
+        "pass_parity": pass_parity,
+        "min_loss_drop": min_loss_drop,
+        "observed_loss_drop": observed_drop,
+        "loss_drop_pass": loss_drop_ok,
+        "train_json": str(json_out),
+    }
+    out = (Path(getattr(args, "run_dir")) / "sanity_overfit.json") if getattr(args, "run_dir", None) else (V7_ROOT / "reports" / "train_sanity_summary_latest.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    if pass_parity and loss_drop_ok:
+        log(f"  Sanity: PASS (loss_drop={observed_drop:.6f})", C_GREEN)
+        log(f"  Summary: {out}", C_GREEN)
+        return
+
+    if not pass_parity:
+        log_error("Sanity failed: parity check did not pass")
+    elif not loss_drop_ok:
+        log_error(f"Sanity failed: observed loss drop {observed_drop:.6f} < required {min_loss_drop:.6f}")
+    log_error(f"Sanity summary: {out}")
+    sys.exit(1)
+
+
+def step_run_train_parity(args: argparse.Namespace) -> None:
+    """Run parity-focused gate bundle: train parity + optional FD/replay checks."""
+    log_step(1, "Running v7 training parity gate")
+
+    if not getattr(args, "train_json_out", None):
+        if getattr(args, "run_dir", None):
+            args.train_json_out = str(Path(getattr(args, "run_dir")) / "train_parity_latest.json")
+        else:
+            args.train_json_out = str(V7_ROOT / "reports" / "train_parity_latest.json")
+    json_out = step_run_train_e2e(args)
+
+    parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exec = str(parity_python) if parity_python.exists() else sys.executable
+
+    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (V7_ROOT / "reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    failures = []
+
+    if getattr(args, "with_fd", False):
+        fd_script = SCRIPTS_DIR / "check_fd_gradients_v7.py"
+        fd_json = report_dir / "fd_gradients_latest.json"
+        fd_cmd = [
+            python_exec,
+            str(fd_script),
+            "--seed", str(getattr(args, "train_seed", 42)),
+            "--seq-len", str(getattr(args, "train_seq_len", 16)),
+            "--total-tokens", str(getattr(args, "train_total_tokens", 1024)),
+            "--vocab", str(getattr(args, "train_vocab", 256)),
+            "--d-model", str(getattr(args, "train_d_model", 64)),
+            "--hidden", str(getattr(args, "train_hidden", 128)),
+            "--json-out", str(fd_json),
+        ]
+        log("  Running finite-difference gradient check", C_DIM)
+        rc = run_cmd_allow_fail(fd_cmd, cwd=PROJECT_ROOT).returncode
+        if rc != 0:
+            failures.append("fd_gradients")
+
+    if getattr(args, "with_replay", False):
+        replay_script = SCRIPTS_DIR / "check_replay_determinism_v7.py"
+        replay_json = report_dir / "replay_determinism_latest.json"
+        replay_cmd = [
+            python_exec,
+            str(replay_script),
+            "--epochs", str(getattr(args, "train_epochs", 3)),
+            "--seq-len", str(getattr(args, "train_seq_len", 16)),
+            "--total-tokens", str(getattr(args, "train_total_tokens", 1024)),
+            "--vocab", str(getattr(args, "train_vocab", 256)),
+            "--d-model", str(getattr(args, "train_d_model", 64)),
+            "--hidden", str(getattr(args, "train_hidden", 128)),
+            "--grad-accum", str(getattr(args, "train_grad_accum", 8)),
+            "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
+            "--lr", str(getattr(args, "train_lr", 1e-3)),
+            "--seed", str(getattr(args, "train_seed", 42)),
+            "--json-out", str(replay_json),
+        ]
+        log("  Running deterministic replay check", C_DIM)
+        rc = run_cmd_allow_fail(replay_cmd, cwd=PROJECT_ROOT).returncode
+        if rc != 0:
+            failures.append("replay")
+
+    payload = json.loads(Path(json_out).read_text(encoding="utf-8"))
+    parity_pass = bool(payload.get("pass_parity", False))
+    if not parity_pass:
+        failures.append("train_parity")
+
+    gate = {
+        "generated_at": _utc_now_iso(),
+        "train_json": str(json_out),
+        "pass_train_parity": parity_pass,
+        "with_fd": bool(getattr(args, "with_fd", False)),
+        "with_replay": bool(getattr(args, "with_replay", False)),
+        "failures": failures,
+        "passed": len(failures) == 0,
+    }
+    gate_out = report_dir / "parity_report.json"
+    gate_out.write_text(json.dumps(gate, indent=2), encoding="utf-8")
+
+    if failures:
+        log_error(f"Parity gate failed: {', '.join(failures)}")
+        log_error(f"Gate report: {gate_out}")
+        sys.exit(1)
+
+    log(f"  Parity gate: PASS", C_GREEN)
+    log(f"  Gate report: {gate_out}", C_GREEN)
+
+
+
+
+def step_run_train_suite(args: argparse.Namespace) -> None:
+    """Run stability sweep epochs (1,3,5,10 by default) + optional spot profiling.
+
+    Outputs:
+      - <run_dir>/train_e{E}.json for each sweep epoch (or version/v7/reports if --run not set)
+      - <run_dir>/training_epoch_sweep_latest.json consolidated table source
+      - training_* telemetry materialized from final sweep epoch
+    """
+    log_step(1, "Running training stability suite")
+
+    epochs_raw = str(getattr(args, "epochs_list", "1,3,5,10") or "1,3,5,10")
+    try:
+        epochs = []
+        for tok in [x.strip() for x in epochs_raw.split(",") if x.strip()]:
+            v = int(tok)
+            if v < 1:
+                raise ValueError
+            if v not in epochs:
+                epochs.append(v)
+    except Exception:
+        log_error(f"Invalid --epochs-list: {epochs_raw}")
+        sys.exit(2)
+    if not epochs:
+        log_error("--epochs-list produced no valid epochs")
+        sys.exit(2)
+
+    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (V7_ROOT / "reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+    sweep_outputs = []
+
+    for ep in epochs:
+        out_json = report_dir / f"train_e{ep}.json"
+        run_args = argparse.Namespace(**vars(args))
+        run_args.train_epochs = ep
+        run_args.train_json_out = str(out_json)
+        run_args.profile_train = "none"
+        step_run_train_e2e(run_args)
+
+        data = json.loads(out_json.read_text(encoding="utf-8"))
+        step_profile = data.get("step_profile") if isinstance(data.get("step_profile"), dict) else {}
+        rows.append({
+            "epoch": ep,
+            "pass_parity": bool(data.get("pass_parity", False)),
+            "final_ck_loss": float(data.get("final_ck_loss", 0.0) or 0.0),
+            "final_torch_loss": float(data.get("final_torch_loss", 0.0) or 0.0),
+            "max_loss_abs_diff": float(data.get("max_loss_abs_diff", 0.0) or 0.0),
+            "final_param_max_abs_diff": float(data.get("final_param_max_abs_diff", 0.0) or 0.0),
+            "steps": int(data.get("steps", 0) or 0),
+            "micro_steps": int(data.get("micro_steps", 0) or 0),
+            "train_tok_s": float(step_profile.get("train_tok_s", 0.0) or 0.0),
+            "json_out": str(out_json),
+        })
+        sweep_outputs.append(out_json)
+
+    profile_mode = str(getattr(args, "profile_train", "none") or "none").lower()
+    profile_epoch = int(getattr(args, "profile_epoch", 3) or 3)
+    profile_row = None
+
+    if profile_mode != "none":
+        profile_json = report_dir / f"train_profile_e{profile_epoch}_{profile_mode}.json"
+        prof_args = argparse.Namespace(**vars(args))
+        prof_args.train_epochs = profile_epoch
+        prof_args.train_json_out = str(profile_json)
+        prof_args.profile_train = profile_mode
+        step_run_train_e2e(prof_args)
+
+        pdata = json.loads(profile_json.read_text(encoding="utf-8"))
+        pstep = pdata.get("step_profile") if isinstance(pdata.get("step_profile"), dict) else {}
+        profile_row = {
+            "epoch": profile_epoch,
+            "mode": profile_mode,
+            "pass_parity": bool(pdata.get("pass_parity", False)),
+            "final_ck_loss": float(pdata.get("final_ck_loss", 0.0) or 0.0),
+            "final_param_max_abs_diff": float(pdata.get("final_param_max_abs_diff", 0.0) or 0.0),
+            "train_tok_s": float(pstep.get("train_tok_s", 0.0) or 0.0),
+            "json_out": str(profile_json),
+        }
+
+    # Keep training_*_latest stable to final sweep epoch for dashboard continuity.
+    last_sweep_json = sweep_outputs[-1]
+    try:
+        _materialize_train_telemetry(last_sweep_json, profile_meta={"mode": "none", "artifacts": []})
+    except Exception as e:
+        log(f"  Warning: failed to rematerialize latest training telemetry: {e}", C_ORANGE)
+
+    payload = {
+        "generated_at": _utc_now_iso(),
+        "epochs": epochs,
+        "runs": rows,
+        "profile_run": profile_row,
+        "source": "ck_run_v7 train-suite",
+    }
+    sweep_path = report_dir / "training_epoch_sweep_latest.json"
+    sweep_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    passed = sum(1 for r in rows if r.get("pass_parity"))
+    log(f"  Sweep summary: {passed}/{len(rows)} epochs parity-pass", C_GREEN if passed == len(rows) else C_ORANGE)
+    log(f"  Sweep report: {sweep_path}", C_GREEN)
+
+
+
+
 def run_reverse_validation(work_dir: Path, verbose: bool = False) -> bool:
     """Run IR reverse validation to check IR Lower 3 consistency.
 
@@ -1714,6 +2470,14 @@ def run_pipeline(args: argparse.Namespace):
     manifest_input_path = None
     gguf_path_for_tokenizer = None  # Track GGUF path for tokenizer extraction
     v7_mode = V7_MODE
+
+    # Optional fast path: training parity harness (CK vs PyTorch).
+    # This path validates training numerics and does not require model conversion.
+    if getattr(args, "train_e2e", False):
+        if getattr(args, "model", None):
+            log("  --train-e2e uses tiny training harness; model input is ignored for now", C_DIM)
+        step_run_train_e2e(args)
+        return
 
     # Step 0: Regenerate kernel registry from kernel maps if needed
     step_regenerate_kernel_registry(force=getattr(args, 'force_compile', False))
@@ -2247,30 +3011,68 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Interactive mode (default - just run with no args)
+  # Interactive mode (default)
   ./ck-v7
-  python scripts/v7/ck_run_v7.py
 
-  # Download GGUF directly (recommended for quantized models)
+  # Inference
   ./ck-v7 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
-  # Local GGUF file
-  ./ck-v7 run ./model.gguf
-
-  # Full HuggingFace model (downloads all files)
-  ./ck-v7 run HuggingFaceTB/SmolLM-135M
-
-  # Generate code only (inspect before running)
-  ./ck-v7 run Qwen/Qwen2-0.5B --generate-only
-
-  # Single prompt mode
-  ./ck-v7 run ./model.gguf --prompt "What is 2+2?" --max-tokens 50
+  # Training run-dir flow
+  ./ck-v7 init --run ./version/v7/runs/exp1 --init xavier_uniform
+  ./ck-v7 train --run ./version/v7/runs/exp1 --data ./train.txt --train-epochs 3
+  ./ck-v7 sanity --run ./version/v7/runs/exp1 --data ./train.txt --train-epochs 1
+  ./ck-v7 parity --run ./version/v7/runs/exp1 --data ./train.txt --with-fd --with-replay
 """
     )
 
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
-    # Run command
+    def _add_train_common_args(sp: argparse.ArgumentParser, *, include_profile: bool = True) -> None:
+        sp.add_argument('--run', dest='run_dir', default=None,
+                        help='Run directory for artifacts (single source of truth)')
+        sp.add_argument('--data', dest='train_data', default=None,
+                        help='Path to UTF-8 training text file (repeated to fill token budget)')
+        sp.add_argument('--prompt', dest='train_text', default='Hello!',
+                        help='Inline training text (used when --data is not set)')
+        sp.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain',
+                        help='Training mode label (pretrain/sft)')
+        sp.add_argument('--pretraining', action='store_true',
+                        help='Shortcut: force --train-mode=pretrain')
+        sp.add_argument('--train-backend', choices=['ck', 'pytorch', 'both'], default='both',
+                        help='Backend mode label (tiny harness currently executes CK+PyTorch parity)')
+        sp.set_defaults(train_use_init_bump=True)
+        sp.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
+                        help='Do not load tiny parity init from run_dir/weights.bump')
+
+        sp.add_argument('--train-epochs', type=int, default=3)
+        sp.add_argument('--train-seq-len', type=int, default=16)
+        sp.add_argument('--train-total-tokens', type=int, default=1024)
+        sp.add_argument('--train-grad-accum', type=int, default=8)
+        sp.add_argument('--train-optimizer', choices=['adamw', 'sgd'], default='adamw')
+        sp.add_argument('--train-lr', type=float, default=1e-3)
+        sp.add_argument('--train-seed', type=int, default=42)
+
+        sp.add_argument('--train-vocab', type=int, default=256,
+                        help='Tiny harness vocab size (default: 256)')
+        sp.add_argument('--train-d-model', type=int, default=64,
+                        help='Tiny harness d_model (default: 64)')
+        sp.add_argument('--train-hidden', type=int, default=128,
+                        help='Tiny harness hidden size (default: 128)')
+        sp.add_argument('--train-loss-tol', type=float, default=2e-5,
+                        help='Parity tolerance for max loss abs diff')
+        sp.add_argument('--train-param-tol', type=float, default=3e-5,
+                        help='Parity tolerance for max param abs diff')
+
+        sp.add_argument('--train-json-out', default=None,
+                        help='Optional JSON output path (default: run_dir/train_e2e_latest.json or v7/reports)')
+
+        if include_profile:
+            sp.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
+                            help='Optional external profiler for training command')
+            sp.add_argument('--train-profile-dir', default=None,
+                            help='Output directory for train profiler artifacts')
+
+    # Run command (inference pipeline + optional tiny train-e2e fast path)
     run_parser = subparsers.add_parser('run', help='Run model')
     run_parser.add_argument('model', help='Model ID, URL, GGUF file, or local path')
     run_parser.add_argument('--weight-dtype',
@@ -2287,6 +3089,45 @@ Examples:
     run_parser.add_argument('--max-tokens', type=int, default=512,
                            help='Max tokens to generate (default: 512)')
     run_parser.add_argument('--prompt', help='Single prompt (non-interactive)')
+    run_parser.add_argument('--train-e2e', action='store_true',
+                           help='Run tiny training parity E2E (CK vs PyTorch) and exit')
+    run_parser.add_argument('--run', dest='run_dir', default=None,
+                           help='Optional run directory for train-e2e artifact output')
+    run_parser.add_argument('--train-data', default=None,
+                           help='Training text file for --train-e2e (UTF-8)')
+    run_parser.add_argument('--train-text', type=str, default=None,
+                           help='Optional training text (UTF-8) for --train-e2e; falls back to --prompt')
+    run_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')
+    run_parser.add_argument('--pretraining', action='store_true')
+    run_parser.add_argument('--train-backend', choices=['ck', 'pytorch', 'both'], default='both')
+    run_parser.set_defaults(train_use_init_bump=True)
+    run_parser.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
+                           help='Do not load tiny parity init from run_dir/weights.bump')
+    run_parser.add_argument('--train-epochs', type=int, default=3,
+                           help='Epochs for --train-e2e (default: 3)')
+    run_parser.add_argument('--train-seq-len', type=int, default=16,
+                           help='Sequence length for --train-e2e (default: 16)')
+    run_parser.add_argument('--train-total-tokens', type=int, default=1024,
+                           help='Total tokens for --train-e2e (default: 1024)')
+    run_parser.add_argument('--train-grad-accum', type=int, default=8,
+                           help='Gradient accumulation steps for --train-e2e (default: 8)')
+    run_parser.add_argument('--train-optimizer', choices=['adamw', 'sgd'], default='adamw',
+                           help='Optimizer for --train-e2e (default: adamw)')
+    run_parser.add_argument('--train-lr', type=float, default=1e-3,
+                           help='Learning rate for --train-e2e (default: 1e-3)')
+    run_parser.add_argument('--train-seed', type=int, default=42,
+                           help='Random seed for --train-e2e (default: 42)')
+    run_parser.add_argument('--train-vocab', type=int, default=256)
+    run_parser.add_argument('--train-d-model', type=int, default=64)
+    run_parser.add_argument('--train-hidden', type=int, default=128)
+    run_parser.add_argument('--train-loss-tol', type=float, default=2e-5)
+    run_parser.add_argument('--train-param-tol', type=float, default=3e-5)
+    run_parser.add_argument('--train-json-out', default=None,
+                           help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or version/v7/reports/train_e2e_latest.json)')
+    run_parser.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
+                           help='Optional external profiler for --train-e2e (none, perf, vtune)')
+    run_parser.add_argument('--train-profile-dir', default=None,
+                           help='Output directory for train profiler artifacts (default: run_dir/profile_train_latest)')
     run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma'], default='auto',
                            help='Chat template mode passed to ck_chat.py (auto, none, qwen, gemma)')
     run_parser.add_argument('--no-chat-template', action='store_true',
@@ -2346,11 +3187,7 @@ Examples:
     run_parser.add_argument('--llama-timeout', type=int, default=None,
                            help='llama.cpp parity timeout in seconds (default 600)')
     run_parser.add_argument('--parallel-decode', action='store_true',
-                           help='[DEPRECATED] Was: OpenMP parallel GEMV for decode. '
-                                'Superseded by persistent pthread thread pool '
-                                '(ck_parallel_decode.h) which is always enabled. '
-                                'Thread pool avoids OpenMP fork/join overhead and '
-                                'core oversubscription. Flag accepted but ignored.')
+                           help='[DEPRECATED] Flag accepted for compatibility only.')
     run_parser.add_argument('--reverse-test', action='store_true',
                            help='Run IR reverse validation after codegen (validates IR Lower 3 consistency)')
     run_parser.add_argument('--reverse-test-verbose', action='store_true',
@@ -2368,18 +3205,73 @@ Examples:
     interactive_parser.add_argument('--temperature', type=float, default=0.7)
     interactive_parser.add_argument('--max-tokens', type=int, default=512)
 
-    # List command
+    # Init command (tiny training run bootstrap)
+    init_parser = subparsers.add_parser('init', help='Initialize tiny v7 training run directory')
+    init_parser.add_argument('--run', dest='output_dir', default=None,
+                             help='Output run directory (default: version/v7/runs/tiny_init)')
+    init_parser.add_argument('--run-name', default='tiny_init',
+                             help='Run name used when --run is not set')
+    init_parser.add_argument('--init', choices=['normal_0p02', 'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'zeros'],
+                             default='normal_0p02', help='Weight initialization method')
+    init_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')
+    init_parser.add_argument('--pretraining', action='store_true')
+    init_parser.add_argument('--train-seed', type=int, default=42)
+    init_parser.add_argument('--layers', type=int, default=2)
+    init_parser.add_argument('--vocab-size', type=int, default=256)
+    init_parser.add_argument('--embed-dim', type=int, default=128)
+    init_parser.add_argument('--hidden-dim', type=int, default=256)
+    init_parser.add_argument('--num-heads', type=int, default=8)
+    init_parser.add_argument('--num-kv-heads', type=int, default=4)
+    init_parser.add_argument('--context-len', type=int, default=128)
+    init_parser.add_argument('--rope-theta', type=float, default=1_000_000.0)
+    init_parser.add_argument('--kernel-policy', default='fp32_reference_first')
+    init_parser.add_argument('--generate-ir', action='store_true',
+                             help='Also generate train IR artifacts (IR1 + IR2 + invariants)')
+    init_parser.add_argument('--generate-runtime', action='store_true',
+                             help='With --generate-ir, also emit generated_train_runtime_v7.c')
+    init_parser.add_argument('--strict', action='store_true',
+                             help='Strict train IR build checks when --generate-ir is used')
+
+    # Train command (alias for train-e2e parity harness)
+    train_parser = subparsers.add_parser('train-e2e', aliases=['train'],
+                                        help='Run tiny training parity E2E (CK vs PyTorch)')
+    _add_train_common_args(train_parser, include_profile=True)
+
+    # Training sanity gate
+    sanity_parser = subparsers.add_parser('sanity', help='Run quick v7 training sanity gate')
+    _add_train_common_args(sanity_parser, include_profile=True)
+    sanity_parser.add_argument('--min-loss-drop', type=float, default=0.0,
+                               help='Require (first_loss - last_loss) >= threshold')
+
+    # Training parity gate bundle
+    parity_parser = subparsers.add_parser('parity', help='Run parity gate (train + optional FD/replay)')
+    _add_train_common_args(parity_parser, include_profile=True)
+    parity_parser.add_argument('--with-fd', action='store_true',
+                               help='Also run finite-difference gradient check')
+    parity_parser.add_argument('--with-replay', action='store_true',
+                               help='Also run deterministic replay check')
+
+    # Training profile command
+    profile_parser = subparsers.add_parser('profile', help='Run train-e2e with profiler enabled')
+    _add_train_common_args(profile_parser, include_profile=True)
+    profile_parser.set_defaults(profile_train='perf')
+
+    suite_parser = subparsers.add_parser('train-suite', aliases=['train-observe'],
+                                        help='Run epoch sweep (1,3,5,10) and optional spot profiling')
+    _add_train_common_args(suite_parser, include_profile=True)
+    suite_parser.add_argument('--epochs-list', default='1,3,5,10',
+                             help='Comma-separated epoch checkpoints to run parity/stability (default: 1,3,5,10)')
+    suite_parser.add_argument('--profile-epoch', type=int, default=3,
+                             help='Epoch count for spot profile run (default: 3)')
+
     list_parser = subparsers.add_parser('list', help='List cached models')
 
-    # Clean command
     clean_parser = subparsers.add_parser('clean', help='Clean cached models')
     clean_parser.add_argument('model', nargs='?', help='Model to clean (or all)')
 
     args = parser.parse_args()
 
-    # Default to interactive mode if no command given
     if args.command is None:
-        # Set defaults for interactive mode
         args.weight_dtype = None
         args.temperature = 0.7
         args.max_tokens = 512
@@ -2388,6 +3280,21 @@ Examples:
         run_pipeline(args)
     elif args.command in ('interactive', 'i'):
         run_interactive(args)
+    elif args.command == 'init':
+        step_run_train_init(args)
+    elif args.command in ('train-e2e', 'train'):
+        args.train_e2e = True
+        step_run_train_e2e(args)
+    elif args.command == 'sanity':
+        step_run_train_sanity(args)
+    elif args.command == 'parity':
+        step_run_train_parity(args)
+    elif args.command == 'profile':
+        if not getattr(args, 'profile_train', None):
+            args.profile_train = 'perf'
+        step_run_train_e2e(args)
+    elif args.command in ('train-suite', 'train-observe'):
+        step_run_train_suite(args)
     elif args.command == 'list':
         if CACHE_DIR.exists():
             models = list(CACHE_DIR.iterdir())

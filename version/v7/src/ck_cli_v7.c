@@ -201,6 +201,7 @@ typedef struct {
     bool stream;
     bool timing;
     bool verbose;
+    bool quiet_output;
     bool no_chat_template;
     ChatTemplateType chat_template;
     int eos_ids[CK_CLI_EOS_MAX];
@@ -232,6 +233,52 @@ static const char *strcasestr_local(const char *haystack, const char *needle) {
     return NULL;
 }
 
+static bool path_exists(const char *path) {
+    struct stat st;
+    return path && stat(path, &st) == 0;
+}
+
+static bool resolve_model_runtime_paths(
+    const char *model_dir,
+    char *lib_out,
+    char *weights_out,
+    size_t out_size,
+    double *weights_size
+) {
+    if (!model_dir || !lib_out || !weights_out || out_size == 0) return false;
+
+    static const char *lib_patterns[] = {
+        "%s/.ck_build/libmodel.so",
+        "%s/libmodel.so",
+        "%s/ck-kernel-inference.so",
+    };
+    static const char *weights_patterns[] = {
+        "%s/.ck_build/weights.bump",
+        "%s/weights.bump",
+        "%s/weights.bump",
+    };
+
+    for (size_t i = 0; i < sizeof(lib_patterns) / sizeof(lib_patterns[0]); i++) {
+        char lib_path[4096], bump_path[4096];
+        snprintf(lib_path, sizeof(lib_path), lib_patterns[i], model_dir);
+        snprintf(bump_path, sizeof(bump_path), weights_patterns[i], model_dir);
+
+        if (path_exists(lib_path) && path_exists(bump_path)) {
+            snprintf(lib_out, out_size, "%s", lib_path);
+            snprintf(weights_out, out_size, "%s", bump_path);
+            if (weights_size) {
+                struct stat st_bump;
+                if (stat(bump_path, &st_bump) == 0) {
+                    *weights_size = (double)st_bump.st_size;
+                }
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool find_model_in_cache(const char *model_name, char *lib_out, char *weights_out, size_t out_size) {
     const char *cache_dir = get_cache_dir();
     DIR *dir = opendir(cache_dir);
@@ -245,16 +292,7 @@ static bool find_model_in_cache(const char *model_name, char *lib_out, char *wei
         if (strcasestr_local(entry->d_name, model_name) != NULL) {
             char model_dir[4096];
             snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
-
-            /* Check for required files */
-            char so_path[4096], bump_path[4096];
-            snprintf(so_path, sizeof(so_path), "%s/ck-kernel-inference.so", model_dir);
-            snprintf(bump_path, sizeof(bump_path), "%s/weights.bump", model_dir);
-
-            struct stat st;
-            if (stat(so_path, &st) == 0 && stat(bump_path, &st) == 0) {
-                strncpy(lib_out, so_path, out_size - 1);
-                strncpy(weights_out, bump_path, out_size - 1);
+            if (resolve_model_runtime_paths(model_dir, lib_out, weights_out, out_size, NULL)) {
                 closedir(dir);
                 return true;
             }
@@ -341,11 +379,8 @@ static void list_available_models(void) {
         char model_dir[4096];
         snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
 
-        char so_path[4096];
-        snprintf(so_path, sizeof(so_path), "%s/ck-kernel-inference.so", model_dir);
-
-        struct stat st;
-        if (stat(so_path, &st) == 0) {
+        char resolved_lib[4096], resolved_bump[4096];
+        if (resolve_model_runtime_paths(model_dir, resolved_lib, resolved_bump, sizeof(resolved_lib), NULL)) {
             fprintf(stderr, "  - %s\n", entry->d_name);
             count++;
         }
@@ -404,22 +439,24 @@ static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_s
         char model_dir[4096];
         snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
 
-        char so_path[4096], bump_path[4096];
-        snprintf(so_path, sizeof(so_path), "%s/ck-kernel-inference.so", model_dir);
-        snprintf(bump_path, sizeof(bump_path), "%s/weights.bump", model_dir);
+        char resolved_lib[4096], resolved_bump[4096];
+        double resolved_weights = 0.0;
+        bool ready = resolve_model_runtime_paths(
+            model_dir,
+            resolved_lib,
+            resolved_bump,
+            sizeof(resolved_lib),
+            &resolved_weights
+        );
 
-        struct stat st_so, st_bump;
-        bool has_so = (stat(so_path, &st_so) == 0);
-        bool has_bump = (stat(bump_path, &st_bump) == 0);
-
-        if (has_so && has_bump && count < MAX_CACHED_MODELS) {
+        if (ready && count < MAX_CACHED_MODELS) {
             strncpy(model_names[count], entry->d_name, 255);
-            model_names[count][255] = '\0';
-            strncpy(so_paths[count], so_path, 4095);
-            so_paths[count][4095] = '\0';
-            strncpy(bump_paths[count], bump_path, 4095);
-            bump_paths[count][4095] = '\0';
-            weights_sizes[count] = (double)st_bump.st_size;
+            model_names[count][255] = 0;
+            strncpy(so_paths[count], resolved_lib, 4095);
+            so_paths[count][4095] = 0;
+            strncpy(bump_paths[count], resolved_bump, 4095);
+            bump_paths[count][4095] = 0;
+            weights_sizes[count] = resolved_weights;
             count++;
         } else {
             uncompiled++;
@@ -1108,21 +1145,23 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
             break;
         }
 
-        /* Process token through EOS pattern detection (buffers potential EOS tokens) */
-        if (!opt->ignore_eos &&
-            eos_pattern_process(word, out_buf, &out_len, output_token, opt->chat_template)) {
-            if (opt->verbose) {
-                fprintf(stderr, "[DEBUG] EOS detected (text pattern), stopping\n");
+        if (!opt->quiet_output) {
+            /* Process token through EOS pattern detection (buffers potential EOS tokens) */
+            if (!opt->ignore_eos &&
+                eos_pattern_process(word, out_buf, &out_len, output_token, opt->chat_template)) {
+                if (opt->verbose) {
+                    fprintf(stderr, "[DEBUG] EOS detected (text pattern), stopping\n");
+                }
+                break;
             }
-            break;
-        }
 
-        if (opt->stream) {
-            output_flush(out_buf, &out_len);
-            fflush(stdout);
-        } else if (out_len > (CK_CLI_OUTPUT_BUF_SIZE / 2)) {
-            output_flush(out_buf, &out_len);
-            fflush(stdout);
+            if (opt->stream) {
+                output_flush(out_buf, &out_len);
+                fflush(stdout);
+            } else if (out_len > (CK_CLI_OUTPUT_BUF_SIZE / 2)) {
+                output_flush(out_buf, &out_len);
+                fflush(stdout);
+            }
         }
 
         if (generated + 1 >= max_tokens) break;
@@ -1143,8 +1182,10 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
 
     #undef SAMPLE_NEXT_TOKEN
     g_generation_active = 0;
-    output_flush(out_buf, &out_len);
-    printf("\n");
+    if (!opt->quiet_output) {
+        output_flush(out_buf, &out_len);
+        printf("\n");
+    }
 
     if (opt->timing) {
         double total_ms = g_prefill_time_ms + g_decode_time_ms;
@@ -1226,6 +1267,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  --temperature, -T F     Sampling temperature (default: 0.0 = greedy)\n");
     fprintf(stderr, "  --top-p F               Nucleus sampling top-p (default: 0.9)\n");
     fprintf(stderr, "  --stream, -s            Stream tokens as generated\n");
+    fprintf(stderr, "  --quiet-output          Suppress generated text output (profiling/noise-free)\n");
     fprintf(stderr, "  --timing, -t            Show timing breakdown\n");
     fprintf(stderr, "  --no-chat-template      Disable chat template formatting\n");
     fprintf(stderr, "  --eos IDS               Comma-separated EOS token IDs\n");
@@ -1294,6 +1336,8 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
             opt->stream = true;
         } else if (!strcmp(arg, "--no-stream")) {
             opt->stream = false;
+        } else if (!strcmp(arg, "--quiet-output")) {
+            opt->quiet_output = true;
         } else if (!strcmp(arg, "--timing") || !strcmp(arg, "-t")) {
             opt->timing = true;
         } else if (!strcmp(arg, "--no-timing")) {

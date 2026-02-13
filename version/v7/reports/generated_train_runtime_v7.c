@@ -144,12 +144,6 @@ static float grad_act_act_Sfooter_logits_0_y[CK_TENSOR_CAP_F32]; /* grad.act.act
 static float grad_act_act_Sfooter_rmsnorm_0_output[CK_TENSOR_CAP_F32]; /* grad.act.act.Sfooter.rmsnorm.0.output */
 static float grad_act_act_Sheader_dense_embedding_lookup_0_out[CK_TENSOR_CAP_F32]; /* grad.act.act.Sheader.dense_embedding_lookup.0.out */
 static float grad_weight_final_ln_weight[CK_TENSOR_CAP_F32]; /* grad.weight.final_ln_weight */
-static float grad_weight_layer_0_b1[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.b1 */
-static float grad_weight_layer_0_b2[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.b2 */
-static float grad_weight_layer_0_bk[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.bk */
-static float grad_weight_layer_0_bo[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.bo */
-static float grad_weight_layer_0_bq[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.bq */
-static float grad_weight_layer_0_bv[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.bv */
 static float grad_weight_layer_0_k_norm[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.k_norm */
 static float grad_weight_layer_0_ln1_gamma[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.ln1_gamma */
 static float grad_weight_layer_0_ln2_gamma[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.ln2_gamma */
@@ -160,12 +154,6 @@ static float grad_weight_layer_0_wk[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.w
 static float grad_weight_layer_0_wo[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.wo */
 static float grad_weight_layer_0_wq[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.wq */
 static float grad_weight_layer_0_wv[CK_TENSOR_CAP_F32]; /* grad.weight.layer.0.wv */
-static float grad_weight_layer_1_b1[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.b1 */
-static float grad_weight_layer_1_b2[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.b2 */
-static float grad_weight_layer_1_bk[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.bk */
-static float grad_weight_layer_1_bo[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.bo */
-static float grad_weight_layer_1_bq[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.bq */
-static float grad_weight_layer_1_bv[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.bv */
 static float grad_weight_layer_1_k_norm[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.k_norm */
 static float grad_weight_layer_1_ln1_gamma[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.ln1_gamma */
 static float grad_weight_layer_1_ln2_gamma[CK_TENSOR_CAP_F32]; /* grad.weight.layer.1.ln2_gamma */
@@ -223,46 +211,28 @@ static float tmp_grad_act_op8_v[CK_TENSOR_CAP_F32]; /* tmp.grad.act.op8.v */
 static float tmp_grad_act_op9_input[CK_TENSOR_CAP_F32]; /* tmp.grad.act.op9.input */
 static float tmp_grad_weight_op11_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op11.gamma */
 static float tmp_grad_weight_op12_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op12.W */
-static float tmp_grad_weight_op12_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op12.bias */
 static float tmp_grad_weight_op14_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op14.W */
-static float tmp_grad_weight_op14_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op14.bias */
 static float tmp_grad_weight_op16_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op16.gamma */
 static float tmp_grad_weight_op17_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op17.W */
-static float tmp_grad_weight_op17_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op17.bias */
 static float tmp_grad_weight_op18_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op18.W */
-static float tmp_grad_weight_op18_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op18.bias */
 static float tmp_grad_weight_op19_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op19.W */
-static float tmp_grad_weight_op19_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op19.bias */
 static float tmp_grad_weight_op1_weight[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op1.weight */
 static float tmp_grad_weight_op20_k_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op20.k_gamma */
 static float tmp_grad_weight_op20_q_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op20.q_gamma */
 static float tmp_grad_weight_op23_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op23.W */
-static float tmp_grad_weight_op23_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op23.bias */
 static float tmp_grad_weight_op25_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op25.gamma */
 static float tmp_grad_weight_op26_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op26.W */
-static float tmp_grad_weight_op26_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op26.bias */
 static float tmp_grad_weight_op28_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op28.W */
-static float tmp_grad_weight_op28_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op28.bias */
 static float tmp_grad_weight_op2_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op2.gamma */
 static float tmp_grad_weight_op30_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op30.gamma */
 static float tmp_grad_weight_op32_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op32.W */
 static float tmp_grad_weight_op3_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op3.W */
-static float tmp_grad_weight_op3_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op3.bias */
 static float tmp_grad_weight_op4_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op4.W */
-static float tmp_grad_weight_op4_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op4.bias */
 static float tmp_grad_weight_op5_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op5.W */
-static float tmp_grad_weight_op5_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op5.bias */
 static float tmp_grad_weight_op6_k_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op6.k_gamma */
 static float tmp_grad_weight_op6_q_gamma[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op6.q_gamma */
 static float tmp_grad_weight_op9_W[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op9.W */
-static float tmp_grad_weight_op9_bias[CK_TENSOR_CAP_F32]; /* tmp.grad.weight.op9.bias */
 static float weight_final_ln_weight[CK_TENSOR_CAP_F32]; /* weight.final_ln_weight */
-static float weight_layer_0_b1[CK_TENSOR_CAP_F32]; /* weight.layer.0.b1 */
-static float weight_layer_0_b2[CK_TENSOR_CAP_F32]; /* weight.layer.0.b2 */
-static float weight_layer_0_bk[CK_TENSOR_CAP_F32]; /* weight.layer.0.bk */
-static float weight_layer_0_bo[CK_TENSOR_CAP_F32]; /* weight.layer.0.bo */
-static float weight_layer_0_bq[CK_TENSOR_CAP_F32]; /* weight.layer.0.bq */
-static float weight_layer_0_bv[CK_TENSOR_CAP_F32]; /* weight.layer.0.bv */
 static float weight_layer_0_k_norm[CK_TENSOR_CAP_F32]; /* weight.layer.0.k_norm */
 static float weight_layer_0_ln1_gamma[CK_TENSOR_CAP_F32]; /* weight.layer.0.ln1_gamma */
 static float weight_layer_0_ln2_gamma[CK_TENSOR_CAP_F32]; /* weight.layer.0.ln2_gamma */
@@ -273,12 +243,6 @@ static float weight_layer_0_wk[CK_TENSOR_CAP_F32]; /* weight.layer.0.wk */
 static float weight_layer_0_wo[CK_TENSOR_CAP_F32]; /* weight.layer.0.wo */
 static float weight_layer_0_wq[CK_TENSOR_CAP_F32]; /* weight.layer.0.wq */
 static float weight_layer_0_wv[CK_TENSOR_CAP_F32]; /* weight.layer.0.wv */
-static float weight_layer_1_b1[CK_TENSOR_CAP_F32]; /* weight.layer.1.b1 */
-static float weight_layer_1_b2[CK_TENSOR_CAP_F32]; /* weight.layer.1.b2 */
-static float weight_layer_1_bk[CK_TENSOR_CAP_F32]; /* weight.layer.1.bk */
-static float weight_layer_1_bo[CK_TENSOR_CAP_F32]; /* weight.layer.1.bo */
-static float weight_layer_1_bq[CK_TENSOR_CAP_F32]; /* weight.layer.1.bq */
-static float weight_layer_1_bv[CK_TENSOR_CAP_F32]; /* weight.layer.1.bv */
 static float weight_layer_1_k_norm[CK_TENSOR_CAP_F32]; /* weight.layer.1.k_norm */
 static float weight_layer_1_ln1_gamma[CK_TENSOR_CAP_F32]; /* weight.layer.1.ln1_gamma */
 static float weight_layer_1_ln2_gamma[CK_TENSOR_CAP_F32]; /* weight.layer.1.ln2_gamma */
@@ -296,18 +260,6 @@ static int32_t input_token_ids[CK_TENSOR_CAP_I32]; /* input.token_ids */
 /* Optimizer state (AdamW moments) */
 static float m_final_ln_weight[CK_TENSOR_CAP_F32];
 static float v_final_ln_weight[CK_TENSOR_CAP_F32];
-static float m_layer_0_b1[CK_TENSOR_CAP_F32];
-static float v_layer_0_b1[CK_TENSOR_CAP_F32];
-static float m_layer_0_b2[CK_TENSOR_CAP_F32];
-static float v_layer_0_b2[CK_TENSOR_CAP_F32];
-static float m_layer_0_bk[CK_TENSOR_CAP_F32];
-static float v_layer_0_bk[CK_TENSOR_CAP_F32];
-static float m_layer_0_bo[CK_TENSOR_CAP_F32];
-static float v_layer_0_bo[CK_TENSOR_CAP_F32];
-static float m_layer_0_bq[CK_TENSOR_CAP_F32];
-static float v_layer_0_bq[CK_TENSOR_CAP_F32];
-static float m_layer_0_bv[CK_TENSOR_CAP_F32];
-static float v_layer_0_bv[CK_TENSOR_CAP_F32];
 static float m_layer_0_k_norm[CK_TENSOR_CAP_F32];
 static float v_layer_0_k_norm[CK_TENSOR_CAP_F32];
 static float m_layer_0_ln1_gamma[CK_TENSOR_CAP_F32];
@@ -316,18 +268,18 @@ static float m_layer_0_ln2_gamma[CK_TENSOR_CAP_F32];
 static float v_layer_0_ln2_gamma[CK_TENSOR_CAP_F32];
 static float m_layer_0_q_norm[CK_TENSOR_CAP_F32];
 static float v_layer_0_q_norm[CK_TENSOR_CAP_F32];
-static float m_layer_1_b1[CK_TENSOR_CAP_F32];
-static float v_layer_1_b1[CK_TENSOR_CAP_F32];
-static float m_layer_1_b2[CK_TENSOR_CAP_F32];
-static float v_layer_1_b2[CK_TENSOR_CAP_F32];
-static float m_layer_1_bk[CK_TENSOR_CAP_F32];
-static float v_layer_1_bk[CK_TENSOR_CAP_F32];
-static float m_layer_1_bo[CK_TENSOR_CAP_F32];
-static float v_layer_1_bo[CK_TENSOR_CAP_F32];
-static float m_layer_1_bq[CK_TENSOR_CAP_F32];
-static float v_layer_1_bq[CK_TENSOR_CAP_F32];
-static float m_layer_1_bv[CK_TENSOR_CAP_F32];
-static float v_layer_1_bv[CK_TENSOR_CAP_F32];
+static float m_layer_0_w1[CK_TENSOR_CAP_F32];
+static float v_layer_0_w1[CK_TENSOR_CAP_F32];
+static float m_layer_0_w2[CK_TENSOR_CAP_F32];
+static float v_layer_0_w2[CK_TENSOR_CAP_F32];
+static float m_layer_0_wk[CK_TENSOR_CAP_F32];
+static float v_layer_0_wk[CK_TENSOR_CAP_F32];
+static float m_layer_0_wo[CK_TENSOR_CAP_F32];
+static float v_layer_0_wo[CK_TENSOR_CAP_F32];
+static float m_layer_0_wq[CK_TENSOR_CAP_F32];
+static float v_layer_0_wq[CK_TENSOR_CAP_F32];
+static float m_layer_0_wv[CK_TENSOR_CAP_F32];
+static float v_layer_0_wv[CK_TENSOR_CAP_F32];
 static float m_layer_1_k_norm[CK_TENSOR_CAP_F32];
 static float v_layer_1_k_norm[CK_TENSOR_CAP_F32];
 static float m_layer_1_ln1_gamma[CK_TENSOR_CAP_F32];
@@ -336,6 +288,20 @@ static float m_layer_1_ln2_gamma[CK_TENSOR_CAP_F32];
 static float v_layer_1_ln2_gamma[CK_TENSOR_CAP_F32];
 static float m_layer_1_q_norm[CK_TENSOR_CAP_F32];
 static float v_layer_1_q_norm[CK_TENSOR_CAP_F32];
+static float m_layer_1_w1[CK_TENSOR_CAP_F32];
+static float v_layer_1_w1[CK_TENSOR_CAP_F32];
+static float m_layer_1_w2[CK_TENSOR_CAP_F32];
+static float v_layer_1_w2[CK_TENSOR_CAP_F32];
+static float m_layer_1_wk[CK_TENSOR_CAP_F32];
+static float v_layer_1_wk[CK_TENSOR_CAP_F32];
+static float m_layer_1_wo[CK_TENSOR_CAP_F32];
+static float v_layer_1_wo[CK_TENSOR_CAP_F32];
+static float m_layer_1_wq[CK_TENSOR_CAP_F32];
+static float v_layer_1_wq[CK_TENSOR_CAP_F32];
+static float m_layer_1_wv[CK_TENSOR_CAP_F32];
+static float v_layer_1_wv[CK_TENSOR_CAP_F32];
+static float m_token_emb[CK_TENSOR_CAP_F32];
+static float v_token_emb[CK_TENSOR_CAP_F32];
 static int g_opt_step = 0;
 
 void ck_train_reset_buffers(void) {
@@ -419,12 +385,6 @@ void ck_train_reset_buffers(void) {
     memset(grad_act_act_Sfooter_rmsnorm_0_output, 0, sizeof(grad_act_act_Sfooter_rmsnorm_0_output));
     memset(grad_act_act_Sheader_dense_embedding_lookup_0_out, 0, sizeof(grad_act_act_Sheader_dense_embedding_lookup_0_out));
     memset(grad_weight_final_ln_weight, 0, sizeof(grad_weight_final_ln_weight));
-    memset(grad_weight_layer_0_b1, 0, sizeof(grad_weight_layer_0_b1));
-    memset(grad_weight_layer_0_b2, 0, sizeof(grad_weight_layer_0_b2));
-    memset(grad_weight_layer_0_bk, 0, sizeof(grad_weight_layer_0_bk));
-    memset(grad_weight_layer_0_bo, 0, sizeof(grad_weight_layer_0_bo));
-    memset(grad_weight_layer_0_bq, 0, sizeof(grad_weight_layer_0_bq));
-    memset(grad_weight_layer_0_bv, 0, sizeof(grad_weight_layer_0_bv));
     memset(grad_weight_layer_0_k_norm, 0, sizeof(grad_weight_layer_0_k_norm));
     memset(grad_weight_layer_0_ln1_gamma, 0, sizeof(grad_weight_layer_0_ln1_gamma));
     memset(grad_weight_layer_0_ln2_gamma, 0, sizeof(grad_weight_layer_0_ln2_gamma));
@@ -435,12 +395,6 @@ void ck_train_reset_buffers(void) {
     memset(grad_weight_layer_0_wo, 0, sizeof(grad_weight_layer_0_wo));
     memset(grad_weight_layer_0_wq, 0, sizeof(grad_weight_layer_0_wq));
     memset(grad_weight_layer_0_wv, 0, sizeof(grad_weight_layer_0_wv));
-    memset(grad_weight_layer_1_b1, 0, sizeof(grad_weight_layer_1_b1));
-    memset(grad_weight_layer_1_b2, 0, sizeof(grad_weight_layer_1_b2));
-    memset(grad_weight_layer_1_bk, 0, sizeof(grad_weight_layer_1_bk));
-    memset(grad_weight_layer_1_bo, 0, sizeof(grad_weight_layer_1_bo));
-    memset(grad_weight_layer_1_bq, 0, sizeof(grad_weight_layer_1_bq));
-    memset(grad_weight_layer_1_bv, 0, sizeof(grad_weight_layer_1_bv));
     memset(grad_weight_layer_1_k_norm, 0, sizeof(grad_weight_layer_1_k_norm));
     memset(grad_weight_layer_1_ln1_gamma, 0, sizeof(grad_weight_layer_1_ln1_gamma));
     memset(grad_weight_layer_1_ln2_gamma, 0, sizeof(grad_weight_layer_1_ln2_gamma));
@@ -498,46 +452,28 @@ void ck_train_reset_buffers(void) {
     memset(tmp_grad_act_op9_input, 0, sizeof(tmp_grad_act_op9_input));
     memset(tmp_grad_weight_op11_gamma, 0, sizeof(tmp_grad_weight_op11_gamma));
     memset(tmp_grad_weight_op12_W, 0, sizeof(tmp_grad_weight_op12_W));
-    memset(tmp_grad_weight_op12_bias, 0, sizeof(tmp_grad_weight_op12_bias));
     memset(tmp_grad_weight_op14_W, 0, sizeof(tmp_grad_weight_op14_W));
-    memset(tmp_grad_weight_op14_bias, 0, sizeof(tmp_grad_weight_op14_bias));
     memset(tmp_grad_weight_op16_gamma, 0, sizeof(tmp_grad_weight_op16_gamma));
     memset(tmp_grad_weight_op17_W, 0, sizeof(tmp_grad_weight_op17_W));
-    memset(tmp_grad_weight_op17_bias, 0, sizeof(tmp_grad_weight_op17_bias));
     memset(tmp_grad_weight_op18_W, 0, sizeof(tmp_grad_weight_op18_W));
-    memset(tmp_grad_weight_op18_bias, 0, sizeof(tmp_grad_weight_op18_bias));
     memset(tmp_grad_weight_op19_W, 0, sizeof(tmp_grad_weight_op19_W));
-    memset(tmp_grad_weight_op19_bias, 0, sizeof(tmp_grad_weight_op19_bias));
     memset(tmp_grad_weight_op1_weight, 0, sizeof(tmp_grad_weight_op1_weight));
     memset(tmp_grad_weight_op20_k_gamma, 0, sizeof(tmp_grad_weight_op20_k_gamma));
     memset(tmp_grad_weight_op20_q_gamma, 0, sizeof(tmp_grad_weight_op20_q_gamma));
     memset(tmp_grad_weight_op23_W, 0, sizeof(tmp_grad_weight_op23_W));
-    memset(tmp_grad_weight_op23_bias, 0, sizeof(tmp_grad_weight_op23_bias));
     memset(tmp_grad_weight_op25_gamma, 0, sizeof(tmp_grad_weight_op25_gamma));
     memset(tmp_grad_weight_op26_W, 0, sizeof(tmp_grad_weight_op26_W));
-    memset(tmp_grad_weight_op26_bias, 0, sizeof(tmp_grad_weight_op26_bias));
     memset(tmp_grad_weight_op28_W, 0, sizeof(tmp_grad_weight_op28_W));
-    memset(tmp_grad_weight_op28_bias, 0, sizeof(tmp_grad_weight_op28_bias));
     memset(tmp_grad_weight_op2_gamma, 0, sizeof(tmp_grad_weight_op2_gamma));
     memset(tmp_grad_weight_op30_gamma, 0, sizeof(tmp_grad_weight_op30_gamma));
     memset(tmp_grad_weight_op32_W, 0, sizeof(tmp_grad_weight_op32_W));
     memset(tmp_grad_weight_op3_W, 0, sizeof(tmp_grad_weight_op3_W));
-    memset(tmp_grad_weight_op3_bias, 0, sizeof(tmp_grad_weight_op3_bias));
     memset(tmp_grad_weight_op4_W, 0, sizeof(tmp_grad_weight_op4_W));
-    memset(tmp_grad_weight_op4_bias, 0, sizeof(tmp_grad_weight_op4_bias));
     memset(tmp_grad_weight_op5_W, 0, sizeof(tmp_grad_weight_op5_W));
-    memset(tmp_grad_weight_op5_bias, 0, sizeof(tmp_grad_weight_op5_bias));
     memset(tmp_grad_weight_op6_k_gamma, 0, sizeof(tmp_grad_weight_op6_k_gamma));
     memset(tmp_grad_weight_op6_q_gamma, 0, sizeof(tmp_grad_weight_op6_q_gamma));
     memset(tmp_grad_weight_op9_W, 0, sizeof(tmp_grad_weight_op9_W));
-    memset(tmp_grad_weight_op9_bias, 0, sizeof(tmp_grad_weight_op9_bias));
     memset(weight_final_ln_weight, 0, sizeof(weight_final_ln_weight));
-    memset(weight_layer_0_b1, 0, sizeof(weight_layer_0_b1));
-    memset(weight_layer_0_b2, 0, sizeof(weight_layer_0_b2));
-    memset(weight_layer_0_bk, 0, sizeof(weight_layer_0_bk));
-    memset(weight_layer_0_bo, 0, sizeof(weight_layer_0_bo));
-    memset(weight_layer_0_bq, 0, sizeof(weight_layer_0_bq));
-    memset(weight_layer_0_bv, 0, sizeof(weight_layer_0_bv));
     memset(weight_layer_0_k_norm, 0, sizeof(weight_layer_0_k_norm));
     memset(weight_layer_0_ln1_gamma, 0, sizeof(weight_layer_0_ln1_gamma));
     memset(weight_layer_0_ln2_gamma, 0, sizeof(weight_layer_0_ln2_gamma));
@@ -548,12 +484,6 @@ void ck_train_reset_buffers(void) {
     memset(weight_layer_0_wo, 0, sizeof(weight_layer_0_wo));
     memset(weight_layer_0_wq, 0, sizeof(weight_layer_0_wq));
     memset(weight_layer_0_wv, 0, sizeof(weight_layer_0_wv));
-    memset(weight_layer_1_b1, 0, sizeof(weight_layer_1_b1));
-    memset(weight_layer_1_b2, 0, sizeof(weight_layer_1_b2));
-    memset(weight_layer_1_bk, 0, sizeof(weight_layer_1_bk));
-    memset(weight_layer_1_bo, 0, sizeof(weight_layer_1_bo));
-    memset(weight_layer_1_bq, 0, sizeof(weight_layer_1_bq));
-    memset(weight_layer_1_bv, 0, sizeof(weight_layer_1_bv));
     memset(weight_layer_1_k_norm, 0, sizeof(weight_layer_1_k_norm));
     memset(weight_layer_1_ln1_gamma, 0, sizeof(weight_layer_1_ln1_gamma));
     memset(weight_layer_1_ln2_gamma, 0, sizeof(weight_layer_1_ln2_gamma));
@@ -569,18 +499,6 @@ void ck_train_reset_buffers(void) {
     memset(input_token_ids, 0, sizeof(input_token_ids));
     memset(m_final_ln_weight, 0, sizeof(m_final_ln_weight));
     memset(v_final_ln_weight, 0, sizeof(v_final_ln_weight));
-    memset(m_layer_0_b1, 0, sizeof(m_layer_0_b1));
-    memset(v_layer_0_b1, 0, sizeof(v_layer_0_b1));
-    memset(m_layer_0_b2, 0, sizeof(m_layer_0_b2));
-    memset(v_layer_0_b2, 0, sizeof(v_layer_0_b2));
-    memset(m_layer_0_bk, 0, sizeof(m_layer_0_bk));
-    memset(v_layer_0_bk, 0, sizeof(v_layer_0_bk));
-    memset(m_layer_0_bo, 0, sizeof(m_layer_0_bo));
-    memset(v_layer_0_bo, 0, sizeof(v_layer_0_bo));
-    memset(m_layer_0_bq, 0, sizeof(m_layer_0_bq));
-    memset(v_layer_0_bq, 0, sizeof(v_layer_0_bq));
-    memset(m_layer_0_bv, 0, sizeof(m_layer_0_bv));
-    memset(v_layer_0_bv, 0, sizeof(v_layer_0_bv));
     memset(m_layer_0_k_norm, 0, sizeof(m_layer_0_k_norm));
     memset(v_layer_0_k_norm, 0, sizeof(v_layer_0_k_norm));
     memset(m_layer_0_ln1_gamma, 0, sizeof(m_layer_0_ln1_gamma));
@@ -589,18 +507,18 @@ void ck_train_reset_buffers(void) {
     memset(v_layer_0_ln2_gamma, 0, sizeof(v_layer_0_ln2_gamma));
     memset(m_layer_0_q_norm, 0, sizeof(m_layer_0_q_norm));
     memset(v_layer_0_q_norm, 0, sizeof(v_layer_0_q_norm));
-    memset(m_layer_1_b1, 0, sizeof(m_layer_1_b1));
-    memset(v_layer_1_b1, 0, sizeof(v_layer_1_b1));
-    memset(m_layer_1_b2, 0, sizeof(m_layer_1_b2));
-    memset(v_layer_1_b2, 0, sizeof(v_layer_1_b2));
-    memset(m_layer_1_bk, 0, sizeof(m_layer_1_bk));
-    memset(v_layer_1_bk, 0, sizeof(v_layer_1_bk));
-    memset(m_layer_1_bo, 0, sizeof(m_layer_1_bo));
-    memset(v_layer_1_bo, 0, sizeof(v_layer_1_bo));
-    memset(m_layer_1_bq, 0, sizeof(m_layer_1_bq));
-    memset(v_layer_1_bq, 0, sizeof(v_layer_1_bq));
-    memset(m_layer_1_bv, 0, sizeof(m_layer_1_bv));
-    memset(v_layer_1_bv, 0, sizeof(v_layer_1_bv));
+    memset(m_layer_0_w1, 0, sizeof(m_layer_0_w1));
+    memset(v_layer_0_w1, 0, sizeof(v_layer_0_w1));
+    memset(m_layer_0_w2, 0, sizeof(m_layer_0_w2));
+    memset(v_layer_0_w2, 0, sizeof(v_layer_0_w2));
+    memset(m_layer_0_wk, 0, sizeof(m_layer_0_wk));
+    memset(v_layer_0_wk, 0, sizeof(v_layer_0_wk));
+    memset(m_layer_0_wo, 0, sizeof(m_layer_0_wo));
+    memset(v_layer_0_wo, 0, sizeof(v_layer_0_wo));
+    memset(m_layer_0_wq, 0, sizeof(m_layer_0_wq));
+    memset(v_layer_0_wq, 0, sizeof(v_layer_0_wq));
+    memset(m_layer_0_wv, 0, sizeof(m_layer_0_wv));
+    memset(v_layer_0_wv, 0, sizeof(v_layer_0_wv));
     memset(m_layer_1_k_norm, 0, sizeof(m_layer_1_k_norm));
     memset(v_layer_1_k_norm, 0, sizeof(v_layer_1_k_norm));
     memset(m_layer_1_ln1_gamma, 0, sizeof(m_layer_1_ln1_gamma));
@@ -609,6 +527,20 @@ void ck_train_reset_buffers(void) {
     memset(v_layer_1_ln2_gamma, 0, sizeof(v_layer_1_ln2_gamma));
     memset(m_layer_1_q_norm, 0, sizeof(m_layer_1_q_norm));
     memset(v_layer_1_q_norm, 0, sizeof(v_layer_1_q_norm));
+    memset(m_layer_1_w1, 0, sizeof(m_layer_1_w1));
+    memset(v_layer_1_w1, 0, sizeof(v_layer_1_w1));
+    memset(m_layer_1_w2, 0, sizeof(m_layer_1_w2));
+    memset(v_layer_1_w2, 0, sizeof(v_layer_1_w2));
+    memset(m_layer_1_wk, 0, sizeof(m_layer_1_wk));
+    memset(v_layer_1_wk, 0, sizeof(v_layer_1_wk));
+    memset(m_layer_1_wo, 0, sizeof(m_layer_1_wo));
+    memset(v_layer_1_wo, 0, sizeof(v_layer_1_wo));
+    memset(m_layer_1_wq, 0, sizeof(m_layer_1_wq));
+    memset(v_layer_1_wq, 0, sizeof(v_layer_1_wq));
+    memset(m_layer_1_wv, 0, sizeof(m_layer_1_wv));
+    memset(v_layer_1_wv, 0, sizeof(v_layer_1_wv));
+    memset(m_token_emb, 0, sizeof(m_token_emb));
+    memset(v_token_emb, 0, sizeof(v_token_emb));
     g_opt_step = 0;
     g_loss_scalar[0] = 0.0f;
 }
@@ -624,13 +556,13 @@ int ck_train_forward_step(void) {
     rmsnorm_forward(act_Sheader_dense_embedding_lookup_0_out, weight_layer_0_ln1_gamma, act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_rstd_cache, CK_NUM_TOKENS, 1024, 1024, 1e-5f);
     call_count++;
     /* op_id=3 op=q_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, weight_layer_0_bq, act_L0_q_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_q_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=4 op=k_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, weight_layer_0_bk, act_L0_k_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_k_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=5 op=v_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, weight_layer_0_bv, act_L0_v_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_rmsnorm_0_output, act_L0_v_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=6 op=qk_norm kernel_id=qk_norm_forward */
     qk_norm_forward(act_L0_q_proj_0_y, act_L0_k_proj_0_y, weight_layer_0_q_norm, weight_layer_0_k_norm, 16, 8, CK_NUM_TOKENS, 128, 1e-5f);
@@ -642,7 +574,7 @@ int ck_train_forward_step(void) {
     attention_forward_causal_head_major_gqa_flash_strided(act_L0_rope_qk_0_q, act_L0_rope_qk_0_k, act_L0_v_proj_0_y, act_L0_attn_0_out, 16, 8, CK_NUM_TOKENS, 128, 128, CK_NUM_TOKENS);
     call_count++;
     /* op_id=9 op=out_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_attn_0_out, act_L0_attn_0_out, weight_layer_0_bo, act_L0_out_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_attn_0_out, act_L0_attn_0_out, act_L0_attn_0_out, act_L0_out_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=10 op=residual_add kernel_id=ck_residual_add_token_major */
     ck_residual_add_token_major(act_L0_out_proj_0_y, act_Sheader_dense_embedding_lookup_0_out, act_L0_residual_add_0_out, CK_NUM_TOKENS, 1024);
@@ -651,13 +583,13 @@ int ck_train_forward_step(void) {
     rmsnorm_forward(act_L0_residual_add_0_out, weight_layer_0_ln2_gamma, act_L0_rmsnorm_1_output, act_L0_rmsnorm_1_rstd_cache, CK_NUM_TOKENS, 1024, 1024, 1e-5f);
     call_count++;
     /* op_id=12 op=mlp_gate_up kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_rmsnorm_1_output, act_L0_rmsnorm_1_output, weight_layer_0_b1, act_L0_mlp_gate_up_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_rmsnorm_1_output, act_L0_rmsnorm_1_output, act_L0_rmsnorm_1_output, act_L0_mlp_gate_up_0_y, 1, 1, 1);
     call_count++;
     /* op_id=13 op=silu_mul kernel_id=swiglu_forward */
     swiglu_forward(act_L0_mlp_gate_up_0_y, act_L0_silu_mul_0_out, CK_NUM_TOKENS, 1);
     call_count++;
     /* op_id=14 op=mlp_down kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L0_silu_mul_0_out, act_L0_silu_mul_0_out, weight_layer_0_b2, act_L0_mlp_down_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L0_silu_mul_0_out, act_L0_silu_mul_0_out, act_L0_silu_mul_0_out, act_L0_mlp_down_0_y, 1, 1, 1);
     call_count++;
     /* op_id=15 op=residual_add kernel_id=ck_residual_add_token_major */
     ck_residual_add_token_major(act_L0_mlp_down_0_y, act_L0_residual_add_0_out, act_L0_residual_add_1_out, CK_NUM_TOKENS, 1024);
@@ -666,13 +598,13 @@ int ck_train_forward_step(void) {
     rmsnorm_forward(act_L0_residual_add_1_out, weight_layer_1_ln1_gamma, act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_rstd_cache, CK_NUM_TOKENS, 1024, 1024, 1e-5f);
     call_count++;
     /* op_id=17 op=q_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, weight_layer_1_bq, act_L1_q_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_q_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=18 op=k_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, weight_layer_1_bk, act_L1_k_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_k_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=19 op=v_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, weight_layer_1_bv, act_L1_v_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_rmsnorm_0_output, act_L1_v_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=20 op=qk_norm kernel_id=qk_norm_forward */
     qk_norm_forward(act_L1_q_proj_0_y, act_L1_k_proj_0_y, weight_layer_1_q_norm, weight_layer_1_k_norm, 16, 8, CK_NUM_TOKENS, 128, 1e-5f);
@@ -684,7 +616,7 @@ int ck_train_forward_step(void) {
     attention_forward_causal_head_major_gqa_flash_strided(act_L1_rope_qk_0_q, act_L1_rope_qk_0_k, act_L1_v_proj_0_y, act_L1_attn_0_out, 16, 8, CK_NUM_TOKENS, 128, 128, CK_NUM_TOKENS);
     call_count++;
     /* op_id=23 op=out_proj kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_attn_0_out, act_L1_attn_0_out, weight_layer_1_bo, act_L1_out_proj_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_attn_0_out, act_L1_attn_0_out, act_L1_attn_0_out, act_L1_out_proj_0_y, 1, 1, 1);
     call_count++;
     /* op_id=24 op=residual_add kernel_id=ck_residual_add_token_major */
     ck_residual_add_token_major(act_L1_out_proj_0_y, act_L0_residual_add_1_out, act_L1_residual_add_0_out, CK_NUM_TOKENS, 1024);
@@ -693,13 +625,13 @@ int ck_train_forward_step(void) {
     rmsnorm_forward(act_L1_residual_add_0_out, weight_layer_1_ln2_gamma, act_L1_rmsnorm_1_output, act_L1_rmsnorm_1_rstd_cache, CK_NUM_TOKENS, 1024, 1024, 1e-5f);
     call_count++;
     /* op_id=26 op=mlp_gate_up kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_rmsnorm_1_output, act_L1_rmsnorm_1_output, weight_layer_1_b1, act_L1_mlp_gate_up_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_rmsnorm_1_output, act_L1_rmsnorm_1_output, act_L1_rmsnorm_1_output, act_L1_mlp_gate_up_0_y, 1, 1, 1);
     call_count++;
     /* op_id=27 op=silu_mul kernel_id=swiglu_forward */
     swiglu_forward(act_L1_mlp_gate_up_0_y, act_L1_silu_mul_0_out, CK_NUM_TOKENS, 1);
     call_count++;
     /* op_id=28 op=mlp_down kernel_id=gemm_blocked_serial */
-    gemm_blocked_serial(act_L1_silu_mul_0_out, act_L1_silu_mul_0_out, weight_layer_1_b2, act_L1_mlp_down_0_y, 1, 1, 1);
+    gemm_blocked_serial(act_L1_silu_mul_0_out, act_L1_silu_mul_0_out, act_L1_silu_mul_0_out, act_L1_mlp_down_0_y, 1, 1, 1);
     call_count++;
     /* op_id=29 op=residual_add kernel_id=ck_residual_add_token_major */
     ck_residual_add_token_major(act_L1_mlp_down_0_y, act_L1_residual_add_0_out, act_L1_residual_add_1_out, CK_NUM_TOKENS, 1024);
@@ -715,7 +647,7 @@ int ck_train_forward_step(void) {
 }
 
 int ck_train_backward_step(void) {
-    /* backward ops: 109 */
+    /* backward ops: 97 */
     int call_count = 0;
     /* op_id=33 op=loss_backward kernel_id=softmax_cross_entropy_loss */
     softmax_cross_entropy_loss(act_Sfooter_logits_0_y, input_targets, CK_NUM_TOKENS, 151936, grad_act_act_Sfooter_logits_0_y, aux_loss);
@@ -756,292 +688,256 @@ int ck_train_backward_step(void) {
     /* op_id=45 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_w2, tmp_grad_weight_op28_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=46 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_b2, tmp_grad_weight_op28_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=47 op=silu_mul_backward_core kernel_id=swiglu_backward_exact */
+    /* op_id=46 op=silu_mul_backward_core kernel_id=swiglu_backward_exact */
     swiglu_backward_exact(grad_act_act_L1_silu_mul_0_out, grad_act_act_L1_silu_mul_0_out, tmp_grad_act_op27_input, CK_NUM_TOKENS, 1);
     call_count++;
-    /* op_id=48 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=47 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_mlp_gate_up_0_y, tmp_grad_act_op27_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=49 op=mlp_gate_up_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=48 op=mlp_gate_up_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L1_mlp_gate_up_0_y, grad_act_act_L1_mlp_gate_up_0_y, grad_act_act_L1_mlp_gate_up_0_y, tmp_grad_act_op26_input, tmp_grad_act_op26_input, tmp_grad_act_op26_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=50 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=49 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rmsnorm_1_output, tmp_grad_act_op26_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=51 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=50 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_w1, tmp_grad_weight_op26_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=52 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_b1, tmp_grad_weight_op26_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=53 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
+    /* op_id=51 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
     rmsnorm_backward(grad_act_act_L1_rmsnorm_1_output, grad_act_act_L1_rmsnorm_1_output, grad_act_act_L1_rmsnorm_1_output, grad_act_act_L1_rmsnorm_1_output, tmp_grad_act_op25_input, tmp_grad_weight_op25_gamma, CK_NUM_TOKENS, 1024, 1024);
     call_count++;
-    /* op_id=54 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=52 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_residual_add_0_out, tmp_grad_act_op25_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=55 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=53 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_ln2_gamma, tmp_grad_weight_op25_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=56 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
+    /* op_id=54 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
     ck_residual_add_backward(grad_act_act_L1_residual_add_0_out, tmp_grad_act_op24_a, tmp_grad_act_op24_b, CK_NUM_TOKENS, 1024);
     call_count++;
-    /* op_id=57 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=55 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_out_proj_0_y, tmp_grad_act_op24_a, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=58 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=56 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_residual_add_1_out, tmp_grad_act_op24_b, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=59 op=out_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=57 op=out_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L1_out_proj_0_y, grad_act_act_L1_out_proj_0_y, grad_act_act_L1_out_proj_0_y, tmp_grad_act_op23_input, tmp_grad_act_op23_input, tmp_grad_act_op23_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=60 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=58 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_attn_0_out, tmp_grad_act_op23_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=61 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=59 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_wo, tmp_grad_weight_op23_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=62 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_bo, tmp_grad_weight_op23_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=63 op=attn_backward_core kernel_id=attention_backward_causal_head_major_gqa */
+    /* op_id=60 op=attn_backward_core kernel_id=attention_backward_causal_head_major_gqa */
     attention_backward_causal_head_major_gqa(grad_act_act_L1_attn_0_out, grad_act_act_L1_attn_0_out, grad_act_act_L1_attn_0_out, grad_act_act_L1_attn_0_out, grad_act_act_L1_attn_0_out, tmp_grad_act_op22_q, tmp_grad_act_op22_k, tmp_grad_act_op22_v, aux_d_scores, 16, 8, CK_NUM_TOKENS, 128, 128, 128);
     call_count++;
-    /* op_id=64 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=61 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rope_qk_0_q, tmp_grad_act_op22_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=65 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=62 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rope_qk_0_k, tmp_grad_act_op22_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=66 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=63 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_v_proj_0_y, tmp_grad_act_op22_v, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=67 op=rope_qk_backward_core kernel_id=rope_backward_qk_f32 */
+    /* op_id=64 op=rope_qk_backward_core kernel_id=rope_backward_qk_f32 */
     rope_backward_qk(grad_act_act_L1_rope_qk_0_q, grad_act_act_L1_rope_qk_0_q, tmp_grad_act_op21_q, tmp_grad_act_op21_k, grad_act_act_L1_rope_qk_0_q, grad_act_act_L1_rope_qk_0_q, 16, 8, CK_NUM_TOKENS, 128, 128, 0);
     call_count++;
-    /* op_id=68 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=65 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_qk_norm_0_q, tmp_grad_act_op21_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=69 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=66 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_qk_norm_0_k, tmp_grad_act_op21_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=70 op=qk_norm_backward_core kernel_id=qk_norm_backward_f32 */
+    /* op_id=67 op=qk_norm_backward_core kernel_id=qk_norm_backward_f32 */
     qk_norm_backward(grad_act_act_L1_qk_norm_0_q, grad_act_act_L1_qk_norm_0_q, grad_act_act_L1_qk_norm_0_q, grad_act_act_L1_qk_norm_0_q, grad_act_act_L1_qk_norm_0_q, grad_act_act_L1_qk_norm_0_q, tmp_grad_act_op20_q, tmp_grad_act_op20_q, tmp_grad_weight_op20_q_gamma, tmp_grad_weight_op20_k_gamma, 16, 8, CK_NUM_TOKENS, 128, 1e-5f);
     call_count++;
-    /* op_id=71 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=68 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_q_proj_0_y, tmp_grad_act_op20_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=72 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=69 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_k_proj_0_y, tmp_grad_act_op20_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=73 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=70 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_q_norm, tmp_grad_weight_op20_q_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=74 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=71 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_k_norm, tmp_grad_weight_op20_k_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=75 op=v_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=72 op=v_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L1_v_proj_0_y, grad_act_act_L1_v_proj_0_y, grad_act_act_L1_v_proj_0_y, tmp_grad_act_op19_input, tmp_grad_act_op19_input, tmp_grad_act_op19_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=76 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=73 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rmsnorm_0_output, tmp_grad_act_op19_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=77 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=74 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_wv, tmp_grad_weight_op19_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=78 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_bv, tmp_grad_weight_op19_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=79 op=k_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=75 op=k_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L1_k_proj_0_y, grad_act_act_L1_k_proj_0_y, grad_act_act_L1_k_proj_0_y, tmp_grad_act_op18_input, tmp_grad_act_op18_input, tmp_grad_act_op18_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=80 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=76 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rmsnorm_0_output, tmp_grad_act_op18_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=81 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=77 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_wk, tmp_grad_weight_op18_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=82 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_bk, tmp_grad_weight_op18_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=83 op=q_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=78 op=q_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L1_q_proj_0_y, grad_act_act_L1_q_proj_0_y, grad_act_act_L1_q_proj_0_y, tmp_grad_act_op17_input, tmp_grad_act_op17_input, tmp_grad_act_op17_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=84 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=79 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L1_rmsnorm_0_output, tmp_grad_act_op17_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=85 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=80 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_wq, tmp_grad_weight_op17_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=86 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_1_bq, tmp_grad_weight_op17_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=87 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
+    /* op_id=81 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
     rmsnorm_backward(grad_act_act_L1_rmsnorm_0_output, grad_act_act_L1_rmsnorm_0_output, grad_act_act_L1_rmsnorm_0_output, grad_act_act_L1_rmsnorm_0_output, tmp_grad_act_op16_input, tmp_grad_weight_op16_gamma, CK_NUM_TOKENS, 1024, 1024);
     call_count++;
-    /* op_id=88 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=82 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_residual_add_1_out, tmp_grad_act_op16_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=89 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=83 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_1_ln1_gamma, tmp_grad_weight_op16_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=90 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
+    /* op_id=84 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
     ck_residual_add_backward(grad_act_act_L0_residual_add_1_out, tmp_grad_act_op15_a, tmp_grad_act_op15_b, CK_NUM_TOKENS, 1024);
     call_count++;
-    /* op_id=91 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=85 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_mlp_down_0_y, tmp_grad_act_op15_a, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=92 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=86 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_residual_add_0_out, tmp_grad_act_op15_b, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=93 op=mlp_down_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=87 op=mlp_down_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_mlp_down_0_y, grad_act_act_L0_mlp_down_0_y, grad_act_act_L0_mlp_down_0_y, tmp_grad_act_op14_input, tmp_grad_act_op14_input, tmp_grad_act_op14_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=94 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=88 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_silu_mul_0_out, tmp_grad_act_op14_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=95 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=89 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_w2, tmp_grad_weight_op14_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=96 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_b2, tmp_grad_weight_op14_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=97 op=silu_mul_backward_core kernel_id=swiglu_backward_exact */
+    /* op_id=90 op=silu_mul_backward_core kernel_id=swiglu_backward_exact */
     swiglu_backward_exact(grad_act_act_L0_silu_mul_0_out, grad_act_act_L0_silu_mul_0_out, tmp_grad_act_op13_input, CK_NUM_TOKENS, 1);
     call_count++;
-    /* op_id=98 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=91 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_mlp_gate_up_0_y, tmp_grad_act_op13_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=99 op=mlp_gate_up_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=92 op=mlp_gate_up_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_mlp_gate_up_0_y, grad_act_act_L0_mlp_gate_up_0_y, grad_act_act_L0_mlp_gate_up_0_y, tmp_grad_act_op12_input, tmp_grad_act_op12_input, tmp_grad_act_op12_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=100 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=93 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rmsnorm_1_output, tmp_grad_act_op12_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=101 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=94 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_w1, tmp_grad_weight_op12_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=102 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_b1, tmp_grad_weight_op12_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=103 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
+    /* op_id=95 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
     rmsnorm_backward(grad_act_act_L0_rmsnorm_1_output, grad_act_act_L0_rmsnorm_1_output, grad_act_act_L0_rmsnorm_1_output, grad_act_act_L0_rmsnorm_1_output, tmp_grad_act_op11_input, tmp_grad_weight_op11_gamma, CK_NUM_TOKENS, 1024, 1024);
     call_count++;
-    /* op_id=104 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=96 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_residual_add_0_out, tmp_grad_act_op11_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=105 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=97 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_ln2_gamma, tmp_grad_weight_op11_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=106 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
+    /* op_id=98 op=residual_add_backward_core kernel_id=residual_add_backward_f32 */
     ck_residual_add_backward(grad_act_act_L0_residual_add_0_out, tmp_grad_act_op10_a, tmp_grad_act_op10_b, CK_NUM_TOKENS, 1024);
     call_count++;
-    /* op_id=107 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=99 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_out_proj_0_y, tmp_grad_act_op10_a, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=108 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=100 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_Sheader_dense_embedding_lookup_0_out, tmp_grad_act_op10_b, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=109 op=out_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=101 op=out_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_out_proj_0_y, grad_act_act_L0_out_proj_0_y, grad_act_act_L0_out_proj_0_y, tmp_grad_act_op9_input, tmp_grad_act_op9_input, tmp_grad_act_op9_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=110 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=102 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_attn_0_out, tmp_grad_act_op9_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=111 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=103 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_wo, tmp_grad_weight_op9_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=112 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_bo, tmp_grad_weight_op9_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=113 op=attn_backward_core kernel_id=attention_backward_causal_head_major_gqa */
+    /* op_id=104 op=attn_backward_core kernel_id=attention_backward_causal_head_major_gqa */
     attention_backward_causal_head_major_gqa(grad_act_act_L0_attn_0_out, grad_act_act_L0_attn_0_out, grad_act_act_L0_attn_0_out, grad_act_act_L0_attn_0_out, grad_act_act_L0_attn_0_out, tmp_grad_act_op8_q, tmp_grad_act_op8_k, tmp_grad_act_op8_v, aux_d_scores, 16, 8, CK_NUM_TOKENS, 128, 128, 128);
     call_count++;
-    /* op_id=114 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=105 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rope_qk_0_q, tmp_grad_act_op8_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=115 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=106 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rope_qk_0_k, tmp_grad_act_op8_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=116 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=107 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_v_proj_0_y, tmp_grad_act_op8_v, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=117 op=rope_qk_backward_core kernel_id=rope_backward_qk_f32 */
+    /* op_id=108 op=rope_qk_backward_core kernel_id=rope_backward_qk_f32 */
     rope_backward_qk(grad_act_act_L0_rope_qk_0_q, grad_act_act_L0_rope_qk_0_q, tmp_grad_act_op7_q, tmp_grad_act_op7_k, grad_act_act_L0_rope_qk_0_q, grad_act_act_L0_rope_qk_0_q, 16, 8, CK_NUM_TOKENS, 128, 128, 0);
     call_count++;
-    /* op_id=118 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=109 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_qk_norm_0_q, tmp_grad_act_op7_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=119 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=110 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_qk_norm_0_k, tmp_grad_act_op7_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=120 op=qk_norm_backward_core kernel_id=qk_norm_backward_f32 */
+    /* op_id=111 op=qk_norm_backward_core kernel_id=qk_norm_backward_f32 */
     qk_norm_backward(grad_act_act_L0_qk_norm_0_q, grad_act_act_L0_qk_norm_0_q, grad_act_act_L0_qk_norm_0_q, grad_act_act_L0_qk_norm_0_q, grad_act_act_L0_qk_norm_0_q, grad_act_act_L0_qk_norm_0_q, tmp_grad_act_op6_q, tmp_grad_act_op6_q, tmp_grad_weight_op6_q_gamma, tmp_grad_weight_op6_k_gamma, 16, 8, CK_NUM_TOKENS, 128, 1e-5f);
     call_count++;
-    /* op_id=121 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=112 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_q_proj_0_y, tmp_grad_act_op6_q, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=122 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=113 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_k_proj_0_y, tmp_grad_act_op6_k, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=123 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=114 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_q_norm, tmp_grad_weight_op6_q_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=124 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=115 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_k_norm, tmp_grad_weight_op6_k_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=125 op=v_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=116 op=v_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_v_proj_0_y, grad_act_act_L0_v_proj_0_y, grad_act_act_L0_v_proj_0_y, tmp_grad_act_op5_input, tmp_grad_act_op5_input, tmp_grad_act_op5_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=126 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=117 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rmsnorm_0_output, tmp_grad_act_op5_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=127 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=118 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_wv, tmp_grad_weight_op5_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=128 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_bv, tmp_grad_weight_op5_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=129 op=k_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=119 op=k_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_k_proj_0_y, grad_act_act_L0_k_proj_0_y, grad_act_act_L0_k_proj_0_y, tmp_grad_act_op4_input, tmp_grad_act_op4_input, tmp_grad_act_op4_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=130 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=120 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rmsnorm_0_output, tmp_grad_act_op4_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=131 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=121 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_wk, tmp_grad_weight_op4_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=132 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_bk, tmp_grad_weight_op4_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=133 op=q_proj_backward_core kernel_id=gemm_backward_f32 */
+    /* op_id=122 op=q_proj_backward_core kernel_id=gemm_backward_f32 */
     fc2_backward_kernel(grad_act_act_L0_q_proj_0_y, grad_act_act_L0_q_proj_0_y, grad_act_act_L0_q_proj_0_y, tmp_grad_act_op3_input, tmp_grad_act_op3_input, tmp_grad_act_op3_input, CK_NUM_TOKENS, 1024, 1024, 1);
     call_count++;
-    /* op_id=134 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=123 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_L0_rmsnorm_0_output, tmp_grad_act_op3_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=135 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=124 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_wq, tmp_grad_weight_op3_W, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=136 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
-    gradient_accumulate_f32(grad_weight_layer_0_bq, tmp_grad_weight_op3_bias, CK_TENSOR_CAP_F32);
-    call_count++;
-    /* op_id=137 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
+    /* op_id=125 op=rmsnorm_backward_core kernel_id=rmsnorm_backward */
     rmsnorm_backward(grad_act_act_L0_rmsnorm_0_output, grad_act_act_L0_rmsnorm_0_output, grad_act_act_L0_rmsnorm_0_output, grad_act_act_L0_rmsnorm_0_output, tmp_grad_act_op2_input, tmp_grad_weight_op2_gamma, CK_NUM_TOKENS, 1024, 1024);
     call_count++;
-    /* op_id=138 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=126 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_act_act_Sheader_dense_embedding_lookup_0_out, tmp_grad_act_op2_input, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=139 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=127 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_layer_0_ln1_gamma, tmp_grad_weight_op2_gamma, CK_TENSOR_CAP_F32);
     call_count++;
-    /* op_id=140 op=dense_embedding_lookup_backward_core kernel_id=embedding_backward_f32 */
+    /* op_id=128 op=dense_embedding_lookup_backward_core kernel_id=embedding_backward_f32 */
     embedding_backward(input_token_ids, CK_NUM_TOKENS, grad_act_act_Sheader_dense_embedding_lookup_0_out, tmp_grad_weight_op1_weight, aux_d_pos_embeddings, 151936, 1024, 1024, 128, 0);
     call_count++;
-    /* op_id=141 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
+    /* op_id=129 op=grad_accumulate kernel_id=gradient_accumulate_f32 */
     gradient_accumulate_f32(grad_weight_token_emb, tmp_grad_weight_op1_weight, CK_TENSOR_CAP_F32);
     call_count++;
     return call_count;
@@ -1054,27 +950,8 @@ int ck_train_optimizer_step(float lr) {
     const float weight_decay = 0.01f;
     int call_count = 0;
     g_opt_step += 1;
-    /* skipped non-fp32 optimizer params: 13 */
     /* AdamW update: final_ln_weight */
     adamw_update_f32(grad_weight_final_ln_weight, weight_final_ln_weight, m_final_ln_weight, v_final_ln_weight, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.b1 */
-    adamw_update_f32(grad_weight_layer_0_b1, weight_layer_0_b1, m_layer_0_b1, v_layer_0_b1, (size_t)6144, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.b2 */
-    adamw_update_f32(grad_weight_layer_0_b2, weight_layer_0_b2, m_layer_0_b2, v_layer_0_b2, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.bk */
-    adamw_update_f32(grad_weight_layer_0_bk, weight_layer_0_bk, m_layer_0_bk, v_layer_0_bk, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.bo */
-    adamw_update_f32(grad_weight_layer_0_bo, weight_layer_0_bo, m_layer_0_bo, v_layer_0_bo, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.bq */
-    adamw_update_f32(grad_weight_layer_0_bq, weight_layer_0_bq, m_layer_0_bq, v_layer_0_bq, (size_t)2048, lr, beta1, beta2, eps, weight_decay, g_opt_step);
-    call_count++;
-    /* AdamW update: layer.0.bv */
-    adamw_update_f32(grad_weight_layer_0_bv, weight_layer_0_bv, m_layer_0_bv, v_layer_0_bv, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
     /* AdamW update: layer.0.k_norm */
     adamw_update_f32(grad_weight_layer_0_k_norm, weight_layer_0_k_norm, m_layer_0_k_norm, v_layer_0_k_norm, (size_t)128, lr, beta1, beta2, eps, weight_decay, g_opt_step);
@@ -1088,23 +965,23 @@ int ck_train_optimizer_step(float lr) {
     /* AdamW update: layer.0.q_norm */
     adamw_update_f32(grad_weight_layer_0_q_norm, weight_layer_0_q_norm, m_layer_0_q_norm, v_layer_0_q_norm, (size_t)128, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.b1 */
-    adamw_update_f32(grad_weight_layer_1_b1, weight_layer_1_b1, m_layer_1_b1, v_layer_1_b1, (size_t)6144, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.w1 */
+    adamw_update_f32(grad_weight_layer_0_w1, weight_layer_0_w1, m_layer_0_w1, v_layer_0_w1, (size_t)6291456, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.b2 */
-    adamw_update_f32(grad_weight_layer_1_b2, weight_layer_1_b2, m_layer_1_b2, v_layer_1_b2, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.w2 */
+    adamw_update_f32(grad_weight_layer_0_w2, weight_layer_0_w2, m_layer_0_w2, v_layer_0_w2, (size_t)3145728, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.bk */
-    adamw_update_f32(grad_weight_layer_1_bk, weight_layer_1_bk, m_layer_1_bk, v_layer_1_bk, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.wk */
+    adamw_update_f32(grad_weight_layer_0_wk, weight_layer_0_wk, m_layer_0_wk, v_layer_0_wk, (size_t)1048576, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.bo */
-    adamw_update_f32(grad_weight_layer_1_bo, weight_layer_1_bo, m_layer_1_bo, v_layer_1_bo, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.wo */
+    adamw_update_f32(grad_weight_layer_0_wo, weight_layer_0_wo, m_layer_0_wo, v_layer_0_wo, (size_t)2097152, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.bq */
-    adamw_update_f32(grad_weight_layer_1_bq, weight_layer_1_bq, m_layer_1_bq, v_layer_1_bq, (size_t)2048, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.wq */
+    adamw_update_f32(grad_weight_layer_0_wq, weight_layer_0_wq, m_layer_0_wq, v_layer_0_wq, (size_t)2097152, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
-    /* AdamW update: layer.1.bv */
-    adamw_update_f32(grad_weight_layer_1_bv, weight_layer_1_bv, m_layer_1_bv, v_layer_1_bv, (size_t)1024, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    /* AdamW update: layer.0.wv */
+    adamw_update_f32(grad_weight_layer_0_wv, weight_layer_0_wv, m_layer_0_wv, v_layer_0_wv, (size_t)1048576, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
     /* AdamW update: layer.1.k_norm */
     adamw_update_f32(grad_weight_layer_1_k_norm, weight_layer_1_k_norm, m_layer_1_k_norm, v_layer_1_k_norm, (size_t)128, lr, beta1, beta2, eps, weight_decay, g_opt_step);
@@ -1117,6 +994,27 @@ int ck_train_optimizer_step(float lr) {
     call_count++;
     /* AdamW update: layer.1.q_norm */
     adamw_update_f32(grad_weight_layer_1_q_norm, weight_layer_1_q_norm, m_layer_1_q_norm, v_layer_1_q_norm, (size_t)128, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.w1 */
+    adamw_update_f32(grad_weight_layer_1_w1, weight_layer_1_w1, m_layer_1_w1, v_layer_1_w1, (size_t)6291456, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.w2 */
+    adamw_update_f32(grad_weight_layer_1_w2, weight_layer_1_w2, m_layer_1_w2, v_layer_1_w2, (size_t)3145728, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.wk */
+    adamw_update_f32(grad_weight_layer_1_wk, weight_layer_1_wk, m_layer_1_wk, v_layer_1_wk, (size_t)1048576, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.wo */
+    adamw_update_f32(grad_weight_layer_1_wo, weight_layer_1_wo, m_layer_1_wo, v_layer_1_wo, (size_t)2097152, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.wq */
+    adamw_update_f32(grad_weight_layer_1_wq, weight_layer_1_wq, m_layer_1_wq, v_layer_1_wq, (size_t)2097152, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: layer.1.wv */
+    adamw_update_f32(grad_weight_layer_1_wv, weight_layer_1_wv, m_layer_1_wv, v_layer_1_wv, (size_t)1048576, lr, beta1, beta2, eps, weight_decay, g_opt_step);
+    call_count++;
+    /* AdamW update: token_emb */
+    adamw_update_f32(grad_weight_token_emb, weight_token_emb, m_token_emb, v_token_emb, (size_t)155582464, lr, beta1, beta2, eps, weight_decay, g_opt_step);
     call_count++;
     return call_count;
 }

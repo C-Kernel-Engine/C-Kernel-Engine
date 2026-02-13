@@ -15,11 +15,13 @@ Usage:
     python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --perf-runtime cli
     python version/v7/tools/open_ir_visualizer.py --generate <model> --no-vtune
     python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --run-model hf://... --chat-template none
+    python version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline
 """
 import os
 import sys
 import json
 import base64
+import re
 import shutil
 import webbrowser
 import argparse
@@ -66,17 +68,26 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     if candidate.exists():
         if not candidate.is_dir():
             raise ValueError(f"Model path is not a directory: {candidate}")
-        if candidate.name == "ck_build":
+        if candidate.name in {"ck_build", ".ck_build"}:
             ck_build = candidate
             model_root = candidate.parent
         else:
-            ck_build = candidate / "ck_build" if (candidate / "ck_build").exists() else candidate
+            if (candidate / "ck_build").exists():
+                ck_build = candidate / "ck_build"
+            elif (candidate / ".ck_build").exists():
+                ck_build = candidate / ".ck_build"
+            else:
+                ck_build = candidate
             model_root = candidate
         return ck_build, model_root
 
     ck_build = CACHE_PATH / model_arg / "ck_build"
     if ck_build.exists():
         return ck_build, CACHE_PATH / model_arg
+
+    dot_ck_build = CACHE_PATH / model_arg / ".ck_build"
+    if dot_ck_build.exists():
+        return dot_ck_build, CACHE_PATH / model_arg
 
     model_dir = CACHE_PATH / model_arg
     if model_dir.exists():
@@ -86,11 +97,30 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     if ck_build_fallback.exists():
         return ck_build_fallback, CACHE_PATH_FALLBACK / model_arg
 
+    dot_ck_build_fallback = CACHE_PATH_FALLBACK / model_arg / ".ck_build"
+    if dot_ck_build_fallback.exists():
+        return dot_ck_build_fallback, CACHE_PATH_FALLBACK / model_arg
+
     model_dir_fallback = CACHE_PATH_FALLBACK / model_arg
     if model_dir_fallback.exists():
         return model_dir_fallback, model_dir_fallback
 
     raise ValueError(f"Model not found: {model_arg}")
+
+
+def resolve_run_target(run_arg: Path) -> tuple[Path, Path]:
+    """Resolve a run directory to (preferred_build_dir, run_root)."""
+    run_root = run_arg.expanduser().resolve()
+    if not run_root.exists():
+        raise ValueError(f"Run directory not found: {run_root}")
+    if not run_root.is_dir():
+        raise ValueError(f"Run path is not a directory: {run_root}")
+
+    if (run_root / "ck_build").exists():
+        return run_root / "ck_build", run_root
+    if (run_root / ".ck_build").exists():
+        return run_root / ".ck_build", run_root
+    return run_root, run_root
 
 
 def has_local_runnable_source(path: Path) -> bool:
@@ -258,13 +288,10 @@ def detect_model_dir_from_input(model_input: str) -> Path | None:
         return CACHE_DIR / info["path"].stem
     if input_type == "local_dir":
         local = Path(info["path"]).resolve()
-        if (local / "libmodel.so").exists() and (local / "weights.bump").exists():
-            return local
-        if (local / ".ck_build").exists():
-            return local / ".ck_build"
-        return local
+        return local.parent if local.name == ".ck_build" else local
     if input_type == "local_config":
-        return Path(info["path"]).parent / ".ck_build"
+        cfg_parent = Path(info["path"]).resolve().parent
+        return cfg_parent.parent if cfg_parent.name == ".ck_build" else cfg_parent
     return None
 
 
@@ -313,9 +340,15 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
     ]
     copied = 0
     dst_model_dir.mkdir(parents=True, exist_ok=True)
+    src_roots = [src_model_dir, src_model_dir / ".ck_build"]
     for name in artifact_names:
-        src = src_model_dir / name
-        if not src.exists():
+        src = None
+        for root in src_roots:
+            candidate = root / name
+            if candidate.exists():
+                src = candidate
+                break
+        if src is None:
             continue
         shutil.copy2(src, dst_model_dir / name)
         copied += 1
@@ -324,7 +357,11 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
 
 
 def has_model_artifact(model_root: Path, ck_build: Path, name: str) -> bool:
-    return (model_root / name).exists() or (ck_build / name).exists()
+    return (
+        (model_root / name).exists()
+        or (model_root / ".ck_build" / name).exists()
+        or (ck_build / name).exists()
+    )
 
 
 def validate_artifact_set(
@@ -442,10 +479,68 @@ def list_available_models():
     return sorted(models, key=lambda m: m["name"])
 
 
-def load_model_data(ck_build_path: Path) -> dict:
-    """Load all IR data for a model."""
-    model_name = ck_build_path.parent.name if ck_build_path.name == "ck_build" else ck_build_path.name
-    model_root = ck_build_path.parent if ck_build_path.name == "ck_build" else ck_build_path
+def collect_analysis_checkpoints(search_roots: list[Path]) -> dict | None:
+    """Load and merge analysis_checkpoint_step_*.json files by step."""
+    step_to_path: dict[int, Path] = {}
+    # Preserve root priority: earlier roots win for the same step.
+    for root in search_roots:
+        if not root.exists() or not root.is_dir():
+            continue
+        for candidate in sorted(root.glob("analysis_checkpoint_step_*.json")):
+            m = re.search(r"_step_(\d+)\.json$", candidate.name)
+            if not m:
+                continue
+            step = int(m.group(1))
+            if step not in step_to_path:
+                step_to_path[step] = candidate
+
+    checkpoints: list[dict] = []
+    for step in sorted(step_to_path.keys()):
+        p = step_to_path[step]
+        try:
+            with open(p, "r") as f:
+                payload = json.load(f)
+            if isinstance(payload, dict):
+                if "step" not in payload:
+                    payload["step"] = step
+                payload.setdefault("_source", str(p))
+                checkpoints.append(payload)
+        except Exception as e:
+            print(f"  ! analysis checkpoint {p.name}: {e}")
+
+    if not checkpoints:
+        return None
+
+    return {
+        "schema_version": "ck.analysis.v1",
+        "count": len(checkpoints),
+        "checkpoints": checkpoints,
+    }
+
+
+def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
+    """Load all IR/profile/training data for a model or run directory."""
+    if run_dir is not None:
+        model_root = run_dir
+        model_name = run_dir.name
+    else:
+        model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
+        model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path
+
+    search_roots: list[Path] = []
+    if run_dir is not None:
+        search_roots.extend([run_dir, run_dir / "ck_build", run_dir / ".ck_build"])
+    search_roots.extend([ck_build_path, model_root, model_root / ".ck_build"])
+
+    deduped_roots: list[Path] = []
+    seen_roots: set[str] = set()
+    for root in search_roots:
+        key = str(root)
+        if key in seen_roots:
+            continue
+        seen_roots.add(key)
+        deduped_roots.append(root)
+    search_roots = deduped_roots
 
     # Define required vs optional files
     REQUIRED_FILES = [
@@ -468,6 +563,13 @@ def load_model_data(ck_build_path: Path) -> dict:
         "training_parity",
         "training_step_profile",
         "training_checkpoint_policy",
+        "training_epoch_sweep",
+        "analysis_checkpoints",
+        "train_e2e",
+        "run_config",
+        "sanity_overfit",
+        "parity_report",
+        "profile_latest",
         "contract_report",
         "parity_1token",
         "qk_norm_backward_parity",
@@ -487,8 +589,7 @@ def load_model_data(ck_build_path: Path) -> dict:
     ]
 
     def model_candidates(name: str) -> list[Path]:
-        # Prefer ck_build, then model root (some runs write directly to model dir).
-        return [ck_build_path / name, model_root / name]
+        return [root / name for root in search_roots]
 
     data_files = {
         "ir1_decode": model_candidates("ir1_decode.json"),
@@ -508,6 +609,12 @@ def load_model_data(ck_build_path: Path) -> dict:
         "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_ROOT / "reports" / "training_parity_latest.json"],
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_ROOT / "reports" / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_ROOT / "reports" / "training_checkpoint_policy_latest.json"],
+        "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_ROOT / "reports" / "training_epoch_sweep_latest.json"],
+        "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_ROOT / "reports" / "train_e2e_latest.json"],
+        "run_config": model_candidates("config.json"),
+        "sanity_overfit": model_candidates("sanity_overfit.json"),
+        "parity_report": model_candidates("parity_report.json"),
+        "profile_latest": model_candidates("profile_latest.json"),
         "contract_report": model_candidates("contract_report_latest.json") + [V7_ROOT / "reports" / "contract_report_latest.json"],
         "parity_1token": model_candidates("parity_1token_latest.json") + [V7_ROOT / "reports" / "parity_1token_latest.json"],
         "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V7_ROOT / "reports" / "qk_norm_backward_parity_latest.json"],
@@ -518,11 +625,11 @@ def load_model_data(ck_build_path: Path) -> dict:
         "grad_rules": [V7_ROOT / "scripts" / "grad_rules_v7.json"],
         "manifest": model_candidates("weights_manifest.json"),
         "profile_summary": model_candidates("profile_summary.json"),
-        "perf_stat_summary": model_candidates("perf_stat_summary.json"),
-        "flamegraph_manifest": model_candidates("flamegraph_manifest.json"),
-        "vtune_summary": model_candidates("vtune_summary.json"),
-        "memory_signoff": model_candidates("memory_signoff.json"),
-        "perf_gate_report": model_candidates("perf_gate_report.json"),
+        "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_ROOT / "reports" / "perf_stat_summary.json"],
+        "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_ROOT / "reports" / "flamegraph_manifest.json"],
+        "vtune_summary": model_candidates("vtune_summary.json") + [V7_ROOT / "reports" / "vtune_summary.json"],
+        "memory_signoff": model_candidates("memory_signoff.json") + [V7_ROOT / "reports" / "memory_signoff.json"],
+        "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_ROOT / "reports" / "perf_gate_report.json"],
         "kernel_registry": [V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
     }
 
@@ -530,6 +637,7 @@ def load_model_data(ck_build_path: Path) -> dict:
         "meta": {
             "model": model_name,
             "path": str(ck_build_path),
+            "run_dir": str(run_dir) if run_dir is not None else None,
             "warnings": [],
         },
         "files": {}
@@ -557,6 +665,14 @@ def load_model_data(ck_build_path: Path) -> dict:
                 missing_required.append(key)
             else:
                 missing_optional.append(key)
+
+    analysis_roots = [*search_roots, V7_ROOT / "reports"]
+    analysis_payload = collect_analysis_checkpoints(analysis_roots)
+    if analysis_payload is not None:
+        data["files"]["analysis_checkpoints"] = analysis_payload
+        loaded.append("analysis_checkpoints")
+    else:
+        missing_optional.append("analysis_checkpoints")
 
     # Enrich artifacts for standalone report portability.
     flame = data["files"].get("flamegraph_manifest")
@@ -639,15 +755,15 @@ def load_model_data(ck_build_path: Path) -> dict:
     return data
 
 
-def generate_html_report(ck_build_path: Path, output_path: Path = None):
+def generate_html_report(ck_build_path: Path, output_path: Path = None, run_dir: Path | None = None):
     """Generate standalone HTML report."""
     from datetime import datetime
 
-    model_name = ck_build_path.parent.name if ck_build_path.name == "ck_build" else ck_build_path.name
+    model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
     print(f"Generating report for: {model_name}")
 
     # Load data
-    data = load_model_data(ck_build_path)
+    data = load_model_data(ck_build_path, run_dir=run_dir)
     data["meta"]["generated_at"] = datetime.now().isoformat()
     data["meta"]["engine_version"] = "v7"
 
@@ -735,6 +851,11 @@ Examples:
         help="Output path for generated HTML (default: ck_build/ir_report.html)"
     )
     parser.add_argument(
+        "--run",
+        type=Path,
+        help="Run directory produced by cks-v7-run (single source of training/profile artifacts)"
+    )
+    parser.add_argument(
         "--run-model",
         type=str,
         help="Explicit model input for runtime probes/profile (hf://..., .gguf, or source checkpoint dir)"
@@ -810,13 +931,18 @@ Examples:
     # Operator-first default:
     # `--generate <model>` should produce a fully populated report unless explicitly disabled.
     if args.html_only:
+        if args.with_profile or args.with_probes:
+            print("Note: --html-only ignores --with-profile/--with-probes and only renders existing artifacts.")
         args.with_profile = False
         args.with_probes = False
-    elif args.generate and args.model and not args.with_profile and not args.with_probes:
-        args.with_probes = True
-        if not args.force_compile:
-            args.force_compile = True
-        print("Defaulting to full generation: enabling --with-probes --force-compile (use --html-only for quick HTML-only output).")
+    elif args.generate and (args.model or args.run) and not args.with_profile and not args.with_probes:
+        if args.run and not args.model:
+            print("Defaulting to artifact-only generation for --run (use --with-probes/--with-profile for active capture).")
+        else:
+            args.with_probes = True
+            if not args.force_compile:
+                args.force_compile = True
+            print("Defaulting to full generation: enabling --with-probes --force-compile (use --html-only for quick HTML-only output).")
 
     if args.list:
         print("Available models in cache:")
@@ -825,18 +951,31 @@ Examples:
             print(f"  - {m['name']} ({status})")
         return
 
-    if (args.with_profile or args.with_probes) and not args.model:
-        parser.error("--with-profile/--with-probes require a model argument")
+    if (args.with_profile or args.with_probes) and not (args.model or args.run):
+        parser.error("--with-profile/--with-probes require --run or a model argument")
 
-    if args.model:
-        try:
-            ck_build, model_root = resolve_model_target(args.model)
-        except ValueError as e:
-            print(f"Error: {e}")
-            print("\nAvailable models:")
-            for m in list_available_models():
-                print(f"  - {m['name']}")
-            return
+    run_dir: Path | None = None
+
+    if args.model or args.run:
+
+        if args.run:
+            try:
+                ck_build, run_dir = resolve_run_target(args.run)
+                model_root = run_dir
+            except ValueError as e:
+                print(f"Error: {e}")
+                return
+            if args.model:
+                print("Note: --run provided; positional model is ignored for artifact loading.")
+        else:
+            try:
+                ck_build, model_root = resolve_model_target(args.model)
+            except ValueError as e:
+                print(f"Error: {e}")
+                print("\nAvailable models:")
+                for m in list_available_models():
+                    print(f"  - {m['name']}")
+                return
 
         maybe_interactive_configure(args, model_root)
 
@@ -1067,8 +1206,8 @@ Examples:
                     print("Tip: rerun with explicit model source or disable optional stages (e.g., --no-vtune).")
 
         # Generate report
-        output = args.output or ck_build / "ir_report.html"
-        report_path = generate_html_report(ck_build, output)
+        output = args.output or ((run_dir or model_root) / "ir_report.html")
+        report_path = generate_html_report(ck_build, output, run_dir=run_dir)
         print(f"\nGenerated: {report_path}")
 
         if not args.generate:
