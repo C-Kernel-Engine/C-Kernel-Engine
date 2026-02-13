@@ -1164,6 +1164,104 @@ Layer 15, Neuron 847:
   layer_22_attn_o[0x1A2000]:   0.0089  ← highest!
   </pre>
 
+  <h2>Mechanistic First Pass (v6.6, Before v7 Training)</h2>
+
+  <p>
+    A practical first protocol should be <strong>small, repeatable, and comparable across models</strong>.
+    Use the same prompts, token index, and context length each run.
+  </p>
+
+  <div class="card card-accent">
+    <h3 style="margin-top: 0;">Protocol Goals</h3>
+    <ul>
+      <li>Verify dataflow is numerically healthy at early layers (L0/L1/L2/L3)</li>
+      <li>Capture stable activation snapshots for the same prompt/token across model families</li>
+      <li>Localize first divergence point before changing kernels or training code</li>
+      <li>Build a baseline archive to compare against v7 training checkpoints</li>
+    </ul>
+  </div>
+
+  <h3>Step 1: Run a Stable Repro Case</h3>
+  <pre><code class="language-bash"># Use one fixed model + prompt + token budget
+python3 version/v6.6/scripts/ck_run_v6_6.py run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 --max-tokens 32 --force-compile --force-convert \
+  --prompt "Explain why matrix multiplication is associative."</code></pre>
+
+  <h3>Step 2: Probe Layer-Level Sanity (L0+)</h3>
+  <pre><code class="language-bash">python version/v6.6/test/test_layer_by_layer.py \
+  --model ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
+  --token 25</code></pre>
+  <p>
+    This validates embedding and early-layer weight/normalization integrity without needing full decode analysis.
+  </p>
+
+  <h3>Step 3: Capture Stop-Point Activations</h3>
+  <pre><code class="language-bash">python version/v6.6/test/v6_6_comprehensive_debug.py \
+  --model-dir ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
+  --token 25 --stop-at 5 --threads 1 --context-len 1024</code></pre>
+  <p>
+    Repeat with increasing <code>--stop-at</code> to walk the pipeline in order
+    (embedding → norm → q/k/v proj → rope → attention → out_proj).
+  </p>
+
+  <h3>Step 4: Locate First Divergence</h3>
+  <pre><code class="language-bash">python version/v6.6/test/trace_divergence.py \
+  --model ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
+  --token 25 --threads 1 --context-len 1024</code></pre>
+  <p>
+    Use this to identify the first failing op. That op is your intervention boundary for mechanistic analysis.
+  </p>
+
+  <h3>Step 5: Use IR Visualizer as the Analysis Surface</h3>
+  <pre><code class="language-bash">python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF</code></pre>
+  <ul>
+    <li><strong>Interpretability tab:</strong> inspect math blocks and generated dump instrumentation.</li>
+    <li><strong>Dataflow tab:</strong> confirm producer/consumer chain for suspect ops.</li>
+    <li><strong>Profile tab:</strong> validate hotspot shifts are expected when changing kernels.</li>
+  </ul>
+
+  <h3>Attention Heads: Current and Next</h3>
+  <div class="card">
+    <p>
+      In v6.6, attention is already head-major and GQA-aware in kernel contracts, so head-level analysis is structurally possible.
+      Current workflow is op-level plus tensor dump tracing.
+    </p>
+    <p>
+      The next concrete improvement is a dedicated head view:
+      per-layer, per-head attention summary for a fixed token position and prompt, loaded directly from dump artifacts.
+      This should become the first panel in v7 interpretability work.
+    </p>
+  </div>
+
+  <h3>Recommended Baseline Matrix (Before v7)</h3>
+  <table>
+    <tr>
+      <th>Model</th>
+      <th>Prompt Set</th>
+      <th>Capture</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td>Qwen2-0.5B</td>
+      <td>4 fixed prompts</td>
+      <td>L0-L3 stop-point dumps + divergence report</td>
+      <td>Legacy-stable baseline</td>
+    </tr>
+    <tr>
+      <td>Qwen3-0.6B</td>
+      <td>same prompts</td>
+      <td>L0-L3 stop-point dumps + divergence report</td>
+      <td>QK-norm + sliding behavior baseline</td>
+    </tr>
+    <tr>
+      <td>Gemma3-270M</td>
+      <td>same prompts</td>
+      <td>L0-L3 stop-point dumps + divergence report</td>
+      <td>Template/contract variance baseline</td>
+    </tr>
+  </table>
+
   <h2>Comparison with Traditional Approaches</h2>
 
   <table>
@@ -1481,7 +1579,7 @@ class TrainingObserver:
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-13</p>
             </div>
         </div>
     </footer>
