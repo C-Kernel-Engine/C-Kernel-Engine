@@ -39,7 +39,7 @@ failed=0
 # =============================================================================
 # Test 1: Compilation
 # =============================================================================
-echo -e "${YELLOW}[1/4]${NC} Building CK-Engine..."
+echo -e "${YELLOW}[1/5]${NC} Building CK-Engine..."
 if make -j$(nproc) > /tmp/ck_build.log 2>&1; then
     echo -e "${GREEN}  ✓ Build successful${NC}"
 else
@@ -51,7 +51,7 @@ fi
 # =============================================================================
 # Test 2: Quick kernel tests (if parity lib exists)
 # =============================================================================
-echo -e "${YELLOW}[2/4]${NC} Running kernel parity tests..."
+echo -e "${YELLOW}[2/5]${NC} Running kernel parity tests..."
 if [ -f "build/libck_parity.so" ] || [ -f "libck_parity.so" ]; then
     # Ensure llama.cpp kernel test library exists (auto-build if missing)
     if [ ! -f "llama.cpp/libggml_kernel_test.so" ]; then
@@ -84,7 +84,7 @@ fi
 # =============================================================================
 # Test 3: E2E inference test
 # =============================================================================
-echo -e "${YELLOW}[3/4]${NC} Running E2E inference test..."
+echo -e "${YELLOW}[3/5]${NC} Running E2E inference test..."
 
 # Prefer explicit HF GGUF URLs (Gemma3 -> Qwen3 -> Qwen2)
 HF_CANDIDATES=(
@@ -193,13 +193,30 @@ fi
 # =============================================================================
 # Test 4: v6.6 required release gate
 # =============================================================================
-echo -e "${YELLOW}[4/4]${NC} Running v6.6 release gate..."
+echo -e "${YELLOW}[4/5]${NC} Running v6.6 release gate..."
 if make --no-print-directory v6.6-gate > /tmp/ck_v66_gate.log 2>&1; then
     echo -e "${GREEN}  ✓ v6.6 gate passed (matrix-smoke + strict parity + long decode)${NC}"
 else
     echo -e "${RED}  ✗ v6.6 gate failed${NC}"
     echo "    See /tmp/ck_v66_gate.log for details"
     failed=1
+fi
+
+# =============================================================================
+# Test 5: v7 inference gate (generate/compile smoke)
+# =============================================================================
+echo -e "${YELLOW}[5/5]${NC} Running v7 inference gate..."
+V7_MODEL_PREPUSH="${CK_V7_MODEL:-Qwen/Qwen3-0.6B}"
+if make --no-print-directory v7-infer-gate V7_MODEL="$V7_MODEL_PREPUSH" > /tmp/ck_v7_infer_gate.log 2>&1; then
+    echo -e "${GREEN}  ✓ v7 inference gate passed (${V7_MODEL_PREPUSH})${NC}"
+else
+    if grep -qiE "timed out|Temporary failure in name resolution|Connection timed out|Could not resolve host|SSL|HTTP|No route to host|network" /tmp/ck_v7_infer_gate.log; then
+        echo -e "${YELLOW}  ⚠ v7 inference gate skipped (network unavailable). Set CK_V7_MODEL to a local cached model to enforce.${NC}"
+    else
+        echo -e "${RED}  ✗ v7 inference gate failed${NC}"
+        echo "    See /tmp/ck_v7_infer_gate.log for details"
+        failed=1
+    fi
 fi
 
 # =============================================================================

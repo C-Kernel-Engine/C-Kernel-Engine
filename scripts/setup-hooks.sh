@@ -6,6 +6,8 @@ cd "$ROOT_DIR"
 
 # Prefer hooksPath; fall back to symlink if user doesn't want global config change.
 git config core.hooksPath .githooks
+git config commit.template .gitmessage
 
 echo "✓ Set core.hooksPath to .githooks"
-echo "  (Pre-push checks will now run on git push)"
+echo "✓ Set commit.template to .gitmessage"
+echo "  (Pre-push checks and commit message template are now active)"
