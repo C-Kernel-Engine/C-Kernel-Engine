@@ -66,6 +66,17 @@ def _get_cache_dir() -> Path:
 
 CACHE_DIR = _get_cache_dir()
 
+
+def _get_default_report_dir() -> Path:
+    """Resolve writable v7 report directory (env override + ignored cache default)."""
+    env = os.environ.get("CK_V7_REPORT_DIR")
+    report_dir = Path(env).expanduser() if env else (V7_ROOT / ".cache" / "reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    return report_dir
+
+
+DEFAULT_REPORT_DIR = _get_default_report_dir()
+
 # Colors
 C_RESET = "\033[0m"
 C_BOLD = "\033[1m"
@@ -1243,7 +1254,7 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
     with summary_json.open("r", encoding="utf-8") as f:
         s = json.load(f)
 
-    report_dir = V7_ROOT / "reports"
+    report_dir = DEFAULT_REPORT_DIR
     report_dir.mkdir(parents=True, exist_ok=True)
 
     step = int(s.get("steps", 0) or 0)
@@ -1455,7 +1466,7 @@ def _run_train_strict_preflight(python_exec: str) -> None:
     if not validate_script.exists():
         log_error(f"Strict preflight requested but script not found: {validate_script}")
         sys.exit(1)
-    out = V7_ROOT / "reports" / "contract_report_latest.json"
+    out = DEFAULT_REPORT_DIR / "contract_report_latest.json"
     cmd = [
         python_exec,
         str(validate_script),
@@ -1491,7 +1502,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         if run_dir is not None:
             json_out = run_dir / "train_e2e_latest.json"
         else:
-            json_out = V7_ROOT / "reports" / "train_e2e_latest.json"
+            json_out = DEFAULT_REPORT_DIR / "train_e2e_latest.json"
     else:
         json_out = Path(json_out)
 
@@ -1570,7 +1581,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     elif run_dir is not None:
         profile_dir = run_dir / "profile_train_latest"
     else:
-        profile_dir = V7_ROOT / "reports" / "profile_train_latest"
+        profile_dir = DEFAULT_REPORT_DIR / "profile_train_latest"
     profile_dir.mkdir(parents=True, exist_ok=True)
     profile_meta = {
         "mode": profile_mode,
@@ -1605,7 +1616,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
                 run_cmd_allow_fail([
                     python_exec,
                     str(perf_artifacts_script),
-                    "--out-dir", str(V7_ROOT / "reports"),
+                    "--out-dir", str(DEFAULT_REPORT_DIR),
                     "--perf-stat", str(perf_stat),
                 ], cwd=PROJECT_ROOT)
         else:
@@ -1633,7 +1644,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
                 run_cmd_allow_fail([
                     python_exec,
                     str(vtune_artifacts_script),
-                    "--out-dir", str(V7_ROOT / "reports"),
+                    "--out-dir", str(DEFAULT_REPORT_DIR),
                     "--result-dir", str(result_dir),
                     "--report-text", str(text_out),
                     "--report-csv", str(csv_out),
@@ -1797,7 +1808,7 @@ def step_run_train_sanity(args: argparse.Namespace) -> None:
         if getattr(args, "run_dir", None):
             args.train_json_out = str(Path(getattr(args, "run_dir")) / "train_sanity_latest.json")
         else:
-            args.train_json_out = str(V7_ROOT / "reports" / "train_sanity_latest.json")
+            args.train_json_out = str(DEFAULT_REPORT_DIR / "train_sanity_latest.json")
 
     json_out = step_run_train_e2e(args)
     payload = json.loads(Path(json_out).read_text(encoding="utf-8"))
@@ -1826,7 +1837,7 @@ def step_run_train_sanity(args: argparse.Namespace) -> None:
         "loss_drop_pass": loss_drop_ok,
         "train_json": str(json_out),
     }
-    out = (Path(getattr(args, "run_dir")) / "sanity_overfit.json") if getattr(args, "run_dir", None) else (V7_ROOT / "reports" / "train_sanity_summary_latest.json")
+    out = (Path(getattr(args, "run_dir")) / "sanity_overfit.json") if getattr(args, "run_dir", None) else (DEFAULT_REPORT_DIR / "train_sanity_summary_latest.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
@@ -1851,13 +1862,13 @@ def step_run_train_parity(args: argparse.Namespace) -> None:
         if getattr(args, "run_dir", None):
             args.train_json_out = str(Path(getattr(args, "run_dir")) / "train_parity_latest.json")
         else:
-            args.train_json_out = str(V7_ROOT / "reports" / "train_parity_latest.json")
+            args.train_json_out = str(DEFAULT_REPORT_DIR / "train_parity_latest.json")
     json_out = step_run_train_e2e(args)
 
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
 
-    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (V7_ROOT / "reports")
+    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (DEFAULT_REPORT_DIR)
     report_dir.mkdir(parents=True, exist_ok=True)
 
     failures = []
@@ -1936,7 +1947,7 @@ def step_run_train_suite(args: argparse.Namespace) -> None:
     """Run stability sweep epochs (1,3,5,10 by default) + optional spot profiling.
 
     Outputs:
-      - <run_dir>/train_e{E}.json for each sweep epoch (or version/v7/reports if --run not set)
+      - <run_dir>/train_e{E}.json for each sweep epoch (or version/v7/.cache/reports if --run not set)
       - <run_dir>/training_epoch_sweep_latest.json consolidated table source
       - training_* telemetry materialized from final sweep epoch
     """
@@ -1958,7 +1969,7 @@ def step_run_train_suite(args: argparse.Namespace) -> None:
         log_error("--epochs-list produced no valid epochs")
         sys.exit(2)
 
-    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (V7_ROOT / "reports")
+    report_dir = Path(getattr(args, "run_dir")) if getattr(args, "run_dir", None) else (DEFAULT_REPORT_DIR)
     report_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
@@ -3130,7 +3141,7 @@ Examples:
                         help='Parity tolerance for max param abs diff')
 
         sp.add_argument('--train-json-out', default=None,
-                        help='Optional JSON output path (default: run_dir/train_e2e_latest.json or v7/reports)')
+                        help='Optional JSON output path (default: run_dir/train_e2e_latest.json or v7/.cache/reports)')
 
         if include_profile:
             sp.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
@@ -3202,7 +3213,7 @@ Examples:
     run_parser.add_argument('--train-loss-tol', type=float, default=2e-5)
     run_parser.add_argument('--train-param-tol', type=float, default=3e-5)
     run_parser.add_argument('--train-json-out', default=None,
-                           help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or version/v7/reports/train_e2e_latest.json)')
+                           help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or version/v7/.cache/reports/train_e2e_latest.json)')
     run_parser.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
                            help='Optional external profiler for --train-e2e (none, perf, vtune)')
     run_parser.add_argument('--train-profile-dir', default=None,

@@ -42,6 +42,8 @@ CACHE_PATH_FALLBACK = Path.home() / ".cache" / "ck-engine-v6.6" / "models"
 VISUALIZER = SCRIPT_DIR / "ir_visualizer.html"
 CK_RUN_SCRIPT = V7_ROOT / "scripts" / "ck_run_v7.py"
 MEMORY_SIGNOFF_SCRIPT = V7_ROOT / "scripts" / "memory_signoff_v7.py"
+V7_REPORT_PATH = Path(os.environ.get("CK_V7_REPORT_DIR", str(V7_ROOT / ".cache" / "reports"))).expanduser()
+V7_REPORT_PATH_LEGACY = V7_ROOT / "reports"
 
 
 def run_cmd(cmd: list[str], cwd: Path, extra_env: dict | None = None):
@@ -600,36 +602,36 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "lowered_prefill": model_candidates("lowered_prefill.json"),
         "lowered_decode_call": model_candidates("lowered_decode_call.json") + model_candidates("lowered_decode.json"),
         "lowered_prefill_call": model_candidates("lowered_prefill_call.json") + model_candidates("lowered_prefill.json"),
-        "ir1_train": model_candidates("ir1_train_forward.json") + model_candidates("ir1_train.json") + [V7_ROOT / "reports" / "ir1_train_forward_latest.json"],
-        "ir2_train": model_candidates("ir2_train_backward.json") + model_candidates("ir2_train.json") + [V7_ROOT / "reports" / "ir2_train_backward_latest.json"],
-        "ir_train_invariants": model_candidates("ir_train_invariants.json") + [V7_ROOT / "reports" / "ir_train_invariants_latest.json"],
-        "ir2_train_summary": model_candidates("ir2_train_summary.json") + [V7_ROOT / "reports" / "ir2_train_summary_latest.json"],
-        "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_ROOT / "reports" / "training_loss_curve_latest.json"],
-        "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_ROOT / "reports" / "training_grad_norms_latest.json"],
-        "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_ROOT / "reports" / "training_parity_latest.json"],
-        "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_ROOT / "reports" / "training_step_profile_latest.json"],
-        "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_ROOT / "reports" / "training_checkpoint_policy_latest.json"],
-        "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_ROOT / "reports" / "training_epoch_sweep_latest.json"],
-        "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_ROOT / "reports" / "train_e2e_latest.json"],
+        "ir1_train": model_candidates("ir1_train_forward.json") + model_candidates("ir1_train.json") + [V7_REPORT_PATH / "ir1_train_forward_latest.json", V7_REPORT_PATH_LEGACY / "ir1_train_forward_latest.json"],
+        "ir2_train": model_candidates("ir2_train_backward.json") + model_candidates("ir2_train.json") + [V7_REPORT_PATH / "ir2_train_backward_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_backward_latest.json"],
+        "ir_train_invariants": model_candidates("ir_train_invariants.json") + [V7_REPORT_PATH / "ir_train_invariants_latest.json", V7_REPORT_PATH_LEGACY / "ir_train_invariants_latest.json"],
+        "ir2_train_summary": model_candidates("ir2_train_summary.json") + [V7_REPORT_PATH / "ir2_train_summary_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_summary_latest.json"],
+        "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_REPORT_PATH / "training_loss_curve_latest.json", V7_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
+        "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_REPORT_PATH / "training_grad_norms_latest.json", V7_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
+        "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_REPORT_PATH / "training_parity_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_latest.json"],
+        "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
+        "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
+        "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
+        "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
         "run_config": model_candidates("config.json"),
         "sanity_overfit": model_candidates("sanity_overfit.json"),
         "parity_report": model_candidates("parity_report.json"),
         "profile_latest": model_candidates("profile_latest.json"),
-        "contract_report": model_candidates("contract_report_latest.json") + [V7_ROOT / "reports" / "contract_report_latest.json"],
-        "parity_1token": model_candidates("parity_1token_latest.json") + [V7_ROOT / "reports" / "parity_1token_latest.json"],
-        "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V7_ROOT / "reports" / "qk_norm_backward_parity_latest.json"],
-        "fd_gradients": model_candidates("fd_gradients_latest.json") + [V7_ROOT / "reports" / "fd_gradients_latest.json"],
-        "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V7_ROOT / "reports" / "train_parity_epochs_3_latest.json"],
-        "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V7_ROOT / "reports" / "train_parity_epochs_5_latest.json"],
-        "replay_determinism": model_candidates("replay_determinism_latest.json") + [V7_ROOT / "reports" / "replay_determinism_latest.json"],
+        "contract_report": model_candidates("contract_report_latest.json") + [V7_REPORT_PATH / "contract_report_latest.json", V7_REPORT_PATH_LEGACY / "contract_report_latest.json"],
+        "parity_1token": model_candidates("parity_1token_latest.json") + [V7_REPORT_PATH / "parity_1token_latest.json", V7_REPORT_PATH_LEGACY / "parity_1token_latest.json"],
+        "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V7_REPORT_PATH / "qk_norm_backward_parity_latest.json", V7_REPORT_PATH_LEGACY / "qk_norm_backward_parity_latest.json"],
+        "fd_gradients": model_candidates("fd_gradients_latest.json") + [V7_REPORT_PATH / "fd_gradients_latest.json", V7_REPORT_PATH_LEGACY / "fd_gradients_latest.json"],
+        "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_3_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_3_latest.json"],
+        "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_5_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_5_latest.json"],
+        "replay_determinism": model_candidates("replay_determinism_latest.json") + [V7_REPORT_PATH / "replay_determinism_latest.json", V7_REPORT_PATH_LEGACY / "replay_determinism_latest.json"],
         "grad_rules": [V7_ROOT / "scripts" / "grad_rules_v7.json"],
         "manifest": model_candidates("weights_manifest.json"),
         "profile_summary": model_candidates("profile_summary.json"),
-        "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_ROOT / "reports" / "perf_stat_summary.json"],
-        "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_ROOT / "reports" / "flamegraph_manifest.json"],
-        "vtune_summary": model_candidates("vtune_summary.json") + [V7_ROOT / "reports" / "vtune_summary.json"],
-        "memory_signoff": model_candidates("memory_signoff.json") + [V7_ROOT / "reports" / "memory_signoff.json"],
-        "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_ROOT / "reports" / "perf_gate_report.json"],
+        "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_REPORT_PATH / "perf_stat_summary.json", V7_REPORT_PATH_LEGACY / "perf_stat_summary.json"],
+        "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_REPORT_PATH / "flamegraph_manifest.json", V7_REPORT_PATH_LEGACY / "flamegraph_manifest.json"],
+        "vtune_summary": model_candidates("vtune_summary.json") + [V7_REPORT_PATH / "vtune_summary.json", V7_REPORT_PATH_LEGACY / "vtune_summary.json"],
+        "memory_signoff": model_candidates("memory_signoff.json") + [V7_REPORT_PATH / "memory_signoff.json", V7_REPORT_PATH_LEGACY / "memory_signoff.json"],
+        "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_REPORT_PATH / "perf_gate_report.json", V7_REPORT_PATH_LEGACY / "perf_gate_report.json"],
         "kernel_registry": [V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
     }
 
@@ -666,7 +668,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
             else:
                 missing_optional.append(key)
 
-    analysis_roots = [*search_roots, V7_ROOT / "reports"]
+    analysis_roots = [*search_roots, V7_REPORT_PATH, V7_REPORT_PATH_LEGACY]
     analysis_payload = collect_analysis_checkpoints(analysis_roots)
     if analysis_payload is not None:
         data["files"]["analysis_checkpoints"] = analysis_payload
