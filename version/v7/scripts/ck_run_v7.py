@@ -1361,7 +1361,12 @@ def _resolve_train_mode(args: argparse.Namespace) -> str:
 
 
 def _resolve_train_backend(args: argparse.Namespace) -> str:
-    backend = str(getattr(args, "train_backend", "both") or "both").lower()
+    backend = getattr(args, "backend", None)
+    if backend is None:
+        backend = getattr(args, "train_backend", "both")
+    backend = str(backend or "both").lower()
+    if backend == "torch":
+        backend = "pytorch"
     if backend not in ("ck", "pytorch", "both"):
         log_error(f"Unsupported train backend: {backend}")
         sys.exit(2)
@@ -1444,6 +1449,25 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         shutil.copy2(summary_json, dst)
 
 
+def _run_train_strict_preflight(python_exec: str) -> None:
+    """Run strict static training contract checks before executing train commands."""
+    validate_script = SCRIPTS_DIR / "validate_v7_contracts.py"
+    if not validate_script.exists():
+        log_error(f"Strict preflight requested but script not found: {validate_script}")
+        sys.exit(1)
+    out = V7_ROOT / "reports" / "contract_report_latest.json"
+    cmd = [
+        python_exec,
+        str(validate_script),
+        "--strict",
+        "--training-mode",
+        "--json-out",
+        str(out),
+    ]
+    log("  train-strict preflight: validate_v7_contracts.py", C_DIM)
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+
+
 def step_run_train_e2e(args: argparse.Namespace) -> Path:
     """Run tiny v7 training parity (CK vs PyTorch) as an operator E2E check."""
     log_step(1, "Running train E2E parity (CK vs PyTorch)")
@@ -1473,6 +1497,9 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
 
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
+
+    if bool(getattr(args, "train_strict", False)):
+        _run_train_strict_preflight(python_exec)
 
     train_vocab = int(getattr(args, "train_vocab", 256) or 256)
     train_d_model = int(getattr(args, "train_d_model", 64) or 64)
@@ -1522,6 +1549,20 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         short = train_text if len(train_text) <= 64 else train_text[:61] + "..."
         log(f"  train_text={short}", C_DIM)
 
+    parity_on = bool(getattr(args, "parity_on", False))
+    parity_profile = str(getattr(args, "parity_profile", "balanced") or "balanced")
+    parity_every = int(getattr(args, "parity_every", 50) or 0)
+    oracle = str(getattr(args, "oracle", "pytorch") or "pytorch")
+    analysis_mode = str(getattr(args, "analysis_checkpoints", "log") or "log")
+    if parity_on:
+        cadence = f"every={parity_every}" if parity_every > 0 else f"profile={parity_profile}"
+        log(f"  parity oracle: on ({oracle}, {cadence})", C_DIM)
+    else:
+        log("  parity oracle: off", C_DIM)
+    if bool(getattr(args, "dump_on_drift", False)):
+        log(f"  drift dumps: on (topk={int(getattr(args, 'drift_topk', 20) or 20)})", C_DIM)
+    log(f"  analysis checkpoints: {analysis_mode}", C_DIM)
+
     profile_mode = str(getattr(args, "profile_train", "none") or "none").lower()
     profile_dir_arg = getattr(args, "train_profile_dir", None)
     if profile_dir_arg:
@@ -1535,6 +1576,13 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "mode": profile_mode,
         "train_mode": train_mode,
         "backend": train_backend,
+        "parity_on": parity_on,
+        "parity_profile": parity_profile,
+        "parity_every": parity_every,
+        "oracle": oracle,
+        "dump_on_drift": bool(getattr(args, "dump_on_drift", False)),
+        "drift_topk": int(getattr(args, "drift_topk", 20) or 20),
+        "analysis_checkpoints": analysis_mode,
         "artifacts": [],
     }
 
@@ -3038,8 +3086,26 @@ Examples:
                         help='Training mode label (pretrain/sft)')
         sp.add_argument('--pretraining', action='store_true',
                         help='Shortcut: force --train-mode=pretrain')
-        sp.add_argument('--train-backend', choices=['ck', 'pytorch', 'both'], default='both',
-                        help='Backend mode label (tiny harness currently executes CK+PyTorch parity)')
+        sp.add_argument('--backend', choices=['ck', 'pytorch', 'torch', 'both'], default='both',
+                        help='Training backend selector (ck, pytorch, both). Default keeps current parity harness behavior.')
+        sp.add_argument('--train-backend', choices=['ck', 'pytorch', 'torch', 'both'], default='both',
+                        help='Deprecated alias for --backend (kept for compatibility)')
+        sp.add_argument('--train-strict', action='store_true',
+                        help='Enable strict training preflight checks before running training commands')
+        sp.add_argument('--parity-on', action='store_true',
+                        help='Enable scheduled oracle parity checks (metadata/config for training pipeline)')
+        sp.add_argument('--oracle', choices=['pytorch'], default='pytorch',
+                        help='Oracle backend used for parity checks (default: pytorch)')
+        sp.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced',
+                        help='Parity cadence profile (debug/balanced/light)')
+        sp.add_argument('--parity-every', type=int, default=50,
+                        help='Fixed parity cadence in steps (<=0 keeps profile-driven cadence)')
+        sp.add_argument('--dump-on-drift', action='store_true',
+                        help='On parity mismatch, dump drift artifacts for triage')
+        sp.add_argument('--drift-topk', type=int, default=20,
+                        help='Top-K tensor diffs to include in drift report')
+        sp.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log',
+                        help='Training analysis checkpoint cadence mode')
         sp.set_defaults(train_use_init_bump=True)
         sp.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                         help='Do not load tiny parity init from run_dir/weights.bump')
@@ -3099,7 +3165,20 @@ Examples:
                            help='Optional training text (UTF-8) for --train-e2e; falls back to --prompt')
     run_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')
     run_parser.add_argument('--pretraining', action='store_true')
-    run_parser.add_argument('--train-backend', choices=['ck', 'pytorch', 'both'], default='both')
+    run_parser.add_argument('--backend', choices=['ck', 'pytorch', 'torch', 'both'], default='both',
+                           help='Training backend selector used with --train-e2e')
+    run_parser.add_argument('--train-backend', choices=['ck', 'pytorch', 'torch', 'both'], default='both',
+                           help='Deprecated alias for --backend')
+    run_parser.add_argument('--train-strict', action='store_true',
+                           help='Enable strict training preflight checks before --train-e2e')
+    run_parser.add_argument('--parity-on', action='store_true',
+                           help='Enable scheduled oracle parity checks metadata for --train-e2e')
+    run_parser.add_argument('--oracle', choices=['pytorch'], default='pytorch')
+    run_parser.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced')
+    run_parser.add_argument('--parity-every', type=int, default=50)
+    run_parser.add_argument('--dump-on-drift', action='store_true')
+    run_parser.add_argument('--drift-topk', type=int, default=20)
+    run_parser.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log')
     run_parser.set_defaults(train_use_init_bump=True)
     run_parser.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                            help='Do not load tiny parity init from run_dir/weights.bump')

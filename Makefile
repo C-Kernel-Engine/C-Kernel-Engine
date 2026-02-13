@@ -3057,6 +3057,7 @@ report-md:
 
 .PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-cachegrind profile-v7-full
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
+.PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
 .PHONY: ck-cli-v7
 
@@ -3202,6 +3203,9 @@ v6.6-e2e:
 v6.6-full: v6.6-download v6.6-build v6.6-test-all
 
 V7_MODEL ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+V7_SMOKE_MODEL_GEMMA ?= hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf
+V7_SMOKE_MODEL_QWEN2 ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
+V7_SMOKE_MODEL_QWEN3 ?= hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf
 V7_CHAT_TEMPLATE ?= auto
 V7_WEIGHT_DTYPE ?=
 V7_WEIGHT_DTYPE_ARG := $(if $(strip $(V7_WEIGHT_DTYPE)),--weight-dtype $(V7_WEIGHT_DTYPE),)
@@ -3243,6 +3247,7 @@ v7-help:
 	@echo "  make v7-sync-inference"
 	@echo "  make v7-infer-run"
 	@echo "  make v7-infer-gate"
+	@echo "  make v7-inference-smoke"
 	@echo "  make v7-perf-gate"
 	@echo "  make profile-v7-full"
 	@echo "  make v7-validate-contracts"
@@ -3287,8 +3292,13 @@ v7-infer-gate:
 	@$(PYTHON) version/v7/scripts/validate_kernel_registry.py
 	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_MODEL)" --generate-only --profile --force-compile --context-len 128 --max-tokens 1 --prompt "Hello"
 
+v7-inference-smoke:
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_SMOKE_MODEL_GEMMA)" --context-len 1024 --force-compile --force-convert --chat-template none --generate-only --prompt "hi" --max-tokens 1
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_SMOKE_MODEL_QWEN2)" --context-len 1024 --force-compile --force-convert --chat-template none --generate-only --prompt "hi" --max-tokens 1
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_SMOKE_MODEL_QWEN3)" --context-len 1024 --force-compile --force-convert --chat-template none --generate-only --prompt "hi" --max-tokens 1
+
 v7-validate-contracts:
-	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --json-out version/v7/reports/contract_report_latest.json
+	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --training-mode --json-out version/v7/reports/contract_report_latest.json
 
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out version/v7/reports/parity_1token_latest.json
@@ -3383,6 +3393,7 @@ v7-replay:
 	@$(PYTHON) version/v7/scripts/check_replay_determinism_v7.py --json-out version/v7/reports/replay_determinism_latest.json
 
 v7-gate-train:
+	@$(MAKE) --no-print-directory v7-inference-smoke
 	@$(MAKE) --no-print-directory v7-validate-contracts
 	@$(MAKE) --no-print-directory v7-train-ir-smoke
 	@$(MAKE) --no-print-directory v7-train-compile-smoke

@@ -83,7 +83,7 @@ def _status_counts(rows: List[Row]) -> dict:
     return counts
 
 
-def run_checks() -> List[Row]:
+def run_checks(training_mode: bool = False) -> List[Row]:
     rows: List[Row] = []
 
     # L1: contract docs present
@@ -187,6 +187,8 @@ def run_checks() -> List[Row]:
     else:
         text = _read_text(makefile)
         required_targets = ["v7-help:", "v7-validate-contracts:", "v7-parity-1tok:", "v7-gate:", "v7:"]
+        if training_mode:
+            required_targets.extend(["v7-inference-smoke:", "v7-gate-train:"])
         missing_targets = [t[:-1] for t in required_targets if t not in text]
         if missing_targets:
             rows.append(
@@ -321,10 +323,12 @@ def run_checks() -> List[Row]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate v7 training contracts.")
     parser.add_argument("--strict", action="store_true", help="Treat WARN as failure.")
+    parser.add_argument("--training-mode", action="store_true",
+                        help="Enable strict training-mode checks (requires train-gate wiring).")
     parser.add_argument("--json-out", type=Path, default=None, help="Optional JSON output path.")
     args = parser.parse_args()
 
-    rows = run_checks()
+    rows = run_checks(training_mode=args.training_mode)
     counts = _status_counts(rows)
 
     print("=" * 112)
@@ -337,6 +341,7 @@ def main() -> int:
     payload = {
         "rows": [r.__dict__ for r in rows],
         "summary": counts,
+        "training_mode": bool(args.training_mode),
     }
     if args.json_out is not None:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
