@@ -23,3 +23,39 @@ python3 version/v6.6/scripts/ck_run_v6_6.py run hf://Qwen/Qwen2-0.5B-Instruct-GG
 
 python3 version/v6.6/scripts/ck_run_v6_6.py run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf --context-len 1024 --force-compile --force-convert
 
+
+==============
+V7 TRAINING (PR2 RUNTIME PATH)
+=============
+# Discoverability
+make --no-print-directory v7-help
+
+# Strict training contracts
+make --no-print-directory v7-validate-contracts
+
+# Tiny run-dir bootstrap (IR1 + IR2 + generated runtime C)
+python3 version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/v7_pr2_ck \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# Train with compiled generated runtime (backend=ck)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_pr2_ck \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 \
+  --train-grad-accum 2 --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none
+
+# Regression check: existing CK+PyTorch parity harness path
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_pr2_ck \
+  --backend both \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 \
+  --train-grad-accum 2 --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none
+
+# Inference non-regression smoke (Gemma/Qwen2/Qwen3)
+make --no-print-directory v7-inference-smoke

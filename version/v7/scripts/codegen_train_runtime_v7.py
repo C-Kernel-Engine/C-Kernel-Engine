@@ -520,6 +520,11 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("static int g_opt_step = 0;")
     ap("")
 
+    grad_vars_f32: List[str] = []
+    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        if isinstance(tid, str) and tid.startswith("grad."):
+            grad_vars_f32.append(var)
+
     ap("void ck_train_reset_buffers(void) {")
     for var in sorted(set(tvars_f32.values())):
         ap("    memset(%s, 0, sizeof(%s));" % (var, var))
@@ -536,6 +541,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 seen.add(vvar)
         ap("    g_opt_step = 0;")
     ap("    g_loss_scalar[0] = 0.0f;")
+    ap("}")
+    ap("")
+    ap("int ck_train_init(const float *bump, const int *manifest_sizes, int num_params) {")
+    ap("    (void)bump;")
+    ap("    (void)manifest_sizes;")
+    ap("    (void)num_params;")
+    ap("    ck_train_reset_buffers();")
+    ap("    return 0;")
+    ap("}")
+    ap("")
+    ap("void ck_zero_grad(void) {")
+    if grad_vars_f32:
+        for var in sorted(set(grad_vars_f32)):
+            ap("    memset(%s, 0, sizeof(%s));" % (var, var))
+    else:
+        ap("    /* No grad.* tensors found in IR; zero-grad is a no-op. */")
     ap("}")
     ap("")
 
@@ -613,6 +634,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("")
 
     ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
+    ap("    ck_zero_grad();")
     ap("    if (token_ids != NULL) {")
     ap("        memcpy(g_dummy_i32, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);")
     ap("    }")
