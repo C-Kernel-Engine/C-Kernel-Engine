@@ -219,6 +219,23 @@ else
     fi
 fi
 
+
+# =============================================================================
+# v7 training-kernel parity gate (default on)
+# =============================================================================
+if [ "${CK_V7_KERNEL_PARITY_TRAIN:-1}" = "1" ]; then
+    echo -e "${YELLOW}[v7]${NC} Running training-kernel parity gate..."
+    if make --no-print-directory v7-kernel-parity-train > /tmp/ck_v7_kernel_parity_train.log 2>&1; then
+        echo -e "${GREEN}  ✓ v7 training-kernel parity passed${NC}"
+    else
+        echo -e "${RED}  ✗ v7 training-kernel parity failed${NC}"
+        echo "    See /tmp/ck_v7_kernel_parity_train.log for details"
+        failed=1
+    fi
+else
+    echo -e "${YELLOW}  ↳ v7 training-kernel parity skipped (set CK_V7_KERNEL_PARITY_TRAIN=1 to force, =0 to skip)${NC}"
+fi
+
 # =============================================================================
 # Summary
 # =============================================================================
