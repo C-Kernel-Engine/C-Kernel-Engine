@@ -18,9 +18,13 @@ import argparse
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+V7_ROOT = SCRIPT_DIR.parent
+TEMPLATES_DIR = V7_ROOT / "templates"
 
 
 def _align(n: int, a: int) -> int:
@@ -89,6 +93,8 @@ def build_tiny_model(
     out_dir: Path,
     seed: int,
     init: str,
+    template_name: str,
+    template_doc: Optional[Dict[str, Any]],
     n_layers: int,
     vocab_size: int,
     embed_dim: int,
@@ -131,25 +137,25 @@ def build_tiny_model(
         _append_tensor(blob, entries, f"{prefix}.ln2_gamma", np.ones((embed_dim,), dtype=np.float32))
 
         _append_tensor(blob, entries, f"{prefix}.wq", _init_weight(rng, (embed_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (embed_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (embed_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
         _append_tensor(blob, entries, f"{prefix}.wo", _init_weight(rng, (embed_dim, embed_dim), init))
         _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((embed_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((embed_dim,), dtype=np.float32))
+        _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
+        _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.bo", np.zeros((embed_dim,), dtype=np.float32))
 
         _append_tensor(blob, entries, f"{prefix}.q_norm", np.ones((head_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.k_norm", np.ones((head_dim,), dtype=np.float32))
 
         # SwiGLU path: w1 emits 2*hidden, w2 projects hidden -> embed
-        _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (embed_dim, 2 * hidden_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (hidden_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
+        _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (embed_dim, hidden_dim), init))
         _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
         _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
 
     cfg = {
-        "model": "qwen3",
+        "model": str(template_name or "qwen3"),
         "num_layers": n_layers,
         "embed_dim": embed_dim,
         "hidden_size": hidden_dim,
@@ -188,10 +194,15 @@ def build_tiny_model(
         "config": cfg,
         "entries": entries,
     }
+    if isinstance(template_doc, dict) and template_doc:
+        # Embed explicit template content so later IR stages do not depend on
+        # external file paths.
+        manifest["template"] = template_doc
 
     run_cfg = {
         "seed": seed,
         "init": init,
+        "template": str(template_name or "qwen3"),
         "kernel_policy": kernel_policy,
         "architecture": {
             "family": "qwen3-like",
@@ -227,6 +238,8 @@ def build_tiny_model(
     (out_dir / "weights.bump").write_bytes(bytes(blob))
     (out_dir / "weights_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (out_dir / "train_init_config.json").write_text(json.dumps(run_cfg, indent=2), encoding="utf-8")
+    if isinstance(template_doc, dict) and template_doc:
+        (out_dir / "template_train.json").write_text(json.dumps(template_doc, indent=2), encoding="utf-8")
 
     print(f"Created tiny v7 training model at: {out_dir}")
     print(f"  entries={len(entries)}  bump_bytes={len(blob)}")
@@ -254,12 +267,40 @@ def main() -> int:
     ap.add_argument("--context-len", type=int, default=128)
     ap.add_argument("--rope-theta", type=float, default=1_000_000.0)
     ap.add_argument("--kernel-policy", type=str, default="fp32_reference_first")
+    ap.add_argument(
+        "--template",
+        type=str,
+        default="qwen3",
+        help="Architecture template name (default: qwen3). Built-ins: qwen3, qwen2, gemma3.",
+    )
+    ap.add_argument(
+        "--template-file",
+        type=Path,
+        default=None,
+        help="Optional custom template JSON path. When set, template is embedded into weights_manifest.json.",
+    )
     args = ap.parse_args()
+
+    template_name = str(args.template or "qwen3").strip().lower()
+    template_doc: Optional[Dict[str, Any]] = None
+    if args.template_file is not None:
+        tf = Path(args.template_file)
+        if not tf.exists():
+            raise FileNotFoundError(f"template file not found: {tf}")
+        template_doc = json.loads(tf.read_text(encoding="utf-8"))
+    else:
+        built_in = TEMPLATES_DIR / f"{template_name}.json"
+        if not built_in.exists():
+            raise FileNotFoundError(
+                f"unknown template '{template_name}' (expected {built_in} or provide --template-file)"
+            )
 
     build_tiny_model(
         out_dir=args.output_dir,
         seed=int(args.seed),
         init=str(args.init),
+        template_name=template_name,
+        template_doc=template_doc,
         n_layers=int(args.layers),
         vocab_size=int(args.vocab_size),
         embed_dim=int(args.embed_dim),

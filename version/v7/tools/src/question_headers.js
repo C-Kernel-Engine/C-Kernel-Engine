@@ -31,6 +31,10 @@ const QUESTION_TABS = {
         label: 'How Does This Compare?',
         title: 'Overlay baseline vs current run and inspect deltas.',
     },
+    'train-memory-canary': {
+        label: 'Where Is Memory Safe?',
+        title: 'Canary corruption checks, slot ownership, and layout audit status.',
+    },
 };
 
 export function applyQuestionHeaders() {

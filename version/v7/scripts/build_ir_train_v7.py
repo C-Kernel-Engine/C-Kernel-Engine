@@ -27,6 +27,9 @@ DEFAULT_GRAD_RULES_PATH = SCRIPT_DIR / "grad_rules_v7.json"
 TEMPLATES_DIR = V7_ROOT / "templates"
 
 
+# NOTE: some forward kernels below are in-place at C API level (currently qk_norm_forward
+# and rope_forward_qk). IR1 intentionally remains out-of-place (explicit input/output tensors)
+# for deterministic graph semantics. Codegen must stage/copy before invoking those kernels.
 FORWARD_KERNEL_BY_OP = {
     "dense_embedding_lookup": "dense_embedding_lookup",
     "rmsnorm": "rmsnorm_forward",

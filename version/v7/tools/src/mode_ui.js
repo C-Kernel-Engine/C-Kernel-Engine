@@ -11,6 +11,7 @@ const TRAINING_TABS = [
     'train-weights',
     'train-attention',
     'train-compare',
+    'train-memory-canary',
 ];
 
 function injectStyles() {
@@ -135,6 +136,7 @@ function appendTrainingTabs() {
         { id: 'train-weights', label: 'Weights & Activations' },
         { id: 'train-attention', label: 'Attention' },
         { id: 'train-compare', label: 'Run Compare' },
+        { id: 'train-memory-canary', label: 'Memory & Canary' },
     ];
     specs.forEach((spec) => {
         const tab = document.createElement('div');
@@ -192,6 +194,11 @@ function ensureTrainingPanels() {
         'Run Compare',
         'Overlay current run vs baseline artifacts.'
     );
+    ensurePanel(
+        'train-memory-canary',
+        'Memory & Canary Diagnostics',
+        'Canary corruption checks, tensor slot map, and layout audit for generated train runtime.'
+    );
 
     ensurePanelRoot('train-dashboard', 'trainDashboardRoot');
     ensurePanelRoot('train-gradient', 'trainGradientRoot');
@@ -200,6 +207,7 @@ function ensureTrainingPanels() {
     ensurePanelRoot('train-weights', 'trainWeightsRoot');
     ensurePanelRoot('train-attention', 'trainAttentionRoot');
     ensurePanelRoot('train-compare', 'trainCompareRoot');
+    ensurePanelRoot('train-memory-canary', 'trainMemoryCanaryRoot');
 }
 
 function installModeToggle() {

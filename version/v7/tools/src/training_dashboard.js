@@ -145,6 +145,14 @@ export function renderTrainingDashboard(files) {
     const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
     const layoutRegionCount = Array.isArray(layoutTrain.regions) ? layoutTrain.regions.length : 0;
     const runCtx = getRunContext();
+    const memoryDiag = files.memory_diagnostic || {};
+    const memoryDiagState = memoryDiag && memoryDiag.diagnostic && memoryDiag.diagnostic.ok === true
+        ? 'PASS'
+        : (Object.keys(memoryDiag).length ? 'FAIL' : '-');
+    const layoutAudit = files.layout_train_audit || {};
+    const layoutAuditState = layoutAudit && layoutAudit.passed === true
+        ? 'PASS'
+        : (Object.keys(layoutAudit).length ? 'FAIL' : '-');
 
     const reportCmd = runCtx.runDir
         ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
@@ -176,6 +184,8 @@ export function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
+            <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
+            <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">

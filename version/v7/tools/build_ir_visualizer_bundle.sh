@@ -22,6 +22,7 @@ FILES=(
   "weight_activation.js"
   "attention_inspector.js"
   "run_compare.js"
+  "training_memory_diag.js"
   "question_headers.js"
   "mode_ui.js"
   "main.js"

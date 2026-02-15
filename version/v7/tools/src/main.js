@@ -6,6 +6,7 @@ import { renderGradientFlow } from './gradient_flow.js';
 import { renderWeightActivation } from './weight_activation.js';
 import { renderAttentionInspector } from './attention_inspector.js';
 import { renderRunCompare } from './run_compare.js';
+import { renderTrainingMemoryDiag } from './training_memory_diag.js';
 import { applyQuestionHeaders } from './question_headers.js';
 
 function currentFiles() {
@@ -32,6 +33,10 @@ function renderTrainingTab(tabId) {
     }
     if (tabId === 'train-compare') {
         renderRunCompare(files);
+        return;
+    }
+    if (tabId === 'train-memory-canary') {
+        renderTrainingMemoryDiag(files);
         return;
     }
     renderTrainingExtensionTab(tabId, files);

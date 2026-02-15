@@ -437,6 +437,54 @@ def _infer_gemm_backward_dims(io_outputs: Dict[str, str], tensor_numel: Dict[str
         "aligned_out": int(aligned_out),
     }
 
+def _infer_gemm_forward_mnk(op: Dict[str, Any], cfg: Dict[str, Any]) -> Tuple[int, int, int]:
+    """Infer GEMM forward M/N/K directly from IR op shapes."""
+    df = op.get("dataflow", {}) if isinstance(op, dict) else {}
+    in_ref = (df.get("inputs") or {}).get("input")
+    out_ref = (df.get("outputs") or {}).get("y")
+    w_ref = (op.get("weights") or {}).get("W") if isinstance(op, dict) else None
+
+    def _shape2(ref: Any) -> Optional[Tuple[int, int]]:
+        if not isinstance(ref, dict):
+            return None
+        sh = ref.get("shape")
+        if not isinstance(sh, list) or len(sh) < 2:
+            return None
+        try:
+            a = int(sh[-2])
+            b = int(sh[-1])
+            if a > 0 and b > 0:
+                return (a, b)
+        except Exception:
+            return None
+        return None
+
+    m = 1
+    n = int(cfg.get("embed_dim", cfg.get("hidden_size", 128)) or 128)
+    k = int(cfg.get("embed_dim", cfg.get("hidden_size", 128)) or 128)
+
+    out_shape = _shape2(out_ref)
+    if out_shape is not None:
+        m = int(out_shape[0])
+        n = int(out_shape[1])
+
+    in_shape = _shape2(in_ref)
+    if in_shape is not None:
+        k = int(in_shape[1])
+        if out_shape is None:
+            m = int(in_shape[0])
+
+    w_shape = _shape2(w_ref)
+    if w_shape is not None:
+        # Use weight shape only as fallback when input/output dims are unavailable.
+        if in_shape is None:
+            k = int(w_shape[0])
+        if out_shape is None:
+            n = int(w_shape[1])
+
+    return (max(1, int(m)), max(1, int(n)), max(1, int(k)))
+
+
 def _sorted_pool_items(pool: Dict[str, str]) -> List[Tuple[str, str]]:
     def key_fn(item: Tuple[str, str]) -> Tuple[int, int, str]:
         k = str(item[0])
@@ -724,6 +772,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     backward_ops = sorted(list(ir2.get("backward") or []), key=lambda o: int(o.get("op_id", 0)))
     all_ops = forward_ops + backward_ops
     op_by_id = {int(op["op_id"]): op for op in all_ops if isinstance(op, dict) and "op_id" in op}
+    # rope_forward_qk expects precomputed cos/sin caches. If present in IR,
+    # ck_train_init must seed deterministic caches before the first forward call.
+    has_rope_forward_qk = any(str(op.get("kernel_id", "")) == "rope_forward_qk" for op in forward_ops)
 
     tvars_f32: Dict[str, str] = {}
     tvars_i32: Dict[str, str] = {}
@@ -913,6 +964,14 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if str(row["name"]).startswith("weight.")
     ]
     weight_snapshot_floats = sum(int(slot_rows[idx]["numel"]) for idx in weight_slot_indices)
+    # Strict snapshot-oracle compares only forward activation slots here.
+    # Exclude saved.* and aux.* because those are kernel-internal or reporting
+    # artifacts and may not map 1:1 to oracle-forward tensors.
+    activation_slot_indices = [
+        idx for idx, row in enumerate(slot_rows)
+        if str(row.get("section", "")) in ("activations",)
+    ]
+    activation_snapshot_floats = sum(int(slot_rows[idx]["numel"]) for idx in activation_slot_indices)
 
     lines: List[str] = []
     ap = lines.append
@@ -944,6 +1003,18 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     ap("#define CK_TRAIN_TOTAL_FLOATS ((size_t)%d)" % int(layout_info["total_floats"]))
     ap("#define CK_CANARY_TAIL_FLOATS ((size_t)16)")
+    rope_heads = int(cfg.get("num_heads", 8) or 8)
+    rope_kv_heads = int(cfg.get("num_kv_heads", max(1, rope_heads // 2)) or max(1, rope_heads // 2))
+    rope_head_dim = int(cfg.get("head_dim", max(1, int(cfg.get("d_model", 128) or 128) // max(1, rope_heads))) or max(1, int(cfg.get("d_model", 128) or 128) // max(1, rope_heads)))
+    rope_aligned_head_dim = int(cfg.get("aligned_head_dim", rope_head_dim) or rope_head_dim)
+    rope_rotary_dim = int(cfg.get("rope_rotary_dim", rope_head_dim) or rope_head_dim)
+    rope_theta = float(cfg.get("rope_theta", 10000.0) or 10000.0)
+    ap("#define CK_ROPE_NUM_HEADS %d" % int(rope_heads))
+    ap("#define CK_ROPE_NUM_KV_HEADS %d" % int(rope_kv_heads))
+    ap("#define CK_ROPE_HEAD_DIM %d" % int(rope_head_dim))
+    ap("#define CK_ROPE_ALIGNED_HEAD_DIM %d" % int(rope_aligned_head_dim))
+    ap("#define CK_ROPE_ROTARY_DIM %d" % int(rope_rotary_dim))
+    ap("#define CK_ROPE_THETA %.6ff" % float(rope_theta))
     for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
         ap("#define %s ((size_t)%d)" % (tensor_offset_macros[tid], int(tensor_offsets[tid])))
     for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
@@ -1017,6 +1088,15 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    -1,")
     ap("};")
     ap("#define CK_WEIGHT_SNAPSHOT_FLOATS ((size_t)%d)" % int(weight_snapshot_floats))
+    ap("#define CK_ACTIVATION_SLOT_COUNT %d" % len(activation_slot_indices))
+    ap("static const int g_activation_slot_indices[CK_ACTIVATION_SLOT_COUNT > 0 ? CK_ACTIVATION_SLOT_COUNT : 1] = {")
+    if activation_slot_indices:
+        for idx in activation_slot_indices:
+            ap("    %d," % int(idx))
+    else:
+        ap("    -1,")
+    ap("};")
+    ap("#define CK_ACTIVATION_SNAPSHOT_FLOATS ((size_t)%d)" % int(activation_snapshot_floats))
     ap("")
 
     ap("static float *g_memory = NULL;")
@@ -1024,6 +1104,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("static float g_dummy_f32[1];")
     ap("static int32_t g_dummy_i32[1];")
     ap("static float g_loss_scalar[1];")
+    ap("static float g_rope_cos_cache[((CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1) * ((CK_ROPE_ROTARY_DIM / 2) > 0 ? (CK_ROPE_ROTARY_DIM / 2) : 1))];")
+    ap("static float g_rope_sin_cache[((CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1) * ((CK_ROPE_ROTARY_DIM / 2) > 0 ? (CK_ROPE_ROTARY_DIM / 2) : 1))];")
     ap("")
 
     for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
@@ -1131,6 +1213,52 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
     ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
     ap("        memcpy(dst + cursor, g_memory + s->offset_floats, s->numel * sizeof(float));")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_weight_snapshot_numel(void) {")
+    ap("    return (int)CK_WEIGHT_SNAPSHOT_FLOATS;")
+    ap("}")
+    ap("")
+    ap("int ck_train_export_weight_snapshot(float *dst, int dst_numel) {")
+    ap("    if (dst_numel < 0) return -1;")
+    ap("    return ck_train_snapshot_weights(dst, (size_t)dst_numel);")
+    ap("}")
+    ap("")
+    ap("static int ck_train_snapshot_activations(float *dst, size_t dst_numel) {")
+    ap("    if (g_memory == NULL || dst == NULL) return -1;")
+    ap("    if (dst_numel < CK_ACTIVATION_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_ACTIVATION_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_activation_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        memcpy(dst + cursor, g_memory + s->offset_floats, s->numel * sizeof(float));")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_activation_snapshot_numel(void) {")
+    ap("    return (int)CK_ACTIVATION_SNAPSHOT_FLOATS;")
+    ap("}")
+    ap("")
+    ap("int ck_train_export_activation_snapshot(float *dst, int dst_numel) {")
+    ap("    if (dst_numel < 0) return -1;")
+    ap("    return ck_train_snapshot_activations(dst, (size_t)dst_numel);")
+    ap("}")
+    ap("")
+    ap("int ck_train_import_weight_snapshot(const float *src, int src_numel) {")
+    ap("    if (g_memory == NULL || src == NULL) return -1;")
+    ap("    if (src_numel < (int)CK_WEIGHT_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_WEIGHT_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_weight_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        memcpy(g_memory + s->offset_floats, src + cursor, s->numel * sizeof(float));")
     ap("        cursor += s->numel;")
     ap("    }")
     ap("    return (int)cursor;")
@@ -1288,6 +1416,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("        }")
     ap("        cursor += (src_n > 0 ? src_n : expected);")
     ap("    }")
+    if has_rope_forward_qk:
+        # Do not remove: rope_forward_qk kernels read cos/sin tables directly.
+        # Missing/NULL caches can silently skew intermediate activations while
+        # keeping final logits deceptively close for tiny-token runs.
+        ap("    if (CK_ROPE_ROTARY_DIM > 0) {")
+        ap("        rope_precompute_cache_split(g_rope_cos_cache, g_rope_sin_cache, CK_NUM_TOKENS, CK_ROPE_ROTARY_DIM, CK_ROPE_THETA);")
+        ap("    }")
     ap("    return CK_INIT_WEIGHT_COUNT;")
     ap("}")
     ap("")
@@ -1340,10 +1475,82 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
             fn, args, _decl = resolved
             io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
+
+            # qk_norm_forward is in-place in kernel API, but IR models distinct outputs.
+            # Preserve IR semantics by copying input buffers into output buffers, then running in-place.
+            if kid == "qk_norm_forward":
+                q_in_tid = io_inputs.get("q")
+                k_in_tid = io_inputs.get("k")
+                q_out_tid = io_outputs.get("q") or q_in_tid
+                k_out_tid = io_outputs.get("k") or k_in_tid
+                q_in_var = tvars_f32.get(q_in_tid or "", "g_dummy_f32")
+                k_in_var = tvars_f32.get(k_in_tid or "", "g_dummy_f32")
+                q_out_var = tvars_f32.get(q_out_tid or "", q_in_var)
+                k_out_var = tvars_f32.get(k_out_tid or "", k_in_var)
+                q_gamma_var = tvars_f32.get(io_weights.get("q_gamma", ""), "g_dummy_f32")
+                k_gamma_var = tvars_f32.get(io_weights.get("k_gamma", ""), "g_dummy_f32")
+                q_numel = int(tensor_numel.get(q_out_tid or q_in_tid or "", 0) or 0)
+                k_numel = int(tensor_numel.get(k_out_tid or k_in_tid or "", 0) or 0)
+
+                ap("    /* op_id=%s op=%s kernel_id=%s (IR out-of-place -> kernel in-place) */" % (op_id, op_name, kid))
+                if q_numel > 0 and q_out_var != q_in_var:
+                    ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
+                if k_numel > 0 and k_out_var != k_in_var:
+                    ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
+                if q_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                if k_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                    q_out_var, k_out_var, q_gamma_var, k_gamma_var
+                ))
+                ap("    call_count++;")
+                continue
+
+            # rope_forward_qk is also in-place and requires cos/sin cache pointers.
+            # IR models explicit q/k outputs, so stage into output buffers first.
+            if kid == "rope_forward_qk":
+                q_in_tid = io_inputs.get("q")
+                k_in_tid = io_inputs.get("k")
+                q_out_tid = io_outputs.get("q") or q_in_tid
+                k_out_tid = io_outputs.get("k") or k_in_tid
+                q_in_var = tvars_f32.get(q_in_tid or "", "g_dummy_f32")
+                k_in_var = tvars_f32.get(k_in_tid or "", "g_dummy_f32")
+                q_out_var = tvars_f32.get(q_out_tid or "", q_in_var)
+                k_out_var = tvars_f32.get(k_out_tid or "", k_in_var)
+                q_numel = int(tensor_numel.get(q_out_tid or q_in_tid or "", 0) or 0)
+                k_numel = int(tensor_numel.get(k_out_tid or k_in_tid or "", 0) or 0)
+
+                ap("    /* op_id=%s op=%s kernel_id=%s (IR out-of-place -> kernel in-place) */" % (op_id, op_name, kid))
+                if q_numel > 0 and q_out_var != q_in_var:
+                    ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
+                if k_numel > 0 and k_out_var != k_in_var:
+                    ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
+                if q_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                if k_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                    q_out_var, k_out_var
+                ))
+                ap("    call_count++;")
+                continue
+
             # gemm_backward_f32 uses op-local inferred dims from IR tensor sizes.
             # Avoid generic defaults here: wrong aligned_out can corrupt
             # tmp.grad.weight.* and trip canary/heap checks.
             gemm_dims = _infer_gemm_backward_dims(io_outputs, tensor_numel, cfg) if kid == "gemm_backward_f32" else None
+            gemm_fwd_mnk = _infer_gemm_forward_mnk(op, cfg) if kid == "gemm_blocked_serial" else None
+            swiglu_dim: Optional[int] = None
+            if kid in ("swiglu_forward", "swiglu_forward_exact", "swiglu_backward", "swiglu_backward_exact"):
+                cands: List[int] = []
+                for pool in (io_outputs, io_inputs):
+                    for tid in pool.values():
+                        n = int(tensor_numel.get(tid, 0) or 0)
+                        if n > 0:
+                            cands.append(n)
+                if cands:
+                    swiglu_dim = int(min(cands))
 
             call_args: List[str] = []
             ptr_fallback_state: Dict[str, int] = {}
@@ -1351,10 +1558,32 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             for atype, aname in args:
                 is_ptr = "*" in atype
                 if is_ptr:
-                    expr = _choose_tensor_for_ptr(
-                        atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
-                        fallback_state=ptr_fallback_state,
-                    )
+                    if kid == "gemm_blocked_serial":
+                        lname = str(aname).lower()
+                        mapped: Optional[str] = None
+                        if lname in ("a", "x", "in", "input", "lhs"):
+                            mapped = tvars_f32.get(io_inputs.get("input", ""))
+                        elif lname in ("b", "w", "weight", "rhs"):
+                            mapped = tvars_f32.get(io_weights.get("W", ""))
+                        elif "bias" in lname:
+                            mapped = tvars_f32.get(io_weights.get("bias", ""))
+                            if mapped is None:
+                                # Some GEMM ops (e.g. logits) intentionally have no bias.
+                                mapped = "NULL"
+                        elif lname in ("c", "y", "out", "output", "dst"):
+                            mapped = tvars_f32.get(io_outputs.get("y", ""))
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
+                    else:
+                        expr = _choose_tensor_for_ptr(
+                            atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                            fallback_state=ptr_fallback_state,
+                        )
                     call_args.append(expr)
                     if ("float" in atype) and ("*" in atype):
                         n = f32_ptr_numel.get(expr)
@@ -1362,6 +1591,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                             bounds_checks.append((expr, int(n)))
                 else:
                     lname = str(aname).lower()
+                    if gemm_fwd_mnk is not None:
+                        m_i, n_i, k_i = gemm_fwd_mnk
+                        if lname in ("m", "rows"):
+                            call_args.append(str(int(m_i)))
+                            continue
+                        if lname in ("n", "cols", "out_dim"):
+                            call_args.append(str(int(n_i)))
+                            continue
+                        if lname in ("k", "inner", "in_dim"):
+                            call_args.append(str(int(k_i)))
+                            continue
+                    if swiglu_dim is not None and lname in ("dim", "hidden_dim", "intermediate_dim"):
+                        call_args.append(str(int(swiglu_dim)))
+                        continue
                     if ("numel" in lname) or ("size_t" in atype):
                         call_args.append(_choose_numel_expr(aname, io_inputs, io_outputs, io_weights, tensor_numel))
                     elif gemm_dims is not None and "aligned_in" in lname:
@@ -1442,8 +1685,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
 
-    ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
-    ap("    ck_zero_grad();")
+    ap("int ck_train_set_batch(const int32_t *token_ids, const int32_t *targets) {")
     ap("    if (token_ids != NULL) {")
     if token_input_i32_vars:
         for var in sorted(set(token_input_i32_vars)):
@@ -1458,6 +1700,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     else:
         ap("        memcpy(g_dummy_i32, targets, sizeof(int32_t) * CK_NUM_TOKENS);")
     ap("    }")
+    ap("    return 0;")
+    ap("}")
+    ap("")
+
+    ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
+    ap("    ck_zero_grad();")
+    ap("    ck_train_set_batch(token_ids, targets);")
     ap("    int first = -1;")
     ap("    if (CK_RUNTIME_CANARY_CHECKS) ck_train_plant_canaries();")
     ap("    int fwd = ck_train_forward_step();")
@@ -1489,6 +1738,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "canary_range_count": len(canary_ranges),
         "canary_tail_floats": 16,
         "weight_snapshot_floats": int(weight_snapshot_floats),
+        "activation_snapshot_floats": int(activation_snapshot_floats),
         "tensor_slots": [
             {
                 "index": int(i),

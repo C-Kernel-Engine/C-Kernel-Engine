@@ -303,6 +303,9 @@ def synthesize_ir2_backward(
 
             grad_logits = canonical_grad_activation(logits_tensor)
             grad_for_tensor[logits_tensor] = grad_logits
+            # aux.loss is a scalar reporting output from the loss seed op.
+            # It is intentionally modeled as an aux tensor (not an activation slot)
+            # and should be excluded from strict forward activation-oracle matching.
             _ensure_tensor(
                 tensors,
                 tensor_id="aux.loss",

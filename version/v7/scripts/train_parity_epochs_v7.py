@@ -496,6 +496,7 @@ def run_training_parity(
     param_tol: float,
     train_text: str | None = None,
     init_state: Dict[str, torch.Tensor] | None = None,
+    max_steps: int | None = None,
 ) -> RunStats:
     _seed_all(seed)
 
@@ -631,6 +632,8 @@ def run_training_parity(
     opt_ck.zero_grad(set_to_none=True)
     opt_torch.zero_grad(set_to_none=True)
 
+    step_limit = int(max_steps or 0)
+
     for _epoch in range(epochs):
         for x, y in batches:
             targets = y.reshape(-1)
@@ -672,8 +675,12 @@ def run_training_parity(
 
             if micro_count % grad_accum == 0:
                 _flush_optimizer_step()
+                if step_limit > 0 and step_count >= step_limit:
+                    break
+        if step_limit > 0 and step_count >= step_limit:
+            break
 
-    if micro_count % grad_accum != 0:
+    if micro_count % grad_accum != 0 and (step_limit <= 0 or step_count < step_limit):
         _flush_optimizer_step()
 
     param_diffs: list[float] = []
@@ -755,6 +762,12 @@ def main() -> int:
     parser.add_argument("--weights-manifest", type=Path, default=None,
                         help="Optional weights_manifest.json path paired with --weights-bump")
     parser.add_argument("--json-out", type=Path, default=None)
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=0,
+        help="Optional cap on optimizer steps (0 = run full epochs).",
+    )
     args = parser.parse_args()
 
     if args.epochs < 1:
@@ -765,6 +778,9 @@ def main() -> int:
         return 2
     if args.seq_len < 1 or args.total_tokens < args.seq_len + 1:
         print("ERROR: need total_tokens >= seq_len + 1", file=sys.stderr)
+        return 2
+    if args.max_steps < 0:
+        print("ERROR: --max-steps must be >= 0", file=sys.stderr)
         return 2
     init_state = None
     if (args.weights_bump is None) != (args.weights_manifest is None):
@@ -809,6 +825,7 @@ def main() -> int:
         param_tol=args.param_tol,
         train_text=args.train_text,
         init_state=init_state,
+        max_steps=args.max_steps if args.max_steps > 0 else None,
     )
 
     print("=" * 100)

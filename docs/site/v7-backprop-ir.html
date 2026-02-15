@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeterministicMemory | C-Kernel-Engine</title>
+    <title>v7BackpropIR | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -928,449 +928,326 @@
     </header>
     <main>
 
-<div class="container">
-  <h1>Deterministic Memory Layout</h1>
-  <p class="lead">
-    Why static memory offsets matter, and what they enable for monitoring, debugging, and mechanistic interpretability.
-  </p>
+<h1>v7 Backprop IR Pipeline (Operator Guide)</h1>
 
+<p>This page explains how v7 training works end to end, with a focus on what is generated from IR, what is layout/codegen output, where logic lives, and how to debug correctness quickly.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>One important clarification</strong><br>
+    There is no <code>ck_run_v7.c</code>. The operator entrypoint is <code>version/v7/scripts/ck_run_v7.py</code> (and wrapper <code>version/v7/scripts/cks-v7-run</code>). It orchestrates generation and execution of generated C runtimes.
+  </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="v7 IR Backprop Stack">
+  <img src="assets/v7-backprop-ir-stack.svg" alt="v7 training flow from init to IR1 to IR2 to layout and codegen">
+</div>
+
+<h2>What Runs in C vs Python</h2>
+
+<table>
+  <tr>
+    <th>Layer</th>
+    <th>Primary Runtime</th>
+    <th>Why It Exists</th>
+    <th>Current Operator Command</th>
+  </tr>
+  <tr>
+    <td>Orchestration and run management</td>
+    <td><strong>Python</strong></td>
+    <td>Build artifacts, launch gates, collect reports, drive strict checks</td>
+    <td><code>cks-v7-run init|train|sanity|parity|profile</code></td>
+  </tr>
+  <tr>
+    <td>Forward and backward kernel math</td>
+    <td><strong>C kernels</strong></td>
+    <td>Deterministic numeric core, SIMD paths, parity-tested primitives</td>
+    <td><code>make test</code>, <code>make v7-gate-train</code></td>
+  </tr>
+  <tr>
+    <td>Generated training runtime</td>
+    <td><strong>C (generated)</strong></td>
+    <td>Dumb emitter executes IR-lowered plan and memory offsets</td>
+    <td><code>generated_train_runtime_v7.c</code>, <code>libtrain.so</code></td>
+  </tr>
+  <tr>
+    <td>Oracle parity and drift localization</td>
+    <td><strong>Python + PyTorch</strong></td>
+    <td>Reference implementation for step-level and slot-level checks</td>
+    <td><code>--backend both</code>, <code>--parity-on</code></td>
+  </tr>
+  <tr>
+    <td>IR report rendering</td>
+    <td><strong>Python + HTML/JS</strong></td>
+    <td>Load run artifacts and present explainable diagnostics</td>
+    <td><code>open_ir_visualizer.py --generate --run ...</code></td>
+  </tr>
+</table>
+
+<h2>Mental Model: What Is Smart and What Is Dumb</h2>
+
+<div class="grid grid-2">
   <div class="card card-accent">
-    <h3 style="margin-top: 0;">The Core Insight</h3>
-    <p>
-      C-Kernel-Engine generates C code with <strong>compile-time known memory offsets</strong>.
-      Every tensor, every weight, every activation has a fixed address that never changes between runs.
-    </p>
-    <p>
-      This isn't just an implementation detail&mdash;it's a fundamental architectural choice that unlocks
-      capabilities impossible in dynamic frameworks like PyTorch or JAX.
-    </p>
-  </div>
-
-  <h2>Why Deterministic Memory?</h2>
-
-  <div class="svg-diagram">
-    <img src="assets/comparison-diagram.svg" alt="Dynamic vs Deterministic Memory Comparison" style="width: 100%; max-width: 900px; margin: 0 auto; display: block;">
-  </div>
-
-  <div class="grid-2" style="margin-top: 2rem;">
-    <div class="card">
-      <h3>Dynamic Frameworks (PyTorch)</h3>
-      <ul>
-        <li>Memory allocated at runtime</li>
-        <li>Addresses change every run</li>
-        <li>Need hooks to observe tensors</li>
-        <li>Hooks add overhead to training</li>
-        <li>Can't observe without perturbing</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>C-Kernel-Engine</h3>
-      <ul>
-        <li>Memory layout computed at compile time</li>
-        <li>Same offsets every run</li>
-        <li>Direct memory access via RDMA</li>
-        <li>Zero overhead observation</li>
-        <li>Observe without disturbing compute</li>
-      </ul>
-    </div>
-  </div>
-
-  <h2>The Layout JSON: Your Memory Address Book</h2>
-
-  <p>
-    When you generate code with <code>build_ir_v4.py</code>, you also get a <code>layout.json</code>
-    that maps every tensor to its exact memory location:
-  </p>
-
-  <pre><code class="language-json">{
-  "model": "Qwen2-0.5B",
-  "layers": {
-    "layer_15": {
-      "attn_q": {"offset": "0x0A2400", "size": 1605632, "dtype": "bf16"},
-      "attn_k": {"offset": "0x0A4800", "size": 1605632, "dtype": "bf16"},
-      "attn_v": {"offset": "0x0A6C00", "size": 1605632, "dtype": "bf16"},
-      "mlp_gate": {"offset": "0x0B2000", "size": 3211264, "dtype": "q4_k"}
-    }
-  }
-}</code></pre>
-
-  <p>
-    This "address book" is the key to everything that follows. You can point to any tensor by name
-    and know exactly where it lives in memory.
-  </p>
-
-  <div class="svg-diagram" style="margin: 2rem 0;">
-    <img src="assets/memory-layout-map.svg" alt="Model Memory Layout Map" style="width: 100%; max-width: 800px; margin: 0 auto; display: block;">
-  </div>
-
-  <h2>What This Enables</h2>
-
-  <h3>1. Zero-Overhead RDMA Monitoring</h3>
-
-  <div class="card">
-    <p>
-      RDMA (Remote Direct Memory Access) supports <strong>one-sided operations</strong>. An observer
-      can read memory from compute nodes without those nodes even knowing it happened&mdash;no interrupts,
-      no CPU involvement, no overhead on training.
-    </p>
-
-    <div class="svg-diagram" style="margin: 1.5rem 0;">
-      <img src="assets/rdma-observer-architecture.svg" alt="RDMA Observer Architecture" style="width: 100%; max-width: 900px; margin: 0 auto; display: block;">
-    </div>
-
-    <p>
-      The observer laptop can sample any tensor at any rate (1Hz, 10Hz, 100Hz) without
-      affecting training throughput. Traditional logging requires compute nodes to serialize
-      and send data&mdash;that's overhead you can't avoid.
-    </p>
-  </div>
-
-  <h3>2. Live Tensor Inspector</h3>
-
-  <div class="card">
-    <pre>
-┌─────────────────────────────────────────────────────────┐
-│ Layer 15 Attention                                      │
-├─────────────────────────────────────────────────────────┤
-│ Q [0x0A2400 - 0x0A4800]  896×896 bf16  ████████░░ 2.1ms │
-│ K [0x0A4800 - 0x0A6C00]  896×896 bf16  ██████████ 1.8ms │
-│ V [0x0A6C00 - 0x0A9000]  896×896 bf16  ███░░░░░░░ 0.4ms │
-│ Scores [0x0A9000]        896×896 f32   computing...     │
-└─────────────────────────────────────────────────────────┘
-    </pre>
-    <p>
-      Click any tensor to see values, histograms, NaN detection. Because memory layout is static,
-      these offsets work across runs&mdash;you can compare the same tensor position across different
-      training experiments.
-    </p>
-  </div>
-
-  <h3>3. Pipeline Parallel Visualization</h3>
-
-  <div class="card">
-    <pre>
-Node 0 (Layers 0-7)    Node 1 (Layers 8-15)   Node 2 (Layers 16-23)
-┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ █ Micro-batch 0  │──▶│ █ Micro-batch 0  │──▶│ ░ waiting        │
-│ █ Micro-batch 1  │   │ ░ Micro-batch 1  │   │                  │
-│ ░ Micro-batch 2  │   │                  │   │                  │
-└──────────────────┘   └──────────────────┘   └──────────────────┘
-  RDMA: 12.4 GB/s        RDMA: 11.8 GB/s
-    </pre>
-    <p>
-      For distributed training, you know exactly which bytes transfer between nodes. Track
-      pipeline bubble efficiency in real-time without any instrumentation overhead.
-    </p>
-  </div>
-
-  <h3>4. Checkpoint Diff Tool</h3>
-
-  <div class="card">
-    <pre><code class="language-bash">ck-diff checkpoint_step1000.bump checkpoint_step2000.bump
-
-Layer 15 MLP Gate [0x0B2000]:
-  Step 1000: mean=-0.0012, std=0.0234
-  Step 2000: mean=-0.0018, std=0.0241
-  Delta:     mean=-0.0006, std=+0.0007  ✓ healthy
-
-Layer 23 Output [0x2A0000]:
-  WARNING: std increased 3x - possible gradient explosion</code></pre>
-    <p>
-      Compare checkpoints byte-by-byte. Because layout is deterministic, offset 0x0B2000 means
-      the same thing in both files.
-    </p>
-  </div>
-
-  <h3>5. Deterministic Replay Debugging</h3>
-
-  <div class="card">
-    <p>
-      Since memory layout is static:
-    </p>
+    <h3 style="margin-top: 0;">Smart Stages</h3>
     <ul>
-      <li>Record input tokens + random seeds</li>
-      <li>Replay exact same forward pass</li>
-      <li>Step through layer-by-layer with known offsets</li>
-      <li>Compare across runs (impossible in PyTorch where allocations differ)</li>
+      <li><strong>Template selection</strong>: architecture op sequence and flags</li>
+      <li><strong>IR1</strong>: forward op graph with typed tensors and kernel IDs</li>
+      <li><strong>IR2</strong>: backward synthesis, fanout accumulation, grad edges</li>
+      <li><strong>Layout generation</strong>: contiguous offsets, sections, canary map</li>
+      <li><strong>Validation</strong>: invariants, memory audit, parity, drift checks</li>
     </ul>
   </div>
-
-  <h2>Mechanistic Interpretability</h2>
-
-  <p>
-    This is where deterministic memory becomes transformative. Mechanistic interpretability
-    research aims to understand <em>how</em> neural networks actually work internally.
-    The field struggles because frameworks hide everything behind abstractions.
-  </p>
-
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">The Interpretability Unlock</h3>
-    <table>
-      <tr>
-        <th>Traditional Approach</th>
-        <th>With C-Kernel-Engine</th>
-      </tr>
-      <tr>
-        <td>"What's attention head 7 doing?"<br>→ Add hooks, slow down training</td>
-        <td><code>layer_15_head_7 @ 0x0A2400</code><br>→ RDMA read, zero overhead</td>
-      </tr>
-      <tr>
-        <td>"Patch this activation"<br>→ Framework gymnastics</td>
-        <td><code>memcpy(0x0A2400, patch, size)</code><br>→ Direct memory write</td>
-      </tr>
-      <tr>
-        <td>"Trace information flow"<br>→ Black box</td>
-        <td>Follow the offsets in layout.json<br>→ Explicit dataflow graph</td>
-      </tr>
-    </table>
-  </div>
-
-  <h3>Live Circuit Discovery</h3>
-
-  <pre><code class="language-python"># While training is running, observe attention patterns
-for layer in range(24):
-    for head in range(14):
-        attn = rdma_read(f"layer_{layer}_head_{head}_scores")
-        if attn[query_pos, key_pos] > 0.8:
-            print(f"Strong connection: L{layer}H{head}")</code></pre>
-
-  <p>No hooks. No slowdown. Just read memory.</p>
-
-  <h3>Activation Patching at Scale</h3>
-
-  <pre><code class="language-python"># Causal intervention: "What happens if we zero this head?"
-original = rdma_read(node=0, offset=LAYER_15_HEAD_7)
-rdma_write(node=0, offset=LAYER_15_HEAD_7, data=zeros)
-# Observe effect on output
-rdma_write(node=0, offset=LAYER_15_HEAD_7, data=original)  # Restore</code></pre>
-
-  <h3>Neuron-Level Probing</h3>
-
-  <pre>
-Layer 15, Neuron 847:
-  Activates strongly on: "capital cities", "country names"
-  Offset: 0x0B2400 + 847*4
-  Historical max: 12.4 (on token "Paris")
-  Current: 0.02
-  </pre>
-
-  <h3>Gradient Attribution</h3>
-
-  <pre>
-"Which weights most affected this prediction?"
-
-∂Loss/∂W for every weight, at known offsets:
-  layer_15_mlp_gate[0x0B2000]: 0.0023  ← high attribution
-  layer_15_mlp_up[0x0B4000]:   0.0001  ← low
-  layer_22_attn_o[0x1A2000]:   0.0089  ← highest!
-  </pre>
-
-  <h2>Mechanistic First Pass (v6.6, Before v7 Training)</h2>
-
-  <p>
-    A practical first protocol should be <strong>small, repeatable, and comparable across models</strong>.
-    Use the same prompts, token index, and context length each run.
-  </p>
-
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">Protocol Goals</h3>
-    <ul>
-      <li>Verify dataflow is numerically healthy at early layers (L0/L1/L2/L3)</li>
-      <li>Capture stable activation snapshots for the same prompt/token across model families</li>
-      <li>Localize first divergence point before changing kernels or training code</li>
-      <li>Build a baseline archive to compare against v7 training checkpoints</li>
-    </ul>
-  </div>
-
-  <h3>Step 1: Run a Stable Repro Case</h3>
-  <pre><code class="language-bash"># Use one fixed model + prompt + token budget
-python3 version/v6.6/scripts/ck_run_v6_6.py run \
-  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
-  --context-len 1024 --max-tokens 32 --force-compile --force-convert \
-  --prompt "Explain why matrix multiplication is associative."</code></pre>
-
-  <h3>Step 2: Probe Layer-Level Sanity (L0+)</h3>
-  <pre><code class="language-bash">python version/v6.6/test/test_layer_by_layer.py \
-  --model ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
-  --token 25</code></pre>
-  <p>
-    This validates embedding and early-layer weight/normalization integrity without needing full decode analysis.
-  </p>
-
-  <h3>Step 3: Capture Stop-Point Activations</h3>
-  <pre><code class="language-bash">python version/v6.6/test/v6_6_comprehensive_debug.py \
-  --model-dir ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
-  --token 25 --stop-at 5 --threads 1 --context-len 1024</code></pre>
-  <p>
-    Repeat with increasing <code>--stop-at</code> to walk the pipeline in order
-    (embedding → norm → q/k/v proj → rope → attention → out_proj).
-  </p>
-
-  <h3>Step 4: Locate First Divergence</h3>
-  <pre><code class="language-bash">python version/v6.6/test/trace_divergence.py \
-  --model ~/.cache/ck-engine-v6.6/models/Qwen--Qwen3-0.6B-GGUF \
-  --token 25 --threads 1 --context-len 1024</code></pre>
-  <p>
-    Use this to identify the first failing op. That op is your intervention boundary for mechanistic analysis.
-  </p>
-
-  <h3>Step 5: Use IR Visualizer as the Analysis Surface</h3>
-  <pre><code class="language-bash">python version/v6.6/tools/open_ir_visualizer.py Qwen--Qwen3-0.6B-GGUF</code></pre>
-  <ul>
-    <li><strong>Interpretability tab:</strong> inspect math blocks and generated dump instrumentation.</li>
-    <li><strong>Dataflow tab:</strong> confirm producer/consumer chain for suspect ops.</li>
-    <li><strong>Profile tab:</strong> validate hotspot shifts are expected when changing kernels.</li>
-  </ul>
-
-  <h3>Attention Heads: Current and Next</h3>
   <div class="card">
-    <p>
-      In v6.6, attention is already head-major and GQA-aware in kernel contracts, so head-level analysis is structurally possible.
-      Current workflow is op-level plus tensor dump tracing.
-    </p>
-    <p>
-      The next concrete improvement is a dedicated head view:
-      per-layer, per-head attention summary for a fixed token position and prompt, loaded directly from dump artifacts.
-      This should become the first panel in v7 interpretability work.
-    </p>
-  </div>
-
-  <h3>Recommended Baseline Matrix (Before v7)</h3>
-  <table>
-    <tr>
-      <th>Model</th>
-      <th>Prompt Set</th>
-      <th>Capture</th>
-      <th>Purpose</th>
-    </tr>
-    <tr>
-      <td>Qwen2-0.5B</td>
-      <td>4 fixed prompts</td>
-      <td>L0-L3 stop-point dumps + divergence report</td>
-      <td>Legacy-stable baseline</td>
-    </tr>
-    <tr>
-      <td>Qwen3-0.6B</td>
-      <td>same prompts</td>
-      <td>L0-L3 stop-point dumps + divergence report</td>
-      <td>QK-norm + sliding behavior baseline</td>
-    </tr>
-    <tr>
-      <td>Gemma3-270M</td>
-      <td>same prompts</td>
-      <td>L0-L3 stop-point dumps + divergence report</td>
-      <td>Template/contract variance baseline</td>
-    </tr>
-  </table>
-
-  <h2>Comparison with Traditional Approaches</h2>
-
-  <table>
-    <tr>
-      <th>Capability</th>
-      <th>Dynamic Framework</th>
-      <th>C-Kernel-Engine</th>
-    </tr>
-    <tr>
-      <td>Memory layout</td>
-      <td>Changes every run</td>
-      <td>Fixed at compile time</td>
-    </tr>
-    <tr>
-      <td>Observability</td>
-      <td>Hooks (add overhead)</td>
-      <td>Direct RDMA read (zero overhead)</td>
-    </tr>
-    <tr>
-      <td>Activation patching</td>
-      <td>Slow, framework-specific</td>
-      <td>Direct memory write</td>
-    </tr>
-    <tr>
-      <td>Probing classifiers</td>
-      <td>Offline analysis</td>
-      <td>Real-time</td>
-    </tr>
-    <tr>
-      <td>Attention visualization</td>
-      <td>Post-hoc</td>
-      <td>Live during training</td>
-    </tr>
-    <tr>
-      <td>Circuit tracing</td>
-      <td>Manual, tedious</td>
-      <td>Automated via layout.json</td>
-    </tr>
-    <tr>
-      <td>Reproducibility</td>
-      <td>Difficult (allocation varies)</td>
-      <td>Guaranteed (same offsets)</td>
-    </tr>
-  </table>
-
-  <h2>The Observer Architecture</h2>
-
-  <p>
-    A third machine (laptop, monitoring server) can observe training clusters via RDMA
-    without affecting their performance:
-  </p>
-
-  <div class="card">
-    <pre><code class="language-python"># observer.py - runs on separate machine
-class TrainingObserver:
-    def __init__(self, nodes, layout_json):
-        self.layout = load_layout(layout_json)  # Static offsets!
-        self.rdma = RDMAConnection(nodes)
-
-    def sample_gradients(self, layer):
-        offset = self.layout[f"layer_{layer}"]["grad_offset"]
-        size = self.layout[f"layer_{layer}"]["grad_size"]
-
-        # One-sided read - compute node doesn't notice
-        data = self.rdma.read(node=layer // 12, offset=offset, size=size)
-        return np.frombuffer(data, dtype=np.float32)
-
-    def check_for_nans(self):
-        for layer in range(24):
-            grad = self.sample_gradients(layer)
-            if np.isnan(grad).any():
-                alert(f"NaN detected in layer {layer}!")</code></pre>
-  </div>
-
-  <h2>The Philosophy</h2>
-
-  <blockquote>
-    "We can't interpret what we can't see."
-  </blockquote>
-
-  <p>
-    Dynamic frameworks hide computation behind layers of abstraction. The memory allocator
-    decides where tensors live. Hooks and callbacks add overhead to observe what's happening.
-  </p>
-
-  <p>
-    C-Kernel-Engine takes the opposite approach: <strong>everything is explicit</strong>.
-    The generated C code shows exactly what computation happens. The layout.json shows
-    exactly where every tensor lives. RDMA lets you observe without disturbing.
-  </p>
-
-  <p>
-    This doesn't solve interpretability&mdash;the science is still hard. But it removes
-    the <em>infrastructure barriers</em> that make interpretability research difficult.
-    When you can see everything, you can start to understand everything.
-  </p>
-
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">Summary</h3>
+    <h3 style="margin-top: 0;">Dumb Stage</h3>
     <ul>
-      <li><strong>Deterministic layout</strong> → Reproducible experiments, same offsets every run</li>
-      <li><strong>Zero-overhead observation</strong> → Don't perturb what you measure</li>
-      <li><strong>Explicit computation</strong> → No hidden framework magic</li>
-      <li><strong>Known offsets</strong> → Point to any neuron, any layer, any time</li>
-      <li><strong>RDMA observer</strong> → Separate monitoring from compute</li>
+      <li><strong>Codegen</strong> only emits what lowered IR and layout already decided</li>
+      <li>No architecture guessing in emitter</li>
+      <li>No hidden model-family conditionals in runtime glue</li>
+      <li>If behavior is wrong, root cause is usually upstream in IR/lowering/layout</li>
     </ul>
   </div>
 </div>
+
+<h2>From Init to Train</h2>
+
+<ol>
+  <li><strong>Initialize run</strong>: choose init policy, dimensions, dtype policy, and template.</li>
+  <li><strong>Emit weights</strong>: write <code>weights.bump</code> and <code>weights_manifest.json</code>.</li>
+  <li><strong>Build IR1</strong>: forward graph and typed tensor registry.</li>
+  <li><strong>Lower IR2</strong>: backward graph from IR1 + grad rules, with explicit accumulations.</li>
+  <li><strong>Generate layout</strong>: contiguous memory map with sections and canary ranges.</li>
+  <li><strong>Codegen runtime</strong>: emit train runtime C and compile to <code>libtrain.so</code>.</li>
+  <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
+</ol>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Template Flexibility</h3>
+  <p style="margin-top: 0;">You can use built-ins (<code>qwen3</code>, <code>qwen2</code>, <code>gemma3</code>) or a custom template file. If a template op has kernel coverage and bindings, it can be stitched automatically.</p>
+  <pre># Built-in
+version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp1 \
+  --template qwen3 \
+  --init xavier_uniform \
+  --generate-ir --generate-runtime --strict
+
+# Custom template
+version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp_custom \
+  --template my_arch \
+  --template-file /absolute/path/to/my_template.json \
+  --init xavier_uniform \
+  --generate-ir --generate-runtime --strict</pre>
+</div>
+
+<h2>IR1, IR2, Layout, Codegen Responsibilities</h2>
+
+<table>
+  <tr>
+    <th>Stage</th>
+    <th>Input</th>
+    <th>Output</th>
+    <th>Core Responsibility</th>
+  </tr>
+  <tr>
+    <td><strong>IR1 (train-forward)</strong></td>
+    <td>template + manifest + kernel registry + grad rules</td>
+    <td><code>ir1_train_forward.json</code></td>
+    <td>Build forward graph, classify weight vs activation tensors, attach save-for-backward contract</td>
+  </tr>
+  <tr>
+    <td><strong>IR2 (backward)</strong></td>
+    <td>IR1 + grad rules + bindings</td>
+    <td><code>ir2_train_backward.json</code></td>
+    <td>Synthesize backward ops, add gradient fanout accumulation, preserve producer-consumer chain</td>
+  </tr>
+  <tr>
+    <td><strong>Layout + Audit (memory-lowered)</strong></td>
+    <td>IR2 + manifest</td>
+    <td><code>layout_train.json</code>, <code>layout_train_audit.json</code></td>
+    <td>Finalize contiguous offsets, section ownership, canary layout, bounds/overlap validation</td>
+  </tr>
+  <tr>
+    <td><strong>Codegen</strong></td>
+    <td>IR2 + layout</td>
+    <td><code>generated_train_runtime_v7.c</code>, <code>generated_train_runtime_summary_v7.json</code></td>
+    <td>Emit deterministic C calls and memory references only</td>
+  </tr>
+</table>
+
+<h2>How Residual, GQA, and Splits Stitch Backward</h2>
+
+<p>The forward graph can branch. IR2 makes the reverse merge explicit by emitting accumulation ops where gradients meet.</p>
+
+<div class="img-container svg-viewer" data-title="Residual and GQA Backward Routing">
+  <img src="assets/v7-residual-gqa-backward.svg" alt="Forward residual and GQA split with backward gradient accumulation routing">
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Key Rule</h3>
+  <p style="margin: 0;">If one forward tensor feeds multiple consumers, IR2 inserts explicit gradient accumulation in backward. This is where residual and attention branch merges stay correct.</p>
+</div>
+
+<h2>Memory Layout and Canary Diagnostics</h2>
+
+<p>Training layout is contiguous and sectioned. Canary guards and runtime checks detect out-of-bounds writes and readonly violations.</p>
+
+<div class="img-container svg-viewer" data-title="Training Memory and Canary Map">
+  <img src="assets/v7-train-memory-canary.svg" alt="Contiguous train memory layout with canary guards and diagnostics phases">
+</div>
+
+<table>
+  <tr>
+    <th>Section</th>
+    <th>Examples</th>
+    <th>Written In</th>
+  </tr>
+  <tr>
+    <td>weights</td>
+    <td><code>weight.layer.*</code></td>
+    <td>optimizer step (not forward)</td>
+  </tr>
+  <tr>
+    <td>activations + saved</td>
+    <td><code>act.*</code>, <code>saved.*</code></td>
+    <td>forward</td>
+  </tr>
+  <tr>
+    <td>grad_activations</td>
+    <td><code>grad.act.*</code></td>
+    <td>backward</td>
+  </tr>
+  <tr>
+    <td>grad_weights</td>
+    <td><code>grad.weight.*</code>, <code>tmp.grad.weight.*</code></td>
+    <td>backward</td>
+  </tr>
+  <tr>
+    <td>optimizer state</td>
+    <td>AdamW <code>m</code>, <code>v</code></td>
+    <td>optimizer step</td>
+  </tr>
+  <tr>
+    <td>temporaries + aux</td>
+    <td>scratch, loss buffers, diagnostics</td>
+    <td>multi-phase</td>
+  </tr>
+</table>
+
+<h2>Runbook: End-to-End Commands</h2>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">1) Initialize and generate IR/runtime</h3>
+  <pre>version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp1 \
+  --template qwen3 \
+  --init xavier_uniform \
+  --layers 2 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 \
+  --generate-ir --generate-runtime --strict</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">2) CK-only training (generated C runtime path)</h3>
+  <pre>version/v7/scripts/cks-v7-run train \
+  --run /tmp/v7_exp1 \
+  --backend ck \
+  --prompt "hello" \
+  --train-epochs 3 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
+  --train-strict</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">3) CK + PyTorch oracle parity</h3>
+  <pre>version/v7/scripts/cks-v7-run train \
+  --run /tmp/v7_exp1 \
+  --backend both \
+  --prompt "hello" \
+  --train-epochs 1 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
+  --parity-on --parity-profile balanced --dump-on-drift --drift-topk 8</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">4) Generate visual report from run directory</h3>
+  <pre>python3 version/v7/tools/open_ir_visualizer.py \
+  --generate --run /tmp/v7_exp1 --html-only</pre>
+  <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
+</div>
+
+<h2>How You Know It Is Actually Training</h2>
+
+<ul>
+  <li><code>train_e2e_latest.json</code> shows loss curve with decreasing trend</li>
+  <li><code>training_loss_curve.json</code> and <code>training_grad_norms.json</code> are populated</li>
+  <li><code>training_parity.json</code> reports PASS for oracle checkpoints (when enabled)</li>
+  <li><code>layout_train_audit.json</code> and memory diagnostics show no bounds/overlap/canary failures</li>
+  <li>Generated runtime summary includes expected forward/backward/optimizer kernel calls</li>
+</ul>
+
+<h2>Debug Fast: First-Divergence and Memory Safety</h2>
+
+<table>
+  <tr>
+    <th>Symptom</th>
+    <th>First Artifact</th>
+    <th>Likely Root</th>
+  </tr>
+  <tr>
+    <td>Parity drift appears after a few steps</td>
+    <td><code>drift_report.json</code></td>
+    <td>Specific op mismatch, accumulation edge, or dimension binding issue</td>
+  </tr>
+  <tr>
+    <td>Crash or invalid pointer in CK backend</td>
+    <td><code>memory_diagnostic_latest.json</code></td>
+    <td>Out-of-bounds write, incorrect slot size/offset, or bad kernel args</td>
+  </tr>
+  <tr>
+    <td>Layout audit fails</td>
+    <td><code>layout_train_audit.json</code></td>
+    <td>Overlap, section bounds error, alignment or ownership mismatch</td>
+  </tr>
+  <tr>
+    <td>Generated runtime compiles but output is unstable</td>
+    <td><code>generated_train_runtime_summary_v7.json</code></td>
+    <td>Wrong kernel binding or call-order mismatch from upstream IR</td>
+  </tr>
+</table>
+
+<h2>What Changes for Backprop vs Inference</h2>
+
+<div class="card">
+  <ul>
+    <li>Inference complexity is dominated by quantized weight paths and decode-time KV behavior.</li>
+    <li>Backprop complexity is dominated by memory pressure and graph bookkeeping: saved activations, gradient routing, accumulation, optimizer state.</li>
+    <li>Training usually runs float paths (fp32/bf16 policy) rather than quantized weight formats.</li>
+    <li>Keeping training pipeline partially separated while contracts stabilize is a pragmatic step, not architectural drift.</li>
+  </ul>
+</div>
+
+<h2>Artifact Checklist in a Healthy Run Directory</h2>
+
+<pre>/tmp/v7_exp1/
+  weights.bump
+  weights_manifest.json
+  ir1_train_forward.json
+  ir2_train_backward.json
+  ir_train_invariants.json
+  layout_train.json
+  layout_train_audit.json
+  generated_train_runtime_v7.c
+  generated_train_runtime_summary_v7.json
+  libtrain.so
+  train_e2e_latest.json
+  training_loss_curve.json
+  training_grad_norms.json
+  training_parity.json
+  memory_diagnostic_latest.json
+  ir_report.html</pre>
+
+<p>Use this page as the operator baseline: if these artifacts line up and the gates pass, your v7 backprop pipeline is stitched correctly.</p>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
